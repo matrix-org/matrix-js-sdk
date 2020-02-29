@@ -105,7 +105,7 @@ export class EventTimeline {
 
         this._startState.setStateEvents(stateEvents);
         this._endState.setStateEvents(stateEvents);
-    };
+    }
 
     /**
      * Forks the (live) timeline, taking ownership of the existing directional state of this timeline.
@@ -132,7 +132,7 @@ export class EventTimeline {
         // Make an immutable copy of the state so back pagination will get the correct sentinels.
         this._endState = forkState.clone();
         return timeline;
-    };
+    }
 
     /**
      * Creates an independent timeline, inheriting the directional state from this timeline.
@@ -149,7 +149,7 @@ export class EventTimeline {
         timeline._startState = forkState.clone();
         timeline._endState = forkState.clone();
         return timeline;
-    };
+    }
 
     /**
      * Get the ID of the room for this timeline
@@ -157,7 +157,7 @@ export class EventTimeline {
      */
     getRoomId() {
         return this._roomId;
-    };
+    }
 
     /**
      * Get the filter for this timeline's timelineSet (if any)
@@ -165,7 +165,7 @@ export class EventTimeline {
      */
     getFilter() {
         return this._eventTimelineSet.getFilter();
-    };
+    }
 
     /**
      * Get the timelineSet for this timeline
@@ -173,7 +173,7 @@ export class EventTimeline {
      */
     getTimelineSet() {
         return this._eventTimelineSet;
-    };
+    }
 
     /**
      * Get the base index.
@@ -188,7 +188,7 @@ export class EventTimeline {
      */
     getBaseIndex() {
         return this._baseIndex;
-    };
+    }
 
     /**
      * Get the list of events in this context
@@ -197,7 +197,7 @@ export class EventTimeline {
      */
     getEvents() {
         return this._events;
-    };
+    }
 
     /**
      * Get the room state at the start/end of the timeline
@@ -216,7 +216,7 @@ export class EventTimeline {
         } else {
             throw new Error("Invalid direction '" + direction + "'");
         }
-    };
+    }
 
     /**
      * Get a pagination token
@@ -229,7 +229,7 @@ export class EventTimeline {
      */
     getPaginationToken(direction) {
         return this.getState(direction).paginationToken;
-    };
+    }
 
     /**
      * Set a pagination token
@@ -242,7 +242,7 @@ export class EventTimeline {
      */
     setPaginationToken(token, direction) {
         this.getState(direction).paginationToken = token;
-    };
+    }
 
     /**
      * Get the next timeline in the series
@@ -261,7 +261,7 @@ export class EventTimeline {
         } else {
             throw new Error("Invalid direction '" + direction + "'");
         }
-    };
+    }
 
     /**
      * Set the next timeline in the series
@@ -290,7 +290,7 @@ export class EventTimeline {
 
         // make sure we don't try to paginate this timeline
         this.setPaginationToken(null, direction);
-    };
+    }
 
     /**
      * Add a new event to the timeline, and update the state
@@ -338,7 +338,7 @@ export class EventTimeline {
         if (atStart) {
             this._baseIndex++;
         }
-    };
+    }
 
     /**
      * Static helper method to set sender and target properties
@@ -366,7 +366,7 @@ export class EventTimeline {
                 event.forwardLooking = false;
             }
         }
-    };
+    }
 
     /**
      * Remove an event from the timeline
@@ -386,7 +386,7 @@ export class EventTimeline {
             }
         }
         return null;
-    };
+    }
 
     /**
      * Return a string to identify this timeline, for debugging
@@ -395,6 +395,6 @@ export class EventTimeline {
      */
     toString() {
         return this._name;
-    };
+    }
 
 }
