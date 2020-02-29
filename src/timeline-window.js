@@ -108,21 +108,24 @@ export class TimelineWindow {
                 eventIndex = events.length;
             } else {
                 for (let i = 0; i < events.length; i++) {
-                    if (events[i].getId() == initialEventId) {
+                    if (events[i].getId() === initialEventId) {
                         eventIndex = i;
                         break;
                     }
                 }
 
                 if (eventIndex === undefined) {
-                    throw new Error("getEventTimeline result didn't include requested event");
+                    throw new Error(
+                        "getEventTimeline result didn't include requested event",
+                    );
                 }
             }
 
             const endIndex = Math.min(events.length,
                 eventIndex + Math.ceil(initialWindowSize / 2));
             const startIndex = Math.max(0, endIndex - initialWindowSize);
-            self._start = new TimelineIndex(timeline, startIndex - timeline.getBaseIndex());
+            self._start =
+                new TimelineIndex(timeline, startIndex - timeline.getBaseIndex());
             self._end = new TimelineIndex(timeline, endIndex - timeline.getBaseIndex());
             self._eventCount = endIndex - startIndex;
         };

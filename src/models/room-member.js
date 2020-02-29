@@ -154,7 +154,8 @@ export class RoomMember extends EventEmitter {
 
         // emit for changes in powerLevelNorm as well (since the app will need to
         // redraw everyone's level if the max has changed)
-        if (oldPowerLevel !== this.powerLevel || oldPowerLevelNorm !== this.powerLevelNorm) {
+        if (oldPowerLevel !== this.powerLevel
+            || oldPowerLevelNorm !== this.powerLevelNorm) {
             this._updateModifiedTime();
             this.emit("RoomMember.powerLevel", powerLevelEvent, this);
         }

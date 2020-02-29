@@ -19,7 +19,6 @@ limitations under the License.
  * @module models/group
  */
 
-import * as utils from "../utils";
 import { EventEmitter } from "events";
 
 /**

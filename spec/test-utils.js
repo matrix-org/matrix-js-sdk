@@ -72,6 +72,7 @@ export function mock(constr, name) {
         return result;
     } else {
         // Probably a class - use the new way to extend/override everything
+        /* eslint-disable constructor-super */
         const HelperClass = class HelperClass extends constr {
             constructor() {
                 try {
@@ -82,6 +83,7 @@ export function mock(constr, name) {
                 }
             }
         };
+        /* eslint-enable constructor-super */
         const result = new HelperClass();
         let obj = result;
         let depth = 0;
@@ -90,13 +92,14 @@ export function mock(constr, name) {
             const props = Object.getOwnPropertyNames(obj);
             try {
                 for (const prop of props) {
-                    if (typeof(obj[prop]) !== 'function' || prop === 'constructor') continue;
-                    obj[prop] = jest.fn();
+                    if (typeof(obj[prop]) === 'function' && prop !== 'constructor') {
+                        obj[prop] = jest.fn();
+                    }
                 }
             } catch (e) {
                 // Ignore - we probably just can't write to it
             }
-        } while(!!(obj = Object.getPrototypeOf(obj)));
+        } while((obj = Object.getPrototypeOf(obj)));
         return result;
     }
 }

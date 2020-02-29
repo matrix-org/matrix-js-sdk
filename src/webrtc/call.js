@@ -817,7 +817,10 @@ export class MatrixCall extends EventEmitter {
      * @param {Object} error
      */
     _getLocalOfferFailed(error) {
-        this.emit("error", callError(MatrixCall.ERR_LOCAL_OFFER_FAILED, "Failed to start audio for call!"));
+        this.emit("error", callError(
+            MatrixCall.ERR_LOCAL_OFFER_FAILED,
+            "Failed to start audio for call!",
+        ));
     }
 
     /**
@@ -864,7 +867,8 @@ export class MatrixCall extends EventEmitter {
      * @private
      */
     _onSignallingStateChanged() {
-        debuglog("call " + this.callId + ": Signalling state changed to: " + this.peerConn.signalingState);
+        debuglog("call " + this.callId + ": Signalling state changed to: "
+            + this.peerConn.signalingState);
     }
 
     /**

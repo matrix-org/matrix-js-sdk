@@ -116,7 +116,8 @@ export class InteractiveAuth {
         this._requestEmailTokenCallback = opts.requestEmailToken;
 
         if (opts.sessionId) this._data.session = opts.sessionId;
-        this._clientSecret = opts.clientSecret || this._matrixClient.generateClientSecret();
+        this._clientSecret =
+            opts.clientSecret || this._matrixClient.generateClientSecret();
         this._emailSid = opts.emailSid;
         if (this._emailSid === undefined) this._emailSid = null;
         this._requestingEmailToken = false;

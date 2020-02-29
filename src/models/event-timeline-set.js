@@ -80,7 +80,8 @@ export class EventTimelineSet extends EventEmitter {
 
         this._timelineSupport = Boolean(opts.timelineSupport);
         this._liveTimeline = new EventTimeline(this);
-        this._unstableClientRelationAggregation = !!opts.unstableClientRelationAggregation;
+        this._unstableClientRelationAggregation =
+            !!opts.unstableClientRelationAggregation;
 
         // just a list - *not* ordered.
         this._timelines = [this._liveTimeline];
@@ -302,8 +303,8 @@ export class EventTimelineSet extends EventEmitter {
 
         if (!toStartOfTimeline && timeline == this._liveTimeline) {
             throw new Error(
-                "EventTimelineSet.addEventsToTimeline cannot be used for adding events to " +
-                "the live timeline - use Room.addLiveEvents instead",
+                "EventTimelineSet.addEventsToTimeline cannot be used for adding " +
+                "events to the live timeline - use Room.addLiveEvents instead",
             );
         }
 
@@ -442,8 +443,10 @@ export class EventTimelineSet extends EventEmitter {
             const existingIsLive = existingTimeline === this._liveTimeline;
             const timelineIsLive = timeline === this._liveTimeline;
 
-            const backwardsIsLive = direction === EventTimeline.BACKWARDS && existingIsLive;
-            const forwardsIsLive = direction === EventTimeline.FORWARDS && timelineIsLive;
+            const backwardsIsLive =
+                direction === EventTimeline.BACKWARDS && existingIsLive;
+            const forwardsIsLive =
+                direction === EventTimeline.FORWARDS && timelineIsLive;
 
             if (backwardsIsLive || forwardsIsLive) {
                 // The live timeline should never be spliced into a non-live position.
@@ -451,7 +454,8 @@ export class EventTimelineSet extends EventEmitter {
                 if (backwardsIsLive) {
                     logger.warn(
                         "Refusing to set a preceding existingTimeLine on our " +
-                        "timeline as the existingTimeLine is live (" + existingTimeline + ")",
+                        "timeline as the existingTimeLine is live " +
+                        "(" + existingTimeline + ")",
                     );
                 }
                 if (forwardsIsLive) {
