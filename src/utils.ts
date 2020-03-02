@@ -20,7 +20,7 @@ limitations under the License.
  * @module utils
  */
 
-import unhomoglyph from 'unhomoglyph';
+import * as unhomoglyph from 'unhomoglyph';
 
 /**
  * Encode a dictionary of query parameters.
