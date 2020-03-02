@@ -1,3 +1,31 @@
+Changes in [5.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.1.0) (2020-03-02)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.1.0-rc.1...v5.1.0)
+
+ * No changes since rc.1
+
+Changes in [5.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.1.0-rc.1) (2020-02-26)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.0.1...v5.1.0-rc.1)
+
+ * Add latest dist-tag for releases
+   [\#1230](https://github.com/matrix-org/matrix-js-sdk/pull/1230)
+ * Add room method for alt_aliases
+   [\#1225](https://github.com/matrix-org/matrix-js-sdk/pull/1225)
+ * Remove buildkite pipeline
+   [\#1227](https://github.com/matrix-org/matrix-js-sdk/pull/1227)
+ * don't assume verify has been called when receiving a cancellation in
+   verifier
+   [\#1226](https://github.com/matrix-org/matrix-js-sdk/pull/1226)
+ * Reduce secret size for new binary packing
+   [\#1221](https://github.com/matrix-org/matrix-js-sdk/pull/1221)
+ * misc rageshake fixes
+   [\#1223](https://github.com/matrix-org/matrix-js-sdk/pull/1223)
+ * Fix cancelled historical requests not appearing as cancelled
+   [\#1220](https://github.com/matrix-org/matrix-js-sdk/pull/1220)
+ * Fix renaming error that broke QR code verification
+   [\#1217](https://github.com/matrix-org/matrix-js-sdk/pull/1217)
+
 Changes in [5.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.0.1) (2020-02-19)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.0.0...v5.0.1)
