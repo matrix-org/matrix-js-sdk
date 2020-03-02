@@ -216,7 +216,7 @@ describe.each([
      () => new IndexedDBCryptoStore(undefined, "tests")],
     ["MemoryCryptoStore", () => {
         const store = new IndexedDBCryptoStore(undefined, "tests");
-        store._backendPromise = Promise.resolve(new MemoryCryptoStore());
+        store._backend = new MemoryCryptoStore();
         return store;
     }],
 ])("CrossSigning > createCryptoStoreCacheCallbacks [%s]", function(name, dbFactory) {
@@ -230,17 +230,18 @@ describe.each([
         await store.deleteAllData();
     });
 
-    it("should cache data to the store and retrieves it", async () => {
+    it("should cache data to the store and retrieve it", async () => {
+        await store.startup();
         const { getCrossSigningKeyCache, storeCrossSigningKeyCache } =
           createCryptoStoreCacheCallbacks(store);
-        await storeCrossSigningKeyCache("master", testKey);
+        await storeCrossSigningKeyCache("self_signing", testKey);
 
         // If we've not saved anything, don't expect anything
         // Definitely don't accidentally return the wrong key for the type
         const nokey = await getCrossSigningKeyCache("self", "");
         expect(nokey).toBeNull();
 
-        const key = await getCrossSigningKeyCache("master", "");
+        const key = await getCrossSigningKeyCache("self_signing", "");
         expect(key).toEqual(testKey);
     });
 });
