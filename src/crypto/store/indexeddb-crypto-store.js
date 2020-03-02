@@ -314,7 +314,7 @@ export class IndexedDBCryptoStore {
      * @param {string} type A key type
      */
     async getCrossSigningPrivateKey(txn, func, type) {
-        this._backend.getCrossSigningPrivateKey(txn, func, type);
+        return this._backend.getCrossSigningPrivateKey(txn, func, type);
     }
 
     /**
@@ -335,7 +335,7 @@ export class IndexedDBCryptoStore {
      * @param {string} key keys object as getCrossSigningKeys()
      */
     storeCrossSigningPrivateKey(txn, type, key) {
-        this._backend.storeCrossSigningPrivateKey(txn, type, key);
+        return this._backend.storeCrossSigningPrivateKey(txn, type, key);
     }
 
     // Olm sessions
