@@ -89,7 +89,7 @@ describe("CrossSigningInfo.getCrossSigningKey", function() {
 
     it.each(types)("should request a key from the cache callback (if set)" +
                    " and does not call app if one is found" +
-                   `%o`,
+                   " %o",
                    async ({ type, shouldCache }) => {
         const getCrossSigningKey = jest.fn().mockImplementation(() => {
             if (shouldCache) {
