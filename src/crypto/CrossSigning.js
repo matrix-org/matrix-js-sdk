@@ -23,6 +23,7 @@ limitations under the License.
 import {decodeBase64, encodeBase64, pkSign, pkVerify} from './olmlib';
 import {EventEmitter} from 'events';
 import {logger} from '../logger';
+import {IndexedDBCryptoStore} from '../crypto/store/indexeddb-crypto-store';
 
 function publicKeyFromKeyInfo(keyInfo) {
     // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
@@ -40,8 +41,9 @@ export class CrossSigningInfo extends EventEmitter {
      * @param {string} userId the user that the information is about
      * @param {object} callbacks Callbacks used to interact with the app
      *     Requires getCrossSigningKey and saveCrossSigningKeys
+     * @param {object} cacheCallbacks Callbacks used to interact with the cache
      */
-    constructor(userId, callbacks) {
+    constructor(userId, callbacks, cacheCallbacks) {
         super();
 
         // you can't change the userId
@@ -50,6 +52,7 @@ export class CrossSigningInfo extends EventEmitter {
             value: userId,
         });
         this._callbacks = callbacks || {};
+        this._cacheCallbacks = cacheCallbacks || {};
         this.keys = {};
         this.firstUse = true;
     }
@@ -62,6 +65,8 @@ export class CrossSigningInfo extends EventEmitter {
      * @returns {Array} An array with [ public key, Olm.PkSigning ]
      */
     async getCrossSigningKey(type, expectedPubkey) {
+        const shouldCache = ["self_signing", "user_signing"].indexOf(type) >= 0;
+
         if (!this._callbacks.getCrossSigningKey) {
             throw new Error("No getCrossSigningKey callback supplied");
         }
@@ -70,22 +75,47 @@ export class CrossSigningInfo extends EventEmitter {
             expectedPubkey = this.getId(type);
         }
 
-        const privkey = await this._callbacks.getCrossSigningKey(type, expectedPubkey);
+        function validateKey(key) {
+            if (!key) return;
+            const signing = new global.Olm.PkSigning();
+            const gotPubkey = signing.init_with_seed(key);
+            if (gotPubkey === expectedPubkey) {
+                return [gotPubkey, signing];
+            }
+            signing.free();
+        }
+
+        let privkey;
+        if (this._cacheCallbacks.getCrossSigningKeyCache && shouldCache) {
+            privkey = await this._cacheCallbacks
+              .getCrossSigningKeyCache(type, expectedPubkey);
+        }
+
+        const cacheresult = validateKey(privkey);
+        if (cacheresult) {
+            return cacheresult;
+        }
+
+        privkey = await this._callbacks.getCrossSigningKey(type, expectedPubkey);
+        const result = validateKey(privkey);
+        if (result) {
+            if (this._cacheCallbacks.storeCrossSigningKeyCache && shouldCache) {
+                await this._cacheCallbacks.storeCrossSigningKeyCache(type, privkey);
+            }
+            return result;
+        }
+
+        /* No keysource even returned a key */
         if (!privkey) {
             throw new Error(
                 "getCrossSigningKey callback for " + type + " returned falsey",
             );
         }
-        const signing = new global.Olm.PkSigning();
-        const gotPubkey = signing.init_with_seed(privkey);
-        if (gotPubkey !== expectedPubkey) {
-            signing.free();
-            throw new Error(
-                "Key type " + type + " from getCrossSigningKey callback did not match",
-            );
-        } else {
-            return [gotPubkey, signing];
-        }
+
+        /* We got some keys from the keysource, but none of them were valid */
+        throw new Error(
+            "Key type " + type + " from getCrossSigningKey callback did not match",
+        );
     }
 
     static fromStorage(obj, userId) {
@@ -538,4 +568,29 @@ export class DeviceTrustLevel {
     isTofu() {
         return this._tofu;
     }
+}
+
+export function createCryptoStoreCacheCallbacks(store) {
+    return {
+        getCrossSigningKeyCache: function(type, _expectedPublicKey) {
+            return new Promise((resolve) => {
+                return store.doTxn(
+                    'readonly',
+                    [IndexedDBCryptoStore.STORE_ACCOUNT],
+                    (txn) => {
+                        store.getCrossSigningPrivateKey(txn, resolve, type);
+                    },
+                );
+            });
+        },
+        storeCrossSigningKeyCache: function(type, key) {
+            return store.doTxn(
+                'readwrite',
+                [IndexedDBCryptoStore.STORE_ACCOUNT],
+                (txn) => {
+                    store.storeCrossSigningPrivateKey(txn, type, key);
+                },
+            );
+        },
+    };
 }

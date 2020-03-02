@@ -341,9 +341,26 @@ export class Backend {
         };
     }
 
+    getCrossSigningPrivateKey(txn, func, type) {
+        const objectStore = txn.objectStore("account");
+        const getReq = objectStore.get(`ssss_cache:${type}`);
+        getReq.onsuccess = function() {
+            try {
+                func(getReq.result || null);
+            } catch (e) {
+                abortWithException(txn, e);
+            }
+        };
+    }
+
     storeCrossSigningKeys(txn, keys) {
         const objectStore = txn.objectStore("account");
         objectStore.put(keys, "crossSigningKeys");
+    }
+
+    storeCrossSigningPrivateKey(txn, type, key) {
+        const objectStore = txn.objectStore("account");
+        objectStore.put(key, `ssss_cache:${type}`);
     }
 
     // Olm Sessions

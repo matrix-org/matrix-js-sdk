@@ -37,6 +37,7 @@ import {
     CrossSigningLevel,
     DeviceTrustLevel,
     UserTrustLevel,
+    createCryptoStoreCacheCallbacks,
 } from './CrossSigning';
 import {SECRET_STORAGE_ALGORITHM_V1, SecretStorage} from './SecretStorage';
 import {OutgoingRoomKeyRequestManager} from './OutgoingRoomKeyRequestManager';
@@ -220,8 +221,13 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     this._inRoomVerificationRequests = new InRoomRequests();
 
     const cryptoCallbacks = this._baseApis._cryptoCallbacks || {};
+    const cacheCallbacks = createCryptoStoreCacheCallbacks(cryptoStore);
 
-    this._crossSigningInfo = new CrossSigningInfo(userId, cryptoCallbacks);
+    this._crossSigningInfo = new CrossSigningInfo(
+        userId,
+        cryptoCallbacks,
+        cacheCallbacks,
+    );
 
     this._secretStorage = new SecretStorage(
         baseApis, cryptoCallbacks, this._crossSigningInfo,
