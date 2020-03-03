@@ -2970,9 +2970,8 @@ Crypto.prototype._processReceivedRoomKeyRequest = async function(req) {
         decryptor.shareKeysWithDevice(req);
     };
 
-    // if the device is is verified already, share the keys
-    const device = this._deviceList.getStoredDevice(userId, deviceId);
-    if (device && device.isVerified()) {
+    // if the device is verified already, share the keys
+    if (this.checkDeviceTrust(userId, deviceId).isVerified()) {
         logger.log('device is already verified: sharing keys');
         req.share();
         return;
