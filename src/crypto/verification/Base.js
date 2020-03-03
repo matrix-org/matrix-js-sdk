@@ -24,6 +24,8 @@ import {EventEmitter} from 'events';
 import {logger} from '../../logger';
 import {DeviceInfo} from '../deviceinfo';
 import {newTimeoutError} from "./Error";
+import {CrossSigningInfo} from "../CrossSigning";
+import {decodeBase64} from "../olmlib";
 
 const timeoutException = new Error("Verification timed out");
 
@@ -75,6 +77,8 @@ export class VerificationBase extends EventEmitter {
         this._promise = null;
         this._transactionTimeoutTimer = null;
     }
+
+    static keyRequestTimeoutMs = 1000 * 60;
 
     get initiatedByMe() {
         // if there is no start event yet,
@@ -188,6 +192,63 @@ export class VerificationBase extends EventEmitter {
         if (!this._done) {
             this.request.onVerifierFinished();
             this._resolve();
+
+            //#region Cross-signing keys request
+            // If this is a self-verification, ask the other party for keys
+            if (this._baseApis.getUserId() !== this.userId) {
+                return;
+            }
+            console.log("VerificationBase.done: Self-verification done; requesting keys");
+            /* This happens asynchronously, and we're not concerned about
+             * waiting for it.  We return here in order to test. */
+            return new Promise((resolve, reject) => {
+                const client = this._baseApis;
+                const original = client._crypto._crossSigningInfo;
+                const storage = client._crypto._secretStorage;
+
+                /* We already have all of the infrastructure we need to validate and
+                 * cache cross-signing keys, so instead of replicating that, here we
+                 * set up callbacks that request them from the other device and call
+                 * CrossSigningInfo.getCrossSigningKey() to validate/cache */
+                const crossSigning = new CrossSigningInfo(
+                    original.userId,
+                    { getCrossSigningKey: async (type) => {
+                        console.debug("VerificationBase.done: requesting secret",
+                                      type, this.deviceId);
+                        const { promise } =
+                            storage.request(`m.key.${type}`, [this.deviceId]);
+                        const result = await promise;
+                        const decoded = decodeBase64(result);
+                        return Uint8Array.from(decoded);
+                    } },
+                    original._cacheCallbacks,
+                );
+                crossSigning.keys = original.keys;
+
+                // XXX: get all keys out if we get one key out
+                // XXX: https://github.com/vector-im/riot-web/issues/12604
+                // XXX: then change here to reject on the timeout
+                /* Requests can be ignored, so don't wait around forever */
+                const timeout = new Promise((resolve, reject) => {
+                    setTimeout(
+                        resolve,
+                        VerificationBase.keyRequestTimeoutMs,
+                        new Error("Timeout"),
+                    );
+                });
+
+                /* We call getCrossSigningKey() for its side-effects */
+                return Promise.race([
+                    Promise.all([
+                        crossSigning.getCrossSigningKey("self_signing"),
+                        crossSigning.getCrossSigningKey("user_signing"),
+                    ]),
+                    timeout,
+                ]).then(resolve, reject);
+            }).catch((e) => {
+                console.warn("VerificationBase: failure while requesting keys:", e);
+            });
+            //#endregion
         }
     }
 
