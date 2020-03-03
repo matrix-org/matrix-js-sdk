@@ -814,6 +814,18 @@ Crypto.prototype.checkUserTrust = function(userId) {
  */
 Crypto.prototype.checkDeviceTrust = function(userId, deviceId) {
     const device = this._deviceList.getStoredDevice(userId, deviceId);
+    return this._checkDeviceInfoTrust(userId, device);
+};
+
+/**
+ * Check whether a given deviceinfo is trusted.
+ *
+ * @param {string} userId The ID of the user whose devices is to be checked.
+ * @param {module:crypto/deviceinfo?} device The device info object to check
+ *
+ * @returns {DeviceTrustLevel}
+ */
+Crypto.prototype._checkDeviceInfoTrust = function(userId, device) {
     const trustedLocally = device && device.isVerified();
 
     const userCrossSigning = this._deviceList.getStoredCrossSigningForUser(userId);
@@ -2135,7 +2147,7 @@ Crypto.prototype._backupPendingKeys = async function(limit) {
         data[roomId]['sessions'][session.sessionId] = {
             first_message_index: firstKnownIndex,
             forwarded_count: forwardedCount,
-            is_verified: !!(device && device.isVerified()),
+            is_verified: this._checkDeviceInfoTrust(this._userId, device),
             session_data: encrypted,
         };
     }
