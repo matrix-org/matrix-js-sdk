@@ -20,99 +20,93 @@ import { randomString } from "../randomstring";
 const DEFAULT_ITERATIONS = 500000;
 
 export async function keyFromAuthData(authData, password) {
-    if (!global.Olm) {
-        throw new Error("Olm is not available");
-    }
+  if (!global.Olm) {
+    throw new Error("Olm is not available");
+  }
 
-    if (!authData.private_key_salt || !authData.private_key_iterations) {
-        throw new Error(
-            "Salt and/or iterations not found: " +
-                "this backup cannot be restored with a passphrase"
-        );
-    }
-
-    return await deriveKey(
-        password,
-        authData.private_key_salt,
-        authData.private_key_iterations
+  if (!authData.private_key_salt || !authData.private_key_iterations) {
+    throw new Error(
+      "Salt and/or iterations not found: " +
+        "this backup cannot be restored with a passphrase",
     );
+  }
+
+  return await deriveKey(
+    password,
+    authData.private_key_salt,
+    authData.private_key_iterations,
+  );
 }
 
 export async function keyFromPassphrase(password) {
-    if (!global.Olm) {
-        throw new Error("Olm is not available");
-    }
+  if (!global.Olm) {
+    throw new Error("Olm is not available");
+  }
 
-    const salt = randomString(32);
+  const salt = randomString(32);
 
-    const key = await deriveKey(password, salt, DEFAULT_ITERATIONS);
+  const key = await deriveKey(password, salt, DEFAULT_ITERATIONS);
 
-    return { key, salt, iterations: DEFAULT_ITERATIONS };
+  return { key, salt, iterations: DEFAULT_ITERATIONS };
 }
 
 export async function deriveKey(password, salt, iterations) {
-    const TextEncoder = global.TextEncoder;
-    if (!TextEncoder) {
-        throw new Error(
-            "Password-based backup is not avaiable on this platform"
-        );
-    }
+  const TextEncoder = global.TextEncoder;
+  if (!TextEncoder) {
+    throw new Error("Password-based backup is not avaiable on this platform");
+  }
 
-    if (global.crypto) {
-        return _deriveKeyBrowser(password, salt, iterations);
-    } else {
-        return _deriveKeyNode(password, salt, iterations);
-    }
+  if (global.crypto) {
+    return _deriveKeyBrowser(password, salt, iterations);
+  } else {
+    return _deriveKeyNode(password, salt, iterations);
+  }
 }
 
 async function _deriveKeyNode(password, salt, iterations) {
-    const crypto = require("crypto");
-    const TextEncoder = global.TextEncoder;
+  const crypto = require("crypto");
+  const TextEncoder = global.TextEncoder;
 
-    if (!crypto) {
-        throw new Error(
-            "Password-based backup is not avaiable on this platform"
-        );
-    }
+  if (!crypto) {
+    throw new Error("Password-based backup is not avaiable on this platform");
+  }
 
-    const keybits = crypto.pbkdf2Sync(
-        new TextEncoder().encode(password),
-        new TextEncoder().encode(salt),
-        iterations,
-        global.Olm.PRIVATE_KEY_LENGTH * 8,
-        "sha512"
-    );
+  const keybits = crypto.pbkdf2Sync(
+    new TextEncoder().encode(password),
+    new TextEncoder().encode(salt),
+    iterations,
+    global.Olm.PRIVATE_KEY_LENGTH * 8,
+    "sha512",
+  );
 
-    return new Uint8Array(keybits);
+  return new Uint8Array(keybits);
 }
 
 async function _deriveKeyBrowser(password, salt, iterations) {
-    const subtleCrypto = global.crypto.subtle;
-    const TextEncoder = global.TextEncoder;
-    if (!subtleCrypto) {
-        throw new Error(
-            "Password-based backup is not avaiable on this platform"
-        );
-    }
+  const subtleCrypto = global.crypto.subtle;
+  const TextEncoder = global.TextEncoder;
+  if (!subtleCrypto) {
+    throw new Error("Password-based backup is not avaiable on this platform");
+  }
 
-    const key = await subtleCrypto.importKey(
-        "raw",
-        new TextEncoder().encode(password),
-        { name: "PBKDF2" },
-        false,
-        ["deriveBits"]
-    );
+  const key = await subtleCrypto.importKey(
+    "raw",
+    new TextEncoder().encode(password),
+    { name: "PBKDF2" },
+    false,
+    ["deriveBits"],
+  );
 
-    const keybits = await subtleCrypto.deriveBits(
-        {
-            name: "PBKDF2",
-            salt: new TextEncoder().encode(salt),
-            iterations: iterations,
-            hash: "SHA-512"
-        },
-        key,
-        global.Olm.PRIVATE_KEY_LENGTH * 8
-    );
+  const keybits = await subtleCrypto.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: new TextEncoder().encode(salt),
+      iterations: iterations,
+      hash: "SHA-512",
+    },
+    key,
+    global.Olm.PRIVATE_KEY_LENGTH * 8,
+  );
 
-    return new Uint8Array(keybits);
+  return new Uint8Array(keybits);
 }
