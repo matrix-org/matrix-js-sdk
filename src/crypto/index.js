@@ -2143,11 +2143,12 @@ Crypto.prototype._backupPendingKeys = async function(limit) {
         const device = this._deviceList.getDeviceByIdentityKey(
             olmlib.MEGOLM_ALGORITHM, session.senderKey,
         );
+        const verified = this._checkDeviceInfoTrust(this._userId, device).isVerified();
 
         data[roomId]['sessions'][session.sessionId] = {
             first_message_index: firstKnownIndex,
             forwarded_count: forwardedCount,
-            is_verified: this._checkDeviceInfoTrust(this._userId, device),
+            is_verified: verified,
             session_data: encrypted,
         };
     }
