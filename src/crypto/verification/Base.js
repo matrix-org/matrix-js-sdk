@@ -226,8 +226,8 @@ export class VerificationBase extends EventEmitter {
                 crossSigning.keys = original.keys;
 
                 // XXX: get all keys out if we get one key out
-                // XXX: https://github.com/vector-im/riot-web/issues/12604
-                // XXX: then change here to reject on the timeout
+                // https://github.com/vector-im/riot-web/issues/12604
+                // then change here to reject on the timeout
                 /* Requests can be ignored, so don't wait around forever */
                 const timeout = new Promise((resolve, reject) => {
                     setTimeout(
