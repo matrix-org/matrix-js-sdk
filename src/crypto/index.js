@@ -55,6 +55,7 @@ import {InRoomChannel, InRoomRequests} from "./verification/request/InRoomChanne
 import {ToDeviceChannel, ToDeviceRequests} from "./verification/request/ToDeviceChannel";
 import * as httpApi from "../http-api";
 import {IllegalMethod} from "./verification/IllegalMethod";
+import {KeyUploadError} from "../errors";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -671,7 +672,15 @@ Crypto.prototype._afterCrossSigningLocalKeyChange = async function() {
         [this._userId]: {
             [this._deviceId]: signedDevice,
         },
-    }).then(() => {
+    }).then(({failures}) => {
+        if (Object.keys(failures || []).length > 0) {
+            this._baseApis.emit(
+                "crypto.keyUploadFailure",
+                failures,
+                "_afterCrossSigningLocalKeyChange"
+            );
+            throw new KeyUploadError("Key upload failed", { failures });
+        }
         logger.info(`Finished background key sig upload for ${this._deviceId}`);
     }).catch(e => {
         logger.error(`Error during background key sig upload for ${this._deviceId}`, e);
@@ -960,8 +969,17 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     const keysToUpload = Object.keys(keySignatures);
     if (keysToUpload.length) {
         logger.info(`Starting background key sig upload for ${keysToUpload}`);
-        this._baseApis.uploadKeySignatures({ [this._userId]: keySignatures }).then(() => {
+        this._baseApis.uploadKeySignatures({ [this._userId]: keySignatures })
+        .then(({failures}) => {
             logger.info(`Finished background key sig upload for ${keysToUpload}`);
+            if (Object.keys(failures || []).length > 0) {
+                this._baseApis.emit(
+                    "crypto.keyUploadFailure",
+                    failures,
+                    "checkOwnCrossSigningTrust"
+                );
+                throw new KeyUploadError("Key upload failed", { failures });
+            }
         }).catch(e => {
             logger.error(`Error during background key sig upload for ${keysToUpload}`, e);
         });
@@ -1606,11 +1624,22 @@ Crypto.prototype.setDeviceVerification = async function(
             const device = await this._crossSigningInfo.signUser(xsk);
             if (device) {
                 logger.info("Uploading signature for " + userId + "...");
-                await this._baseApis.uploadKeySignatures({
+                const { failures } = await this._baseApis.uploadKeySignatures({
                     [userId]: {
                         [deviceId]: device,
                     },
                 });
+                if (Object.keys(failures || []).length > 0) {
+                    this._baseApis.emit(
+                        "crypto.keyUploadFailure",
+                        failures,
+                        "setDeviceVerification"
+                    );
+                    /* Throwing here causes the process to be cancelled and the other
+                     * user to be notified */
+                    throw new KeyUploadError("Key upload failed", { failures });
+                }
+
                 // This will emit events when it comes back down the sync
                 // (we could do local echo to speed things up)
             }
@@ -1660,11 +1689,14 @@ Crypto.prototype.setDeviceVerification = async function(
         );
         if (device) {
             logger.info("Uploading signature for " + deviceId);
-            await this._baseApis.uploadKeySignatures({
+            const { failures } = await this._baseApis.uploadKeySignatures({
                 [userId]: {
                     [deviceId]: device,
                 },
             });
+            if (Object.keys(failures || []).length > 0) {
+                throw new KeyUploadError("Key upload failed", { failures });
+            }
             // XXX: we'll need to wait for the device list to be updated
         }
     }
