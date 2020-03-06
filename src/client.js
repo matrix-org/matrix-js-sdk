@@ -5507,13 +5507,6 @@ MatrixClient.prototype.generateClientSecret = function() {
  */
 
 /**
- * Fires when a key verification started message is received.
- * @event module:client~MatrixClient#"crypto.verification.start"
- * @param {module:crypto/verification/Base} verifier a verifier object to
- *     perform the key verification
- */
-
-/**
  * Fires when a secret request has been cancelled.  If the client is prompting
  * the user to ask whether they want to share a secret, the prompt can be
  * dismissed.
