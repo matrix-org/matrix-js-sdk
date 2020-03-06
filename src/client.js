@@ -5181,6 +5181,15 @@ MatrixClient.prototype.getEventMapper = function() {
     return _PojoToMatrixEventMapper(this);
 };
 
+/**
+ * The app may wish to see if we have a key cached without
+ * triggering a user interaction.
+ * @return {object}
+ */
+MatrixClient.prototype.getCrossSigningCacheCallbacks = function() {
+    return this._crypto && this._crypto._crossSigningInfo.getCacheCallbacks();
+};
+
 // Identity Server Operations
 // ==========================
 

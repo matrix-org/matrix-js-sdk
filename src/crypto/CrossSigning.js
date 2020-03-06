@@ -473,6 +473,13 @@ export class CrossSigningInfo extends EventEmitter {
             return new DeviceTrustLevel(false, false, localTrust);
         }
     }
+
+    /**
+     * @returns {object} Cache callbacks
+     */
+    getCacheCallbacks() {
+        return this._cacheCallbacks;
+    }
 }
 
 function deviceToObject(device, userId) {
