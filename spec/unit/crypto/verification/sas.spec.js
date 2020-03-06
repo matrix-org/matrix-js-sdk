@@ -122,8 +122,8 @@ describe("SAS verification", function() {
             bobSasEvent = null;
 
             bobPromise = new Promise((resolve, reject) => {
-                bob.client.on("crypto.verification.start", (verifier) => {
-                    verifier.on("show_sas", (e) => {
+                bob.client.on("crypto.verification.request", request => {
+                    request.verifier.on("show_sas", (e) => {
                         if (!e.sas.emoji || !e.sas.decimal) {
                             e.cancel();
                         } else if (!aliceSasEvent) {
@@ -139,7 +139,7 @@ describe("SAS verification", function() {
                             }
                         }
                     });
-                    resolve(verifier);
+                    resolve(request.verifier);
                 });
             });
 
@@ -339,11 +339,11 @@ describe("SAS verification", function() {
         };
 
         const bobPromise = new Promise((resolve, reject) => {
-            bob.client.on("crypto.verification.start", (verifier) => {
-                verifier.on("show_sas", (e) => {
+            bob.client.on("crypto.verification.request", request => {
+                request.verifier.on("show_sas", (e) => {
                     e.mismatch();
                 });
-                resolve(verifier);
+                resolve(request.verifier);
             });
         });
 

@@ -2680,12 +2680,7 @@ Crypto.prototype._handleVerificationEvent = async function(
     }
     event.setVerificationRequest(request);
     try {
-        const hadVerifier = !!request.verifier;
         await request.channel.handleEvent(event, request, isLiveEvent);
-        // emit start event when verifier got set
-        if (!hadVerifier && request.verifier) {
-            this._baseApis.emit("crypto.verification.start", request.verifier);
-        }
     } catch (err) {
         logger.error("error while handling verification event: " + err.message);
     }
