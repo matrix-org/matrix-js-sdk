@@ -661,6 +661,8 @@ Crypto.prototype.resetCrossSigningKeys = async function(level, {
  * verifications, etc.
  */
 Crypto.prototype._afterCrossSigningLocalKeyChange = async function() {
+    logger.info("Starting cross-signing key change post-processing");
+
     // sign the current device with the new key, and upload to the server
     const device = this._deviceList.getStoredDevice(this._userId, this._deviceId);
     const signedDevice = await this._crossSigningInfo.signDevice(this._userId, device);
@@ -704,6 +706,8 @@ Crypto.prototype._afterCrossSigningLocalKeyChange = async function() {
             );
         }
     }
+
+    logger.info("Finished cross-signing key change post-processing");
 };
 
 /**
