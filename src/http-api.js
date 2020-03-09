@@ -47,6 +47,7 @@ export const PREFIX_UNSTABLE = "/_matrix/client/unstable";
 
 /**
  * URI path for v1 of the the identity API
+ * @deprecated Use v2.
  */
 export const PREFIX_IDENTITY_V1 = "/_matrix/identity/api/v1";
 
