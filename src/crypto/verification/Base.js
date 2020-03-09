@@ -216,7 +216,7 @@ export class VerificationBase extends EventEmitter {
                         console.debug("VerificationBase.done: requesting secret",
                                       type, this.deviceId);
                         const { promise } =
-                            storage.request(`m.key.${type}`, [this.deviceId]);
+                            storage.request(`m.cross_signing.${type}`, [this.deviceId]);
                         const result = await promise;
                         const decoded = decodeBase64(result);
                         return Uint8Array.from(decoded);
