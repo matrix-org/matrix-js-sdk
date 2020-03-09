@@ -666,10 +666,15 @@ Crypto.prototype._afterCrossSigningLocalKeyChange = async function() {
     // sign the current device with the new key, and upload to the server
     const device = this._deviceList.getStoredDevice(this._userId, this._deviceId);
     const signedDevice = await this._crossSigningInfo.signDevice(this._userId, device);
-    await this._baseApis.uploadKeySignatures({
+    logger.info(`Starting background key sig upload for ${this._deviceId}`);
+    this._baseApis.uploadKeySignatures({
         [this._userId]: {
             [this._deviceId]: signedDevice,
         },
+    }).then(() => {
+        logger.info(`Finished background key sig upload for ${this._deviceId}`);
+    }).catch(e => {
+        logger.error(`Error during background key sig upload for ${this._deviceId}`, e);
     });
 
     const shouldUpgradeCb = (
@@ -952,8 +957,14 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
             = this._crossSigningInfo.keys.master;
     }
 
-    if (Object.keys(keySignatures).length) {
-        await this._baseApis.uploadKeySignatures({[this._userId]: keySignatures});
+    const keysToUpload = Object.keys(keySignatures);
+    if (keysToUpload.length) {
+        logger.info(`Starting background key sig upload for ${keysToUpload}`);
+        this._baseApis.uploadKeySignatures({ [this._userId]: keySignatures }).then(() => {
+            logger.info(`Finished background key sig upload for ${keysToUpload}`);
+        }).catch(e => {
+            logger.error(`Error during background key sig upload for ${keysToUpload}`, e);
+        });
     }
 
     this.emit("userTrustStatusChanged", userId, this.checkUserTrust(userId));
