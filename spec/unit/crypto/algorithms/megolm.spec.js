@@ -320,14 +320,14 @@ describe("MegolmDecryption", function() {
 
             // this should have claimed a key for alice as it's starting a new session
             expect(mockBaseApis.claimOneTimeKeys).toHaveBeenCalledWith(
-                [['@alice:home.server', 'aliceDevice']], 'signed_curve25519',
+                [['@alice:home.server', 'aliceDevice']], 'signed_curve25519', 2000,
             );
             expect(mockCrypto.downloadKeys).toHaveBeenCalledWith(
                 ['@alice:home.server'], false,
             );
             expect(mockBaseApis.sendToDevice).toHaveBeenCalled();
             expect(mockBaseApis.claimOneTimeKeys).toHaveBeenCalledWith(
-                [['@alice:home.server', 'aliceDevice']], 'signed_curve25519',
+                [['@alice:home.server', 'aliceDevice']], 'signed_curve25519', 2000,
             );
 
             mockBaseApis.claimOneTimeKeys.mockReset();
@@ -540,6 +540,12 @@ describe("MegolmDecryption", function() {
             content: {},
         });
         await aliceClient._crypto.encryptEvent(event, aliceRoom);
+        await new Promise((resolve) => {
+            // encryptMessage retries senders in the background before giving
+            // up and telling them that there's no olm channel, so we need to
+            // wait a bit before checking that we got the message
+            setTimeout(resolve, 100);
+        });
 
         expect(run).toBe(true);
     });

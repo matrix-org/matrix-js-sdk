@@ -114,6 +114,57 @@ export async function encryptMessageForDevice(
 }
 
 /**
+ * Get the existing olm sessions for the given devices, and the devices that
+ * don't have olm sessions.
+ *
+ * @param {module:crypto/OlmDevice} olmDevice
+ *
+ * @param {module:base-apis~MatrixBaseApis} baseApis
+ *
+ * @param {object<string, module:crypto/deviceinfo[]>} devicesByUser
+ *    map from userid to list of devices to ensure sessions for
+ *
+ * @return {Promise} resolves to an array.  The first element of the array is a
+ *    a map of user IDs to arrays of deviceInfo, representing the devices that
+ *    don't have established olm sessions.  The second element of the array is
+ *    a map from userId to deviceId to {@link module:crypto~OlmSessionResult}
+ */
+export async function getExistingOlmSessions(
+    olmDevice, baseApis, devicesByUser,
+) {
+    const devicesWithoutSession = {};
+    const sessions = {};
+
+    const promises = [];
+
+    for (const [userId, devices] of Object.entries(devicesByUser)) {
+        for (const deviceInfo of devices) {
+            const deviceId = deviceInfo.deviceId;
+            const key = deviceInfo.getIdentityKey();
+            promises.push((async () => {
+                const sessionId = await olmDevice.getSessionIdForDevice(
+                    key, true,
+                );
+                if (sessionId === null) {
+                    devicesWithoutSession[userId] = devicesWithoutSession[userId] || [];
+                    devicesWithoutSession[userId].push(deviceInfo);
+                } else {
+                    sessions[userId] = sessions[userId] || {};
+                    sessions[userId][deviceId] = {
+                        device: deviceInfo,
+                        sessionId: sessionId,
+                    };
+                }
+            })());
+        }
+    }
+
+    await Promise.all(promises);
+
+    return [devicesWithoutSession, sessions];
+}
+
+/**
  * Try to make sure we have established olm sessions for the given devices.
  *
  * @param {module:crypto/OlmDevice} olmDevice
@@ -123,30 +174,33 @@ export async function encryptMessageForDevice(
  * @param {object<string, module:crypto/deviceinfo[]>} devicesByUser
  *    map from userid to list of devices to ensure sessions for
  *
- * @param {boolean} force If true, establish a new session even if one already exists.
- *     Optional.
+ * @param {boolean} [force=false] If true, establish a new session even if one
+ *     already exists.
+ *
+ * @param {Number} [otkTimeout] The timeout in milliseconds when requesting
+ *     one-time keys for establishing new olm sessions.
  *
  * @return {Promise} resolves once the sessions are complete, to
  *    an Object mapping from userId to deviceId to
  *    {@link module:crypto~OlmSessionResult}
  */
 export async function ensureOlmSessionsForDevices(
-    olmDevice, baseApis, devicesByUser, force,
+    olmDevice, baseApis, devicesByUser, force, otkTimeout,
 ) {
+    if (typeof force === "number") {
+        otkTimeout = force;
+        force = false;
+    }
+
     const devicesWithoutSession = [
         // [userId, deviceId], ...
     ];
     const result = {};
     const resolveSession = {};
 
-    for (const userId in devicesByUser) {
-        if (!devicesByUser.hasOwnProperty(userId)) {
-            continue;
-        }
+    for (const [userId, devices] of Object.entries(devicesByUser)) {
         result[userId] = {};
-        const devices = devicesByUser[userId];
-        for (let j = 0; j < devices.length; j++) {
-            const deviceInfo = devices[j];
+        for (const deviceInfo of devices) {
             const deviceId = deviceInfo.deviceId;
             const key = deviceInfo.getIdentityKey();
             if (!olmDevice._sessionsInProgress[key]) {
@@ -197,7 +251,7 @@ export async function ensureOlmSessionsForDevices(
     let res;
     try {
         res = await baseApis.claimOneTimeKeys(
-            devicesWithoutSession, oneTimeKeyAlgorithm,
+            devicesWithoutSession, oneTimeKeyAlgorithm, otkTimeout,
         );
     } catch (e) {
         for (const resolver of Object.values(resolveSession)) {
@@ -209,12 +263,8 @@ export async function ensureOlmSessionsForDevices(
 
     const otk_res = res.one_time_keys || {};
     const promises = [];
-    for (const userId in devicesByUser) {
-        if (!devicesByUser.hasOwnProperty(userId)) {
-            continue;
-        }
+    for (const [userId, devices] of Object.entries(devicesByUser)) {
         const userRes = otk_res[userId] || {};
-        const devices = devicesByUser[userId];
         for (let j = 0; j < devices.length; j++) {
             const deviceInfo = devices[j];
             const deviceId = deviceInfo.deviceId;
