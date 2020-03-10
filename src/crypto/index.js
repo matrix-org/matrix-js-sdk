@@ -55,7 +55,7 @@ import {InRoomChannel, InRoomRequests} from "./verification/request/InRoomChanne
 import {ToDeviceChannel, ToDeviceRequests} from "./verification/request/ToDeviceChannel";
 import * as httpApi from "../http-api";
 import {IllegalMethod} from "./verification/IllegalMethod";
-import {KeyUploadError} from "../errors";
+import {KeySignatureUploadError} from "../errors";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -675,11 +675,11 @@ Crypto.prototype._afterCrossSigningLocalKeyChange = async function() {
     }).then(({failures}) => {
         if (Object.keys(failures || []).length > 0) {
             this._baseApis.emit(
-                "crypto.keyUploadFailure",
+                "crypto.keySignatureUploadFailure",
                 failures,
-                "_afterCrossSigningLocalKeyChange"
+                "_afterCrossSigningLocalKeyChange",
             );
-            throw new KeyUploadError("Key upload failed", { failures });
+            throw new KeySignatureUploadError("Key upload failed", { failures });
         }
         logger.info(`Finished background key sig upload for ${this._deviceId}`);
     }).catch(e => {
@@ -974,11 +974,11 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
             logger.info(`Finished background key sig upload for ${keysToUpload}`);
             if (Object.keys(failures || []).length > 0) {
                 this._baseApis.emit(
-                    "crypto.keyUploadFailure",
+                    "crypto.keySignatureUploadFailure",
                     failures,
-                    "checkOwnCrossSigningTrust"
+                    "checkOwnCrossSigningTrust",
                 );
-                throw new KeyUploadError("Key upload failed", { failures });
+                throw new KeySignatureUploadError("Key upload failed", { failures });
             }
         }).catch(e => {
             logger.error(`Error during background key sig upload for ${keysToUpload}`, e);
@@ -1631,13 +1631,13 @@ Crypto.prototype.setDeviceVerification = async function(
                 });
                 if (Object.keys(failures || []).length > 0) {
                     this._baseApis.emit(
-                        "crypto.keyUploadFailure",
+                        "crypto.keySignatureUploadFailure",
                         failures,
-                        "setDeviceVerification"
+                        "setDeviceVerification",
                     );
                     /* Throwing here causes the process to be cancelled and the other
                      * user to be notified */
-                    throw new KeyUploadError("Key upload failed", { failures });
+                    throw new KeySignatureUploadError("Key upload failed", { failures });
                 }
 
                 // This will emit events when it comes back down the sync
@@ -1695,7 +1695,7 @@ Crypto.prototype.setDeviceVerification = async function(
                 },
             });
             if (Object.keys(failures || []).length > 0) {
-                throw new KeyUploadError("Key upload failed", { failures });
+                throw new KeySignatureUploadError("Key upload failed", { failures });
             }
             // XXX: we'll need to wait for the device list to be updated
         }
