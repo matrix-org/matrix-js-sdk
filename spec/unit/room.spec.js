@@ -617,15 +617,10 @@ describe("Room", function() {
                 }, event: true,
             })]);
         };
-        const setAliases = function(aliases, stateKey) {
-            if (!stateKey) {
-                stateKey = aliases.length
-                    ? aliases[0].split(':').splice(1).join(':') // domain+port
-                    : 'fibble';
-            }
+        const setAltAliases = function(aliases) {
             room.addLiveEvents([utils.mkEvent({
-                type: "m.room.aliases", room: roomId, skey: stateKey, content: {
-                    aliases: aliases,
+                type: "m.room.canonical_alias", room: roomId, skey: "", content: {
+                    alt_aliases: aliases,
                 }, event: true,
             })]);
         };
@@ -862,7 +857,7 @@ describe("Room", function() {
             "(invite join_rules) rooms if a room name doesn't exist.", function() {
                 const alias = "#room_alias:here";
                 setJoinRule("invite");
-                setAliases([alias, "#another:here"]);
+                setAltAliases([alias, "#another:here"]);
                 room.recalculate();
                 const name = room.name;
                 expect(name).toEqual(alias);
@@ -872,7 +867,7 @@ describe("Room", function() {
             "(public join_rules) rooms if a room name doesn't exist.", function() {
                 const alias = "#room_alias:here";
                 setJoinRule("public");
-                setAliases([alias, "#another:here"]);
+                setAltAliases([alias, "#another:here"]);
                 room.recalculate();
                 const name = room.name;
                 expect(name).toEqual(alias);
