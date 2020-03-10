@@ -244,8 +244,6 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
             }
         }
 
-        const errorDevices = [];
-
         const key = this._olmDevice.getOutboundGroupSessionKey(session.sessionId);
         const payload = {
             type: "m.room_key",
@@ -269,6 +267,8 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
                 );
             })(),
             (async () => {
+                const errorDevices = [];
+
                 // meanwhile, establish olm sessions for devices that we don't
                 // already have a session for, and share keys with them.  Use a
                 // shorter timeout when fetching one-time keys.
@@ -769,11 +769,12 @@ MegolmEncryption.prototype._notifyBlockedDevices = async function(
  * @param {module:models/room} room the room the event is in
  */
 MegolmEncryption.prototype.prepareToEncrypt = function(room) {
-    logger.log(`Preparing to encrypt events for ${this._roomId}`);
+    logger.debug(`Preparing to encrypt events for ${this._roomId}`);
 
     if (this.encryptionPreparation) {
         // We're already preparing something, so don't do anything else.
         // FIXME: check if we need to restart
+        // (https://github.com/matrix-org/matrix-js-sdk/issues/1255)
         return;
     }
 
@@ -807,7 +808,8 @@ MegolmEncryption.prototype.encryptMessage = async function(room, eventType, cont
 
     if (this.encryptionPreparation) {
         // If we started sending keys, wait for it to be done.
-        // FIXME: check if we need to restart
+        // FIXME: check if we need to cancel
+        // (https://github.com/matrix-org/matrix-js-sdk/issues/1255)
         try {
             await this.encryptionPreparation;
         } catch (e) {

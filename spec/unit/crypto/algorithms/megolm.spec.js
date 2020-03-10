@@ -516,21 +516,22 @@ describe("MegolmDecryption", function() {
             };
         };
 
-        let run = false;
-        aliceClient.sendToDevice = async (msgtype, contentMap) => {
-            run = true;
-            expect(msgtype).toBe("org.matrix.room_key.withheld");
-            expect(contentMap).toStrictEqual({
-                '@bob:example.com': {
-                    bobdevice: {
-                        algorithm: "m.megolm.v1.aes-sha2",
-                        code: 'm.no_olm',
-                        reason: 'Unable to establish a secure channel.',
-                        sender_key: aliceDevice.deviceCurve25519Key,
+        const sendPromise = new Promise((resolve, reject) => {
+            aliceClient.sendToDevice = async (msgtype, contentMap) => {
+                expect(msgtype).toBe("org.matrix.room_key.withheld");
+                expect(contentMap).toStrictEqual({
+                    '@bob:example.com': {
+                        bobdevice: {
+                            algorithm: "m.megolm.v1.aes-sha2",
+                            code: 'm.no_olm',
+                            reason: 'Unable to establish a secure channel.',
+                            sender_key: aliceDevice.deviceCurve25519Key,
+                        },
                     },
-                },
-            });
-        };
+                });
+                resolve();
+            };
+        });
 
         const event = new MatrixEvent({
             type: "m.room.message",
@@ -540,14 +541,7 @@ describe("MegolmDecryption", function() {
             content: {},
         });
         await aliceClient._crypto.encryptEvent(event, aliceRoom);
-        await new Promise((resolve) => {
-            // encryptMessage retries senders in the background before giving
-            // up and telling them that there's no olm channel, so we need to
-            // wait a bit before checking that we got the message
-            setTimeout(resolve, 100);
-        });
-
-        expect(run).toBe(true);
+        await sendPromise;
     });
 
     it("throws an error describing why it doesn't have a key", async function() {
