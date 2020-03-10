@@ -672,7 +672,8 @@ Crypto.prototype._afterCrossSigningLocalKeyChange = async function() {
         [this._userId]: {
             [this._deviceId]: signedDevice,
         },
-    }).then(({failures}) => {
+    }).then((response) => {
+        const { failures } = response || {};
         if (Object.keys(failures || []).length > 0) {
             this._baseApis.emit(
                 "crypto.keySignatureUploadFailure",
@@ -970,7 +971,8 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     if (keysToUpload.length) {
         logger.info(`Starting background key sig upload for ${keysToUpload}`);
         this._baseApis.uploadKeySignatures({ [this._userId]: keySignatures })
-        .then(({failures}) => {
+        .then((response) => {
+            const { failures } = response || {};
             logger.info(`Finished background key sig upload for ${keysToUpload}`);
             if (Object.keys(failures || []).length > 0) {
                 this._baseApis.emit(
@@ -1624,11 +1626,12 @@ Crypto.prototype.setDeviceVerification = async function(
             const device = await this._crossSigningInfo.signUser(xsk);
             if (device) {
                 logger.info("Uploading signature for " + userId + "...");
-                const { failures } = await this._baseApis.uploadKeySignatures({
+                const response = await this._baseApis.uploadKeySignatures({
                     [userId]: {
                         [deviceId]: device,
                     },
                 });
+                const { failures } = response || {};
                 if (Object.keys(failures || []).length > 0) {
                     this._baseApis.emit(
                         "crypto.keySignatureUploadFailure",
@@ -1689,11 +1692,12 @@ Crypto.prototype.setDeviceVerification = async function(
         );
         if (device) {
             logger.info("Uploading signature for " + deviceId);
-            const { failures } = await this._baseApis.uploadKeySignatures({
+            const response = await this._baseApis.uploadKeySignatures({
                 [userId]: {
                     [deviceId]: device,
                 },
             });
+            const { failures } = response || {};
             if (Object.keys(failures || []).length > 0) {
                 throw new KeySignatureUploadError("Key upload failed", { failures });
             }
