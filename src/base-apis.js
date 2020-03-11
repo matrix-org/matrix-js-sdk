@@ -1770,10 +1770,13 @@ MatrixBaseApis.prototype.downloadKeysForUsers = function(userIds, opts) {
  *
  * @param {string} [key_algorithm = signed_curve25519]  desired key type
  *
+ * @param {number} [timeout] the time (in milliseconds) to wait for keys from remote
+ *     servers
+ *
  * @return {Promise} Resolves: result object. Rejects: with
  *     an error response ({@link module:http-api.MatrixError}).
  */
-MatrixBaseApis.prototype.claimOneTimeKeys = function(devices, key_algorithm) {
+MatrixBaseApis.prototype.claimOneTimeKeys = function(devices, key_algorithm, timeout) {
     const queries = {};
 
     if (key_algorithm === undefined) {
@@ -1788,6 +1791,9 @@ MatrixBaseApis.prototype.claimOneTimeKeys = function(devices, key_algorithm) {
         query[deviceId] = key_algorithm;
     }
     const content = {one_time_keys: queries};
+    if (timeout) {
+        content.timeout = timeout;
+    }
     const path = "/keys/claim";
     return this._http.authedRequest(undefined, "POST", path, undefined, content);
 };

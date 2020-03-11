@@ -2411,7 +2411,7 @@ function _sendEvent(client, room, event, callback) {
         let promise;
         // this event may be queued
         if (client.scheduler) {
-            // if this returns a promsie then the scheduler has control now and will
+            // if this returns a promise then the scheduler has control now and will
             // resolve/reject when it is done. Internally, the scheduler will invoke
             // processFn which is set to this._sendEventHttpRequest so the same code
             // path is executed regardless.
