@@ -1,3 +1,44 @@
+Changes in [5.1.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.1.1-rc.1) (2020-03-11)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.1.0...v5.1.1-rc.1)
+
+ * refactor megolm encryption to improve perceived speed
+   [\#1252](https://github.com/matrix-org/matrix-js-sdk/pull/1252)
+ * Remove v1 identity server fallbacks
+   [\#1253](https://github.com/matrix-org/matrix-js-sdk/pull/1253)
+ * Use alt_aliases instead of local ones for room names
+   [\#1251](https://github.com/matrix-org/matrix-js-sdk/pull/1251)
+ * Upload cross-signing key signatures in the background
+   [\#1250](https://github.com/matrix-org/matrix-js-sdk/pull/1250)
+ * Fix secret sharing names to match spec
+   [\#1249](https://github.com/matrix-org/matrix-js-sdk/pull/1249)
+ * Cleanup: remove crypto.verification.start event
+   [\#1248](https://github.com/matrix-org/matrix-js-sdk/pull/1248)
+ * Fix regression in key backup request params
+   [\#1246](https://github.com/matrix-org/matrix-js-sdk/pull/1246)
+ * Use cross-signing trust to mark backups verified
+   [\#1244](https://github.com/matrix-org/matrix-js-sdk/pull/1244)
+ * Check both cross-signing and local trust for key sharing
+   [\#1243](https://github.com/matrix-org/matrix-js-sdk/pull/1243)
+ * Fixed up tests to match new way that crypto stores are created
+   [\#1242](https://github.com/matrix-org/matrix-js-sdk/pull/1242)
+ * Store USK and SSK locally
+   [\#1235](https://github.com/matrix-org/matrix-js-sdk/pull/1235)
+ * Use unpadded base64 for QR code secrets
+   [\#1236](https://github.com/matrix-org/matrix-js-sdk/pull/1236)
+ * Don't require .done event for finishing self-verification
+   [\#1239](https://github.com/matrix-org/matrix-js-sdk/pull/1239)
+ * Don't cancel as 3rd party in verification request
+   [\#1237](https://github.com/matrix-org/matrix-js-sdk/pull/1237)
+ * Verification: log when switching start event
+   [\#1234](https://github.com/matrix-org/matrix-js-sdk/pull/1234)
+ * Perform crypto store operations directly after transaction
+   [\#1233](https://github.com/matrix-org/matrix-js-sdk/pull/1233)
+ * More verification request logging
+   [\#1232](https://github.com/matrix-org/matrix-js-sdk/pull/1232)
+ * Upgrade deps
+   [\#1231](https://github.com/matrix-org/matrix-js-sdk/pull/1231)
+
 Changes in [5.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.1.0) (2020-03-02)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.1.0-rc.1...v5.1.0)
