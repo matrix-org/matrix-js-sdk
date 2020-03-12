@@ -1751,6 +1751,27 @@ Crypto.prototype.beginKeyVerification = function(
     return request.beginKeyVerification(method, {userId, deviceId});
 };
 
+Crypto.prototype.legacyDeviceVerification = async function(
+    userId, deviceId, method,
+) {
+    const transactionId = ToDeviceChannel.makeTransactionId();
+    const channel = new ToDeviceChannel(
+        this._baseApis, userId, [deviceId], transactionId, deviceId);
+    const request = new VerificationRequest(
+        channel, this._verificationMethods, this._baseApis);
+    this._toDeviceVerificationRequests.setRequestBySenderAndTxnId(
+        userId, transactionId, request);
+    const verifier = request.beginKeyVerification(method, {userId, deviceId});
+    // either reject by an error from verify() while sending .start
+    // or resolve when the request receives the
+    // local (fake remote) echo for sending the .start event
+    await Promise.race([
+        verifier.verify(),
+        request.waitFor(r => r.started),
+    ]);
+    return request;
+};
+
 
 /**
  * Get information on the active olm sessions with a user

@@ -1135,6 +1135,7 @@ wrapCryptoFuncs(MatrixClient, [
     "checkDeviceTrust",
     "checkOwnCrossSigningTrust",
     "checkCrossSigningPrivateKey",
+    "legacyDeviceVerification",
 ]);
 
 /**
