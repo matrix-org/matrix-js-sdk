@@ -380,7 +380,7 @@ export class SecretStorage extends EventEmitter {
             return null;
         }
 
-        const keyInfo = this._baseApis.getAccountDataFromServer(
+        const keyInfo = await this._baseApis.getAccountDataFromServer(
             "m.secret_storage.key." + keyId,
         );
         return keyInfo ? [keyId, keyInfo] : null;
@@ -850,7 +850,7 @@ export class SecretStorage extends EventEmitter {
                 );
             }
             const decryption = {
-                free: pkDecryption.free().bind(pkDecryption),
+                free: pkDecryption.free.bind(pkDecryption),
                 decrypt: async function(encInfo) {
                     return pkDecryption.decrypt(
                         encInfo.ephemeral, encInfo.mac, encInfo.ciphertext,

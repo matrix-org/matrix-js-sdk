@@ -395,7 +395,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     const ssssKeys = {};
 
     this._baseApis._cryptoCallbacks.getSecretStorageKey =
-        async (keys, name) => {
+        async ({keys}, name) => {
             // if we already have a key that works, return it
             for (const keyId of Object.keys(keys)) {
                 if (ssssKeys[keyId]) {
@@ -404,7 +404,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             }
 
             // otherwise, prompt the user and cache it
-            const key = await appCallbacks.getSecretStorageKey(keys, name);
+            const key = await appCallbacks.getSecretStorageKey({keys}, name);
             if (key) {
                 const [keyId, keyData] = key;
                 ssssKeys[keyId] = keyData;
@@ -422,7 +422,51 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                 "Cross-signing public and/or private keys not found, " +
                 "checking secret storage for private keys",
             );
-            if (inStorage) {
+            if (!(Object.values(decryptionKeys).some(
+                info => info.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES,
+            ))) {
+                // we already have cross-signing keys, but they're encrypted using
+                // the old algorithm
+                logger.log("Switching to symmetric");
+                const keys = {};
+                // fetch the cross-signing private keys (needed to sign the
+                // new SSSS key)
+                this._baseApis._cryptoCallbacks.getCrossSigningKey =
+                    name => crossSigningPrivateKeys[name];
+                for (const type of ["master", "self_signing", "user_signing"]) {
+                    const secretName = `m.cross_signing.${type}`;
+                    const secret = await this.getSecret(secretName);
+                    keys[type] = secret;
+                    crossSigningPrivateKeys[type] = olmlib.decodeBase64(secret);
+                }
+                await this.checkOwnCrossSigningTrust();
+                const opts = {};
+                let oldKeyId = null;
+                for (const [keyId, keyInfo] of Object.entries(decryptionKeys)) {
+                    // See if the old key was generated from a passphrase.  If
+                    // yes, use the same settings.
+                    if (keyId in ssssKeys) {
+                        oldKeyId = keyId;
+                        if (keyInfo.passphrase) {
+                            opts.passphrase = keyInfo.passphrase;
+                        }
+                        break;
+                    }
+                }
+                // create new symmetric SSSS key and set it as default
+                newKeyId = await this.addSecretStorageKey(
+                    SECRET_STORAGE_ALGORITHM_V1_AES, opts,
+                );
+                if (oldKeyId) {
+                    ssssKeys[newKeyId] = ssssKeys[oldKeyId];
+                }
+                await this.setDefaultSecretStorageKeyId(newKeyId);
+                // re-encrypt all the keys with the new key
+                for (const type of ["master", "self_signing", "user_signing"]) {
+                    const secretName = `m.cross_signing.${type}`;
+                    await this.storeSecret(secretName, keys[type], [newKeyId]);
+                }
+            } else if (inStorage) {
                 logger.log("Cross-signing private keys found in secret storage");
                 await this.checkOwnCrossSigningTrust();
             } else {
@@ -438,21 +482,6 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                     CrossSigningLevel.MASTER,
                     { authUploadDeviceSigningKeys },
                 );
-            }
-        } else if (!(Object.values(decryptionKeys).some(
-            info => info.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES,
-        ))) {
-            // we already have cross-signing keys, but they're encrypted using
-            // the old algorithm
-            logger.log("Switching to symmetric");
-            // create new symmetric key and set it as default
-            newKeyId = this.addSecretStorageKey();
-            this.setDefaultSecretStorageKeyId(newKeyId);
-            // re-encrypt all the keys with the new key
-            for (const type of ["master", "self_signing", "user_signing"]) {
-                const secretName = `m.cross_signing.${type}`;
-                const secret = this.getSecret(secretName);
-                this.storeSecret(secretName, secret, [newKeyId]);
             }
         } else {
             logger.log("Cross signing keys are present in secret storage");
@@ -501,7 +530,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                 // so the key backup can be trusted via cross-signing.
                 const backupSigStatus = await this.checkKeyBackup(keyBackupInfo);
                 if (backupSigStatus.trustInfo.usable) {
-                    console.log("Adding cross signing signature to key backup");
+                    logger.log("Adding cross signing signature to key backup");
                     await this._crossSigningInfo.signObject(
                         keyBackupInfo.auth_data, "master",
                     );
@@ -512,7 +541,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                     );
                     await this.storeSecret("m.megolm_backup.v1", backupKey, [newKeyId]);
                 } else {
-                    console.log(
+                    logger.log(
                         "Key backup is NOT TRUSTED: NOT adding cross signing signature",
                     );
                 }

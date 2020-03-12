@@ -217,8 +217,10 @@ function keyFromRecoverySession(session, decryptionKey) {
  * Args:
  *   {object} keys Information about the keys:
  *       {
- *           <key name>: {
- *               pubkey: {UInt8Array}
+ *           keys: {
+ *               <key name>: {
+ *                   pubkey: {UInt8Array}
+ *               }, ...
  *           }
  *       }
  *   {string} name the name of the value we want to read out of SSSS, for UI purposes.
