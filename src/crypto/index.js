@@ -842,7 +842,7 @@ Crypto.prototype.checkDeviceTrust = function(userId, deviceId) {
  * @returns {DeviceTrustLevel}
  */
 Crypto.prototype._checkDeviceInfoTrust = function(userId, device) {
-    const trustedLocally = device && device.isVerified();
+    const trustedLocally = !!(device && device.isVerified());
 
     const userCrossSigning = this._deviceList.getStoredCrossSigningForUser(userId);
     if (device && userCrossSigning) {
@@ -2168,10 +2168,13 @@ Crypto.prototype._backupPendingKeys = async function(limit) {
         const forwardedCount =
               (sessionData.forwarding_curve25519_key_chain || []).length;
 
+        const userId = this._deviceList.getUserByIdentityKey(
+            olmlib.MEGOLM_ALGORITHM, session.senderKey,
+        );
         const device = this._deviceList.getDeviceByIdentityKey(
             olmlib.MEGOLM_ALGORITHM, session.senderKey,
         );
-        const verified = this._checkDeviceInfoTrust(this._userId, device).isVerified();
+        const verified = this._checkDeviceInfoTrust(userId, device).isVerified();
 
         data[roomId]['sessions'][session.sessionId] = {
             first_message_index: firstKnownIndex,

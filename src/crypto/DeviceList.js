@@ -380,6 +380,26 @@ export class DeviceList extends EventEmitter {
     }
 
     /**
+     * Get a user ID by one of their device's curve25519 identity key
+     *
+     * @param {string} algorithm  encryption algorithm
+     * @param {string} senderKey  curve25519 key to match
+     *
+     * @return {string} user ID
+     */
+    getUserByIdentityKey(algorithm, senderKey) {
+        if (
+            algorithm !== olmlib.OLM_ALGORITHM &&
+            algorithm !== olmlib.MEGOLM_ALGORITHM
+        ) {
+            // we only deal in olm keys
+            return null;
+        }
+
+        return this._userByIdentityKey[senderKey];
+    }
+
+    /**
      * Find a device by curve25519 identity key
      *
      * @param {string} algorithm  encryption algorithm
@@ -388,16 +408,8 @@ export class DeviceList extends EventEmitter {
      * @return {module:crypto/deviceinfo?}
      */
     getDeviceByIdentityKey(algorithm, senderKey) {
-        const userId = this._userByIdentityKey[senderKey];
+        const userId = this.getUserByIdentityKey(algorithm, senderKey);
         if (!userId) {
-            return null;
-        }
-
-        if (
-            algorithm !== olmlib.OLM_ALGORITHM &&
-            algorithm !== olmlib.MEGOLM_ALGORITHM
-        ) {
-            // we only deal in olm keys
             return null;
         }
 
