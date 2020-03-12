@@ -842,7 +842,7 @@ Crypto.prototype.checkDeviceTrust = function(userId, deviceId) {
  * @returns {DeviceTrustLevel}
  */
 Crypto.prototype._checkDeviceInfoTrust = function(userId, device) {
-    const trustedLocally = device && device.isVerified();
+    const trustedLocally = !!(device && device.isVerified());
 
     const userCrossSigning = this._deviceList.getStoredCrossSigningForUser(userId);
     if (device && userCrossSigning) {
