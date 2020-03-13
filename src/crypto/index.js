@@ -668,24 +668,34 @@ Crypto.prototype._afterCrossSigningLocalKeyChange = async function() {
     const device = this._deviceList.getStoredDevice(this._userId, this._deviceId);
     const signedDevice = await this._crossSigningInfo.signDevice(this._userId, device);
     logger.info(`Starting background key sig upload for ${this._deviceId}`);
-    this._baseApis.uploadKeySignatures({
-        [this._userId]: {
-            [this._deviceId]: signedDevice,
-        },
-    }).then((response) => {
-        const { failures } = response || {};
-        if (Object.keys(failures || []).length > 0) {
-            this._baseApis.emit(
-                "crypto.keySignatureUploadFailure",
-                failures,
-                "_afterCrossSigningLocalKeyChange",
+
+    const upload = ({ shouldEmit }) => {
+        this._baseApis.uploadKeySignatures({
+            [this._userId]: {
+                [this._deviceId]: signedDevice,
+            },
+        }).then((response) => {
+            const { failures } = response || {};
+            if (Object.keys(failures || []).length > 0) {
+                if (shouldEmit) {
+                    this._baseApis.emit(
+                        "crypto.keySignatureUploadFailure",
+                        failures,
+                        "_afterCrossSigningLocalKeyChange",
+                        upload, // continuation
+                    );
+                }
+                throw new KeySignatureUploadError("Key upload failed", { failures });
+            }
+            logger.info(`Finished background key sig upload for ${this._deviceId}`);
+        }).catch(e => {
+            logger.error(
+                `Error during background key sig upload for ${this._deviceId}`,
+                e,
             );
-            throw new KeySignatureUploadError("Key upload failed", { failures });
-        }
-        logger.info(`Finished background key sig upload for ${this._deviceId}`);
-    }).catch(e => {
-        logger.error(`Error during background key sig upload for ${this._deviceId}`, e);
-    });
+        });
+    };
+    upload({ shouldEmit: true });
 
     const shouldUpgradeCb = (
         this._baseApis._cryptoCallbacks.shouldUpgradeDeviceVerifications
@@ -969,22 +979,31 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
 
     const keysToUpload = Object.keys(keySignatures);
     if (keysToUpload.length) {
-        logger.info(`Starting background key sig upload for ${keysToUpload}`);
-        this._baseApis.uploadKeySignatures({ [this._userId]: keySignatures })
-        .then((response) => {
-            const { failures } = response || {};
-            logger.info(`Finished background key sig upload for ${keysToUpload}`);
-            if (Object.keys(failures || []).length > 0) {
-                this._baseApis.emit(
-                    "crypto.keySignatureUploadFailure",
-                    failures,
-                    "checkOwnCrossSigningTrust",
+        const upload = ({ shouldEmit }) => {
+            logger.info(`Starting background key sig upload for ${keysToUpload}`);
+            this._baseApis.uploadKeySignatures({ [this._userId]: keySignatures })
+            .then((response) => {
+                const { failures } = response || {};
+                logger.info(`Finished background key sig upload for ${keysToUpload}`);
+                if (Object.keys(failures || []).length > 0) {
+                    if (shouldEmit) {
+                        this._baseApis.emit(
+                            "crypto.keySignatureUploadFailure",
+                            failures,
+                            "checkOwnCrossSigningTrust",
+                            upload,
+                        );
+                    }
+                    throw new KeySignatureUploadError("Key upload failed", { failures });
+                }
+            }).catch(e => {
+                logger.error(
+                    `Error during background key sig upload for ${keysToUpload}`,
+                    e,
                 );
-                throw new KeySignatureUploadError("Key upload failed", { failures });
-            }
-        }).catch(e => {
-            logger.error(`Error during background key sig upload for ${keysToUpload}`, e);
-        });
+            });
+        };
+        upload({ shouldEmit: true });
     }
 
     this.emit("userTrustStatusChanged", userId, this.checkUserTrust(userId));
@@ -1625,23 +1644,32 @@ Crypto.prototype.setDeviceVerification = async function(
             );
             const device = await this._crossSigningInfo.signUser(xsk);
             if (device) {
-                logger.info("Uploading signature for " + userId + "...");
-                const response = await this._baseApis.uploadKeySignatures({
-                    [userId]: {
-                        [deviceId]: device,
-                    },
-                });
-                const { failures } = response || {};
-                if (Object.keys(failures || []).length > 0) {
-                    this._baseApis.emit(
-                        "crypto.keySignatureUploadFailure",
-                        failures,
-                        "setDeviceVerification",
-                    );
-                    /* Throwing here causes the process to be cancelled and the other
-                     * user to be notified */
-                    throw new KeySignatureUploadError("Key upload failed", { failures });
-                }
+                const upload = async ({ shouldEmit }) => {
+                    logger.info("Uploading signature for " + userId + "...");
+                    const response = await this._baseApis.uploadKeySignatures({
+                        [userId]: {
+                            [deviceId]: device,
+                        },
+                    });
+                    const { failures } = response || {};
+                    if (Object.keys(failures || []).length > 0) {
+                        if (shouldEmit) {
+                            this._baseApis.emit(
+                                "crypto.keySignatureUploadFailure",
+                                failures,
+                                "setDeviceVerification",
+                                upload,
+                            );
+                        }
+                        /* Throwing here causes the process to be cancelled and the other
+                        * user to be notified */
+                        throw new KeySignatureUploadError(
+                            "Key upload failed",
+                            { failures },
+                        );
+                    }
+                };
+                await upload({ shouldEmit: true });
 
                 // This will emit events when it comes back down the sync
                 // (we could do local echo to speed things up)
@@ -1691,16 +1719,27 @@ Crypto.prototype.setDeviceVerification = async function(
             userId, DeviceInfo.fromStorage(dev, deviceId),
         );
         if (device) {
-            logger.info("Uploading signature for " + deviceId);
-            const response = await this._baseApis.uploadKeySignatures({
-                [userId]: {
-                    [deviceId]: device,
-                },
-            });
-            const { failures } = response || {};
-            if (Object.keys(failures || []).length > 0) {
-                throw new KeySignatureUploadError("Key upload failed", { failures });
-            }
+            const upload = async ({shouldEmit}) => {
+                logger.info("Uploading signature for " + deviceId);
+                const response = await this._baseApis.uploadKeySignatures({
+                    [userId]: {
+                        [deviceId]: device,
+                    },
+                });
+                const { failures } = response || {};
+                if (Object.keys(failures || []).length > 0) {
+                    if (shouldEmit) {
+                        this._baseApis.emit(
+                            "crypto.keySignatureUploadFailure",
+                            failures,
+                            "_afterCrossSigningLocalKeyChange",
+                            upload, // continuation
+                        );
+                    }
+                    throw new KeySignatureUploadError("Key upload failed", { failures });
+                }
+            };
+            await upload({shouldEmit: true});
             // XXX: we'll need to wait for the device list to be updated
         }
     }
