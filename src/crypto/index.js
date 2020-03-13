@@ -670,7 +670,7 @@ Crypto.prototype._afterCrossSigningLocalKeyChange = async function() {
     logger.info(`Starting background key sig upload for ${this._deviceId}`);
 
     const upload = ({ shouldEmit }) => {
-        this._baseApis.uploadKeySignatures({
+        return this._baseApis.uploadKeySignatures({
             [this._userId]: {
                 [this._deviceId]: signedDevice,
             },
@@ -981,7 +981,7 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     if (keysToUpload.length) {
         const upload = ({ shouldEmit }) => {
             logger.info(`Starting background key sig upload for ${keysToUpload}`);
-            this._baseApis.uploadKeySignatures({ [this._userId]: keySignatures })
+            return this._baseApis.uploadKeySignatures({ [this._userId]: keySignatures })
             .then((response) => {
                 const { failures } = response || {};
                 logger.info(`Finished background key sig upload for ${keysToUpload}`);
