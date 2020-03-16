@@ -397,6 +397,15 @@ export class SecretStorage extends EventEmitter {
         return !!(await this.getKey(keyId));
     }
 
+    async keyNeedsUpgrade(keyId) {
+        const keyInfo = await this.getKey(keyId);
+        if (keyInfo && keyInfo[1].algorithm === SECRET_STORAGE_ALGORITHM_V1_CURVE25519) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     /**
      * Store an encrypted secret on the server
      *

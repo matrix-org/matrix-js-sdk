@@ -609,6 +609,10 @@ Crypto.prototype.hasSecretStorageKey = function(keyID) {
     return this._secretStorage.hasKey(keyID);
 };
 
+Crypto.prototype.secretStorageKeyNeedsUpgrade = function(keyID) {
+    return this._secretStorage.keyNeedsUpgrade(keyID);
+};
+
 Crypto.prototype.getSecretStorageKey = function(keyID) {
     return this._secretStorage.getKey(keyID);
 };
