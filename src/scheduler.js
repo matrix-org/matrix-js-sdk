@@ -232,7 +232,6 @@ function _processQueue(scheduler, queueName) {
     // This way enqueued relations/redactions to enqueued events can receive
     // the remove id of their target before being sent.
     Promise.resolve().then(() => {
-        console.log("DEBUG", "processing", obj.event.getId());
         return scheduler._procFn(obj.event);
     }).then(function(res) {
         // remove this from the queue

@@ -2337,7 +2337,7 @@ MatrixClient.prototype.sendEvent = function(roomId, eventType, content, txnId,
  * @return {Promise} Resolves: TODO
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype._sendCompleteEvent = async function(roomId, eventObject, txnId,
+MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
                                             callback) {
     if (utils.isFunction(txnId)) {
         callback = txnId; txnId = undefined;
