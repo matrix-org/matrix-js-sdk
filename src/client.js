@@ -293,7 +293,7 @@ export function MatrixClient(opts) {
                 // updates on the synchronous event emitter get a chance to run first.
                 promise.then(res => {
                     room.updatePendingEvent(eventToSend, EventStatus.SENT, res.event_id);
-                });
+                }, () => {}); // handle rejection to stop it being thrown
             }
             return promise;
         });
@@ -2433,7 +2433,7 @@ function _sendEvent(client, room, event, callback) {
             if (room) {
                 promise.then(res => {
                     room.updatePendingEvent(event, EventStatus.SENT, res.event_id);
-                });
+                }, () => {}); // handle rejection to stop it being thrown
             }
         }
         return promise;
