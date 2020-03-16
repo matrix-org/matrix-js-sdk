@@ -287,13 +287,14 @@ export function MatrixClient(opts) {
                 _updatePendingEventStatus(room, eventToSend,
                                           EventStatus.SENDING);
             }
-            const promise = _sendEventHttpRequest(self, eventToSend);
+            let promise = _sendEventHttpRequest(self, eventToSend);
             if (room) {
                 // ensure we update pending event before the next scheduler run so that any listeners to event id
                 // updates on the synchronous event emitter get a chance to run first.
-                promise.then(res => {
+                promise = promise.then(res => {
                     room.updatePendingEvent(eventToSend, EventStatus.SENT, res.event_id);
-                }, () => {}); // handle rejection to stop it being thrown
+                    return res;
+                });
             }
             return promise;
         });
@@ -2431,9 +2432,10 @@ function _sendEvent(client, room, event, callback) {
         if (!promise) {
             promise = _sendEventHttpRequest(client, event);
             if (room) {
-                promise.then(res => {
+                promise = promise.then(res => {
                     room.updatePendingEvent(event, EventStatus.SENT, res.event_id);
-                }, () => {}); // handle rejection to stop it being thrown
+                    return res;
+                });
             }
         }
         return promise;
