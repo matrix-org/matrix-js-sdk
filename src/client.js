@@ -2329,7 +2329,7 @@ MatrixClient.prototype.sendEvent = function(roomId, eventType, content, txnId,
  * @return {Promise} Resolves: TODO
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
+MatrixClient.prototype._sendCompleteEvent = async function(roomId, eventObject, txnId,
                                             callback) {
     if (utils.isFunction(txnId)) {
         callback = txnId; txnId = undefined;
@@ -2358,8 +2358,11 @@ MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
     const targetId = localEvent.getAssociatedId();
     if (targetId && targetId.startsWith("~")) {
         const target = room.getPendingEvents().find(e => e.getId() === targetId);
-        target.once("Event.localEventIdReplaced", () => {
-            localEvent.updateAssociatedId(target.getId());
+        await new Promise(resolve => {
+            target.once("Event.localEventIdReplaced", () => {
+                localEvent.updateAssociatedId(target.getId());
+                resolve();
+            });
         });
     }
 
