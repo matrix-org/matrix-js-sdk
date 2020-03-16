@@ -287,7 +287,15 @@ export function MatrixClient(opts) {
                 _updatePendingEventStatus(room, eventToSend,
                                           EventStatus.SENDING);
             }
-            return _sendEventHttpRequest(self, eventToSend);
+            const promise = _sendEventHttpRequest(self, eventToSend);
+            if (room) {
+                // ensure we update pending event before the next scheduler run so that any listeners to event id
+                // updates on the synchronous event emitter get a chance to run first.
+                promise.then(res => {
+                    room.updatePendingEvent(eventToSend, EventStatus.SENT, res.event_id);
+                });
+            }
+            return promise;
         });
     }
     this.clientRunning = false;
@@ -2358,11 +2366,8 @@ MatrixClient.prototype._sendCompleteEvent = async function(roomId, eventObject, 
     const targetId = localEvent.getAssociatedId();
     if (targetId && targetId.startsWith("~")) {
         const target = room.getPendingEvents().find(e => e.getId() === targetId);
-        await new Promise(resolve => {
-            target.once("Event.localEventIdReplaced", () => {
-                localEvent.updateAssociatedId(target.getId());
-                resolve();
-            });
+        target.once("Event.localEventIdReplaced", () => {
+            localEvent.updateAssociatedId(target.getId());
         });
     }
 
@@ -2411,7 +2416,7 @@ function _sendEvent(client, room, event, callback) {
         let promise;
         // this event may be queued
         if (client.scheduler) {
-            // if this returns a promsie then the scheduler has control now and will
+            // if this returns a promise then the scheduler has control now and will
             // resolve/reject when it is done. Internally, the scheduler will invoke
             // processFn which is set to this._sendEventHttpRequest so the same code
             // path is executed regardless.
@@ -2425,12 +2430,14 @@ function _sendEvent(client, room, event, callback) {
 
         if (!promise) {
             promise = _sendEventHttpRequest(client, event);
+            if (room) {
+                promise.then(res => {
+                    room.updatePendingEvent(event, EventStatus.SENT, res.event_id);
+                });
+            }
         }
         return promise;
     }).then(function(res) {  // the request was sent OK
-        if (room) {
-            room.updatePendingEvent(event, EventStatus.SENT, res.event_id);
-        }
         if (callback) {
             callback(null, res);
         }
