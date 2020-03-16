@@ -545,14 +545,23 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                         "Key backup is NOT TRUSTED: NOT adding cross signing signature",
                     );
                 }
-            } else if (!newKeyId) {
-                logger.log("Secret storage default key not found, creating new key");
-                const keyOptions = await createSecretStorageKey();
-                newKeyId = await this.addSecretStorageKey(
-                    SECRET_STORAGE_ALGORITHM_V1_AES,
-                    keyOptions,
-                );
-                await this.setDefaultSecretStorageKeyId(newKeyId);
+            } else {
+                if (!newKeyId) {
+                    logger.log("Secret storage default key not found, creating new key");
+                    const keyOptions = await createSecretStorageKey();
+                    newKeyId = await this.addSecretStorageKey(
+                        SECRET_STORAGE_ALGORITHM_V1_AES,
+                        keyOptions,
+                    );
+                    await this.setDefaultSecretStorageKeyId(newKeyId);
+                }
+                if (await this.isSecretStored("m.megolm_backup.v1")) {
+                    // we created a new SSSS, and we previously encrypted the
+                    // backup key with the old SSSS key, so re-encrypt with the
+                    // new key
+                    const backupKey = await this.getSecret("m.megolm_backup.v1");
+                    await this.storeSecret("m.megolm_backup.v1", backupKey, [newKeyId]);
+                }
             }
         } else {
             logger.log("Have secret storage key");
