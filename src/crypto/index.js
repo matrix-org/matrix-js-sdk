@@ -502,7 +502,9 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                 logger.log("Secret storage default key not found, using key backup key");
 
                 // FIXME: ask for recovery passphrase/key
-                const backupKey = Buffer.from("XrmITOOdBhw6yY5Bh7trb/bgp1FRdIGyCUxxMP873R0", "base64");
+                const backupKey = Buffer.from(
+                    "XrmITOOdBhw6yY5Bh7trb/bgp1FRdIGyCUxxMP873R0", "base64",
+                );
 
                 if (!newKeyId) {
                     const opts = {};
