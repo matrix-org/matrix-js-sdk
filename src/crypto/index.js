@@ -1732,7 +1732,7 @@ Crypto.prototype.setDeviceVerification = async function(
                         this._baseApis.emit(
                             "crypto.keySignatureUploadFailure",
                             failures,
-                            "_afterCrossSigningLocalKeyChange",
+                            "setDeviceVerification",
                             upload, // continuation
                         );
                     }
