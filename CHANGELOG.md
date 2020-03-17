@@ -1,3 +1,14 @@
+Changes in [5.1.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.1.1) (2020-03-17)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.1.1-rc.1...v5.1.1)
+
+ * Fix: ensureOlmSessionsForDevices parameter format
+   [\#1265](https://github.com/matrix-org/matrix-js-sdk/pull/1265)
+ * Fix: prevent error being thrown during sync in some cases
+   [\#1262](https://github.com/matrix-org/matrix-js-sdk/pull/1262)
+ * Force `is_verified` for key backups to bool and fix computation
+   [\#1260](https://github.com/matrix-org/matrix-js-sdk/pull/1260)
+
 Changes in [5.1.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.1.1-rc.1) (2020-03-11)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.1.0...v5.1.1-rc.1)
