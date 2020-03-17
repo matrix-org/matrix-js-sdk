@@ -629,9 +629,7 @@ MegolmEncryption.prototype.reshareKeyWithDevice = async function(
 
     await olmlib.ensureOlmSessionsForDevices(
         this._olmDevice, this._baseApis, {
-            [userId]: {
-                [device.deviceId]: device,
-            },
+            [userId]: [device],
         },
     );
 
