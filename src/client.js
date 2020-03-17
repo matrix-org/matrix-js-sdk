@@ -281,13 +281,19 @@ export function MatrixClient(opts) {
     this.scheduler = opts.scheduler;
     if (this.scheduler) {
         const self = this;
-        this.scheduler.setProcessFunction(function(eventToSend) {
+        this.scheduler.setProcessFunction(async function(eventToSend) {
             const room = self.getRoom(eventToSend.getRoomId());
             if (eventToSend.status !== EventStatus.SENDING) {
                 _updatePendingEventStatus(room, eventToSend,
                                           EventStatus.SENDING);
             }
-            return _sendEventHttpRequest(self, eventToSend);
+            const res = await _sendEventHttpRequest(self, eventToSend);
+            if (room) {
+                // ensure we update pending event before the next scheduler run so that any listeners to event id
+                // updates on the synchronous event emitter get a chance to run first.
+                room.updatePendingEvent(eventToSend, EventStatus.SENT, res.event_id);
+            }
+            return res;
         });
     }
     this.clientRunning = false;
@@ -2426,12 +2432,15 @@ function _sendEvent(client, room, event, callback) {
 
         if (!promise) {
             promise = _sendEventHttpRequest(client, event);
+            if (room) {
+                promise = promise.then(res => {
+                    room.updatePendingEvent(event, EventStatus.SENT, res.event_id);
+                    return res;
+                });
+            }
         }
         return promise;
     }).then(function(res) {  // the request was sent OK
-        if (room) {
-            room.updatePendingEvent(event, EventStatus.SENT, res.event_id);
-        }
         if (callback) {
             callback(null, res);
         }
