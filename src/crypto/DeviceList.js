@@ -767,31 +767,34 @@ class DeviceListUpdateSerialiser {
 
         this._baseApis.downloadKeysForUsers(
             downloadUsers, opts,
-        ).then((res) => {
+        ).then(async (res) => {
             const dk = res.device_keys || {};
             const masterKeys = res.master_keys || {};
             const ssks = res.self_signing_keys || {};
             const usks = res.user_signing_keys || {};
 
-            // do each user in a separate promise, to avoid wedging the CPU
+            // yield to other things that want to execute in between users, to
+            // avoid wedging the CPU
             // (https://github.com/vector-im/riot-web/issues/3158)
             //
             // of course we ought to do this in a web worker or similar, but
             // this serves as an easy solution for now.
-            let prom = Promise.resolve();
             for (const userId of downloadUsers) {
-                prom = prom.then(sleep(5)).then(() => {
-                    return this._processQueryResponseForUser(
+                await sleep(5);
+                try {
+                    await this._processQueryResponseForUser(
                         userId, dk[userId], {
                             master: masterKeys[userId],
                             self_signing: ssks[userId],
                             user_signing: usks[userId],
                         },
                     );
-                });
+                } catch (e) {
+                    // log the error but continue, so that one bad key
+                    // doesn't kill the whole process
+                    logger.error(`Error processing keys for ${userId}:`, e);
+                }
             }
-
-            return prom;
         }).then(() => {
             logger.log('Completed key download for ' + downloadUsers);
 
