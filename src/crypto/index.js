@@ -972,9 +972,23 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     }
 
     if (masterChanged) {
-        await this._signObject(this._crossSigningInfo.keys.master);
-        keySignatures[this._crossSigningInfo.getId()]
-            = this._crossSigningInfo.keys.master;
+        const masterKey = this._crossSigningInfo.keys.master;
+        await this._signObject(masterKey);
+        const deviceSig = masterKey.signatures[this._userId]["ed25519:" + this._deviceId];
+        // Include only the _new_ device signature in the upload.
+        // We may have existing signatures from deleted devices, which will cause
+        // the entire upload to fail.
+        keySignatures[this._crossSigningInfo.getId()] = Object.assign(
+            {},
+            masterKey,
+            {
+                signatures: {
+                    [this._userId]: {
+                        ["ed25519:" + this._deviceId]: deviceSig,
+                    },
+                },
+            },
+        );
     }
 
     const keysToUpload = Object.keys(keySignatures);
