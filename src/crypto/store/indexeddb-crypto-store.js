@@ -338,6 +338,26 @@ export class IndexedDBCryptoStore {
         this._backend.storeCrossSigningPrivateKey(txn, type, key);
     }
 
+    /**
+     * Retrieve session backup keys from the store
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {function(Uint8Array)} func Called with the private key
+     * @param {string} type A key type
+     */
+    getBackupKey(txn, func, type) {
+        this._backend.getBackupKey(txn, func, type);
+    }
+
+    /**
+     *
+     * @param {*} txn
+     * @param {string} type A key type
+     * @param {Uint8Array} key A private key
+     */
+    storeBackupKey(txn, type, key) {
+        this._backend.storeBackupKey(txn, type, key);
+    }
+
     // Olm sessions
 
     /**

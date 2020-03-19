@@ -384,6 +384,17 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         );
     }
 
+    getBackupKey(txn, func, type) {
+        const key = getJsonItem(this.store, `backup_key_cache.${type}`);
+        func(key ? Uint8Array.from(key) : key);
+    }
+
+    storeBackupKey(txn, type, key) {
+        setJsonItem(
+            this.store, `backup_key_cache.${type}`, Array.from(key),
+        );
+    }
+
     doTxn(mode, stores, func) {
         return Promise.resolve(func(null));
     }

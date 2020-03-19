@@ -23,10 +23,15 @@ import {MatrixEvent} from "../../../src/models/event";
 import * as algorithms from "../../../src/crypto/algorithms";
 import {WebStorageSessionStore} from "../../../src/store/session/webstorage";
 import {MemoryCryptoStore} from "../../../src/crypto/store/memory-crypto-store";
+import {
+    IndexedDBCryptoStore,
+} from '../../../src/crypto/store/indexeddb-crypto-store';
 import {MockStorageApi} from "../../MockStorageApi";
 import * as testUtils from "../../test-utils";
 import {OlmDevice} from "../../../src/crypto/OlmDevice";
 import {Crypto} from "../../../src/crypto";
+import 'fake-indexeddb/auto';
+import 'jest-localstorage-mock';
 
 const Olm = global.Olm;
 
@@ -78,6 +83,13 @@ const BACKUP_INFO = {
         public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
     },
 };
+
+const testKey = new Uint8Array([
+    0xda, 0x5a, 0x27, 0x60, 0xe3, 0x3a, 0xc5, 0x82,
+    0x9d, 0x12, 0xc3, 0xbe, 0xe8, 0xaa, 0xc2, 0xef,
+    0xae, 0xb1, 0x05, 0xc1, 0xe7, 0x62, 0x78, 0xa6,
+    0xd7, 0x1f, 0xf8, 0x2c, 0x51, 0x85, 0xf0, 0x1d,
+]);
 
 const keys = {};
 
@@ -541,5 +553,47 @@ describe("MegolmBackup", function() {
                 expect(res.clearEvent.content).toEqual('testytest');
             });
         });
+    });
+});
+
+describe.each([
+    ["IndexedDBCryptoStore",
+     () => new IndexedDBCryptoStore(global.indexedDB, "tests")],
+    ["LocalStorageCryptoStore",
+     () => new IndexedDBCryptoStore(undefined, "tests")],
+    ["MemoryCryptoStore", () => {
+        const store = new IndexedDBCryptoStore(undefined, "tests");
+        store._backend = new MemoryCryptoStore();
+        store._backendPromise = Promise.resolve(store._backend);
+        return store;
+    }],
+])("Crypto store backup key cache functions [%s]", function(name, dbFactory) {
+    let store;
+
+    beforeAll(async () => {
+        store = dbFactory();
+        await store.startup();
+    });
+
+    it("Stores and retrieves a backup key", async () => {
+        expect(store._backend).not.toBeNull();
+
+        await store.doTxn(
+            'readwrite',
+            [IndexedDBCryptoStore.STORE_ACCOUNT],
+            (txn) => {
+                store.storeBackupKey(txn, "m.megolm_backup.v1", testKey);
+            },
+        );
+        const result = await new Promise((resolve) => {
+            store.doTxn(
+                'readonly',
+                [IndexedDBCryptoStore.STORE_ACCOUNT],
+                (txn) => {
+                    store.getBackupKey(txn, resolve, "m.megolm_backup.v1");
+                },
+            );
+        });
+        expect(result).toEqual(testKey);
     });
 });
