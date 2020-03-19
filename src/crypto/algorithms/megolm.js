@@ -767,14 +767,14 @@ MegolmEncryption.prototype._notifyBlockedDevices = async function(
  * @param {module:models/room} room the room the event is in
  */
 MegolmEncryption.prototype.prepareToEncrypt = function(room) {
-    logger.debug(`Preparing to encrypt events for ${this._roomId}`);
-
     if (this.encryptionPreparation) {
         // We're already preparing something, so don't do anything else.
         // FIXME: check if we need to restart
         // (https://github.com/matrix-org/matrix-js-sdk/issues/1255)
         return;
     }
+
+    logger.debug(`Preparing to encrypt events for ${this._roomId}`);
 
     this.encryptionPreparation = (async () => {
         const [devicesInRoom, blocked] = await this._getDevicesInRoom(room);

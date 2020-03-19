@@ -2348,6 +2348,20 @@ Crypto.prototype.flagAllGroupSessionsForBackup = async function() {
     return remaining;
 };
 
+/**
+ * Perform any background tasks that can be done before a message is ready to
+ * send, in order to speed up sending of the message.
+ *
+ * @param {module:models/room} room the room the event is in
+ */
+Crypto.prototype.prepareToEncrypt = function(room) {
+    const roomId = room.roomId;
+    const alg = this._roomEncryptors[roomId];
+    if (alg) {
+        alg.prepareToEncrypt(room);
+    }
+};
+
 /* eslint-disable valid-jsdoc */    //https://github.com/eslint/eslint/issues/7307
 /**
  * Encrypt an event according to the configuration of the room.
