@@ -566,6 +566,43 @@ export class VerificationRequest extends EventEmitter {
         return newTransitions;
     }
 
+    _isWinningStartRace(newEvent) {
+        if (newEvent.getType() !== START_TYPE) {
+            return false;
+        }
+        const oldEvent = this._verifier.startEvent;
+        const isSelfVerification = this.channel.userId === this._client.getUserId();
+
+        let oldRaceIdentifier;
+        if (isSelfVerification) {
+            // if the verifier does not have a startEvent,
+            // it is because it's still sending and we are on the initator side
+            // we know we are sending a .start event because we already
+            // have a verifier (checked in calling method)
+            if (oldEvent) {
+                const oldContent = oldEvent.getContent();
+                oldRaceIdentifier = oldContent && oldContent.from_device;
+            } else {
+                oldRaceIdentifier = this._client.getDeviceId();
+            }
+        } else {
+            if (oldEvent) {
+                oldRaceIdentifier = oldEvent.getSender();
+            } else {
+                oldRaceIdentifier = this._client.getUserId();
+            }
+        }
+
+        let newRaceIdentifier;
+        if (isSelfVerification) {
+            const newContent = newEvent.getContent();
+            newRaceIdentifier = newContent && newContent.from_device;
+        } else {
+            newRaceIdentifier = newEvent.getSender();
+        }
+        return newRaceIdentifier < oldRaceIdentifier;
+    }
+
     /**
      * Changes the state of the request and verifier in response to a key verification event.
      * @param {string} type the "symbolic" event type, as returned by the `getEventType` function on the channel.
@@ -600,12 +637,7 @@ export class VerificationRequest extends EventEmitter {
             // only pass events from the other side to the verifier,
             // no remote echos of our own events
             if (this._verifier && !this.observeOnly) {
-                const oldEvent = this._verifier.startEvent;
-                // if the verifier does not have a startEvent, it is because it's still sending and we are on the initator side
-                const oldSender = oldEvent ?
-                    oldEvent.getSender() :
-                    this._client.getUserId();
-                const newEventWinsRace = event.getSender() < oldSender;
+                const newEventWinsRace = this._isWinningStartRace(event);
                 if (this._verifier.canSwitchStartEvent(event) && newEventWinsRace) {
                     this._verifier.switchStartEvent(event);
                 } else if (!isRemoteEcho) {
