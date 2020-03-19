@@ -1730,6 +1730,35 @@ MatrixClient.prototype.isValidRecoveryKey = function(recoveryKey) {
     }
 };
 
+/**
+ * Get the raw key for a key backup from the password
+ * Used when migrating key backups into SSSS
+ *
+ * The cross-signing API is currently UNSTABLE and may change without notice.
+ *
+ * @param {string} password Passphrase
+ * @param {object} backupInfo Backup metadata from `checkKeyBackup`
+ * @return {Promise<Buffer>} key backup key
+ */
+MatrixClient.prototype.keyBackupKeyFromPassword = function(
+    password, backupInfo,
+) {
+    return keyFromAuthData(backupInfo.auth_data, password);
+};
+
+/**
+ * Get the raw key for a key backup from the recovery key
+ * Used when migrating key backups into SSSS
+ *
+ * The cross-signing API is currently UNSTABLE and may change without notice.
+ *
+ * @param {string} recoveryKey The recovery key
+ * @return {Buffer} key backup key
+ */
+MatrixClient.prototype.keyBackupKeyFromRecoveryKey = function(recoveryKey) {
+    return decodeRecoveryKey(recoveryKey);
+};
+
 MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY = 'RESTORE_BACKUP_ERROR_BAD_KEY';
 
 /**
