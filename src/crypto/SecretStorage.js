@@ -28,8 +28,8 @@ export const SECRET_STORAGE_ALGORITHM_V1_AES
 export const SECRET_STORAGE_ALGORITHM_V1_CURVE25519
     = "m.secret_storage.v1.curve25519-aes-sha2";
 
-const subtleCrypto = typeof window === "undefined" ? null :
-    (window.crypto.subtle || window.crypto.webkitSubtle);
+const subtleCrypto = (window && window.crypto) ?
+    (window.crypto.subtle || window.crypto.webkitSubtle) : null;
 
 // salt for HKDF, with 8 bytes of zeros
 const zerosalt = new Uint8Array(8);
