@@ -371,6 +371,9 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
  * created and the private key stored in the new SSSS store. Ignored if keyBackupInfo
  * is supplied.
  * @param {bool} [opts.setupNewSecretStorage] Optional. Reset even if keys already exist.
+ * @param {func} [opts.getKeyBackupPassphrase] Optional. Function called to get the user's
+ *     current key backup passphrase. Should return a promise that resolves with a Buffer
+ *     containing the key, or rejects if the key cannot be obtained.
  * Returns:
  *     {Promise} A promise which resolves to key creation data for
  *     SecretStorage#addKey: an object with `passphrase` and/or `pubkey` fields.
@@ -381,6 +384,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     keyBackupInfo,
     setupNewKeyBackup,
     setupNewSecretStorage,
+    getKeyBackupPassphrase,
 } = {}) {
     logger.log("Bootstrapping Secure Secret Storage");
 
@@ -423,7 +427,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         const decryptionKeys =
               await this._crossSigningInfo.isStoredInSecretStorage(this._secretStorage);
         const inStorage = !setupNewSecretStorage && decryptionKeys;
-        if (!(Object.values(decryptionKeys).some(
+        if (decryptionKeys && !(Object.values(decryptionKeys).some(
             info => info.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES,
         ))) {
             // we already have cross-signing keys, but they're encrypted using
@@ -508,10 +512,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                 // secret storage key
                 logger.log("Secret storage default key not found, using key backup key");
 
-                // FIXME: ask for recovery passphrase/key
-                const backupKey = Buffer.from(
-                    "XrmITOOdBhw6yY5Bh7trb/bgp1FRdIGyCUxxMP873R0", "base64",
-                );
+                const backupKey = await getKeyBackupPassphrase();
 
                 if (!newKeyId) {
                     const opts = {};
