@@ -341,7 +341,7 @@ export class Backend {
         };
     }
 
-    getCrossSigningPrivateKey(txn, func, type) {
+    getSecretStorePrivateKey(txn, func, type) {
         const objectStore = txn.objectStore("account");
         const getReq = objectStore.get(`ssss_cache:${type}`);
         getReq.onsuccess = function() {
@@ -358,7 +358,7 @@ export class Backend {
         objectStore.put(keys, "crossSigningKeys");
     }
 
-    storeCrossSigningPrivateKey(txn, type, key) {
+    storeSecretStorePrivateKey(txn, type, key) {
         const objectStore = txn.objectStore("account");
         objectStore.put(key, `ssss_cache:${type}`);
     }

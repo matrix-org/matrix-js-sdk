@@ -34,6 +34,7 @@ export class MemoryCryptoStore {
         this._account = null;
         this._crossSigningKeys = null;
         this._privateKeys = {};
+        this._backupKeys = {};
 
         // Map of {devicekey -> {sessionId -> session pickle}}
         this._sessions = {};
@@ -256,7 +257,7 @@ export class MemoryCryptoStore {
         func(this._crossSigningKeys);
     }
 
-    getCrossSigningPrivateKey(txn, func, type) {
+    getSecretStorePrivateKey(txn, func, type) {
         const result = this._privateKeys[type];
         return func(result || null);
     }
@@ -265,7 +266,7 @@ export class MemoryCryptoStore {
         this._crossSigningKeys = keys;
     }
 
-    storeCrossSigningPrivateKey(txn, type, key) {
+    storeSecretStorePrivateKey(txn, type, key) {
         this._privateKeys[type] = key;
     }
 

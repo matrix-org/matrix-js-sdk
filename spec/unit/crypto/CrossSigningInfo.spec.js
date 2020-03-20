@@ -217,6 +217,7 @@ describe.each([
     ["MemoryCryptoStore", () => {
         const store = new IndexedDBCryptoStore(undefined, "tests");
         store._backend = new MemoryCryptoStore();
+        store._backendPromise = Promise.resolve(store._backend);
         return store;
     }],
 ])("CrossSigning > createCryptoStoreCacheCallbacks [%s]", function(name, dbFactory) {

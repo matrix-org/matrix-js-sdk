@@ -367,7 +367,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         func(keys);
     }
 
-    getCrossSigningPrivateKey(txn, func, type) {
+    getSecretStorePrivateKey(txn, func, type) {
         const key = getJsonItem(this.store, E2E_PREFIX + `ssss_cache.${type}`);
         func(key ? Uint8Array.from(key) : key);
     }
@@ -378,7 +378,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         );
     }
 
-    storeCrossSigningPrivateKey(txn, type, key) {
+    storeSecretStorePrivateKey(txn, type, key) {
         setJsonItem(
             this.store, E2E_PREFIX + `ssss_cache.${type}`, Array.from(key),
         );
