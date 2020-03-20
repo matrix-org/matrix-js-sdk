@@ -171,7 +171,6 @@ MatrixCall.prototype.placeScreenSharingCall =
     this.localVideoElement = localVideoElement;
     this.remoteVideoElement = remoteVideoElement;
     const self = this;
-
     try {
         self.screenSharingStream = await this.webRtc.getDisplayMedia({'audio': false});
         debuglog("Got screen stream, requesting audio stream...");
