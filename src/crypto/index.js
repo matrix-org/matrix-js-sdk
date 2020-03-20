@@ -584,6 +584,41 @@ Crypto.prototype.checkSecretStoragePrivateKey = function(privateKey, expectedPub
 };
 
 /**
+ * Fetches the backup private key, if cached
+ * @returns {Promise} the key, if any, or null
+ */
+Crypto.prototype.getSessionBackupPrivateKey = async function() {
+    return new Promise((resolve) => {
+        this._cryptoStore.doTxn(
+            'readonly',
+            [IndexedDBCryptoStore.STORE_ACCOUNT],
+            (txn) => {
+                this._cryptoStore.getSecretStorePrivateKey(
+                    txn,
+                    resolve,
+                    "m.megolm_backup.v1",
+                );
+            },
+        );
+    });
+};
+
+/**
+ * Stores the session backup key to the cache
+ * @param {Uint8Array} key the private key
+ * @returns {Promise} so you can catch failures
+ */
+Crypto.prototype.storeSessionBackupPrivateKey = async function(key) {
+    return this._cryptoStore.doTxn(
+        'readwrite',
+        [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._cryptoStore.storeSecretStorePrivateKey(txn, "m.megolm_backup.v1", key);
+        },
+    );
+};
+
+/**
  * Checks that a given cross-signing private key matches a given public key.
  * This can be used by the getCrossSigningKey callback to verify that the
  * private key it is about to supply is the one that was requested.

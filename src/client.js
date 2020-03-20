@@ -1745,15 +1745,16 @@ MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY = 'RESTORE_BACKUP_ERROR_BAD_KEY';
  * @param {string} [targetSessionId] Session ID to target a specific session.
  * Restores all sessions if omitted.
  * @param {object} backupInfo Backup metadata from `checkKeyBackup`
+ * @param {object} opts Optional params such as callbacks
  * @return {Promise<object>} Status of restoration with `total` and `imported`
  * key counts.
  */
 MatrixClient.prototype.restoreKeyBackupWithPassword = async function(
-    password, targetRoomId, targetSessionId, backupInfo,
+    password, targetRoomId, targetSessionId, backupInfo, opts,
 ) {
     const privKey = await keyFromAuthData(backupInfo.auth_data, password);
     return this._restoreKeyBackup(
-        privKey, targetRoomId, targetSessionId, backupInfo,
+        privKey, targetRoomId, targetSessionId, backupInfo, opts,
     );
 };
 
@@ -1766,15 +1767,16 @@ MatrixClient.prototype.restoreKeyBackupWithPassword = async function(
  * Restores all rooms if omitted.
  * @param {string} [targetSessionId] Session ID to target a specific session.
  * Restores all sessions if omitted.
+ * @param {object} opts Optional params such as callbacks
  * @return {Promise<object>} Status of restoration with `total` and `imported`
  * key counts.
  */
 MatrixClient.prototype.restoreKeyBackupWithSecretStorage = async function(
-    backupInfo, targetRoomId, targetSessionId,
+    backupInfo, targetRoomId, targetSessionId, opts,
 ) {
     const privKey = decodeBase64(await this.getSecret("m.megolm_backup.v1"));
     return this._restoreKeyBackup(
-        privKey, targetRoomId, targetSessionId, backupInfo,
+        privKey, targetRoomId, targetSessionId, backupInfo, opts,
     );
 };
 
@@ -1787,20 +1789,47 @@ MatrixClient.prototype.restoreKeyBackupWithSecretStorage = async function(
  * @param {string} [targetSessionId] Session ID to target a specific session.
  * Restores all sessions if omitted.
  * @param {object} backupInfo Backup metadata from `checkKeyBackup`
+ * @param {object} opts Optional params such as callbacks
+
  * @return {Promise<object>} Status of restoration with `total` and `imported`
  * key counts.
  */
 MatrixClient.prototype.restoreKeyBackupWithRecoveryKey = function(
-    recoveryKey, targetRoomId, targetSessionId, backupInfo,
+    recoveryKey, targetRoomId, targetSessionId, backupInfo, opts,
 ) {
     const privKey = decodeRecoveryKey(recoveryKey);
     return this._restoreKeyBackup(
-        privKey, targetRoomId, targetSessionId, backupInfo,
+        privKey, targetRoomId, targetSessionId, backupInfo, opts,
+    );
+};
+
+/**
+ * Restore from an existing key backup using a cached key, or fail
+ *
+ * @param {string} [targetRoomId] Room ID to target a specific room.
+ * Restores all rooms if omitted.
+ * @param {string} [targetSessionId] Session ID to target a specific session.
+ * Restores all sessions if omitted.
+ * @param {object} backupInfo Backup metadata from `checkKeyBackup`
+ * @param {object} opts Optional params such as callbacks
+ * @return {Promise<object>} Status of restoration with `total` and `imported`
+ * key counts.
+ */
+MatrixClient.prototype.restoreKeyBackupWithCache = async function(
+    targetRoomId, targetSessionId, backupInfo, opts,
+) {
+    const privKey = await this._crypto.getSessionBackupPrivateKey();
+    if (!privKey) {
+        return Promise.reject(new Error("Couldn't get key"));
+    }
+    return this._restoreKeyBackup(
+        privKey, targetRoomId, targetSessionId, backupInfo, opts,
     );
 };
 
 MatrixClient.prototype._restoreKeyBackup = function(
     privKey, targetRoomId, targetSessionId, backupInfo,
+    { cacheCompleteCallback }={}, // For sequencing during tests
 ) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
@@ -1827,6 +1856,13 @@ MatrixClient.prototype._restoreKeyBackup = function(
     if (backupPubKey !== backupInfo.auth_data.public_key) {
         return Promise.reject({errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY});
     }
+
+    // Cache the key, if possible.
+    // This is async.
+    this._crypto.storeSessionBackupPrivateKey(privKey)
+    .catch((e) => {
+        console.warn("Error caching session backup key:", e);
+    }).then(cacheCompleteCallback);
 
     return this._http.authedRequest(
         undefined, "GET", path.path, path.queryData, undefined,
