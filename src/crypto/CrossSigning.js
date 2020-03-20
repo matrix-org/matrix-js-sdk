@@ -585,7 +585,7 @@ export function createCryptoStoreCacheCallbacks(store) {
                     'readonly',
                     [IndexedDBCryptoStore.STORE_ACCOUNT],
                     (txn) => {
-                        store.getCrossSigningPrivateKey(txn, resolve, type);
+                        store.getSecretStorePrivateKey(txn, resolve, type);
                     },
                 );
             });
@@ -595,7 +595,7 @@ export function createCryptoStoreCacheCallbacks(store) {
                 'readwrite',
                 [IndexedDBCryptoStore.STORE_ACCOUNT],
                 (txn) => {
-                    store.storeCrossSigningPrivateKey(txn, type, key);
+                    store.storeSecretStorePrivateKey(txn, type, key);
                 },
             );
         },

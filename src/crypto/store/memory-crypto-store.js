@@ -257,7 +257,7 @@ export class MemoryCryptoStore {
         func(this._crossSigningKeys);
     }
 
-    getCrossSigningPrivateKey(txn, func, type) {
+    getSecretStorePrivateKey(txn, func, type) {
         const result = this._privateKeys[type];
         return func(result || null);
     }
@@ -266,17 +266,8 @@ export class MemoryCryptoStore {
         this._crossSigningKeys = keys;
     }
 
-    storeCrossSigningPrivateKey(txn, type, key) {
+    storeSecretStorePrivateKey(txn, type, key) {
         this._privateKeys[type] = key;
-    }
-
-    getBackupKey(txn, func, type) {
-        const result = this._backupKeys[type];
-        return func(result || null);
-    }
-
-    storeBackupKey(txn, type, key) {
-        this._backupKeys[type] = key;
     }
 
     // Olm Sessions
