@@ -1344,8 +1344,13 @@ export function createNewMatrixCall(client, roomId, options) {
         };
     }
 
-    webRtc.getDisplayMedia = w.navigator.mediaDevices.getDisplayMedia.bind(
-        w.navigator.mediaDevices);
+    const getDisplayMedia = (
+        w.navigator.mediaDevices && w.navigator.mediaDevices.getDisplayMedia ||
+        w.navigator.getDisplayMedia
+    );
+    if (getDisplayMedia) {
+        webRtc.getDisplayMedia = getDisplayMedia.bind(w.navigator.mediaDevices);
+    }
 
     // Firefox throws on so little as accessing the RTCPeerConnection when operating in
     // a secure mode. There's some information at https://bugzilla.mozilla.org/show_bug.cgi?id=1542616
