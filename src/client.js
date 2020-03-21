@@ -5130,9 +5130,6 @@ function checkTurnServers(client) {
     if (!client._supportsVoip) {
         return;
     }
-    if (client.isGuest()) {
-        return; // guests can't access TURN servers
-    }
 
     client.turnServer().then(function(res) {
         if (res.uris) {
