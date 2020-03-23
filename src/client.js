@@ -1242,7 +1242,9 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
  * @param {boolean} checkKey check if the secret is encrypted by a trusted
  *     key
  *
- * @return {boolean} whether or not the secret is stored
+ * @return {object?} map of key name to key info the secret is encrypted
+ *     with, or null if it is not present or not encrypted with a trusted
+ *     key
  */
 
 /**
@@ -1577,7 +1579,9 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(
 
 /**
  * Check whether the key backup private key is stored in secret storage.
- * @return {Promise<boolean>} Whether the backup key is stored.
+ * @return {Promise<object?>} map of key name to key info the secret is
+ *     encrypted with, or null if it is not present or not encrypted with a
+ *     trusted key
  */
 MatrixClient.prototype.isKeyBackupKeyStored = async function() {
     return this.isSecretStored("m.megolm_backup.v1", false /* checkKey */);

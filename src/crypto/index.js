@@ -434,8 +434,10 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             // the old algorithm
             logger.log("Switching to symmetric");
             const keys = {};
-            // fetch the cross-signing private keys (needed to sign the
-            // new SSSS key)
+            // fetch the cross-signing private keys (needed to sign the new
+            // SSSS key).  We store the cross-signing keys, and temporarily set
+            // a callback so that when the private key is needed while setting
+            // things up, we can provide it.
             this._baseApis._cryptoCallbacks.getCrossSigningKey =
                 name => crossSigningPrivateKeys[name];
             for (const type of ["master", "self_signing", "user_signing"]) {
