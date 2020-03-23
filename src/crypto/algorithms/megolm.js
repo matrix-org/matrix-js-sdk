@@ -955,8 +955,10 @@ MegolmEncryption.prototype._getDevicesInRoom = async function(room) {
                 continue;
             }
 
+            const deviceTrust = this._crypto.checkDeviceTrust(userId, deviceId);
+
             if (userDevices[deviceId].isBlocked() ||
-                (userDevices[deviceId].isUnverified() && isBlacklisting)
+                (!deviceTrust.isVerified() && isBlacklisting)
             ) {
                 if (!blocked[userId]) {
                     blocked[userId] = {};
