@@ -297,6 +297,10 @@ describe("MegolmDecryption", function() {
                 },
             }));
 
+            mockCrypto.checkDeviceTrust.mockReturnValue({
+                isVerified: () => false,
+            });
+
             const megolmEncryption = new MegolmEncryption({
                 userId: '@user:id',
                 crypto: mockCrypto,
