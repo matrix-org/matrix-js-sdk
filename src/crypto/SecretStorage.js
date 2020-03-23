@@ -34,7 +34,8 @@ const subtleCrypto = (typeof window !== "undefined" && window.crypto) ?
 // salt for HKDF, with 8 bytes of zeros
 const zerosalt = new Uint8Array(8);
 
-/** encrypt a string in Node.js
+/**
+ * encrypt a string in Node.js
  *
  * @param {string} data the plaintext to encrypt
  * @param {Uint8Array} key the encryption key to use
