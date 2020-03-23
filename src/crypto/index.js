@@ -353,6 +353,37 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
 };
 
 /**
+ * Checks whether cross signing:
+ * - is enabled on this account
+ * - is trusted by this device
+ * - has private keys stored in secret storage
+ * and that the account has a secret storage key
+ *
+ * If this function returns false, bootstrapSecretStorage() can be used
+ * to fix things such that it returns true. That is to say, after
+ * bootstrapSecretStorage() completes sucessfully, this function should
+ * return true.
+ *
+ * The cross-signing API is currently UNSTABLE and may change without notice.
+ *
+ * @return {bool} True if cross-signing is ready to be used on this device
+ */
+Crypto.prototype.crossSigningReady = async function() {
+    const publicKeysOnDevice = this._crossSigningInfo.getId();
+    const privateKeysInStorage = await this._crossSigningInfo.isStoredInSecretStorage(
+        this._secretStorage,
+    );
+    const secretStorageKeyInAccount = await this._secretStorage.hasKey();
+
+    return (
+        publicKeysOnDevice &&
+        privateKeysInStorage &&
+        secretStorageKeyInAccount
+    );
+};
+
+
+/**
  * Bootstrap Secure Secret Storage if needed by creating a default key and
  * signing it with the cross-signing master key. If everything is already set
  * up, then no changes are made, so this is safe to run to ensure secret storage
