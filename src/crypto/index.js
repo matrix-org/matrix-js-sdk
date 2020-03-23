@@ -519,7 +519,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
 
                     if (
                         keyBackupInfo.auth_data.private_key_salt &&
-                            keyBackupInfo.auth_data.private_key_iterations
+                        keyBackupInfo.auth_data.private_key_iterations
                     ) {
                         opts.passphrase = {
                             algorithm: "m.pbkdf2",
