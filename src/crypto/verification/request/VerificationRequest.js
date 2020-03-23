@@ -214,6 +214,15 @@ export class VerificationRequest extends EventEmitter {
         const theirMethodEvent = this._eventsByThem.get(REQUEST_TYPE) ||
             this._eventsByThem.get(READY_TYPE);
         if (!theirMethodEvent) {
+            // if we started straight away with .start event,
+            // we are assuming that the other side will support the
+            // chosen method, so return true for that.
+            if (this.started && this.initiatedByMe) {
+                const myStartEvent = this._eventsByUs.get(START_TYPE);
+                const content = myStartEvent && myStartEvent.getContent();
+                const myStartMethod = content && content.method;
+                return method == myStartMethod;
+            }
             return false;
         }
         const content = theirMethodEvent.getContent();
