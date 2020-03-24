@@ -527,7 +527,7 @@ export class SecretStorage extends EventEmitter {
                 device_trust: this._baseApis.checkDeviceTrust(sender, deviceId),
             });
             if (secret) {
-                logger.info(`Preparing ${content.name} secret for ${deviceId}`)
+                logger.info(`Preparing ${content.name} secret for ${deviceId}`);
                 const payload = {
                     type: "m.secret.send",
                     content: {
@@ -564,10 +564,10 @@ export class SecretStorage extends EventEmitter {
                     },
                 };
 
-                logger.info(`Sending ${content.name} secret for ${deviceId}`)
+                logger.info(`Sending ${content.name} secret for ${deviceId}`);
                 this._baseApis.sendToDevice("m.room.encrypted", contentMap);
             } else {
-                logger.info(`Request denied for ${content.name} secret for ${deviceId}`)
+                logger.info(`Request denied for ${content.name} secret for ${deviceId}`);
             }
         }
     }
