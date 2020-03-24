@@ -149,7 +149,7 @@ export class CrossSigningInfo extends EventEmitter {
         // check what SSSS keys have encrypted the master key (if any)
         const stored =
               await secretStorage.isStored("m.cross_signing.master", false) || {};
-        // then check which of those SSSS keys have also encryypted the SSK and USK
+        // then check which of those SSSS keys have also encrypted the SSK and USK
         function intersect(s) {
             for (const k of Object.keys(stored)) {
                 if (!s[k]) {
