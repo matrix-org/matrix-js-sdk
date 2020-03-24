@@ -368,7 +368,7 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
  *
  * @return {bool} True if cross-signing is ready to be used on this device
  */
-Crypto.prototype.crossSigningReady = async function() {
+Crypto.prototype.isCrossSigningReady = async function() {
     const publicKeysOnDevice = this._crossSigningInfo.getId();
     const privateKeysInStorage = await this._crossSigningInfo.isStoredInSecretStorage(
         this._secretStorage,
