@@ -148,7 +148,8 @@ async function encryptBrowser(data, key, name) {
     };
 }
 
-/** decrypt a string in the browser
+/**
+ * decrypt a string in the browser
  *
  * @param {object} data the encrypted data
  * @param {string} data.ciphertext the ciphertext in base64
