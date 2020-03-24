@@ -541,5 +541,31 @@ describe("MegolmBackup", function() {
                 expect(res.clearEvent.content).toEqual('testytest');
             });
         });
+
+        it('has working cache functions', async function() {
+            const key = Uint8Array.from([1, 2, 3, 4, 5, 6, 7, 8]);
+            await client._crypto.storeSessionBackupPrivateKey(key);
+            const result = await client._crypto.getSessionBackupPrivateKey();
+            expect(result).toEqual(key);
+        });
+
+        it('caches session backup keys as it encounters them', async function() {
+            const cachedNull = await client._crypto.getSessionBackupPrivateKey();
+            expect(cachedNull).toBeNull();
+            client._http.authedRequest = function() {
+                return Promise.resolve(KEY_BACKUP_DATA);
+            };
+            await new Promise((resolve) => {
+                client.restoreKeyBackupWithRecoveryKey(
+                    "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d",
+                    ROOM_ID,
+                    SESSION_ID,
+                    BACKUP_INFO,
+                    { cacheCompleteCallback: resolve },
+                );
+            });
+            const cachedKey = await client._crypto.getSessionBackupPrivateKey();
+            expect(cachedKey).not.toBeNull();
+        });
     });
 });
