@@ -185,12 +185,14 @@ utils.inherits(MegolmEncryption, EncryptionAlgorithm);
  *
  * @param {Object} devicesInRoom The devices in this room, indexed by user ID
  * @param {Object} blocked The devices that are blocked, indexed by user ID
+ * @param {boolean} [singleOlmCreationPhase] Only perform one round of olm
+ *     session creation
  *
  * @return {Promise} Promise which resolves to the
  *    OutboundSessionInfo when setup is complete.
  */
 MegolmEncryption.prototype._ensureOutboundSession = async function(
-    devicesInRoom, blocked,
+    devicesInRoom, blocked, singleOlmCreationPhase,
 ) {
     let session;
 
@@ -270,56 +272,53 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
                 const errorDevices = [];
 
                 // meanwhile, establish olm sessions for devices that we don't
-                // already have a session for, and share keys with them.  Use a
-                // shorter timeout when fetching one-time keys.
+                // already have a session for, and share keys with them.  If
+                // we're doing two phases of olm session creation, use a
+                // shorter timeout when fetching one-time keys for the first
+                // phase.
+                const start = Date.now();
+                const failedServers = [];
                 await this._shareKeyWithDevices(
-                    session, key, payload, devicesWithoutSession, errorDevices, 2000,
+                    session, key, payload, devicesWithoutSession, errorDevices,
+                    singleOlmCreationPhase ? 10000 : 2000, failedServers,
                 );
 
-                (async () => {
-                    // Retry sending keys to devices that we were unable to establish
-                    // an olm session for.  This time, we use a longer timeout, but we
-                    // do this in the background and don't block anything else while we
-                    // do this.
-                    const retryDevices = {};
-                    for (const {userId, deviceInfo} of errorDevices) {
-                        retryDevices[userId] = retryDevices[userId] || [];
-                        retryDevices[userId].push(deviceInfo);
-                    }
+                if (!singleOlmCreationPhase && (Date.now() - start < 10000)) {
+                    // perform the second phase of olm session creation if requested,
+                    // and if the first phase didn't take too long
+                    (async () => {
+                        // Retry sending keys to devices that we were unable to establish
+                        // an olm session for.  This time, we use a longer timeout, but we
+                        // do this in the background and don't block anything else while we
+                        // do this.  We only need to retry users from servers that didn't
+                        // respond the first time.
+                        const retryDevices = {};
+                        const failedServerMap = new Set;
+                        for (const server of failedServers) {
+                            failedServerMap.add(server);
+                        }
+                        const failedDevices = [];
+                        for (const {userId, deviceInfo} of errorDevices) {
+                            const userHS = userId.slice(userId.indexOf(":") + 1);
+                            if (failedServerMap.has(userHS)) {
+                                retryDevices[userId] = retryDevices[userId] || [];
+                                retryDevices[userId].push(deviceInfo);
+                            } else {
+                                // if we aren't going to retry, then handle it
+                                // as a failed device
+                                failedDevices.push({userId, deviceInfo});
+                            }
+                        }
 
-                    const failedDevices = [];
-                    await this._shareKeyWithDevices(
-                        session, key, payload, retryDevices, failedDevices,
-                    );
-
-                    const blockedMap = {};
-                    const filteredFailedDevices =
-                        await this._olmDevice.filterOutNotifiedErrorDevices(
-                            failedDevices,
+                        await this._shareKeyWithDevices(
+                            session, key, payload, retryDevices, failedDevices,
                         );
-                    for (const {userId, deviceInfo} of filteredFailedDevices) {
-                        blockedMap[userId] = blockedMap[userId] || {};
-                        // we use a similar format to what
-                        // olmlib.ensureOlmSessionsForDevices returns, so that
-                        // we can use the same function to split
-                        blockedMap[userId][deviceInfo.deviceId] = {
-                            device: {
-                                code: "m.no_olm",
-                                reason: WITHHELD_MESSAGES["m.no_olm"],
-                                deviceInfo,
-                            },
-                        };
 
-                        const deviceId = deviceInfo.deviceId;
-
-                        // mark this device as "handled" because we don't want to try
-                        // to claim a one-time-key for dead devices on every message.
-                        session.markSharedWithDevice(userId, deviceId, key.chain_index);
-                    }
-
-                    // notify devices that we couldn't get an olm session
-                    await this._notifyBlockedDevices(session, blockedMap);
-                })();
+                        await this._notifyFailedOlmDevices(session, key, failedDevices);
+                    })();
+                } else {
+                    await this._notifyFailedOlmDevices(session, key, errorDevices);
+                }
             })(),
             (async () => {
                 // also, notify blocked devices that they're blocked
@@ -690,12 +689,15 @@ MegolmEncryption.prototype.reshareKeyWithDevice = async function(
  *
  * @param {Number} [otkTimeout] The timeout in milliseconds when requesting
  *     one-time keys for establishing new olm sessions.
+ *
+ * @param {Array} [failedServers] An array to fill with remote servers that
+ *     failed to respond to one-time-key requests.
  */
 MegolmEncryption.prototype._shareKeyWithDevices = async function(
-    session, key, payload, devicesByUser, errorDevices, otkTimeout,
+    session, key, payload, devicesByUser, errorDevices, otkTimeout, failedServers,
 ) {
     const devicemap = await olmlib.ensureOlmSessionsForDevices(
-        this._olmDevice, this._baseApis, devicesByUser, otkTimeout,
+        this._olmDevice, this._baseApis, devicesByUser, otkTimeout, failedServers,
     );
 
     this._getDevicesWithoutSessions(devicemap, devicesByUser, errorDevices);
@@ -722,6 +724,52 @@ MegolmEncryption.prototype._shareKeyWithOlmSessions = async function(
             throw e;
         }
     }
+};
+
+/**
+ * Notify devices that we weren't able to create olm sessions.
+ *
+ * @param {module:crypto/algorithms/megolm.OutboundSessionInfo} session
+ *
+ * @param {object} key
+ *
+ * @param {Array<object>} failedDevices the devices that we were unable to
+ *     create olm sessions for, as returned by _shareKeyWithDevices
+ */
+MegolmEncryption.prototype._notifyFailedOlmDevices = async function(
+    session, key, failedDevices,
+) {
+    // mark the devices that failed as "handled" because we don't want to try
+    // to claim a one-time-key for dead devices on every message.
+    for (const {userId, deviceInfo} of failedDevices) {
+        const deviceId = deviceInfo.deviceId;
+
+        session.markSharedWithDevice(
+            userId, deviceId, key.chain_index,
+        );
+    }
+
+    const filteredFailedDevices =
+          await this._olmDevice.filterOutNotifiedErrorDevices(
+              failedDevices,
+          );
+    const blockedMap = {};
+    for (const {userId, deviceInfo} of filteredFailedDevices) {
+        blockedMap[userId] = blockedMap[userId] || {};
+        // we use a similar format to what
+        // olmlib.ensureOlmSessionsForDevices returns, so that
+        // we can use the same function to split
+        blockedMap[userId][deviceInfo.deviceId] = {
+            device: {
+                code: "m.no_olm",
+                reason: WITHHELD_MESSAGES["m.no_olm"],
+                deviceInfo,
+            },
+        };
+    }
+
+    // send the notifications
+    await this._notifyBlockedDevices(session, blockedMap);
 };
 
 /**
@@ -786,7 +834,7 @@ MegolmEncryption.prototype.prepareToEncrypt = function(room) {
             this._removeUnknownDevices(devicesInRoom);
         }
 
-        await this._ensureOutboundSession(devicesInRoom, blocked);
+        await this._ensureOutboundSession(devicesInRoom, blocked, true);
 
         delete this.encryptionPreparation;
     })();

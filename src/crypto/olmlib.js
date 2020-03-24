@@ -180,14 +180,18 @@ export async function getExistingOlmSessions(
  * @param {Number} [otkTimeout] The timeout in milliseconds when requesting
  *     one-time keys for establishing new olm sessions.
  *
+ * @param {Array} [failedServers] An array to fill with remote servers that
+ *     failed to respond to one-time-key requests.
+ *
  * @return {Promise} resolves once the sessions are complete, to
  *    an Object mapping from userId to deviceId to
  *    {@link module:crypto~OlmSessionResult}
  */
 export async function ensureOlmSessionsForDevices(
-    olmDevice, baseApis, devicesByUser, force, otkTimeout,
+    olmDevice, baseApis, devicesByUser, force, otkTimeout, failedServers,
 ) {
     if (typeof force === "number") {
+        failedServers = otkTimeout;
         otkTimeout = force;
         force = false;
     }
@@ -259,6 +263,10 @@ export async function ensureOlmSessionsForDevices(
         }
         logger.log("failed to claim one-time keys", e, devicesWithoutSession);
         throw e;
+    }
+
+    if (failedServers && "failures" in res) {
+        failedServers.push(...Object.keys(res.failures));
     }
 
     const otk_res = res.one_time_keys || {};
