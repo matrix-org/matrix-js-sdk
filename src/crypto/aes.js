@@ -59,7 +59,8 @@ async function encryptNode(data, key, name) {
     };
 }
 
-/** decrypt a string in Node.js
+/**
+ * decrypt a string in Node.js
  *
  * @param {object} data the encrypted data
  * @param {string} data.ciphertext the ciphertext in base64
