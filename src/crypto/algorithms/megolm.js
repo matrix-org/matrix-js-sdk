@@ -277,9 +277,10 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
                 // shorter timeout when fetching one-time keys for the first
                 // phase.
                 const start = Date.now();
+                const failedServers = [];
                 await this._shareKeyWithDevices(
                     session, key, payload, devicesWithoutSession, errorDevices,
-                    singleOlmCreationPhase ? 10000 : 2000,
+                    singleOlmCreationPhase ? 10000 : 2000, failedServers,
                 );
 
                 if (!singleOlmCreationPhase && (Date.now() - start < 10000)) {
@@ -289,11 +290,19 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
                         // Retry sending keys to devices that we were unable to establish
                         // an olm session for.  This time, we use a longer timeout, but we
                         // do this in the background and don't block anything else while we
-                        // do this.
+                        // do this.  We only need to retry users from servers that didn't
+                        // respond the first time.
                         const retryDevices = {};
+                        const failedServerMap = new Set;
+                        for (const server of failedServers) {
+                            failedServerMap.add(server);
+                        }
                         for (const {userId, deviceInfo} of errorDevices) {
-                            retryDevices[userId] = retryDevices[userId] || [];
-                            retryDevices[userId].push(deviceInfo);
+                            const userHS = userId.slice(userId.indexOf(":") + 1);
+                            if (failedServerMap.has(userHS)) {
+                                retryDevices[userId] = retryDevices[userId] || [];
+                                retryDevices[userId].push(deviceInfo);
+                            }
                         }
 
                         const failedDevices = [];
@@ -702,12 +711,15 @@ MegolmEncryption.prototype.reshareKeyWithDevice = async function(
  *
  * @param {Number} [otkTimeout] The timeout in milliseconds when requesting
  *     one-time keys for establishing new olm sessions.
+ *
+ * @param {Array} [failedServers] An array to fill with remote servers that
+ *     failed to respond to one-time-key requests.
  */
 MegolmEncryption.prototype._shareKeyWithDevices = async function(
-    session, key, payload, devicesByUser, errorDevices, otkTimeout,
+    session, key, payload, devicesByUser, errorDevices, otkTimeout, failedServers,
 ) {
     const devicemap = await olmlib.ensureOlmSessionsForDevices(
-        this._olmDevice, this._baseApis, devicesByUser, otkTimeout,
+        this._olmDevice, this._baseApis, devicesByUser, otkTimeout, failedServers,
     );
 
     this._getDevicesWithoutSessions(devicemap, devicesByUser, errorDevices);
