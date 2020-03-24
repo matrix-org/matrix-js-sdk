@@ -21,5 +21,12 @@ import request from "request";
 matrixcs.request(request);
 utils.runPolyfills();
 
+try {
+    const crypto = require('crypto');
+    utils.setCrypto(crypto);
+} catch (err) {
+    console.log('nodejs was compiled without crypto support');
+}
+
 export * from "./matrix";
 export default matrixcs;

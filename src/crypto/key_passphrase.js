@@ -19,6 +19,8 @@ import {randomString} from '../randomstring';
 
 const DEFAULT_ITERATIONS = 500000;
 
+const DEFAULT_BITSIZE = 256;
+
 export async function keyFromAuthData(authData, password) {
     if (!global.Olm) {
         throw new Error("Olm is not available");
@@ -34,6 +36,7 @@ export async function keyFromAuthData(authData, password) {
     return await deriveKey(
         password, authData.private_key_salt,
         authData.private_key_iterations,
+        authData.private_key_bits || DEFAULT_BITSIZE,
     );
 }
 
@@ -44,12 +47,12 @@ export async function keyFromPassphrase(password) {
 
     const salt = randomString(32);
 
-    const key = await deriveKey(password, salt, DEFAULT_ITERATIONS);
+    const key = await deriveKey(password, salt, DEFAULT_ITERATIONS, DEFAULT_BITSIZE);
 
     return { key, salt, iterations: DEFAULT_ITERATIONS };
 }
 
-export async function deriveKey(password, salt, iterations) {
+export async function deriveKey(password, salt, iterations, numBits = DEFAULT_BITSIZE) {
     const subtleCrypto = global.crypto.subtle;
     const TextEncoder = global.TextEncoder;
     if (!subtleCrypto || !TextEncoder) {
@@ -73,7 +76,7 @@ export async function deriveKey(password, salt, iterations) {
             hash: 'SHA-512',
         },
         key,
-        global.Olm.PRIVATE_KEY_LENGTH * 8,
+        numBits,
     );
 
     return new Uint8Array(keybits);

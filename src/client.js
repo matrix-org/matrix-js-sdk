@@ -217,8 +217,10 @@ function keyFromRecoverySession(session, decryptionKey) {
  * Args:
  *   {object} keys Information about the keys:
  *       {
- *           <key name>: {
- *               pubkey: {UInt8Array}
+ *           keys: {
+ *               <key name>: {
+ *                   pubkey: {UInt8Array}
+ *               }, ...
  *           }
  *       }
  *   {string} name the name of the value we want to read out of SSSS, for UI purposes.
@@ -1247,7 +1249,9 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
  * @param {boolean} checkKey check if the secret is encrypted by a trusted
  *     key
  *
- * @return {boolean} whether or not the secret is stored
+ * @return {object?} map of key name to key info the secret is encrypted
+ *     with, or null if it is not present or not encrypted with a trusted
+ *     key
  */
 
 /**
@@ -1295,6 +1299,7 @@ wrapCryptoFuncs(MatrixClient, [
     "bootstrapSecretStorage",
     "addSecretStorageKey",
     "hasSecretStorageKey",
+    "secretStorageKeyNeedsUpgrade",
     "storeSecret",
     "getSecret",
     "isSecretStored",
@@ -1581,7 +1586,9 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(
 
 /**
  * Check whether the key backup private key is stored in secret storage.
- * @return {Promise<boolean>} Whether the backup key is stored.
+ * @return {Promise<object?>} map of key name to key info the secret is
+ *     encrypted with, or null if it is not present or not encrypted with a
+ *     trusted key
  */
 MatrixClient.prototype.isKeyBackupKeyStored = async function() {
     return this.isSecretStored("m.megolm_backup.v1", false /* checkKey */);
@@ -1732,6 +1739,35 @@ MatrixClient.prototype.isValidRecoveryKey = function(recoveryKey) {
     } catch (e) {
         return false;
     }
+};
+
+/**
+ * Get the raw key for a key backup from the password
+ * Used when migrating key backups into SSSS
+ *
+ * The cross-signing API is currently UNSTABLE and may change without notice.
+ *
+ * @param {string} password Passphrase
+ * @param {object} backupInfo Backup metadata from `checkKeyBackup`
+ * @return {Promise<Buffer>} key backup key
+ */
+MatrixClient.prototype.keyBackupKeyFromPassword = function(
+    password, backupInfo,
+) {
+    return keyFromAuthData(backupInfo.auth_data, password);
+};
+
+/**
+ * Get the raw key for a key backup from the recovery key
+ * Used when migrating key backups into SSSS
+ *
+ * The cross-signing API is currently UNSTABLE and may change without notice.
+ *
+ * @param {string} recoveryKey The recovery key
+ * @return {Buffer} key backup key
+ */
+MatrixClient.prototype.keyBackupKeyFromRecoveryKey = function(recoveryKey) {
+    return decodeRecoveryKey(recoveryKey);
 };
 
 MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY = 'RESTORE_BACKUP_ERROR_BAD_KEY';

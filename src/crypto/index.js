@@ -39,7 +39,7 @@ import {
     UserTrustLevel,
     createCryptoStoreCacheCallbacks,
 } from './CrossSigning';
-import {SECRET_STORAGE_ALGORITHM_V1, SecretStorage} from './SecretStorage';
+import {SECRET_STORAGE_ALGORITHM_V1_AES, SecretStorage} from './SecretStorage';
 import {OutgoingRoomKeyRequestManager} from './OutgoingRoomKeyRequestManager';
 import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
 import {
@@ -371,6 +371,9 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
  * created and the private key stored in the new SSSS store. Ignored if keyBackupInfo
  * is supplied.
  * @param {bool} [opts.setupNewSecretStorage] Optional. Reset even if keys already exist.
+ * @param {func} [opts.getKeyBackupPassphrase] Optional. Function called to get the user's
+ *     current key backup passphrase. Should return a promise that resolves with a Buffer
+ *     containing the key, or rejects if the key cannot be obtained.
  * Returns:
  *     {Promise} A promise which resolves to key creation data for
  *     SecretStorage#addKey: an object with `passphrase` and/or `pubkey` fields.
@@ -381,6 +384,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     keyBackupInfo,
     setupNewKeyBackup,
     setupNewSecretStorage,
+    getKeyBackupPassphrase,
 } = {}) {
     logger.log("Bootstrapping Secure Secret Storage");
 
@@ -395,10 +399,82 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     // use temporary callbacks to weave them through the various APIs.
     const appCallbacks = Object.assign({}, this._baseApis._cryptoCallbacks);
 
+    // the ID of the new SSSS key, if we create one
+    let newKeyId = null;
+
+    // cache SSSS keys so that we don't need to constantly pester the user about it
+    const ssssKeys = {};
+
+    this._baseApis._cryptoCallbacks.getSecretStorageKey =
+        async ({keys}, name) => {
+            // if we already have a key that works, return it
+            for (const keyId of Object.keys(keys)) {
+                if (ssssKeys[keyId]) {
+                    return [keyId, ssssKeys[keyId]];
+                }
+            }
+
+            // otherwise, prompt the user and cache it
+            const key = await appCallbacks.getSecretStorageKey({keys}, name);
+            if (key) {
+                const [keyId, keyData] = key;
+                ssssKeys[keyId] = keyData;
+            }
+            return key;
+        };
+
     try {
-        const inStorage = !setupNewSecretStorage &&
-            await this._crossSigningInfo.isStoredInSecretStorage(this._secretStorage);
-        if (!this._crossSigningInfo.getId() || !inStorage) {
+        const decryptionKeys =
+              await this._crossSigningInfo.isStoredInSecretStorage(this._secretStorage);
+        const inStorage = !setupNewSecretStorage && decryptionKeys;
+        if (decryptionKeys && !(Object.values(decryptionKeys).some(
+            info => info.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES,
+        ))) {
+            // we already have cross-signing keys, but they're encrypted using
+            // the old algorithm
+            logger.log("Switching to symmetric");
+            const keys = {};
+            // fetch the cross-signing private keys (needed to sign the new
+            // SSSS key).  We store the cross-signing keys, and temporarily set
+            // a callback so that when the private key is needed while setting
+            // things up, we can provide it.
+            this._baseApis._cryptoCallbacks.getCrossSigningKey =
+                name => crossSigningPrivateKeys[name];
+            for (const type of ["master", "self_signing", "user_signing"]) {
+                const secretName = `m.cross_signing.${type}`;
+                const secret = await this.getSecret(secretName);
+                keys[type] = secret;
+                crossSigningPrivateKeys[type] = olmlib.decodeBase64(secret);
+            }
+            await this.checkOwnCrossSigningTrust();
+            const opts = {};
+            let oldKeyId = null;
+            for (const [keyId, keyInfo] of Object.entries(decryptionKeys)) {
+                // See if the old key was generated from a passphrase.  If
+                // yes, use the same settings.
+                if (keyId in ssssKeys) {
+                    oldKeyId = keyId;
+                    if (keyInfo.passphrase) {
+                        opts.passphrase = keyInfo.passphrase;
+                    }
+                    break;
+                }
+            }
+            // create new symmetric SSSS key and set it as default
+            newKeyId = await this.addSecretStorageKey(
+                SECRET_STORAGE_ALGORITHM_V1_AES, opts,
+            );
+            if (oldKeyId) {
+                ssssKeys[newKeyId] = ssssKeys[oldKeyId];
+            }
+            await this.setDefaultSecretStorageKeyId(newKeyId);
+            // re-encrypt all the keys with the new key
+            for (const type of ["master", "self_signing", "user_signing"]) {
+                const secretName = `m.cross_signing.${type}`;
+                await this.storeSecret(secretName, keys[type], [newKeyId]);
+            }
+        } else if (!this._crossSigningInfo.getId() || !inStorage) {
+            // create new cross-signing keys if necessary.
             logger.log(
                 "Cross-signing public and/or private keys not found, " +
                 "checking secret storage for private keys",
@@ -424,40 +500,50 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             logger.log("Cross signing keys are present in secret storage");
         }
 
-        // Check if Secure Secret Storage has a default key. If we don't have one, create
-        // the default key (which will also be signed by the cross-signing master key).
-        if (setupNewSecretStorage || !await this.hasSecretStorageKey()) {
-            let newKeyId;
+        // Check if we need to create a new secret storage key
+        // - we're resetting secret storage
+        // - we don't have a default secret storage key yet
+        // - our default secret storage key is using an older algorithm
+        // We will also run this part if we created a new secret storage key
+        // above, so that we can (re-)encrypt the backup with it.
+        const defaultSSSSKey = await this.getSecretStorageKey();
+        if (setupNewSecretStorage || newKeyId || !defaultSSSSKey
+            || defaultSSSSKey[1].algorithm !== SECRET_STORAGE_ALGORITHM_V1_AES) {
             if (keyBackupInfo) {
+                // if we already have a backup key, use the same key as the
+                // secret storage key
                 logger.log("Secret storage default key not found, using key backup key");
-                const opts = {
-                    pubkey: keyBackupInfo.auth_data.public_key,
-                };
 
-                if (
-                    keyBackupInfo.auth_data.private_key_salt &&
-                    keyBackupInfo.auth_data.private_key_iterations
-                ) {
-                    opts.passphrase = {
-                        algorithm: "m.pbkdf2",
-                        iterations: keyBackupInfo.auth_data.private_key_iterations,
-                        salt: keyBackupInfo.auth_data.private_key_salt,
-                    };
+                const backupKey = await getKeyBackupPassphrase();
+
+                if (!newKeyId) {
+                    const opts = {};
+
+                    if (
+                        keyBackupInfo.auth_data.private_key_salt &&
+                        keyBackupInfo.auth_data.private_key_iterations
+                    ) {
+                        opts.passphrase = {
+                            algorithm: "m.pbkdf2",
+                            iterations: keyBackupInfo.auth_data.private_key_iterations,
+                            salt: keyBackupInfo.auth_data.private_key_salt,
+                            bits: 256,
+                        };
+                    }
+
+                    newKeyId = await this.addSecretStorageKey(
+                        SECRET_STORAGE_ALGORITHM_V1_AES, opts,
+                    );
+                    this.setDefaultSecretStorageKeyId(newKeyId);
+                    // use the backup key as the new ssss key
+                    ssssKeys[newKeyId] = backupKey;
                 }
-
-                newKeyId = await this.addSecretStorageKey(
-                    SECRET_STORAGE_ALGORITHM_V1, opts,
-                );
-
-                // Add an entry for the backup key in SSSS as a 'passthrough' key
-                // (ie. the secret is the key itself).
-                this._secretStorage.storePassthrough('m.megolm_backup.v1', newKeyId);
 
                 // if this key backup is trusted, sign it with the cross signing key
                 // so the key backup can be trusted via cross-signing.
                 const backupSigStatus = await this.checkKeyBackup(keyBackupInfo);
                 if (backupSigStatus.trustInfo.usable) {
-                    console.log("Adding cross signing signature to key backup");
+                    logger.log("Adding cross signing signature to key backup");
                     await this._crossSigningInfo.signObject(
                         keyBackupInfo.auth_data, "master",
                     );
@@ -466,20 +552,32 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                         undefined, keyBackupInfo,
                         {prefix: httpApi.PREFIX_UNSTABLE},
                     );
+                    await this.storeSecret(
+                        "m.megolm_backup.v1", olmlib.encodeBase64(backupKey), [newKeyId],
+                    );
                 } else {
-                    console.log(
+                    logger.log(
                         "Key backup is NOT TRUSTED: NOT adding cross signing signature",
                     );
                 }
             } else {
-                logger.log("Secret storage default key not found, creating new key");
-                const keyOptions = await createSecretStorageKey();
-                newKeyId = await this.addSecretStorageKey(
-                    SECRET_STORAGE_ALGORITHM_V1,
-                    keyOptions,
-                );
+                if (!newKeyId) {
+                    logger.log("Secret storage default key not found, creating new key");
+                    const keyOptions = await createSecretStorageKey();
+                    newKeyId = await this.addSecretStorageKey(
+                        SECRET_STORAGE_ALGORITHM_V1_AES,
+                        keyOptions,
+                    );
+                    await this.setDefaultSecretStorageKeyId(newKeyId);
+                }
+                if (await this.isSecretStored("m.megolm_backup.v1")) {
+                    // we created a new SSSS, and we previously encrypted the
+                    // backup key with the old SSSS key, so re-encrypt with the
+                    // new key
+                    const backupKey = await this.getSecret("m.megolm_backup.v1");
+                    await this.storeSecret("m.megolm_backup.v1", backupKey, [newKeyId]);
+                }
             }
-            await this.setDefaultSecretStorageKeyId(newKeyId);
         } else {
             logger.log("Have secret storage key");
         }
@@ -533,6 +631,14 @@ Crypto.prototype.addSecretStorageKey = function(algorithm, opts, keyID) {
 
 Crypto.prototype.hasSecretStorageKey = function(keyID) {
     return this._secretStorage.hasKey(keyID);
+};
+
+Crypto.prototype.secretStorageKeyNeedsUpgrade = function(keyID) {
+    return this._secretStorage.keyNeedsUpgrade(keyID);
+};
+
+Crypto.prototype.getSecretStorageKey = function(keyID) {
+    return this._secretStorage.getKey(keyID);
 };
 
 Crypto.prototype.storeSecret = function(name, secret, keys) {
