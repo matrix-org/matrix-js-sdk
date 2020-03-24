@@ -106,7 +106,8 @@ function deriveKeysNode(key, name) {
     return [aesKey, hmacKey];
 }
 
-/** encrypt a string in Node.js
+/**
+ * encrypt a string in Node.js
  *
  * @param {string} data the plaintext to encrypt
  * @param {Uint8Array} key the encryption key to use
