@@ -632,6 +632,14 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                     this._secretStorage,
                 );
             }
+            // Call `getCrossSigningKey` for side effect of caching if enabled
+            // via app level callbacks.
+            if (this._crossSigningInfo._cacheCallbacks) {
+                for (const type of ["self_signing", "user_signing"]) {
+                    logger.log(`Cache ${type} cross-signing private key locally`);
+                    await this._crossSigningInfo.getCrossSigningKey(type);
+                }
+            }
         }
 
         if (setupNewKeyBackup && !keyBackupInfo) {
