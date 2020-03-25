@@ -1857,7 +1857,7 @@ MatrixClient.prototype.restoreKeyBackupWithCache = async function(
 ) {
     const privKey = await this._crypto.getSessionBackupPrivateKey();
     if (!privKey) {
-        return Promise.reject(new Error("Couldn't get key"));
+        throw new Error("Couldn't get key");
     }
     return this._restoreKeyBackup(
         privKey, targetRoomId, targetSessionId, backupInfo, opts,
