@@ -471,7 +471,9 @@ export class CrossSigningInfo extends EventEmitter {
         if (!userSSK) {
             // if the user has no self-signing key then we cannot make any
             // trust assertions about this device from cross-signing
-            return new DeviceTrustLevel(false, false, localTrust, trustCrossSignedDevices);
+            return new DeviceTrustLevel(
+                false, false, localTrust, trustCrossSignedDevices,
+            );
         }
 
         const deviceObj = deviceToObject(device, userCrossSigning.userId);
@@ -483,9 +485,13 @@ export class CrossSigningInfo extends EventEmitter {
                 deviceObj, publicKeyFromKeyInfo(userSSK), userCrossSigning.userId,
             );
             // ...then we trust this device as much as far as we trust the user
-            return DeviceTrustLevel.fromUserTrustLevel(userTrust, localTrust, trustCrossSignedDevices);
+            return DeviceTrustLevel.fromUserTrustLevel(
+                userTrust, localTrust, trustCrossSignedDevices,
+            );
         } catch (e) {
-            return new DeviceTrustLevel(false, false, localTrust, trustCrossSignedDevices);
+            return new DeviceTrustLevel(
+                false, false, localTrust, trustCrossSignedDevices,
+            );
         }
     }
 

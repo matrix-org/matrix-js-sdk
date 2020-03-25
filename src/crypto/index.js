@@ -348,7 +348,10 @@ Crypto.prototype.setCryptoTrustCrossSignedDevices = function(val) {
         const devices = this._deviceList.getRawStoredDevicesForUser(userId);
         for (const deviceId of Object.keys(devices)) {
             const deviceTrust = this.checkDeviceTrust(userId, deviceId);
-            if (!deviceTrust.isLocallyVerified() && deviceTrust.isCrossSigningVerified()) {
+            if (
+                !deviceTrust.isLocallyVerified() &&
+                deviceTrust.isCrossSigningVerified()
+            ) {
                 const deviceObj = this._deviceList.getStoredDevice(userId, deviceId);
                 this.emit("deviceVerificationChanged", userId, deviceId, deviceObj);
             }
