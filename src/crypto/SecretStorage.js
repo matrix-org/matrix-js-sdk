@@ -473,6 +473,7 @@ export class SecretStorage extends EventEmitter {
         for (const device of devices) {
             toDevice[device] = requestData;
         }
+        logger.info(`Request secret ${name} from ${devices}, id ${requestId}`);
         this._baseApis.sendToDevice("m.secret.request", {
             [this._baseApis.getUserId()]: toDevice,
         });
@@ -526,6 +527,7 @@ export class SecretStorage extends EventEmitter {
                 device_trust: this._baseApis.checkDeviceTrust(sender, deviceId),
             });
             if (secret) {
+                logger.info(`Preparing ${content.name} secret for ${deviceId}`);
                 const payload = {
                     type: "m.secret.send",
                     content: {
@@ -562,7 +564,10 @@ export class SecretStorage extends EventEmitter {
                     },
                 };
 
+                logger.info(`Sending ${content.name} secret for ${deviceId}`);
                 this._baseApis.sendToDevice("m.room.encrypted", contentMap);
+            } else {
+                logger.info(`Request denied for ${content.name} secret for ${deviceId}`);
             }
         }
     }
@@ -574,7 +579,7 @@ export class SecretStorage extends EventEmitter {
             return;
         }
         const content = event.getContent();
-        logger.log("got secret share for request ", content.request_id);
+        logger.log("got secret share for request", content.request_id);
         const requestControl = this._requests[content.request_id];
         if (requestControl) {
             // make sure that the device that sent it is one of the devices that
