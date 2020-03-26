@@ -214,8 +214,9 @@ export class VerificationBase extends EventEmitter {
                     { getCrossSigningKey: async (type) => {
                         console.debug("VerificationBase.done: requesting secret",
                                       type, this.deviceId);
-                        const { promise } =
-                            client.requestSecret(`m.cross_signing.${type}`, [this.deviceId]);
+                        const { promise } = client.requestSecret(
+                            `m.cross_signing.${type}`, [this.deviceId],
+                        );
                         const result = await promise;
                         const decoded = decodeBase64(result);
                         return Uint8Array.from(decoded);
