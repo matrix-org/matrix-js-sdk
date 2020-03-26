@@ -69,6 +69,7 @@ describe("self-verifications", () => {
                 _crossSigningInfo,
                 _secretStorage,
             },
+            requestSecret: _secretStorage.request.bind(_secretStorage),
             getUserId: () => userId,
         };
 
