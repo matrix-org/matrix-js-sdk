@@ -1080,9 +1080,9 @@ Crypto.prototype._checkDeviceInfoTrust = function(userId, device) {
     if (device && userCrossSigning) {
         // The _trustCrossSignedDevices only affects trust of other people's cross-signing
         // signatures
-        const trustCrossSigning =  this._trustCrossSignedDevices || userId === this._userId;
+        const trustCrossSig = this._trustCrossSignedDevices || userId === this._userId;
         return this._crossSigningInfo.checkDeviceTrust(
-            userCrossSigning, device, trustedLocally, trustCrossSigning,
+            userCrossSigning, device, trustedLocally, trustCrossSig,
         );
     } else {
         return new DeviceTrustLevel(false, false, trustedLocally);
