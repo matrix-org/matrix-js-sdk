@@ -637,6 +637,18 @@ export class VerificationRequest extends EventEmitter {
             }
         }
 
+        // This assumes verification won't need to send an event with
+        // the same type for the same party twice.
+        // This is true for QR and SAS verification, and was
+        // added here to prevent verification getting cancelled
+        // when the server duplicates an event (https://github.com/matrix-org/synapse/issues/3365)
+        const isDuplicateEvent = isSentByUs ?
+            this._eventsByUs.has(type) :
+            this._eventsByThem.has(type);
+        if (isDuplicateEvent) {
+            return;
+        }
+
         const oldPhase = this.phase;
         this._addEvent(type, event, isSentByUs);
 
