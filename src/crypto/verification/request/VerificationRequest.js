@@ -662,7 +662,7 @@ export class VerificationRequest extends EventEmitter {
                 if (this._verifier.canSwitchStartEvent(event) && newEventWinsRace) {
                     this._verifier.switchStartEvent(event);
                 } else if (!isRemoteEcho) {
-                     if (type === CANCEL_TYPE || (this._verifier.events
+                    if (type === CANCEL_TYPE || (this._verifier.events
                         && this._verifier.events.includes(type))) {
                         this._verifier.handleEvent(event);
                     }
