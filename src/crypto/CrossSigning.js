@@ -460,17 +460,20 @@ export class CrossSigningInfo extends EventEmitter {
      * @param {CrossSigningInfo} userCrossSigning Cross signing info for user
      * @param {module:crypto/deviceinfo} device The device to check
      * @param {bool} localTrust Whether the device is trusted locally
+     * @param {bool} trustCrossSignedDevices Whether we trust cross signed devices
      *
      * @returns {DeviceTrustLevel}
      */
-    checkDeviceTrust(userCrossSigning, device, localTrust) {
+    checkDeviceTrust(userCrossSigning, device, localTrust, trustCrossSignedDevices) {
         const userTrust = this.checkUserTrust(userCrossSigning);
 
         const userSSK = userCrossSigning.keys.self_signing;
         if (!userSSK) {
             // if the user has no self-signing key then we cannot make any
             // trust assertions about this device from cross-signing
-            return new DeviceTrustLevel(false, false, localTrust);
+            return new DeviceTrustLevel(
+                false, false, localTrust, trustCrossSignedDevices,
+            );
         }
 
         const deviceObj = deviceToObject(device, userCrossSigning.userId);
@@ -482,9 +485,13 @@ export class CrossSigningInfo extends EventEmitter {
                 deviceObj, publicKeyFromKeyInfo(userSSK), userCrossSigning.userId,
             );
             // ...then we trust this device as much as far as we trust the user
-            return DeviceTrustLevel.fromUserTrustLevel(userTrust, localTrust);
+            return DeviceTrustLevel.fromUserTrustLevel(
+                userTrust, localTrust, trustCrossSignedDevices,
+            );
         } catch (e) {
-            return new DeviceTrustLevel(false, false, localTrust);
+            return new DeviceTrustLevel(
+                false, false, localTrust, trustCrossSignedDevices,
+            );
         }
     }
 
@@ -547,17 +554,19 @@ export class UserTrustLevel {
  * Represents the ways in which we trust a device
  */
 export class DeviceTrustLevel {
-    constructor(crossSigningVerified, tofu, localVerified) {
+    constructor(crossSigningVerified, tofu, localVerified, trustCrossSignedDevices) {
         this._crossSigningVerified = crossSigningVerified;
         this._tofu = tofu;
         this._localVerified = localVerified;
+        this._trustCrossSignedDevices = trustCrossSignedDevices;
     }
 
-    static fromUserTrustLevel(userTrustLevel, localVerified) {
+    static fromUserTrustLevel(userTrustLevel, localVerified, trustCrossSignedDevices) {
         return new DeviceTrustLevel(
             userTrustLevel._crossSigningVerified,
             userTrustLevel._tofu,
             localVerified,
+            trustCrossSignedDevices,
         );
     }
 
@@ -565,7 +574,9 @@ export class DeviceTrustLevel {
      * @returns {bool} true if this device is verified via any means
      */
     isVerified() {
-        return this.isCrossSigningVerified() || this.isLocallyVerified();
+        return this.isLocallyVerified() || (
+            this._trustCrossSignedDevices && this.isCrossSigningVerified()
+        );
     }
 
     /**

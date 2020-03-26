@@ -120,6 +120,8 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     this._onDeviceListUserCrossSigningUpdated =
         this._onDeviceListUserCrossSigningUpdated.bind(this);
 
+    this._trustCrossSignedDevices = true;
+
     this._reEmitter = new ReEmitter(this);
     this._baseApis = baseApis;
     this._sessionStore = sessionStore;
@@ -317,6 +319,47 @@ Crypto.prototype.init = async function(opts) {
 
     logger.log("Crypto: checking for key backup...");
     this._checkAndStartKeyBackup();
+};
+
+/**
+ * Whether to trust a others users signatures of their devices.
+ * If false, devices will only be considered 'verified' if we have
+ * verified that device individually (effectively disabling cross-signing).
+ *
+ * Default: true
+ *
+ * @return {bool} True if trusting cross-signed devices
+ */
+Crypto.prototype.getCryptoTrustCrossSignedDevices = function() {
+    return this._trustCrossSignedDevices;
+};
+
+/**
+ * See getCryptoTrustCrossSignedDevices
+
+ * This may be set before initCrypto() is called to ensure no races occur.
+ *
+ * @param {bool} val True to trust cross-signed devices
+ */
+Crypto.prototype.setCryptoTrustCrossSignedDevices = function(val) {
+    this._trustCrossSignedDevices = val;
+
+    for (const userId of this._deviceList.getKnownUserIds()) {
+        const devices = this._deviceList.getRawStoredDevicesForUser(userId);
+        for (const deviceId of Object.keys(devices)) {
+            const deviceTrust = this.checkDeviceTrust(userId, deviceId);
+            // If the device is locally verified then isVerified() is always true,
+            // so this will only have caused the value to change if the device is
+            // cross-signing verified but not locally verified
+            if (
+                !deviceTrust.isLocallyVerified() &&
+                deviceTrust.isCrossSigningVerified()
+            ) {
+                const deviceObj = this._deviceList.getStoredDevice(userId, deviceId);
+                this.emit("deviceVerificationChanged", userId, deviceId, deviceObj);
+            }
+        }
+    }
 };
 
 /**
@@ -1047,8 +1090,11 @@ Crypto.prototype._checkDeviceInfoTrust = function(userId, device) {
 
     const userCrossSigning = this._deviceList.getStoredCrossSigningForUser(userId);
     if (device && userCrossSigning) {
+        // The _trustCrossSignedDevices only affects trust of other people's cross-signing
+        // signatures
+        const trustCrossSig = this._trustCrossSignedDevices || userId === this._userId;
         return this._crossSigningInfo.checkDeviceTrust(
-            userCrossSigning, device, trustedLocally,
+            userCrossSigning, device, trustedLocally, trustCrossSig,
         );
     } else {
         return new DeviceTrustLevel(false, false, trustedLocally);

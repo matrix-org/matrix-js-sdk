@@ -760,7 +760,6 @@ MatrixClient.prototype.isCryptoEnabled = function() {
     return this._crypto !== null;
 };
 
-
 /**
  * Get the Ed25519 key for this device
  *
@@ -1152,6 +1151,8 @@ wrapCryptoFuncs(MatrixClient, [
     "legacyDeviceVerification",
     "prepareToEncrypt",
     "isCrossSigningReady",
+    "getCryptoTrustCrossSignedDevices",
+    "setCryptoTrustCrossSignedDevices",
 ]);
 
 /**
