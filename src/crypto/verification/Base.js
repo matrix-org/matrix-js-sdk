@@ -204,7 +204,6 @@ export class VerificationBase extends EventEmitter {
             return new Promise((resolve, reject) => {
                 const client = this._baseApis;
                 const original = client._crypto._crossSigningInfo;
-                const storage = client._crypto._secretStorage;
 
                 /* We already have all of the infrastructure we need to validate and
                  * cache cross-signing keys, so instead of replicating that, here we
@@ -215,8 +214,9 @@ export class VerificationBase extends EventEmitter {
                     { getCrossSigningKey: async (type) => {
                         console.debug("VerificationBase.done: requesting secret",
                                       type, this.deviceId);
-                        const { promise } =
-                            storage.request(`m.cross_signing.${type}`, [this.deviceId]);
+                        const { promise } = client.requestSecret(
+                            `m.cross_signing.${type}`, [this.deviceId],
+                        );
                         const result = await promise;
                         const decoded = decodeBase64(result);
                         return Uint8Array.from(decoded);
