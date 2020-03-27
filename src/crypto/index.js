@@ -1066,7 +1066,7 @@ Crypto.prototype.getStoredCrossSigningForUser = function(userId) {
 Crypto.prototype.checkUserTrust = function(userId) {
     const userCrossSigning = this._deviceList.getStoredCrossSigningForUser(userId);
     if (!userCrossSigning) {
-        return new UserTrustLevel(false, false);
+        return new UserTrustLevel(false, false, false);
     }
     return this._crossSigningInfo.checkUserTrust(userCrossSigning);
 };
@@ -1134,6 +1134,19 @@ Crypto.prototype._onDeviceListUserCrossSigningUpdated = async function(userId) {
         }
     } else {
         await this._checkDeviceVerifications(userId);
+
+        // Update verified before latch using the current state and save the new
+        // latch value in the device list store.
+        const crossSigning = this._deviceList.getStoredCrossSigningForUser(userId);
+        if (crossSigning) {
+            crossSigning.updateCrossSigningVerifiedBefore(
+                this.checkUserTrust(userId).isCrossSigningVerified(),
+            );
+            this._deviceList.setRawStoredCrossSigningForUser(
+                userId, crossSigning.toStorage(),
+            );
+        }
+
         this.emit("userTrustStatusChanged", userId, this.checkUserTrust(userId));
     }
 };
