@@ -574,9 +574,9 @@ export class DeviceTrustLevel {
      * @returns {bool} true if this device is verified via any means
      */
     isVerified() {
-        return this.isLocallyVerified() || (
+        return Boolean(this.isLocallyVerified() || (
             this._trustCrossSignedDevices && this.isCrossSigningVerified()
-        );
+        ));
     }
 
     /**
