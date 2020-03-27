@@ -1097,7 +1097,7 @@ Crypto.prototype._checkDeviceInfoTrust = function(userId, device) {
             userCrossSigning, device, trustedLocally, trustCrossSig,
         );
     } else {
-        return new DeviceTrustLevel(false, false, trustedLocally);
+        return new DeviceTrustLevel(false, false, trustedLocally, false);
     }
 };
 
