@@ -819,11 +819,10 @@ export class VerificationRequest extends EventEmitter {
     }
 
     onVerifierFinished() {
-        if (this.channel.needsDoneMessage) {
-            // verification in DM requires a done message
-            this.channel.send("m.key.verification.done", {});
-        }
+        // verification in DM requires a done message
+        this.channel.send("m.key.verification.done", {});
         this._verifierHasFinished = true;
+        // move to .done phase
         const newTransitions = this._applyPhaseTransitions();
         if (newTransitions.length) {
             this._setPhase(newTransitions[newTransitions.length - 1].phase);
