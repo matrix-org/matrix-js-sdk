@@ -65,15 +65,19 @@ describe("self-verifications", () => {
         };
 
         const storeSessionBackupPrivateKey = jest.fn();
+        const restoreKeyBackupWithCache = jest.fn(() => Promise.resolve());
 
         const client = {
             _crypto: {
                 _crossSigningInfo,
                 _secretStorage,
                 storeSessionBackupPrivateKey,
+                getSessionBackupPrivateKey: () => null,
             },
             requestSecret: _secretStorage.request.bind(_secretStorage),
             getUserId: () => userId,
+            getKeyBackupVersion: () => Promise.resolve({}),
+            restoreKeyBackupWithCache,
         };
 
         const request = {
@@ -103,6 +107,8 @@ describe("self-verifications", () => {
 
         expect(storeSessionBackupPrivateKey.mock.calls[0][0])
           .toEqual(testKey);
+
+        expect(restoreKeyBackupWithCache).toHaveBeenCalled();
 
         expect(result).toBeInstanceOf(Array);
         expect(result[0][0]).toBe(testKeyPub);
