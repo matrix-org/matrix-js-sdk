@@ -1,3 +1,10 @@
+Changes in [5.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.2.0) (2020-03-30)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.2.0-rc.1...v5.2.0)
+
+ * Fix isVerified returning false
+   [\#1290](https://github.com/matrix-org/matrix-js-sdk/pull/1290)
+
 Changes in [5.2.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.2.0-rc.1) (2020-03-26)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.1.1...v5.2.0-rc.1)
