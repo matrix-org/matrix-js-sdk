@@ -608,7 +608,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                     newKeyId = await this.addSecretStorageKey(
                         SECRET_STORAGE_ALGORITHM_V1_AES, opts,
                     );
-                    this.setDefaultSecretStorageKeyId(newKeyId);
+                    await this.setDefaultSecretStorageKeyId(newKeyId);
                     // use the backup key as the new ssss key
                     ssssKeys[newKeyId] = backupKey;
                 }
@@ -690,7 +690,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         const sessionBackupKey = await this.getSecret('m.megolm_backup.v1');
         if (sessionBackupKey) {
             logger.info("Got session backup key from secret storage: caching");
-            this.storeSessionBackupPrivateKey(sessionBackupKey);
+            await this.storeSessionBackupPrivateKey(sessionBackupKey);
         }
 
         if (setupNewKeyBackup && !keyBackupInfo) {
