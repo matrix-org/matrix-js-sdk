@@ -637,12 +637,13 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             } else {
                 if (!newKeyId) {
                     logger.log("Secret storage default key not found, creating new key");
-                    const keyOptions = await createSecretStorageKey();
+                    const [keyOptions, , key] = await createSecretStorageKey();
                     newKeyId = await this.addSecretStorageKey(
                         SECRET_STORAGE_ALGORITHM_V1_AES,
                         keyOptions,
                     );
                     await this.setDefaultSecretStorageKeyId(newKeyId);
+                    ssssKeys[newKeyId] = key;
                 }
                 if (await this.isSecretStored("m.megolm_backup.v1")) {
                     // we created a new SSSS, and we previously encrypted the
