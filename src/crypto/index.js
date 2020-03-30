@@ -344,7 +344,7 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
         } else {
             keyInfo.pubkey = decryption.generate_key();
         }
-        const privateKey = decryption.get_private_key();
+        const privateKey = keyInfo.key = decryption.get_private_key();
         const encodedPrivateKey = encodeRecoveryKey(privateKey);
         return [keyInfo, encodedPrivateKey, privateKey];
     } finally {
@@ -491,6 +491,9 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                     break;
                 }
             }
+            if (oldKeyId) {
+                opts.key = ssssKeys[oldKeyId];
+            }
             // create new symmetric SSSS key and set it as default
             newKeyId = await this.addSecretStorageKey(
                 SECRET_STORAGE_ALGORITHM_V1_AES, opts,
@@ -562,12 +565,14 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                         };
                     }
 
+                    // use the backup key as the new ssss key
+                    ssssKeys[newKeyId] = backupKey;
+                    opts.key = backupKey;
+
                     newKeyId = await this.addSecretStorageKey(
                         SECRET_STORAGE_ALGORITHM_V1_AES, opts,
                     );
                     this.setDefaultSecretStorageKeyId(newKeyId);
-                    // use the backup key as the new ssss key
-                    ssssKeys[newKeyId] = backupKey;
                 }
 
                 // if this key backup is trusted, sign it with the cross signing key
@@ -697,6 +702,10 @@ Crypto.prototype.getDefaultSecretStorageKeyId = function() {
 
 Crypto.prototype.setDefaultSecretStorageKeyId = function(k) {
     return this._secretStorage.setDefaultKeyId(k);
+};
+
+Crypto.prototype.checkSecretStorageKey = function(key, info) {
+    return this._secretStorage.checkKey(key, info);
 };
 
 /**
