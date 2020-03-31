@@ -49,6 +49,7 @@ export class ReciprocateQRCode extends Base {
                 "with this method yet.");
         }
 
+        // 1. check the secret
         if (this.startEvent.getContent()['secret'] !== this.request.encodedSharedSecret) {
             throw newKeyMismatchError();
         }
@@ -64,6 +65,13 @@ export class ReciprocateQRCode extends Base {
         const devices = (await this._baseApis.getStoredDevicesForUser(this.userId)) || [];
         const targetDevice = devices.find(d => {
             return d.deviceId === this.request.targetDevice.deviceId;
+        // 2. ask if other user shows shield as well
+        await new Promise((resolve, reject) => {
+            this.reciprocateQREvent = {
+                confirm: resolve,
+                cancel: reject, // which code should we cancel with here?
+            };
+            this.emit("show_reciprocate_qr", this.reciprocateQREvent);
         });
         if (!targetDevice) throw new Error("Device not found, somehow");
         keys[`ed25519:${targetDevice.deviceId}`] = targetDevice.getFingerprint();
