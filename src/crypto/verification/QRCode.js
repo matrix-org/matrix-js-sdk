@@ -23,7 +23,6 @@ limitations under the License.
 import {VerificationBase as Base} from "./Base";
 import {
     newKeyMismatchError,
-    newUserMismatchError,
 } from './Error';
 import {decodeBase64} from "../olmlib";
 
@@ -48,23 +47,6 @@ export class ReciprocateQRCode extends Base {
             // TODO: Support scanning QR codes
             throw new Error("It is not currently possible to start verification" +
                 "with this method yet.");
-        }
-
-        const targetUserId = this.startEvent.getSender();
-        if (!this.userId) {
-            console.log("Asking to confirm user ID");
-            this.userId = await new Promise((resolve, reject) => {
-                this.emit("confirm_user_id", {
-                    userId: targetUserId,
-                    confirm: resolve, // takes a userId
-                    cancel: () => reject(newUserMismatchError()),
-                });
-            });
-        } else if (targetUserId !== this.userId) {
-            throw newUserMismatchError({
-                expected: this.userId,
-                actual: targetUserId,
-            });
         }
 
         if (this.startEvent.getContent()['secret'] !== this.request.encodedSharedSecret) {
