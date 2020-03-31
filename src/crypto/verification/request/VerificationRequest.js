@@ -23,7 +23,6 @@ import {
     newUnexpectedMessageError,
     newUnknownMethodError,
 } from "../Error";
-import * as olmlib from "../../olmlib";
 import {QRCodeData, SCAN_QR_CODE_METHOD} from "../QRCode";
 
 // the recommended amount of time before a verification request
@@ -71,7 +70,6 @@ export class VerificationRequest extends EventEmitter {
         this._eventsByThem = new Map();
         this._observeOnly = false;
         this._timeoutTimer = null;
-        this._sharedSecret = null; // used for QR codes
         this._accepting = false;
         this._declining = false;
         this._verifierHasFinished = false;
@@ -209,7 +207,6 @@ export class VerificationRequest extends EventEmitter {
 
     /** Only set after a .ready if the other party can scan a QR code */
     get qrCodeData() {
-        // TODO, merge encodedSharedSecret in here as well
         return this._qrCodeData;
     }
 
@@ -327,14 +324,6 @@ export class VerificationRequest extends EventEmitter {
         return this._observeOnly;
     }
 
-    /**
-     * The unpadded base64 encoded shared secret. Primarily used for QR code
-     * verification.
-     */
-    get encodedSharedSecret() {
-        if (!this._sharedSecret) this._generateSharedSecret();
-        return this._sharedSecret;
-    }
 
     /**
      * Gets which device the verification should be started with
@@ -394,7 +383,6 @@ export class VerificationRequest extends EventEmitter {
         if (!this.observeOnly && this._phase === PHASE_UNSENT) {
             const methods = [...this._verificationMethods.keys()];
             await this.channel.send(REQUEST_TYPE, {methods});
-            this._generateSharedSecret();
         }
     }
 
@@ -427,14 +415,7 @@ export class VerificationRequest extends EventEmitter {
             this._accepting = true;
             this.emit("change");
             await this.channel.send(READY_TYPE, {methods});
-            this._generateSharedSecret();
         }
-    }
-
-    _generateSharedSecret() {
-        const secretBytes = new Uint8Array(8);
-        global.crypto.getRandomValues(secretBytes);
-        this._sharedSecret = olmlib.encodeUnpaddedBase64(secretBytes);
     }
 
     /**

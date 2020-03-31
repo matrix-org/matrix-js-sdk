@@ -24,7 +24,7 @@ import {VerificationBase as Base} from "./Base";
 import {
     newKeyMismatchError,
 } from './Error';
-import {decodeBase64} from "../olmlib";
+import olmlib from "../olmlib";
 
 export const SHOW_QR_CODE_METHOD = "m.qr_code.show.v1";
 export const SCAN_QR_CODE_METHOD = "m.qr_code.scan.v1";
@@ -49,8 +49,9 @@ export class ReciprocateQRCode extends Base {
                 "with this method yet.");
         }
 
+        const {qrCodeData} = this.request;
         // 1. check the secret
-        if (this.startEvent.getContent()['secret'] !== this.request.encodedSharedSecret) {
+        if (this.startEvent.getContent()['secret'] !== qrCodeData.encodedSharedSecret) {
             throw newKeyMismatchError();
         }
 
@@ -64,7 +65,6 @@ export class ReciprocateQRCode extends Base {
         });
 
         const keys = {};
-        const {qrCodeData} = this.request;
         if (qrCodeData.mode === MODE_VERIFY_OTHER_USER) {
             // add master key to keys to be signed, only if we're not doing self-verification
             const masterKey = qrCodeData.otherUserMasterKey;
@@ -107,6 +107,7 @@ const MODE_VERIFY_SELF_UNTRUSTED = 0x02; // We do not trust the master key
 
 export class QRCodeData {
     constructor(request, client) {
+        this._sharedSecret = QRCodeData._generateSharedSecret();
         this._mode = QRCodeData._determineMode(request, client);
         this._otherUserMasterKey = null;
         this._otherDeviceKey = null;
@@ -135,6 +136,19 @@ export class QRCodeData {
 
     get otherUserMasterKey() {
         return this._otherUserMasterKey;
+    }
+
+    /**
+     * The unpadded base64 encoded shared secret.
+     */
+    get encodedSharedSecret() {
+        return this._sharedSecret;
+    }
+
+    static _generateSharedSecret() {
+        const secretBytes = new Uint8Array(8);
+        global.crypto.getRandomValues(secretBytes);
+        this._sharedSecret = olmlib.encodeUnpaddedBase64(secretBytes);
     }
 
     static _getOtherDeviceKey(request, client) {
@@ -173,7 +187,7 @@ export class QRCodeData {
             transactionId,
             firstKeyB64: '', // worked out shortly
             secondKeyB64: '', // worked out shortly
-            secretB64: request.encodedSharedSecret,
+            secretB64: this.encodedSharedSecret,
         };
 
         const myCrossSigningInfo = client.getStoredCrossSigningForUser(myUserId);
@@ -216,7 +230,7 @@ export class QRCodeData {
             buf = Buffer.concat([buf, tmpBuf]);
         };
         const appendEncBase64 = (b64: string) => {
-            const b = decodeBase64(b64);
+            const b = olmlib.decodeBase64(b64);
             const tmpBuf = Buffer.from(b);
             buf = Buffer.concat([buf, tmpBuf]);
         };
