@@ -25,6 +25,7 @@ import {
     newKeyMismatchError,
     newUserMismatchError,
 } from './Error';
+import {decodeBase64} from "../olmlib";
 
 export const SHOW_QR_CODE_METHOD = "m.qr_code.show.v1";
 export const SCAN_QR_CODE_METHOD = "m.qr_code.scan.v1";
@@ -109,5 +110,115 @@ export class ReciprocateQRCode extends Base {
 
             // Otherwise it is probably fine
         });
+    }
+}
+
+const CODE_VERSION = 0x02; // the version of binary QR codes we support
+const BINARY_PREFIX = "MATRIX"; // ASCII, used to prefix the binary format
+const MODE_VERIFY_OTHER_USER = 0x00; // Verifying someone who isn't us
+const MODE_VERIFY_SELF_TRUSTED = 0x01; // We trust the master key
+const MODE_VERIFY_SELF_UNTRUSTED = 0x02; // We do not trust the master key
+
+export class QRCodeData {
+    constructor(request, client) {
+        const qrData = QRCodeData._generateQrData(request, client);
+        this._buffer = QRCodeData._generateBuffer(qrData);
+    }
+
+    get buffer() {
+        return this._buffer;
+    }
+
+    static _generateQrData(request, client) {
+        const myUserId = client.getUserId();
+        const otherUserId = request.otherUserId;
+
+        let mode = MODE_VERIFY_OTHER_USER;
+        if (myUserId === otherUserId) {
+            // Mode changes depending on whether or not we trust the master cross signing key
+            const myTrust = client.checkUserTrust(myUserId);
+            if (myTrust.isCrossSigningVerified()) {
+                mode = MODE_VERIFY_SELF_TRUSTED;
+            } else {
+                mode = MODE_VERIFY_SELF_UNTRUSTED;
+            }
+        }
+
+        const transactionId = request.channel.transactionId;
+
+        const qrData = {
+            prefix: BINARY_PREFIX,
+            version: CODE_VERSION,
+            mode,
+            transactionId,
+            firstKeyB64: '', // worked out shortly
+            secondKeyB64: '', // worked out shortly
+            secretB64: request.encodedSharedSecret,
+        };
+
+        const myCrossSigningInfo = client.getStoredCrossSigningForUser(myUserId);
+        const myDevices = client.getStoredDevicesForUser(myUserId) || [];
+
+        if (mode === MODE_VERIFY_OTHER_USER) {
+            // First key is our master cross signing key
+            qrData.firstKeyB64 = myCrossSigningInfo.getId("master");
+
+            // Second key is the other user's master cross signing key
+            const otherUserCrossSigningInfo =
+                client.getStoredCrossSigningForUser(otherUserId);
+            qrData.secondKeyB64 = otherUserCrossSigningInfo.getId("master");
+        } else if (mode === MODE_VERIFY_SELF_TRUSTED) {
+            // First key is our master cross signing key
+            qrData.firstKeyB64 = myCrossSigningInfo.getId("master");
+
+            // Second key is the other device's device key
+            const otherDevice = request.targetDevice;
+            const otherDeviceId = otherDevice ? otherDevice.deviceId : null;
+            const device = myDevices.find(d => d.deviceId === otherDeviceId);
+            qrData.secondKeyB64 = device.getFingerprint();
+        } else if (mode === MODE_VERIFY_SELF_UNTRUSTED) {
+            // First key is our device's key
+            qrData.firstKeyB64 = client.getDeviceEd25519Key();
+
+            // Second key is what we think our master cross signing key is
+            qrData.secondKeyB64 = myCrossSigningInfo.getId("master");
+        }
+
+        return qrData;
+    }
+
+    static _generateBuffer(qrData) {
+        let buf = Buffer.alloc(0); // we'll concat our way through life
+
+        const appendByte = (b: number) => {
+            const tmpBuf = Buffer.from([b]);
+            buf = Buffer.concat([buf, tmpBuf]);
+        };
+        const appendInt = (i: number) => {
+            const tmpBuf = Buffer.alloc(2);
+            tmpBuf.writeInt16BE(i, 0);
+            buf = Buffer.concat([buf, tmpBuf]);
+        };
+        const appendStr = (s: string, enc: string, withLengthPrefix = true) => {
+            const tmpBuf = Buffer.from(s, enc);
+            if (withLengthPrefix) appendInt(tmpBuf.byteLength);
+            buf = Buffer.concat([buf, tmpBuf]);
+        };
+        const appendEncBase64 = (b64: string) => {
+            const b = decodeBase64(b64);
+            const tmpBuf = Buffer.from(b);
+            buf = Buffer.concat([buf, tmpBuf]);
+        };
+
+        // Actually build the buffer for the QR code
+        appendStr(qrData.prefix, "ascii", false);
+        appendByte(qrData.version);
+        appendByte(qrData.mode);
+        appendStr(qrData.transactionId, "utf-8");
+        appendEncBase64(qrData.firstKeyB64);
+        appendEncBase64(qrData.secondKeyB64);
+        appendEncBase64(qrData.secretB64);
+
+        return buf;
     }
 }

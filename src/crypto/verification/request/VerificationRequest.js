@@ -24,6 +24,7 @@ import {
     newUnknownMethodError,
 } from "../Error";
 import * as olmlib from "../../olmlib";
+import {QRCodeData, SCAN_QR_CODE_METHOD} from "../QRCode";
 
 // the recommended amount of time before a verification request
 // should be (automatically) cancelled without user interaction
@@ -74,6 +75,11 @@ export class VerificationRequest extends EventEmitter {
         this._accepting = false;
         this._declining = false;
         this._verifierHasFinished = false;
+        // we keep a copy of the QR Code data (including other user master key) around
+        // for QR reciprocate verification, to protect against
+        // cross-signing identity reset between the .ready and .start event
+        // and signing the wrong key after .start
+        this._qrCodeData = null;
     }
 
     /**
@@ -199,6 +205,12 @@ export class VerificationRequest extends EventEmitter {
         return !this.observeOnly &&
             this._phase !== PHASE_DONE &&
             this._phase !== PHASE_CANCELLED;
+    }
+
+    /** Only set after a .ready if the other party can scan a QR code */
+    get qrCodeData() {
+        // TODO, merge encodedSharedSecret in here as well
+        return this._qrCodeData;
     }
 
     /** Checks whether the other party supports a given verification method.
@@ -552,6 +564,14 @@ export class VerificationRequest extends EventEmitter {
                 ) {
                     this._observeOnly = true;
                 }
+            }
+        }
+        if (phase === PHASE_READY) {
+            const shouldGenerateQrCode =
+                this.otherPartySupportsMethod(SCAN_QR_CODE_METHOD);
+            if (shouldGenerateQrCode) {
+                // TODO: we should only do this for live events
+                this._qrCodeData = new QRCodeData(this, this._client);
             }
         }
         // create verifier
