@@ -146,7 +146,7 @@ export class QRCodeData {
     }
 
     static _generateSharedSecret() {
-        const secretBytes = new Uint8Array(8);
+        const secretBytes = new Uint8Array(11);
         global.crypto.getRandomValues(secretBytes);
         this._sharedSecret = olmlib.encodeUnpaddedBase64(secretBytes);
     }
