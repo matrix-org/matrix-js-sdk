@@ -387,7 +387,7 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
         } else {
             keyInfo.pubkey = decryption.generate_key();
         }
-        const privateKey = keyInfo.key = decryption.get_private_key();
+        const privateKey = decryption.get_private_key();
         const encodedPrivateKey = encodeRecoveryKey(privateKey);
         return { keyInfo, encodedPrivateKey, privateKey };
     } finally {
@@ -647,6 +647,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                 if (!newKeyId) {
                     logger.log("Secret storage default key not found, creating new key");
                     const { keyInfo, privateKey } = await createSecretStorageKey();
+                    keyInfo.key = privateKey;
                     newKeyId = await this.addSecretStorageKey(
                         SECRET_STORAGE_ALGORITHM_V1_AES,
                         keyInfo,
