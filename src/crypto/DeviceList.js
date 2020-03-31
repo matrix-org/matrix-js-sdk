@@ -824,7 +824,7 @@ class DeviceListUpdateSerialiser {
     }
 
     async _processQueryResponseForUser(
-        userId, dkResponse, crossSigningResponse, sskResponse,
+        userId, dkResponse, crossSigningResponse,
     ) {
         logger.log('got device keys for ' + userId + ':', dkResponse);
         logger.log('got cross-signing keys for ' + userId + ':', crossSigningResponse);

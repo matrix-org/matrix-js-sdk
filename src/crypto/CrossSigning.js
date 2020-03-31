@@ -55,6 +55,12 @@ export class CrossSigningInfo extends EventEmitter {
         this._cacheCallbacks = cacheCallbacks || {};
         this.keys = {};
         this.firstUse = true;
+        // This tracks whether we've ever verified this user with any identity.
+        // When you verify a user, any devices online at the time that receive
+        // the verifying signature via the homeserver will latch this to true
+        // and can use it in the future to detect cases where the user has
+        // become unverifed later for any reason.
+        this.crossSigningVerifiedBefore = false;
     }
 
     /**
@@ -132,6 +138,7 @@ export class CrossSigningInfo extends EventEmitter {
         return {
             keys: this.keys,
             firstUse: this.firstUse,
+            crossSigningVerifiedBefore: this.crossSigningVerifiedBefore,
         };
     }
 
@@ -375,6 +382,14 @@ export class CrossSigningInfo extends EventEmitter {
         }
     }
 
+    updateCrossSigningVerifiedBefore(isCrossSigningVerified) {
+        // It is critical that this value latches forward from false to true but
+        // never back to false to avoid a downgrade attack.
+        if (!this.crossSigningVerifiedBefore && isCrossSigningVerified) {
+            this.crossSigningVerifiedBefore = true;
+        }
+    }
+
     async signObject(data, type) {
         if (!this.keys[type]) {
             throw new Error(
@@ -433,13 +448,13 @@ export class CrossSigningInfo extends EventEmitter {
             && this.getId("self_signing")
             && this.getId("self_signing") === userCrossSigning.getId("self_signing")
         ) {
-            return new UserTrustLevel(true, this.firstUse);
+            return new UserTrustLevel(true, true, this.firstUse);
         }
 
         if (!this.keys.user_signing) {
             // If there's no user signing key, they can't possibly be verified.
             // They may be TOFU trusted though.
-            return new UserTrustLevel(false, userCrossSigning.firstUse);
+            return new UserTrustLevel(false, false, userCrossSigning.firstUse);
         }
 
         let userTrusted;
@@ -451,7 +466,11 @@ export class CrossSigningInfo extends EventEmitter {
         } catch (e) {
             userTrusted = false;
         }
-        return new UserTrustLevel(userTrusted, userCrossSigning.firstUse);
+        return new UserTrustLevel(
+            userTrusted,
+            userCrossSigning.crossSigningVerifiedBefore,
+            userCrossSigning.firstUse,
+        );
     }
 
     /**
@@ -523,8 +542,9 @@ export const CrossSigningLevel = {
  * Represents the ways in which we trust a user
  */
 export class UserTrustLevel {
-    constructor(crossSigningVerified, tofu) {
+    constructor(crossSigningVerified, crossSigningVerifiedBefore, tofu) {
         this._crossSigningVerified = crossSigningVerified;
+        this._crossSigningVerifiedBefore = crossSigningVerifiedBefore;
         this._tofu = tofu;
     }
 
@@ -540,6 +560,14 @@ export class UserTrustLevel {
      */
     isCrossSigningVerified() {
         return this._crossSigningVerified;
+    }
+
+    /**
+     * @returns {bool} true if we ever verified this user before (at least for
+     * the history of verifications observed by this device).
+     */
+    wasCrossSigningVerified() {
+        return this._crossSigningVerifiedBefore;
     }
 
     /**
