@@ -73,6 +73,7 @@ export class VerificationRequest extends EventEmitter {
         this._accepting = false;
         this._declining = false;
         this._verifierHasFinished = false;
+        this._chosenMethod = null;
         // we keep a copy of the QR Code data (including other user master key) around
         // for QR reciprocate verification, to protect against
         // cross-signing identity reset between the .ready and .start event
@@ -156,6 +157,11 @@ export class VerificationRequest extends EventEmitter {
     /** once the phase is PHASE_STARTED (and !initiatedByMe) or PHASE_READY: common methods supported by both sides */
     get methods() {
         return this._commonMethods;
+    }
+
+    /** the method picked in the .start event */
+    get chosenMethod() {
+        return this._chosenMethod;
     }
 
     /** The current remaining amount of ms before the request should be automatically cancelled */
@@ -370,6 +376,7 @@ export class VerificationRequest extends EventEmitter {
                 if (!this._verifier) {
                     throw newUnknownMethodError();
                 }
+                this._chosenMethod = method;
             }
         }
         return this._verifier;
@@ -560,6 +567,14 @@ export class VerificationRequest extends EventEmitter {
             const {method} = event.getContent();
             if (!this._verifier && !this.observeOnly) {
                 this._verifier = this._createVerifier(method, event);
+                if (!this._verifier) {
+                    this.cancel({
+                        code: "m.unknown_method",
+                        reason: `Unknown method: ${method}`,
+                    });
+                } else {
+                    this._chosenMethod = method;
+                }
             }
         }
     }
