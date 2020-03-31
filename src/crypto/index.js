@@ -120,6 +120,8 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     this._onDeviceListUserCrossSigningUpdated =
         this._onDeviceListUserCrossSigningUpdated.bind(this);
 
+    this._trustCrossSignedDevices = true;
+
     this._reEmitter = new ReEmitter(this);
     this._baseApis = baseApis;
     this._sessionStore = sessionStore;
@@ -320,12 +322,53 @@ Crypto.prototype.init = async function(opts) {
 };
 
 /**
+ * Whether to trust a others users signatures of their devices.
+ * If false, devices will only be considered 'verified' if we have
+ * verified that device individually (effectively disabling cross-signing).
+ *
+ * Default: true
+ *
+ * @return {bool} True if trusting cross-signed devices
+ */
+Crypto.prototype.getCryptoTrustCrossSignedDevices = function() {
+    return this._trustCrossSignedDevices;
+};
+
+/**
+ * See getCryptoTrustCrossSignedDevices
+
+ * This may be set before initCrypto() is called to ensure no races occur.
+ *
+ * @param {bool} val True to trust cross-signed devices
+ */
+Crypto.prototype.setCryptoTrustCrossSignedDevices = function(val) {
+    this._trustCrossSignedDevices = val;
+
+    for (const userId of this._deviceList.getKnownUserIds()) {
+        const devices = this._deviceList.getRawStoredDevicesForUser(userId);
+        for (const deviceId of Object.keys(devices)) {
+            const deviceTrust = this.checkDeviceTrust(userId, deviceId);
+            // If the device is locally verified then isVerified() is always true,
+            // so this will only have caused the value to change if the device is
+            // cross-signing verified but not locally verified
+            if (
+                !deviceTrust.isLocallyVerified() &&
+                deviceTrust.isCrossSigningVerified()
+            ) {
+                const deviceObj = this._deviceList.getStoredDevice(userId, deviceId);
+                this.emit("deviceVerificationChanged", userId, deviceId, deviceObj);
+            }
+        }
+    }
+};
+
+/**
  * Create a recovery key from a user-supplied passphrase.
  *
  * @param {string} password Passphrase string that can be entered by the user
  *     when restoring the backup as an alternative to entering the recovery key.
  *     Optional.
- * @returns {Promise<Array>} Array with public key metadata, encoded private
+ * @returns {Promise<Object>} Object with public key metadata, encoded private
  *     recovery key which should be disposed of after displaying to the user,
  *     and raw private key to avoid round tripping if needed.
  */
@@ -346,7 +389,7 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
         }
         const privateKey = keyInfo.key = decryption.get_private_key();
         const encodedPrivateKey = encodeRecoveryKey(privateKey);
-        return [keyInfo, encodedPrivateKey, privateKey];
+        return { keyInfo, encodedPrivateKey, privateKey };
     } finally {
         if (decryption) decryption.free();
     }
@@ -396,6 +439,10 @@ Crypto.prototype.isCrossSigningReady = async function() {
  *     auth data as an object.
  * @param {function} [opts.createSecretStorageKey] Optional. Function
  * called to await a secret storage key creation flow.
+ * Returns:
+ *     {Promise<Object>} Object with public key metadata, encoded private
+ *     recovery key which should be disposed of after displaying to the user,
+ *     and raw private key to avoid round tripping if needed.
  * @param {object} [opts.keyBackupInfo] The current key backup object. If passed,
  * the passphrase and recovery key from this backup will be used.
  * @param {bool} [opts.setupNewKeyBackup] If true, a new key backup version will be
@@ -411,7 +458,7 @@ Crypto.prototype.isCrossSigningReady = async function() {
  */
 Crypto.prototype.bootstrapSecretStorage = async function({
     authUploadDeviceSigningKeys,
-    createSecretStorageKey = async () => { },
+    createSecretStorageKey = async () => ({ }),
     keyBackupInfo,
     setupNewKeyBackup,
     setupNewSecretStorage,
@@ -572,7 +619,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                     newKeyId = await this.addSecretStorageKey(
                         SECRET_STORAGE_ALGORITHM_V1_AES, opts,
                     );
-                    this.setDefaultSecretStorageKeyId(newKeyId);
+                    await this.setDefaultSecretStorageKeyId(newKeyId);
                 }
 
                 // if this key backup is trusted, sign it with the cross signing key
@@ -599,12 +646,13 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             } else {
                 if (!newKeyId) {
                     logger.log("Secret storage default key not found, creating new key");
-                    const keyOptions = await createSecretStorageKey();
+                    const { keyInfo, privateKey } = await createSecretStorageKey();
                     newKeyId = await this.addSecretStorageKey(
                         SECRET_STORAGE_ALGORITHM_V1_AES,
-                        keyOptions,
+                        keyInfo,
                     );
                     await this.setDefaultSecretStorageKeyId(newKeyId);
+                    ssssKeys[newKeyId] = privateKey;
                 }
                 if (await this.isSecretStored("m.megolm_backup.v1")) {
                     // we created a new SSSS, and we previously encrypted the
@@ -637,6 +685,22 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                     this._secretStorage,
                 );
             }
+        }
+
+        // Call `getCrossSigningKey` for side effect of caching private keys for
+        // future gossiping to other devices if enabled via app level callbacks.
+        if (this._crossSigningInfo._cacheCallbacks) {
+            for (const type of ["self_signing", "user_signing"]) {
+                logger.log(`Cache ${type} cross-signing private key locally`);
+                await this._crossSigningInfo.getCrossSigningKey(type);
+            }
+        }
+
+        // and likewise for the session backup key
+        const sessionBackupKey = await this.getSecret('m.megolm_backup.v1');
+        if (sessionBackupKey) {
+            logger.info("Got session backup key from secret storage: caching");
+            await this.storeSessionBackupPrivateKey(sessionBackupKey);
         }
 
         if (setupNewKeyBackup && !keyBackupInfo) {
@@ -1016,7 +1080,7 @@ Crypto.prototype.getStoredCrossSigningForUser = function(userId) {
 Crypto.prototype.checkUserTrust = function(userId) {
     const userCrossSigning = this._deviceList.getStoredCrossSigningForUser(userId);
     if (!userCrossSigning) {
-        return new UserTrustLevel(false, false);
+        return new UserTrustLevel(false, false, false);
     }
     return this._crossSigningInfo.checkUserTrust(userCrossSigning);
 };
@@ -1047,11 +1111,14 @@ Crypto.prototype._checkDeviceInfoTrust = function(userId, device) {
 
     const userCrossSigning = this._deviceList.getStoredCrossSigningForUser(userId);
     if (device && userCrossSigning) {
+        // The _trustCrossSignedDevices only affects trust of other people's cross-signing
+        // signatures
+        const trustCrossSig = this._trustCrossSignedDevices || userId === this._userId;
         return this._crossSigningInfo.checkDeviceTrust(
-            userCrossSigning, device, trustedLocally,
+            userCrossSigning, device, trustedLocally, trustCrossSig,
         );
     } else {
-        return new DeviceTrustLevel(false, false, trustedLocally);
+        return new DeviceTrustLevel(false, false, trustedLocally, false);
     }
 };
 
@@ -1081,6 +1148,19 @@ Crypto.prototype._onDeviceListUserCrossSigningUpdated = async function(userId) {
         }
     } else {
         await this._checkDeviceVerifications(userId);
+
+        // Update verified before latch using the current state and save the new
+        // latch value in the device list store.
+        const crossSigning = this._deviceList.getStoredCrossSigningForUser(userId);
+        if (crossSigning) {
+            crossSigning.updateCrossSigningVerifiedBefore(
+                this.checkUserTrust(userId).isCrossSigningVerified(),
+            );
+            this._deviceList.setRawStoredCrossSigningForUser(
+                userId, crossSigning.toStorage(),
+            );
+        }
+
         this.emit("userTrustStatusChanged", userId, this.checkUserTrust(userId));
     }
 };

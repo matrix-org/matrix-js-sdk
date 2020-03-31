@@ -347,7 +347,11 @@ describe("Secrets", function() {
 
         // Set up cross-signing keys from scratch with specific storage key
         await bob.bootstrapSecretStorage({
-            createSecretStorageKey: async () => ({ pubkey: storagePublicKey }),
+            createSecretStorageKey: async () => ({
+                // `pubkey` not used anymore with symmetric 4S
+                keyInfo: { pubkey: storagePublicKey },
+                privateKey: storagePrivateKey,
+            }),
         });
 
         // Clear local cross-signing keys and read from secret storage

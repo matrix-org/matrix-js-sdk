@@ -55,6 +55,12 @@ export class CrossSigningInfo extends EventEmitter {
         this._cacheCallbacks = cacheCallbacks || {};
         this.keys = {};
         this.firstUse = true;
+        // This tracks whether we've ever verified this user with any identity.
+        // When you verify a user, any devices online at the time that receive
+        // the verifying signature via the homeserver will latch this to true
+        // and can use it in the future to detect cases where the user has
+        // become unverifed later for any reason.
+        this.crossSigningVerifiedBefore = false;
     }
 
     /**
@@ -132,6 +138,7 @@ export class CrossSigningInfo extends EventEmitter {
         return {
             keys: this.keys,
             firstUse: this.firstUse,
+            crossSigningVerifiedBefore: this.crossSigningVerifiedBefore,
         };
     }
 
@@ -375,6 +382,14 @@ export class CrossSigningInfo extends EventEmitter {
         }
     }
 
+    updateCrossSigningVerifiedBefore(isCrossSigningVerified) {
+        // It is critical that this value latches forward from false to true but
+        // never back to false to avoid a downgrade attack.
+        if (!this.crossSigningVerifiedBefore && isCrossSigningVerified) {
+            this.crossSigningVerifiedBefore = true;
+        }
+    }
+
     async signObject(data, type) {
         if (!this.keys[type]) {
             throw new Error(
@@ -433,13 +448,13 @@ export class CrossSigningInfo extends EventEmitter {
             && this.getId("self_signing")
             && this.getId("self_signing") === userCrossSigning.getId("self_signing")
         ) {
-            return new UserTrustLevel(true, this.firstUse);
+            return new UserTrustLevel(true, true, this.firstUse);
         }
 
         if (!this.keys.user_signing) {
             // If there's no user signing key, they can't possibly be verified.
             // They may be TOFU trusted though.
-            return new UserTrustLevel(false, userCrossSigning.firstUse);
+            return new UserTrustLevel(false, false, userCrossSigning.firstUse);
         }
 
         let userTrusted;
@@ -451,7 +466,11 @@ export class CrossSigningInfo extends EventEmitter {
         } catch (e) {
             userTrusted = false;
         }
-        return new UserTrustLevel(userTrusted, userCrossSigning.firstUse);
+        return new UserTrustLevel(
+            userTrusted,
+            userCrossSigning.crossSigningVerifiedBefore,
+            userCrossSigning.firstUse,
+        );
     }
 
     /**
@@ -460,17 +479,20 @@ export class CrossSigningInfo extends EventEmitter {
      * @param {CrossSigningInfo} userCrossSigning Cross signing info for user
      * @param {module:crypto/deviceinfo} device The device to check
      * @param {bool} localTrust Whether the device is trusted locally
+     * @param {bool} trustCrossSignedDevices Whether we trust cross signed devices
      *
      * @returns {DeviceTrustLevel}
      */
-    checkDeviceTrust(userCrossSigning, device, localTrust) {
+    checkDeviceTrust(userCrossSigning, device, localTrust, trustCrossSignedDevices) {
         const userTrust = this.checkUserTrust(userCrossSigning);
 
         const userSSK = userCrossSigning.keys.self_signing;
         if (!userSSK) {
             // if the user has no self-signing key then we cannot make any
             // trust assertions about this device from cross-signing
-            return new DeviceTrustLevel(false, false, localTrust);
+            return new DeviceTrustLevel(
+                false, false, localTrust, trustCrossSignedDevices,
+            );
         }
 
         const deviceObj = deviceToObject(device, userCrossSigning.userId);
@@ -482,9 +504,13 @@ export class CrossSigningInfo extends EventEmitter {
                 deviceObj, publicKeyFromKeyInfo(userSSK), userCrossSigning.userId,
             );
             // ...then we trust this device as much as far as we trust the user
-            return DeviceTrustLevel.fromUserTrustLevel(userTrust, localTrust);
+            return DeviceTrustLevel.fromUserTrustLevel(
+                userTrust, localTrust, trustCrossSignedDevices,
+            );
         } catch (e) {
-            return new DeviceTrustLevel(false, false, localTrust);
+            return new DeviceTrustLevel(
+                false, false, localTrust, trustCrossSignedDevices,
+            );
         }
     }
 
@@ -516,8 +542,9 @@ export const CrossSigningLevel = {
  * Represents the ways in which we trust a user
  */
 export class UserTrustLevel {
-    constructor(crossSigningVerified, tofu) {
+    constructor(crossSigningVerified, crossSigningVerifiedBefore, tofu) {
         this._crossSigningVerified = crossSigningVerified;
+        this._crossSigningVerifiedBefore = crossSigningVerifiedBefore;
         this._tofu = tofu;
     }
 
@@ -536,6 +563,14 @@ export class UserTrustLevel {
     }
 
     /**
+     * @returns {bool} true if we ever verified this user before (at least for
+     * the history of verifications observed by this device).
+     */
+    wasCrossSigningVerified() {
+        return this._crossSigningVerifiedBefore;
+    }
+
+    /**
      * @returns {bool} true if this user's key is trusted on first use
      */
     isTofu() {
@@ -547,17 +582,19 @@ export class UserTrustLevel {
  * Represents the ways in which we trust a device
  */
 export class DeviceTrustLevel {
-    constructor(crossSigningVerified, tofu, localVerified) {
+    constructor(crossSigningVerified, tofu, localVerified, trustCrossSignedDevices) {
         this._crossSigningVerified = crossSigningVerified;
         this._tofu = tofu;
         this._localVerified = localVerified;
+        this._trustCrossSignedDevices = trustCrossSignedDevices;
     }
 
-    static fromUserTrustLevel(userTrustLevel, localVerified) {
+    static fromUserTrustLevel(userTrustLevel, localVerified, trustCrossSignedDevices) {
         return new DeviceTrustLevel(
             userTrustLevel._crossSigningVerified,
             userTrustLevel._tofu,
             localVerified,
+            trustCrossSignedDevices,
         );
     }
 
@@ -565,7 +602,9 @@ export class DeviceTrustLevel {
      * @returns {bool} true if this device is verified via any means
      */
     isVerified() {
-        return this.isCrossSigningVerified() || this.isLocallyVerified();
+        return Boolean(this.isLocallyVerified() || (
+            this._trustCrossSignedDevices && this.isCrossSigningVerified()
+        ));
     }
 
     /**

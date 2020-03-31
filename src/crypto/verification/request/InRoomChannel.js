@@ -44,11 +44,6 @@ export class InRoomChannel {
         this._requestEventId = null;
     }
 
-    /** Whether this channel needs m.key.verification.done messages to be sent after a successful verification */
-    get needsDoneMessage() {
-        return true;
-    }
-
     get receiveStartFromOtherDevices() {
         return true;
     }

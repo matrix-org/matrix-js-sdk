@@ -61,10 +61,6 @@ export class ToDeviceChannel {
         return this._deviceId;
     }
 
-    get needsDoneMessage() {
-        return false;
-    }
-
     static getEventType(event) {
         return event.getType();
     }

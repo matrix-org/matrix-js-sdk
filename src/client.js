@@ -760,7 +760,6 @@ MatrixClient.prototype.isCryptoEnabled = function() {
     return this._crypto !== null;
 };
 
-
 /**
  * Get the Ed25519 key for this device
  *
@@ -1152,6 +1151,8 @@ wrapCryptoFuncs(MatrixClient, [
     "legacyDeviceVerification",
     "prepareToEncrypt",
     "isCrossSigningReady",
+    "getCryptoTrustCrossSignedDevices",
+    "setCryptoTrustCrossSignedDevices",
 ]);
 
 /**
@@ -1178,7 +1179,9 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
  * @param {string} password Passphrase string that can be entered by the user
  *     when restoring the backup as an alternative to entering the recovery key.
  *     Optional.
- * @returns {Promise<String>} The user-facing recovery key string.
+ * @returns {Promise<Object>} Object with public key metadata, encoded private
+ *     recovery key which should be disposed of after displaying to the user,
+ *     and raw private key to avoid round tripping if needed.
  */
 
 /**
@@ -1563,7 +1566,7 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(
         throw new Error("End-to-end encryption disabled");
     }
 
-    const [keyInfo, encodedPrivateKey, privateKey] =
+    const { keyInfo, encodedPrivateKey, privateKey } =
         await this.createRecoveryKeyFromPassphrase(password);
 
     if (secureSecretStorage) {
@@ -1858,7 +1861,7 @@ MatrixClient.prototype.restoreKeyBackupWithCache = async function(
 ) {
     const privKey = await this._crypto.getSessionBackupPrivateKey();
     if (!privKey) {
-        return Promise.reject(new Error("Couldn't get key"));
+        throw new Error("Couldn't get key");
     }
     return this._restoreKeyBackup(
         privKey, targetRoomId, targetSessionId, backupInfo, opts,
@@ -5203,9 +5206,6 @@ function setupCallEventHandler(client) {
 function checkTurnServers(client) {
     if (!client._supportsVoip) {
         return;
-    }
-    if (client.isGuest()) {
-        return; // guests can't access TURN servers
     }
 
     client.turnServer().then(function(res) {

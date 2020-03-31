@@ -637,6 +637,18 @@ export class VerificationRequest extends EventEmitter {
             }
         }
 
+        // This assumes verification won't need to send an event with
+        // the same type for the same party twice.
+        // This is true for QR and SAS verification, and was
+        // added here to prevent verification getting cancelled
+        // when the server duplicates an event (https://github.com/matrix-org/synapse/issues/3365)
+        const isDuplicateEvent = isSentByUs ?
+            this._eventsByUs.has(type) :
+            this._eventsByThem.has(type);
+        if (isDuplicateEvent) {
+            return;
+        }
+
         const oldPhase = this.phase;
         this._addEvent(type, event, isSentByUs);
 
@@ -650,7 +662,7 @@ export class VerificationRequest extends EventEmitter {
                 if (this._verifier.canSwitchStartEvent(event) && newEventWinsRace) {
                     this._verifier.switchStartEvent(event);
                 } else if (!isRemoteEcho) {
-                     if (type === CANCEL_TYPE || (this._verifier.events
+                    if (type === CANCEL_TYPE || (this._verifier.events
                         && this._verifier.events.includes(type))) {
                         this._verifier.handleEvent(event);
                     }
@@ -807,11 +819,9 @@ export class VerificationRequest extends EventEmitter {
     }
 
     onVerifierFinished() {
-        if (this.channel.needsDoneMessage) {
-            // verification in DM requires a done message
-            this.channel.send("m.key.verification.done", {});
-        }
+        this.channel.send("m.key.verification.done", {});
         this._verifierHasFinished = true;
+        // move to .done phase
         const newTransitions = this._applyPhaseTransitions();
         if (newTransitions.length) {
             this._setPhase(newTransitions[newTransitions.length - 1].phase);

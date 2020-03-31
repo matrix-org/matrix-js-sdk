@@ -318,6 +318,15 @@ export class DeviceList extends EventEmitter {
     }
 
     /**
+     * Returns a list of all user IDs the DeviceList knows about
+     *
+     * @return {array} All known user IDs
+     */
+    getKnownUserIds() {
+        return Object.keys(this._devices);
+    }
+
+    /**
      * Get the stored device keys for a user id
      *
      * @param {string} userId the user to list keys for.
@@ -815,7 +824,7 @@ class DeviceListUpdateSerialiser {
     }
 
     async _processQueryResponseForUser(
-        userId, dkResponse, crossSigningResponse, sskResponse,
+        userId, dkResponse, crossSigningResponse,
     ) {
         logger.log('got device keys for ' + userId + ':', dkResponse);
         logger.log('got cross-signing keys for ' + userId + ':', crossSigningResponse);
