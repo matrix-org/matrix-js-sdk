@@ -54,17 +54,6 @@ export class ReciprocateQRCode extends Base {
             throw newKeyMismatchError();
         }
 
-        // If we've gotten this far, verify the user's master cross signing key
-        const xsignInfo = this._baseApis.getStoredCrossSigningForUser(this.userId);
-        if (!xsignInfo) throw new Error("Missing cross signing info");
-
-        const masterKey = xsignInfo.getId("master");
-        const masterKeyId = `ed25519:${masterKey}`;
-        const keys = {[masterKeyId]: masterKey};
-
-        const devices = (await this._baseApis.getStoredDevicesForUser(this.userId)) || [];
-        const targetDevice = devices.find(d => {
-            return d.deviceId === this.request.targetDevice.deviceId;
         // 2. ask if other user shows shield as well
         await new Promise((resolve, reject) => {
             this.reciprocateQREvent = {
@@ -73,11 +62,18 @@ export class ReciprocateQRCode extends Base {
             };
             this.emit("show_reciprocate_qr", this.reciprocateQREvent);
         });
-        if (!targetDevice) throw new Error("Device not found, somehow");
-        keys[`ed25519:${targetDevice.deviceId}`] = targetDevice.getFingerprint();
 
-        if (this.request.requestingUserId === this.request.receivingUserId) {
-            delete keys[masterKeyId];
+        const keys = {};
+        const {qrCodeData} = this.request;
+        if (qrCodeData.mode === MODE_VERIFY_OTHER_USER) {
+            // add master key to keys to be signed, only if we're not doing self-verification
+            const masterKey = qrCodeData.otherUserMasterKey;
+            keys[`ed25519:${masterKey}`] = masterKey;
+        } else if (qrCodeData.mode === MODE_VERIFY_SELF_TRUSTED) {
+            const deviceId = this.request.targetDevice.deviceId;
+            keys[`ed25519:${deviceId}`] = qrCodeData.otherDeviceKey;
+        } else {
+            // TODO: not sure if MODE_VERIFY_SELF_UNTRUSTED makes sense to sign anything here?
         }
 
         await this._verifyKeys(this.userId, keys, (keyId, device, keyInfo) => {
