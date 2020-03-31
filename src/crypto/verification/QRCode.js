@@ -24,7 +24,7 @@ import {VerificationBase as Base} from "./Base";
 import {
     newKeyMismatchError,
 } from './Error';
-import olmlib from "../olmlib";
+import {encodeUnpaddedBase64, decodeBase64} from "../olmlib";
 
 export const SHOW_QR_CODE_METHOD = "m.qr_code.show.v1";
 export const SCAN_QR_CODE_METHOD = "m.qr_code.scan.v1";
@@ -148,7 +148,7 @@ export class QRCodeData {
     static _generateSharedSecret() {
         const secretBytes = new Uint8Array(11);
         global.crypto.getRandomValues(secretBytes);
-        this._sharedSecret = olmlib.encodeUnpaddedBase64(secretBytes);
+        this._sharedSecret = encodeUnpaddedBase64(secretBytes);
     }
 
     static _getOtherDeviceKey(request, client) {
@@ -230,7 +230,7 @@ export class QRCodeData {
             buf = Buffer.concat([buf, tmpBuf]);
         };
         const appendEncBase64 = (b64: string) => {
-            const b = olmlib.decodeBase64(b64);
+            const b = decodeBase64(b64);
             const tmpBuf = Buffer.from(b);
             buf = Buffer.concat([buf, tmpBuf]);
         };
