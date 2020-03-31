@@ -64,6 +64,7 @@ export class ReciprocateQRCode extends Base {
             this.emit("show_reciprocate_qr", this.reciprocateQREvent);
         });
 
+        // 3. determine key to sign
         const keys = {};
         if (qrCodeData.mode === MODE_VERIFY_OTHER_USER) {
             // add master key to keys to be signed, only if we're not doing self-verification
@@ -76,7 +77,9 @@ export class ReciprocateQRCode extends Base {
             // TODO: not sure if MODE_VERIFY_SELF_UNTRUSTED makes sense to sign anything here?
         }
 
+        // 4. sign the key
         await this._verifyKeys(this.userId, keys, (keyId, device, keyInfo) => {
+            // make sure the device has the expected keys
             const targetKey = keys[keyId];
             if (!targetKey) throw newKeyMismatchError();
 
@@ -93,8 +96,6 @@ export class ReciprocateQRCode extends Base {
                     throw newKeyMismatchError();
                 }
             }
-
-            // Otherwise it is probably fine
         });
     }
 }
