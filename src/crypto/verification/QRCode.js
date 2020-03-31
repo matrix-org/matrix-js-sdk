@@ -121,7 +121,17 @@ const MODE_VERIFY_SELF_UNTRUSTED = 0x02; // We do not trust the master key
 
 export class QRCodeData {
     constructor(request, client) {
-        const qrData = QRCodeData._generateQrData(request, client);
+        this._mode = QRCodeData._determineMode(request, client);
+        this._otherUserMasterKey = null;
+        this._otherDeviceKey = null;
+        if (this._mode === MODE_VERIFY_OTHER_USER) {
+            const otherUserCrossSigningInfo =
+                client.getStoredCrossSigningForUser(request.otherUserId);
+            this._otherUserMasterKey = otherUserCrossSigningInfo.getId("master");
+        } else if (this._mode === MODE_VERIFY_SELF_TRUSTED) {
+            this._otherDeviceKey = QRCodeData._getOtherDeviceKey(request, client);
+        }
+        const qrData = QRCodeData._generateQrData(request, client, this._mode);
         this._buffer = QRCodeData._generateBuffer(qrData);
     }
 
@@ -129,7 +139,28 @@ export class QRCodeData {
         return this._buffer;
     }
 
-    static _generateQrData(request, client) {
+    get mode() {
+        return this._mode;
+    }
+
+    get otherDeviceKey() {
+        return this._otherDeviceKey;
+    }
+
+    get otherUserMasterKey() {
+        return this._otherUserMasterKey;
+    }
+
+    static _getOtherDeviceKey(request, client) {
+        const myUserId = client.getUserId();
+        const myDevices = client.getStoredDevicesForUser(myUserId) || [];
+        const otherDevice = request.targetDevice;
+        const otherDeviceId = otherDevice ? otherDevice.deviceId : null;
+        const device = myDevices.find(d => d.deviceId === otherDeviceId);
+        return device.getFingerprint();
+    }
+
+    static _determineMode(request, client) {
         const myUserId = client.getUserId();
         const otherUserId = request.otherUserId;
 
@@ -143,9 +174,12 @@ export class QRCodeData {
                 mode = MODE_VERIFY_SELF_UNTRUSTED;
             }
         }
+        return mode;
+    }
 
+    static _generateQrData(request, client, mode) {
+        const myUserId = client.getUserId();
         const transactionId = request.channel.transactionId;
-
         const qrData = {
             prefix: BINARY_PREFIX,
             version: CODE_VERSION,
@@ -157,31 +191,22 @@ export class QRCodeData {
         };
 
         const myCrossSigningInfo = client.getStoredCrossSigningForUser(myUserId);
-        const myDevices = client.getStoredDevicesForUser(myUserId) || [];
+        const myMasterKey = myCrossSigningInfo.getId("master");
 
         if (mode === MODE_VERIFY_OTHER_USER) {
             // First key is our master cross signing key
-            qrData.firstKeyB64 = myCrossSigningInfo.getId("master");
-
+            qrData.firstKeyB64 = myMasterKey;
             // Second key is the other user's master cross signing key
-            const otherUserCrossSigningInfo =
-                client.getStoredCrossSigningForUser(otherUserId);
-            qrData.secondKeyB64 = otherUserCrossSigningInfo.getId("master");
+            qrData.secondKeyB64 = this._otherUserMasterKey;
         } else if (mode === MODE_VERIFY_SELF_TRUSTED) {
             // First key is our master cross signing key
-            qrData.firstKeyB64 = myCrossSigningInfo.getId("master");
-
-            // Second key is the other device's device key
-            const otherDevice = request.targetDevice;
-            const otherDeviceId = otherDevice ? otherDevice.deviceId : null;
-            const device = myDevices.find(d => d.deviceId === otherDeviceId);
-            qrData.secondKeyB64 = device.getFingerprint();
+            qrData.firstKeyB64 = myMasterKey;
+            qrData.secondKeyB64 = this._otherDeviceKey;
         } else if (mode === MODE_VERIFY_SELF_UNTRUSTED) {
             // First key is our device's key
             qrData.firstKeyB64 = client.getDeviceEd25519Key();
-
             // Second key is what we think our master cross signing key is
-            qrData.secondKeyB64 = myCrossSigningInfo.getId("master");
+            qrData.secondKeyB64 = myMasterKey;
         }
 
         return qrData;
