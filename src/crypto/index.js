@@ -647,7 +647,9 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                 if (!newKeyId) {
                     logger.log("Secret storage default key not found, creating new key");
                     const { keyInfo, privateKey } = await createSecretStorageKey();
-                    keyInfo.key = privateKey;
+                    if (keyInfo && privateKey) {
+                        keyInfo.key = privateKey;
+                    }
                     newKeyId = await this.addSecretStorageKey(
                         SECRET_STORAGE_ALGORITHM_V1_AES,
                         keyInfo,
