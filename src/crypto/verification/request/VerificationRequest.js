@@ -612,6 +612,20 @@ export class VerificationRequest extends EventEmitter {
         return newRaceIdentifier < oldRaceIdentifier;
     }
 
+    hasEventId(eventId) {
+        for (const event of this._eventsByUs.values()) {
+            if (event.getId() === eventId) {
+                return true;
+            }
+        }
+        for (const event of this._eventsByThem.values()) {
+            if (event.getId() === eventId) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Changes the state of the request and verifier in response to a key verification event.
      * @param {string} type the "symbolic" event type, as returned by the `getEventType` function on the channel.
