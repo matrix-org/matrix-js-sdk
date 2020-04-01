@@ -29,14 +29,20 @@ const zerosalt = new Uint8Array(8);
  * @param {string} data the plaintext to encrypt
  * @param {Uint8Array} key the encryption key to use
  * @param {string} name the name of the secret
+ * @param {string} ivStr the initialization vector to use
  */
-async function encryptNode(data, key, name) {
+async function encryptNode(data, key, name, ivStr) {
     const crypto = getCrypto();
     if (!crypto) {
         throw new Error("No usable crypto implementation");
     }
 
-    const iv = crypto.randomBytes(16);
+    let iv;
+    if (ivStr) {
+        iv = decodeBase64(ivStr);
+    } else {
+        iv = crypto.randomBytes(16);
+    }
 
     // clear bit 63 of the IV to stop us hitting the 64-bit counter boundary
     // (which would mean we wouldn't be able to decrypt on Android). The loss
@@ -112,10 +118,16 @@ function deriveKeysNode(key, name) {
  * @param {string} data the plaintext to encrypt
  * @param {Uint8Array} key the encryption key to use
  * @param {string} name the name of the secret
+ * @param {string} ivStr the initialization vector to use
  */
-async function encryptBrowser(data, key, name) {
-    const iv = new Uint8Array(16);
-    window.crypto.getRandomValues(iv);
+async function encryptBrowser(data, key, name, ivStr) {
+    let iv;
+    if (ivStr) {
+        iv = decodeBase64(ivStr);
+    } else {
+        iv = new Uint8Array(16);
+        window.crypto.getRandomValues(iv);
+    }
 
     // clear bit 63 of the IV to stop us hitting the 64-bit counter boundary
     // (which would mean we wouldn't be able to decrypt on Android). The loss

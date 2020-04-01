@@ -27,6 +27,8 @@ export const SECRET_STORAGE_ALGORITHM_V1_AES
 export const SECRET_STORAGE_ALGORITHM_V1_CURVE25519
     = "m.secret_storage.v1.curve25519-aes-sha2";
 
+const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+
 /**
  * Implements Secure Secret Storage and Sharing (MSC1946)
  * @module crypto/SecretStorage
@@ -92,13 +94,13 @@ export class SecretStorage extends EventEmitter {
         switch (algorithm) {
         case SECRET_STORAGE_ALGORITHM_V1_AES:
         {
-            const decryption = new global.Olm.PkDecryption();
-            try {
-                if (opts.passphrase) {
-                    keyData.passphrase = opts.passphrase;
-                }
-            } finally {
-                decryption.free();
+            if (opts.passphrase) {
+                keyData.passphrase = opts.passphrase;
+            }
+            if (opts.key) {
+                const {iv, mac} = await encryptAES(ZERO_STR, opts.key, "");
+                keyData.iv = iv;
+                keyData.mac = mac;
             }
             break;
         }
@@ -191,6 +193,45 @@ export class SecretStorage extends EventEmitter {
             return true;
         } else {
             return false;
+        }
+    }
+
+    /**
+     * Check whether a key matches what we expect based on the key info
+     *
+     * @param {Uint8Array} key the key to check
+     * @param {object} info the key info
+     *
+     * @return {boolean} whether or not the key matches
+     */
+    async checkKey(key, info) {
+        switch (info.algorithm) {
+        case SECRET_STORAGE_ALGORITHM_V1_AES:
+        {
+            if (info.mac) {
+                const {mac} = await encryptAES(ZERO_STR, key, "", info.iv);
+                return info.mac === mac;
+            } else {
+                // if we have no information, we have to assume the key is right
+                return true;
+            }
+        }
+        case SECRET_STORAGE_ALGORITHM_V1_CURVE25519:
+        {
+            let decryption = null;
+            try {
+                decryption = new global.Olm.PkDecryption();
+                const gotPubkey = decryption.init_with_private_key(key);
+                // make sure it agrees with the given pubkey
+                return gotPubkey === info.pubkey;
+            } catch (e) {
+                return false;
+            } finally {
+                if (decryption) decryption.free();
+            }
+        }
+        default:
+            throw new Error("Unknown algorithm");
         }
     }
 

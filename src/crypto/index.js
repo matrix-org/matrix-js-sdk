@@ -538,6 +538,9 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                     break;
                 }
             }
+            if (oldKeyId) {
+                opts.key = ssssKeys[oldKeyId];
+            }
             // create new symmetric SSSS key and set it as default
             newKeyId = await this.addSecretStorageKey(
                 SECRET_STORAGE_ALGORITHM_V1_AES, opts,
@@ -609,12 +612,14 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                         };
                     }
 
+                    // use the backup key as the new ssss key
+                    ssssKeys[newKeyId] = backupKey;
+                    opts.key = backupKey;
+
                     newKeyId = await this.addSecretStorageKey(
                         SECRET_STORAGE_ALGORITHM_V1_AES, opts,
                     );
                     await this.setDefaultSecretStorageKeyId(newKeyId);
-                    // use the backup key as the new ssss key
-                    ssssKeys[newKeyId] = backupKey;
                 }
 
                 // if this key backup is trusted, sign it with the cross signing key
@@ -642,6 +647,9 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                 if (!newKeyId) {
                     logger.log("Secret storage default key not found, creating new key");
                     const { keyInfo, privateKey } = await createSecretStorageKey();
+                    if (keyInfo && privateKey) {
+                        keyInfo.key = privateKey;
+                    }
                     newKeyId = await this.addSecretStorageKey(
                         SECRET_STORAGE_ALGORITHM_V1_AES,
                         keyInfo,
@@ -761,6 +769,10 @@ Crypto.prototype.getDefaultSecretStorageKeyId = function() {
 
 Crypto.prototype.setDefaultSecretStorageKeyId = function(k) {
     return this._secretStorage.setDefaultKeyId(k);
+};
+
+Crypto.prototype.checkSecretStorageKey = function(key, info) {
+    return this._secretStorage.checkKey(key, info);
 };
 
 /**

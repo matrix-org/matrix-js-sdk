@@ -1310,6 +1310,7 @@ wrapCryptoFuncs(MatrixClient, [
     "requestSecret",
     "getDefaultSecretStorageKeyId",
     "setDefaultSecretStorageKeyId",
+    "checkSecretStorageKey",
     "checkSecretStoragePrivateKey",
 ]);
 
