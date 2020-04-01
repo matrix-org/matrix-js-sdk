@@ -222,8 +222,8 @@ export class VerificationRequest extends EventEmitter {
      *  For methods that need to be supported by both ends, use the `methods` property.
      *  @param {string} method the method to check
      *  @return {bool} whether or not the other party said the supported the method */
-    otherPartySupportsMethod(method) {
-        if (!this.ready && !this.started) {
+    otherPartySupportsMethod(method, force = false) {
+        if (!force && !this.ready && !this.started) {
             return false;
         }
         const theirMethodEvent = this._eventsByThem.get(REQUEST_TYPE) ||
@@ -554,14 +554,6 @@ export class VerificationRequest extends EventEmitter {
                 }
             }
         }
-        if (phase === PHASE_READY) {
-            const shouldGenerateQrCode =
-                this.otherPartySupportsMethod(SCAN_QR_CODE_METHOD);
-            if (shouldGenerateQrCode) {
-                // TODO: we should only do this for live events
-                this._qrCodeData = new QRCodeData(this, this._client);
-            }
-        }
         // create verifier
         if (phase === PHASE_STARTED) {
             const {method} = event.getContent();
@@ -686,6 +678,14 @@ export class VerificationRequest extends EventEmitter {
             }
 
             if (newTransitions.length) {
+                if (isLiveEvent && newTransitions.some(t => t.phase === PHASE_READY)) {
+                    const shouldGenerateQrCode =
+                        this.otherPartySupportsMethod(SCAN_QR_CODE_METHOD, true);
+                    if (shouldGenerateQrCode) {
+                        this._qrCodeData = await QRCodeData.create(this, this._client);
+                    }
+                }
+
                 const lastTransition = newTransitions[newTransitions.length - 1];
                 const {phase} = lastTransition;
 
