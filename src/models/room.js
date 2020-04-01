@@ -1278,6 +1278,11 @@ Room.prototype._handleRemoteEcho = function(remoteEvent, localEvent) {
     const newEventId = remoteEvent.getId();
     const oldStatus = localEvent.status;
 
+    logger.debug(
+        `Got remote echo for event ${oldEventId} -> ${newEventId} ` +
+        `old status ${oldStatus}`,
+    );
+
     // no longer pending
     delete this._txnToEvent[remoteEvent.getUnsigned().transaction_id];
 
@@ -1347,7 +1352,10 @@ ALLOWED_TRANSITIONS[EventStatus.CANCELLED] =
  * @fires module:client~MatrixClient#event:"Room.localEchoUpdated"
  */
 Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
-    logger.log(`setting pendingEvent status to ${newStatus} in ${event.getRoomId()}`);
+    logger.log(
+        `setting pendingEvent status to ${newStatus} in ${event.getRoomId()} ` +
+        `event ID ${event.getId()} -> ${newEventId}`,
+    );
 
     // if the message was sent, we expect an event id
     if (newStatus == EventStatus.SENT && !newEventId) {
