@@ -107,20 +107,35 @@ const MODE_VERIFY_SELF_TRUSTED = 0x01; // We trust the master key
 const MODE_VERIFY_SELF_UNTRUSTED = 0x02; // We do not trust the master key
 
 export class QRCodeData {
-    constructor(request, client) {
-        this._sharedSecret = QRCodeData._generateSharedSecret();
-        this._mode = QRCodeData._determineMode(request, client);
-        this._otherUserMasterKey = null;
-        this._otherDeviceKey = null;
-        if (this._mode === MODE_VERIFY_OTHER_USER) {
+    constructor(mode, sharedSecret, otherUserMasterKey, otherDeviceKey, buffer) {
+        this._sharedSecret = sharedSecret;
+        this._mode = mode;
+        this._otherUserMasterKey = otherUserMasterKey;
+        this._otherDeviceKey = otherDeviceKey;
+        this._buffer = buffer;
+    }
+
+    static async create(request, client) {
+        const sharedSecret = QRCodeData._generateSharedSecret();
+        const mode = QRCodeData._determineMode(request, client);
+        let otherUserMasterKey = null;
+        let otherDeviceKey = null;
+        if (mode === MODE_VERIFY_OTHER_USER) {
             const otherUserCrossSigningInfo =
                 client.getStoredCrossSigningForUser(request.otherUserId);
-            this._otherUserMasterKey = otherUserCrossSigningInfo.getId("master");
-        } else if (this._mode === MODE_VERIFY_SELF_TRUSTED) {
-            this._otherDeviceKey = QRCodeData._getOtherDeviceKey(request, client);
+            otherUserMasterKey = otherUserCrossSigningInfo.getId("master");
+        } else if (mode === MODE_VERIFY_SELF_TRUSTED) {
+            otherDeviceKey = await QRCodeData._getOtherDeviceKey(request, client);
         }
-        const qrData = QRCodeData._generateQrData(request, client, this._mode);
-        this._buffer = QRCodeData._generateBuffer(qrData);
+        const qrData = QRCodeData._generateQrData(
+            request, client, mode,
+            sharedSecret,
+            otherUserMasterKey,
+            otherDeviceKey,
+        );
+        const buffer = QRCodeData._generateBuffer(qrData);
+        return new QRCodeData(mode, sharedSecret,
+            otherUserMasterKey, otherDeviceKey, buffer);
     }
 
     get buffer() {
@@ -149,16 +164,19 @@ export class QRCodeData {
     static _generateSharedSecret() {
         const secretBytes = new Uint8Array(11);
         global.crypto.getRandomValues(secretBytes);
-        this._sharedSecret = encodeUnpaddedBase64(secretBytes);
+        return encodeUnpaddedBase64(secretBytes);
     }
 
-    static _getOtherDeviceKey(request, client) {
+    static async _getOtherDeviceKey(request, client) {
         const myUserId = client.getUserId();
-        const myDevices = client.getStoredDevicesForUser(myUserId) || [];
         const otherDevice = request.targetDevice;
         const otherDeviceId = otherDevice ? otherDevice.deviceId : null;
-        const device = myDevices.find(d => d.deviceId === otherDeviceId);
-        return device.getFingerprint();
+        const device = await client.getStoredDevice(myUserId, otherDeviceId);
+        if (!device) {
+            throw new Error("could not find device " + otherDeviceId);
+        }
+        const key = device.getFingerprint();
+        return key;
     }
 
     static _determineMode(request, client) {
@@ -178,7 +196,9 @@ export class QRCodeData {
         return mode;
     }
 
-    static _generateQrData(request, client, mode) {
+    static _generateQrData(request, client, mode,
+        encodedSharedSecret, otherUserMasterKey, otherDeviceKey,
+    ) {
         const myUserId = client.getUserId();
         const transactionId = request.channel.transactionId;
         const qrData = {
@@ -188,7 +208,7 @@ export class QRCodeData {
             transactionId,
             firstKeyB64: '', // worked out shortly
             secondKeyB64: '', // worked out shortly
-            secretB64: this.encodedSharedSecret,
+            secretB64: encodedSharedSecret,
         };
 
         const myCrossSigningInfo = client.getStoredCrossSigningForUser(myUserId);
@@ -198,18 +218,17 @@ export class QRCodeData {
             // First key is our master cross signing key
             qrData.firstKeyB64 = myMasterKey;
             // Second key is the other user's master cross signing key
-            qrData.secondKeyB64 = this._otherUserMasterKey;
+            qrData.secondKeyB64 = otherUserMasterKey;
         } else if (mode === MODE_VERIFY_SELF_TRUSTED) {
             // First key is our master cross signing key
             qrData.firstKeyB64 = myMasterKey;
-            qrData.secondKeyB64 = this._otherDeviceKey;
+            qrData.secondKeyB64 = otherDeviceKey;
         } else if (mode === MODE_VERIFY_SELF_UNTRUSTED) {
             // First key is our device's key
             qrData.firstKeyB64 = client.getDeviceEd25519Key();
             // Second key is what we think our master cross signing key is
             qrData.secondKeyB64 = myMasterKey;
         }
-
         return qrData;
     }
 
