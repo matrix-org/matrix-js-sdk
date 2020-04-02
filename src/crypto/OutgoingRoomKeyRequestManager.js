@@ -58,7 +58,7 @@ const SEND_KEY_REQUESTS_DELAY_MS = 500;
  *
  * @enum {number}
  */
-const ROOM_KEY_REQUEST_STATES = {
+export const ROOM_KEY_REQUEST_STATES = {
     /** request not yet sent */
     UNSENT: 0,
 
@@ -325,6 +325,21 @@ export class OutgoingRoomKeyRequestManager {
         return this._cryptoStore.getOutgoingRoomKeyRequestsByTarget(
             userId, deviceId, [ROOM_KEY_REQUEST_STATES.SENT],
         );
+    }
+
+    /**
+     * Find anything in `sent` state, and kick it around the loop again.
+     * This is intended for situations where something substantial has changed, and we
+     * don't really expect the other end to even care about the cancellation.
+     * For example, after initialization or self-verification.
+     * @return {Promise} An array of `sendRoomKeyRequest` outputs.
+     */
+    async cancelAndResendAllOutgoingRequests() {
+        const outgoings = await this._cryptoStore.getAllOutgoingRoomKeyRequestsByState(
+            ROOM_KEY_REQUEST_STATES.SENT,
+        );
+        return Promise.all(outgoings.map(({ requestBody, recipients }) =>
+            this.sendRoomKeyRequest(requestBody, recipients, true)));
     }
 
     // start the background timer to send queued requests, if the timer isn't
