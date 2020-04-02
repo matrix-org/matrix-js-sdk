@@ -678,6 +678,12 @@ export class VerificationRequest extends EventEmitter {
             }
 
             if (newTransitions.length) {
+                // create QRCodeData if the other side can scan
+                // important this happens before emitting a phase change,
+                // so listeners can rely on it being there already
+                // We only do this for live events because it is important that
+                // we sign the keys that were in the QR code, and not the keys
+                // we happen to have at some later point in time.
                 if (isLiveEvent && newTransitions.some(t => t.phase === PHASE_READY)) {
                     const shouldGenerateQrCode =
                         this.otherPartySupportsMethod(SCAN_QR_CODE_METHOD, true);
