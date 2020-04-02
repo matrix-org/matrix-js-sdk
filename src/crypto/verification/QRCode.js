@@ -23,6 +23,7 @@ limitations under the License.
 import {VerificationBase as Base} from "./Base";
 import {
     newKeyMismatchError,
+    newUserCancelledError,
 } from './Error';
 import {encodeUnpaddedBase64, decodeBase64} from "../olmlib";
 
@@ -59,7 +60,7 @@ export class ReciprocateQRCode extends Base {
         await new Promise((resolve, reject) => {
             this.reciprocateQREvent = {
                 confirm: resolve,
-                cancel: reject, // which code should we cancel with here?
+                cancel: () => reject(newUserCancelledError()),
             };
             this.emit("show_reciprocate_qr", this.reciprocateQREvent);
         });
