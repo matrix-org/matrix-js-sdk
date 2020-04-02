@@ -236,21 +236,21 @@ export class QRCodeData {
     static _generateBuffer(qrData) {
         let buf = Buffer.alloc(0); // we'll concat our way through life
 
-        const appendByte = (b: number) => {
+        const appendByte = (b) => {
             const tmpBuf = Buffer.from([b]);
             buf = Buffer.concat([buf, tmpBuf]);
         };
-        const appendInt = (i: number) => {
+        const appendInt = (i) => {
             const tmpBuf = Buffer.alloc(2);
             tmpBuf.writeInt16BE(i, 0);
             buf = Buffer.concat([buf, tmpBuf]);
         };
-        const appendStr = (s: string, enc: string, withLengthPrefix = true) => {
+        const appendStr = (s, enc, withLengthPrefix = true) => {
             const tmpBuf = Buffer.from(s, enc);
             if (withLengthPrefix) appendInt(tmpBuf.byteLength);
             buf = Buffer.concat([buf, tmpBuf]);
         };
-        const appendEncBase64 = (b64: string) => {
+        const appendEncBase64 = (b64) => {
             const b = decodeBase64(b64);
             const tmpBuf = Buffer.from(b);
             buf = Buffer.concat([buf, tmpBuf]);
