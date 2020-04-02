@@ -23,7 +23,7 @@ import {
     newUnexpectedMessageError,
     newUnknownMethodError,
 } from "../Error";
-import * as olmlib from "../../olmlib";
+import {QRCodeData, SCAN_QR_CODE_METHOD} from "../QRCode";
 
 // the recommended amount of time before a verification request
 // should be (automatically) cancelled without user interaction
@@ -70,10 +70,15 @@ export class VerificationRequest extends EventEmitter {
         this._eventsByThem = new Map();
         this._observeOnly = false;
         this._timeoutTimer = null;
-        this._sharedSecret = null; // used for QR codes
         this._accepting = false;
         this._declining = false;
         this._verifierHasFinished = false;
+        this._chosenMethod = null;
+        // we keep a copy of the QR Code data (including other user master key) around
+        // for QR reciprocate verification, to protect against
+        // cross-signing identity reset between the .ready and .start event
+        // and signing the wrong key after .start
+        this._qrCodeData = null;
     }
 
     /**
@@ -154,6 +159,11 @@ export class VerificationRequest extends EventEmitter {
         return this._commonMethods;
     }
 
+    /** the method picked in the .start event */
+    get chosenMethod() {
+        return this._chosenMethod;
+    }
+
     /** The current remaining amount of ms before the request should be automatically cancelled */
     get timeout() {
         const requestEvent = this._getEventByEither(REQUEST_TYPE);
@@ -201,14 +211,20 @@ export class VerificationRequest extends EventEmitter {
             this._phase !== PHASE_CANCELLED;
     }
 
+    /** Only set after a .ready if the other party can scan a QR code */
+    get qrCodeData() {
+        return this._qrCodeData;
+    }
+
     /** Checks whether the other party supports a given verification method.
      *  This is useful when setting up the QR code UI, as it is somewhat asymmetrical:
      *  if the other party supports SCAN_QR, we should show a QR code in the UI, and vice versa.
      *  For methods that need to be supported by both ends, use the `methods` property.
      *  @param {string} method the method to check
+     *  @param {boolean} force to check even if the phase is not ready or started yet, internal usage
      *  @return {bool} whether or not the other party said the supported the method */
-    otherPartySupportsMethod(method) {
-        if (!this.ready && !this.started) {
+    otherPartySupportsMethod(method, force = false) {
+        if (!force && !this.ready && !this.started) {
             return false;
         }
         const theirMethodEvent = this._eventsByThem.get(REQUEST_TYPE) ||
@@ -315,14 +331,6 @@ export class VerificationRequest extends EventEmitter {
         return this._observeOnly;
     }
 
-    /**
-     * The unpadded base64 encoded shared secret. Primarily used for QR code
-     * verification.
-     */
-    get encodedSharedSecret() {
-        if (!this._sharedSecret) this._generateSharedSecret();
-        return this._sharedSecret;
-    }
 
     /**
      * Gets which device the verification should be started with
@@ -369,6 +377,7 @@ export class VerificationRequest extends EventEmitter {
                 if (!this._verifier) {
                     throw newUnknownMethodError();
                 }
+                this._chosenMethod = method;
             }
         }
         return this._verifier;
@@ -382,7 +391,6 @@ export class VerificationRequest extends EventEmitter {
         if (!this.observeOnly && this._phase === PHASE_UNSENT) {
             const methods = [...this._verificationMethods.keys()];
             await this.channel.send(REQUEST_TYPE, {methods});
-            this._generateSharedSecret();
         }
     }
 
@@ -415,14 +423,7 @@ export class VerificationRequest extends EventEmitter {
             this._accepting = true;
             this.emit("change");
             await this.channel.send(READY_TYPE, {methods});
-            this._generateSharedSecret();
         }
-    }
-
-    _generateSharedSecret() {
-        const secretBytes = new Uint8Array(8);
-        global.crypto.getRandomValues(secretBytes);
-        this._sharedSecret = olmlib.encodeUnpaddedBase64(secretBytes);
     }
 
     /**
@@ -559,6 +560,14 @@ export class VerificationRequest extends EventEmitter {
             const {method} = event.getContent();
             if (!this._verifier && !this.observeOnly) {
                 this._verifier = this._createVerifier(method, event);
+                if (!this._verifier) {
+                    this.cancel({
+                        code: "m.unknown_method",
+                        reason: `Unknown method: ${method}`,
+                    });
+                } else {
+                    this._chosenMethod = method;
+                }
             }
         }
     }
@@ -684,6 +693,20 @@ export class VerificationRequest extends EventEmitter {
             }
 
             if (newTransitions.length) {
+                // create QRCodeData if the other side can scan
+                // important this happens before emitting a phase change,
+                // so listeners can rely on it being there already
+                // We only do this for live events because it is important that
+                // we sign the keys that were in the QR code, and not the keys
+                // we happen to have at some later point in time.
+                if (isLiveEvent && newTransitions.some(t => t.phase === PHASE_READY)) {
+                    const shouldGenerateQrCode =
+                        this.otherPartySupportsMethod(SCAN_QR_CODE_METHOD, true);
+                    if (shouldGenerateQrCode) {
+                        this._qrCodeData = await QRCodeData.create(this, this._client);
+                    }
+                }
+
                 const lastTransition = newTransitions[newTransitions.length - 1];
                 const {phase} = lastTransition;
 
