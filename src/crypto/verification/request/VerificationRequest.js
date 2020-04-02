@@ -221,6 +221,7 @@ export class VerificationRequest extends EventEmitter {
      *  if the other party supports SCAN_QR, we should show a QR code in the UI, and vice versa.
      *  For methods that need to be supported by both ends, use the `methods` property.
      *  @param {string} method the method to check
+     *  @param {boolean} force to check even if the phase is not ready or started yet, internal usage
      *  @return {bool} whether or not the other party said the supported the method */
     otherPartySupportsMethod(method, force = false) {
         if (!force && !this.ready && !this.started) {
