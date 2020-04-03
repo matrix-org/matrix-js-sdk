@@ -302,6 +302,10 @@ export class VerificationRequest extends EventEmitter {
         return this.channel.userId;
     }
 
+    get isSelfVerification() {
+        return this._client.getUserId() === this.otherUserId;
+    }
+
     /**
      * The id of the user that cancelled the request,
      * only defined when phase is PHASE_CANCELLED
@@ -589,10 +593,9 @@ export class VerificationRequest extends EventEmitter {
             return false;
         }
         const oldEvent = this._verifier.startEvent;
-        const isSelfVerification = this.channel.userId === this._client.getUserId();
 
         let oldRaceIdentifier;
-        if (isSelfVerification) {
+        if (this.isSelfVerification) {
             // if the verifier does not have a startEvent,
             // it is because it's still sending and we are on the initator side
             // we know we are sending a .start event because we already
@@ -612,7 +615,7 @@ export class VerificationRequest extends EventEmitter {
         }
 
         let newRaceIdentifier;
-        if (isSelfVerification) {
+        if (this.isSelfVerification) {
             const newContent = newEvent.getContent();
             newRaceIdentifier = newContent && newContent.from_device;
         } else {
