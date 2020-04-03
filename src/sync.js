@@ -833,8 +833,7 @@ SyncApi.prototype._doSyncRequest = function(syncOptions, syncToken) {
         // is fixed
 
         try {
-            // Give a skip option for larger accounts which might burn CPU by logging
-            if (localStorage && localStorage.getItem("mx_skip_sync_logging")) {
+            if (localStorage && !localStorage.getItem("mx_do_sync_logging")) {
                 return r;
             }
 
