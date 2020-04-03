@@ -833,7 +833,8 @@ SyncApi.prototype._doSyncRequest = function(syncOptions, syncToken) {
         // is fixed
 
         try {
-            if (localStorage && !localStorage.getItem("mx_do_sync_logging")) {
+            if (typeof(localStorage) === 'object'
+                && !localStorage.getItem("mx_do_sync_logging")) {
                 return r;
             }
 
