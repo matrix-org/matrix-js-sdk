@@ -824,10 +824,56 @@ SyncApi.prototype._sync = async function(syncOptions) {
 
 SyncApi.prototype._doSyncRequest = function(syncOptions, syncToken) {
     const qps = this._getSyncParams(syncOptions, syncToken);
+    console.log("[sync_dbg] Doing sync with query string: ", qps);
     return this.client._http.authedRequest(
         undefined, "GET", "/sync", qps, undefined,
         qps.timeout + BUFFER_PERIOD_MS,
-    );
+    ).then(r => {
+        // TODO: Remove logging once https://github.com/matrix-org/synapse/issues/7206
+        // is fixed
+
+        try {
+            // Give a skip option for larger accounts which might burn CPU by logging
+            if (localStorage && localStorage.getItem("mx_skip_sync_logging")) {
+                return r;
+            }
+
+            // before processing the sync, log some details about it.
+            console.log("[sync_dbg] Got sync response -- checking event details");
+            const joinedRooms = ((r || {})['rooms'] || {})['join'] || {}; // r.rooms.join
+            for (const room of Object.entries(joinedRooms)) {
+                console.log("[sync_dbg] \tChecking event details in: ", room[0]);
+
+                const timeline = room[1].timeline || {};
+                const events = (timeline['events'] || []);
+                delete timeline['events']; // remove events to prevent revealing info
+                console.log("[sync_dbg] \t\tTimeline without events: ", timeline);
+                timeline['events'] = events; // put it back
+
+                for (const ev of events) {
+                    if (ev['sender'] === this.client.getUserId()) {
+                        const txnId =
+                            (ev['unsigned'] || {})['transaction_id'] || '<none>';
+
+                        console.log(
+                            `[sync_dbg] \t\tReceived echo of ${ev['event_id']} with ` +
+                            `txnId of ${txnId}`,
+                        );
+                    } else {
+                        console.log(
+                            `[sync_dbg] \t\tReceived ${ev['event_id']} which was not ` +
+                            `sent by our user (was ${ev['sender']})`,
+                        );
+                    }
+                }
+            }
+            console.log("Stopped processing sync");
+        } catch (e) {
+            console.error("Error logging details about sync: ", e);
+        }
+
+        return r;
+    });
 };
 
 SyncApi.prototype._getSyncParams = function(syncOptions, syncToken) {
