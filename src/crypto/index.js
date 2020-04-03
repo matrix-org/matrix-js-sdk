@@ -2784,6 +2784,14 @@ Crypto.prototype.cancelRoomKeyRequest = function(requestBody) {
 };
 
 /**
+ * Re-send any outgoing key requests, eg after verification
+ * @returns {Promise}
+ */
+Crypto.prototype.cancelAndResendAllOutgoingKeyRequests = function() {
+    return this._outgoingRoomKeyRequestManager.cancelAndResendAllOutgoingRequests();
+};
+
+/**
  * handle an m.room.encryption event
  *
  * @param {module:models/event.MatrixEvent} event encryption event
