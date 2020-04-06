@@ -163,6 +163,8 @@ InteractiveAuth.prototype = {
      */
     poll: async function() {
         if (!this._data.session) return;
+        // likewise don't poll if there is no auth session in progress
+        if (!this._resolveFunc) return;
         // if we currently have a request in flight, there's no point making
         // another just to check what the status is
         if (this._submitPromise) return;
@@ -318,6 +320,8 @@ InteractiveAuth.prototype = {
         try {
             const result = await this._requestCallback(auth, background);
             this._resolveFunc(result);
+            this._resolveFunc = null;
+            this._rejectFunc = null;
         } catch (error) {
             // sometimes UI auth errors don't come with flows
             const errorFlows = error.data ? error.data.flows : null;
