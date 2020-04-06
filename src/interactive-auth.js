@@ -145,7 +145,7 @@ InteractiveAuth.prototype = {
 
             // if we have no flows, try a request (we'll have
             // just a session ID in _data if resuming)
-            if (!this._data.flows) {
+            if (this._data  && !this._data.flows) {
                 if (this._busyChangedCallback) this._busyChangedCallback(true);
                 this._doRequest(this._data).finally(() => {
                     if (this._busyChangedCallback) this._busyChangedCallback(false);
@@ -162,12 +162,12 @@ InteractiveAuth.prototype = {
      * be resolved.
      */
     poll: async function() {
-        if (!this._data.session) return;
+        if (this._data && !this._data.session) return;
         // if we currently have a request in flight, there's no point making
         // another just to check what the status is
         if (this._submitPromise) return;
 
-        let authDict = {};
+        let authDict = null;
         if (this._currentStage == EMAIL_STAGE_TYPE) {
             // The email can be validated out-of-band, but we need to provide the
             // creds so the HS can go & check it.
@@ -321,7 +321,7 @@ InteractiveAuth.prototype = {
         } catch (error) {
             // sometimes UI auth errors don't come with flows
             const errorFlows = error.data ? error.data.flows : null;
-            const haveFlows = Boolean(this._data.flows) || Boolean(errorFlows);
+            const haveFlows = Boolean(this._data && this._data.flows) || Boolean(errorFlows);
             if (error.httpStatus !== 401 || !error.data || !haveFlows) {
                 // doesn't look like an interactive-auth failure.
                 if (!background) {
@@ -364,7 +364,7 @@ InteractiveAuth.prototype = {
                         this._inputs.emailAddress,
                         this._clientSecret,
                         1, // TODO: Multiple send attempts?
-                        this._data.session,
+                        this._data ? this._data.session : null,
                     );
                     this._emailSid = requestTokenResult.sid;
                     // NB. promise is not resolved here - at some point, doRequest
@@ -408,7 +408,7 @@ InteractiveAuth.prototype = {
             return;
         }
 
-        if (this._data.errcode || this._data.error) {
+        if (this._data && this._data.errcode || this._data.error) {
             this._stateUpdatedCallback(nextStage, {
                 errcode: this._data.errcode || "",
                 error: this._data.error || "",
