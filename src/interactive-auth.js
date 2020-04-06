@@ -316,7 +316,8 @@ InteractiveAuth.prototype = {
      */
     _doRequest: async function(auth, background) {
         try {
-            if (auth === {}) auth = null;
+            if (auth == {}) auth = null;
+            console.warn(auth);
             const result = await this._requestCallback(auth, background);
             this._resolveFunc(result);
         } catch (error) {
