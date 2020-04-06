@@ -104,7 +104,7 @@ const MSISDN_STAGE_TYPE = "m.login.msisdn";
  */
 export function InteractiveAuth(opts) {
     this._matrixClient = opts.matrixClient;
-    this._data = opts.authData || null;
+    this._data = opts.authData || {};
     this._requestCallback = opts.doRequest;
     this._busyChangedCallback = opts.busyChanged;
     // startAuthStage included for backwards compat
@@ -316,6 +316,7 @@ InteractiveAuth.prototype = {
      */
     _doRequest: async function(auth, background) {
         try {
+            if (auth === {}) auth = null;
             const result = await this._requestCallback(auth, background);
             this._resolveFunc(result);
         } catch (error) {
