@@ -690,6 +690,14 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             }
         }
 
+        if (setupNewKeyBackup && !keyBackupInfo) {
+            const info = await this._baseApis.prepareKeyBackupVersion(
+                null /* random key */,
+                { secureSecretStorage: true },
+            );
+            await this._baseApis.createKeyBackupVersion(info);
+        }
+
         // Call `getCrossSigningKey` for side effect of caching private keys for
         // future gossiping to other devices if enabled via app level callbacks.
         if (this._crossSigningInfo._cacheCallbacks) {
@@ -704,14 +712,6 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         if (sessionBackupKey) {
             logger.info("Got session backup key from secret storage: caching");
             await this.storeSessionBackupPrivateKey(sessionBackupKey);
-        }
-
-        if (setupNewKeyBackup && !keyBackupInfo) {
-            const info = await this._baseApis.prepareKeyBackupVersion(
-                null /* random key */,
-                { secureSecretStorage: true },
-            );
-            await this._baseApis.createKeyBackupVersion(info);
         }
     } finally {
         // Restore the original callbacks. NB. we must do this by manipulating
