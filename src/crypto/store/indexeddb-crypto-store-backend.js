@@ -60,7 +60,6 @@ export class Backend {
         return new Promise((resolve, reject) => {
             const txn = this._db.transaction("outgoingRoomKeyRequests", "readwrite");
             txn.onerror = reject;
-            txn.onabort = (ev) => reject(ev.target.error);
 
             // first see if we already have an entry for this request.
             this._getOutgoingRoomKeyRequest(txn, requestBody, (existing) => {
@@ -218,7 +217,6 @@ export class Backend {
 
             request.onsuccess = (ev) => resolve(ev.target.result);
             request.onerror = (ev) => reject(ev.target.error);
-            request.onabort = (ev) => reject(ev.target.error);
         });
     }
 
