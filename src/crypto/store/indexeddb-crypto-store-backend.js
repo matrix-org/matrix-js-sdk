@@ -203,6 +203,23 @@ export class Backend {
         return promiseifyTxn(txn).then(() => result);
     }
 
+    /**
+     *
+     * @param {Number} wantedState
+     * @return {Promise<Array<*>>} All elements in a given state
+     */
+    getAllOutgoingRoomKeyRequestsByState(wantedState) {
+        return new Promise((resolve, reject) => {
+            const txn = this._db.transaction("outgoingRoomKeyRequests", "readonly");
+            const store = txn.objectStore("outgoingRoomKeyRequests");
+            const index = store.index("state");
+            const request = index.getAll(wantedState);
+
+            request.onsuccess = (ev) => resolve(ev.target.result);
+            request.onerror = (ev) => reject(ev.target.error);
+        });
+    }
+
     getOutgoingRoomKeyRequestsByTarget(userId, deviceId, wantedStates) {
         let stateIndex = 0;
         const results = [];
