@@ -185,7 +185,7 @@ TestClient.prototype.expectKeyQuery = function(response) {
         200, (path, content) => {
             Object.keys(response.device_keys).forEach((userId) => {
                 expect(content.device_keys[userId]).toEqual(
-                    {},
+                    [],
                     "Expected key query for " + userId + ", got " +
                     Object.keys(content.device_keys),
                 );
