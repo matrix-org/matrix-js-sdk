@@ -644,6 +644,11 @@ export function createCryptoStoreCacheCallbacks(store) {
             });
         },
         storeCrossSigningKeyCache: function(type, key) {
+            if (!(key instanceof Uint8Array)) {
+                throw new Error(
+                    `storeCrossSigningKeyCache expects Uint8Array, got ${key}`,
+                );
+            }
             return store.doTxn(
                 'readwrite',
                 [IndexedDBCryptoStore.STORE_ACCOUNT],

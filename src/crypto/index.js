@@ -822,6 +822,9 @@ Crypto.prototype.getSessionBackupPrivateKey = async function() {
  * @returns {Promise} so you can catch failures
  */
 Crypto.prototype.storeSessionBackupPrivateKey = async function(key) {
+    if (!(key instanceof Uint8Array)) {
+        throw new Error(`storeSessionBackupPrivateKey expects Uint8Array, got ${key}`);
+    }
     return this._cryptoStore.doTxn(
         'readwrite',
         [IndexedDBCryptoStore.STORE_ACCOUNT],
