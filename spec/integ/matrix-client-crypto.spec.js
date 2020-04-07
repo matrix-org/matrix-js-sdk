@@ -98,7 +98,7 @@ function expectBobQueryKeys() {
         "POST", "/keys/query",
     ).respond(200, function(path, content) {
         expect(content.device_keys[aliUserId]).toEqual(
-            {},
+            [],
             "Expected Bob to key query for " + aliUserId + ", got " +
             Object.keys(content.device_keys),
         );
