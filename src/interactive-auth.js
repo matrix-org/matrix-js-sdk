@@ -383,7 +383,7 @@ InteractiveAuth.prototype = {
                     // (or not being registered, depending on what we're trying
                     // to do) or it could be a network failure. Either way, pass
                     // the failure up as the user can't complete auth if we can't
-                    // send the email, foe whatever reason.
+                    // send the email, for whatever reason.
                     this._rejectFunc(e);
                     this._resolveFunc = null;
                     this._rejectFunc = null;
