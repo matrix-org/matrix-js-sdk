@@ -70,7 +70,7 @@ function expectAliQueryKeys() {
     aliTestClient.httpBackend.when("POST", "/keys/query")
             .respond(200, function(path, content) {
         expect(content.device_keys[bobUserId]).toEqual(
-            {},
+            [],
             "Expected Alice to key query for " + bobUserId + ", got " +
             Object.keys(content.device_keys),
         );
