@@ -221,8 +221,7 @@ export class VerificationBase extends EventEmitter {
                             `m.cross_signing.${type}`, [this.deviceId],
                         );
                         const result = await promise;
-                        const decoded = decodeBase64(result);
-                        return Uint8Array.from(decoded);
+                        return decodeBase64(result);
                     } },
                     original._cacheCallbacks,
                 );
@@ -252,9 +251,7 @@ export class VerificationBase extends EventEmitter {
                         logger.info("Got key backup key, decoding...");
                         const decodedKey = decodeBase64(base64Key);
                         logger.info("Decoded backup key, storing...");
-                        client._crypto.storeSessionBackupPrivateKey(
-                            Uint8Array.from(decodedKey),
-                        );
+                        client._crypto.storeSessionBackupPrivateKey(decodedKey);
                         logger.info("Backup key stored. Starting backup restore...");
                         const backupInfo = await client.getKeyBackupVersion();
                         // no need to await for this - just let it go in the bg
