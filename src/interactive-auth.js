@@ -145,7 +145,7 @@ InteractiveAuth.prototype = {
 
             // if we have no flows, try a request (we'll have
             // just a session ID in _data if resuming)
-            if (this._data  && !this._data.flows) {
+            if (this._data && !this._data.flows) {
                 if (this._busyChangedCallback) this._busyChangedCallback(true);
                 this._doRequest(this._data).finally(() => {
                     if (this._busyChangedCallback) this._busyChangedCallback(false);
@@ -316,7 +316,8 @@ InteractiveAuth.prototype = {
      */
     _doRequest: async function(auth, background) {
         try {
-            if (Object.keys(auth).length === 0 && auth.constructor === Object) auth = null;
+            if (Object.keys(auth).length === 0 &&
+                auth.constructor === Object) auth = null;
             console.warn(auth);
             const result = await this._requestCallback(auth, background);
             this._resolveFunc(result);
