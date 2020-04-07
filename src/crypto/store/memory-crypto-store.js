@@ -166,6 +166,19 @@ export class MemoryCryptoStore {
         return Promise.resolve(null);
     }
 
+    /**
+     *
+     * @param {Number} wantedState
+     * @return {Promise<Array<*>>} All OutgoingRoomKeyRequests in state
+     */
+    getAllOutgoingRoomKeyRequestsByState(wantedState) {
+        return Promise.resolve(
+            this._outgoingRoomKeyRequests.filter(
+                (r) => r.state == wantedState,
+            ),
+        );
+    }
+
     getOutgoingRoomKeyRequestsByTarget(userId, deviceId, wantedStates) {
         const results = [];
 
