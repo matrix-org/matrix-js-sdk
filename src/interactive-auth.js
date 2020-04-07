@@ -385,6 +385,8 @@ InteractiveAuth.prototype = {
                     // the failure up as the user can't complete auth if we can't
                     // send the email, foe whatever reason.
                     this._rejectFunc(e);
+                    this._resolveFunc = null;
+                    this._rejectFunc = null;
                 } finally {
                     this._requestingEmailToken = false;
                 }
