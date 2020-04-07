@@ -328,7 +328,8 @@ InteractiveAuth.prototype = {
         } catch (error) {
             // sometimes UI auth errors don't come with flows
             const errorFlows = error.data ? error.data.flows : null;
-            const haveFlows = Boolean(this._data && this._data.flows) || Boolean(errorFlows);
+            const haveFlows = Boolean(this._data &&
+                this._data.flows) || Boolean(errorFlows);
             if (error.httpStatus !== 401 || !error.data || !haveFlows) {
                 // doesn't look like an interactive-auth failure.
                 if (!background) {
