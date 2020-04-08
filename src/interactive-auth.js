@@ -162,14 +162,14 @@ InteractiveAuth.prototype = {
      * be resolved.
      */
     poll: async function() {
-        if (this._data && !this._data.session) return;
+        if (!this._data.session) return;
         // likewise don't poll if there is no auth session in progress
         if (!this._resolveFunc) return;
         // if we currently have a request in flight, there's no point making
         // another just to check what the status is
         if (this._submitPromise) return;
 
-        let authDict = null;
+        let authDict = {};
         if (this._currentStage == EMAIL_STAGE_TYPE) {
             // The email can be validated out-of-band, but we need to provide the
             // creds so the HS can go & check it.
@@ -320,7 +320,6 @@ InteractiveAuth.prototype = {
         try {
             if (Object.keys(auth).length === 0 &&
                 auth.constructor === Object) auth = null;
-            console.warn(auth);
             const result = await this._requestCallback(auth, background);
             this._resolveFunc(result);
             this._resolveFunc = null;
@@ -328,8 +327,7 @@ InteractiveAuth.prototype = {
         } catch (error) {
             // sometimes UI auth errors don't come with flows
             const errorFlows = error.data ? error.data.flows : null;
-            const haveFlows = Boolean(this._data &&
-                this._data.flows) || Boolean(errorFlows);
+            const haveFlows = this._data.flows || Boolean(errorFlows);
             if (error.httpStatus !== 401 || !error.data || !haveFlows) {
                 // doesn't look like an interactive-auth failure.
                 if (!background) {
@@ -372,7 +370,7 @@ InteractiveAuth.prototype = {
                         this._inputs.emailAddress,
                         this._clientSecret,
                         1, // TODO: Multiple send attempts?
-                        this._data ? this._data.session : null,
+                        this._data.session,
                     );
                     this._emailSid = requestTokenResult.sid;
                     // NB. promise is not resolved here - at some point, doRequest
