@@ -711,7 +711,8 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         const sessionBackupKey = await this.getSecret('m.megolm_backup.v1');
         if (sessionBackupKey) {
             logger.info("Got session backup key from secret storage: caching");
-            await this.storeSessionBackupPrivateKey(sessionBackupKey);
+            const decoded = olmlib.decodeBase64(sessionBackupKey);
+            await this.storeSessionBackupPrivateKey(decoded);
         }
     } finally {
         // Restore the original callbacks. NB. we must do this by manipulating
@@ -822,6 +823,9 @@ Crypto.prototype.getSessionBackupPrivateKey = async function() {
  * @returns {Promise} so you can catch failures
  */
 Crypto.prototype.storeSessionBackupPrivateKey = async function(key) {
+    if (!(key instanceof Uint8Array)) {
+        throw new Error(`storeSessionBackupPrivateKey expects Uint8Array, got ${key}`);
+    }
     return this._cryptoStore.doTxn(
         'readwrite',
         [IndexedDBCryptoStore.STORE_ACCOUNT],
