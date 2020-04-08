@@ -1,3 +1,50 @@
+Changes in [5.3.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.3.0-rc.1) (2020-04-08)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.2.0...v5.3.0-rc.1)
+
+ * Store key backup key in cache as Uint8Array
+   [\#1308](https://github.com/matrix-org/matrix-js-sdk/pull/1308)
+ * Use the correct request body for the /keys/query endpoint.
+   [\#1307](https://github.com/matrix-org/matrix-js-sdk/pull/1307)
+ * Avoid creating two devices on registration
+   [\#1305](https://github.com/matrix-org/matrix-js-sdk/pull/1305)
+ * Lower max-warnings to 81
+   [\#1306](https://github.com/matrix-org/matrix-js-sdk/pull/1306)
+ * Move key backup key creation before caching
+   [\#1303](https://github.com/matrix-org/matrix-js-sdk/pull/1303)
+ * Expose function to force-reset outgoing room key requests
+   [\#1298](https://github.com/matrix-org/matrix-js-sdk/pull/1298)
+ * Add isSelfVerification property to VerificationRequest
+   [\#1302](https://github.com/matrix-org/matrix-js-sdk/pull/1302)
+ * QR code reciprocation
+   [\#1297](https://github.com/matrix-org/matrix-js-sdk/pull/1297)
+ * Add ability to check symmetric SSSS key before we try to use it
+   [\#1294](https://github.com/matrix-org/matrix-js-sdk/pull/1294)
+ * Add some debug logging for events stuck to bottom of timeline
+   [\#1296](https://github.com/matrix-org/matrix-js-sdk/pull/1296)
+ * Fix: spontanous verification request cancellation under some circumstances
+   [\#1295](https://github.com/matrix-org/matrix-js-sdk/pull/1295)
+ * Receive private key for caching from the app layer
+   [\#1293](https://github.com/matrix-org/matrix-js-sdk/pull/1293)
+ * Track whether we have verified a user before
+   [\#1292](https://github.com/matrix-org/matrix-js-sdk/pull/1292)
+ * Fix: error during tests
+   [\#1222](https://github.com/matrix-org/matrix-js-sdk/pull/1222)
+ * Send .done event for to_device verification
+   [\#1288](https://github.com/matrix-org/matrix-js-sdk/pull/1288)
+ * Request the key backup key & restore backup
+   [\#1291](https://github.com/matrix-org/matrix-js-sdk/pull/1291)
+ * Make screen sharing works on Chrome using getDisplayMedia()
+   [\#1276](https://github.com/matrix-org/matrix-js-sdk/pull/1276)
+ * Fix isVerified returning false
+   [\#1289](https://github.com/matrix-org/matrix-js-sdk/pull/1289)
+ * Fix: verification gets cancelled when event gets duplicated
+   [\#1286](https://github.com/matrix-org/matrix-js-sdk/pull/1286)
+ * Use requestSecret on the client to request secrets
+   [\#1287](https://github.com/matrix-org/matrix-js-sdk/pull/1287)
+ * Allow guests to fetch TURN servers
+   [\#1277](https://github.com/matrix-org/matrix-js-sdk/pull/1277)
+
 Changes in [5.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.2.0) (2020-03-30)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.2.0-rc.1...v5.2.0)
