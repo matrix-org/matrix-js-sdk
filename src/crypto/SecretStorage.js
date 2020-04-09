@@ -20,6 +20,7 @@ import * as olmlib from './olmlib';
 import {pkVerify} from './olmlib';
 import {randomString} from '../randomstring';
 import {encryptAES, decryptAES} from './aes';
+import {encodeBase64} from "./olmlib";
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES
     = "m.secret_storage.v1.aes-hmac-sha2";
@@ -98,7 +99,7 @@ export class SecretStorage extends EventEmitter {
                 keyData.passphrase = opts.passphrase;
             }
             if (opts.key) {
-                const {iv, mac} = await encryptAES(ZERO_STR, opts.key, "");
+                const {iv, mac} = await SecretStorage._calculateKeyCheck(opts.key);
                 keyData.iv = iv;
                 keyData.mac = mac;
             }
@@ -209,7 +210,7 @@ export class SecretStorage extends EventEmitter {
         case SECRET_STORAGE_ALGORITHM_V1_AES:
         {
             if (info.mac) {
-                const {mac} = await encryptAES(ZERO_STR, key, "", info.iv);
+                const {mac} = await SecretStorage._calculateKeyCheck(key, info.iv);
                 return info.mac === mac;
             } else {
                 // if we have no information, we have to assume the key is right
@@ -233,6 +234,10 @@ export class SecretStorage extends EventEmitter {
         default:
             throw new Error("Unknown algorithm");
         }
+    }
+
+    static async _calculateKeyCheck(key, iv) {
+        return await encryptAES(ZERO_STR, key, "", iv);
     }
 
     /**
@@ -372,8 +377,9 @@ export class SecretStorage extends EventEmitter {
             const encInfo = secretInfo.encrypted[keyId];
 
             // We don't actually need the decryption object if it's a passthrough
-            // since we just want to return the key itself.
-            if (encInfo.passthrough) return decryption.get_private_key();
+            // since we just want to return the key itself. It must be base64
+            // encoded, since this is how a key would normally be stored.
+            if (encInfo.passthrough) return encodeBase64(decryption.get_private_key());
 
             return await decryption.decrypt(encInfo);
         } finally {
