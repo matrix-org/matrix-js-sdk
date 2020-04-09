@@ -363,7 +363,7 @@ export class SecretStorage extends EventEmitter {
             }
         }
 
-        if (Object.keys(keys) === 0) {
+        if (Object.keys(keys).length === 0) {
             throw new Error(`Could not decrypt ${name} because none of ` +
                 `the keys it is encrypted with are for a supported algorithm`);
         }
