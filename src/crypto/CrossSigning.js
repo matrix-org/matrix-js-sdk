@@ -310,7 +310,9 @@ export class CrossSigningInfo extends EventEmitter {
         }
     }
 
-    /** unsets the keys, used when another session has reset the keys, to disable cross-signing */
+    /**
+     * unsets the keys, used when another session has reset the keys, to disable cross-signing
+     */
     clearKeys() {
         this.keys = {};
     }
