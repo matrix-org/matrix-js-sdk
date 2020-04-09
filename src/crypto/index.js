@@ -659,7 +659,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                 const secretName = `m.cross_signing.${type}`;
                 const secret = await this.getSecret(secretName);
                 keys[type] = secret;
-                crossSigningPrivateKeys[type] = olmlib.decodeBase64(secret);
+                crossSigningPrivateKeys[type] = new Uint8Array(olmlib.decodeBase64(secret));
             }
 
             await this.checkOwnCrossSigningTrust();
@@ -911,9 +911,10 @@ Crypto.prototype.getSessionBackupPrivateKey = async function() {
 
     // make sure we have a Uint8Array, rather than a string
     if (key && typeof(key === "string")) {
-        key = olmlib.decodeBase64(fixBackupKey(key) || key);
+        key = new Uint8Array(olmlib.decodeBase64(fixBackupKey(key) || key));
         await this.storeSessionBackupPrivateKey(key);
     }
+    return key;
 };
 
 /**
