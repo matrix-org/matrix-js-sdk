@@ -295,7 +295,7 @@ export class SAS extends Base {
         const hashCommitment = content.commitment;
         const olmSAS = new global.Olm.SAS();
         try {
-            this._send("m.key.verification.key", {
+            await this._send("m.key.verification.key", {
                 key: olmSAS.get_pubkey(),
             });
 
@@ -318,9 +318,13 @@ export class SAS extends Base {
             const verifySAS = new Promise((resolve, reject) => {
                 this.sasEvent = {
                     sas: generateSas(sasBytes, sasMethods),
-                    confirm: () => {
-                        this._sendMAC(olmSAS, macMethod);
-                        resolve();
+                    confirm: async () => {
+                        try {
+                            await this._sendMAC(olmSAS, macMethod);
+                            resolve();
+                        } catch (err) {
+                            reject(err);
+                        }
                     },
                     cancel: () => reject(newUserCancelledError()),
                     mismatch: () => reject(newMismatchedSASError()),
@@ -377,7 +381,7 @@ export class SAS extends Base {
         const olmSAS = new global.Olm.SAS();
         try {
             const commitmentStr = olmSAS.get_pubkey() + anotherjson.stringify(content);
-            this._send("m.key.verification.accept", {
+            await this._send("m.key.verification.accept", {
                 key_agreement_protocol: keyAgreement,
                 hash: hashMethod,
                 message_authentication_code: macMethod,
@@ -391,7 +395,7 @@ export class SAS extends Base {
             // FIXME: make sure event is properly formed
             content = e.getContent();
             olmSAS.set_their_key(content.key);
-            this._send("m.key.verification.key", {
+            await this._send("m.key.verification.key", {
                 key: olmSAS.get_pubkey(),
             });
 
@@ -403,9 +407,13 @@ export class SAS extends Base {
             const verifySAS = new Promise((resolve, reject) => {
                 this.sasEvent = {
                     sas: generateSas(sasBytes, sasMethods),
-                    confirm: () => {
-                        this._sendMAC(olmSAS, macMethod);
-                        resolve();
+                    confirm: async () => {
+                        try {
+                            await this._sendMAC(olmSAS, macMethod);
+                            resolve();
+                        } catch(err) {
+                            reject(err);
+                        }
                     },
                     cancel: () => reject(newUserCancelledError()),
                     mismatch: () => reject(newMismatchedSASError()),
@@ -461,7 +469,7 @@ export class SAS extends Base {
             keyList.sort().join(","),
             baseInfo + "KEY_IDS",
         );
-        this._send("m.key.verification.mac", { mac, keys });
+        return this._send("m.key.verification.mac", { mac, keys });
     }
 
     async _checkMAC(olmSAS, content, method) {
