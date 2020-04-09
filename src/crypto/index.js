@@ -516,16 +516,16 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             opts.key = privateKey;
         }
 
-        const newKeyId = await this.addSecretStorageKey(
+        const keyId = await this.addSecretStorageKey(
             SECRET_STORAGE_ALGORITHM_V1_AES, opts,
         );
-        await this.setDefaultSecretStorageKeyId(newKeyId);
+        await this.setDefaultSecretStorageKeyId(keyId);
 
         if (privateKey) {
             // cache the private key so that we can access it again
-            ssssKeys[newKeyId] = privateKey;
+            ssssKeys[keyId] = privateKey;
         }
-        return newKeyId;
+        return keyId;
     };
 
     // reset the cross-signing keys
@@ -568,7 +568,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
               await this._crossSigningInfo.isStoredInSecretStorage(this._secretStorage);
         const inStorage = !setupNewSecretStorage && decryptionKeys;
 
-        if (!decryptionKeys && !keyBackupInfo) {
+        if (!inStorage && !keyBackupInfo) {
             // either we don't have anything, or we've been asked to restart
             // from scratch
             logger.log(
@@ -578,10 +578,8 @@ Crypto.prototype.bootstrapSecretStorage = async function({
 
             await resetCrossSigning();
 
-            if (oldKeyInfo && oldKeyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
-                // if we already have a default SSSS key; use it
-                newKeyId = oldKeyId;
-            } else {
+            if (!oldKeyInfo || oldKeyInfo.algorithm !== SECRET_STORAGE_ALGORITHM_V1_AES) {
+                // if we already have a usable default SSSS key, just use it.
                 // otherwise, create a new one
                 const { keyInfo, privateKey } = await createSecretStorageKey();
                 newKeyId = await createSSSS(keyInfo, privateKey);
@@ -613,7 +611,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
 
             if (
                 keyBackupInfo.auth_data.private_key_salt &&
-                    keyBackupInfo.auth_data.private_key_iterations
+                keyBackupInfo.auth_data.private_key_iterations
             ) {
                 opts.passphrase = {
                     algorithm: "m.pbkdf2",
@@ -779,14 +777,6 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                 fixedBackupKey || sessionBackupKey,
             ));
             await this.storeSessionBackupPrivateKey(decodedBackupKey);
-        }
-
-        if (setupNewKeyBackup && !keyBackupInfo) {
-            const info = await this._baseApis.prepareKeyBackupVersion(
-                null /* random key */,
-                { secureSecretStorage: true },
-            );
-            await this._baseApis.createKeyBackupVersion(info);
         }
     } finally {
         // Restore the original callbacks. NB. we must do this by manipulating
