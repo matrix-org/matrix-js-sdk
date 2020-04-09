@@ -1151,7 +1151,12 @@ Crypto.prototype._onDeviceListUserCrossSigningUpdated = async function(userId) {
             // effectively disabling cross-signing until the user gets verified by the device
             // that reset the keys
             this._storeTrustedSelfKeys(null);
+            // emit cross-signing has been disabled
             this.emit("crossSigning.keysChanged", {});
+            // as the trust for our own user has changed,
+            // also emit an event for this
+            this.emit("userTrustStatusChanged",
+                this._userId, this.checkUserTrust(userId));
         }
     } else {
         await this._checkDeviceVerifications(userId);
