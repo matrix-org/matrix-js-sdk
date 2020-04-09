@@ -659,7 +659,8 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                 const secretName = `m.cross_signing.${type}`;
                 const secret = await this.getSecret(secretName);
                 keys[type] = secret;
-                crossSigningPrivateKeys[type] = new Uint8Array(olmlib.decodeBase64(secret));
+                crossSigningPrivateKeys[type]
+                    = new Uint8Array(olmlib.decodeBase64(secret));
             }
 
             await this.checkOwnCrossSigningTrust();
