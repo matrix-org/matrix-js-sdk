@@ -601,7 +601,10 @@ Crypto.prototype.bootstrapSecretStorage = async function({
 
             logger.log("Secret storage default key not found, using key backup key");
 
-            const backupKey = await getKeyBackupPassphrase();
+            // if we have the backup key already cached, use it; otherwise use the
+            // callback to prompt for the key
+            const backupKey = await this.getSessionBackupPrivateKey() ||
+                              await getKeyBackupPassphrase();
 
             // create new cross-signing keys
             await resetCrossSigning();
