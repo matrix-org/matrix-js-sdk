@@ -1145,13 +1145,17 @@ Crypto.prototype._onDeviceListUserCrossSigningUpdated = async function(userId) {
             // If it's not changed, just make sure everything is up to date
             await this.checkOwnCrossSigningTrust();
         } else {
-            this.emit("crossSigning.keysChanged", {});
             // We'll now be in a state where cross-signing on the account is not trusted
             // because our locally stored cross-signing keys will not match the ones
-            // on the server for our account. The app must call checkOwnCrossSigningTrust()
-            // to fix this.
-            // XXX: Do we need to do something to emit events saying every device has become
-            // untrusted?
+            // on the server for our account. So we clear our own stored cross-signing keys,
+            // effectively disabling cross-signing until the user gets verified by the device
+            // that reset the keys
+            this._storeTrustedSelfKeys(null);
+            // XXX this event doesn't seem to be used anywhere
+            // the DeviceListener in react-sdl does recheck though,
+            // as `crypto.devicesUpdated`` and `accountData` are
+            // emitted on the client when this case happens.
+            this.emit("crossSigning.keysChanged", {});
         }
     } else {
         await this._checkDeviceVerifications(userId);
@@ -1307,7 +1311,11 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
  * @param {object} keys The new trusted set of keys
  */
 Crypto.prototype._storeTrustedSelfKeys = async function(keys) {
-    this._crossSigningInfo.setKeys(keys);
+    if (keys) {
+        this._crossSigningInfo.setKeys(keys);
+    } else {
+        this._crossSigningInfo.clearKeys();
+    }
     await this._cryptoStore.doTxn(
         'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
         (txn) => {
