@@ -1151,10 +1151,6 @@ Crypto.prototype._onDeviceListUserCrossSigningUpdated = async function(userId) {
             // effectively disabling cross-signing until the user gets verified by the device
             // that reset the keys
             this._storeTrustedSelfKeys(null);
-            // XXX this event doesn't seem to be used anywhere
-            // the DeviceListener in react-sdl does recheck though,
-            // as `crypto.devicesUpdated`` and `accountData` are
-            // emitted on the client when this case happens.
             this.emit("crossSigning.keysChanged", {});
         }
     } else {
