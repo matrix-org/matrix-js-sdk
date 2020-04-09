@@ -44,7 +44,16 @@ describe("SAS verification", function() {
     });
 
     it("should error on an unexpected event", async function() {
-        const sas = new SAS({}, "@alice:example.com", "ABCDEFG");
+        //channel, baseApis, userId, deviceId, startEvent, request
+        const request = {
+            onVerifierCancelled: function() {},
+        };
+        const channel = {
+            send: function() {
+                return Promise.resolve();
+            },
+        };
+        const sas = new SAS(channel, {}, "@alice:example.com", "ABCDEFG", null, request);
         sas.handleEvent(new MatrixEvent({
             sender: "@alice:example.com",
             type: "es.inquisition",
