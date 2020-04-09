@@ -73,6 +73,7 @@ export class VerificationRequest extends EventEmitter {
         this._accepting = false;
         this._declining = false;
         this._verifierHasFinished = false;
+        this._cancelled = false;
         this._chosenMethod = null;
         // we keep a copy of the QR Code data (including other user master key) around
         // for QR reciprocate verification, to protect against
@@ -525,7 +526,7 @@ export class VerificationRequest extends EventEmitter {
         }
 
         const cancelEvent = this._getEventByEither(CANCEL_TYPE);
-        if (cancelEvent && phase() !== PHASE_DONE) {
+        if ((this._cancelled || cancelEvent) && phase() !== PHASE_DONE) {
             transitions.push({phase: PHASE_CANCELLED, event: cancelEvent});
             return transitions;
         }
@@ -856,6 +857,15 @@ export class VerificationRequest extends EventEmitter {
             return false;
         }
         return true;
+    }
+
+    onVerifierCancelled() {
+        this._cancelled = true;
+        // move to cancelled phase
+        const newTransitions = this._applyPhaseTransitions();
+        if (newTransitions.length) {
+            this._setPhase(newTransitions[newTransitions.length - 1].phase);
+        }
     }
 
     onVerifierFinished() {

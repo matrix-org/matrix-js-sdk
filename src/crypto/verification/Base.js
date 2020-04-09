@@ -287,6 +287,7 @@ export class VerificationBase extends EventEmitter {
         this._endTimer(); // always kill the activity timer
         if (!this._done) {
             this.cancelled = true;
+            this.request.onVerifierCancelled();
             if (this.userId && this.deviceId) {
                 // send a cancellation to the other user (if it wasn't
                 // cancelled by the other user)
