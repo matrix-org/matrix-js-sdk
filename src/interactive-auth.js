@@ -318,8 +318,6 @@ InteractiveAuth.prototype = {
      */
     _doRequest: async function(auth, background) {
         try {
-            if (Object.keys(auth).length === 0 &&
-                auth.constructor === Object) auth = null;
             const result = await this._requestCallback(auth, background);
             this._resolveFunc(result);
             this._resolveFunc = null;
