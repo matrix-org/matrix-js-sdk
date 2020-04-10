@@ -265,10 +265,16 @@ InteractiveAuth.prototype = {
         }
 
         // use the sessionid from the last request.
-        const auth = {
-            session: this._data.session,
-        };
-        utils.extend(auth, authData);
+        // but keep the null in authData if this is the first stage.
+        let auth;
+        if (this._data.session) {
+            auth = {
+                session: this._data.session,
+            };
+            utils.extend(auth, authData);
+        } else {
+            auth = authData;
+        }
 
         try {
             // NB. the 'background' flag is deprecated by the busyChanged
