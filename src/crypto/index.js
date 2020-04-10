@@ -306,7 +306,8 @@ Crypto.prototype.init = async function(opts) {
         'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
         (txn) => {
             this._cryptoStore.getCrossSigningKeys(txn, (keys) => {
-                if (keys) {
+                // can be an empty object after resetting cross-signing keys, see _storeTrustedSelfKeys
+                if (keys && Object.keys(keys).length !== 0) {
                     logger.log("Loaded cross-signing public keys from crypto store");
                     this._crossSigningInfo.setKeys(keys);
                 }
