@@ -578,7 +578,7 @@ describe("Secrets", function() {
             expect(await alice.getSecret("m.megolm_backup.v1"))
                 .toEqual(olmlib.encodeBase64(backupKey));
         });
-        it("converts asymmetric SSSS with passthrough to symmetric SSSS", async function() {
+        it("converts asymmetric SSSS with passthrough", async function() {
             let crossSigningKeys = {};
             const secretStorageKeys = {
                 "old_key_id": SSSSKey,
