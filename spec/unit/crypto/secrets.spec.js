@@ -50,6 +50,13 @@ async function makeTestClient(userInfo, options) {
     return client;
 }
 
+// Wrapper around pkSign to return a signed object. pkSign returns the
+// signature, rather than the signed object.
+function sign(obj, key, userId) {
+    olmlib.pkSign(obj, key, userId);
+    return obj;
+}
+
 describe("Secrets", function() {
     if (!global.Olm) {
         console.warn('Not running megolm backup unit tests: libolm not present');
@@ -429,22 +436,15 @@ describe("Secrets", function() {
                 }),
                 new MatrixEvent({
                     type: "m.secret_storage.key.old_key_id",
-                    content: {
+                    content: sign({
                         algorithm: "m.secret_storage.v1.curve25519-aes-sha2",
                         passphrase: {
                             algorithm: "m.pbkdf2",
                             iterations: 500000,
                             salt: "GbkvwKHVMveo1zGVSb2GMMdCinG2npJK",
                         },
-                        pubkey: "v3A8HTypbccUm6jaRCRw5l+7lSdzQUACeY9xpQ5BVmE",
-                        signatures: {
-                            "@alice:example.com": {
-                                "ed25519:DRb8pFVJyEJ9OWvXeUoM0jq/C2Wt+NxzBZVuk2nRb+0":
-                                "wHXPunpXd1IppW8DN54BrC5UTevG8MNNOnJFP5wB8xE8n7xuF7ntounA"
-                                + "hI34Q/wR+xRyaWLaAoFgI+nWeopJDQ",
-                            },
-                        },
-                    },
+                        pubkey: SSSSPubKey,
+                    }, XSK, "@alice:example.com"),
                 }),
                 new MatrixEvent({
                     type: "m.cross_signing.master",
@@ -491,50 +491,29 @@ describe("Secrets", function() {
                             [`ed25519:${XSPubKey}`]: XSPubKey,
                         },
                     },
-                    self_signing: {
+                    self_signing: sign({
                         user_id: "@alice:example.com",
                         usage: ["self_signing"],
                         keys: {
                             [`ed25519:${SSPubKey}`]: SSPubKey,
                         },
-                        signatures: {
-                            "@alice:example.com": {
-                                "ed25519:DRb8pFVJyEJ9OWvXeUoM0jq/C2Wt+NxzBZVuk2nRb+0":
-                                "zdvI7+HmaOMYInWsYD1ctZe1tuCL7ENvVHBiNAagRwPaekF0zLSBnDrg"
-                                + "SRwIC4do4Oi/v+9dl6+IVSdr5sdSAw",
-                            },
-                        },
-                    },
-                    user_signing: {
+                    }, XSK, "@alice:example.com"),
+                    user_signing: sign({
                         user_id: "@alice:example.com",
                         usage: ["user_signing"],
                         keys: {
                             [`ed25519:${USPubKey}`]: USPubKey,
                         },
-                        signatures: {
-                            "@alice:example.com": {
-                                "ed25519:DRb8pFVJyEJ9OWvXeUoM0jq/C2Wt+NxzBZVuk2nRb+0":
-                                "xK9XibBb13VSOwOaITx9ifEGWgXxJoxHY3IkTf99rxJ/YVoxTJNXxx5S"
-                                + "QzAIFzPKBxA7Zm59efYZ+UehDE0sBw",
-                            },
-                        },
-                    },
+                    }, XSK, "@alice:example.com"),
                 },
             });
             alice.getKeyBackupVersion = async () => {
                 return {
                     version: "1",
                     algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
-                    auth_data: {
+                    auth_data: sign({
                         public_key: "pxEXhg+4vdMf/kFwP4bVawFWdb0EmytL3eFJx++zQ0A",
-                        signatures: {
-                            "@alice:example.com": {
-                                "ed25519:DRb8pFVJyEJ9OWvXeUoM0jq/C2Wt+NxzBZVuk2nRb+0":
-                                "GfdOoC3xJ26bR5mpePq55GdPcPxu46LLbEZ0mDU3PLnTF/Ol/NQWszpz"
-                                + "S51wmCPfE60znwLFCD0OqswSCNtHBA",
-                            },
-                        },
-                    },
+                    }, XSK, "@alice:example.com"),
                 };
             };
             const origAddSecretStorageKey = alice._crypto.addSecretStorageKey;
@@ -678,50 +657,29 @@ describe("Secrets", function() {
                             [`ed25519:${XSPubKey}`]: XSPubKey,
                         },
                     },
-                    self_signing: {
+                    self_signing: sign({
                         user_id: "@alice:example.com",
                         usage: ["self_signing"],
                         keys: {
                             [`ed25519:${SSPubKey}`]: SSPubKey,
                         },
-                        signatures: {
-                            "@alice:example.com": {
-                                "ed25519:DRb8pFVJyEJ9OWvXeUoM0jq/C2Wt+NxzBZVuk2nRb+0":
-                                "zdvI7+HmaOMYInWsYD1ctZe1tuCL7ENvVHBiNAagRwPaekF0zLSBnDrg"
-                                + "SRwIC4do4Oi/v+9dl6+IVSdr5sdSAw",
-                            },
-                        },
-                    },
-                    user_signing: {
+                    }, XSK, "@alice:example.com"),
+                    user_signing: sign({
                         user_id: "@alice:example.com",
                         usage: ["user_signing"],
                         keys: {
                             [`ed25519:${USPubKey}`]: USPubKey,
                         },
-                        signatures: {
-                            "@alice:example.com": {
-                                "ed25519:DRb8pFVJyEJ9OWvXeUoM0jq/C2Wt+NxzBZVuk2nRb+0":
-                                "xK9XibBb13VSOwOaITx9ifEGWgXxJoxHY3IkTf99rxJ/YVoxTJNXxx5S"
-                                + "QzAIFzPKBxA7Zm59efYZ+UehDE0sBw",
-                            },
-                        },
-                    },
+                    }, XSK, "@alice:example.com"),
                 },
             });
             alice.getKeyBackupVersion = async () => {
                 return {
                     version: "1",
                     algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
-                    auth_data: {
+                    auth_data: sign({
                         public_key: "pxEXhg+4vdMf/kFwP4bVawFWdb0EmytL3eFJx++zQ0A",
-                        signatures: {
-                            "@alice:example.com": {
-                                "ed25519:DRb8pFVJyEJ9OWvXeUoM0jq/C2Wt+NxzBZVuk2nRb+0":
-                                "GfdOoC3xJ26bR5mpePq55GdPcPxu46LLbEZ0mDU3PLnTF/Ol/NQWszpz"
-                                + "S51wmCPfE60znwLFCD0OqswSCNtHBA",
-                            },
-                        },
-                    },
+                    }, XSK, "@alice:example.com"),
                 };
             };
             alice.setAccountData = async function(name, data) {
@@ -839,50 +797,29 @@ describe("Secrets", function() {
                             [`ed25519:${XSPubKey}`]: XSPubKey,
                         },
                     },
-                    self_signing: {
+                    self_signing: sign({
                         user_id: "@alice:example.com",
                         usage: ["self_signing"],
                         keys: {
                             [`ed25519:${SSPubKey}`]: SSPubKey,
                         },
-                        signatures: {
-                            "@alice:example.com": {
-                                "ed25519:DRb8pFVJyEJ9OWvXeUoM0jq/C2Wt+NxzBZVuk2nRb+0":
-                                "zdvI7+HmaOMYInWsYD1ctZe1tuCL7ENvVHBiNAagRwPaekF0zLSBnDrg"
-                                + "SRwIC4do4Oi/v+9dl6+IVSdr5sdSAw",
-                            },
-                        },
-                    },
-                    user_signing: {
+                    }, XSK, "@alice:example.com"),
+                    user_signing: sign({
                         user_id: "@alice:example.com",
                         usage: ["user_signing"],
                         keys: {
                             [`ed25519:${USPubKey}`]: USPubKey,
                         },
-                        signatures: {
-                            "@alice:example.com": {
-                                "ed25519:DRb8pFVJyEJ9OWvXeUoM0jq/C2Wt+NxzBZVuk2nRb+0":
-                                "xK9XibBb13VSOwOaITx9ifEGWgXxJoxHY3IkTf99rxJ/YVoxTJNXxx5S"
-                                + "QzAIFzPKBxA7Zm59efYZ+UehDE0sBw",
-                            },
-                        },
-                    },
+                    }, XSK, "@alice:example.com"),
                 },
             });
             alice.getKeyBackupVersion = async () => {
                 return {
                     version: "1",
                     algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
-                    auth_data: {
+                    auth_data: sign({
                         public_key: "pxEXhg+4vdMf/kFwP4bVawFWdb0EmytL3eFJx++zQ0A",
-                        signatures: {
-                            "@alice:example.com": {
-                                "ed25519:DRb8pFVJyEJ9OWvXeUoM0jq/C2Wt+NxzBZVuk2nRb+0":
-                                "GfdOoC3xJ26bR5mpePq55GdPcPxu46LLbEZ0mDU3PLnTF/Ol/NQWszpz"
-                                + "S51wmCPfE60znwLFCD0OqswSCNtHBA",
-                            },
-                        },
-                    },
+                    }, XSK, "@alice:example.com"),
                 };
             };
             alice.setAccountData = async function(name, data) {
