@@ -48,6 +48,7 @@ import {keyFromAuthData} from './crypto/key_passphrase';
 import {randomString} from './randomstring';
 import {PushProcessor} from "./pushprocessor";
 import {encodeBase64, decodeBase64} from "./crypto/olmlib";
+import { User } from "./models/user";
 
 const SCROLLBACK_DELAY_MS = 3000;
 export const CRYPTO_ENABLED = isCryptoAvailable();
@@ -4742,6 +4743,13 @@ MatrixClient.prototype.startClient = async function(opts) {
         opts = {
             initialSyncLimit: opts,
         };
+    }
+
+    // Create our own user object artificially (instead of waiting for sync)
+    // so it's always available, even if the user is not in any rooms etc.
+    const userId = this.getUserId();
+    if (userId) {
+        this.store.storeUser(new User(userId));
     }
 
     if (this._crypto) {
