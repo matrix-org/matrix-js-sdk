@@ -5279,7 +5279,7 @@ function _PojoToMatrixEventMapper(client, options) {
 }
 
 /**
- * @param {[object]} options
+ * @param {object} [options]
  * @param {bool} options.preventReEmit don't reemit events emitted on an event mapped by this mapper on the client
  * @return {Function}
  */
