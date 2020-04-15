@@ -5257,17 +5257,20 @@ function _resolve(callback, resolve, res) {
     resolve(res);
 }
 
-function _PojoToMatrixEventMapper(client) {
+function _PojoToMatrixEventMapper(client, options) {
+    const preventReEmit = Boolean(options && options.preventReEmit);
     function mapper(plainOldJsObject) {
         const event = new MatrixEvent(plainOldJsObject);
         if (event.isEncrypted()) {
-            client.reEmitter.reEmit(event, [
-                "Event.decrypted",
-            ]);
+            if (!preventReEmit) {
+                client.reEmitter.reEmit(event, [
+                    "Event.decrypted",
+                ]);
+            }
             event.attemptDecryption(client._crypto);
         }
         const room = client.getRoom(event.getRoomId());
-        if (room) {
+        if (room && !preventReEmit) {
             room.reEmitter.reEmit(event, ["Event.replaced"]);
         }
         return event;
@@ -5276,10 +5279,12 @@ function _PojoToMatrixEventMapper(client) {
 }
 
 /**
+ * @param {[object]} options
+ * @param {bool} options.preventReEmit don't reemit events emitted on an event mapped by this mapper on the client
  * @return {Function}
  */
-MatrixClient.prototype.getEventMapper = function() {
-    return _PojoToMatrixEventMapper(this);
+MatrixClient.prototype.getEventMapper = function(options = undefined) {
+    return _PojoToMatrixEventMapper(this, options);
 };
 
 /**
