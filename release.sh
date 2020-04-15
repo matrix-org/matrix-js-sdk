@@ -38,6 +38,7 @@ $USAGE
     -c changelog_file:  specify name of file containing changelog
     -x:                 skip updating the changelog
     -z:                 skip generating the jsdoc
+    -n:                 skip publish to NPM
 EOF
 }
 
@@ -60,9 +61,10 @@ fi
 
 skip_changelog=
 skip_jsdoc=
+skip_npm=
 changelog_file="CHANGELOG.md"
 expected_npm_user="matrixdotorg"
-while getopts hc:u:xz f; do
+while getopts hc:u:xzn f; do
     case $f in
         h)
             help
@@ -76,6 +78,9 @@ while getopts hc:u:xz f; do
             ;;
         z)
             skip_jsdoc=1
+            ;;
+        n)
+            skip_npm=1
             ;;
         u)
             expected_npm_user="$OPTARG"
@@ -96,10 +101,12 @@ fi
 
 # Login and publish continues to use `npm`, as it seems to have more clearly
 # defined options and semantics than `yarn` for writing to the registry.
-actual_npm_user=`npm whoami`;
-if [ $expected_npm_user != $actual_npm_user ]; then
-    echo "you need to be logged into npm as $expected_npm_user, but you are logged in as $actual_npm_user" >&2
-    exit 1
+if [ -z "$skip_npm" ]; then
+    actual_npm_user=`npm whoami`;
+    if [ $expected_npm_user != $actual_npm_user ]; then
+        echo "you need to be logged into npm as $expected_npm_user, but you are logged in as $actual_npm_user" >&2
+        exit 1
+    fi
 fi
 
 # ignore leading v on release
@@ -298,11 +305,13 @@ rm "${latest_changes}"
 # defined options and semantics than `yarn` for writing to the registry.
 # Tag both releases and prereleases as `next` so the last stable release remains
 # the default.
-npm publish --tag next
-if [ $prerelease -eq 0 ]; then
-    # For a release, also add the default `latest` tag.
-    package=$(cat package.json | jq -er .name)
-    npm dist-tag add "$package@$release" latest
+if [ -z "$skip_npm" ]; then
+    npm publish --tag next
+    if [ $prerelease -eq 0 ]; then
+        # For a release, also add the default `latest` tag.
+        package=$(cat package.json | jq -er .name)
+        npm dist-tag add "$package@$release" latest
+    fi
 fi
 
 if [ -z "$skip_jsdoc" ]; then
@@ -338,8 +347,10 @@ if [ -z "$skip_jsdoc" ]; then
     git push origin gh-pages
 fi
 
-# finally, merge master back onto develop
-git checkout develop
-git pull
-git merge master
-git push origin develop
+# finally, merge master back onto develop (if it exists)
+if [ $(git branch -lr | grep origin/develop -c) -ge 1 ]; then
+    git checkout develop
+    git pull
+    git merge master
+    git push origin develop
+fi
