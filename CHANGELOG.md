@@ -1,3 +1,25 @@
+Changes in [5.3.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.3.1-rc.1) (2020-04-15)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.3.0-rc.1...v5.3.1-rc.1)
+
+ * Adapt release script for riot-desktop
+   [\#1319](https://github.com/matrix-org/matrix-js-sdk/pull/1319)
+ * Fix: prevent spurious notifications from indexer
+   [\#1318](https://github.com/matrix-org/matrix-js-sdk/pull/1318)
+ * Always create our own user object
+   [\#1317](https://github.com/matrix-org/matrix-js-sdk/pull/1317)
+ * Fix incorrect backup key format in SSSS
+   [\#1311](https://github.com/matrix-org/matrix-js-sdk/pull/1311)
+ * Fix e2ee crash after refreshing after having received a cross-singing key
+   reset
+   [\#1315](https://github.com/matrix-org/matrix-js-sdk/pull/1315)
+ * Fix: catch send errors in SAS verifier
+   [\#1314](https://github.com/matrix-org/matrix-js-sdk/pull/1314)
+ * Clear cross-signing keys when detecting the keys have changed
+   [\#1312](https://github.com/matrix-org/matrix-js-sdk/pull/1312)
+ * Upgrade deps
+   [\#1310](https://github.com/matrix-org/matrix-js-sdk/pull/1310)
+
 Changes in [5.3.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.3.0-rc.1) (2020-04-08)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.2.0...v5.3.0-rc.1)
