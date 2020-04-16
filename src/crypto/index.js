@@ -579,7 +579,11 @@ Crypto.prototype.bootstrapSecretStorage = async function({
 
             await resetCrossSigning();
 
-            if (setupNewSecretStorage || !oldKeyInfo || oldKeyInfo.algorithm !== SECRET_STORAGE_ALGORITHM_V1_AES) {
+            if (
+                setupNewSecretStorage ||
+                !oldKeyInfo ||
+                oldKeyInfo.algorithm !== SECRET_STORAGE_ALGORITHM_V1_AES
+            ) {
                 // if we already have a usable default SSSS key and aren't resetting SSSS just use it.
                 // otherwise, create a new one
                 // Note: we leave the old SSSS key in place: there could be other secrets using it, in theory.
