@@ -65,7 +65,7 @@ export class ReciprocateQRCode extends Base {
             this.emit("show_reciprocate_qr", this.reciprocateQREvent);
         });
 
-        // 3. determine key to sign
+        // 3. determine key to sign / mark as trusted
         const keys = {};
 
         switch (qrCodeData.mode) {
@@ -87,7 +87,7 @@ export class ReciprocateQRCode extends Base {
             }
         }
 
-        // 4. sign the key
+        // 4. sign the key (or mark own MSK as verified in case of MODE_VERIFY_SELF_TRUSTED)
         await this._verifyKeys(this.userId, keys, (keyId, device, keyInfo) => {
             // make sure the device has the expected keys
             const targetKey = keys[keyId];
