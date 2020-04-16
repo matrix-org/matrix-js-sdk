@@ -1,3 +1,10 @@
+Changes in [5.3.1-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.3.1-rc.2) (2020-04-16)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.3.1-rc.1...v5.3.1-rc.2)
+
+ * Implement QR code reciprocate for self-verification with untrusted MSK
+   [\#1321](https://github.com/matrix-org/matrix-js-sdk/pull/1321)
+
 Changes in [5.3.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.3.1-rc.1) (2020-04-15)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.3.0-rc.1...v5.3.1-rc.1)
