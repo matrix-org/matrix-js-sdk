@@ -272,10 +272,12 @@ OlmDecryption.prototype._decryptMessage = async function(
         // not a prekey message: we can safely just try & decrypt it
         return this._reallyDecryptMessage(theirDeviceIdentityKey, message);
     } else {
-        this._olmDevice._olmPrekeyPromise = this._olmDevice._olmPrekeyPromise.then(() => {
+        const myPromise = this._olmDevice._olmPrekeyPromise.then(() => {
             return this._reallyDecryptMessage(theirDeviceIdentityKey, message);
         });
-        return await this._olmDevice._olmPrekeyPromise;
+        // we want the error, but don't propagate it to the next decryption
+        this._olmDevice._olmPrekeyPromise = myPromise.catch(() => {});
+        return await myPromise;
     }
 };
 
