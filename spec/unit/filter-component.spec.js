@@ -2,7 +2,6 @@ import {FilterComponent} from "../../src/filter-component";
 import {mkEvent} from '../test-utils';
 
 describe("Filter Component", function() {
-
     describe("types", function() {
         it("should filter out events with other types", function() {
             const filter = new FilterComponent({ types: ['m.room.message'] });
@@ -31,7 +30,5 @@ describe("Filter Component", function() {
 
             expect(checkResult).toBe(true);
         });
-
     });
-
 });
