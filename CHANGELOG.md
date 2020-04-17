@@ -1,3 +1,12 @@
+Changes in [5.3.1-rc.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.3.1-rc.3) (2020-04-17)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.3.1-rc.2...v5.3.1-rc.3)
+
+ * Fix cross-signing/SSSS reset
+   [\#1323](https://github.com/matrix-org/matrix-js-sdk/pull/1323)
+ * Fix: crash when backup key needs fixing from corruption issue
+   [\#1325](https://github.com/matrix-org/matrix-js-sdk/pull/1325)
+
 Changes in [5.3.1-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.3.1-rc.2) (2020-04-16)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.3.1-rc.1...v5.3.1-rc.2)
