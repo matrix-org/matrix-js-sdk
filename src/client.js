@@ -1822,7 +1822,7 @@ MatrixClient.prototype.restoreKeyBackupWithSecretStorage = async function(
     // store the fixed version
     const fixedKey = fixBackupKey(storedKey);
     if (fixedKey) {
-        const [keyId] = await this.getSecretStorageKey();
+        const [keyId] = await this._crypto.getSecretStorageKey();
         await this.storeSecret("m.megolm_backup.v1", fixedKey, [keyId]);
     }
 
