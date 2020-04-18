@@ -109,7 +109,7 @@ FilterComponent.prototype._checkFields =
 
         const allowed_values = self[name];
         if (allowed_values && allowed_values.length > 0) {
-            const anyMatch = allowed_values.map(match_func).reduce((a, b) => a || b);
+            const anyMatch = allowed_values.some(match_func);
             if (!anyMatch) {
                 return false;
             }
