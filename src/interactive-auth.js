@@ -351,7 +351,13 @@ InteractiveAuth.prototype = {
                 error.data.session = this._data.session;
             }
             this._data = error.data;
-            this._startNextAuthStage();
+            try {
+                this._startNextAuthStage();
+            } catch (e) {
+                this._rejectFunc(e);
+                this._resolveFunc = null;
+                this._rejectFunc = null;
+            }
 
             if (
                 !this._emailSid &&
