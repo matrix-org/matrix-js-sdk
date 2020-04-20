@@ -511,6 +511,12 @@ SyncApi.prototype.sync = function() {
         checkLazyLoadStatus(); // advance to the next stage
     }
 
+    function buildDefaultFilter() {
+        const filter = new Filter(client.credentials.userId);
+        filter.setTimelineLimit(self.opts.initialSyncLimit);
+        return filter;
+    }
+
     const checkLazyLoadStatus = async () => {
         debuglog("Checking lazy load status...");
         if (this.opts.lazyLoadMembers && client.isGuest()) {
@@ -520,19 +526,11 @@ SyncApi.prototype.sync = function() {
             debuglog("Checking server lazy load support...");
             const supported = await client.doesServerSupportLazyLoading();
             if (supported) {
-                try {
-                    debuglog("Creating and storing lazy load sync filter...");
-                    this.opts.filter = await client.createFilter(
-                        Filter.LAZY_LOADING_SYNC_FILTER,
-                    );
-                    debuglog("Created and stored lazy load sync filter");
-                } catch (err) {
-                    logger.error(
-                        "Creating and storing lazy load sync filter failed",
-                        err,
-                    );
-                    throw err;
+                debuglog("Enabling lazy load on sync filter...");
+                if (!this.opts.filter) {
+                    this.opts.filter = buildDefaultFilter();
                 }
+                this.opts.filter.setLazyLoadMembers(true);
             } else {
                 debuglog("LL: lazy loading requested but not supported " +
                     "by server, so disabling");
@@ -575,8 +573,7 @@ SyncApi.prototype.sync = function() {
         if (self.opts.filter) {
             filter = self.opts.filter;
         } else {
-            filter = new Filter(client.credentials.userId);
-            filter.setTimelineLimit(self.opts.initialSyncLimit);
+            filter = buildDefaultFilter();
         }
 
         let filterId;
