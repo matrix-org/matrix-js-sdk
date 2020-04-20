@@ -511,7 +511,7 @@ SyncApi.prototype.sync = function() {
         checkLazyLoadStatus(); // advance to the next stage
     }
 
-    function createDefaultFilter() {
+    function buildDefaultFilter() {
         const filter = new Filter(client.credentials.userId);
         filter.setTimelineLimit(self.opts.initialSyncLimit);
         return filter;
@@ -528,7 +528,7 @@ SyncApi.prototype.sync = function() {
             if (supported) {
                 debuglog("Enabling lazy load on sync filter...");
                 if (!this.opts.filter) {
-                    this.opts.filter = createDefaultFilter();
+                    this.opts.filter = buildDefaultFilter();
                 }
                 this.opts.filter.setLazyLoadMembers(true);
             } else {
@@ -573,7 +573,7 @@ SyncApi.prototype.sync = function() {
         if (self.opts.filter) {
             filter = self.opts.filter;
         } else {
-            filter = createDefaultFilter();
+            filter = buildDefaultFilter();
         }
 
         let filterId;
