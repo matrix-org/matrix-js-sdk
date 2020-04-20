@@ -105,6 +105,9 @@ export function OlmDevice(cryptoStore) {
     // Keep track of sessions that we're starting, so that we don't start
     // multiple sessions for the same device at the same time.
     this._sessionsInProgress = {};
+
+    // Used by olm to serialise prekey message decryptions
+    this._olmPrekeyPromise = Promise.resolve();
 }
 
 /**
