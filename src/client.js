@@ -4510,64 +4510,54 @@ MatrixClient.prototype.getFilter = function(userId, filterId, allowCached) {
  * @param {Filter} filter
  * @return {Promise<String>} Filter ID
  */
-MatrixClient.prototype.getOrCreateFilter = function(filterName, filter) {
+MatrixClient.prototype.getOrCreateFilter = async function(filterName, filter) {
     const filterId = this.store.getFilterIdByName(filterName);
-    let promise = Promise.resolve();
-    const self = this;
+    let existingId = undefined;
 
     if (filterId) {
         // check that the existing filter matches our expectations
-        promise = self.getFilter(self.credentials.userId,
-                         filterId, true,
-        ).then(function(existingFilter) {
-            const oldDef = existingFilter.getDefinition();
-            const newDef = filter.getDefinition();
+        try {
+            const existingFilter =
+                await this.getFilter(this.credentials.userId, filterId, true);
+            if (existingFilter) {
+                const oldDef = existingFilter.getDefinition();
+                const newDef = filter.getDefinition();
 
-            if (utils.deepCompare(oldDef, newDef)) {
-                // super, just use that.
-                // debuglog("Using existing filter ID %s: %s", filterId,
-                //          JSON.stringify(oldDef));
-                return Promise.resolve(filterId);
+                if (utils.deepCompare(oldDef, newDef)) {
+                    // super, just use that.
+                    // debuglog("Using existing filter ID %s: %s", filterId,
+                    //          JSON.stringify(oldDef));
+                    existingId = filterId;
+                }
             }
-            // debuglog("Existing filter ID %s: %s; new filter: %s",
-            //          filterId, JSON.stringify(oldDef), JSON.stringify(newDef));
-            self.store.setFilterIdByName(filterName, undefined);
-            return undefined;
-        }, function(error) {
+        } catch (error) {
             // Synapse currently returns the following when the filter cannot be found:
             // {
             //     errcode: "M_UNKNOWN",
             //     name: "M_UNKNOWN",
             //     message: "No row found",
-            //     data: Object, httpStatus: 404
             // }
-            if (error.httpStatus === 404 &&
-                (error.errcode === "M_UNKNOWN" || error.errcode === "M_NOT_FOUND")) {
-                // Clear existing filterId from localStorage
-                // if it no longer exists on the server
-                self.store.setFilterIdByName(filterName, undefined);
-                // Return a undefined value for existingId further down the promise chain
-                return undefined;
-            } else {
+            if (error.errcode !== "M_UNKNOWN" && error.errcode !== "M_NOT_FOUND") {
                 throw error;
             }
-        });
+        }
+        // if the filter doesn't exist anymore on the server, remove from store
+        if (!existingId) {
+            this.store.setFilterIdByName(filterName, undefined);
+        }
     }
 
-    return promise.then(function(existingId) {
-        if (existingId) {
-            return existingId;
-        }
+    if (existingId) {
+        return existingId;
+    }
 
-        // create a new filter
-        return self.createFilter(filter.getDefinition(),
-        ).then(function(createdFilter) {
-            // debuglog("Created new filter ID %s: %s", createdFilter.filterId,
-            //          JSON.stringify(createdFilter.getDefinition()));
-            self.store.setFilterIdByName(filterName, createdFilter.filterId);
-            return createdFilter.filterId;
-        });
-    });
+    // create a new filter
+    const createdFilter = await this.createFilter(filter.getDefinition());
+
+    // debuglog("Created new filter ID %s: %s", createdFilter.filterId,
+    //          JSON.stringify(createdFilter.getDefinition()));
+    this.store.setFilterIdByName(filterName, createdFilter.filterId);
+    return createdFilter.filterId;
 };
 
 
