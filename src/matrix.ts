@@ -16,6 +16,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import type Request from "request";
+
 import {MemoryCryptoStore} from "./crypto/store/memory-crypto-store";
 import {LocalStorageCryptoStore} from "./crypto/store/localStorage-crypto-store";
 import {IndexedDBCryptoStore} from "./crypto/store/indexeddb-crypto-store";
@@ -117,7 +119,7 @@ interface ICreateClientOpts {
     store?: Store;
     cryptoStore?: CryptoStore;
     scheduler?: MatrixScheduler;
-    request?: any; // TODO
+    request?: Request;
 }
 
 /**
