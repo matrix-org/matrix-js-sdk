@@ -1358,7 +1358,8 @@ MatrixClient.prototype.cancelAndResendEventRoomKeyRequest = function(event) {
 };
 
 /**
- * Enable end-to-end encryption for a room.
+ * Enable end-to-end encryption for a room. This does not modify room state.
+ * Any messages sent before the returned promise resolves will be sent unencrypted.
  * @param {string} roomId The room ID to enable encryption in.
  * @param {object} config The encryption config for the room.
  * @return {Promise} A promise that will resolve when encryption is set up.
