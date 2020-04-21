@@ -25,6 +25,15 @@ limitations under the License.
 import {User} from "../models/user";
 import * as utils from "../utils";
 
+function isValidFilterId(filterId) {
+    const isValidStr = typeof filterId === "string" &&
+        !!filterId &&
+        filterId !== "undefined" && // exclude these as we've serialized undefined in localStorage before
+        filterId !== "null";
+
+    return isValidStr || typeof filterId === "number";
+}
+
 /**
  * Construct a new in-memory data store for the Matrix Client.
  * @constructor
@@ -273,8 +282,17 @@ MemoryStore.prototype = {
         if (!this.localStorage) {
             return null;
         }
+        const key = "mxjssdk_memory_filter_" + filterName;
+        // XXX Storage.getItem doesn't throw ...
+        // or are we using something different
+        // than window.localStorage in some cases
+        // that does throw?
+        // that would be very naughty
         try {
-            return this.localStorage.getItem("mxjssdk_memory_filter_" + filterName);
+            const value = this.localStorage.getItem(key);
+            if (isValidFilterId(value)) {
+                return value;
+            }
         } catch (e) {}
         return null;
     },
@@ -288,8 +306,13 @@ MemoryStore.prototype = {
         if (!this.localStorage) {
             return;
         }
+        const key = "mxjssdk_memory_filter_" + filterName;
         try {
-            this.localStorage.setItem("mxjssdk_memory_filter_" + filterName, filterId);
+            if (isValidFilterId(filterId)) {
+                this.localStorage.setItem(key, filterId);
+            } else {
+                this.localStorage.removeItem(key);
+            }
         } catch (e) {}
     },
 
