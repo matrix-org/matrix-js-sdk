@@ -17,7 +17,12 @@ limitations under the License.
 */
 
 import {MemoryCryptoStore} from "./crypto/store/memory-crypto-store";
+import {LocalStorageCryptoStore} from "./crypto/store/localStorage-crypto-store";
+import {IndexedDBCryptoStore} from "./crypto/store/indexeddb-crypto-store";
 import {MemoryStore} from "./store/memory";
+import {StubStore} from "./store/stub";
+import {LocalIndexedDBStoreBackend} from "./store/indexeddb-local-backend";
+import {RemoteIndexedDBStoreBackend} from "./store/indexeddb-remote-backend";
 import {MatrixScheduler} from "./scheduler";
 import {MatrixClient} from "./client";
 
@@ -89,6 +94,10 @@ export function wrapRequest(wrapper) {
     };
 }
 
+type Store =
+    StubStore | MemoryStore | LocalIndexedDBStoreBackend | RemoteIndexedDBStoreBackend;
+
+type CryptoStore = MemoryCryptoStore | LocalStorageCryptoStore | IndexedDBCryptoStore;
 
 let cryptoStoreFactory = () => new MemoryCryptoStore;
 
@@ -100,6 +109,15 @@ let cryptoStoreFactory = () => new MemoryCryptoStore;
  */
 export function setCryptoStoreFactory(fac) {
     cryptoStoreFactory = fac;
+}
+
+
+interface ICreateClientOpts {
+    baseUrl: string;
+    store?: Store;
+    cryptoStore?: CryptoStore;
+    scheduler?: MatrixScheduler;
+    request?: any; // TODO
 }
 
 /**
@@ -125,10 +143,10 @@ export function setCryptoStoreFactory(fac) {
  * @see {@link module:client.MatrixClient} for the full list of options for
  * <code>opts</code>.
  */
-export function createClient(opts) {
+export function createClient(opts: ICreateClientOpts | string) {
     if (typeof opts === "string") {
         opts = {
-            "baseUrl": opts,
+            "baseUrl": opts as string,
         };
     }
     opts.request = opts.request || requestInstance;

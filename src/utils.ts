@@ -265,7 +265,7 @@ export function checkObjectHasNoAdditionalKeys(obj: object, allowedKeys: string[
  * @param {Object} obj The object to deep copy.
  * @return {Object} A copy of the object without any references to the original.
  */
-export function deepCopy(obj: object): object {
+export function deepCopy<T>(obj: T): T {
     return JSON.parse(JSON.stringify(obj));
 }
 
