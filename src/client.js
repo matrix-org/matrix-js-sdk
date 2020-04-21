@@ -2134,9 +2134,17 @@ MatrixClient.prototype.getAccountDataFromServer = async function(eventType) {
         $userId: this.credentials.userId,
         $type: eventType,
     });
-    return this._http.authedRequest(
-        undefined, "GET", path, undefined,
-    );
+    try {
+        const result = await this._http.authedRequest(
+            undefined, "GET", path, undefined,
+        );
+        return result;
+    } catch (e) {
+        if (e.data && e.data.errcode === 'M_NOT_FOUND') {
+            return null;
+        }
+        throw e;
+    }
 };
 
 /**
