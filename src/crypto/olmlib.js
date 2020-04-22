@@ -238,6 +238,11 @@ export async function ensureOlmSessionsForDevices(
                 delete resolveSession[key];
             }
             if (sessionId === null || force) {
+                if (force) {
+                    logger.info("Forcing new Olm session for " + userId + ":" + deviceId);
+                } else {
+                    logger.info("Making new Olm session for " + userId + ":" + deviceId);
+                }
                 devicesWithoutSession.push([userId, deviceId]);
             }
             result[userId][deviceId] = {
