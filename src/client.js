@@ -35,7 +35,12 @@ import {StubStore} from "./store/stub";
 import {createNewMatrixCall} from "./webrtc/call";
 import * as utils from './utils';
 import {sleep} from './utils';
-import {MatrixError, PREFIX_MEDIA_R0, PREFIX_UNSTABLE} from "./http-api";
+import {
+    MatrixError,
+    PREFIX_MEDIA_R0,
+    PREFIX_UNSTABLE,
+    retryNetworkOperation,
+} from "./http-api";
 import {getHttpUriForMxc} from "./content-repo";
 import * as ContentHelpers from "./content-helpers";
 import * as olmlib from "./crypto/olmlib";
@@ -49,7 +54,6 @@ import {randomString} from './randomstring';
 import {PushProcessor} from "./pushprocessor";
 import {encodeBase64, decodeBase64} from "./crypto/olmlib";
 import { User } from "./models/user";
-import {retryNetworkOperation} from "./utils";
 
 const SCROLLBACK_DELAY_MS = 3000;
 export const CRYPTO_ENABLED = isCryptoAvailable();

@@ -948,3 +948,34 @@ export class AbortError extends Error {
         return "AbortError";
     }
 }
+
+/**
+ * Retries a network operation run in a callback.
+ * @param  {number}   maxAttempts maximum attempts to try
+ * @param  {Function} callback    callback that returns a promise of the network operation. If rejected with ConnectionError, it will be retried by calling the callback again.
+ * @return {any} the result of the network operation
+ * @throws {ConnectionError} If after maxAttempts the callback still throws ConnectionError
+ */
+export async function retryNetworkOperation(maxAttempts, callback) {
+    let attempts = 0;
+    let lastConnectionError = null;
+    while (attempts < maxAttempts) {
+        try {
+            if (attempts > 0) {
+                const timeout = 1000 * Math.pow(2, attempts);
+                console.log(`network operation failed ${attempts} times,` +
+                    ` retrying in ${timeout}ms...`);
+                await new Promise(r => setTimeout(r, timeout));
+            }
+            return await callback();
+        } catch (err) {
+            if (err instanceof ConnectionError) {
+                attempts += 1;
+                lastConnectionError = err;
+            } else {
+                throw err;
+            }
+        }
+    }
+    throw lastConnectionError;
+}
