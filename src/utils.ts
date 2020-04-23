@@ -749,26 +749,3 @@ export function setCrypto(c: Object) {
 export function getCrypto(): Object {
     return crypto;
 }
-
-export async function retryNetworkOperation(maxAttempts, callback) {
-    let attempts = 0;
-    let lastConnectionError = null;
-    while (attempts < maxAttempts) {
-        try {
-            if (attempts > 0) {
-                const timeout = 1000 * Math.pow(2, attempts);
-                console.log(`network operation failed ${attempts} times, retrying in ${timeout}ms...`);
-                await new Promise(r => setTimeout(r, timeout));
-            }
-            return await callback();
-        } catch (err) {
-            if (err instanceof ConnectionError) {
-                attempts += 1;
-                lastConnectionError = err;
-            } else {
-                throw err;
-            }
-        }
-    }
-    throw lastConnectionError;
-}
