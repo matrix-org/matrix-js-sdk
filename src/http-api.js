@@ -892,12 +892,13 @@ function getResponseContentType(response) {
  * @prop {Object} data The raw Matrix error JSON used to construct this object.
  * @prop {integer} httpStatus The numeric HTTP status code given
  */
-export function MatrixError(errorJson) {
-    errorJson = errorJson || {};
-    this.errcode = errorJson.errcode;
-    this.name = errorJson.errcode || "Unknown error code";
-    this.message = errorJson.error || "Unknown message";
-    this.data = errorJson;
+export class MatrixError extends Error {
+    constructor(errorJson) {
+        errorJson = errorJson || {};
+        super(`MatrixError: ${errorJson.errcode}`);
+        this.errcode = errorJson.errcode;
+        this.name = errorJson.errcode || "Unknown error code";
+        this.message = errorJson.error || "Unknown message";
+        this.data = errorJson;
+    }
 }
-MatrixError.prototype = Object.create(Error.prototype);
-MatrixError.prototype.constructor = MatrixError;
