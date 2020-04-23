@@ -1032,6 +1032,11 @@ OlmDevice.prototype.addInboundGroupSession = async function(
                             }
                         }
 
+                        logger.info(
+                            "Storing megolm session " + senderKey + "/" + sessionId +
+                            " with first index " + session.first_known_index(),
+                        );
+
                         const sessionData = {
                             room_id: roomId,
                             session: session.pickle(this._pickleKey),
