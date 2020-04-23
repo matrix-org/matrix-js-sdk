@@ -1323,7 +1323,6 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
         keysClaimed = event.getKeysClaimed();
     }
 
-    logger.log(`Received and adding key for megolm session ${senderKey}|${sessionId}`);
     return this._olmDevice.addInboundGroupSession(
         content.room_id, senderKey, forwardingKeyChain, sessionId,
         content.session_key, keysClaimed,
