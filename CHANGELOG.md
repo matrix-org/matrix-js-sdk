@@ -1,3 +1,22 @@
+Changes in [5.3.1-rc.4](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.3.1-rc.4) (2020-04-23)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.3.1-rc.3...v5.3.1-rc.4)
+
+ * Retry account data upload requests
+   [\#1347](https://github.com/matrix-org/matrix-js-sdk/pull/1347)
+ * Fix: handle filter not found
+   [\#1341](https://github.com/matrix-org/matrix-js-sdk/pull/1341)
+ * Make getAccountDataFromServer return null if not found
+   [\#1339](https://github.com/matrix-org/matrix-js-sdk/pull/1339)
+ * Fix setDefaultKeyId to fail if the request fails
+   [\#1337](https://github.com/matrix-org/matrix-js-sdk/pull/1337)
+ * Fix: don't do extra /filter request when enabling lazy loading of members
+   [\#1333](https://github.com/matrix-org/matrix-js-sdk/pull/1333)
+ * Reject attemptAuth promise if no auth flow found
+   [\#1331](https://github.com/matrix-org/matrix-js-sdk/pull/1331)
+ * Serialise Olm prekey decryptions
+   [\#1330](https://github.com/matrix-org/matrix-js-sdk/pull/1330)
+
 Changes in [5.3.1-rc.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.3.1-rc.3) (2020-04-17)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.3.1-rc.2...v5.3.1-rc.3)
