@@ -789,6 +789,12 @@ const requestCallback = function(
     userDefinedCallback = userDefinedCallback || function() {};
 
     return function(err, response, body) {
+        if (err) {
+            // browser-request just throws normal Error objects,
+            // not `TypeError`s like fetch does. So just assume any
+            // error is due to the connection.
+            err = new ConnectionError("request failed", err);
+        }
         if (!err) {
             try {
                 if (response.statusCode >= 400) {
@@ -900,5 +906,27 @@ export class MatrixError extends Error {
         this.name = errorJson.errcode || "Unknown error code";
         this.message = errorJson.error || "Unknown message";
         this.data = errorJson;
+    }
+}
+
+/**
+ * Construct a ConnectionError. This is a JavaScript Error indicating
+ * that a request failed because of some error with the connection, either
+ * CORS was not correctly configured on the server, the server didn't response,
+ * the request timed out, or the internet connection on the client side went down.
+ * @constructor
+ */
+export class ConnectionError extends Error {
+    constructor(message, cause = undefined) {
+        super(message + (cause ? `: ${cause.message}` : ""));
+        this._cause = cause;
+    }
+
+    get name() {
+        return "ConnectionError";
+    }
+
+    get cause() {
+        return this._cause;
     }
 }
