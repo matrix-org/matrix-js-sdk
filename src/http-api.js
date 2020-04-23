@@ -276,6 +276,9 @@ MatrixHttpApi.prototype = {
                         callbacks.clearTimeout(xhr.timeout_timer);
                         var resp;
                         try {
+                            if (xhr.status === 0) {
+                                throw new AbortError();
+                            }
                             if (!xhr.responseText) {
                                 throw new Error('No response body.');
                             }
@@ -790,10 +793,15 @@ const requestCallback = function(
 
     return function(err, response, body) {
         if (err) {
-            // browser-request just throws normal Error objects,
-            // not `TypeError`s like fetch does. So just assume any
-            // error is due to the connection.
-            err = new ConnectionError("request failed", err);
+            // the unit tests use matrix-mock-request, which throw the string "aborted" when aborting a request.
+            // See https://github.com/matrix-org/matrix-mock-request/blob/3276d0263a561b5b8326b47bae720578a2c7473a/src/index.js#L48
+            const aborted = err.name === "AbortError" || err === "aborted";
+            if (!aborted && !(err instanceof MatrixError)) {
+                // browser-request just throws normal Error objects,
+                // not `TypeError`s like fetch does. So just assume any
+                // error is due to the connection.
+                err = new ConnectionError("request failed", err);
+            }
         }
         if (!err) {
             try {
@@ -928,5 +936,15 @@ export class ConnectionError extends Error {
 
     get cause() {
         return this._cause;
+    }
+}
+
+export class AbortError extends Error {
+    constructor() {
+        super("Operation aborted");
+    }
+
+    get name() {
+        return "AbortError";
     }
 }

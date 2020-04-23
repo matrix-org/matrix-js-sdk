@@ -3,6 +3,7 @@ import HttpBackend from "matrix-mock-request";
 import {MatrixClient} from "../../src/matrix";
 import {MatrixScheduler} from "../../src/scheduler";
 import {MemoryStore} from "../../src/store/memory";
+import {MatrixError} from "../../src/http-api";
 
 describe("MatrixClient opts", function() {
     const baseUrl = "http://localhost.or.something";
@@ -132,10 +133,10 @@ describe("MatrixClient opts", function() {
         });
 
         it("shouldn't retry sending events", function(done) {
-            httpBackend.when("PUT", "/txn1").fail(500, {
+            httpBackend.when("PUT", "/txn1").fail(500, new MatrixError({
                 errcode: "M_SOMETHING",
                 error: "Ruh roh",
-            });
+            }));
             client.sendTextMessage("!foo:bar", "a body", "txn1").then(function(res) {
                 expect(false).toBe(true, "sendTextMessage resolved but shouldn't");
             }, function(err) {
