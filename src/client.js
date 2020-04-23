@@ -49,6 +49,7 @@ import {randomString} from './randomstring';
 import {PushProcessor} from "./pushprocessor";
 import {encodeBase64, decodeBase64} from "./crypto/olmlib";
 import { User } from "./models/user";
+import {retryNetworkOperation} from "./utils";
 
 const SCROLLBACK_DELAY_MS = 3000;
 export const CRYPTO_ENABLED = isCryptoAvailable();
@@ -2086,6 +2087,7 @@ MatrixClient.prototype.getUsers = function() {
 
 /**
  * Set account data event for the current user.
+ * It will retry the request up to 5 times.
  * @param {string} eventType The event type
  * @param {Object} contents the contents object for the event
  * @param {module:client.callback} callback Optional.
@@ -2097,9 +2099,13 @@ MatrixClient.prototype.setAccountData = function(eventType, contents, callback) 
         $userId: this.credentials.userId,
         $type: eventType,
     });
-    return this._http.authedRequest(
-        callback, "PUT", path, undefined, contents,
-    );
+    const promise = retryNetworkOperation(5, () => {
+        return this._http.authedRequest(undefined, "PUT", path, undefined, contents);
+    });
+    if (callback) {
+        promise.then(result => callback(null, result), callback);
+    }
+    return promise;
 };
 
 /**
