@@ -21,6 +21,7 @@ limitations under the License.
  */
 
 import unhomoglyph from 'unhomoglyph';
+import {ConnectionError} from "./http-api";
 
 /**
  * Encode a dictionary of query parameters.
@@ -747,4 +748,33 @@ export function setCrypto(c: Object) {
 
 export function getCrypto(): Object {
     return crypto;
+}
+
+export async function retryNetworkOperation(maxAttempts, callback) {
+    let attempts = 0;
+    let success = false;
+    let lastConnectionError = null;
+    let result;
+    while (!success && attempts < maxAttempts) {
+        try {
+            if (attempts > 0) {
+                const timeout = 1000 * Math.pow(2, attempts);
+                await new Promise(r => setTimeout(r, timeout));
+            }
+            result = await callback();
+            success = true;
+        } catch (err) {
+            if (err instanceof ConnectionError) {
+                attempts += 1;
+                lastConnectionError = err;
+            } else {
+                throw err;
+            }
+        }
+    }
+    if (!success) {
+        throw lastConnectionError;
+    } else {
+        return result;
+    }
 }
