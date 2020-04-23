@@ -215,7 +215,7 @@ export async function ensureOlmSessionsForDevices(
                 // they get a message and see that the 'other side' has started a
                 // new chain when this side has an active sender chain.
                 // If you see this message being logged in the wild, we should find
-                // the thing that it trying to send Olm messages to itself and fix it.
+                // the thing that is trying to send Olm messages to itself and fix it.
                 logger.info("Attempted to start session with ourself! Ignoring");
                 // We must fill in the section in the return value though, as callers
                 // expect it to be there.
