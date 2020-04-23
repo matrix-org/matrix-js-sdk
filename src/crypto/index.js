@@ -3492,6 +3492,19 @@ Crypto.prototype._processReceivedRoomKeyRequest = async function(req) {
         return;
     }
 
+    if (deviceId !== this._deviceId) {
+        // We'll always get these because we send room key requests to
+        // '*' (ie. 'all devices') which includes the sending device,
+        // so ignore requests from ourself because apart from it being
+        // very silly, it won't work because an Olm session cannot send
+        // messages to itself.
+        // The log here is probably superfluous since we know this will
+        // always happen, but let's log anyway for now just in case it
+        // causes issues.
+        logger.log("Ignoring room key request from ourselves");
+        return;
+    }
+
     // todo: should we queue up requests we don't yet have keys for,
     // in case they turn up later?
 
