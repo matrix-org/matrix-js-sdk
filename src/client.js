@@ -35,7 +35,12 @@ import {StubStore} from "./store/stub";
 import {createNewMatrixCall} from "./webrtc/call";
 import * as utils from './utils';
 import {sleep} from './utils';
-import {MatrixError, PREFIX_MEDIA_R0, PREFIX_UNSTABLE} from "./http-api";
+import {
+    MatrixError,
+    PREFIX_MEDIA_R0,
+    PREFIX_UNSTABLE,
+    retryNetworkOperation,
+} from "./http-api";
 import {getHttpUriForMxc} from "./content-repo";
 import * as ContentHelpers from "./content-helpers";
 import * as olmlib from "./crypto/olmlib";
@@ -2087,6 +2092,7 @@ MatrixClient.prototype.getUsers = function() {
 
 /**
  * Set account data event for the current user.
+ * It will retry the request up to 5 times.
  * @param {string} eventType The event type
  * @param {Object} contents the contents object for the event
  * @param {module:client.callback} callback Optional.
@@ -2098,9 +2104,13 @@ MatrixClient.prototype.setAccountData = function(eventType, contents, callback) 
         $userId: this.credentials.userId,
         $type: eventType,
     });
-    return this._http.authedRequest(
-        callback, "PUT", path, undefined, contents,
-    );
+    const promise = retryNetworkOperation(5, () => {
+        return this._http.authedRequest(undefined, "PUT", path, undefined, contents);
+    });
+    if (callback) {
+        promise.then(result => callback(null, result), callback);
+    }
+    return promise;
 };
 
 /**

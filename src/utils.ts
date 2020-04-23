@@ -21,6 +21,7 @@ limitations under the License.
  */
 
 import unhomoglyph from 'unhomoglyph';
+import {ConnectionError} from "./http-api";
 
 /**
  * Encode a dictionary of query parameters.
