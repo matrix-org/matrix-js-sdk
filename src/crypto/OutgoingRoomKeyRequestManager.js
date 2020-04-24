@@ -302,6 +302,7 @@ export class OutgoingRoomKeyRequestManager {
                                 "Error sending room key request cancellation;"
                                 + " will retry later.", e,
                             );
+                            this._startTimer();
                         });
                     });
                 }
