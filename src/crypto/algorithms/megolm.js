@@ -1581,7 +1581,8 @@ MegolmDecryption.prototype.importRoomKey = function(session) {
 };
 
 /**
- * Have another go at decrypting events after we receive a key
+ * Have another go at decrypting events after we receive a key. Resolves once
+ * decryption has been re-attempted on all events.
  *
  * @private
  * @param {String} senderKey
@@ -1600,11 +1601,6 @@ MegolmDecryption.prototype._retryDecryption = async function(senderKey, sessionI
         return true;
     }
 
-    pending.delete(sessionId);
-    if (pending.size === 0) {
-        this._pendingEvents[senderKey];
-    }
-
     await Promise.all([...pending].map(async (ev) => {
         try {
             await ev.attemptDecryption(this._crypto);
@@ -1613,8 +1609,7 @@ MegolmDecryption.prototype._retryDecryption = async function(senderKey, sessionI
         }
     }));
 
-    // ev.attemptDecryption will re-add to this._pendingEvents if an event
-    // couldn't be decrypted
+    // If decrypted successfully, they'll have been removed from _pendingEvents
     return !((this._pendingEvents[senderKey] || {})[sessionId]);
 };
 

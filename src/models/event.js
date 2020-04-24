@@ -406,7 +406,7 @@ utils.extend(MatrixEvent.prototype, {
         ) {
             // we may want to just ignore this? let's start with rejecting it.
             throw new Error(
-                "Attempt to decrypt event which has already been encrypted",
+                "Attempt to decrypt event which has already been decrypted",
             );
         }
 
