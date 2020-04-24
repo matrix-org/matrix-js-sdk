@@ -2882,15 +2882,16 @@ Crypto.prototype.handleDeviceListChanges = async function(syncData, syncDeviceLi
 Crypto.prototype.requestRoomKey = function(requestBody, recipients, resend=false) {
     return this._outgoingRoomKeyRequestManager.queueRoomKeyRequest(
         requestBody, recipients, resend,
-    ).catch((e) => {
+    ).then(() => {
+        if (this._sendKeyRequestsImmediately) {
+            this._outgoingRoomKeyRequestManager.sendQueuedRequests();
+        }
+    }).catch((e) => {
         // this normally means we couldn't talk to the store
         logger.error(
             'Error requesting key for event', e,
         );
     });
-    if (this._sendKeyRequestsImmediately) {
-        this._outgoingRoomKeyRequestManager.sendQueuedRequests();
-    }
 };
 
 /**
