@@ -2459,6 +2459,7 @@ MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
     const localEvent = new MatrixEvent(Object.assign(eventObject, {
         event_id: "~" + roomId + ":" + txnId,
         user_id: this.credentials.userId,
+        sender: this.credentials.userId,
         room_id: roomId,
         origin_server_ts: new Date().getTime(),
     }));
