@@ -169,7 +169,9 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     this._deviceList.on(
         'userCrossSigningUpdated', this._onDeviceListUserCrossSigningUpdated,
     );
-    this._reEmitter.reEmit(this._deviceList, ["crypto.devicesUpdated"]);
+    this._reEmitter.reEmit(this._deviceList, [
+        "crypto.devicesUpdated", "crypto.willUpdateDevices",
+    ]);
 
     // the last time we did a check for the number of one-time-keys on the
     // server.

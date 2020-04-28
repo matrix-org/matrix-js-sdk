@@ -737,6 +737,7 @@ MatrixClient.prototype.initCrypto = async function() {
         "crypto.roomKeyRequestCancellation",
         "crypto.warning",
         "crypto.devicesUpdated",
+        "crypto.willUpdateDevices",
         "deviceVerificationChanged",
         "userTrustStatusChanged",
         "crossSigning.keysChanged",
@@ -825,9 +826,9 @@ MatrixClient.prototype.downloadKeys = function(userIds, forceDownload) {
  *
  * @param {string} userId the user to list keys for.
  *
- * @return {Promise<module:crypto/deviceinfo[]>} list of devices
+ * @return {module:crypto/deviceinfo[]} list of devices
  */
-MatrixClient.prototype.getStoredDevicesForUser = async function(userId) {
+MatrixClient.prototype.getStoredDevicesForUser = function(userId) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
@@ -840,9 +841,9 @@ MatrixClient.prototype.getStoredDevicesForUser = async function(userId) {
  * @param {string} userId the user to list keys for.
  * @param {string} deviceId unique identifier for the device
  *
- * @return {Promise<?module:crypto/deviceinfo>} device or null
+ * @return {module:crypto/deviceinfo} device or null
  */
-MatrixClient.prototype.getStoredDevice = async function(userId, deviceId) {
+MatrixClient.prototype.getStoredDevice = function(userId, deviceId) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
@@ -5584,6 +5585,18 @@ MatrixClient.prototype.generateClientSecret = function() {
  * matrixClient.on("accountData", function(event){
  *   myAccountData[event.type] = event.content;
  * });
+ */
+
+/**
+ * Fires whenever the stored devices for a user have changed
+ * @event module:client~MatrixClient#"crypto.devicesUpdated"
+ * @param {String[]} users A list of user IDs that were updated
+ */
+
+/**
+ * Fires whenever the stored devices for a user will be updated
+ * @event module:client~MatrixClient#"crypto.willUpdateDevices"
+ * @param {String[]} users A list of user IDs that will be updated
  */
 
 /**

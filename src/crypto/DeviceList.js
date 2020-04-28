@@ -652,6 +652,7 @@ export class DeviceList extends EventEmitter {
         });
 
         const finished = (success) => {
+            this.emit("crypto.willUpdateDevices", users);
             users.forEach((u) => {
                 this._dirty = true;
 
