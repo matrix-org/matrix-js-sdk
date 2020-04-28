@@ -2560,7 +2560,7 @@ Crypto.prototype.exportRoomKeys = async function() {
 Crypto.prototype.importRoomKeys = function(keys, opts = {}) {
     let successes = 0;
     let failures = 0;
-    let total = keys.length;
+    const total = keys.length;
 
     function updateProgress() {
         opts.progressCallback({
@@ -2575,14 +2575,14 @@ Crypto.prototype.importRoomKeys = function(keys, opts = {}) {
         if (!key.room_id || !key.algorithm) {
             logger.warn("ignoring room key entry with missing fields", key);
             failures++;
-            if (opts.progressCallback) { updateProgress() };
+            if (opts.progressCallback) { updateProgress(); }
             return null;
         }
 
         const alg = this._getRoomDecryptor(key.room_id, key.algorithm);
         return alg.importRoomKey(key).finally((r) => {
-            successes++
-            if (opts.progressCallback) { updateProgress() };
+            successes++;
+            if (opts.progressCallback) { updateProgress(); }
         });
     }));
 };
