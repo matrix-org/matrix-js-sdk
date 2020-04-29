@@ -5591,12 +5591,16 @@ MatrixClient.prototype.generateClientSecret = function() {
  * Fires whenever the stored devices for a user have changed
  * @event module:client~MatrixClient#"crypto.devicesUpdated"
  * @param {String[]} users A list of user IDs that were updated
+ * @param {bool} initialFetch If true, the store was empty (apart
+ *     from our own device) and has been seeded.
  */
 
 /**
  * Fires whenever the stored devices for a user will be updated
  * @event module:client~MatrixClient#"crypto.willUpdateDevices"
  * @param {String[]} users A list of user IDs that will be updated
+ * @param {bool} initialFetch If true, the store is empty (apart
+ *     from our own device) and is being seeded.
  */
 
 /**
