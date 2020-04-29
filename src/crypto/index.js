@@ -2168,7 +2168,8 @@ Crypto.prototype.requestVerification = function(userId, devices) {
     if (existingRequest) {
         return Promise.resolve(existingRequest);
     }
-    const channel = new ToDeviceChannel(this._baseApis, userId, devices);
+    const channel = new ToDeviceChannel(this._baseApis, userId, devices,
+        ToDeviceChannel.makeTransactionId());
     return this._requestVerificationWithChannel(
         userId,
         channel,
@@ -2181,6 +2182,10 @@ Crypto.prototype._requestVerificationWithChannel = async function(
 ) {
     let request = new VerificationRequest(
         channel, this._verificationMethods, this._baseApis);
+    // if transaction id is already known, add request
+    if (channel.transactionId) {
+        requestsMap.setRequestByChannel(channel, request);
+    }
     await request.sendRequest();
     // don't replace the request created by a racing remote echo
     const racingRequest = requestsMap.getRequestByChannel(channel);
