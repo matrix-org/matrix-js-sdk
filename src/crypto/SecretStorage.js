@@ -597,7 +597,7 @@ export class SecretStorage extends EventEmitter {
                     this._baseApis,
                     {
                         [sender]: [
-                            await this._baseApis.getStoredDevice(sender, deviceId),
+                            this._baseApis.getStoredDevice(sender, deviceId),
                         ],
                     },
                 );
@@ -607,7 +607,7 @@ export class SecretStorage extends EventEmitter {
                     this._baseApis.deviceId,
                     this._baseApis._crypto._olmDevice,
                     sender,
-                    this._baseApis._crypto.getStoredDevice(sender, deviceId),
+                    this._baseApis.getStoredDevice(sender, deviceId),
                     payload,
                 );
                 const contentMap = {
