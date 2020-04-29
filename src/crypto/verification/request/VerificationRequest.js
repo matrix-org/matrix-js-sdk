@@ -877,4 +877,8 @@ export class VerificationRequest extends EventEmitter {
             this._setPhase(newTransitions[newTransitions.length - 1].phase);
         }
     }
+
+    getEventFromOtherParty(type) {
+        return this._eventsByThem.get(type);
+    }
 }

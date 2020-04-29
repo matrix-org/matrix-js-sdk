@@ -122,6 +122,11 @@ export class VerificationBase extends EventEmitter {
         if (this._done) {
             return Promise.reject(new Error("Verification is already done"));
         }
+        const existingEvent = this.request.getEventFromOtherParty(type);
+        if (existingEvent) {
+            return Promise.resolve(existingEvent);
+        }
+
         this._expectedEvent = type;
         return new Promise((resolve, reject) => {
             this._resolveEvent = resolve;
