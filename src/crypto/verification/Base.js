@@ -370,7 +370,7 @@ export class VerificationBase extends EventEmitter {
 
         for (const [keyId, keyInfo] of Object.entries(keys)) {
             const deviceId = keyId.split(':', 2)[1];
-            const device = await this._baseApis.getStoredDevice(userId, deviceId);
+            const device = this._baseApis.getStoredDevice(userId, deviceId);
             if (device) {
                 await verifier(keyId, device, keyInfo);
                 verifiedDevices.push(deviceId);
