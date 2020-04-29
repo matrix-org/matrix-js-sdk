@@ -207,7 +207,7 @@ export class QRCodeData {
         const myUserId = client.getUserId();
         const otherDevice = request.targetDevice;
         const otherDeviceId = otherDevice ? otherDevice.deviceId : null;
-        const device = await client.getStoredDevice(myUserId, otherDeviceId);
+        const device = client.getStoredDevice(myUserId, otherDeviceId);
         if (!device) {
             throw new Error("could not find device " + otherDeviceId);
         }

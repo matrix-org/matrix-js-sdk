@@ -1,3 +1,8 @@
+BREAKING CHANGES
+---
+
+ * client.getStoredDevicesForUser and client.getStoredDevices are no longer async
+
 Changes in [5.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.2.0) (2020-03-30)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.2.0-rc.1...v5.2.0)
