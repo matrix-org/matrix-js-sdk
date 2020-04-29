@@ -1436,7 +1436,7 @@ MatrixClient.prototype.exportRoomKeys = function() {
  * Import a list of room keys previously exported by exportRoomKeys
  *
  * @param {Object[]} keys a list of session export objects
- * @param {Object} opts
+ * @param {Function} opts.progressCallback called with an object that has a "stage" param
  *
  * @return {Promise} a promise which resolves when the keys
  *    have been imported
