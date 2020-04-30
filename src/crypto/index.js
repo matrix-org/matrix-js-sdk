@@ -2554,6 +2554,7 @@ Crypto.prototype.exportRoomKeys = async function() {
  * Import a list of room keys previously exported by exportRoomKeys
  *
  * @param {Object[]} keys a list of session export objects
+ * @param {Object} opts
  * @param {Function} opts.progressCallback called with an object which has a stage param
  * @return {Promise} a promise which resolves once the keys have been imported
  */
