@@ -1507,11 +1507,15 @@ MatrixClient.prototype.isKeyBackupTrusted = function(info) {
 
 /**
  * @returns {bool} true if the client is configured to back up keys to
- *     the server, otherwise false.
+ *     the server, otherwise false. If we haven't completed a successful check
+ *     of key backup status yet, returns null.
  */
 MatrixClient.prototype.getKeyBackupEnabled = function() {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
+    }
+    if (!this._crypto._checkedForBackup) {
+        return null;
     }
     return Boolean(this._crypto.backupKey);
 };
