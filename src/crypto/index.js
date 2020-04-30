@@ -1482,8 +1482,9 @@ Crypto.prototype._checkAndStartKeyBackup = async function() {
         backupInfo = await this._baseApis.getKeyBackupVersion();
     } catch (e) {
         logger.log("Error checking for active key backup", e);
-        if (e.httpStatus / 100 === 4) {
-            // well that's told us. we won't try again.
+        if (e.httpStatus === 404) {
+            // 404 is returned when the key backup does not exist, so that
+            // counts as successfully checking.
             this._checkedForBackup = true;
         }
         return null;
