@@ -1,7 +1,26 @@
+Changes in [6.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v6.0.0-rc.1) (2020-04-30)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.3.1-rc.4...v6.0.0-rc.1)
+
 BREAKING CHANGES
 ---
 
  * client.getStoredDevicesForUser and client.getStoredDevices are no longer async
+
+All Changes
+---
+
+ * Add initialFetch param to willUpdateDevices / devicesUpdated
+   [\#1362](https://github.com/matrix-org/matrix-js-sdk/pull/1362)
+ * Fix race between sending .request and receiving .ready over to_device
+   [\#1361](https://github.com/matrix-org/matrix-js-sdk/pull/1361)
+ * Handle race between sending and await next event from other party
+   [\#1358](https://github.com/matrix-org/matrix-js-sdk/pull/1358)
+ * Add crypto.willUpdateDevices event and make
+   getStoredDevices/getStoredDevicesForUser synchronous
+   [\#1356](https://github.com/matrix-org/matrix-js-sdk/pull/1356)
+ * Remove redundant key backup setup path
+   [\#1355](https://github.com/matrix-org/matrix-js-sdk/pull/1355)
 
 Changes in [5.3.1-rc.4](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.3.1-rc.4) (2020-04-23)
 ==========================================================================================================
