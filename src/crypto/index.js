@@ -2022,7 +2022,9 @@ Crypto.prototype.setDeviceVerification = async function(
         if (!this._crossSigningInfo.getId() && userId === this._crossSigningInfo.userId) {
             this._storeTrustedSelfKeys(xsk.keys);
             // This will cause our own user trust to change, so emit the event
-            this.emit("userTrustStatusChanged", this._userId, this.checkUserTrust(userId));
+            this.emit(
+                "userTrustStatusChanged", this._userId, this.checkUserTrust(userId),
+            );
         }
 
         // Now sign the master key with our user signing key (unless it's ourself)
