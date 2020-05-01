@@ -39,6 +39,7 @@ function checkPayloadLength(payloadString) {
         const err = new Error("Message too long (" + payloadString.length + " bytes). " +
                         "The maximum for an encrypted message is " +
                         MAX_PLAINTEXT_LENGTH + " bytes.");
+        // TODO: [TypeScript] We should have our own error types
         err.data = {
             errcode: "M_TOO_LARGE",
             error: "Payload too large for encrypted message",
