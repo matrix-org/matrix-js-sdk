@@ -1601,9 +1601,11 @@ MegolmDecryption.prototype._retryDecryption = async function(senderKey, sessionI
         return true;
     }
 
+    logger.debug("Retrying decryption on events", [...pending]);
+
     await Promise.all([...pending].map(async (ev) => {
         try {
-            await ev.attemptDecryption(this._crypto);
+            await ev.attemptDecryption(this._crypto, true);
         } catch (e) {
             // don't die if something goes wrong
         }
