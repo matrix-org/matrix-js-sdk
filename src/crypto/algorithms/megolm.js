@@ -311,7 +311,7 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
                         }
 
                         await this._shareKeyWithDevices(
-                            session, key, payload, retryDevices, failedDevices,
+                            session, key, payload, retryDevices, failedDevices, 30000,
                         );
 
                         await this._notifyFailedOlmDevices(session, key, failedDevices);
