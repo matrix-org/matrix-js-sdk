@@ -1436,15 +1436,17 @@ MatrixClient.prototype.exportRoomKeys = function() {
  * Import a list of room keys previously exported by exportRoomKeys
  *
  * @param {Object[]} keys a list of session export objects
+ * @param {Object} opts
+ * @param {Function} opts.progressCallback called with an object that has a "stage" param
  *
  * @return {Promise} a promise which resolves when the keys
  *    have been imported
  */
-MatrixClient.prototype.importRoomKeys = function(keys) {
+MatrixClient.prototype.importRoomKeys = function(keys, opts) {
     if (!this._crypto) {
         throw new Error("End-to-end encryption disabled");
     }
-    return this._crypto.importRoomKeys(keys);
+    return this._crypto.importRoomKeys(keys, opts);
 };
 
 /**
@@ -1887,7 +1889,10 @@ MatrixClient.prototype.restoreKeyBackupWithCache = async function(
 
 MatrixClient.prototype._restoreKeyBackup = function(
     privKey, targetRoomId, targetSessionId, backupInfo,
-    { cacheCompleteCallback }={}, // For sequencing during tests
+    {
+        cacheCompleteCallback, // For sequencing during tests
+        progressCallback,
+    }={},
 ) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
@@ -1921,6 +1926,12 @@ MatrixClient.prototype._restoreKeyBackup = function(
     .catch((e) => {
         console.warn("Error caching session backup key:", e);
     }).then(cacheCompleteCallback);
+
+    if (progressCallback) {
+        progressCallback({
+            stage: "fetch",
+        });
+    }
 
     return this._http.authedRequest(
         undefined, "GET", path.path, path.queryData, undefined,
@@ -1956,7 +1967,7 @@ MatrixClient.prototype._restoreKeyBackup = function(
             }
         }
 
-        return this.importRoomKeys(keys);
+        return this.importRoomKeys(keys, { progressCallback });
     }).then(() => {
         return this._crypto.setTrustedBackupPubKey(backupPubKey);
     }).then(() => {

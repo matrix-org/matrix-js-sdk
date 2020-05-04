@@ -2552,17 +2552,37 @@ Crypto.prototype.exportRoomKeys = async function() {
  * Import a list of room keys previously exported by exportRoomKeys
  *
  * @param {Object[]} keys a list of session export objects
+ * @param {Object} opts
+ * @param {Function} opts.progressCallback called with an object which has a stage param
  * @return {Promise} a promise which resolves once the keys have been imported
  */
-Crypto.prototype.importRoomKeys = function(keys) {
+Crypto.prototype.importRoomKeys = function(keys, opts = {}) {
+    let successes = 0;
+    let failures = 0;
+    const total = keys.length;
+
+    function updateProgress() {
+        opts.progressCallback({
+            stage: "load_keys",
+            successes,
+            failures,
+            total,
+        });
+    }
+
     return Promise.all(keys.map((key) => {
         if (!key.room_id || !key.algorithm) {
             logger.warn("ignoring room key entry with missing fields", key);
+            failures++;
+            if (opts.progressCallback) { updateProgress(); }
             return null;
         }
 
         const alg = this._getRoomDecryptor(key.room_id, key.algorithm);
-        return alg.importRoomKey(key);
+        return alg.importRoomKey(key).finally((r) => {
+            successes++;
+            if (opts.progressCallback) { updateProgress(); }
+        });
     }));
 };
 
