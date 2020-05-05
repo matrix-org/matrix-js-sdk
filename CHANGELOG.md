@@ -1,3 +1,10 @@
+Changes in [6.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v6.0.0) (2020-05-05)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v6.0.0-rc.2...v6.0.0)
+
+ * Add progress callback for key backups
+   [\#1368](https://github.com/matrix-org/matrix-js-sdk/pull/1368)
+
 Changes in [6.0.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v6.0.0-rc.2) (2020-05-01)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v6.0.0-rc.1...v6.0.0-rc.2)
