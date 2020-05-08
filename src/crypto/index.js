@@ -1614,7 +1614,7 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
                 );
                 sigInfo.valid = true;
             } catch (e) {
-                logger.warning(
+                logger.warn(
                     "Bad signature from cross signing key " + crossSigningId, e,
                 );
                 sigInfo.valid = false;
