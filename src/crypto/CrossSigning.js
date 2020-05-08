@@ -81,7 +81,7 @@ export class CrossSigningInfo extends EventEmitter {
             expectedPubkey = this.getId(type);
         }
 
-        function validateKey(key) {
+        function validateKeyWithSigning(key) {
             if (!key) return;
             const signing = new global.Olm.PkSigning();
             const gotPubkey = signing.init_with_seed(key);
@@ -97,13 +97,13 @@ export class CrossSigningInfo extends EventEmitter {
               .getCrossSigningKeyCache(type, expectedPubkey);
         }
 
-        const cacheresult = validateKey(privkey);
+        const cacheresult = validateKeyWithSigning(privkey);
         if (cacheresult) {
             return cacheresult;
         }
 
         privkey = await this._callbacks.getCrossSigningKey(type, expectedPubkey);
-        const result = validateKey(privkey);
+        const result = validateKeyWithSigning(privkey);
         if (result) {
             if (this._cacheCallbacks.storeCrossSigningKeyCache && shouldCache) {
                 await this._cacheCallbacks.storeCrossSigningKeyCache(type, privkey);
