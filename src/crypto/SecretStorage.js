@@ -254,6 +254,12 @@ export class SecretStorage extends EventEmitter {
      *     or null/undefined to use the default key.
      */
     async store(name, secret, keys) {
+        // save encrypted secret
+        await this._baseApis.setAccountData(name,
+            await this.encryptAccountData(name, secret, keys));
+    }
+
+    async encryptAccountData(name, secret, keys, ivStrs = {}) {
         const encrypted = {};
 
         if (!keys) {
@@ -283,7 +289,7 @@ export class SecretStorage extends EventEmitter {
             {
                 const keys = {[keyId]: keyInfo};
                 const [, encryption] = await this._getSecretStorageKey(keys, name);
-                encrypted[keyId] = await encryption.encrypt(secret);
+                encrypted[keyId] = await encryption.encrypt(secret, ivStrs[keyId]);
                 break;
             }
             default:
@@ -292,9 +298,7 @@ export class SecretStorage extends EventEmitter {
                 // do nothing if we don't understand the encryption algorithm
             }
         }
-
-        // save encrypted secret
-        await this._baseApis.setAccountData(name, {encrypted});
+        return {encrypted};
     }
 
     /**
@@ -678,8 +682,8 @@ export class SecretStorage extends EventEmitter {
         case SECRET_STORAGE_ALGORITHM_V1_AES:
         {
             const decryption = {
-                encrypt: async function(secret) {
-                    return await encryptAES(secret, privateKey, name);
+                encrypt: async function(secret, ivStr = undefined) {
+                    return await encryptAES(secret, privateKey, name, ivStr);
                 },
                 decrypt: async function(encInfo) {
                     return await decryptAES(encInfo, privateKey, name);
