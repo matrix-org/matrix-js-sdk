@@ -1167,6 +1167,16 @@ Crypto.prototype.getCrossSigningId = function(type) {
     return this._crossSigningInfo.getId(type);
 };
 
+Crypto.prototype.checkCrossSignKeysIn4SMatchPublishedKeys = async function() {
+    const userId = this._baseApis.getUserId();
+    await this._deviceList.downloadKeys([userId]);
+    return this._crossSigningInfo.checkCrossSignKeysIn4SMatchPublishedKeys(this._secretStorage, this._baseApis);
+};
+
+Crypto.prototype.checkCrossSignKeysInCacheMatchPublishedKeys = function() {
+    return this._crossSigningInfo.checkCrossSignKeysInCacheMatchPublishedKeys();
+};
+
 /**
  * Get the cross signing information for a given user.
  *

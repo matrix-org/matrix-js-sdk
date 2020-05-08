@@ -1160,6 +1160,8 @@ wrapCryptoFuncs(MatrixClient, [
     "isCrossSigningReady",
     "getCryptoTrustCrossSignedDevices",
     "setCryptoTrustCrossSignedDevices",
+    "checkCrossSignKeysInCacheMatchPublishedKeys",
+    "checkCrossSignKeysIn4SMatchPublishedKeys",
 ]);
 
 /**
@@ -1900,6 +1902,7 @@ MatrixClient.prototype._restoreKeyBackup = function(
     }={},
 ) {
     if (this._crypto === null) {
+        // we should reject rather than throw here
         throw new Error("End-to-end encryption disabled");
     }
     let totalKeyCount = 0;
@@ -2116,6 +2119,9 @@ MatrixClient.prototype.getUsers = function() {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.setAccountData = function(eventType, contents, callback) {
+    // if (eventType.startsWith("m.cross_signing.")) {
+    //     return Promise.reject("computer says no");
+    // }
     const path = utils.encodeUri("/user/$userId/account_data/$type", {
         $userId: this.credentials.userId,
         $type: eventType,
