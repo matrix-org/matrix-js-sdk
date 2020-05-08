@@ -21,6 +21,7 @@ limitations under the License.
  */
 
 import {decodeBase64, encodeBase64, pkSign, pkVerify} from './olmlib';
+import anotherjson from "another-json";
 import {EventEmitter} from 'events';
 import {logger} from '../logger';
 import {IndexedDBCryptoStore} from '../crypto/store/indexeddb-crypto-store';
@@ -75,6 +76,65 @@ export class CrossSigningInfo extends EventEmitter {
         // and can use it in the future to detect cases where the user has
         // become unverifed later for any reason.
         this.crossSigningVerifiedBefore = false;
+    }
+
+    // this will prompt for passphrase
+    async checkCrossSignKeysIn4SMatchPublishedKeys(secretStorage, baseApis) {
+        const keyTypes = ["master", "self_signing", "user_signing"];
+        // assume we only encrypt with the same default 4s key
+        const sssskeyId = await secretStorage.getDefaultKeyId();
+        try {
+            for (const keyType of keyTypes) {
+                const expectedPubkey = this.getId(keyType);
+                const privkey =
+                    await this._callbacks.getCrossSigningKey(keyType, expectedPubkey);
+                // first, make sure that the published key matches
+                // the private key stored in 4S
+                if (!validateKey(privkey, expectedPubkey)) {
+                    console.log("checkCrossSignKeysIn4SMatchPublishedKeys: " +
+                        "cross-signing public key mismatch", keyType);
+                    return false;
+                }
+                // the private key here is provided by a callback, and it doesn't feel
+                // safe to rely on it having been fetched from 4S account data (e.g. rather than cache),
+                // so do an explicit check that the published account data matches the private key
+                const accountDataType = `m.cross_signing.${keyType}`;
+                const event = baseApis.getAccountData(accountDataType);
+                const actualAccountData = event && event.getContent();
+
+                const expectedKeySection = actualAccountData.encrypted[sssskeyId];
+                const usedIvStr = expectedKeySection && expectedKeySection.iv;
+
+                const encodedPrivkey = encodeBase64(privkey);
+                const expectedAccountData = await secretStorage.encryptAccountData(
+                    accountDataType,
+                    encodedPrivkey,
+                    [sssskeyId],
+                    // we need to pass the iv str to encrypt,
+                    // which is otherwise filled with random data,
+                    // to obtain the same encrypted value and be able to compare
+                    {[sssskeyId]: usedIvStr},
+                );
+
+                if (!actualAccountData) {
+                    return false;
+                }
+
+                const expectedJSON = anotherjson.stringify(expectedAccountData);
+                const actualJSON = anotherjson.stringify(actualAccountData);
+
+                if (expectedJSON !== actualJSON) {
+                    console.log("checkCrossSignKeysIn4SMatchPublishedKeys: " +
+                        "account data mismatch", keyType, {expectedJSON, actualJSON});
+                    return false;
+                }
+            }
+        } catch (err) {
+            console.error(err);
+            return false;
+        }
+
+        return true;
     }
 
     // this doesn't need to prompt.
