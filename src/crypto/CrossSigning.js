@@ -32,6 +32,20 @@ function publicKeyFromKeyInfo(keyInfo) {
     return Object.values(keyInfo.keys)[0];
 }
 
+function validateKey(privkey, expectedPubkey) {
+    if (!privkey) return;
+    const signing = new global.Olm.PkSigning();
+    try {
+        const gotPubkey = signing.init_with_seed(privkey);
+        if (gotPubkey === expectedPubkey) {
+            return true;
+        }
+    } finally {
+        signing.free();
+    }
+    return false;
+}
+
 export class CrossSigningInfo extends EventEmitter {
     /**
      * Information about a user's cross-signing keys
@@ -61,6 +75,31 @@ export class CrossSigningInfo extends EventEmitter {
         // and can use it in the future to detect cases where the user has
         // become unverifed later for any reason.
         this.crossSigningVerifiedBefore = false;
+    }
+
+    // this doesn't need to prompt.
+    // if true, do 4s check, otherwise show reset toast straight away
+    async checkCrossSignKeysInCacheMatchPublishedKeys() {
+        const keyTypes = ["self_signing", "user_signing"];
+        try {
+            for (const keyType of keyTypes) {
+                const expectedPubkey = this.getId(keyType);
+                const privkey = await this._cacheCallbacks
+                    .getCrossSigningKeyCache(keyType, expectedPubkey);
+                if (!privkey) {
+                    return false;
+                }
+                if (!validateKey(privkey, expectedPubkey)) {
+                    return false;
+                }
+                console.log(`${keyType} privkey matches pubkey`);
+            }
+        } catch (err) {
+            console.error(err);
+            return false;
+        }
+
+        return true;
     }
 
     /**
