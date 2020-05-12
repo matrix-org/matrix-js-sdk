@@ -288,17 +288,11 @@ describe("Secrets", function() {
             olmlib.decodeBase64("1R6JVlXX99UcfUZzKuCDGQgJTw8ur1/ofgPD8pp+96M="),
         );
         const SSPubKey = "0DfNsRDzEvkCLA0gD3m7VAGJ5VClhjEsewI35xq873Q";
-        const backupKey = new Uint8Array(
-            olmlib.decodeBase64(
-                "OTmOKrPsWP1qxmt0s2qat4vYxULG+U9cmFAWFco3A5U=",
-            ),
-        );
         const SSSSKey = new Uint8Array(
             olmlib.decodeBase64(
                 "XrmITOOdBhw6yY5Bh7trb/bgp1FRdIGyCUxxMP873R0=",
             ),
         );
-        const SSSSPubKey = "v3A8HTypbccUm6jaRCRw5l+7lSdzQUACeY9xpQ5BVmE";
 
         it("bootstraps when no storage or cross-signing keys locally", async function() {
             const key = new Uint8Array(16);
