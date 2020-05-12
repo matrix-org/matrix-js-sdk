@@ -2119,9 +2119,6 @@ MatrixClient.prototype.getUsers = function() {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.setAccountData = function(eventType, contents, callback) {
-    // if (eventType.startsWith("m.cross_signing.")) {
-    //     return Promise.reject("computer says no");
-    // }
     const path = utils.encodeUri("/user/$userId/account_data/$type", {
         $userId: this.credentials.userId,
         $type: eventType,
