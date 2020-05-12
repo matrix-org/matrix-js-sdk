@@ -1310,7 +1310,6 @@ wrapCryptoFuncs(MatrixClient, [
     "bootstrapSecretStorage",
     "addSecretStorageKey",
     "hasSecretStorageKey",
-    "secretStorageKeyNeedsUpgrade",
     "storeSecret",
     "getSecret",
     "isSecretStored",
