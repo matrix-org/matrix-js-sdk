@@ -17,7 +17,6 @@ limitations under the License.
 import {EventEmitter} from 'events';
 import {logger} from '../logger';
 import * as olmlib from './olmlib';
-import {pkVerify} from './olmlib';
 import {randomString} from '../randomstring';
 import {encryptAES, decryptAES} from './aes';
 import {encodeBase64} from "./olmlib";
@@ -32,11 +31,10 @@ const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
  * @module crypto/SecretStorage
  */
 export class SecretStorage extends EventEmitter {
-    constructor(baseApis, cryptoCallbacks, crossSigningInfo) {
+    constructor(baseApis, cryptoCallbacks) {
         super();
         this._baseApis = baseApis;
         this._cryptoCallbacks = cryptoCallbacks;
-        this._crossSigningInfo = crossSigningInfo;
         this._requests = {};
         this._incomingRequests = {};
     }
@@ -94,9 +92,7 @@ export class SecretStorage extends EventEmitter {
             keyData.name = opts.name;
         }
 
-        switch (algorithm) {
-        case SECRET_STORAGE_ALGORITHM_V1_AES:
-        {
+        if (algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             if (opts.passphrase) {
                 keyData.passphrase = opts.passphrase;
             }
@@ -105,9 +101,7 @@ export class SecretStorage extends EventEmitter {
                 keyData.iv = iv;
                 keyData.mac = mac;
             }
-            break;
-        }
-        default:
+        } else {
             throw new Error(`Unknown key algorithm ${opts.algorithm}`);
         }
 
@@ -121,40 +115,11 @@ export class SecretStorage extends EventEmitter {
             );
         }
 
-        await this._crossSigningInfo.signObject(keyData, 'master');
-
         await this._baseApis.setAccountData(
             `m.secret_storage.key.${keyId}`, keyData,
         );
 
         return keyId;
-    }
-
-    /**
-     * Signs a given secret storage key with the cross-signing master key.
-     *
-     * @param {string} [keyId = default key's ID] The ID of the key to sign.
-     *     Defaults to the default key ID if not provided.
-     */
-    async signKey(keyId) {
-        if (!keyId) {
-            keyId = await this.getDefaultKeyId();
-        }
-        if (!keyId) {
-            throw new Error("signKey requires a key ID");
-        }
-
-        const keyInfo = await this._baseApis.getAccountDataFromServer(
-            `m.secret_storage.key.${keyId}`,
-        );
-        if (!keyInfo) {
-            throw new Error(`Key ${keyId} does not exist in account data`);
-        }
-
-        await this._crossSigningInfo.signObject(keyInfo, 'master');
-        await this._baseApis.setAccountData(
-            `m.secret_storage.key.${keyId}`, keyInfo,
-        );
     }
 
     /**
@@ -249,15 +214,11 @@ export class SecretStorage extends EventEmitter {
             }
 
             // encrypt secret, based on the algorithm
-            switch (keyInfo.algorithm) {
-            case SECRET_STORAGE_ALGORITHM_V1_AES:
-            {
+            if (keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
                 const keys = {[keyId]: keyInfo};
                 const [, encryption] = await this._getSecretStorageKey(keys, name);
                 encrypted[keyId] = await encryption.encrypt(secret);
-                break;
-            }
-            default:
+            } else {
                 logger.warn("unknown algorithm for secret storage key " + keyId
                             + ": " + keyInfo.algorithm);
                 // do nothing if we don't understand the encryption algorithm
@@ -376,8 +337,7 @@ export class SecretStorage extends EventEmitter {
 
         const ret = {};
 
-        // check if secret is encrypted by a known/trusted secret and
-        // encryption looks sane
+        // filter secret encryption keys with supported algorithm
         for (const keyId of Object.keys(secretInfo.encrypted)) {
             // get key information from key storage
             const keyInfo = await this._baseApis.getAccountDataFromServer(
@@ -385,23 +345,6 @@ export class SecretStorage extends EventEmitter {
             );
             if (!keyInfo) continue;
             const encInfo = secretInfo.encrypted[keyId];
-
-            // We don't actually need the decryption object if it's a passthrough
-            // since we just want to return the key itself.
-            if (encInfo.passthrough) {
-                try {
-                    pkVerify(
-                        keyInfo,
-                        this._crossSigningInfo.getId('master'),
-                        this._crossSigningInfo.userId,
-                    );
-                } catch (e) {
-                    // not trusted, so move on to the next key
-                    continue;
-                }
-                ret[keyId] = keyInfo;
-                continue;
-            }
 
             // only use keys we understand the encryption algorithm of
             if (keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {

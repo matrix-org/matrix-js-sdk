@@ -240,7 +240,7 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     );
 
     this._secretStorage = new SecretStorage(
-        baseApis, cryptoCallbacks, this._crossSigningInfo,
+        baseApis, cryptoCallbacks,
     );
 
     // Assuming no app-supplied callback, default to getting from SSSS.
@@ -740,11 +740,6 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         // See also https://github.com/vector-im/riot-web/issues/11635
         if (Object.keys(crossSigningPrivateKeys).length) {
             logger.log("Storing cross-signing private keys in secret storage");
-            // SSSS expects its keys to be signed by cross-signing master key.
-            // Since we have just reset cross-signing keys, we need to re-sign the
-            // SSSS default key with the new cross-signing master key so that the
-            // following storage step can proceed.
-            await this._secretStorage.signKey();
             // Assuming no app-supplied callback, default to storing in SSSS.
             if (!appCallbacks.saveCrossSigningKeys) {
                 await CrossSigningInfo.storeInSecretStorage(
