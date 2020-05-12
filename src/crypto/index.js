@@ -560,8 +560,6 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                 keyInfo.iv = iv;
                 keyInfo.mac = mac;
 
-                await this._crossSigningInfo.signObject(keyInfo, 'master');
-
                 await this._baseApis.setAccountData(
                     `m.secret_storage.key.${keyId}`, keyInfo,
                 );
