@@ -177,12 +177,12 @@ export class CrossSigningInfo extends EventEmitter {
      * typically called in conjunction with the creation of new cross-signing
      * keys.
      *
-     * @param {object} keys The keys to store
+     * @param {Map} keys The keys to store
      * @param {SecretStorage} secretStorage The secret store using account data
      */
     static async storeInSecretStorage(keys, secretStorage) {
-        for (const type of Object.keys(keys)) {
-            const encodedKey = encodeBase64(keys[type]);
+        for (const [type, privateKey] of keys) {
+            const encodedKey = encodeBase64(privateKey);
             await secretStorage.store(`m.cross_signing.${type}`, encodedKey);
         }
     }
