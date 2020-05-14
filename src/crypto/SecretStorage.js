@@ -17,16 +17,12 @@ limitations under the License.
 import {EventEmitter} from 'events';
 import {logger} from '../logger';
 import * as olmlib from './olmlib';
-import {pkVerify} from './olmlib';
 import {randomString} from '../randomstring';
 import {encryptAES, decryptAES} from './aes';
 import {encodeBase64} from "./olmlib";
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES
     = "m.secret_storage.v1.aes-hmac-sha2";
-// don't use curve25519 for writing data.
-export const SECRET_STORAGE_ALGORITHM_V1_CURVE25519
-    = "m.secret_storage.v1.curve25519-aes-sha2";
 
 const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
 
@@ -35,11 +31,10 @@ const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
  * @module crypto/SecretStorage
  */
 export class SecretStorage extends EventEmitter {
-    constructor(baseApis, cryptoCallbacks, crossSigningInfo) {
+    constructor(baseApis, cryptoCallbacks) {
         super();
         this._baseApis = baseApis;
         this._cryptoCallbacks = cryptoCallbacks;
-        this._crossSigningInfo = crossSigningInfo;
         this._requests = {};
         this._incomingRequests = {};
     }
@@ -97,9 +92,7 @@ export class SecretStorage extends EventEmitter {
             keyData.name = opts.name;
         }
 
-        switch (algorithm) {
-        case SECRET_STORAGE_ALGORITHM_V1_AES:
-        {
+        if (algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             if (opts.passphrase) {
                 keyData.passphrase = opts.passphrase;
             }
@@ -108,9 +101,7 @@ export class SecretStorage extends EventEmitter {
                 keyData.iv = iv;
                 keyData.mac = mac;
             }
-            break;
-        }
-        default:
+        } else {
             throw new Error(`Unknown key algorithm ${opts.algorithm}`);
         }
 
@@ -124,40 +115,11 @@ export class SecretStorage extends EventEmitter {
             );
         }
 
-        await this._crossSigningInfo.signObject(keyData, 'master');
-
         await this._baseApis.setAccountData(
             `m.secret_storage.key.${keyId}`, keyData,
         );
 
         return keyId;
-    }
-
-    /**
-     * Signs a given secret storage key with the cross-signing master key.
-     *
-     * @param {string} [keyId = default key's ID] The ID of the key to sign.
-     *     Defaults to the default key ID if not provided.
-     */
-    async signKey(keyId) {
-        if (!keyId) {
-            keyId = await this.getDefaultKeyId();
-        }
-        if (!keyId) {
-            throw new Error("signKey requires a key ID");
-        }
-
-        const keyInfo = await this._baseApis.getAccountDataFromServer(
-            `m.secret_storage.key.${keyId}`,
-        );
-        if (!keyInfo) {
-            throw new Error(`Key ${keyId} does not exist in account data`);
-        }
-
-        await this._crossSigningInfo.signObject(keyInfo, 'master');
-        await this._baseApis.setAccountData(
-            `m.secret_storage.key.${keyId}`, keyInfo,
-        );
     }
 
     /**
@@ -193,15 +155,6 @@ export class SecretStorage extends EventEmitter {
         return !!(await this.getKey(keyId));
     }
 
-    async keyNeedsUpgrade(keyId) {
-        const keyInfo = await this.getKey(keyId);
-        if (keyInfo && keyInfo[1].algorithm === SECRET_STORAGE_ALGORITHM_V1_CURVE25519) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
     /**
      * Check whether a key matches what we expect based on the key info
      *
@@ -211,9 +164,7 @@ export class SecretStorage extends EventEmitter {
      * @return {boolean} whether or not the key matches
      */
     async checkKey(key, info) {
-        switch (info.algorithm) {
-        case SECRET_STORAGE_ALGORITHM_V1_AES:
-        {
+        if (info.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             if (info.mac) {
                 const {mac} = await SecretStorage._calculateKeyCheck(key, info.iv);
                 return info.mac === mac;
@@ -221,22 +172,7 @@ export class SecretStorage extends EventEmitter {
                 // if we have no information, we have to assume the key is right
                 return true;
             }
-        }
-        case SECRET_STORAGE_ALGORITHM_V1_CURVE25519:
-        {
-            let decryption = null;
-            try {
-                decryption = new global.Olm.PkDecryption();
-                const gotPubkey = decryption.init_with_private_key(key);
-                // make sure it agrees with the given pubkey
-                return gotPubkey === info.pubkey;
-            } catch (e) {
-                return false;
-            } finally {
-                if (decryption) decryption.free();
-            }
-        }
-        default:
+        } else {
             throw new Error("Unknown algorithm");
         }
     }
@@ -278,15 +214,11 @@ export class SecretStorage extends EventEmitter {
             }
 
             // encrypt secret, based on the algorithm
-            switch (keyInfo.algorithm) {
-            case SECRET_STORAGE_ALGORITHM_V1_AES:
-            {
+            if (keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
                 const keys = {[keyId]: keyInfo};
                 const [, encryption] = await this._getSecretStorageKey(keys, name);
                 encrypted[keyId] = await encryption.encrypt(secret);
-                break;
-            }
-            default:
+            } else {
                 logger.warn("unknown algorithm for secret storage key " + keyId
                             + ": " + keyInfo.algorithm);
                 // do nothing if we don't understand the encryption algorithm
@@ -352,24 +284,11 @@ export class SecretStorage extends EventEmitter {
                 "m.secret_storage.key." + keyId,
             );
             const encInfo = secretInfo.encrypted[keyId];
-            switch (keyInfo.algorithm) {
-            case SECRET_STORAGE_ALGORITHM_V1_AES:
+            // only use keys we understand the encryption algorithm of
+            if (keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
                 if (encInfo.iv && encInfo.ciphertext && encInfo.mac) {
                     keys[keyId] = keyInfo;
                 }
-                break;
-            case SECRET_STORAGE_ALGORITHM_V1_CURVE25519:
-                if (
-                    keyInfo.pubkey && (
-                        (encInfo.ciphertext && encInfo.mac && encInfo.ephemeral) ||
-                        encInfo.passthrough
-                    )
-                ) {
-                    keys[keyId] = keyInfo;
-                }
-                break;
-            default:
-                // do nothing if we don't understand the encryption algorithm
             }
         }
 
@@ -418,8 +337,7 @@ export class SecretStorage extends EventEmitter {
 
         const ret = {};
 
-        // check if secret is encrypted by a known/trusted secret and
-        // encryption looks sane
+        // filter secret encryption keys with supported algorithm
         for (const keyId of Object.keys(secretInfo.encrypted)) {
             // get key information from key storage
             const keyInfo = await this._baseApis.getAccountDataFromServer(
@@ -428,49 +346,11 @@ export class SecretStorage extends EventEmitter {
             if (!keyInfo) continue;
             const encInfo = secretInfo.encrypted[keyId];
 
-            // We don't actually need the decryption object if it's a passthrough
-            // since we just want to return the key itself.
-            if (encInfo.passthrough) {
-                try {
-                    pkVerify(
-                        keyInfo,
-                        this._crossSigningInfo.getId('master'),
-                        this._crossSigningInfo.userId,
-                    );
-                } catch (e) {
-                    // not trusted, so move on to the next key
-                    continue;
-                }
-                ret[keyId] = keyInfo;
-                continue;
-            }
-
-            switch (keyInfo.algorithm) {
-            case SECRET_STORAGE_ALGORITHM_V1_AES:
+            // only use keys we understand the encryption algorithm of
+            if (keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
                 if (encInfo.iv && encInfo.ciphertext && encInfo.mac) {
                     ret[keyId] = keyInfo;
                 }
-                break;
-            case SECRET_STORAGE_ALGORITHM_V1_CURVE25519:
-                if (keyInfo.pubkey && encInfo.ciphertext && encInfo.mac
-                    && encInfo.ephemeral) {
-                    if (checkKey) {
-                        try {
-                            pkVerify(
-                                keyInfo,
-                                this._crossSigningInfo.getId('master'),
-                                this._crossSigningInfo.userId,
-                            );
-                        } catch (e) {
-                            // not trusted, so move on to the next key
-                            continue;
-                        }
-                    }
-                    ret[keyId] = keyInfo;
-                }
-                break;
-            default:
-                // do nothing if we don't understand the encryption algorithm
             }
         }
         return Object.keys(ret).length ? ret : null;
@@ -674,9 +554,7 @@ export class SecretStorage extends EventEmitter {
             throw new Error("App returned unknown key from getSecretStorageKey!");
         }
 
-        switch (keys[keyId].algorithm) {
-        case SECRET_STORAGE_ALGORITHM_V1_AES:
-        {
+        if (keys[keyId].algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             const decryption = {
                 encrypt: async function(secret) {
                     return await encryptAES(secret, privateKey, name);
@@ -686,36 +564,7 @@ export class SecretStorage extends EventEmitter {
                 },
             };
             return [keyId, decryption];
-        }
-        case SECRET_STORAGE_ALGORITHM_V1_CURVE25519:
-        {
-            const pkDecryption = new global.Olm.PkDecryption();
-            let pubkey;
-            try {
-                pubkey = pkDecryption.init_with_private_key(privateKey);
-            } catch (e) {
-                pkDecryption.free();
-                throw new Error("getSecretStorageKey callback returned invalid key");
-            }
-            if (pubkey !== keys[keyId].pubkey) {
-                pkDecryption.free();
-                throw new Error(
-                    "getSecretStorageKey callback returned incorrect key",
-                );
-            }
-            const decryption = {
-                free: pkDecryption.free.bind(pkDecryption),
-                decrypt: async function(encInfo) {
-                    return pkDecryption.decrypt(
-                        encInfo.ephemeral, encInfo.mac, encInfo.ciphertext,
-                    );
-                },
-                // needed for passthrough
-                get_private_key: pkDecryption.get_private_key.bind(pkDecryption),
-            };
-            return [keyId, decryption];
-        }
-        default:
+        } else {
             throw new Error("Unknown key type: " + keys[keyId].algorithm);
         }
     }
