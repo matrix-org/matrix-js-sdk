@@ -1075,17 +1075,6 @@ function wrapCryptoFuncs(MatrixClient, names) {
     }
 }
 
- /**
- * Generate new cross-signing keys.
- * The cross-signing API is currently UNSTABLE and may change without notice.
- *
- * @function module:client~MatrixClient#resetCrossSigningKeys
- * @param {object} authDict Auth data to supply for User-Interactive auth.
- * @param {CrossSigningLevel} [level] the level of cross-signing to reset.  New
- * keys will be created for the given level and below.  Defaults to
- * regenerating all keys.
- */
-
 /**
  * Get the user's cross-signing key ID.
  * The cross-signing API is currently UNSTABLE and may change without notice.
@@ -1155,7 +1144,6 @@ function wrapCryptoFuncs(MatrixClient, names) {
  * @param {module:models/room} room the room the event is in
  */
 wrapCryptoFuncs(MatrixClient, [
-    "resetCrossSigningKeys",
     "getCrossSigningId",
     "getStoredCrossSigningForUser",
     "checkUserTrust",
