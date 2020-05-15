@@ -109,6 +109,9 @@ export class DeviceList extends EventEmitter {
         this._savePromiseTime = null;
         // The timer used to delay the save
         this._saveTimer = null;
+        // True if we have fetched data from the server or loaded a non-empty
+        // set of device data from the store
+        this._hasFetched = null;
     }
 
     /**
@@ -118,6 +121,7 @@ export class DeviceList extends EventEmitter {
         await this._cryptoStore.doTxn(
             'readonly', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
                 this._cryptoStore.getEndToEndDeviceData(txn, (deviceData) => {
+                    this._hasFetched = Boolean(deviceData && deviceData.devices);
                     this._devices = deviceData ? deviceData.devices : {},
                     this._crossSigningInfo = deviceData ?
                         deviceData.crossSigningInfo || {} : {};
@@ -197,16 +201,16 @@ export class DeviceList extends EventEmitter {
             const resolveSavePromise = this._resolveSavePromise;
             this._savePromiseTime = targetTime;
             this._saveTimer = setTimeout(() => {
-                logger.log('Saving device tracking data at token ' + this._syncToken);
+                logger.log('Saving device tracking data', this._syncToken);
+
                 // null out savePromise now (after the delay but before the write),
                 // otherwise we could return the existing promise when the save has
-                // actually already happened. Likewise for the dirty flag.
+                // actually already happened.
                 this._savePromiseTime = null;
                 this._saveTimer = null;
                 this._savePromise = null;
                 this._resolveSavePromise = null;
 
-                this._dirty = false;
                 this._cryptoStore.doTxn(
                     'readwrite', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
                         this._cryptoStore.storeEndToEndDeviceData({
@@ -217,7 +221,13 @@ export class DeviceList extends EventEmitter {
                         }, txn);
                     },
                 ).then(() => {
+                    // The device list is considered dirty until the write
+                    // completes.
+                    this._dirty = false;
                     resolveSavePromise();
+                }, err => {
+                    logger.error('Failed to save device tracking data', this._syncToken);
+                    logger.error(err);
                 });
             }, delay);
         }
@@ -312,6 +322,15 @@ export class DeviceList extends EventEmitter {
     }
 
     /**
+     * Returns a list of all user IDs the DeviceList knows about
+     *
+     * @return {array} All known user IDs
+     */
+    getKnownUserIds() {
+        return Object.keys(this._devices);
+    }
+
+    /**
      * Get the stored device keys for a user id
      *
      * @param {string} userId the user to list keys for.
@@ -374,6 +393,26 @@ export class DeviceList extends EventEmitter {
     }
 
     /**
+     * Get a user ID by one of their device's curve25519 identity key
+     *
+     * @param {string} algorithm  encryption algorithm
+     * @param {string} senderKey  curve25519 key to match
+     *
+     * @return {string} user ID
+     */
+    getUserByIdentityKey(algorithm, senderKey) {
+        if (
+            algorithm !== olmlib.OLM_ALGORITHM &&
+            algorithm !== olmlib.MEGOLM_ALGORITHM
+        ) {
+            // we only deal in olm keys
+            return null;
+        }
+
+        return this._userByIdentityKey[senderKey];
+    }
+
+    /**
      * Find a device by curve25519 identity key
      *
      * @param {string} algorithm  encryption algorithm
@@ -382,16 +421,8 @@ export class DeviceList extends EventEmitter {
      * @return {module:crypto/deviceinfo?}
      */
     getDeviceByIdentityKey(algorithm, senderKey) {
-        const userId = this._userByIdentityKey[senderKey];
+        const userId = this.getUserByIdentityKey(algorithm, senderKey);
         if (!userId) {
-            return null;
-        }
-
-        if (
-            algorithm !== olmlib.OLM_ALGORITHM &&
-            algorithm !== olmlib.MEGOLM_ALGORITHM
-        ) {
-            // we only deal in olm keys
             return null;
         }
 
@@ -625,6 +656,7 @@ export class DeviceList extends EventEmitter {
         });
 
         const finished = (success) => {
+            this.emit("crypto.willUpdateDevices", users, !this._hasFetched);
             users.forEach((u) => {
                 this._dirty = true;
 
@@ -650,7 +682,8 @@ export class DeviceList extends EventEmitter {
                 }
             });
             this.saveIfDirty();
-            this.emit("crypto.devicesUpdated", users);
+            this.emit("crypto.devicesUpdated", users, !this._hasFetched);
+            this._hasFetched = true;
         };
 
         return prom;
@@ -749,31 +782,34 @@ class DeviceListUpdateSerialiser {
 
         this._baseApis.downloadKeysForUsers(
             downloadUsers, opts,
-        ).then((res) => {
+        ).then(async (res) => {
             const dk = res.device_keys || {};
             const masterKeys = res.master_keys || {};
             const ssks = res.self_signing_keys || {};
             const usks = res.user_signing_keys || {};
 
-            // do each user in a separate promise, to avoid wedging the CPU
+            // yield to other things that want to execute in between users, to
+            // avoid wedging the CPU
             // (https://github.com/vector-im/riot-web/issues/3158)
             //
             // of course we ought to do this in a web worker or similar, but
             // this serves as an easy solution for now.
-            let prom = Promise.resolve();
             for (const userId of downloadUsers) {
-                prom = prom.then(sleep(5)).then(() => {
-                    return this._processQueryResponseForUser(
+                await sleep(5);
+                try {
+                    await this._processQueryResponseForUser(
                         userId, dk[userId], {
                             master: masterKeys[userId],
                             self_signing: ssks[userId],
                             user_signing: usks[userId],
                         },
                     );
-                });
+                } catch (e) {
+                    // log the error but continue, so that one bad key
+                    // doesn't kill the whole process
+                    logger.error(`Error processing keys for ${userId}:`, e);
+                }
             }
-
-            return prom;
         }).then(() => {
             logger.log('Completed key download for ' + downloadUsers);
 
@@ -794,7 +830,7 @@ class DeviceListUpdateSerialiser {
     }
 
     async _processQueryResponseForUser(
-        userId, dkResponse, crossSigningResponse, sskResponse,
+        userId, dkResponse, crossSigningResponse,
     ) {
         logger.log('got device keys for ' + userId + ':', dkResponse);
         logger.log('got cross-signing keys for ' + userId + ':', crossSigningResponse);

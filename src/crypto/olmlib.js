@@ -114,6 +114,57 @@ export async function encryptMessageForDevice(
 }
 
 /**
+ * Get the existing olm sessions for the given devices, and the devices that
+ * don't have olm sessions.
+ *
+ * @param {module:crypto/OlmDevice} olmDevice
+ *
+ * @param {module:base-apis~MatrixBaseApis} baseApis
+ *
+ * @param {object<string, module:crypto/deviceinfo[]>} devicesByUser
+ *    map from userid to list of devices to ensure sessions for
+ *
+ * @return {Promise} resolves to an array.  The first element of the array is a
+ *    a map of user IDs to arrays of deviceInfo, representing the devices that
+ *    don't have established olm sessions.  The second element of the array is
+ *    a map from userId to deviceId to {@link module:crypto~OlmSessionResult}
+ */
+export async function getExistingOlmSessions(
+    olmDevice, baseApis, devicesByUser,
+) {
+    const devicesWithoutSession = {};
+    const sessions = {};
+
+    const promises = [];
+
+    for (const [userId, devices] of Object.entries(devicesByUser)) {
+        for (const deviceInfo of devices) {
+            const deviceId = deviceInfo.deviceId;
+            const key = deviceInfo.getIdentityKey();
+            promises.push((async () => {
+                const sessionId = await olmDevice.getSessionIdForDevice(
+                    key, true,
+                );
+                if (sessionId === null) {
+                    devicesWithoutSession[userId] = devicesWithoutSession[userId] || [];
+                    devicesWithoutSession[userId].push(deviceInfo);
+                } else {
+                    sessions[userId] = sessions[userId] || {};
+                    sessions[userId][deviceId] = {
+                        device: deviceInfo,
+                        sessionId: sessionId,
+                    };
+                }
+            })());
+        }
+    }
+
+    await Promise.all(promises);
+
+    return [devicesWithoutSession, sessions];
+}
+
+/**
  * Try to make sure we have established olm sessions for the given devices.
  *
  * @param {module:crypto/OlmDevice} olmDevice
@@ -123,32 +174,58 @@ export async function encryptMessageForDevice(
  * @param {object<string, module:crypto/deviceinfo[]>} devicesByUser
  *    map from userid to list of devices to ensure sessions for
  *
- * @param {boolean} force If true, establish a new session even if one already exists.
- *     Optional.
+ * @param {boolean} [force=false] If true, establish a new session even if one
+ *     already exists.
+ *
+ * @param {Number} [otkTimeout] The timeout in milliseconds when requesting
+ *     one-time keys for establishing new olm sessions.
+ *
+ * @param {Array} [failedServers] An array to fill with remote servers that
+ *     failed to respond to one-time-key requests.
  *
  * @return {Promise} resolves once the sessions are complete, to
  *    an Object mapping from userId to deviceId to
  *    {@link module:crypto~OlmSessionResult}
  */
 export async function ensureOlmSessionsForDevices(
-    olmDevice, baseApis, devicesByUser, force,
+    olmDevice, baseApis, devicesByUser, force, otkTimeout, failedServers,
 ) {
+    if (typeof force === "number") {
+        failedServers = otkTimeout;
+        otkTimeout = force;
+        force = false;
+    }
+
     const devicesWithoutSession = [
         // [userId, deviceId], ...
     ];
     const result = {};
     const resolveSession = {};
 
-    for (const userId in devicesByUser) {
-        if (!devicesByUser.hasOwnProperty(userId)) {
-            continue;
-        }
+    for (const [userId, devices] of Object.entries(devicesByUser)) {
         result[userId] = {};
-        const devices = devicesByUser[userId];
-        for (let j = 0; j < devices.length; j++) {
-            const deviceInfo = devices[j];
+        for (const deviceInfo of devices) {
             const deviceId = deviceInfo.deviceId;
             const key = deviceInfo.getIdentityKey();
+
+            if (key === olmDevice.deviceCurve25519Key) {
+                // We should never be trying to start a session with ourself.
+                // Apart from talking to yourself being the first sign of madness,
+                // olm sessions can't do this because they get confused when
+                // they get a message and see that the 'other side' has started a
+                // new chain when this side has an active sender chain.
+                // If you see this message being logged in the wild, we should find
+                // the thing that is trying to send Olm messages to itself and fix it.
+                logger.info("Attempted to start session with ourself! Ignoring");
+                // We must fill in the section in the return value though, as callers
+                // expect it to be there.
+                result[userId][deviceId] = {
+                    device: deviceInfo,
+                    sessionId: null,
+                };
+                continue;
+            }
+
             if (!olmDevice._sessionsInProgress[key]) {
                 // pre-emptively mark the session as in-progress to avoid race
                 // conditions.  If we find that we already have a session, then
@@ -180,6 +257,11 @@ export async function ensureOlmSessionsForDevices(
                 delete resolveSession[key];
             }
             if (sessionId === null || force) {
+                if (force) {
+                    logger.info("Forcing new Olm session for " + userId + ":" + deviceId);
+                } else {
+                    logger.info("Making new Olm session for " + userId + ":" + deviceId);
+                }
                 devicesWithoutSession.push([userId, deviceId]);
             }
             result[userId][deviceId] = {
@@ -197,7 +279,7 @@ export async function ensureOlmSessionsForDevices(
     let res;
     try {
         res = await baseApis.claimOneTimeKeys(
-            devicesWithoutSession, oneTimeKeyAlgorithm,
+            devicesWithoutSession, oneTimeKeyAlgorithm, otkTimeout,
         );
     } catch (e) {
         for (const resolver of Object.values(resolveSession)) {
@@ -207,18 +289,26 @@ export async function ensureOlmSessionsForDevices(
         throw e;
     }
 
+    if (failedServers && "failures" in res) {
+        failedServers.push(...Object.keys(res.failures));
+    }
+
     const otk_res = res.one_time_keys || {};
     const promises = [];
-    for (const userId in devicesByUser) {
-        if (!devicesByUser.hasOwnProperty(userId)) {
-            continue;
-        }
+    for (const [userId, devices] of Object.entries(devicesByUser)) {
         const userRes = otk_res[userId] || {};
-        const devices = devicesByUser[userId];
         for (let j = 0; j < devices.length; j++) {
             const deviceInfo = devices[j];
             const deviceId = deviceInfo.deviceId;
             const key = deviceInfo.getIdentityKey();
+
+            if (key === olmDevice.deviceCurve25519Key) {
+                // We've already logged about this above. Skip here too
+                // otherwise we'll log saying there are no one-time keys
+                // which will be confusing.
+                continue;
+            }
+
             if (result[userId][deviceId].sessionId && !force) {
                 // we already have a result for this device
                 continue;
@@ -405,6 +495,15 @@ export function pkVerify(obj, pubkey, userId) {
  */
 export function encodeBase64(uint8Array) {
     return Buffer.from(uint8Array).toString("base64");
+}
+
+/**
+ * Encode a typed array of uint8 as unpadded base64.
+ * @param {Uint8Array} uint8Array The data to encode.
+ * @return {string} The unpadded base64.
+ */
+export function encodeUnpaddedBase64(uint8Array) {
+    return encodeBase64(uint8Array).replace(/=+$/g, '');
 }
 
 /**

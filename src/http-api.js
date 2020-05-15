@@ -47,6 +47,7 @@ export const PREFIX_UNSTABLE = "/_matrix/client/unstable";
 
 /**
  * URI path for v1 of the the identity API
+ * @deprecated Use v2.
  */
 export const PREFIX_IDENTITY_V1 = "/_matrix/identity/api/v1";
 
@@ -275,6 +276,9 @@ MatrixHttpApi.prototype = {
                         callbacks.clearTimeout(xhr.timeout_timer);
                         var resp;
                         try {
+                            if (xhr.status === 0) {
+                                throw new AbortError();
+                            }
                             if (!xhr.responseText) {
                                 throw new Error('No response body.');
                             }
@@ -788,6 +792,17 @@ const requestCallback = function(
     userDefinedCallback = userDefinedCallback || function() {};
 
     return function(err, response, body) {
+        if (err) {
+            // the unit tests use matrix-mock-request, which throw the string "aborted" when aborting a request.
+            // See https://github.com/matrix-org/matrix-mock-request/blob/3276d0263a561b5b8326b47bae720578a2c7473a/src/index.js#L48
+            const aborted = err.name === "AbortError" || err === "aborted";
+            if (!aborted && !(err instanceof MatrixError)) {
+                // browser-request just throws normal Error objects,
+                // not `TypeError`s like fetch does. So just assume any
+                // error is due to the connection.
+                err = new ConnectionError("request failed", err);
+            }
+        }
         if (!err) {
             try {
                 if (response.statusCode >= 400) {
@@ -891,12 +906,76 @@ function getResponseContentType(response) {
  * @prop {Object} data The raw Matrix error JSON used to construct this object.
  * @prop {integer} httpStatus The numeric HTTP status code given
  */
-export function MatrixError(errorJson) {
-    errorJson = errorJson || {};
-    this.errcode = errorJson.errcode;
-    this.name = errorJson.errcode || "Unknown error code";
-    this.message = errorJson.error || "Unknown message";
-    this.data = errorJson;
+export class MatrixError extends Error {
+    constructor(errorJson) {
+        errorJson = errorJson || {};
+        super(`MatrixError: ${errorJson.errcode}`);
+        this.errcode = errorJson.errcode;
+        this.name = errorJson.errcode || "Unknown error code";
+        this.message = errorJson.error || "Unknown message";
+        this.data = errorJson;
+    }
 }
-MatrixError.prototype = Object.create(Error.prototype);
-MatrixError.prototype.constructor = MatrixError;
+
+/**
+ * Construct a ConnectionError. This is a JavaScript Error indicating
+ * that a request failed because of some error with the connection, either
+ * CORS was not correctly configured on the server, the server didn't response,
+ * the request timed out, or the internet connection on the client side went down.
+ * @constructor
+ */
+export class ConnectionError extends Error {
+    constructor(message, cause = undefined) {
+        super(message + (cause ? `: ${cause.message}` : ""));
+        this._cause = cause;
+    }
+
+    get name() {
+        return "ConnectionError";
+    }
+
+    get cause() {
+        return this._cause;
+    }
+}
+
+export class AbortError extends Error {
+    constructor() {
+        super("Operation aborted");
+    }
+
+    get name() {
+        return "AbortError";
+    }
+}
+
+/**
+ * Retries a network operation run in a callback.
+ * @param  {number}   maxAttempts maximum attempts to try
+ * @param  {Function} callback    callback that returns a promise of the network operation. If rejected with ConnectionError, it will be retried by calling the callback again.
+ * @return {any} the result of the network operation
+ * @throws {ConnectionError} If after maxAttempts the callback still throws ConnectionError
+ */
+export async function retryNetworkOperation(maxAttempts, callback) {
+    let attempts = 0;
+    let lastConnectionError = null;
+    while (attempts < maxAttempts) {
+        try {
+            if (attempts > 0) {
+                const timeout = 1000 * Math.pow(2, attempts);
+                console.log(`network operation failed ${attempts} times,` +
+                    ` retrying in ${timeout}ms...`);
+                await new Promise(r => setTimeout(r, timeout));
+            }
+            return await callback();
+        } catch (err) {
+            if (err instanceof ConnectionError) {
+                attempts += 1;
+                lastConnectionError = err;
+            } else {
+                throw err;
+            }
+        }
+    }
+    throw lastConnectionError;
+}

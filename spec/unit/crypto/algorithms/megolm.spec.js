@@ -297,6 +297,10 @@ describe("MegolmDecryption", function() {
                 },
             }));
 
+            mockCrypto.checkDeviceTrust.mockReturnValue({
+                isVerified: () => false,
+            });
+
             const megolmEncryption = new MegolmEncryption({
                 userId: '@user:id',
                 crypto: mockCrypto,
@@ -320,14 +324,14 @@ describe("MegolmDecryption", function() {
 
             // this should have claimed a key for alice as it's starting a new session
             expect(mockBaseApis.claimOneTimeKeys).toHaveBeenCalledWith(
-                [['@alice:home.server', 'aliceDevice']], 'signed_curve25519',
+                [['@alice:home.server', 'aliceDevice']], 'signed_curve25519', 2000,
             );
             expect(mockCrypto.downloadKeys).toHaveBeenCalledWith(
                 ['@alice:home.server'], false,
             );
             expect(mockBaseApis.sendToDevice).toHaveBeenCalled();
             expect(mockBaseApis.claimOneTimeKeys).toHaveBeenCalledWith(
-                [['@alice:home.server', 'aliceDevice']], 'signed_curve25519',
+                [['@alice:home.server', 'aliceDevice']], 'signed_curve25519', 2000,
             );
 
             mockBaseApis.claimOneTimeKeys.mockReset();
@@ -516,21 +520,22 @@ describe("MegolmDecryption", function() {
             };
         };
 
-        let run = false;
-        aliceClient.sendToDevice = async (msgtype, contentMap) => {
-            run = true;
-            expect(msgtype).toBe("org.matrix.room_key.withheld");
-            expect(contentMap).toStrictEqual({
-                '@bob:example.com': {
-                    bobdevice: {
-                        algorithm: "m.megolm.v1.aes-sha2",
-                        code: 'm.no_olm',
-                        reason: 'Unable to establish a secure channel.',
-                        sender_key: aliceDevice.deviceCurve25519Key,
+        const sendPromise = new Promise((resolve, reject) => {
+            aliceClient.sendToDevice = async (msgtype, contentMap) => {
+                expect(msgtype).toBe("org.matrix.room_key.withheld");
+                expect(contentMap).toStrictEqual({
+                    '@bob:example.com': {
+                        bobdevice: {
+                            algorithm: "m.megolm.v1.aes-sha2",
+                            code: 'm.no_olm',
+                            reason: 'Unable to establish a secure channel.',
+                            sender_key: aliceDevice.deviceCurve25519Key,
+                        },
                     },
-                },
-            });
-        };
+                });
+                resolve();
+            };
+        });
 
         const event = new MatrixEvent({
             type: "m.room.message",
@@ -540,8 +545,7 @@ describe("MegolmDecryption", function() {
             content: {},
         });
         await aliceClient._crypto.encryptEvent(event, aliceRoom);
-
-        expect(run).toBe(true);
+        await sendPromise;
     });
 
     it("throws an error describing why it doesn't have a key", async function() {

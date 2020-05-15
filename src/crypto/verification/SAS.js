@@ -175,11 +175,33 @@ function calculateMAC(olmSAS, method) {
     };
 }
 
+const calculateKeyAgreement = {
+    "curve25519-hkdf-sha256": function(sas, olmSAS, bytes) {
+        const ourInfo = `${sas._baseApis.getUserId()}|${sas._baseApis.deviceId}|`
+              + `${sas.ourSASPubKey}|`;
+        const theirInfo = `${sas.userId}|${sas.deviceId}|${sas.theirSASPubKey}|`;
+        const sasInfo =
+            "MATRIX_KEY_VERIFICATION_SAS|"
+              + (sas.initiatedByMe ? ourInfo + theirInfo : theirInfo + ourInfo)
+              + sas._channel.transactionId;
+        return olmSAS.generate_bytes(sasInfo, bytes);
+    },
+    "curve25519": function(sas, olmSAS, bytes) {
+        const ourInfo = `${sas._baseApis.getUserId()}${sas._baseApis.deviceId}`;
+        const theirInfo = `${sas.userId}${sas.deviceId}`;
+        const sasInfo =
+            "MATRIX_KEY_VERIFICATION_SAS"
+              + (sas.initiatedByMe ? ourInfo + theirInfo : theirInfo + ourInfo)
+              + sas._channel.transactionId;
+        return olmSAS.generate_bytes(sasInfo, bytes);
+    },
+};
+
 /* lists of algorithms/methods that are supported.  The key agreement, hashes,
  * and MAC lists should be sorted in order of preference (most preferred
  * first).
  */
-const KEY_AGREEMENT_LIST = ["curve25519"];
+const KEY_AGREEMENT_LIST = ["curve25519-hkdf-sha256", "curve25519"];
 const HASHES_LIST = ["sha256"];
 const MAC_LIST = ["hkdf-hmac-sha256", "hmac-sha256"];
 const SAS_LIST = Object.keys(sasGenerators);
@@ -291,12 +313,14 @@ export class SAS extends Base {
         if (typeof content.commitment !== "string") {
             throw newInvalidMessageError();
         }
+        const keyAgreement = content.key_agreement_protocol;
         const macMethod = content.message_authentication_code;
         const hashCommitment = content.commitment;
         const olmSAS = new global.Olm.SAS();
         try {
-            this._send("m.key.verification.key", {
-                key: olmSAS.get_pubkey(),
+            this.ourSASPubKey = olmSAS.get_pubkey();
+            await this._send("m.key.verification.key", {
+                key: this.ourSASPubKey,
             });
 
 
@@ -308,19 +332,20 @@ export class SAS extends Base {
             if (olmutil.sha256(commitmentStr) !== hashCommitment) {
                 throw newMismatchedCommitmentError();
             }
+            this.theirSASPubKey = content.key;
             olmSAS.set_their_key(content.key);
 
-            const sasInfo = "MATRIX_KEY_VERIFICATION_SAS"
-                  + this._baseApis.getUserId() + this._baseApis.deviceId
-                  + this.userId + this.deviceId
-                  + this._channel.transactionId;
-            const sasBytes = olmSAS.generate_bytes(sasInfo, 6);
+            const sasBytes = calculateKeyAgreement[keyAgreement](this, olmSAS, 6);
             const verifySAS = new Promise((resolve, reject) => {
                 this.sasEvent = {
                     sas: generateSas(sasBytes, sasMethods),
-                    confirm: () => {
-                        this._sendMAC(olmSAS, macMethod);
-                        resolve();
+                    confirm: async () => {
+                        try {
+                            await this._sendMAC(olmSAS, macMethod);
+                            resolve();
+                        } catch (err) {
+                            reject(err);
+                        }
                     },
                     cancel: () => reject(newUserCancelledError()),
                     mismatch: () => reject(newMismatchedSASError()),
@@ -377,7 +402,7 @@ export class SAS extends Base {
         const olmSAS = new global.Olm.SAS();
         try {
             const commitmentStr = olmSAS.get_pubkey() + anotherjson.stringify(content);
-            this._send("m.key.verification.accept", {
+            await this._send("m.key.verification.accept", {
                 key_agreement_protocol: keyAgreement,
                 hash: hashMethod,
                 message_authentication_code: macMethod,
@@ -390,22 +415,24 @@ export class SAS extends Base {
             let e = await this._waitForEvent("m.key.verification.key");
             // FIXME: make sure event is properly formed
             content = e.getContent();
+            this.theirSASPubKey = content.key;
             olmSAS.set_their_key(content.key);
-            this._send("m.key.verification.key", {
-                key: olmSAS.get_pubkey(),
+            this.ourSASPubKey = olmSAS.get_pubkey();
+            await this._send("m.key.verification.key", {
+                key: this.ourSASPubKey,
             });
 
-            const sasInfo = "MATRIX_KEY_VERIFICATION_SAS"
-                  + this.userId + this.deviceId
-                  + this._baseApis.getUserId() + this._baseApis.deviceId
-                  + this._channel.transactionId;
-            const sasBytes = olmSAS.generate_bytes(sasInfo, 6);
+            const sasBytes = calculateKeyAgreement[keyAgreement](this, olmSAS, 6);
             const verifySAS = new Promise((resolve, reject) => {
                 this.sasEvent = {
                     sas: generateSas(sasBytes, sasMethods),
-                    confirm: () => {
-                        this._sendMAC(olmSAS, macMethod);
-                        resolve();
+                    confirm: async () => {
+                        try {
+                            await this._sendMAC(olmSAS, macMethod);
+                            resolve();
+                        } catch(err) {
+                            reject(err);
+                        }
                     },
                     cancel: () => reject(newUserCancelledError()),
                     mismatch: () => reject(newMismatchedSASError()),
@@ -461,7 +488,7 @@ export class SAS extends Base {
             keyList.sort().join(","),
             baseInfo + "KEY_IDS",
         );
-        this._send("m.key.verification.mac", { mac, keys });
+        return this._send("m.key.verification.mac", { mac, keys });
     }
 
     async _checkMAC(olmSAS, content, method) {

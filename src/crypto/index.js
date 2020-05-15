@@ -37,8 +37,9 @@ import {
     CrossSigningLevel,
     DeviceTrustLevel,
     UserTrustLevel,
+    createCryptoStoreCacheCallbacks,
 } from './CrossSigning';
-import {SECRET_STORAGE_ALGORITHM_V1, SecretStorage} from './SecretStorage';
+import {SECRET_STORAGE_ALGORITHM_V1_AES, SecretStorage} from './SecretStorage';
 import {OutgoingRoomKeyRequestManager} from './OutgoingRoomKeyRequestManager';
 import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
 import {
@@ -54,6 +55,7 @@ import {InRoomChannel, InRoomRequests} from "./verification/request/InRoomChanne
 import {ToDeviceChannel, ToDeviceRequests} from "./verification/request/ToDeviceChannel";
 import * as httpApi from "../http-api";
 import {IllegalMethod} from "./verification/IllegalMethod";
+import {KeySignatureUploadError} from "../errors";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -118,6 +120,8 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     this._onDeviceListUserCrossSigningUpdated =
         this._onDeviceListUserCrossSigningUpdated.bind(this);
 
+    this._trustCrossSignedDevices = true;
+
     this._reEmitter = new ReEmitter(this);
     this._baseApis = baseApis;
     this._sessionStore = sessionStore;
@@ -165,7 +169,9 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     this._deviceList.on(
         'userCrossSigningUpdated', this._onDeviceListUserCrossSigningUpdated,
     );
-    this._reEmitter.reEmit(this._deviceList, ["crypto.devicesUpdated"]);
+    this._reEmitter.reEmit(this._deviceList, [
+        "crypto.devicesUpdated", "crypto.willUpdateDevices",
+    ]);
 
     // the last time we did a check for the number of one-time-keys on the
     // server.
@@ -219,12 +225,22 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     this._toDeviceVerificationRequests = new ToDeviceRequests();
     this._inRoomVerificationRequests = new InRoomRequests();
 
-    const cryptoCallbacks = this._baseApis._cryptoCallbacks || {};
+    // This flag will be unset whilst the client processes a sync response
+    // so that we don't start requesting keys until we've actually finished
+    // processing the response.
+    this._sendKeyRequestsImmediately = false;
 
-    this._crossSigningInfo = new CrossSigningInfo(userId, cryptoCallbacks);
+    const cryptoCallbacks = this._baseApis._cryptoCallbacks || {};
+    const cacheCallbacks = createCryptoStoreCacheCallbacks(cryptoStore);
+
+    this._crossSigningInfo = new CrossSigningInfo(
+        userId,
+        cryptoCallbacks,
+        cacheCallbacks,
+    );
 
     this._secretStorage = new SecretStorage(
-        baseApis, cryptoCallbacks, this._crossSigningInfo,
+        baseApis, cryptoCallbacks,
     );
 
     // Assuming no app-supplied callback, default to getting from SSSS.
@@ -297,7 +313,8 @@ Crypto.prototype.init = async function(opts) {
         'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
         (txn) => {
             this._cryptoStore.getCrossSigningKeys(txn, (keys) => {
-                if (keys) {
+                // can be an empty object after resetting cross-signing keys, see _storeTrustedSelfKeys
+                if (keys && Object.keys(keys).length !== 0) {
                     logger.log("Loaded cross-signing public keys from crypto store");
                     this._crossSigningInfo.setKeys(keys);
                 }
@@ -313,12 +330,53 @@ Crypto.prototype.init = async function(opts) {
 };
 
 /**
+ * Whether to trust a others users signatures of their devices.
+ * If false, devices will only be considered 'verified' if we have
+ * verified that device individually (effectively disabling cross-signing).
+ *
+ * Default: true
+ *
+ * @return {bool} True if trusting cross-signed devices
+ */
+Crypto.prototype.getCryptoTrustCrossSignedDevices = function() {
+    return this._trustCrossSignedDevices;
+};
+
+/**
+ * See getCryptoTrustCrossSignedDevices
+
+ * This may be set before initCrypto() is called to ensure no races occur.
+ *
+ * @param {bool} val True to trust cross-signed devices
+ */
+Crypto.prototype.setCryptoTrustCrossSignedDevices = function(val) {
+    this._trustCrossSignedDevices = val;
+
+    for (const userId of this._deviceList.getKnownUserIds()) {
+        const devices = this._deviceList.getRawStoredDevicesForUser(userId);
+        for (const deviceId of Object.keys(devices)) {
+            const deviceTrust = this.checkDeviceTrust(userId, deviceId);
+            // If the device is locally verified then isVerified() is always true,
+            // so this will only have caused the value to change if the device is
+            // cross-signing verified but not locally verified
+            if (
+                !deviceTrust.isLocallyVerified() &&
+                deviceTrust.isCrossSigningVerified()
+            ) {
+                const deviceObj = this._deviceList.getStoredDevice(userId, deviceId);
+                this.emit("deviceVerificationChanged", userId, deviceId, deviceObj);
+            }
+        }
+    }
+};
+
+/**
  * Create a recovery key from a user-supplied passphrase.
  *
  * @param {string} password Passphrase string that can be entered by the user
  *     when restoring the backup as an alternative to entering the recovery key.
  *     Optional.
- * @returns {Promise<Array>} Array with public key metadata, encoded private
+ * @returns {Promise<Object>} Object with public key metadata, encoded private
  *     recovery key which should be disposed of after displaying to the user,
  *     and raw private key to avoid round tripping if needed.
  */
@@ -339,17 +397,56 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
         }
         const privateKey = decryption.get_private_key();
         const encodedPrivateKey = encodeRecoveryKey(privateKey);
-        return [keyInfo, encodedPrivateKey, privateKey];
+        return { keyInfo, encodedPrivateKey, privateKey };
     } finally {
         if (decryption) decryption.free();
     }
 };
 
 /**
+ * Checks whether cross signing:
+ * - is enabled on this account
+ * - is trusted by this device
+ * - has private keys stored in secret storage
+ * and that the account has a secret storage key
+ *
+ * If this function returns false, bootstrapSecretStorage() can be used
+ * to fix things such that it returns true. That is to say, after
+ * bootstrapSecretStorage() completes sucessfully, this function should
+ * return true.
+ *
+ * The cross-signing API is currently UNSTABLE and may change without notice.
+ *
+ * @return {bool} True if cross-signing is ready to be used on this device
+ */
+Crypto.prototype.isCrossSigningReady = async function() {
+    const publicKeysOnDevice = this._crossSigningInfo.getId();
+    const privateKeysInStorage = await this._crossSigningInfo.isStoredInSecretStorage(
+        this._secretStorage,
+    );
+    const secretStorageKeyInAccount = await this._secretStorage.hasKey();
+
+    return (
+        publicKeysOnDevice &&
+        privateKeysInStorage &&
+        secretStorageKeyInAccount
+    );
+};
+
+
+/**
  * Bootstrap Secure Secret Storage if needed by creating a default key and
  * signing it with the cross-signing master key. If everything is already set
  * up, then no changes are made, so this is safe to run to ensure secret storage
  * is ready for use.
+ *
+ * This function
+ * - creates a new Secure Secret Storage key if no default key exists
+ *   - if a key backup exists, it is migrated to store the key in the Secret
+ *     Storage
+ * - creates a backup if none exists, and one is requested
+ * - migrates Secure Secret Storage to use the latest algorithm, if an outdated
+ *   algorithm is found
  *
  * @param {function} [opts.authUploadDeviceSigningKeys] Optional. Function
  * called to await an interactive auth flow when uploading device signing keys.
@@ -358,22 +455,30 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
  *     auth data as an object.
  * @param {function} [opts.createSecretStorageKey] Optional. Function
  * called to await a secret storage key creation flow.
+ * Returns:
+ *     {Promise<Object>} Object with public key metadata, encoded private
+ *     recovery key which should be disposed of after displaying to the user,
+ *     and raw private key to avoid round tripping if needed.
  * @param {object} [opts.keyBackupInfo] The current key backup object. If passed,
  * the passphrase and recovery key from this backup will be used.
  * @param {bool} [opts.setupNewKeyBackup] If true, a new key backup version will be
  * created and the private key stored in the new SSSS store. Ignored if keyBackupInfo
  * is supplied.
  * @param {bool} [opts.setupNewSecretStorage] Optional. Reset even if keys already exist.
+ * @param {func} [opts.getKeyBackupPassphrase] Optional. Function called to get the user's
+ *     current key backup passphrase. Should return a promise that resolves with a Buffer
+ *     containing the key, or rejects if the key cannot be obtained.
  * Returns:
  *     {Promise} A promise which resolves to key creation data for
  *     SecretStorage#addKey: an object with `passphrase` and/or `pubkey` fields.
  */
 Crypto.prototype.bootstrapSecretStorage = async function({
     authUploadDeviceSigningKeys,
-    createSecretStorageKey = async () => { },
+    createSecretStorageKey = async () => ({ }),
     keyBackupInfo,
     setupNewKeyBackup,
     setupNewSecretStorage,
+    getKeyBackupPassphrase,
 } = {}) {
     logger.log("Bootstrapping Secure Secret Storage");
 
@@ -388,93 +493,184 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     // use temporary callbacks to weave them through the various APIs.
     const appCallbacks = Object.assign({}, this._baseApis._cryptoCallbacks);
 
-    try {
-        const inStorage = !setupNewSecretStorage &&
-            await this._crossSigningInfo.isStoredInSecretStorage(this._secretStorage);
-        if (!this._crossSigningInfo.getId() || !inStorage) {
-            logger.log(
-                "Cross-signing public and/or private keys not found, " +
-                "checking secret storage for private keys",
-            );
-            if (inStorage) {
-                logger.log("Cross-signing private keys found in secret storage");
-                await this.checkOwnCrossSigningTrust();
-            } else {
-                logger.log(
-                    "Cross-signing private keys not found in secret storage, " +
-                    "creating new keys",
-                );
-                this._baseApis._cryptoCallbacks.saveCrossSigningKeys =
-                    keys => Object.assign(crossSigningPrivateKeys, keys);
-                this._baseApis._cryptoCallbacks.getCrossSigningKey =
-                    name => crossSigningPrivateKeys[name];
-                await this.resetCrossSigningKeys(
-                    CrossSigningLevel.MASTER,
-                    { authUploadDeviceSigningKeys },
-                );
+    // the ID of the new SSSS key, if we create one
+    let newKeyId = null;
+
+    // cache SSSS keys so that we don't need to constantly pester the user about it
+    const ssssKeys = {};
+
+    this._baseApis._cryptoCallbacks.getSecretStorageKey =
+        async ({keys}, name) => {
+            // if we already have a key that works, return it
+            for (const keyId of Object.keys(keys)) {
+                if (ssssKeys[keyId]) {
+                    return [keyId, ssssKeys[keyId]];
+                }
             }
-        } else {
-            logger.log("Cross signing keys are present in secret storage");
+
+            // otherwise, prompt the user and cache it
+            const key = await appCallbacks.getSecretStorageKey({keys}, name);
+            if (key) {
+                const [keyId, keyData] = key;
+                ssssKeys[keyId] = keyData;
+            }
+            return key;
+        };
+
+    // create a new SSSS key and set it as default
+    const createSSSS = async (opts, privateKey) => {
+        opts = opts || {};
+        if (privateKey) {
+            opts.key = privateKey;
         }
 
-        // Check if Secure Secret Storage has a default key. If we don't have one, create
-        // the default key (which will also be signed by the cross-signing master key).
-        if (setupNewSecretStorage || !await this.hasSecretStorageKey()) {
-            let newKeyId;
-            if (keyBackupInfo) {
-                logger.log("Secret storage default key not found, using key backup key");
-                const opts = {
-                    pubkey: keyBackupInfo.auth_data.public_key,
-                };
+        const keyId = await this.addSecretStorageKey(
+            SECRET_STORAGE_ALGORITHM_V1_AES, opts,
+        );
+        await this.setDefaultSecretStorageKeyId(keyId);
 
-                if (
-                    keyBackupInfo.auth_data.private_key_salt &&
-                    keyBackupInfo.auth_data.private_key_iterations
-                ) {
-                    opts.passphrase = {
-                        algorithm: "m.pbkdf2",
-                        iterations: keyBackupInfo.auth_data.private_key_iterations,
-                        salt: keyBackupInfo.auth_data.private_key_salt,
-                    };
-                }
+        if (privateKey) {
+            // cache the private key so that we can access it again
+            ssssKeys[keyId] = privateKey;
+        }
+        return keyId;
+    };
 
-                newKeyId = await this.addSecretStorageKey(
-                    SECRET_STORAGE_ALGORITHM_V1, opts,
-                );
+    // reset the cross-signing keys
+    const resetCrossSigning = async () => {
+        this._baseApis._cryptoCallbacks.saveCrossSigningKeys =
+            keys => Object.assign(crossSigningPrivateKeys, keys);
+        this._baseApis._cryptoCallbacks.getCrossSigningKey =
+            name => crossSigningPrivateKeys[name];
+        await this.resetCrossSigningKeys(
+            CrossSigningLevel.MASTER,
+            { authUploadDeviceSigningKeys },
+        );
+    };
 
-                // Add an entry for the backup key in SSSS as a 'passthrough' key
-                // (ie. the secret is the key itself).
-                this._secretStorage.storePassthrough('m.megolm_backup.v1', newKeyId);
+    const ensureCanCheckPassphrase = async (keyId, keyInfo) => {
+        if (!keyInfo.mac) {
+            const key = await this._baseApis._cryptoCallbacks.getSecretStorageKey(
+                {keys: {[keyId]: keyInfo}}, "",
+            );
+            if (key) {
+                const keyData = key[1];
+                ssssKeys[keyId] = keyData;
+                const {iv, mac} = await SecretStorage._calculateKeyCheck(keyData);
+                keyInfo.iv = iv;
+                keyInfo.mac = mac;
 
-                // if this key backup is trusted, sign it with the cross signing key
-                // so the key backup can be trusted via cross-signing.
-                const backupSigStatus = await this.checkKeyBackup(keyBackupInfo);
-                if (backupSigStatus.trustInfo.usable) {
-                    console.log("Adding cross signing signature to key backup");
-                    await this._crossSigningInfo.signObject(
-                        keyBackupInfo.auth_data, "master",
-                    );
-                    await this._baseApis._http.authedRequest(
-                        undefined, "PUT", "/room_keys/version/" + keyBackupInfo.version,
-                        undefined, keyBackupInfo,
-                        {prefix: httpApi.PREFIX_UNSTABLE},
-                    );
-                } else {
-                    console.log(
-                        "Key backup is NOT TRUSTED: NOT adding cross signing signature",
-                    );
-                }
-            } else {
-                logger.log("Secret storage default key not found, creating new key");
-                const keyOptions = await createSecretStorageKey();
-                newKeyId = await this.addSecretStorageKey(
-                    SECRET_STORAGE_ALGORITHM_V1,
-                    keyOptions,
+                await this._baseApis.setAccountData(
+                    `m.secret_storage.key.${keyId}`, keyInfo,
                 );
             }
-            await this.setDefaultSecretStorageKeyId(newKeyId);
+        }
+    };
+
+    try {
+        const oldSSSSKey = await this.getSecretStorageKey();
+        const [oldKeyId, oldKeyInfo] = oldSSSSKey || [null, null];
+        const decryptionKeys =
+              await this._crossSigningInfo.isStoredInSecretStorage(this._secretStorage);
+        const inStorage = !setupNewSecretStorage && decryptionKeys;
+
+        if (!inStorage && !keyBackupInfo) {
+            // either we don't have anything, or we've been asked to restart
+            // from scratch
+            logger.log(
+                "Cross-signing private keys not found in secret storage, " +
+                    "creating new keys",
+            );
+
+            await resetCrossSigning();
+
+            if (
+                setupNewSecretStorage ||
+                !oldKeyInfo ||
+                oldKeyInfo.algorithm !== SECRET_STORAGE_ALGORITHM_V1_AES
+            ) {
+                // if we already have a usable default SSSS key and aren't resetting SSSS just use it.
+                // otherwise, create a new one
+                // Note: we leave the old SSSS key in place: there could be other secrets using it, in theory.
+                // We could move them to the new key but a) that would mean we'd need to prompt for the old
+                // passphrase, and b) it's not clear that would be the right thing to do anyway.
+                const { keyInfo, privateKey } = await createSecretStorageKey();
+                newKeyId = await createSSSS(keyInfo, privateKey);
+            }
+
+            if (oldKeyInfo && oldKeyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
+                await ensureCanCheckPassphrase(oldKeyId, oldKeyInfo);
+            }
+        } else if (!inStorage && keyBackupInfo) {
+            // we have an existing backup, but no SSSS
+
+            logger.log("Secret storage default key not found, using key backup key");
+
+            // if we have the backup key already cached, use it; otherwise use the
+            // callback to prompt for the key
+            const backupKey = await this.getSessionBackupPrivateKey() ||
+                              await getKeyBackupPassphrase();
+
+            // create new cross-signing keys
+            await resetCrossSigning();
+
+            // create a new SSSS key and use the backup key as the new SSSS key
+            const opts = {};
+
+            if (
+                keyBackupInfo.auth_data.private_key_salt &&
+                keyBackupInfo.auth_data.private_key_iterations
+            ) {
+                opts.passphrase = {
+                    algorithm: "m.pbkdf2",
+                    iterations: keyBackupInfo.auth_data.private_key_iterations,
+                    salt: keyBackupInfo.auth_data.private_key_salt,
+                    bits: 256,
+                };
+            }
+
+            newKeyId = await createSSSS(opts, backupKey);
+
+            // store the backup key in secret storage
+            await this.storeSecret(
+                "m.megolm_backup.v1", olmlib.encodeBase64(backupKey), [newKeyId],
+            );
+
+            // The backup is trusted because the user provided the private key.
+            // Sign the backup with the cross signing key so the key backup can
+            // be trusted via cross-signing.
+            logger.log("Adding cross signing signature to key backup");
+            await this._crossSigningInfo.signObject(
+                keyBackupInfo.auth_data, "master",
+            );
+            await this._baseApis._http.authedRequest(
+                undefined, "PUT", "/room_keys/version/" + keyBackupInfo.version,
+                undefined, keyBackupInfo,
+                {prefix: httpApi.PREFIX_UNSTABLE},
+            );
+        } else if (!this._crossSigningInfo.getId()) {
+            // we have SSSS, but we don't know if the server's cross-signing
+            // keys should be trusted
+            logger.log("Cross-signing private keys found in secret storage");
+
+            // fetch the private keys and set up our local copy of the keys for
+            // use
+            await this.checkOwnCrossSigningTrust();
+
+            if (oldKeyInfo && oldKeyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
+                // make sure that the default key has the information needed to
+                // check the passphrase
+                await ensureCanCheckPassphrase(oldKeyId, oldKeyInfo);
+            }
         } else {
-            logger.log("Have secret storage key");
+            // we have SSSS and we cross-signing is already set up
+            logger.log("Cross signing keys are present in secret storage");
+
+            if (oldKeyInfo && oldKeyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
+                // make sure that the default key has the information needed to
+                // check the passphrase
+                await ensureCanCheckPassphrase(oldKeyId, oldKeyInfo);
+            }
         }
 
         // If cross-signing keys were reset, store them in Secure Secret Storage.
@@ -484,11 +680,6 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         // See also https://github.com/vector-im/riot-web/issues/11635
         if (Object.keys(crossSigningPrivateKeys).length) {
             logger.log("Storing cross-signing private keys in secret storage");
-            // SSSS expects its keys to be signed by cross-signing master key.
-            // Since we have just reset cross-signing keys, we need to re-sign the
-            // SSSS default key with the new cross-signing master key so that the
-            // following storage step can proceed.
-            await this._secretStorage.signKey();
             // Assuming no app-supplied callback, default to storing in SSSS.
             if (!appCallbacks.saveCrossSigningKeys) {
                 await CrossSigningInfo.storeInSecretStorage(
@@ -505,6 +696,33 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             );
             await this._baseApis.createKeyBackupVersion(info);
         }
+
+        // Call `getCrossSigningKey` for side effect of caching private keys for
+        // future gossiping to other devices if enabled via app level callbacks.
+        if (this._crossSigningInfo._cacheCallbacks) {
+            for (const type of ["self_signing", "user_signing"]) {
+                logger.log(`Cache ${type} cross-signing private key locally`);
+                await this._crossSigningInfo.getCrossSigningKey(type);
+            }
+        }
+
+        // and likewise for the session backup key
+        const sessionBackupKey = await this.getSecret('m.megolm_backup.v1');
+        if (sessionBackupKey) {
+            logger.info("Got session backup key from secret storage: caching");
+            // fix up the backup key if it's in the wrong format, and replace
+            // in secret storage
+            const fixedBackupKey = fixBackupKey(sessionBackupKey);
+            if (fixedBackupKey) {
+                await this.storeSecret(
+                    "m.megolm_backup.v1", fixedBackupKey, [newKeyId || oldKeyId],
+                );
+            }
+            const decodedBackupKey = new Uint8Array(olmlib.decodeBase64(
+                fixedBackupKey || sessionBackupKey,
+            ));
+            await this.storeSessionBackupPrivateKey(decodedBackupKey);
+        }
     } finally {
         // Restore the original callbacks. NB. we must do this by manipulating
         // the same object since the CrossSigning class has a reference to the
@@ -520,12 +738,36 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     logger.log("Secure Secret Storage ready");
 };
 
+/**
+ * Fix up the backup key, that may be in the wrong format due to a bug in a
+ * migration step.  Some backup keys were stored as a comma-separated list of
+ * integers, rather than a base64-encoded byte array.  If this function is
+ * passed a string that looks like a list of integers rather than a base64
+ * string, it will attempt to convert it to the right format.
+ *
+ * @param {string} key the key to check
+ * @returns {null | string} If the key is in the wrong format, then the fixed
+ * key will be returned. Otherwise null will be returned.
+ *
+ */
+export function fixBackupKey(key) {
+    if (key.indexOf(",") < 0) {
+        return null;
+    }
+    const fixedKey = Uint8Array.from(key.split(","), x => parseInt(x));
+    return olmlib.encodeBase64(fixedKey);
+}
+
 Crypto.prototype.addSecretStorageKey = function(algorithm, opts, keyID) {
     return this._secretStorage.addKey(algorithm, opts, keyID);
 };
 
 Crypto.prototype.hasSecretStorageKey = function(keyID) {
     return this._secretStorage.hasKey(keyID);
+};
+
+Crypto.prototype.getSecretStorageKey = function(keyID) {
+    return this._secretStorage.getKey(keyID);
 };
 
 Crypto.prototype.storeSecret = function(name, secret, keys) {
@@ -555,6 +797,10 @@ Crypto.prototype.setDefaultSecretStorageKeyId = function(k) {
     return this._secretStorage.setDefaultKeyId(k);
 };
 
+Crypto.prototype.checkSecretStorageKey = function(key, info) {
+    return this._secretStorage.checkKey(key, info);
+};
+
 /**
  * Checks that a given secret storage private key matches a given public key.
  * This can be used by the getSecretStorageKey callback to verify that the
@@ -574,6 +820,51 @@ Crypto.prototype.checkSecretStoragePrivateKey = function(privateKey, expectedPub
     } finally {
         if (decryption) decryption.free();
     }
+};
+
+/**
+ * Fetches the backup private key, if cached
+ * @returns {Promise} the key, if any, or null
+ */
+Crypto.prototype.getSessionBackupPrivateKey = async function() {
+    let key = await new Promise((resolve) => {
+        this._cryptoStore.doTxn(
+            'readonly',
+            [IndexedDBCryptoStore.STORE_ACCOUNT],
+            (txn) => {
+                this._cryptoStore.getSecretStorePrivateKey(
+                    txn,
+                    resolve,
+                    "m.megolm_backup.v1",
+                );
+            },
+        );
+    });
+
+    // make sure we have a Uint8Array, rather than a string
+    if (key && typeof(key === "string")) {
+        key = new Uint8Array(olmlib.decodeBase64(fixBackupKey(key) || key));
+        await this.storeSessionBackupPrivateKey(key);
+    }
+    return key;
+};
+
+/**
+ * Stores the session backup key to the cache
+ * @param {Uint8Array} key the private key
+ * @returns {Promise} so you can catch failures
+ */
+Crypto.prototype.storeSessionBackupPrivateKey = async function(key) {
+    if (!(key instanceof Uint8Array)) {
+        throw new Error(`storeSessionBackupPrivateKey expects Uint8Array, got ${key}`);
+    }
+    return this._cryptoStore.doTxn(
+        'readwrite',
+        [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._cryptoStore.storeSecretStorePrivateKey(txn, "m.megolm_backup.v1", key);
+        },
+    );
 };
 
 /**
@@ -655,49 +946,84 @@ Crypto.prototype.resetCrossSigningKeys = async function(level, {
  * verifications, etc.
  */
 Crypto.prototype._afterCrossSigningLocalKeyChange = async function() {
+    logger.info("Starting cross-signing key change post-processing");
+
     // sign the current device with the new key, and upload to the server
     const device = this._deviceList.getStoredDevice(this._userId, this._deviceId);
     const signedDevice = await this._crossSigningInfo.signDevice(this._userId, device);
-    await this._baseApis.uploadKeySignatures({
-        [this._userId]: {
-            [this._deviceId]: signedDevice,
-        },
-    });
+    logger.info(`Starting background key sig upload for ${this._deviceId}`);
 
-    // check all users for signatures
-    // FIXME: do this in batches
-    const users = {};
-    for (const [userId, crossSigningInfo]
-         of Object.entries(this._deviceList._crossSigningInfo)) {
-        const upgradeInfo = await this._checkForDeviceVerificationUpgrade(
-            userId, CrossSigningInfo.fromStorage(crossSigningInfo, userId),
-        );
-        if (upgradeInfo) {
-            users[userId] = upgradeInfo;
-        }
-    }
+    const upload = ({ shouldEmit }) => {
+        return this._baseApis.uploadKeySignatures({
+            [this._userId]: {
+                [this._deviceId]: signedDevice,
+            },
+        }).then((response) => {
+            const { failures } = response || {};
+            if (Object.keys(failures || []).length > 0) {
+                if (shouldEmit) {
+                    this._baseApis.emit(
+                        "crypto.keySignatureUploadFailure",
+                        failures,
+                        "_afterCrossSigningLocalKeyChange",
+                        upload, // continuation
+                    );
+                }
+                throw new KeySignatureUploadError("Key upload failed", { failures });
+            }
+            logger.info(`Finished background key sig upload for ${this._deviceId}`);
+        }).catch(e => {
+            logger.error(
+                `Error during background key sig upload for ${this._deviceId}`,
+                e,
+            );
+        });
+    };
+    upload({ shouldEmit: true });
 
     const shouldUpgradeCb = (
         this._baseApis._cryptoCallbacks.shouldUpgradeDeviceVerifications
     );
-    if (Object.keys(users).length > 0 && shouldUpgradeCb) {
-        try {
-            const usersToUpgrade = await shouldUpgradeCb({users: users});
-            if (usersToUpgrade) {
-                for (const userId of usersToUpgrade) {
-                    if (userId in users) {
-                        await this._baseApis.setDeviceVerified(
-                            userId, users[userId].crossSigningInfo.getId(),
-                        );
+    if (shouldUpgradeCb) {
+        logger.info("Starting device verification upgrade");
+
+        // Check all users for signatures if upgrade callback present
+        // FIXME: do this in batches
+        const users = {};
+        for (const [userId, crossSigningInfo]
+            of Object.entries(this._deviceList._crossSigningInfo)) {
+            const upgradeInfo = await this._checkForDeviceVerificationUpgrade(
+                userId, CrossSigningInfo.fromStorage(crossSigningInfo, userId),
+            );
+            if (upgradeInfo) {
+                users[userId] = upgradeInfo;
+            }
+        }
+
+        if (Object.keys(users).length > 0) {
+            logger.info(`Found ${Object.keys(users).length} verif users to upgrade`);
+            try {
+                const usersToUpgrade = await shouldUpgradeCb({ users: users });
+                if (usersToUpgrade) {
+                    for (const userId of usersToUpgrade) {
+                        if (userId in users) {
+                            await this._baseApis.setDeviceVerified(
+                                userId, users[userId].crossSigningInfo.getId(),
+                            );
+                        }
                     }
                 }
+            } catch (e) {
+                logger.log(
+                    "shouldUpgradeDeviceVerifications threw an error: not upgrading", e,
+                );
             }
-        } catch (e) {
-            logger.log(
-                "shouldUpgradeDeviceVerifications threw an error: not upgrading", e,
-            );
         }
+
+        logger.info("Finished device verification upgrade");
     }
+
+    logger.info("Finished cross-signing key change post-processing");
 };
 
 /**
@@ -793,7 +1119,7 @@ Crypto.prototype.getStoredCrossSigningForUser = function(userId) {
 Crypto.prototype.checkUserTrust = function(userId) {
     const userCrossSigning = this._deviceList.getStoredCrossSigningForUser(userId);
     if (!userCrossSigning) {
-        return new UserTrustLevel(false, false);
+        return new UserTrustLevel(false, false, false);
     }
     return this._crossSigningInfo.checkUserTrust(userCrossSigning);
 };
@@ -808,15 +1134,30 @@ Crypto.prototype.checkUserTrust = function(userId) {
  */
 Crypto.prototype.checkDeviceTrust = function(userId, deviceId) {
     const device = this._deviceList.getStoredDevice(userId, deviceId);
-    const trustedLocally = device && device.isVerified();
+    return this._checkDeviceInfoTrust(userId, device);
+};
+
+/**
+ * Check whether a given deviceinfo is trusted.
+ *
+ * @param {string} userId The ID of the user whose devices is to be checked.
+ * @param {module:crypto/deviceinfo?} device The device info object to check
+ *
+ * @returns {DeviceTrustLevel}
+ */
+Crypto.prototype._checkDeviceInfoTrust = function(userId, device) {
+    const trustedLocally = !!(device && device.isVerified());
 
     const userCrossSigning = this._deviceList.getStoredCrossSigningForUser(userId);
     if (device && userCrossSigning) {
+        // The _trustCrossSignedDevices only affects trust of other people's cross-signing
+        // signatures
+        const trustCrossSig = this._trustCrossSignedDevices || userId === this._userId;
         return this._crossSigningInfo.checkDeviceTrust(
-            userCrossSigning, device, trustedLocally,
+            userCrossSigning, device, trustedLocally, trustCrossSig,
         );
     } else {
-        return new DeviceTrustLevel(false, false, trustedLocally);
+        return new DeviceTrustLevel(false, false, trustedLocally, false);
     }
 };
 
@@ -836,16 +1177,34 @@ Crypto.prototype._onDeviceListUserCrossSigningUpdated = async function(userId) {
             // If it's not changed, just make sure everything is up to date
             await this.checkOwnCrossSigningTrust();
         } else {
-            this.emit("crossSigning.keysChanged", {});
             // We'll now be in a state where cross-signing on the account is not trusted
             // because our locally stored cross-signing keys will not match the ones
-            // on the server for our account. The app must call checkOwnCrossSigningTrust()
-            // to fix this.
-            // XXX: Do we need to do something to emit events saying every device has become
-            // untrusted?
+            // on the server for our account. So we clear our own stored cross-signing keys,
+            // effectively disabling cross-signing until the user gets verified by the device
+            // that reset the keys
+            this._storeTrustedSelfKeys(null);
+            // emit cross-signing has been disabled
+            this.emit("crossSigning.keysChanged", {});
+            // as the trust for our own user has changed,
+            // also emit an event for this
+            this.emit("userTrustStatusChanged",
+                this._userId, this.checkUserTrust(userId));
         }
     } else {
         await this._checkDeviceVerifications(userId);
+
+        // Update verified before latch using the current state and save the new
+        // latch value in the device list store.
+        const crossSigning = this._deviceList.getStoredCrossSigningForUser(userId);
+        if (crossSigning) {
+            crossSigning.updateCrossSigningVerifiedBefore(
+                this.checkUserTrust(userId).isCrossSigningVerified(),
+            );
+            this._deviceList.setRawStoredCrossSigningForUser(
+                userId, crossSigning.toStorage(),
+            );
+        }
+
         this.emit("userTrustStatusChanged", userId, this.checkUserTrust(userId));
     }
 };
@@ -918,13 +1277,52 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     }
 
     if (masterChanged) {
-        await this._signObject(this._crossSigningInfo.keys.master);
-        keySignatures[this._crossSigningInfo.getId()]
-            = this._crossSigningInfo.keys.master;
+        const masterKey = this._crossSigningInfo.keys.master;
+        await this._signObject(masterKey);
+        const deviceSig = masterKey.signatures[this._userId]["ed25519:" + this._deviceId];
+        // Include only the _new_ device signature in the upload.
+        // We may have existing signatures from deleted devices, which will cause
+        // the entire upload to fail.
+        keySignatures[this._crossSigningInfo.getId()] = Object.assign(
+            {},
+            masterKey,
+            {
+                signatures: {
+                    [this._userId]: {
+                        ["ed25519:" + this._deviceId]: deviceSig,
+                    },
+                },
+            },
+        );
     }
 
-    if (Object.keys(keySignatures).length) {
-        await this._baseApis.uploadKeySignatures({[this._userId]: keySignatures});
+    const keysToUpload = Object.keys(keySignatures);
+    if (keysToUpload.length) {
+        const upload = ({ shouldEmit }) => {
+            logger.info(`Starting background key sig upload for ${keysToUpload}`);
+            return this._baseApis.uploadKeySignatures({ [this._userId]: keySignatures })
+            .then((response) => {
+                const { failures } = response || {};
+                logger.info(`Finished background key sig upload for ${keysToUpload}`);
+                if (Object.keys(failures || []).length > 0) {
+                    if (shouldEmit) {
+                        this._baseApis.emit(
+                            "crypto.keySignatureUploadFailure",
+                            failures,
+                            "checkOwnCrossSigningTrust",
+                            upload,
+                        );
+                    }
+                    throw new KeySignatureUploadError("Key upload failed", { failures });
+                }
+            }).catch(e => {
+                logger.error(
+                    `Error during background key sig upload for ${keysToUpload}`,
+                    e,
+                );
+            });
+        };
+        upload({ shouldEmit: true });
     }
 
     this.emit("userTrustStatusChanged", userId, this.checkUserTrust(userId));
@@ -946,7 +1344,11 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
  * @param {object} keys The new trusted set of keys
  */
 Crypto.prototype._storeTrustedSelfKeys = async function(keys) {
-    this._crossSigningInfo.setKeys(keys);
+    if (keys) {
+        this._crossSigningInfo.setKeys(keys);
+    } else {
+        this._crossSigningInfo.clearKeys();
+    }
     await this._cryptoStore.doTxn(
         'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
         (txn) => {
@@ -962,16 +1364,21 @@ Crypto.prototype._storeTrustedSelfKeys = async function(keys) {
  * @param {string} userId the user ID whose key should be checked
  */
 Crypto.prototype._checkDeviceVerifications = async function(userId) {
+    const shouldUpgradeCb = (
+        this._baseApis._cryptoCallbacks.shouldUpgradeDeviceVerifications
+    );
+    if (!shouldUpgradeCb) {
+        // Upgrading skipped when callback is not present.
+        return;
+    }
+    logger.info(`Starting device verification upgrade for ${userId}`);
     if (this._crossSigningInfo.keys.user_signing) {
         const crossSigningInfo = this._deviceList.getStoredCrossSigningForUser(userId);
         if (crossSigningInfo) {
             const upgradeInfo = await this._checkForDeviceVerificationUpgrade(
                 userId, crossSigningInfo,
             );
-            const shouldUpgradeCb = (
-                this._baseApis._cryptoCallbacks.shouldUpgradeDeviceVerifications
-            );
-            if (upgradeInfo && shouldUpgradeCb) {
+            if (upgradeInfo) {
                 const usersToUpgrade = await shouldUpgradeCb({
                     users: {
                         [userId]: upgradeInfo,
@@ -985,6 +1392,7 @@ Crypto.prototype._checkDeviceVerifications = async function(userId) {
             }
         }
     }
+    logger.info(`Finished device verification upgrade for ${userId}`);
 };
 
 /**
@@ -1005,8 +1413,9 @@ Crypto.prototype._checkAndStartKeyBackup = async function() {
         backupInfo = await this._baseApis.getKeyBackupVersion();
     } catch (e) {
         logger.log("Error checking for active key backup", e);
-        if (e.httpStatus / 100 === 4) {
-            // well that's told us. we won't try again.
+        if (e.httpStatus === 404) {
+            // 404 is returned when the key backup does not exist, so that
+            // counts as successfully checking.
             this._checkedForBackup = true;
         }
         return null;
@@ -1549,6 +1958,10 @@ Crypto.prototype.setDeviceVerification = async function(
 
         if (!this._crossSigningInfo.getId() && userId === this._crossSigningInfo.userId) {
             this._storeTrustedSelfKeys(xsk.keys);
+            // This will cause our own user trust to change, so emit the event
+            this.emit(
+                "userTrustStatusChanged", this._userId, this.checkUserTrust(userId),
+            );
         }
 
         // Now sign the master key with our user signing key (unless it's ourself)
@@ -1559,12 +1972,33 @@ Crypto.prototype.setDeviceVerification = async function(
             );
             const device = await this._crossSigningInfo.signUser(xsk);
             if (device) {
-                logger.info("Uploading signature for " + userId + "...");
-                await this._baseApis.uploadKeySignatures({
-                    [userId]: {
-                        [deviceId]: device,
-                    },
-                });
+                const upload = async ({ shouldEmit }) => {
+                    logger.info("Uploading signature for " + userId + "...");
+                    const response = await this._baseApis.uploadKeySignatures({
+                        [userId]: {
+                            [deviceId]: device,
+                        },
+                    });
+                    const { failures } = response || {};
+                    if (Object.keys(failures || []).length > 0) {
+                        if (shouldEmit) {
+                            this._baseApis.emit(
+                                "crypto.keySignatureUploadFailure",
+                                failures,
+                                "setDeviceVerification",
+                                upload,
+                            );
+                        }
+                        /* Throwing here causes the process to be cancelled and the other
+                        * user to be notified */
+                        throw new KeySignatureUploadError(
+                            "Key upload failed",
+                            { failures },
+                        );
+                    }
+                };
+                await upload({ shouldEmit: true });
+
                 // This will emit events when it comes back down the sync
                 // (we could do local echo to speed things up)
             }
@@ -1613,12 +2047,27 @@ Crypto.prototype.setDeviceVerification = async function(
             userId, DeviceInfo.fromStorage(dev, deviceId),
         );
         if (device) {
-            logger.info("Uploading signature for " + deviceId);
-            await this._baseApis.uploadKeySignatures({
-                [userId]: {
-                    [deviceId]: device,
-                },
-            });
+            const upload = async ({shouldEmit}) => {
+                logger.info("Uploading signature for " + deviceId);
+                const response = await this._baseApis.uploadKeySignatures({
+                    [userId]: {
+                        [deviceId]: device,
+                    },
+                });
+                const { failures } = response || {};
+                if (Object.keys(failures || []).length > 0) {
+                    if (shouldEmit) {
+                        this._baseApis.emit(
+                            "crypto.keySignatureUploadFailure",
+                            failures,
+                            "setDeviceVerification",
+                            upload, // continuation
+                        );
+                    }
+                    throw new KeySignatureUploadError("Key upload failed", { failures });
+                }
+            };
+            await upload({shouldEmit: true});
             // XXX: we'll need to wait for the device list to be updated
         }
     }
@@ -1655,7 +2104,8 @@ Crypto.prototype.requestVerification = function(userId, devices) {
     if (existingRequest) {
         return Promise.resolve(existingRequest);
     }
-    const channel = new ToDeviceChannel(this._baseApis, userId, devices);
+    const channel = new ToDeviceChannel(this._baseApis, userId, devices,
+        ToDeviceChannel.makeTransactionId());
     return this._requestVerificationWithChannel(
         userId,
         channel,
@@ -1668,6 +2118,10 @@ Crypto.prototype._requestVerificationWithChannel = async function(
 ) {
     let request = new VerificationRequest(
         channel, this._verificationMethods, this._baseApis);
+    // if transaction id is already known, add request
+    if (channel.transactionId) {
+        requestsMap.setRequestByChannel(channel, request);
+    }
     await request.sendRequest();
     // don't replace the request created by a racing remote echo
     const racingRequest = requestsMap.getRequestByChannel(channel);
@@ -1703,6 +2157,27 @@ Crypto.prototype.beginKeyVerification = function(
             userId, transactionId, request);
     }
     return request.beginKeyVerification(method, {userId, deviceId});
+};
+
+Crypto.prototype.legacyDeviceVerification = async function(
+    userId, deviceId, method,
+) {
+    const transactionId = ToDeviceChannel.makeTransactionId();
+    const channel = new ToDeviceChannel(
+        this._baseApis, userId, [deviceId], transactionId, deviceId);
+    const request = new VerificationRequest(
+        channel, this._verificationMethods, this._baseApis);
+    this._toDeviceVerificationRequests.setRequestBySenderAndTxnId(
+        userId, transactionId, request);
+    const verifier = request.beginKeyVerification(method, {userId, deviceId});
+    // either reject by an error from verify() while sending .start
+    // or resolve when the request receives the
+    // local (fake remote) echo for sending the .start event
+    await Promise.race([
+        verifier.verify(),
+        request.waitFor(r => r.started),
+    ]);
+    return request;
 };
 
 
@@ -2014,17 +2489,37 @@ Crypto.prototype.exportRoomKeys = async function() {
  * Import a list of room keys previously exported by exportRoomKeys
  *
  * @param {Object[]} keys a list of session export objects
+ * @param {Object} opts
+ * @param {Function} opts.progressCallback called with an object which has a stage param
  * @return {Promise} a promise which resolves once the keys have been imported
  */
-Crypto.prototype.importRoomKeys = function(keys) {
+Crypto.prototype.importRoomKeys = function(keys, opts = {}) {
+    let successes = 0;
+    let failures = 0;
+    const total = keys.length;
+
+    function updateProgress() {
+        opts.progressCallback({
+            stage: "load_keys",
+            successes,
+            failures,
+            total,
+        });
+    }
+
     return Promise.all(keys.map((key) => {
         if (!key.room_id || !key.algorithm) {
             logger.warn("ignoring room key entry with missing fields", key);
+            failures++;
+            if (opts.progressCallback) { updateProgress(); }
             return null;
         }
 
         const alg = this._getRoomDecryptor(key.room_id, key.algorithm);
-        return alg.importRoomKey(key);
+        return alg.importRoomKey(key).finally((r) => {
+            successes++;
+            if (opts.progressCallback) { updateProgress(); }
+        });
     }));
 };
 
@@ -2122,14 +2617,18 @@ Crypto.prototype._backupPendingKeys = async function(limit) {
         const forwardedCount =
               (sessionData.forwarding_curve25519_key_chain || []).length;
 
+        const userId = this._deviceList.getUserByIdentityKey(
+            olmlib.MEGOLM_ALGORITHM, session.senderKey,
+        );
         const device = this._deviceList.getDeviceByIdentityKey(
             olmlib.MEGOLM_ALGORITHM, session.senderKey,
         );
+        const verified = this._checkDeviceInfoTrust(userId, device).isVerified();
 
         data[roomId]['sessions'][session.sessionId] = {
             first_message_index: firstKnownIndex,
             forwarded_count: forwardedCount,
-            is_verified: !!(device && device.isVerified()),
+            is_verified: verified,
             session_data: encrypted,
         };
     }
@@ -2200,6 +2699,20 @@ Crypto.prototype.flagAllGroupSessionsForBackup = async function() {
     const remaining = await this._cryptoStore.countSessionsNeedingBackup();
     this.emit("crypto.keyBackupSessionsRemaining", remaining);
     return remaining;
+};
+
+/**
+ * Perform any background tasks that can be done before a message is ready to
+ * send, in order to speed up sending of the message.
+ *
+ * @param {module:models/room} room the room the event is in
+ */
+Crypto.prototype.prepareToEncrypt = function(room) {
+    const roomId = room.roomId;
+    const alg = this._roomEncryptors[roomId];
+    if (alg) {
+        alg.prepareToEncrypt(room);
+    }
 };
 
 /* eslint-disable valid-jsdoc */    //https://github.com/eslint/eslint/issues/7307
@@ -2322,9 +2835,13 @@ Crypto.prototype.handleDeviceListChanges = async function(syncData, syncDeviceLi
  * @return {Promise} a promise that resolves when the key request is queued
  */
 Crypto.prototype.requestRoomKey = function(requestBody, recipients, resend=false) {
-    return this._outgoingRoomKeyRequestManager.sendRoomKeyRequest(
+    return this._outgoingRoomKeyRequestManager.queueRoomKeyRequest(
         requestBody, recipients, resend,
-    ).catch((e) => {
+    ).then(() => {
+        if (this._sendKeyRequestsImmediately) {
+            this._outgoingRoomKeyRequestManager.sendQueuedRequests();
+        }
+    }).catch((e) => {
         // this normally means we couldn't talk to the store
         logger.error(
             'Error requesting key for event', e,
@@ -2343,6 +2860,14 @@ Crypto.prototype.cancelRoomKeyRequest = function(requestBody) {
     .catch((e) => {
         logger.warn("Error clearing pending room key requests", e);
     });
+};
+
+/**
+ * Re-send any outgoing key requests, eg after verification
+ * @returns {Promise}
+ */
+Crypto.prototype.cancelAndResendAllOutgoingKeyRequests = function() {
+    return this._outgoingRoomKeyRequestManager.cancelAndResendAllOutgoingRequests();
 };
 
 /**
@@ -2381,6 +2906,8 @@ Crypto.prototype.onSyncWillProcess = async function(syncData) {
         this._deviceList.startTrackingDeviceList(this._userId);
         this._roomDeviceTrackingState = {};
     }
+
+    this._sendKeyRequestsImmediately = false;
 };
 
 /**
@@ -2412,6 +2939,14 @@ Crypto.prototype.onSyncCompleted = async function(syncData) {
     if (!syncData.catchingUp) {
         _maybeUploadOneTimeKeys(this);
         this._processReceivedRoomKeyRequests();
+
+        // likewise don't start requesting keys until we've caught up
+        // on to_device messages, otherwise we'll request keys that we're
+        // just about to get.
+        this._outgoingRoomKeyRequestManager.sendQueuedRequests();
+
+        // Sync has finished so send key requests straight away.
+        this._sendKeyRequestsImmediately = true;
     }
 };
 
@@ -2661,12 +3196,7 @@ Crypto.prototype._handleVerificationEvent = async function(
     }
     event.setVerificationRequest(request);
     try {
-        const hadVerifier = !!request.verifier;
         await request.channel.handleEvent(event, request, isLiveEvent);
-        // emit start event when verifier got set
-        if (!hadVerifier && request.verifier) {
-            this._baseApis.emit("crypto.verification.start", request.verifier);
-        }
     } catch (err) {
         logger.error("error while handling verification event: " + err.message);
     }
@@ -2936,6 +3466,19 @@ Crypto.prototype._processReceivedRoomKeyRequest = async function(req) {
         return;
     }
 
+    if (deviceId !== this._deviceId) {
+        // We'll always get these because we send room key requests to
+        // '*' (ie. 'all devices') which includes the sending device,
+        // so ignore requests from ourself because apart from it being
+        // very silly, it won't work because an Olm session cannot send
+        // messages to itself.
+        // The log here is probably superfluous since we know this will
+        // always happen, but let's log anyway for now just in case it
+        // causes issues.
+        logger.log("Ignoring room key request from ourselves");
+        return;
+    }
+
     // todo: should we queue up requests we don't yet have keys for,
     // in case they turn up later?
 
@@ -2964,9 +3507,8 @@ Crypto.prototype._processReceivedRoomKeyRequest = async function(req) {
         decryptor.shareKeysWithDevice(req);
     };
 
-    // if the device is is verified already, share the keys
-    const device = this._deviceList.getStoredDevice(userId, deviceId);
-    if (device && device.isVerified()) {
+    // if the device is verified already, share the keys
+    if (this.checkDeviceTrust(userId, deviceId).isVerified()) {
         logger.log('device is already verified: sharing keys');
         req.share();
         return;

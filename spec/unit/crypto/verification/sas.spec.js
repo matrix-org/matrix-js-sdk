@@ -44,7 +44,16 @@ describe("SAS verification", function() {
     });
 
     it("should error on an unexpected event", async function() {
-        const sas = new SAS({}, "@alice:example.com", "ABCDEFG");
+        //channel, baseApis, userId, deviceId, startEvent, request
+        const request = {
+            onVerifierCancelled: function() {},
+        };
+        const channel = {
+            send: function() {
+                return Promise.resolve();
+            },
+        };
+        const sas = new SAS(channel, {}, "@alice:example.com", "ABCDEFG", null, request);
         sas.handleEvent(new MatrixEvent({
             sender: "@alice:example.com",
             type: "es.inquisition",
@@ -122,8 +131,8 @@ describe("SAS verification", function() {
             bobSasEvent = null;
 
             bobPromise = new Promise((resolve, reject) => {
-                bob.client.on("crypto.verification.start", (verifier) => {
-                    verifier.on("show_sas", (e) => {
+                bob.client.on("crypto.verification.request", request => {
+                    request.verifier.on("show_sas", (e) => {
                         if (!e.sas.emoji || !e.sas.decimal) {
                             e.cancel();
                         } else if (!aliceSasEvent) {
@@ -139,7 +148,7 @@ describe("SAS verification", function() {
                             }
                         }
                     });
-                    resolve(verifier);
+                    resolve(request.verifier);
                 });
             });
 
@@ -172,11 +181,14 @@ describe("SAS verification", function() {
 
         it("should verify a key", async () => {
             let macMethod;
+            let keyAgreement;
             const origSendToDevice = bob.client.sendToDevice.bind(bob.client);
             bob.client.sendToDevice = function(type, map) {
                 if (type === "m.key.verification.accept") {
                     macMethod = map[alice.client.getUserId()][alice.client.deviceId]
                         .message_authentication_code;
+                    keyAgreement = map[alice.client.getUserId()][alice.client.deviceId]
+                        .key_agreement_protocol;
                 }
                 return origSendToDevice(type, map);
             };
@@ -203,6 +215,7 @@ describe("SAS verification", function() {
 
             // make sure that it uses the preferred method
             expect(macMethod).toBe("hkdf-hmac-sha256");
+            expect(keyAgreement).toBe("curve25519-hkdf-sha256");
 
             // make sure Alice and Bob verified each other
             const bobDevice
@@ -339,11 +352,11 @@ describe("SAS verification", function() {
         };
 
         const bobPromise = new Promise((resolve, reject) => {
-            bob.client.on("crypto.verification.start", (verifier) => {
-                verifier.on("show_sas", (e) => {
+            bob.client.on("crypto.verification.request", request => {
+                request.verifier.on("show_sas", (e) => {
                     e.mismatch();
                 });
-                resolve(verifier);
+                resolve(request.verifier);
             });
         });
 

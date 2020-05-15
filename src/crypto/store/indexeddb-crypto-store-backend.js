@@ -203,6 +203,23 @@ export class Backend {
         return promiseifyTxn(txn).then(() => result);
     }
 
+    /**
+     *
+     * @param {Number} wantedState
+     * @return {Promise<Array<*>>} All elements in a given state
+     */
+    getAllOutgoingRoomKeyRequestsByState(wantedState) {
+        return new Promise((resolve, reject) => {
+            const txn = this._db.transaction("outgoingRoomKeyRequests", "readonly");
+            const store = txn.objectStore("outgoingRoomKeyRequests");
+            const index = store.index("state");
+            const request = index.getAll(wantedState);
+
+            request.onsuccess = (ev) => resolve(ev.target.result);
+            request.onerror = (ev) => reject(ev.target.error);
+        });
+    }
+
     getOutgoingRoomKeyRequestsByTarget(userId, deviceId, wantedStates) {
         let stateIndex = 0;
         const results = [];
@@ -341,9 +358,26 @@ export class Backend {
         };
     }
 
+    getSecretStorePrivateKey(txn, func, type) {
+        const objectStore = txn.objectStore("account");
+        const getReq = objectStore.get(`ssss_cache:${type}`);
+        getReq.onsuccess = function() {
+            try {
+                func(getReq.result || null);
+            } catch (e) {
+                abortWithException(txn, e);
+            }
+        };
+    }
+
     storeCrossSigningKeys(txn, keys) {
         const objectStore = txn.objectStore("account");
         objectStore.put(keys, "crossSigningKeys");
+    }
+
+    storeSecretStorePrivateKey(txn, type, key) {
+        const objectStore = txn.objectStore("account");
+        objectStore.put(key, `ssss_cache:${type}`);
     }
 
     // Olm Sessions
@@ -352,7 +386,11 @@ export class Backend {
         const objectStore = txn.objectStore("sessions");
         const countReq = objectStore.count();
         countReq.onsuccess = function() {
-            func(countReq.result);
+            try {
+                func(countReq.result);
+            } catch (e) {
+                abortWithException(txn, e);
+            }
         };
     }
 
@@ -402,16 +440,16 @@ export class Backend {
         const objectStore = txn.objectStore("sessions");
         const getReq = objectStore.openCursor();
         getReq.onsuccess = function() {
-            const cursor = getReq.result;
-            if (cursor) {
-                func(cursor.value);
-                cursor.continue();
-            } else {
-                try {
+            try {
+                const cursor = getReq.result;
+                if (cursor) {
+                    func(cursor.value);
+                    cursor.continue();
+                } else {
                     func(null);
-                } catch (e) {
-                    abortWithException(txn, e);
                 }
+            } catch (e) {
+                abortWithException(txn, e);
             }
         };
     }

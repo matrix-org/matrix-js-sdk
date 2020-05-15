@@ -28,13 +28,7 @@ import {SERVICE_TYPES} from './service-types';
 import {logger} from './logger';
 import {PushProcessor} from "./pushprocessor";
 import * as utils from "./utils";
-import {
-    MatrixHttpApi,
-    PREFIX_IDENTITY_V1,
-    PREFIX_IDENTITY_V2,
-    PREFIX_R0,
-    PREFIX_UNSTABLE,
-} from "./http-api";
+import {MatrixHttpApi, PREFIX_IDENTITY_V2, PREFIX_R0, PREFIX_UNSTABLE} from "./http-api";
 
 function termsUrlForService(serviceType, baseUrl) {
     switch (serviceType) {
@@ -1763,7 +1757,7 @@ MatrixBaseApis.prototype.downloadKeysForUsers = function(userIds, opts) {
         content.token = opts.token;
     }
     userIds.forEach((u) => {
-        content.device_keys[u] = {};
+        content.device_keys[u] = [];
     });
 
     return this._http.authedRequest(undefined, "POST", "/keys/query", undefined, content);
@@ -1776,10 +1770,13 @@ MatrixBaseApis.prototype.downloadKeysForUsers = function(userIds, opts) {
  *
  * @param {string} [key_algorithm = signed_curve25519]  desired key type
  *
+ * @param {number} [timeout] the time (in milliseconds) to wait for keys from remote
+ *     servers
+ *
  * @return {Promise} Resolves: result object. Rejects: with
  *     an error response ({@link module:http-api.MatrixError}).
  */
-MatrixBaseApis.prototype.claimOneTimeKeys = function(devices, key_algorithm) {
+MatrixBaseApis.prototype.claimOneTimeKeys = function(devices, key_algorithm, timeout) {
     const queries = {};
 
     if (key_algorithm === undefined) {
@@ -1794,6 +1791,9 @@ MatrixBaseApis.prototype.claimOneTimeKeys = function(devices, key_algorithm) {
         query[deviceId] = key_algorithm;
     }
     const content = {one_time_keys: queries};
+    if (timeout) {
+        content.timeout = timeout;
+    }
     const path = "/keys/claim";
     return this._http.authedRequest(undefined, "POST", path, undefined, content);
 };
@@ -1895,28 +1895,10 @@ MatrixBaseApis.prototype.requestEmailToken = async function(
         next_link: nextLink,
     };
 
-    try {
-        const response = await this._http.idServerRequest(
-            undefined, "POST", "/validate/email/requestToken",
-            params, PREFIX_IDENTITY_V2, identityAccessToken,
-        );
-        // TODO: Fold callback into above call once v1 path below is removed
-        if (callback) callback(null, response);
-        return response;
-    } catch (err) {
-        if (err.cors === "rejected" || err.httpStatus === 404) {
-            // Fall back to deprecated v1 API for now
-            // TODO: Remove this path once v2 is only supported version
-            // See https://github.com/vector-im/riot-web/issues/10443
-            logger.warn("IS doesn't support v2, falling back to deprecated v1");
-            return await this._http.idServerRequest(
-                callback, "POST", "/validate/email/requestToken",
-                params, PREFIX_IDENTITY_V1,
-            );
-        }
-        if (callback) callback(err);
-        throw err;
-    }
+    return await this._http.idServerRequest(
+        callback, "POST", "/validate/email/requestToken",
+        params, PREFIX_IDENTITY_V2, identityAccessToken,
+    );
 };
 
 /**
@@ -1963,28 +1945,10 @@ MatrixBaseApis.prototype.requestMsisdnToken = async function(
         next_link: nextLink,
     };
 
-    try {
-        const response = await this._http.idServerRequest(
-            undefined, "POST", "/validate/msisdn/requestToken",
-            params, PREFIX_IDENTITY_V2, identityAccessToken,
-        );
-        // TODO: Fold callback into above call once v1 path below is removed
-        if (callback) callback(null, response);
-        return response;
-    } catch (err) {
-        if (err.cors === "rejected" || err.httpStatus === 404) {
-            // Fall back to deprecated v1 API for now
-            // TODO: Remove this path once v2 is only supported version
-            // See https://github.com/vector-im/riot-web/issues/10443
-            logger.warn("IS doesn't support v2, falling back to deprecated v1");
-            return await this._http.idServerRequest(
-                callback, "POST", "/validate/msisdn/requestToken",
-                params, PREFIX_IDENTITY_V1,
-            );
-        }
-        if (callback) callback(err);
-        throw err;
-    }
+    return await this._http.idServerRequest(
+        callback, "POST", "/validate/msisdn/requestToken",
+        params, PREFIX_IDENTITY_V2, identityAccessToken,
+    );
 };
 
 /**
@@ -2018,24 +1982,10 @@ MatrixBaseApis.prototype.submitMsisdnToken = async function(
         token: msisdnToken,
     };
 
-    try {
-        return await this._http.idServerRequest(
-            undefined, "POST", "/validate/msisdn/submitToken",
-            params, PREFIX_IDENTITY_V2, identityAccessToken,
-        );
-    } catch (err) {
-        if (err.cors === "rejected" || err.httpStatus === 404) {
-            // Fall back to deprecated v1 API for now
-            // TODO: Remove this path once v2 is only supported version
-            // See https://github.com/vector-im/riot-web/issues/10443
-            logger.warn("IS doesn't support v2, falling back to deprecated v1");
-            return await this._http.idServerRequest(
-                undefined, "POST", "/validate/msisdn/submitToken",
-                params, PREFIX_IDENTITY_V1,
-            );
-        }
-        throw err;
-    }
+    return await this._http.idServerRequest(
+        undefined, "POST", "/validate/msisdn/submitToken",
+        params, PREFIX_IDENTITY_V2, identityAccessToken,
+    );
 };
 
 /**
@@ -2190,53 +2140,32 @@ MatrixBaseApis.prototype.lookupThreePid = async function(
     callback,
     identityAccessToken,
 ) {
-    try {
-        // Note: we're using the V2 API by calling this function, but our
-        // function contract requires a V1 response. We therefore have to
-        // convert it manually.
-        const response = await this.identityHashedLookup(
-            [[address, medium]], identityAccessToken,
-        );
-        const result = response.find(p => p.address === address);
-        if (!result) {
-            // TODO: Fold callback into above call once v1 path below is removed
-            if (callback) callback(null, {});
-            return {};
-        }
-
-        const mapping = {
-            address,
-            medium,
-            mxid: result.mxid,
-
-            // We can't reasonably fill these parameters:
-            // not_before
-            // not_after
-            // ts
-            // signatures
-        };
-
-        // TODO: Fold callback into above call once v1 path below is removed
-        if (callback) callback(null, mapping);
-        return mapping;
-    } catch (err) {
-        if (err.cors === "rejected" || err.httpStatus === 404) {
-            // Fall back to deprecated v1 API for now
-            // TODO: Remove this path once v2 is only supported version
-            // See https://github.com/vector-im/riot-web/issues/10443
-            const params = {
-                medium: medium,
-                address: address,
-            };
-            logger.warn("IS doesn't support v2, falling back to deprecated v1");
-            return await this._http.idServerRequest(
-                callback, "GET", "/lookup",
-                params, PREFIX_IDENTITY_V1,
-            );
-        }
-        if (callback) callback(err, undefined);
-        throw err;
+    // Note: we're using the V2 API by calling this function, but our
+    // function contract requires a V1 response. We therefore have to
+    // convert it manually.
+    const response = await this.identityHashedLookup(
+        [[address, medium]], identityAccessToken,
+    );
+    const result = response.find(p => p.address === address);
+    if (!result) {
+        if (callback) callback(null, {});
+        return {};
     }
+
+    const mapping = {
+        address,
+        medium,
+        mxid: result.mxid,
+
+        // We can't reasonably fill these parameters:
+        // not_before
+        // not_after
+        // ts
+        // signatures
+    };
+
+    if (callback) callback(null, mapping);
+    return mapping;
 };
 
 /**
@@ -2254,46 +2183,29 @@ MatrixBaseApis.prototype.bulkLookupThreePids = async function(
     query,
     identityAccessToken,
 ) {
-    try {
-        // Note: we're using the V2 API by calling this function, but our
-        // function contract requires a V1 response. We therefore have to
-        // convert it manually.
-        const response = await this.identityHashedLookup(
-            // We have to reverse the query order to get [address, medium] pairs
-            query.map(p => [p[1], p[0]]), identityAccessToken,
-        );
+    // Note: we're using the V2 API by calling this function, but our
+    // function contract requires a V1 response. We therefore have to
+    // convert it manually.
+    const response = await this.identityHashedLookup(
+        // We have to reverse the query order to get [address, medium] pairs
+        query.map(p => [p[1], p[0]]), identityAccessToken,
+    );
 
-        const v1results = [];
-        for (const mapping of response) {
-            const originalQuery = query.find(p => p[1] === mapping.address);
-            if (!originalQuery) {
-                throw new Error("Identity sever returned unexpected results");
-            }
-
-            v1results.push([
-                originalQuery[0], // medium
-                mapping.address,
-                mapping.mxid,
-            ]);
+    const v1results = [];
+    for (const mapping of response) {
+        const originalQuery = query.find(p => p[1] === mapping.address);
+        if (!originalQuery) {
+            throw new Error("Identity sever returned unexpected results");
         }
 
-        return {threepids: v1results};
-    } catch (err) {
-        if (err.cors === "rejected" || err.httpStatus === 404) {
-            // Fall back to deprecated v1 API for now
-            // TODO: Remove this path once v2 is only supported version
-            // See https://github.com/vector-im/riot-web/issues/10443
-            const params = {
-                threepids: query,
-            };
-            logger.warn("IS doesn't support v2, falling back to deprecated v1");
-            return await this._http.idServerRequest(
-                undefined, "POST", "/bulk_lookup", params,
-                PREFIX_IDENTITY_V1, identityAccessToken,
-            );
-        }
-        throw err;
+        v1results.push([
+            originalQuery[0], // medium
+            mapping.address,
+            mapping.mxid,
+        ]);
     }
+
+    return {threepids: v1results};
 };
 
 /**

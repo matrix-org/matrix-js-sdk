@@ -108,8 +108,9 @@ FilterComponent.prototype._checkFields =
         }
 
         const allowed_values = self[name];
-        if (allowed_values) {
-            if (!allowed_values.map(match_func)) {
+        if (allowed_values && allowed_values.length > 0) {
+            const anyMatch = allowed_values.some(match_func);
+            if (!anyMatch) {
                 return false;
             }
         }

@@ -163,6 +163,8 @@ InteractiveAuth.prototype = {
      */
     poll: async function() {
         if (!this._data.session) return;
+        // likewise don't poll if there is no auth session in progress
+        if (!this._resolveFunc) return;
         // if we currently have a request in flight, there's no point making
         // another just to check what the status is
         if (this._submitPromise) return;
@@ -318,6 +320,8 @@ InteractiveAuth.prototype = {
         try {
             const result = await this._requestCallback(auth, background);
             this._resolveFunc(result);
+            this._resolveFunc = null;
+            this._rejectFunc = null;
         } catch (error) {
             // sometimes UI auth errors don't come with flows
             const errorFlows = error.data ? error.data.flows : null;
@@ -347,7 +351,13 @@ InteractiveAuth.prototype = {
                 error.data.session = this._data.session;
             }
             this._data = error.data;
-            this._startNextAuthStage();
+            try {
+                this._startNextAuthStage();
+            } catch (e) {
+                this._rejectFunc(e);
+                this._resolveFunc = null;
+                this._rejectFunc = null;
+            }
 
             if (
                 !this._emailSid &&
@@ -379,8 +389,10 @@ InteractiveAuth.prototype = {
                     // (or not being registered, depending on what we're trying
                     // to do) or it could be a network failure. Either way, pass
                     // the failure up as the user can't complete auth if we can't
-                    // send the email, foe whatever reason.
+                    // send the email, for whatever reason.
                     this._rejectFunc(e);
+                    this._resolveFunc = null;
+                    this._rejectFunc = null;
                 } finally {
                     this._requestingEmailToken = false;
                 }

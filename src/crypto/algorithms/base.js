@@ -61,6 +61,15 @@ export class EncryptionAlgorithm {
     }
 
     /**
+     * Perform any background tasks that can be done before a message is ready to
+     * send, in order to speed up sending of the message.
+     *
+     * @param {module:models/room} room the room the event is in
+     */
+    prepareToEncrypt(room) {
+    }
+
+    /**
      * Encrypt a message event
      *
      * @method module:crypto/algorithms/base.EncryptionAlgorithm.encryptMessage

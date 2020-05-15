@@ -390,11 +390,12 @@ utils.extend(MatrixEvent.prototype, {
      * @internal
      *
      * @param {module:crypto} crypto crypto module
+     * @param {bool} isRetry True if this is a retry (enables more logging)
      *
      * @returns {Promise} promise which resolves (to undefined) when the decryption
      * attempt is completed.
      */
-    attemptDecryption: async function(crypto) {
+    attemptDecryption: async function(crypto, isRetry) {
         // start with a couple of sanity checks.
         if (!this.isEncrypted()) {
             throw new Error("Attempt to decrypt event which isn't encrypted");
@@ -406,7 +407,7 @@ utils.extend(MatrixEvent.prototype, {
         ) {
             // we may want to just ignore this? let's start with rejecting it.
             throw new Error(
-                "Attempt to decrypt event which has already been encrypted",
+                "Attempt to decrypt event which has already been decrypted",
             );
         }
 
@@ -424,7 +425,7 @@ utils.extend(MatrixEvent.prototype, {
             return this._decryptionPromise;
         }
 
-        this._decryptionPromise = this._decryptionLoop(crypto);
+        this._decryptionPromise = this._decryptionLoop(crypto, isRetry);
         return this._decryptionPromise;
     },
 
@@ -469,7 +470,7 @@ utils.extend(MatrixEvent.prototype, {
         return recipients;
     },
 
-    _decryptionLoop: async function(crypto) {
+    _decryptionLoop: async function(crypto, isRetry) {
         // make sure that this method never runs completely synchronously.
         // (doing so would mean that we would clear _decryptionPromise *before*
         // it is set in attemptDecryption - and hence end up with a stuck
@@ -486,13 +487,18 @@ utils.extend(MatrixEvent.prototype, {
                     res = this._badEncryptedMessage("Encryption not enabled");
                 } else {
                     res = await crypto.decryptEvent(this);
+                    if (isRetry) {
+                        logger.info(`Decrypted event on retry (id=${this.getId()})`);
+                    }
                 }
             } catch (e) {
                 if (e.name !== "DecryptionError") {
                     // not a decryption error: log the whole exception as an error
                     // (and don't bother with a retry)
+                    const re = isRetry ? 're' : '';
                     logger.error(
-                        `Error decrypting event (id=${this.getId()}): ${e.stack || e}`,
+                        `Error ${re}decrypting event ` +
+                        `(id=${this.getId()}): ${e.stack || e}`,
                     );
                     this._decryptionPromise = null;
                     this._retryDecryption = false;

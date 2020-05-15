@@ -313,6 +313,10 @@ describe("Crypto", function() {
             // make a room key request, and record the transaction ID for the
             // sendToDevice call
             await aliceClient.cancelAndResendEventRoomKeyRequest(event);
+            // key requests get queued until the sync has finished, but we don't
+            // let the client set up enough for that to happen, so gut-wrench a bit
+            // to force it to send now.
+            aliceClient._crypto._outgoingRoomKeyRequestManager.sendQueuedRequests();
             jest.runAllTimers();
             await Promise.resolve();
             expect(aliceClient.sendToDevice).toBeCalledTimes(1);

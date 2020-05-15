@@ -23,7 +23,7 @@ import {
     newUnexpectedMessageError,
     newUnknownMethodError,
 } from "../Error";
-import * as olmlib from "../../olmlib";
+import {QRCodeData, SCAN_QR_CODE_METHOD} from "../QRCode";
 
 // the recommended amount of time before a verification request
 // should be (automatically) cancelled without user interaction
@@ -70,9 +70,16 @@ export class VerificationRequest extends EventEmitter {
         this._eventsByThem = new Map();
         this._observeOnly = false;
         this._timeoutTimer = null;
-        this._sharedSecret = null; // used for QR codes
         this._accepting = false;
         this._declining = false;
+        this._verifierHasFinished = false;
+        this._cancelled = false;
+        this._chosenMethod = null;
+        // we keep a copy of the QR Code data (including other user master key) around
+        // for QR reciprocate verification, to protect against
+        // cross-signing identity reset between the .ready and .start event
+        // and signing the wrong key after .start
+        this._qrCodeData = null;
     }
 
     /**
@@ -153,6 +160,11 @@ export class VerificationRequest extends EventEmitter {
         return this._commonMethods;
     }
 
+    /** the method picked in the .start event */
+    get chosenMethod() {
+        return this._chosenMethod;
+    }
+
     /** The current remaining amount of ms before the request should be automatically cancelled */
     get timeout() {
         const requestEvent = this._getEventByEither(REQUEST_TYPE);
@@ -200,19 +212,34 @@ export class VerificationRequest extends EventEmitter {
             this._phase !== PHASE_CANCELLED;
     }
 
+    /** Only set after a .ready if the other party can scan a QR code */
+    get qrCodeData() {
+        return this._qrCodeData;
+    }
+
     /** Checks whether the other party supports a given verification method.
      *  This is useful when setting up the QR code UI, as it is somewhat asymmetrical:
      *  if the other party supports SCAN_QR, we should show a QR code in the UI, and vice versa.
      *  For methods that need to be supported by both ends, use the `methods` property.
      *  @param {string} method the method to check
+     *  @param {boolean} force to check even if the phase is not ready or started yet, internal usage
      *  @return {bool} whether or not the other party said the supported the method */
-    otherPartySupportsMethod(method) {
-        if (!this.ready && !this.started) {
+    otherPartySupportsMethod(method, force = false) {
+        if (!force && !this.ready && !this.started) {
             return false;
         }
         const theirMethodEvent = this._eventsByThem.get(REQUEST_TYPE) ||
             this._eventsByThem.get(READY_TYPE);
         if (!theirMethodEvent) {
+            // if we started straight away with .start event,
+            // we are assuming that the other side will support the
+            // chosen method, so return true for that.
+            if (this.started && this.initiatedByMe) {
+                const myStartEvent = this._eventsByUs.get(START_TYPE);
+                const content = myStartEvent && myStartEvent.getContent();
+                const myStartMethod = content && content.method;
+                return method == myStartMethod;
+            }
             return false;
         }
         const content = theirMethodEvent.getContent();
@@ -276,6 +303,10 @@ export class VerificationRequest extends EventEmitter {
         return this.channel.userId;
     }
 
+    get isSelfVerification() {
+        return this._client.getUserId() === this.otherUserId;
+    }
+
     /**
      * The id of the user that cancelled the request,
      * only defined when phase is PHASE_CANCELLED
@@ -305,14 +336,6 @@ export class VerificationRequest extends EventEmitter {
         return this._observeOnly;
     }
 
-    /**
-     * The unpadded base64 encoded shared secret. Primarily used for QR code
-     * verification.
-     */
-    get encodedSharedSecret() {
-        if (!this._sharedSecret) this._generateSharedSecret();
-        return this._sharedSecret;
-    }
 
     /**
      * Gets which device the verification should be started with
@@ -359,6 +382,7 @@ export class VerificationRequest extends EventEmitter {
                 if (!this._verifier) {
                     throw newUnknownMethodError();
                 }
+                this._chosenMethod = method;
             }
         }
         return this._verifier;
@@ -372,7 +396,6 @@ export class VerificationRequest extends EventEmitter {
         if (!this.observeOnly && this._phase === PHASE_UNSENT) {
             const methods = [...this._verificationMethods.keys()];
             await this.channel.send(REQUEST_TYPE, {methods});
-            this._generateSharedSecret();
         }
     }
 
@@ -405,14 +428,7 @@ export class VerificationRequest extends EventEmitter {
             this._accepting = true;
             this.emit("change");
             await this.channel.send(READY_TYPE, {methods});
-            this._generateSharedSecret();
         }
-    }
-
-    _generateSharedSecret() {
-        const secretBytes = new Uint8Array(8);
-        global.crypto.getRandomValues(secretBytes);
-        this._sharedSecret = olmlib.encodeBase64(secretBytes);
     }
 
     /**
@@ -505,12 +521,12 @@ export class VerificationRequest extends EventEmitter {
         }
 
         const ourDoneEvent = this._eventsByUs.get(DONE_TYPE);
-        if (ourDoneEvent && phase() === PHASE_STARTED) {
+        if (this._verifierHasFinished || (ourDoneEvent && phase() === PHASE_STARTED)) {
             transitions.push({phase: PHASE_DONE});
         }
 
         const cancelEvent = this._getEventByEither(CANCEL_TYPE);
-        if (cancelEvent && phase() !== PHASE_DONE) {
+        if ((this._cancelled || cancelEvent) && phase() !== PHASE_DONE) {
             transitions.push({phase: PHASE_CANCELLED, event: cancelEvent});
             return transitions;
         }
@@ -549,8 +565,78 @@ export class VerificationRequest extends EventEmitter {
             const {method} = event.getContent();
             if (!this._verifier && !this.observeOnly) {
                 this._verifier = this._createVerifier(method, event);
+                if (!this._verifier) {
+                    this.cancel({
+                        code: "m.unknown_method",
+                        reason: `Unknown method: ${method}`,
+                    });
+                } else {
+                    this._chosenMethod = method;
+                }
             }
         }
+    }
+
+    _applyPhaseTransitions() {
+        const transitions = this._calculatePhaseTransitions();
+        const existingIdx = transitions.findIndex(t => t.phase === this.phase);
+        // trim off phases we already went through, if any
+        const newTransitions = transitions.slice(existingIdx + 1);
+        // transition to all new phases
+        for (const transition of newTransitions) {
+            this._transitionToPhase(transition);
+        }
+        return newTransitions;
+    }
+
+    _isWinningStartRace(newEvent) {
+        if (newEvent.getType() !== START_TYPE) {
+            return false;
+        }
+        const oldEvent = this._verifier.startEvent;
+
+        let oldRaceIdentifier;
+        if (this.isSelfVerification) {
+            // if the verifier does not have a startEvent,
+            // it is because it's still sending and we are on the initator side
+            // we know we are sending a .start event because we already
+            // have a verifier (checked in calling method)
+            if (oldEvent) {
+                const oldContent = oldEvent.getContent();
+                oldRaceIdentifier = oldContent && oldContent.from_device;
+            } else {
+                oldRaceIdentifier = this._client.getDeviceId();
+            }
+        } else {
+            if (oldEvent) {
+                oldRaceIdentifier = oldEvent.getSender();
+            } else {
+                oldRaceIdentifier = this._client.getUserId();
+            }
+        }
+
+        let newRaceIdentifier;
+        if (this.isSelfVerification) {
+            const newContent = newEvent.getContent();
+            newRaceIdentifier = newContent && newContent.from_device;
+        } else {
+            newRaceIdentifier = newEvent.getSender();
+        }
+        return newRaceIdentifier < oldRaceIdentifier;
+    }
+
+    hasEventId(eventId) {
+        for (const event of this._eventsByUs.values()) {
+            if (event.getId() === eventId) {
+                return true;
+            }
+        }
+        for (const event of this._eventsByThem.values()) {
+            if (event.getId() === eventId) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -578,31 +664,32 @@ export class VerificationRequest extends EventEmitter {
             }
         }
 
+        // This assumes verification won't need to send an event with
+        // the same type for the same party twice.
+        // This is true for QR and SAS verification, and was
+        // added here to prevent verification getting cancelled
+        // when the server duplicates an event (https://github.com/matrix-org/synapse/issues/3365)
+        const isDuplicateEvent = isSentByUs ?
+            this._eventsByUs.has(type) :
+            this._eventsByThem.has(type);
+        if (isDuplicateEvent) {
+            return;
+        }
+
         const oldPhase = this.phase;
         this._addEvent(type, event, isSentByUs);
 
-        const transitions = this._calculatePhaseTransitions();
-        const existingIdx = transitions.findIndex(t => t.phase === this.phase);
-        // trim off phases we already went through, if any
-        const newTransitions = transitions.slice(existingIdx + 1);
-        // transition to all new phases
-        for (const transition of newTransitions) {
-            this._transitionToPhase(transition);
-        }
+        // this will create if needed the verifier so needs to happen before calling it
+        const newTransitions = this._applyPhaseTransitions();
         try {
             // only pass events from the other side to the verifier,
             // no remote echos of our own events
             if (this._verifier && !this.observeOnly) {
-                const oldEvent = this._verifier.startEvent;
-                // if the verifier does not have a startEvent, it is because it's still sending and we are on the initator side
-                const oldSender = oldEvent ?
-                    oldEvent.getSender() :
-                    this._client.getUserId();
-                const newEventWinsRace = event.getSender() < oldSender;
+                const newEventWinsRace = this._isWinningStartRace(event);
                 if (this._verifier.canSwitchStartEvent(event) && newEventWinsRace) {
                     this._verifier.switchStartEvent(event);
                 } else if (!isRemoteEcho) {
-                     if (type === CANCEL_TYPE || (this._verifier.events
+                    if (type === CANCEL_TYPE || (this._verifier.events
                         && this._verifier.events.includes(type))) {
                         this._verifier.handleEvent(event);
                     }
@@ -610,6 +697,20 @@ export class VerificationRequest extends EventEmitter {
             }
 
             if (newTransitions.length) {
+                // create QRCodeData if the other side can scan
+                // important this happens before emitting a phase change,
+                // so listeners can rely on it being there already
+                // We only do this for live events because it is important that
+                // we sign the keys that were in the QR code, and not the keys
+                // we happen to have at some later point in time.
+                if (isLiveEvent && newTransitions.some(t => t.phase === PHASE_READY)) {
+                    const shouldGenerateQrCode =
+                        this.otherPartySupportsMethod(SCAN_QR_CODE_METHOD, true);
+                    if (shouldGenerateQrCode) {
+                        this._qrCodeData = await QRCodeData.create(this, this._client);
+                    }
+                }
+
                 const lastTransition = newTransitions[newTransitions.length - 1];
                 const {phase} = lastTransition;
 
@@ -622,9 +723,11 @@ export class VerificationRequest extends EventEmitter {
         } finally {
             // log events we processed so we can see from rageshakes what events were added to a request
             logger.log(`Verification request ${this.channel.transactionId}: ` +
-                `${type} event with ${JSON.stringify(event.getContent())} ` +
-                `deviceId:${this.channel.deviceId} ` +
-                `sender:${event.getSender()}, isSentByUs:${isSentByUs} ` +
+                `${type} event with id:${event.getId()}, ` +
+                `content:${JSON.stringify(event.getContent())} ` +
+                `deviceId:${this.channel.deviceId}, ` +
+                `sender:${event.getSender()}, isSentByUs:${isSentByUs}, ` +
+                `isLiveEvent:${isLiveEvent}, isRemoteEcho:${isRemoteEcho}, ` +
                 `phase:${oldPhase}=>${this.phase}, ` +
                 `observeOnly:${wasObserveOnly}=>${this._observeOnly}`);
         }
@@ -668,7 +771,12 @@ export class VerificationRequest extends EventEmitter {
 
         const isUnexpectedRequest = type === REQUEST_TYPE && this.phase !== PHASE_UNSENT;
         const isUnexpectedReady = type === READY_TYPE && this.phase !== PHASE_REQUESTED;
-        if (isUnexpectedRequest || isUnexpectedReady) {
+        // only if phase has passed from PHASE_UNSENT should we cancel, because events
+        // are allowed to come in in any order (at least with InRoomChannel). So we only know
+        // we're dealing with a valid request we should participate in once we've moved to PHASE_REQUESTED
+        // before that, we could be looking at somebody elses verification request and we just
+        // happen to be in the room
+        if (this.phase !== PHASE_UNSENT && (isUnexpectedRequest || isUnexpectedReady)) {
             logger.warn(`Cancelling, unexpected ${type} verification ` +
                 `event from ${event.getSender()}`);
             const reason = `Unexpected ${type} event in phase ${this.phase}`;
@@ -749,5 +857,28 @@ export class VerificationRequest extends EventEmitter {
             return false;
         }
         return true;
+    }
+
+    onVerifierCancelled() {
+        this._cancelled = true;
+        // move to cancelled phase
+        const newTransitions = this._applyPhaseTransitions();
+        if (newTransitions.length) {
+            this._setPhase(newTransitions[newTransitions.length - 1].phase);
+        }
+    }
+
+    onVerifierFinished() {
+        this.channel.send("m.key.verification.done", {});
+        this._verifierHasFinished = true;
+        // move to .done phase
+        const newTransitions = this._applyPhaseTransitions();
+        if (newTransitions.length) {
+            this._setPhase(newTransitions[newTransitions.length - 1].phase);
+        }
+    }
+
+    getEventFromOtherParty(type) {
+        return this._eventsByThem.get(type);
     }
 }

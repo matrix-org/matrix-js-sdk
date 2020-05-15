@@ -44,11 +44,6 @@ export class InRoomChannel {
         this._requestEventId = null;
     }
 
-    /** Whether this channel needs m.key.verification.done messages to be sent after a successful verification */
-    get needsDoneMessage() {
-        return true;
-    }
-
     get receiveStartFromOtherDevices() {
         return true;
     }
@@ -183,6 +178,11 @@ export class InRoomChannel {
      * @returns {Promise} a promise that resolves when any requests as an anwser to the passed-in event are sent.
      */
     async handleEvent(event, request, isLiveEvent) {
+        // prevent processing the same event multiple times, as under
+        // some circumstances Room.timeline can get emitted twice for the same event
+        if (request.hasEventId(event.getId())) {
+            return;
+        }
         const type = InRoomChannel.getEventType(event);
         // do validations that need state (roomId, userId),
         // ignore if invalid

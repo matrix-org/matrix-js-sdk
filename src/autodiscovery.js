@@ -502,10 +502,12 @@ export class AutoDiscovery {
             request(
                 { method: "GET", uri: url, timeout: 5000 },
                 (err, response, body) => {
-                    if (err || response.statusCode < 200 || response.statusCode >= 300) {
+                    if (err || response &&
+                        (response.statusCode < 200 || response.statusCode >= 300)
+                    ) {
                         let action = "FAIL_PROMPT";
                         let reason = (err ? err.message : null) || "General failure";
-                        if (response.statusCode === 404) {
+                        if (response && response.statusCode === 404) {
                             action = "IGNORE";
                             reason = AutoDiscovery.ERROR_MISSING_WELLKNOWN;
                         }
