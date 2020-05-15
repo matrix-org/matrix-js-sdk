@@ -1,5 +1,6 @@
 import {MatrixEvent} from "../models/event";
 import {EventEmitter} from "events";
+import {createCryptoStoreCacheCallbacks} from "./CrossSigning";
 
 class AccountDataClientAdapter extends EventEmitter {
     constructor() {
@@ -88,7 +89,41 @@ export default class CrossSigningBootstrapOperation {
         };
     }
 
-    async run(baseApis, cryptoStore) {
+    addSessionBackup(info) {
+
+    }
+
+    addSessionBackupPrivateKeyToCache(privateKey) {
+        this._sessionBackupPrivateKey = privateKey;
+    }
+
+    hasAnythingToDo() {
+        const hasAccountData = this.accountDataClientAdapter._values.size > 0;
+        if (hasAccountData) {
+            return true;
+        }
+        if (this._publishKeys) {
+            return true;
+        }
+    }
+
+    async persist(crypto) {
+        // store self_signing and user_signing private key in cache
+        const cacheCallbacks = createCryptoStoreCacheCallbacks(crypto._cryptoStore);
+        for (const type of ["self_signing", "user_signing"]) {
+            // logger.log(`Cache ${type} cross-signing private key locally`);
+            const privateKey = this.crossSigningCallbacks.privateKey.get(type);
+            cacheCallbacks.storeCrossSigningKeyCache(type, privateKey);
+            await this._crossSigningInfo.getCrossSigningKey(type);
+        }
+        // store session backup key in cache
+        if (this._sessionBackupPrivateKey) {
+            await crypto.storeSessionBackupPrivateKey(this._sessionBackupPrivateKey);
+        }
+    }
+
+    async apply(crypto) {
+        const baseApis = crypto._baseApis;
         // set account data
         const accountData = this.accountDataClientAdapter._values;
         for (const [type, content] of accountData) {
@@ -113,12 +148,14 @@ export default class CrossSigningBootstrapOperation {
                 this._publishKeys.auth,
                 keys,
             );
-            await cryptoStore.doTxn(
+            await crypto._cryptoStore.doTxn(
                 'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
                 (txn) => {
                     this._cryptoStore.storeCrossSigningKeys(txn, this._publishKeys.keys);
                 },
             );
         }
+        // setup backup version
+        await this._baseApis.createKeyBackupVersion(info);
     }
 }

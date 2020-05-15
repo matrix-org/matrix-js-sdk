@@ -49,7 +49,8 @@ import {
 } from './verification/QRCode';
 import {SAS} from './verification/SAS';
 import {keyFromPassphrase} from './key_passphrase';
-import {encodeRecoveryKey} from './recoverykey';
+import {encodeRecoveryKey, decodeRecoveryKey} from './recoverykey';
+import {encodeBase64} from "./crypto/olmlib";
 import {VerificationRequest} from "./verification/request/VerificationRequest";
 import {InRoomChannel, InRoomRequests} from "./verification/request/InRoomChannel";
 import {ToDeviceChannel, ToDeviceRequests} from "./verification/request/ToDeviceChannel";
@@ -870,6 +871,15 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
 
         // fetch the private keys and set up our local copy of the keys for
         // use
+        // TODO: check if this doesn't have any side-effects
+        // spoiler: it does
+        //
+        // so if some other device resets the cross-signing keys,
+        // we mark them as untrusted from _onDeviceListUserCrossSigningUpdated
+        // you can either fix this by hitting the verify this session which (might?) call this method,
+        // or the reset button in the settings
+        //
+        // perhaps we can detect this case and not make an operation for it and just do it?
         await this.checkOwnCrossSigningTrust();
     } else {
         // we have SSSS and we cross-signing is already set up
@@ -891,35 +901,22 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
     }
 
     if (setupNewKeyBackup && !keyBackupInfo) {
-        // we need to pass our own secretStorage in there or extract it because it does storeSecret
         const info = await this._baseApis.prepareKeyBackupVersion(
             null /* random key */,
-            { secureSecretStorage: true },
+            // don't write to secret storage, as it will write to this._secretStorage.
+            // Here, we want to capture all the side-effects of bootstrapping,
+            // and want to write to the local secretStorage
+            { secureSecretStorage: false },
         );
+        // write the key ourselves to 4S
+        const privateKey = decodeRecoveryKey(info.recovery_key);
+        await secretStorage.store("m.megolm_backup.v1", encodeBase64(privateKey));
 
-        // TODO: replace with something that is stored in operation
-        await this._baseApis.createKeyBackupVersion(info);
+        operation.addSessionBackup(info);
     }
 
-    // Call `getCrossSigningKey` for side effect of caching private keys for
-    // future gossiping to other devices if enabled via app level callbacks.
-    if (this._crossSigningInfo._cacheCallbacks) {
-        for (const type of ["self_signing", "user_signing"]) {
-            logger.log(`Cache ${type} cross-signing private key locally`);
-            await this._crossSigningInfo.getCrossSigningKey(type);
-        }
-    }
-
-    // and likewise for the session backup key
-    const sessionBackupKey = await this.getSecret('m.megolm_backup.v1');
-    if (sessionBackupKey) {
-        logger.info("Got session backup key from secret storage: caching");
-        const decodedBackupKey =
-            new Uint8Array(olmlib.decodeBase64(sessionBackupKey));
-        await this.storeSessionBackupPrivateKey(decodedBackupKey);
-    }
-
-    await operation.run(this._baseApis);
+    await operation.apply(this);
+    await operation.persist(this);
 
     logger.log("Secure Secret Storage ready");
 };
