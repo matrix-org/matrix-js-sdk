@@ -167,7 +167,7 @@ export class SecretStorage extends EventEmitter {
         if (info.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             if (info.mac) {
                 const {mac} = await SecretStorage._calculateKeyCheck(key, info.iv);
-                return info.mac === mac;
+                return info.mac.replace(/=+$/g, '') === mac.replace(/=+$/g, '');
             } else {
                 // if we have no information, we have to assume the key is right
                 return true;
