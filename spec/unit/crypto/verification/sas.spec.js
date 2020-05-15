@@ -181,11 +181,14 @@ describe("SAS verification", function() {
 
         it("should verify a key", async () => {
             let macMethod;
+            let keyAgreement;
             const origSendToDevice = bob.client.sendToDevice.bind(bob.client);
             bob.client.sendToDevice = function(type, map) {
                 if (type === "m.key.verification.accept") {
                     macMethod = map[alice.client.getUserId()][alice.client.deviceId]
                         .message_authentication_code;
+                    keyAgreement = map[alice.client.getUserId()][alice.client.deviceId]
+                        .key_agreement_protocol;
                 }
                 return origSendToDevice(type, map);
             };
@@ -212,6 +215,7 @@ describe("SAS verification", function() {
 
             // make sure that it uses the preferred method
             expect(macMethod).toBe("hkdf-hmac-sha256");
+            expect(keyAgreement).toBe("curve25519-hkdf-sha256");
 
             // make sure Alice and Bob verified each other
             const bobDevice
