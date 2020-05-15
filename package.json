@@ -92,6 +92,9 @@
     "typescript": "^3.7.3"
   },
   "jest": {
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "setupFilesAfterEnv": [
+      "<rootDir>/spec/setupTests.js"
+    ]
   }
 }
