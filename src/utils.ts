@@ -20,7 +20,7 @@ limitations under the License.
  * @module utils
  */
 
-import * as unhomoglyph from 'unhomoglyph';
+import unhomoglyph from 'unhomoglyph';
 import {ConnectionError} from "./http-api";
 
 /**
