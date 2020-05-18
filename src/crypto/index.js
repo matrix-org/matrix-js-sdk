@@ -51,7 +51,6 @@ import {
 import {SAS} from './verification/SAS';
 import {keyFromPassphrase} from './key_passphrase';
 import {encodeRecoveryKey, decodeRecoveryKey} from './recoverykey';
-import {encodeBase64} from "./crypto/olmlib";
 import {VerificationRequest} from "./verification/request/VerificationRequest";
 import {InRoomChannel, InRoomRequests} from "./verification/request/InRoomChannel";
 import {ToDeviceChannel, ToDeviceRequests} from "./verification/request/ToDeviceChannel";
@@ -912,7 +911,7 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
         );
         // write the key ourselves to 4S
         const privateKey = decodeRecoveryKey(info.recovery_key);
-        await secretStorage.store("m.megolm_backup.v1", encodeBase64(privateKey));
+        await secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(privateKey));
 
         // create keyBackupInfo object to add to operation
         const data = {
