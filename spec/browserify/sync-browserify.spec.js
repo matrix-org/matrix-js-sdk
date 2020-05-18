@@ -29,6 +29,9 @@ const ROOM_ID = "!room_id:server.test";
 /* global matrixcs */
 
 describe("Browserify Test", function() {
+    let client;
+    let httpBackend;
+
     async function createTestClient() {
         const sessionStoreBackend = new MockStorageApi();
         const sessionStore = new WebStorageSessionStore(sessionStoreBackend);
@@ -52,9 +55,17 @@ describe("Browserify Test", function() {
         return { client, httpBackend };
     }
 
-    it("Sync", async function() {
-        const {client, httpBackend} = await createTestClient();
+    beforeEach(async () => {
+        ({client, httpBackend} = await createTestClient());
+        await client.startClient();
+    });
 
+    afterEach(async () => {
+        client.stopClient();
+        await httpBackend.stop();
+    });
+
+    it("Sync", async function() {
         const event = utils.mkMembership({
             room: ROOM_ID,
             mship: "join",
@@ -81,7 +92,6 @@ describe("Browserify Test", function() {
         await Promise.race([
             Promise.all([
                 httpBackend.flushAllExpected(),
-                client.startClient(),
             ]),
             new Promise((_, reject) => {
                 client.once("sync.unexpectedError", reject);
