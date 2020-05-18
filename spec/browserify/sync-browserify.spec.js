@@ -67,11 +67,6 @@ describe("Browserify Test", function() {
         await httpBackend.stop();
     });
 
-    afterAll(() => {
-        // clean up XMLHttpRequest mock
-        global.XMLHttpRequest = undefined;
-    });
-
     it("Sync", async function() {
         const event = utils.mkMembership({
             room: ROOM_ID,
