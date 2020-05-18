@@ -793,6 +793,7 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
 
 
     const oldSSSSKey = await this.getSecretStorageKey();
+    // TODO: oldKeyId is not used because we need to restore ensureCanCheckPassphrase behaviour
     const [oldKeyId, oldKeyInfo] = oldSSSSKey || [null, null];
     const decryptionKeys =
           await this._crossSigningInfo.isStoredInSecretStorage(this._secretStorage);
@@ -880,7 +881,8 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
         // or the reset button in the settings
         //
         // perhaps we can detect this case and not make an operation for it and just do it?
-        await this.checkOwnCrossSigningTrust();
+        throw new Error("this is not supported yet");
+        // await this.checkOwnCrossSigningTrust();
     } else {
         // we have SSSS and we cross-signing is already set up
         logger.log("Cross signing keys are present in secret storage");
