@@ -71,7 +71,7 @@ class SSSSCryptoCallbacks {
     }
 }
 
-export default class CrossSigningBootstrapOperation {
+export class CrossSigningBootstrapOperation {
     constructor() {
         // do we need to put in the previous 4S account data as well? so we can detect colliding id's?
         this.accountDataClientAdapter = new AccountDataClientAdapter();
@@ -110,13 +110,20 @@ export default class CrossSigningBootstrapOperation {
         for (const type of ["self_signing", "user_signing"]) {
             // logger.log(`Cache ${type} cross-signing private key locally`);
             const privateKey = this.crossSigningCallbacks.privateKey.get(type);
-            cacheCallbacks.storeCrossSigningKeyCache(type, privateKey);
+            await cacheCallbacks.storeCrossSigningKeyCache(type, privateKey);
             await this._crossSigningInfo.getCrossSigningKey(type);
         }
         // store session backup key in cache
         if (this._sessionBackupPrivateKey) {
             await crypto.storeSessionBackupPrivateKey(this._sessionBackupPrivateKey);
         }
+        // store own cross-sign pubkeys as trusted
+        await crypto._cryptoStore.doTxn(
+            'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+            (txn) => {
+                crypto._cryptoStore.storeCrossSigningKeys(txn, this._publishKeys.keys);
+            },
+        );
     }
 
     async apply(crypto) {
@@ -126,8 +133,17 @@ export default class CrossSigningBootstrapOperation {
         for (const [type, content] of accountData) {
             await baseApis.setAccountData(type, content);
         }
-        // add 4S private keys to in-memory cache?
-
+        // upload cross-signing keys
+        if (this._publishKeys) {
+            const keys = {};
+            for (const [name, key] of Object.entries(this._publishKeys.keys)) {
+                keys[name + "_key"] = key;
+            }
+            await baseApis.uploadDeviceSigningKeys(
+                this._publishKeys.auth,
+                keys,
+            );
+        }
         // session backup signature
         // The backup is trusted because the user provided the private key.
         // Sign the backup with the cross signing key so the key backup can
@@ -150,26 +166,5 @@ export default class CrossSigningBootstrapOperation {
                 {prefix: PREFIX_UNSTABLE},
             );
         }
-
-
-        // upload cross-signing keys
-        if (this._publishKeys) {
-            const keys = {};
-            for (const [name, key] of Object.entries(this._publishKeys.keys)) {
-                keys[name + "_key"] = key;
-            }
-            await baseApis.uploadDeviceSigningKeys(
-                this._publishKeys.auth,
-                keys,
-            );
-            await crypto._cryptoStore.doTxn(
-                'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
-                (txn) => {
-                    this._cryptoStore.storeCrossSigningKeys(txn, this._publishKeys.keys);
-                },
-            );
-        }
-        // setup backup version
-        await this._baseApis.createKeyBackupVersion(info);
     }
 }

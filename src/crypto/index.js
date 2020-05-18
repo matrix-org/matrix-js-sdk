@@ -39,6 +39,7 @@ import {
     UserTrustLevel,
     createCryptoStoreCacheCallbacks,
 } from './CrossSigning';
+import {CrossSigningBootstrapOperation} from "./CrossSigningBootstrapOperation";
 import {SECRET_STORAGE_ALGORITHM_V1_AES, SecretStorage} from './SecretStorage';
 import {OutgoingRoomKeyRequestManager} from './OutgoingRoomKeyRequestManager';
 import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
