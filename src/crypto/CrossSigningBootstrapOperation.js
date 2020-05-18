@@ -60,8 +60,9 @@ class SSSSCryptoCallbacks {
 
     getSecretStorageKey({ keys }, name) {
         for (const keyId of Object.keys(keys)) {
-            if (this._privateKeys[keyId]) {
-                return [keyId, this._privateKeys[keyId]];
+            const privateKey = this._privateKeys.get(keyId);
+            if (privateKey) {
+                return [keyId, privateKey];
             }
         }
     }
@@ -109,9 +110,9 @@ export class CrossSigningBootstrapOperation {
         const cacheCallbacks = createCryptoStoreCacheCallbacks(crypto._cryptoStore);
         for (const type of ["self_signing", "user_signing"]) {
             // logger.log(`Cache ${type} cross-signing private key locally`);
-            const privateKey = this.crossSigningCallbacks.privateKey.get(type);
-            await cacheCallbacks.storeCrossSigningKeyCache(type, privateKey);
-            await this._crossSigningInfo.getCrossSigningKey(type);
+            const privateKey = this.crossSigningCallbacks.privateKeys.get(type);
+            const ssssType = `m.cross_signing.${type}`;
+            await cacheCallbacks.storeCrossSigningKeyCache(ssssType, privateKey);
         }
         // store session backup key in cache
         if (this._sessionBackupPrivateKey) {
@@ -161,7 +162,7 @@ export class CrossSigningBootstrapOperation {
             );
         } else {
             // add new key backup
-            await this._http.authedRequest(
+            await baseApis._http.authedRequest(
                 undefined, "POST", "/room_keys/version", undefined, this._keyBackupInfo,
                 {prefix: PREFIX_UNSTABLE},
             );

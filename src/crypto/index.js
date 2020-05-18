@@ -743,7 +743,7 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
         operation.accountDataClientAdapter,
         operation.ssssCryptoCallbacks);
     const crossSigningInfo = new CrossSigningInfo(
-            this._baseApis.userId,
+            this._userId,
             operation.crossSigningCallbacks,
             operation.crossSigningCallbacks);
 
@@ -921,7 +921,7 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
             auth_data: info.auth_data,
         };
         // sign with cross-sign master key
-        crossSigningInfo.signObject(data.auth_data);
+        crossSigningInfo.signObject(data.auth_data, "master");
         // sign with the device fingerprint
         this._signObject(data.auth_data);
 
