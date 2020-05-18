@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// load XmlHttpRequest mock
+import "./setupTests";
 import "../../dist/browser-matrix"; // uses browser-matrix instead of the src
 import {MockStorageApi} from "../MockStorageApi";
 import {WebStorageSessionStore} from "../../src/store/session/webstorage";
@@ -63,6 +65,11 @@ describe("Browserify Test", function() {
     afterEach(async () => {
         client.stopClient();
         await httpBackend.stop();
+    });
+
+    afterAll(() => {
+        // clean up XMLHttpRequest mock
+        global.XMLHttpRequest = undefined;
     });
 
     it("Sync", async function() {
