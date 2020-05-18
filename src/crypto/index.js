@@ -787,7 +787,7 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
 
         if (keyBackupInfo) {
             await crossSigningInfo.signObject(keyBackupInfo.auth_data, "master");
-            operation.addSessionBackupSignature(keyBackupInfo);
+            operation.addSessionBackup(keyBackupInfo);
         }
     };
 
@@ -863,7 +863,7 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
         await crossSigningInfo.signObject(
             keyBackupInfo.auth_data, "master",
         );
-        operation.addSessionBackupSignature(keyBackupInfo);
+        operation.addSessionBackup(keyBackupInfo);
     } else if (!this._crossSigningInfo.getId()) {
         // we have SSSS, but we don't know if the server's cross-signing
         // keys should be trusted
@@ -907,12 +907,23 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
             // Here, we want to capture all the side-effects of bootstrapping,
             // and want to write to the local secretStorage
             { secureSecretStorage: false },
+
         );
         // write the key ourselves to 4S
         const privateKey = decodeRecoveryKey(info.recovery_key);
         await secretStorage.store("m.megolm_backup.v1", encodeBase64(privateKey));
 
-        operation.addSessionBackup(info);
+        // create keyBackupInfo object to add to operation
+        const data = {
+            algorithm: info.algorithm,
+            auth_data: info.auth_data,
+        };
+        // sign with cross-sign master key
+        crossSigningInfo.signObject(data.auth_data);
+        // sign with the device fingerprint
+        this._signObject(data.auth_data);
+
+        operation.addSessionBackup(data);
     }
 
     await operation.apply(this);

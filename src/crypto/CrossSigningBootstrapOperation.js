@@ -1,6 +1,10 @@
 import {MatrixEvent} from "../models/event";
 import {EventEmitter} from "events";
 import {createCryptoStoreCacheCallbacks} from "./CrossSigning";
+import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
+import {
+    PREFIX_UNSTABLE,
+} from "../http-api";
 
 class AccountDataClientAdapter extends EventEmitter {
     constructor() {
@@ -75,22 +79,15 @@ export default class CrossSigningBootstrapOperation {
         this.ssssCryptoCallbacks = new SSSSCryptoCallbacks();
 
         this._publishKeys = null;
-        this._sessionBackupSignature = null;
+        this._keyBackupInfo = null;
     }
 
     addCrossSigningKeys(auth, keys) {
         this._publishKeys = {auth, keys};
     }
 
-    addSessionBackupSignature(keyBackupInfo) {
-        this._sessionBackupSignature = {
-            version: keyBackupInfo.version,
-            signatures: keyBackupInfo.auth_data.signatures,
-        };
-    }
-
-    addSessionBackup(info) {
-
+    addSessionBackup(keyBackupInfo) {
+        this._keyBackupInfo = keyBackupInfo;
     }
 
     addSessionBackupPrivateKeyToCache(privateKey) {
@@ -129,15 +126,32 @@ export default class CrossSigningBootstrapOperation {
         for (const [type, content] of accountData) {
             await baseApis.setAccountData(type, content);
         }
+        // add 4S private keys to in-memory cache?
 
-        // add 4S private keys to cache
-
-        // session backup signature, first do get?
+        // session backup signature
+        // The backup is trusted because the user provided the private key.
+        // Sign the backup with the cross signing key so the key backup can
+        // be trusted via cross-signing.
+        //
+        if (this._keyBackupInfo.version) {
+            // update signatures on key backup
             await baseApis._http.authedRequest(
-                undefined, "PUT", "/room_keys/version/" + keyBackupInfo.version,
-                undefined, keyBackupInfo,
-                {prefix: httpApi.PREFIX_UNSTABLE},
+                undefined, "PUT", "/room_keys/version/" + this._keyBackupInfo.version,
+                undefined, {
+                    algorithm: this._keyBackupInfo.algorithm,
+                    auth_data: this._keyBackupInfo.auth_data,
+                },
+                {prefix: PREFIX_UNSTABLE},
             );
+        } else {
+            // add new key backup
+            await this._http.authedRequest(
+                undefined, "POST", "/room_keys/version", undefined, this._keyBackupInfo,
+                {prefix: PREFIX_UNSTABLE},
+            );
+        }
+
+
         // upload cross-signing keys
         if (this._publishKeys) {
             const keys = {};
