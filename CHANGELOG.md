@@ -1,3 +1,79 @@
+Changes in [6.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v6.1.0) (2020-05-19)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v6.1.0-rc.1...v6.1.0)
+
+ * No changes since rc.1
+
+Changes in [6.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v6.1.0-rc.1) (2020-05-14)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v6.0.0...v6.1.0-rc.1)
+
+ * Remove support for asymmetric 4S encryption
+   [\#1373](https://github.com/matrix-org/matrix-js-sdk/pull/1373)
+ * Increase timeout for 2nd phase of Olm session creation
+   [\#1367](https://github.com/matrix-org/matrix-js-sdk/pull/1367)
+ * Add logging on decryption retries
+   [\#1366](https://github.com/matrix-org/matrix-js-sdk/pull/1366)
+ * Emit event when a trusted self-key is stored
+   [\#1364](https://github.com/matrix-org/matrix-js-sdk/pull/1364)
+ * Customize error payload for oversized messages
+   [\#1352](https://github.com/matrix-org/matrix-js-sdk/pull/1352)
+ * Return null for key backup state when we haven't checked yet
+   [\#1363](https://github.com/matrix-org/matrix-js-sdk/pull/1363)
+ * Added a progressCallback for backup key loading
+   [\#1351](https://github.com/matrix-org/matrix-js-sdk/pull/1351)
+ * Add initialFetch param to willUpdateDevices / devicesUpdated
+   [\#1360](https://github.com/matrix-org/matrix-js-sdk/pull/1360)
+ * Fix race between sending .request and receiving .ready over to_device
+   [\#1359](https://github.com/matrix-org/matrix-js-sdk/pull/1359)
+ * Handle race between sending and await next event from other party
+   [\#1357](https://github.com/matrix-org/matrix-js-sdk/pull/1357)
+ * Add crypto.willUpdateDevices event and make
+   getStoredDevices/getStoredDevicesForUser synchronous
+   [\#1354](https://github.com/matrix-org/matrix-js-sdk/pull/1354)
+ * Fix sender of local echo events in unsigned redactions
+   [\#1350](https://github.com/matrix-org/matrix-js-sdk/pull/1350)
+ * Remove redundant key backup setup path
+   [\#1353](https://github.com/matrix-org/matrix-js-sdk/pull/1353)
+ * Remove some dead code from _retryDecryption
+   [\#1349](https://github.com/matrix-org/matrix-js-sdk/pull/1349)
+ * Don't send key requests until after sync processing is finished
+   [\#1348](https://github.com/matrix-org/matrix-js-sdk/pull/1348)
+ * Prevent attempts to send olm messages to ourselves
+   [\#1346](https://github.com/matrix-org/matrix-js-sdk/pull/1346)
+ * Retry account data upload requests
+   [\#1345](https://github.com/matrix-org/matrix-js-sdk/pull/1345)
+ * Log first known index with megolm session updates
+   [\#1344](https://github.com/matrix-org/matrix-js-sdk/pull/1344)
+ * Prune to_device messages to avoid sending empty messages
+   [\#1343](https://github.com/matrix-org/matrix-js-sdk/pull/1343)
+ * Convert bunch of things to TypeScript
+   [\#1335](https://github.com/matrix-org/matrix-js-sdk/pull/1335)
+ * Add logging when making new Olm sessions
+   [\#1342](https://github.com/matrix-org/matrix-js-sdk/pull/1342)
+ * Fix: handle filter not found
+   [\#1340](https://github.com/matrix-org/matrix-js-sdk/pull/1340)
+ * Make getAccountDataFromServer return null if not found
+   [\#1338](https://github.com/matrix-org/matrix-js-sdk/pull/1338)
+ * Fix setDefaultKeyId to fail if the request fails
+   [\#1336](https://github.com/matrix-org/matrix-js-sdk/pull/1336)
+ * Document setRoomEncryption not modifying room state
+   [\#1328](https://github.com/matrix-org/matrix-js-sdk/pull/1328)
+ * Fix: don't do extra /filter request when enabling lazy loading of members
+   [\#1332](https://github.com/matrix-org/matrix-js-sdk/pull/1332)
+ * Reject attemptAuth promise if no auth flow found
+   [\#1329](https://github.com/matrix-org/matrix-js-sdk/pull/1329)
+ * Fix FilterComponent allowed_values check
+   [\#1327](https://github.com/matrix-org/matrix-js-sdk/pull/1327)
+ * Serialise Olm prekey decryptions
+   [\#1326](https://github.com/matrix-org/matrix-js-sdk/pull/1326)
+ * Fix: crash when backup key needs fixing from corruption issue
+   [\#1324](https://github.com/matrix-org/matrix-js-sdk/pull/1324)
+ * Fix cross-signing/SSSS reset
+   [\#1322](https://github.com/matrix-org/matrix-js-sdk/pull/1322)
+ * Implement QR code reciprocate for self-verification with untrusted MSK
+   [\#1320](https://github.com/matrix-org/matrix-js-sdk/pull/1320)
+
 Changes in [6.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v6.0.0) (2020-05-05)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v6.0.0-rc.2...v6.0.0)
