@@ -933,6 +933,15 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
         builder.addSessionBackup(data);
     }
 
+    // and likewise for the session backup key
+    const sessionBackupKey = await secretStorage.get('m.megolm_backup.v1');
+    if (sessionBackupKey) {
+        logger.info("Got session backup key from secret storage: caching");
+        const decodedBackupKey =
+            new Uint8Array(olmlib.decodeBase64(sessionBackupKey));
+        await builder.addSessionBackupPrivateKeyToCache(decodedBackupKey);
+    }
+
     const operation = builder.buildOperation();
     await operation.apply(this);
     // this persists private keys and public keys as trusted,
