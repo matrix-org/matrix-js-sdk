@@ -84,9 +84,9 @@ async function decryptNode(data, key, name) {
     const [aesKey, hmacKey] = deriveKeysNode(key, name);
 
     const hmac = crypto.createHmac("sha256", hmacKey)
-        .update(data.ciphertext, "base64").digest("base64");
+        .update(data.ciphertext, "base64").digest("base64").replace(/=+$/g, '');
 
-    if (hmac !== data.mac) {
+    if (hmac !== data.mac.replace(/=+$/g, '')) {
         throw new Error(`Error decrypting secret ${name}: bad MAC`);
     }
 
