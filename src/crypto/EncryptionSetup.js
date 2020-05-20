@@ -120,7 +120,9 @@ export class EncryptionSetupBuilder {
         await crypto._cryptoStore.doTxn(
             'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
-                crypto._cryptoStore.storeCrossSigningKeys(txn, this._crossSigningKeys.keys);
+                console.log("EncryptionSetup: storing public keys as trusted locally", this._crossSigningKeys);
+                crypto._cryptoStore.storeCrossSigningKeys(
+                    txn, this._crossSigningKeys.keys);
             },
         );
     }
