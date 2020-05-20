@@ -72,19 +72,19 @@ class SSSSCryptoCallbacks {
     }
 }
 
-export class CrossSigningBootstrapOperation {
+export class EncryptionSetupBuilder {
     constructor() {
-        // do we need to put in the previous 4S account data as well? so we can detect colliding id's?
+        // TODO: do we need to put in the previous 4S account data as well? so we can detect colliding id's?
         this.accountDataClientAdapter = new AccountDataClientAdapter();
         this.crossSigningCallbacks = new CrossSigningCallbacks();
         this.ssssCryptoCallbacks = new SSSSCryptoCallbacks();
 
-        this._publishKeys = null;
+        this._crossSigningKeys = null;
         this._keyBackupInfo = null;
     }
 
     addCrossSigningKeys(auth, keys) {
-        this._publishKeys = {auth, keys};
+        this._crossSigningKeys = {auth, keys};
     }
 
     addSessionBackup(keyBackupInfo) {
@@ -95,14 +95,13 @@ export class CrossSigningBootstrapOperation {
         this._sessionBackupPrivateKey = privateKey;
     }
 
-    hasAnythingToDo() {
-        const hasAccountData = this.accountDataClientAdapter._values.size > 0;
-        if (hasAccountData) {
-            return true;
-        }
-        if (this._publishKeys) {
-            return true;
-        }
+    buildOperation() {
+        const accountData = this.accountDataClientAdapter._values;
+        return new EncryptionSetupOperation(
+            accountData,
+            this._crossSigningKeys,
+            this._keyBackupInfo,
+        );
     }
 
     async persist(crypto) {
@@ -122,26 +121,49 @@ export class CrossSigningBootstrapOperation {
         await crypto._cryptoStore.doTxn(
             'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
-                crypto._cryptoStore.storeCrossSigningKeys(txn, this._publishKeys.keys);
+                crypto._cryptoStore.storeCrossSigningKeys(txn, this._crossSigningKeys.keys);
             },
         );
+    }
+}
+
+// this will be restored from idb in a future PR for retrying
+export class EncryptionSetupOperation {
+    constructor(accountData, crossSigningKeys, keyBackupInfo) {
+        this._accountData = accountData;
+        this._crossSigningKeys = crossSigningKeys;
+        this._keyBackupInfo = keyBackupInfo;
+    }
+
+    hasAnythingToDo() {
+        if (this._accountData.size > 0) {
+            return true;
+        }
+        if (this._crossSigningKeys) {
+            return true;
+        }
     }
 
     async apply(crypto) {
         const baseApis = crypto._baseApis;
         // set account data
-        const accountData = this.accountDataClientAdapter._values;
-        for (const [type, content] of accountData) {
+        const adData = Array.from(this._accountData.entries()).reduce((obj, [key, value]) => {
+            obj[key] = value;
+            return obj;
+        }, {});
+        console.log("CrossSigningBootstrapOperation: apply account data", adData);
+        for (const [type, content] of this._accountData) {
             await baseApis.setAccountData(type, content);
         }
         // upload cross-signing keys
-        if (this._publishKeys) {
+        console.log("CrossSigningBootstrapOperation: uploading keys", this._crossSigningKeys);
+        if (this._crossSigningKeys) {
             const keys = {};
-            for (const [name, key] of Object.entries(this._publishKeys.keys)) {
+            for (const [name, key] of Object.entries(this._crossSigningKeys.keys)) {
                 keys[name + "_key"] = key;
             }
             await baseApis.uploadDeviceSigningKeys(
-                this._publishKeys.auth,
+                this._crossSigningKeys.auth,
                 keys,
             );
         }
@@ -150,6 +172,7 @@ export class CrossSigningBootstrapOperation {
         // Sign the backup with the cross signing key so the key backup can
         // be trusted via cross-signing.
         //
+        console.log("CrossSigningBootstrapOperation: key backup", this._keyBackupInfo);
         if (this._keyBackupInfo.version) {
             // update signatures on key backup
             await baseApis._http.authedRequest(

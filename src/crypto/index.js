@@ -39,7 +39,7 @@ import {
     UserTrustLevel,
     createCryptoStoreCacheCallbacks,
 } from './CrossSigning';
-import {CrossSigningBootstrapOperation} from "./CrossSigningBootstrapOperation";
+import {EncryptionSetupBuilder} from "./EncryptionSetup";
 import {SECRET_STORAGE_ALGORITHM_V1_AES, SecretStorage} from './SecretStorage';
 import {OutgoingRoomKeyRequestManager} from './OutgoingRoomKeyRequestManager';
 import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
@@ -738,14 +738,14 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
     setupNewSecretStorage,
     getKeyBackupPassphrase,
 } = {}) {
-    const operation = new CrossSigningBootstrapOperation();
+    const builder = new EncryptionSetupBuilder();
     const secretStorage = new SecretStorage(
-        operation.accountDataClientAdapter,
-        operation.ssssCryptoCallbacks);
+        builder.accountDataClientAdapter,
+        builder.ssssCryptoCallbacks);
     const crossSigningInfo = new CrossSigningInfo(
             this._userId,
-            operation.crossSigningCallbacks,
-            operation.crossSigningCallbacks);
+            builder.crossSigningCallbacks,
+            builder.crossSigningCallbacks);
 
     // the ID of the new SSSS key, if we create one
     let newKeyId = null;
@@ -767,7 +767,7 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
 
         if (privateKey) {
             // make the private key available to encrypt 4S secrets
-            operation.ssssCryptoCallbacks.addPrivateKey(keyId, privateKey);
+            builder.ssssCryptoCallbacks.addPrivateKey(keyId, privateKey);
         }
 
         await secretStorage.setDefaultKeyId(keyId);
@@ -781,13 +781,13 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
         await this._signObject(crossSigningInfo.keys.master);
 
         await authUploadDeviceSigningKeys(authDict => {
-            operation.addCrossSigningKeys(authDict, crossSigningInfo.keys);
+            builder.addCrossSigningKeys(authDict, crossSigningInfo.keys);
             return Promise.resolve();
         });
 
         if (keyBackupInfo) {
             await crossSigningInfo.signObject(keyBackupInfo.auth_data, "master");
-            operation.addSessionBackup(keyBackupInfo);
+            builder.addSessionBackup(keyBackupInfo);
         }
     };
 
@@ -864,7 +864,7 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
         await crossSigningInfo.signObject(
             keyBackupInfo.auth_data, "master",
         );
-        operation.addSessionBackup(keyBackupInfo);
+        builder.addSessionBackup(keyBackupInfo);
     } else if (!this._crossSigningInfo.getId()) {
         // we have SSSS, but we don't know if the server's cross-signing
         // keys should be trusted
@@ -880,7 +880,7 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
         // you can either fix this by hitting the verify this session which (might?) call this method,
         // or the reset button in the settings
         //
-        // perhaps we can detect this case and not make an operation for it and just do it?
+        // perhaps we can detect this case and not make an builder for it and just do it?
         throw new Error("this is not supported yet");
         // await this.checkOwnCrossSigningTrust();
     } else {
@@ -888,12 +888,12 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
         logger.log("Cross signing keys are present in secret storage");
     }
 
-    const crossSigningPrivateKeys = operation.crossSigningCallbacks.privateKeys;
+    const crossSigningPrivateKeys = builder.crossSigningCallbacks.privateKeys;
     if (crossSigningPrivateKeys.size) {
         logger.log("Storing cross-signing private keys in secret storage");
         // Assuming no app-supplied callback, default to storing in SSSS.
         if (!this._baseApis._cryptoCallbacks.saveCrossSigningKeys) {
-            // this is writing to in-memory account data in operation.accountDataClientAdapter
+            // this is writing to in-memory account data in builder.accountDataClientAdapter
             // so won't fail
             await CrossSigningInfo.storeInSecretStorage(
                 crossSigningPrivateKeys,
@@ -915,7 +915,7 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
         const privateKey = decodeRecoveryKey(info.recovery_key);
         await secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(privateKey));
 
-        // create keyBackupInfo object to add to operation
+        // create keyBackupInfo object to add to builder
         const data = {
             algorithm: info.algorithm,
             auth_data: info.auth_data,
@@ -925,11 +925,14 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
         // sign with the device fingerprint
         await this._signObject(data.auth_data);
 
-        operation.addSessionBackup(data);
+        builder.addSessionBackup(data);
     }
 
+    const operation = builder.buildOperation();
     await operation.apply(this);
-    await operation.persist(this);
+    // this persists private keys and public keys as trusted,
+    // only do this if apply succeeded for now as retry isn't in place yet
+    await builder.persist(this);
 
     logger.log("Secure Secret Storage ready");
 };
