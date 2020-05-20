@@ -710,17 +710,8 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         const sessionBackupKey = await this.getSecret('m.megolm_backup.v1');
         if (sessionBackupKey) {
             logger.info("Got session backup key from secret storage: caching");
-            // fix up the backup key if it's in the wrong format, and replace
-            // in secret storage
-            const fixedBackupKey = fixBackupKey(sessionBackupKey);
-            if (fixedBackupKey) {
-                await this.storeSecret(
-                    "m.megolm_backup.v1", fixedBackupKey, [newKeyId || oldKeyId],
-                );
-            }
-            const decodedBackupKey = new Uint8Array(olmlib.decodeBase64(
-                fixedBackupKey || sessionBackupKey,
-            ));
+            const decodedBackupKey =
+                new Uint8Array(olmlib.decodeBase64(sessionBackupKey));
             await this.storeSessionBackupPrivateKey(decodedBackupKey);
         }
     } finally {
@@ -737,26 +728,6 @@ Crypto.prototype.bootstrapSecretStorage = async function({
 
     logger.log("Secure Secret Storage ready");
 };
-
-/**
- * Fix up the backup key, that may be in the wrong format due to a bug in a
- * migration step.  Some backup keys were stored as a comma-separated list of
- * integers, rather than a base64-encoded byte array.  If this function is
- * passed a string that looks like a list of integers rather than a base64
- * string, it will attempt to convert it to the right format.
- *
- * @param {string} key the key to check
- * @returns {null | string} If the key is in the wrong format, then the fixed
- * key will be returned. Otherwise null will be returned.
- *
- */
-export function fixBackupKey(key) {
-    if (key.indexOf(",") < 0) {
-        return null;
-    }
-    const fixedKey = Uint8Array.from(key.split(","), x => parseInt(x));
-    return olmlib.encodeBase64(fixedKey);
-}
 
 Crypto.prototype.addSecretStorageKey = function(algorithm, opts, keyID) {
     return this._secretStorage.addKey(algorithm, opts, keyID);
@@ -826,8 +797,8 @@ Crypto.prototype.checkSecretStoragePrivateKey = function(privateKey, expectedPub
  * Fetches the backup private key, if cached
  * @returns {Promise} the key, if any, or null
  */
-Crypto.prototype.getSessionBackupPrivateKey = async function() {
-    let key = await new Promise((resolve) => {
+Crypto.prototype.getSessionBackupPrivateKey = function() {
+    return new Promise((resolve) => {
         this._cryptoStore.doTxn(
             'readonly',
             [IndexedDBCryptoStore.STORE_ACCOUNT],
@@ -840,13 +811,6 @@ Crypto.prototype.getSessionBackupPrivateKey = async function() {
             },
         );
     });
-
-    // make sure we have a Uint8Array, rather than a string
-    if (key && typeof(key === "string")) {
-        key = new Uint8Array(olmlib.decodeBase64(fixBackupKey(key) || key));
-        await this.storeSessionBackupPrivateKey(key);
-    }
-    return key;
 };
 
 /**

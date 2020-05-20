@@ -47,7 +47,7 @@ import * as olmlib from "./crypto/olmlib";
 import {ReEmitter} from './ReEmitter';
 import {RoomList} from './crypto/RoomList';
 import {logger} from './logger';
-import {Crypto, isCryptoAvailable, fixBackupKey} from './crypto';
+import {Crypto, isCryptoAvailable} from './crypto';
 import {decodeRecoveryKey} from './crypto/recoverykey';
 import {keyFromAuthData} from './crypto/key_passphrase';
 import {randomString} from './randomstring';
@@ -1828,17 +1828,7 @@ MatrixClient.prototype.restoreKeyBackupWithPassword = async function(
 MatrixClient.prototype.restoreKeyBackupWithSecretStorage = async function(
     backupInfo, targetRoomId, targetSessionId, opts,
 ) {
-    const storedKey = await this.getSecret("m.megolm_backup.v1");
-
-    // ensure that the key is in the right format.  If not, fix the key and
-    // store the fixed version
-    const fixedKey = fixBackupKey(storedKey);
-    if (fixedKey) {
-        const [keyId] = await this._crypto.getSecretStorageKey();
-        await this.storeSecret("m.megolm_backup.v1", fixedKey, [keyId]);
-    }
-
-    const privKey = decodeBase64(fixedKey || storedKey);
+    const privKey = decodeBase64(await this.getSecret("m.megolm_backup.v1"));
     return this._restoreKeyBackup(
         privKey, targetRoomId, targetSessionId, backupInfo, opts,
     );
