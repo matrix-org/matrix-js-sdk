@@ -750,10 +750,6 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
     // the ID of the new SSSS key, if we create one
     let newKeyId = null;
 
-    // XXX: how do we cache result of getSecretStorageKey to also use it during cross-signing bootstrapping, to encrypt our private keys with it.
-    // return it from this method somehow and pass it in as an argument there?
-    // or have one method in this class that does both and passes in cryptoCallbacks?
-
     // create a new SSSS key and set it as default
     const createSSSS = async (opts, privateKey) => {
         opts = opts || {};
@@ -912,7 +908,7 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
             null /* random key */,
             // don't write to secret storage, as it will write to this._secretStorage.
             // Here, we want to capture all the side-effects of bootstrapping,
-            // and want to write to the local secretStorage
+            // and want to write to the local secretStorage object
             { secureSecretStorage: false },
 
         );
