@@ -785,6 +785,11 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
             return Promise.resolve();
         });
 
+        // cross-sign own device
+        const device = this._deviceList.getStoredDevice(this._userId, this._deviceId);
+        const deviceSignature = await crossSigningInfo.signDevice(this._userId, device);
+        builder.addKeySignature(this._userId, this._deviceId, deviceSignature);
+
         if (keyBackupInfo) {
             await crossSigningInfo.signObject(keyBackupInfo.auth_data, "master");
             builder.addSessionBackup(keyBackupInfo);

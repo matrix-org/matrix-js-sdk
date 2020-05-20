@@ -80,6 +80,7 @@ export class EncryptionSetupBuilder {
         this.ssssCryptoCallbacks = new SSSSCryptoCallbacks();
 
         this._crossSigningKeys = null;
+        this._keySignatures = null;
         this._keyBackupInfo = null;
     }
 
@@ -95,12 +96,22 @@ export class EncryptionSetupBuilder {
         this._sessionBackupPrivateKey = privateKey;
     }
 
+    addKeySignature(userId, deviceId, signature) {
+        if (!this._keySignatures) {
+            this._keySignatures = {};
+        }
+        const userSignatures = this._keySignatures[userId] || {};
+        this._keySignatures[userId] = userSignatures;
+        userSignatures[deviceId] = signature;
+    }
+
     buildOperation() {
         const accountData = this.accountDataClientAdapter._values;
         return new EncryptionSetupOperation(
             accountData,
             this._crossSigningKeys,
             this._keyBackupInfo,
+            this._keySignatures,
         );
     }
 
@@ -130,10 +141,11 @@ export class EncryptionSetupBuilder {
 
 // this will be restored from idb in a future PR for retrying
 export class EncryptionSetupOperation {
-    constructor(accountData, crossSigningKeys, keyBackupInfo) {
+    constructor(accountData, crossSigningKeys, keyBackupInfo, keySignatures) {
         this._accountData = accountData;
         this._crossSigningKeys = crossSigningKeys;
         this._keyBackupInfo = keyBackupInfo;
+        this._keySignatures = keySignatures;
     }
 
     hasAnythingToDo() {
@@ -143,6 +155,13 @@ export class EncryptionSetupOperation {
         if (this._crossSigningKeys) {
             return true;
         }
+        if (this._keyBackupInfo) {
+            return true;
+        }
+        if (this._keySignatures) {
+            return true;
+        }
+        return false;
     }
 
     async apply(crypto) {
@@ -167,6 +186,13 @@ export class EncryptionSetupOperation {
                 this._crossSigningKeys.auth,
                 keys,
             );
+            // pass the new keys to the main instance of our own CrossSigningInfo.
+            crypto._crossSigningInfo.setKeys(this._crossSigningKeys.keys);
+        }
+        // upload first cross-signing signatures with the new key
+        // (e.g. signing our own device)
+        if (this._keySignatures) {
+            await baseApis.uploadKeySignatures(this._keySignatures);
         }
         // session backup signature
         // The backup is trusted because the user provided the private key.
