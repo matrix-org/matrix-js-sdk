@@ -778,7 +778,7 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
     const resetCrossSigning = async () => {
         crossSigningInfo.resetKeys();
         // sign master key with device key
-        this._signObject(crossSigningInfo.keys.master);
+        await this._signObject(crossSigningInfo.keys.master);
 
         await authUploadDeviceSigningKeys(authDict => {
             operation.addCrossSigningKeys(authDict, crossSigningInfo.keys);
@@ -921,9 +921,9 @@ Crypto.prototype.bootstrapSecretStorage2 = async function({
             auth_data: info.auth_data,
         };
         // sign with cross-sign master key
-        crossSigningInfo.signObject(data.auth_data, "master");
+        await crossSigningInfo.signObject(data.auth_data, "master");
         // sign with the device fingerprint
-        this._signObject(data.auth_data);
+        await this._signObject(data.auth_data);
 
         operation.addSessionBackup(data);
     }
