@@ -34,7 +34,6 @@ import {DeviceInfo} from "./deviceinfo";
 import * as algorithms from "./algorithms";
 import {
     CrossSigningInfo,
-    CrossSigningLevel,
     DeviceTrustLevel,
     UserTrustLevel,
     createCryptoStoreCacheCallbacks,
@@ -54,7 +53,6 @@ import {encodeRecoveryKey, decodeRecoveryKey} from './recoverykey';
 import {VerificationRequest} from "./verification/request/VerificationRequest";
 import {InRoomChannel, InRoomRequests} from "./verification/request/InRoomChannel";
 import {ToDeviceChannel, ToDeviceRequests} from "./verification/request/ToDeviceChannel";
-import * as httpApi from "../http-api";
 import {IllegalMethod} from "./verification/IllegalMethod";
 import {KeySignatureUploadError} from "../errors";
 
