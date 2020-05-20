@@ -139,7 +139,8 @@ export class EncryptionSetupBuilder {
     }
 }
 
-// this will be restored from idb in a future PR for retrying
+// this will be restored from idb in a future PR for retrying,
+// it does not have knowledge of any private keys, unlike the builder.
 export class EncryptionSetupOperation {
     constructor(accountData, crossSigningKeys, keyBackupInfo, keySignatures) {
         this._accountData = accountData;
@@ -167,16 +168,18 @@ export class EncryptionSetupOperation {
     async apply(crypto) {
         const baseApis = crypto._baseApis;
         // set account data
-        const adData = Array.from(this._accountData.entries()).reduce((obj, [key, value]) => {
-            obj[key] = value;
-            return obj;
-        }, {});
-        console.log("CrossSigningBootstrapOperation: apply account data", adData);
+        // (convert from Map to object for logging)
+        const adData = Array.from(this._accountData.entries()).
+            reduce((obj, [key, value]) => {
+                obj[key] = value;
+                return obj;
+            }, {});
+        console.log("EncryptionSetup: apply account data", adData);
         for (const [type, content] of this._accountData) {
             await baseApis.setAccountData(type, content);
         }
         // upload cross-signing keys
-        console.log("CrossSigningBootstrapOperation: uploading keys", this._crossSigningKeys);
+        console.log("EncryptionSetup: uploading keys", this._crossSigningKeys);
         if (this._crossSigningKeys) {
             const keys = {};
             for (const [name, key] of Object.entries(this._crossSigningKeys.keys)) {
@@ -199,7 +202,7 @@ export class EncryptionSetupOperation {
         // Sign the backup with the cross signing key so the key backup can
         // be trusted via cross-signing.
         //
-        console.log("CrossSigningBootstrapOperation: key backup", this._keyBackupInfo);
+        console.log("EncryptionSetup: key backup", this._keyBackupInfo);
         if (this._keyBackupInfo.version) {
             // update signatures on key backup
             await baseApis._http.authedRequest(
