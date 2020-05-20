@@ -110,8 +110,7 @@ export class EncryptionSetupBuilder {
         for (const type of ["self_signing", "user_signing"]) {
             // logger.log(`Cache ${type} cross-signing private key locally`);
             const privateKey = this.crossSigningCallbacks.privateKeys.get(type);
-            const ssssType = `m.cross_signing.${type}`;
-            await cacheCallbacks.storeCrossSigningKeyCache(ssssType, privateKey);
+            await cacheCallbacks.storeCrossSigningKeyCache(type, privateKey);
         }
         // store session backup key in cache
         if (this._sessionBackupPrivateKey) {
