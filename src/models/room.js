@@ -209,7 +209,7 @@ utils.inherits(Room, EventEmitter);
 Room.prototype.getVersion = function() {
     const createEvent = this.currentState.getStateEvents("m.room.create", "");
     if (!createEvent) {
-        logger.warn("Room " + this.room_id + " does not have an m.room.create event");
+        logger.warn("Room " + this.roomId + " does not have an m.room.create event");
         return '1';
     }
     const ver = createEvent.getContent()['room_version'];
