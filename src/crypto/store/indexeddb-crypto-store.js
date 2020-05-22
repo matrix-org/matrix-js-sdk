@@ -444,6 +444,12 @@ export class IndexedDBCryptoStore {
         );
     }
 
+    getEndToEndInboundGroupSessions(tuples, txn, func) {
+        this._backend.getEndToEndInboundGroupSessions(
+            tuples, txn, func,
+        );
+    }
+
     /**
      * Fetches all inbound group sessions in the store
      * @param {*} txn An active transaction. See doTxn().

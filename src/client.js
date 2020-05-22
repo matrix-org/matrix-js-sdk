@@ -5282,6 +5282,7 @@ function _resolve(callback, resolve, res) {
 
 function _PojoToMatrixEventMapper(client, options) {
     const preventReEmit = Boolean(options && options.preventReEmit);
+    const decrypt = Boolean(options && (options.decrypt || options.decrypt === undefined));
     function mapper(plainOldJsObject) {
         const event = new MatrixEvent(plainOldJsObject);
         if (event.isEncrypted()) {
@@ -5290,7 +5291,7 @@ function _PojoToMatrixEventMapper(client, options) {
                     "Event.decrypted",
                 ]);
             }
-            event.attemptDecryption(client._crypto);
+            if (decrypt) event.attemptDecryption(client._crypto);
         }
         const room = client.getRoom(event.getRoomId());
         if (room && !preventReEmit) {

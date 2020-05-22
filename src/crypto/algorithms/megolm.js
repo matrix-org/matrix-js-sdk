@@ -1204,6 +1204,10 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
     };
 };
 
+MegolmDecryption.prototype.decryptEvents = async function(events) {
+    return this._olmDevice.decryptGroupMessages(events);
+}
+
 MegolmDecryption.prototype._requestKeysForEvent = function(event) {
     const wireContent = event.getWireContent();
 

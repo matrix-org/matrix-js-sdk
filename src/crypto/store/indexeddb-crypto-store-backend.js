@@ -572,6 +572,38 @@ export class Backend {
         };
     }
 
+    getEndToEndInboundGroupSessions(tuples, txn, func) {
+        const results = {};
+
+        const objectStore = txn.objectStore("inbound_group_sessions");
+
+        let i = 0;
+        const getNext = () => {
+            if (i === tuples.length) {
+                func(results);
+            } else {
+                if (results[tuples[i][0]] && results[tuples[i][0]][tuples[i][1]] !== undefined) {
+                    ++i;
+                    getNext();
+                } else {
+                    const getReq = objectStore.get(tuples[i]);
+                    getReq.onsuccess = function() {
+                        try {
+                            results[tuples[i][0]] = results[tuples[i][0]] || {};
+                            results[tuples[i][0]][tuples[i][1]] = getReq.result;
+                            ++i;
+                            getNext();
+                        } catch (e) {
+                            abortWithException(txn, e);
+                        }
+                    };
+                }
+                
+            }
+        };
+        getNext();
+    }
+
     getAllEndToEndInboundGroupSessions(txn, func) {
         const objectStore = txn.objectStore("inbound_group_sessions");
         const getReq = objectStore.openCursor();

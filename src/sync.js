@@ -1151,10 +1151,10 @@ SyncApi.prototype._processSyncResponse = async function(
     // Handle joins
     await utils.promiseMapSeries(joinRooms, async function(joinObj) {
         const room = joinObj.room;
-        const stateEvents = self._mapSyncEventsFormat(joinObj.state, room);
-        const timelineEvents = self._mapSyncEventsFormat(joinObj.timeline, room);
-        const ephemeralEvents = self._mapSyncEventsFormat(joinObj.ephemeral);
-        const accountDataEvents = self._mapSyncEventsFormat(joinObj.account_data);
+        const stateEvents = await self._mapSyncEventsFormat(joinObj.state, room, true);
+        const timelineEvents = await self._mapSyncEventsFormat(joinObj.timeline, room, true);
+        const ephemeralEvents = await self._mapSyncEventsFormat(joinObj.ephemeral, null, true);
+        const accountDataEvents = await self._mapSyncEventsFormat(joinObj.account_data, null, true);
 
         // we do this first so it's correct when any of the events fire
         if (joinObj.unread_notifications) {
@@ -1502,17 +1502,37 @@ SyncApi.prototype._mapSyncResponseToRoomArray = function(obj) {
  * @param {Room} room
  * @return {MatrixEvent[]}
  */
-SyncApi.prototype._mapSyncEventsFormat = function(obj, room) {
+SyncApi.prototype._mapSyncEventsFormat = function(obj, room, async) {
     if (!obj || !utils.isArray(obj.events)) {
         return [];
     }
     const mapper = this.client.getEventMapper();
-    return obj.events.map(function(e) {
+    const mappedEvents = obj.events.map(function(e) {
         if (room) {
             e.room_id = room.roomId;
         }
-        return mapper(e);
+        return mapper(e, {decrypt: false});
     });
+
+    const encryptedEvents = mappedEvents.filter(e => e.isEncrypted());
+
+
+
+    /*const decryptionPromises = encryptedEvents.map(e => e.attemptDecryption(this.opts.crypto, false, false));
+    let allDecryptionsPromise = Promise.resolve();
+    if (decryptionPromises.length > 0) {
+        allDecryptionsPromise = Promise.all(decryptionPromises).then(() => {
+            this.client.emit("Events.decrypted", encryptedEvents);
+        });
+    }*/
+
+
+
+    //if (async) return allDecryptionsPromise.then(() => {
+    if (async) return this.opts.crypto.decryptEvents(encryptedEvents).then(() => {
+        return mappedEvents;
+    });
+    return mappedEvents;
 };
 
 /**

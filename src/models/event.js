@@ -395,7 +395,7 @@ utils.extend(MatrixEvent.prototype, {
      * @returns {Promise} promise which resolves (to undefined) when the decryption
      * attempt is completed.
      */
-    attemptDecryption: async function(crypto, isRetry) {
+    attemptDecryption: async function(crypto, isRetry, emit) {
         // start with a couple of sanity checks.
         if (!this.isEncrypted()) {
             throw new Error("Attempt to decrypt event which isn't encrypted");
@@ -425,7 +425,7 @@ utils.extend(MatrixEvent.prototype, {
             return this._decryptionPromise;
         }
 
-        this._decryptionPromise = this._decryptionLoop(crypto, isRetry);
+        this._decryptionPromise = this._decryptionLoop(crypto, isRetry, emit);
         return this._decryptionPromise;
     },
 
@@ -470,7 +470,9 @@ utils.extend(MatrixEvent.prototype, {
         return recipients;
     },
 
-    _decryptionLoop: async function(crypto, isRetry) {
+    _decryptionLoop: async function(crypto, isRetry, emit) {
+        if (emit === undefined) emit = true;
+
         // make sure that this method never runs completely synchronously.
         // (doing so would mean that we would clear _decryptionPromise *before*
         // it is set in attemptDecryption - and hence end up with a stuck
@@ -564,6 +566,29 @@ utils.extend(MatrixEvent.prototype, {
             this.emit("Event.decrypted", this, err);
 
             return;
+        }
+    },
+
+    setEncryptionResult: function(res) {
+        if (res.status === 'fulfilled') {
+            this._decryptionPromise = null;
+            this._retryDecryption = false;
+            if (res.value === undefined) {
+                console.log("sxcfhj");
+            }
+            this._setClearData(res.value);
+
+            // Before we emit the event, clear the push actions so that they can be recalculated
+            // by relevant code. We do this because the clear event has now changed, making it
+            // so that existing rules can be re-run over the applicable properties. Stuff like
+            // highlighting when the user's name is mentioned rely on this happening. We also want
+            // to set the push actions before emitting so that any notification listeners don't
+            // pick up the wrong contents.
+            this.setPushActions(null);
+
+            //this.emit("Event.decrypted", this, err);
+        } else {
+            this._setClearData(this._badEncryptedMessage(res.reason.message));
         }
     },
 

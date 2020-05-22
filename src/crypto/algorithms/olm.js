@@ -254,6 +254,12 @@ OlmDecryption.prototype.decryptEvent = async function(event) {
     };
 };
 
+OlmDecryption.prototype.decryptEvents = async function(events) {
+    return Promise.allSettled(events.map(ev => {
+        return this.decryptEvent(ev);
+    }));
+};
+
 /**
  * Attempt to decrypt an Olm message
  *

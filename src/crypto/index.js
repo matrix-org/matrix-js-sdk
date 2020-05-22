@@ -2764,6 +2764,33 @@ Crypto.prototype.decryptEvent = function(event) {
     return alg.decryptEvent(event);
 };
 
+Crypto.prototype.decryptEvents = function(events) {
+    if (events.length === 0) return Promise.resolve([]);
+
+    const byRoomAlg = {};
+    for (const ev of events) {
+        const content = ev.getWireContent();
+        if (content.algorithm === undefined) continue;
+        const roomAlg = ev.getRoomId() + '-' + content.algorithm;
+        if(byRoomAlg[roomAlg] === undefined) byRoomAlg[roomAlg] = [];
+        byRoomAlg[roomAlg].push(ev);
+    }
+
+    return Promise.all(Object.values(byRoomAlg).map(evs => {
+        const content = evs[0].getWireContent();
+        return this._getRoomDecryptor(evs[0].getRoomId(), content.algorithm).decryptEvents(evs);
+    })).then(results => {
+        for (let i = 0; i < Object.values(byRoomAlg).length; ++i) {
+            const evs = Object.values(byRoomAlg)[i];
+            const out = results[i];
+
+            for (let j = 0; j < evs.length; ++j) {
+                evs[j].setEncryptionResult(out[j]);
+            }
+        }
+    });
+};
+
 /**
  * Handle the notification from /sync or /keys/changes that device lists have
  * been changed.

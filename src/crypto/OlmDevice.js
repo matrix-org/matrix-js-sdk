@@ -980,6 +980,32 @@ OlmDevice.prototype._getInboundGroupSession = function(
     );
 };
 
+OlmDevice.prototype._getInboundGroupSessions = function(
+    roomId, senderKeys, sessionIds, txn, func,
+) {
+    this._cryptoStore.getEndToEndInboundGroupSession(
+        senderKey, sessionId, txn, (sessionData, withheld) => {
+            if (sessionData === null) {
+                func(null, null, withheld);
+                return;
+            }
+
+            // if we were given a room ID, check that the it matches the original one for the session. This stops
+            // the HS pretending a message was targeting a different room.
+            if (roomId !== null && roomId !== sessionData.room_id) {
+                throw new Error(
+                    "Mismatched room_id for inbound group session (expected " +
+                    sessionData.room_id + ", was " + roomId + ")",
+                );
+            }
+
+            this._unpickleInboundGroupSession(sessionData, (session) => {
+                func(session, sessionData, withheld);
+            });
+        },
+    );
+};
+
 /**
  * Add an inbound group session to the session store
  *
@@ -1234,6 +1260,73 @@ OlmDevice.prototype.decryptGroupMessage = async function(
         throw error;
     }
     return result;
+};
+
+OlmDevice.prototype.decryptGroupMessages = async function(events) {
+    const tuples = events.map(e => {
+        return [e.getWireContent().sender_key, e.getWireContent().session_id];
+    });
+    const results = [];
+    for (let i = 0; i < events.length; ++i) results[i] = null;
+
+    await this._cryptoStore.doTxn(
+        'readonly', [
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
+        ], (txn) => {
+            this._cryptoStore.getEndToEndInboundGroupSessions(tuples, txn, (sessionResults) => {
+                for (let i = 0; i < events.length; ++i) {
+                    const ev = events[i];
+                    const content = ev.getWireContent();
+                    const sessionData = sessionResults[content.sender_key][content.session_id];
+                    if (sessionData) {
+                        const session = new global.Olm.InboundGroupSession();
+                        session.unpickle(this._pickleKey, sessionData.session.session);
+
+                        try {
+                            const decryptRes = session.decrypt(content.ciphertext);
+                            const result = {
+    /*return {
+        clearEvent: payload,
+        senderCurve25519Key: res.senderKey,
+        claimedEd25519Key: res.keysClaimed.ed25519,
+        forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
+    };*/
+                                clearEvent: JSON.parse(decryptRes.plaintext),
+                                keysClaimed: sessionData.keysClaimed || {},
+                                senderKey: content.sender_key,
+                                forwardingCurve25519KeyChain: (
+                                    sessionData.forwardingCurve25519KeyChain || []
+                                ),
+                            };
+                            results[i]  = {status: 'fulfilled', value: result};
+                        } catch (e) {
+                            results[i]  = {status: 'rejected', reason: e};
+                        } finally {
+                            session.free();
+                        }
+                    }
+                }
+
+            },
+        );
+    });
+
+    for (let i = 0; i < results.length; ++i) {
+        if (results[i] === null) {
+            results[i] = {
+                status: 'rejected',
+                reason: new algorithms.DecryptionError(
+                    "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
+                    "The sender's device has not sent us the keys for this message.",
+                    {
+                        //session: content.sender_key + '|' + content.session_id,
+                    },
+                ),
+            };
+        }
+    }
+
+    return results;
 };
 
 /**
