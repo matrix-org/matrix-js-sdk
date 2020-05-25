@@ -35,6 +35,7 @@
   "author": "matrix.org",
   "license": "Apache-2.0",
   "files": [
+    "dist",
     "lib",
     "src",
     "git-revision.txt",
