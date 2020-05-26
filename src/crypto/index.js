@@ -3430,7 +3430,7 @@ Crypto.prototype._processReceivedRoomKeyRequest = async function(req) {
         return;
     }
 
-    if (deviceId !== this._deviceId) {
+    if (deviceId === this._deviceId) {
         // We'll always get these because we send room key requests to
         // '*' (ie. 'all devices') which includes the sending device,
         // so ignore requests from ourself because apart from it being
