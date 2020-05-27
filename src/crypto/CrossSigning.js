@@ -24,6 +24,7 @@ import {decodeBase64, encodeBase64, pkSign, pkVerify} from './olmlib';
 import {EventEmitter} from 'events';
 import {logger} from '../logger';
 import {IndexedDBCryptoStore} from '../crypto/store/indexeddb-crypto-store';
+import {decryptAES, encryptAES} from './aes';
 
 function publicKeyFromKeyInfo(keyInfo) {
     // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
@@ -637,10 +638,10 @@ export class DeviceTrustLevel {
     }
 }
 
-export function createCryptoStoreCacheCallbacks(store) {
+export function createCryptoStoreCacheCallbacks(store, olmdevice) {
     return {
-        getCrossSigningKeyCache: function(type, _expectedPublicKey) {
-            return new Promise((resolve) => {
+        getCrossSigningKeyCache: async function(type, _expectedPublicKey) {
+            const key = await new Promise((resolve) => {
                 return store.doTxn(
                     'readonly',
                     [IndexedDBCryptoStore.STORE_ACCOUNT],
@@ -649,13 +650,23 @@ export function createCryptoStoreCacheCallbacks(store) {
                     },
                 );
             });
+
+            if (key && key.ciphertext) {
+                const pickleKey = Buffer.from(olmdevice._pickleKey);
+                const decrypted = await decryptAES(key, pickleKey, type);
+                return decodeBase64(decrypted);
+            } else {
+                return key;
+            }
         },
-        storeCrossSigningKeyCache: function(type, key) {
+        storeCrossSigningKeyCache: async function(type, key) {
             if (!(key instanceof Uint8Array)) {
                 throw new Error(
                     `storeCrossSigningKeyCache expects Uint8Array, got ${key}`,
                 );
             }
+            const pickleKey = Buffer.from(olmdevice._pickleKey);
+            key = await encryptAES(encodeBase64(key), pickleKey, type);
             return store.doTxn(
                 'readwrite',
                 [IndexedDBCryptoStore.STORE_ACCOUNT],

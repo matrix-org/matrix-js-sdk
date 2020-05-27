@@ -56,6 +56,7 @@ import {ToDeviceChannel, ToDeviceRequests} from "./verification/request/ToDevice
 import * as httpApi from "../http-api";
 import {IllegalMethod} from "./verification/IllegalMethod";
 import {KeySignatureUploadError} from "../errors";
+import {decryptAES, encryptAES} from './aes';
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -231,7 +232,7 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     this._sendKeyRequestsImmediately = false;
 
     const cryptoCallbacks = this._baseApis._cryptoCallbacks || {};
-    const cacheCallbacks = createCryptoStoreCacheCallbacks(cryptoStore);
+    const cacheCallbacks = createCryptoStoreCacheCallbacks(cryptoStore, this._olmDevice);
 
     this._crossSigningInfo = new CrossSigningInfo(
         userId,
@@ -798,8 +799,8 @@ Crypto.prototype.checkSecretStoragePrivateKey = function(privateKey, expectedPub
  * Fetches the backup private key, if cached
  * @returns {Promise} the key, if any, or null
  */
-Crypto.prototype.getSessionBackupPrivateKey = function() {
-    return new Promise((resolve) => {
+Crypto.prototype.getSessionBackupPrivateKey = async function() {
+    const key = await new Promise((resolve) => {
         this._cryptoStore.doTxn(
             'readonly',
             [IndexedDBCryptoStore.STORE_ACCOUNT],
@@ -812,6 +813,14 @@ Crypto.prototype.getSessionBackupPrivateKey = function() {
             },
         );
     });
+
+    if (key && key.ciphertext) {
+        const pickleKey = Buffer.from(this._olmDevice._pickleKey);
+        const decrypted = await decryptAES(key, pickleKey, "m.megolm_backup.v1");
+        return olmlib.decodeBase64(decrypted);
+    } else {
+        return key;
+    }
 };
 
 /**
@@ -823,6 +832,8 @@ Crypto.prototype.storeSessionBackupPrivateKey = async function(key) {
     if (!(key instanceof Uint8Array)) {
         throw new Error(`storeSessionBackupPrivateKey expects Uint8Array, got ${key}`);
     }
+    const pickleKey = Buffer.from(this._olmDevice._pickleKey);
+    key = await encryptAES(olmlib.encodeBase64(key), pickleKey, "m.megolm_backup.v1");
     return this._cryptoStore.doTxn(
         'readwrite',
         [IndexedDBCryptoStore.STORE_ACCOUNT],
