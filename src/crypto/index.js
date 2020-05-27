@@ -264,6 +264,7 @@ utils.inherits(Crypto, EventEmitter);
 Crypto.prototype.init = async function(opts) {
     const {
         exportedOlmDevice,
+        pickleKey,
     } = opts || {};
 
     logger.log("Crypto: initialising Olm...");
@@ -273,7 +274,7 @@ Crypto.prototype.init = async function(opts) {
             ? "Crypto: initialising Olm device from exported device..."
             : "Crypto: initialising Olm device...",
     );
-    await this._olmDevice.init({ fromExportedDevice: exportedOlmDevice });
+    await this._olmDevice.init({ fromExportedDevice: exportedOlmDevice, pickleKey });
     logger.log("Crypto: loading device list...");
     await this._deviceList.load();
 

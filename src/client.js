@@ -110,6 +110,9 @@ function keyFromRecoverySession(session, decryptionKey) {
  *     If provided, opts.deviceId and opts.userId should **NOT** be provided
  *     (they are present in the exported data).
  *
+ * @param {string} opts.pickleKey Key used to pickle olm objects or other
+ *     sensitive data.
+ *
  * @param {IdentityServerProvider} [opts.identityServer]
  * Optional. A provider object with one function `getAccessToken`, which is a
  * callback that returns a Promise<String> of an identity access token to supply
@@ -284,6 +287,8 @@ export function MatrixClient(opts) {
             // will be used during async initialization of the crypto
             this._exportedOlmDeviceToImport = opts.deviceToImport.olmDevice;
         }
+    } else if (opts.pickleKey) {
+        this.pickleKey = opts.pickleKey;
     }
 
     this.scheduler = opts.scheduler;
@@ -746,6 +751,7 @@ MatrixClient.prototype.initCrypto = async function() {
     logger.log("Crypto: initialising crypto object...");
     await crypto.init({
         exportedOlmDevice: this._exportedOlmDeviceToImport,
+        pickleKey: this.pickleKey,
     });
     delete this._exportedOlmDeviceToImport;
 
