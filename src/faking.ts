@@ -78,17 +78,37 @@ class State<T, V> {
  * Using the state monad here allows us to write random object generators.
  * We can build them up combinatorially while threading the state of
  * the RNG through stuff.
+ * 
+ * A state monad is basically a big, composed function that says "when you get this input
+ * state, do these things and return the new state and result".  The magic is that we can
+ * put them together, with helper functions that mutate the state, without ever having to
+ * think about threading the state around again.
+ * 
+ * Normal, healthy programmers would probably just make it a global.
  */
+
+ /* Helpfully, `xorshit128p` already follows the { state, value } pair output format that
+  * our state monad defines, so the implemntation is trivial */
 const Random = new State<Xorshift128pState, number>((s: Xorshift128pState) => xorshift128p(s));
+
+/* A random int is just a transformed Random */
 const RandInt = (n: number) => Random.map((v) => Math.floor(v * n));
+
+/* A random item in a list is just a random index used on that list */
 const Choose = <T>(a: T[]) => RandInt(a.length).map(v => a[v]);
+
+/* Build a random character string of a given length */
 const alphabet: string[] = "abcdefghijklmnopqrstuvwxyz".split("");
 const RandStr = (l: number) => State.sequence<Xorshift128pState, string>((new Array(l || 1)).fill(Choose(alphabet)))
                                     .map((v) => v.join(""));
 
+/* Building blocks for identifiers */
 const RoomId = RandStr(20).map((v) => `!${v}:localhost`);
 const UserId = RandStr(20).map((v) => `@${v}:localhost`);
 const EventId = RandStr(40).map((v) => "$" + v);
+
+/* Here's our big compositional win: using State.obj, we push the random state through
+* every element of an object, making a randomly generated room message */
 const MessageEvent = ({roomId, users}: {roomId: string, users?: string[]}) => State.obj({
     type: State.pure("m.room.message"),
     sender: users ? Choose(users) : UserId,
@@ -224,10 +244,13 @@ const Rooms = (n: number) => State.sequence((new Array(n)).fill(Room)).map((rs) 
   Object.assign({}, ...rs));
 
 // This is just {a: 1n, b: 1n} iterated 20 times
+// Starting at 1,1 tends to keep the RNG at very small values for a few iterations
+// so we punt it along a bit
 const Seed = State.put({a: BigInt(1), b: BigInt(1)})
              .flatMap(() => State.sequence((new Array(20)).fill(Random)))
              .map(() => undefined);
 
+/* A helper to execute a state monad using our predefined seed. */
 function randomly<T, V>(s: State<undefined, V>) {
     return Seed.flatMap(() => s).runState(undefined).value;
 }
