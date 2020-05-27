@@ -78,12 +78,12 @@ class State<T, V> {
  * Using the state monad here allows us to write random object generators.
  * We can build them up combinatorially while threading the state of
  * the RNG through stuff.
- * 
+ *
  * A state monad is basically a big, composed function that says "when you get this input
  * state, do these things and return the new state and result".  The magic is that we can
  * put them together, with helper functions that mutate the state, without ever having to
  * think about threading the state around again.
- * 
+ *
  * Normal, healthy programmers would probably just make it a global.
  */
 
