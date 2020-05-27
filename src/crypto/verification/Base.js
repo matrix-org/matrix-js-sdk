@@ -122,6 +122,11 @@ export class VerificationBase extends EventEmitter {
         if (this._done) {
             return Promise.reject(new Error("Verification is already done"));
         }
+        const existingEvent = this.request.getEventFromOtherParty(type);
+        if (existingEvent) {
+            return Promise.resolve(existingEvent);
+        }
+
         this._expectedEvent = type;
         return new Promise((resolve, reject) => {
             this._resolveEvent = resolve;
@@ -287,6 +292,7 @@ export class VerificationBase extends EventEmitter {
         this._endTimer(); // always kill the activity timer
         if (!this._done) {
             this.cancelled = true;
+            this.request.onVerifierCancelled();
             if (this.userId && this.deviceId) {
                 // send a cancellation to the other user (if it wasn't
                 // cancelled by the other user)
@@ -369,7 +375,7 @@ export class VerificationBase extends EventEmitter {
 
         for (const [keyId, keyInfo] of Object.entries(keys)) {
             const deviceId = keyId.split(':', 2)[1];
-            const device = await this._baseApis.getStoredDevice(userId, deviceId);
+            const device = this._baseApis.getStoredDevice(userId, deviceId);
             if (device) {
                 await verifier(keyId, device, keyInfo);
                 verifiedDevices.push(deviceId);

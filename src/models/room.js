@@ -209,7 +209,7 @@ utils.inherits(Room, EventEmitter);
 Room.prototype.getVersion = function() {
     const createEvent = this.currentState.getStateEvents("m.room.create", "");
     if (!createEvent) {
-        logger.warn("Room " + this.room_id + " does not have an m.room.create event");
+        logger.warn("Room " + this.roomId + " does not have an m.room.create event");
         return '1';
     }
     const ver = createEvent.getContent()['room_version'];
@@ -675,7 +675,7 @@ Room.prototype.hasUnverifiedDevices = async function() {
     }
     const e2eMembers = await this.getEncryptionTargetMembers();
     for (const member of e2eMembers) {
-        const devices = await this._client.getStoredDevicesForUser(member.userId);
+        const devices = this._client.getStoredDevicesForUser(member.userId);
         if (devices.some((device) => device.isUnverified())) {
             return true;
         }

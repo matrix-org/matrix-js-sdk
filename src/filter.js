@@ -56,13 +56,6 @@ Filter.LAZY_LOADING_MESSAGES_FILTER = {
     lazy_load_members: true,
 };
 
-Filter.LAZY_LOADING_SYNC_FILTER = {
-    room: {
-        state: Filter.LAZY_LOADING_MESSAGES_FILTER,
-    },
-};
-
-
 /**
  * Get the ID of this filter on your homeserver (if known)
  * @return {?Number} The filter ID
@@ -96,6 +89,7 @@ Filter.prototype.setDefinition = function(definition) {
     //     "state": {
     //       "types": ["m.room.*"],
     //       "not_rooms": ["!726s6s6q:example.com"],
+    //       "lazy_load_members": true,
     //     },
     //     "timeline": {
     //       "limit": 10,
@@ -175,6 +169,10 @@ Filter.prototype.filterRoomTimeline = function(events) {
  */
 Filter.prototype.setTimelineLimit = function(limit) {
     setProp(this.definition, "room.timeline.limit", limit);
+};
+
+Filter.prototype.setLazyLoadMembers = function(enabled) {
+    setProp(this.definition, "room.state.lazy_load_members", !!enabled);
 };
 
 /**

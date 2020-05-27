@@ -49,6 +49,13 @@ async function makeTestClient(userInfo, options) {
     return client;
 }
 
+// Wrapper around pkSign to return a signed object. pkSign returns the
+// signature, rather than the signed object.
+function sign(obj, key, userId) {
+    olmlib.pkSign(obj, key, userId);
+    return obj;
+}
+
 describe("Secrets", function() {
     if (!global.Olm) {
         console.warn('Not running megolm backup unit tests: libolm not present');
@@ -266,104 +273,259 @@ describe("Secrets", function() {
         expect(secret).toBe("bar");
     });
 
-    it("bootstraps when no storage or cross-signing keys locally", async function() {
-        const key = new Uint8Array(16);
-        for (let i = 0; i < 16; i++) key[i] = i;
-        const getKey = jest.fn(e => {
-            return [Object.keys(e.keys)[0], key];
-        });
-
-        const bob = await makeTestClient(
-            {
-                userId: "@bob:example.com",
-                deviceId: "bob1",
-            },
-            {
-                cryptoCallbacks: {
-                    getSecretStorageKey: getKey,
-                },
-            },
+    describe("bootstrap", function() {
+        // keys used in some of the tests
+        const XSK = new Uint8Array(
+            olmlib.decodeBase64("3lo2YdJugHjfE+Or7KJ47NuKbhE7AAGLgQ/dc19913Q="),
         );
-        bob.uploadDeviceSigningKeys = async () => {};
-        bob.uploadKeySignatures = async () => {};
-        bob.setAccountData = async function(eventType, contents, callback) {
-            const event = new MatrixEvent({
-                type: eventType,
-                content: contents,
+        const XSPubKey = "DRb8pFVJyEJ9OWvXeUoM0jq/C2Wt+NxzBZVuk2nRb+0";
+        const USK = new Uint8Array(
+            olmlib.decodeBase64("lKWi3hJGUie5xxHgySoz8PHFnZv6wvNaud/p2shN9VU="),
+        );
+        const USPubKey = "CUpoiTtHiyXpUmd+3ohb7JVxAlUaOG1NYs9Jlx8soQU";
+        const SSK = new Uint8Array(
+            olmlib.decodeBase64("1R6JVlXX99UcfUZzKuCDGQgJTw8ur1/ofgPD8pp+96M="),
+        );
+        const SSPubKey = "0DfNsRDzEvkCLA0gD3m7VAGJ5VClhjEsewI35xq873Q";
+        const SSSSKey = new Uint8Array(
+            olmlib.decodeBase64(
+                "XrmITOOdBhw6yY5Bh7trb/bgp1FRdIGyCUxxMP873R0=",
+            ),
+        );
+
+        it("bootstraps when no storage or cross-signing keys locally", async function() {
+            const key = new Uint8Array(16);
+            for (let i = 0; i < 16; i++) key[i] = i;
+            const getKey = jest.fn(e => {
+                return [Object.keys(e.keys)[0], key];
             });
-            this.store.storeAccountDataEvents([
-                event,
-            ]);
-            this.emit("accountData", event);
-        };
 
-        await bob.bootstrapSecretStorage();
-
-        const crossSigning = bob._crypto._crossSigningInfo;
-        const secretStorage = bob._crypto._secretStorage;
-
-        expect(crossSigning.getId()).toBeTruthy();
-        expect(await crossSigning.isStoredInSecretStorage(secretStorage)).toBeTruthy();
-        expect(await secretStorage.hasKey()).toBeTruthy();
-    });
-
-    it("bootstraps when cross-signing keys in secret storage", async function() {
-        const decryption = new global.Olm.PkDecryption();
-        const storagePublicKey = decryption.generate_key();
-        const storagePrivateKey = decryption.get_private_key();
-
-        const bob = await makeTestClient(
-            {
-                userId: "@bob:example.com",
-                deviceId: "bob1",
-            },
-            {
-                cryptoCallbacks: {
-                    getSecretStorageKey: async request => {
-                        const defaultKeyId = await bob.getDefaultSecretStorageKeyId();
-                        expect(Object.keys(request.keys)).toEqual([defaultKeyId]);
-                        return [defaultKeyId, storagePrivateKey];
+            const bob = await makeTestClient(
+                {
+                    userId: "@bob:example.com",
+                    deviceId: "bob1",
+                },
+                {
+                    cryptoCallbacks: {
+                        getSecretStorageKey: getKey,
                     },
                 },
-            },
-        );
+            );
+            bob.uploadDeviceSigningKeys = async () => {};
+            bob.uploadKeySignatures = async () => {};
+            bob.setAccountData = async function(eventType, contents, callback) {
+                const event = new MatrixEvent({
+                    type: eventType,
+                    content: contents,
+                });
+                this.store.storeAccountDataEvents([
+                    event,
+                ]);
+                this.emit("accountData", event);
+            };
 
-        bob.uploadDeviceSigningKeys = async () => {};
-        bob.uploadKeySignatures = async () => {};
-        bob.setAccountData = async function(eventType, contents, callback) {
-            const event = new MatrixEvent({
-                type: eventType,
-                content: contents,
-            });
-            this.store.storeAccountDataEvents([
-                event,
-            ]);
-            this.emit("accountData", event);
-        };
-        bob._crypto.checkKeyBackup = async () => {};
+            await bob.bootstrapSecretStorage();
 
-        const crossSigning = bob._crypto._crossSigningInfo;
-        const secretStorage = bob._crypto._secretStorage;
+            const crossSigning = bob._crypto._crossSigningInfo;
+            const secretStorage = bob._crypto._secretStorage;
 
-        // Set up cross-signing keys from scratch with specific storage key
-        await bob.bootstrapSecretStorage({
-            createSecretStorageKey: async () => ({
-                // `pubkey` not used anymore with symmetric 4S
-                keyInfo: { pubkey: storagePublicKey },
-                privateKey: storagePrivateKey,
-            }),
+            expect(crossSigning.getId()).toBeTruthy();
+            expect(await crossSigning.isStoredInSecretStorage(secretStorage))
+                .toBeTruthy();
+            expect(await secretStorage.hasKey()).toBeTruthy();
         });
 
-        // Clear local cross-signing keys and read from secret storage
-        bob._crypto._deviceList.storeCrossSigningForUser(
-            "@bob:example.com",
-            crossSigning.toStorage(),
-        );
-        crossSigning.keys = {};
-        await bob.bootstrapSecretStorage();
+        it("bootstraps when cross-signing keys in secret storage", async function() {
+            const decryption = new global.Olm.PkDecryption();
+            const storagePublicKey = decryption.generate_key();
+            const storagePrivateKey = decryption.get_private_key();
 
-        expect(crossSigning.getId()).toBeTruthy();
-        expect(await crossSigning.isStoredInSecretStorage(secretStorage)).toBeTruthy();
-        expect(await secretStorage.hasKey()).toBeTruthy();
+            const bob = await makeTestClient(
+                {
+                    userId: "@bob:example.com",
+                    deviceId: "bob1",
+                },
+                {
+                    cryptoCallbacks: {
+                        getSecretStorageKey: async request => {
+                            const defaultKeyId = await bob.getDefaultSecretStorageKeyId();
+                            expect(Object.keys(request.keys)).toEqual([defaultKeyId]);
+                            return [defaultKeyId, storagePrivateKey];
+                        },
+                    },
+                },
+            );
+
+            bob.uploadDeviceSigningKeys = async () => {};
+            bob.uploadKeySignatures = async () => {};
+            bob.setAccountData = async function(eventType, contents, callback) {
+                const event = new MatrixEvent({
+                    type: eventType,
+                    content: contents,
+                });
+                this.store.storeAccountDataEvents([
+                    event,
+                ]);
+                this.emit("accountData", event);
+            };
+            bob._crypto.checkKeyBackup = async () => {};
+
+            const crossSigning = bob._crypto._crossSigningInfo;
+            const secretStorage = bob._crypto._secretStorage;
+
+            // Set up cross-signing keys from scratch with specific storage key
+            await bob.bootstrapSecretStorage({
+                createSecretStorageKey: async () => ({
+                    // `pubkey` not used anymore with symmetric 4S
+                    keyInfo: { pubkey: storagePublicKey },
+                    privateKey: storagePrivateKey,
+                }),
+            });
+
+            // Clear local cross-signing keys and read from secret storage
+            bob._crypto._deviceList.storeCrossSigningForUser(
+                "@bob:example.com",
+                crossSigning.toStorage(),
+            );
+            crossSigning.keys = {};
+            await bob.bootstrapSecretStorage();
+
+            expect(crossSigning.getId()).toBeTruthy();
+            expect(await crossSigning.isStoredInSecretStorage(secretStorage))
+                .toBeTruthy();
+            expect(await secretStorage.hasKey()).toBeTruthy();
+        });
+
+        it("adds passphrase checking if it's lacking", async function() {
+            let crossSigningKeys = {
+                master: XSK,
+                user_signing: USK,
+                self_signing: SSK,
+            };
+            const secretStorageKeys = {
+                key_id: SSSSKey,
+            };
+            const alice = await makeTestClient(
+                {userId: "@alice:example.com", deviceId: "Osborne2"},
+                {
+                    cryptoCallbacks: {
+                        getCrossSigningKey: t => crossSigningKeys[t],
+                        saveCrossSigningKeys: k => crossSigningKeys = k,
+                        getSecretStorageKey: ({keys}, name) => {
+                            for (const keyId of Object.keys(keys)) {
+                                if (secretStorageKeys[keyId]) {
+                                    return [keyId, secretStorageKeys[keyId]];
+                                }
+                            }
+                        },
+                    },
+                },
+            );
+            alice.store.storeAccountDataEvents([
+                new MatrixEvent({
+                    type: "m.secret_storage.default_key",
+                    content: {
+                        key: "key_id",
+                    },
+                }),
+                new MatrixEvent({
+                    type: "m.secret_storage.key.key_id",
+                    content: {
+                        algorithm: "m.secret_storage.v1.aes-hmac-sha2",
+                        passphrase: {
+                            algorithm: "m.pbkdf2",
+                            iterations: 500000,
+                            salt: "GbkvwKHVMveo1zGVSb2GMMdCinG2npJK",
+                        },
+                    },
+                }),
+                // we never use these values, other than checking that they
+                // exist, so just use dummy values
+                new MatrixEvent({
+                    type: "m.cross_signing.master",
+                    content: {
+                        encrypted: {
+                            key_id: {ciphertext: "bla", mac: "bla", iv: "bla"},
+                        },
+                    },
+                }),
+                new MatrixEvent({
+                    type: "m.cross_signing.self_signing",
+                    content: {
+                        encrypted: {
+                            key_id: {ciphertext: "bla", mac: "bla", iv: "bla"},
+                        },
+                    },
+                }),
+                new MatrixEvent({
+                    type: "m.cross_signing.user_signing",
+                    content: {
+                        encrypted: {
+                            key_id: {ciphertext: "bla", mac: "bla", iv: "bla"},
+                        },
+                    },
+                }),
+            ]);
+            alice._crypto._deviceList.storeCrossSigningForUser("@alice:example.com", {
+                keys: {
+                    master: {
+                        user_id: "@alice:example.com",
+                        usage: ["master"],
+                        keys: {
+                            [`ed25519:${XSPubKey}`]: XSPubKey,
+                        },
+                    },
+                    self_signing: sign({
+                        user_id: "@alice:example.com",
+                        usage: ["self_signing"],
+                        keys: {
+                            [`ed25519:${SSPubKey}`]: SSPubKey,
+                        },
+                    }, XSK, "@alice:example.com"),
+                    user_signing: sign({
+                        user_id: "@alice:example.com",
+                        usage: ["user_signing"],
+                        keys: {
+                            [`ed25519:${USPubKey}`]: USPubKey,
+                        },
+                    }, XSK, "@alice:example.com"),
+                },
+            });
+            alice.getKeyBackupVersion = async () => {
+                return {
+                    version: "1",
+                    algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
+                    auth_data: sign({
+                        public_key: "pxEXhg+4vdMf/kFwP4bVawFWdb0EmytL3eFJx++zQ0A",
+                    }, XSK, "@alice:example.com"),
+                };
+            };
+            alice.setAccountData = async function(name, data) {
+                const event = new MatrixEvent({
+                    type: name,
+                    content: data,
+                });
+                alice.store.storeAccountDataEvents([event]);
+                this.emit("accountData", event);
+            };
+
+            await alice.bootstrapSecretStorage();
+
+            expect(alice.getAccountData("m.secret_storage.default_key").getContent())
+                .toEqual({key: "key_id"});
+            const keyInfo = alice.getAccountData("m.secret_storage.key.key_id")
+                .getContent();
+            expect(keyInfo.algorithm)
+                .toEqual("m.secret_storage.v1.aes-hmac-sha2");
+            expect(keyInfo.passphrase).toEqual({
+                algorithm: "m.pbkdf2",
+                iterations: 500000,
+                salt: "GbkvwKHVMveo1zGVSb2GMMdCinG2npJK",
+            });
+            expect(keyInfo).toHaveProperty("iv");
+            expect(keyInfo).toHaveProperty("mac");
+            expect(alice.checkSecretStorageKey(secretStorageKeys.key_id, keyInfo))
+                .toBeTruthy();
+        });
     });
 });

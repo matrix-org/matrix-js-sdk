@@ -311,7 +311,7 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
                         }
 
                         await this._shareKeyWithDevices(
-                            session, key, payload, retryDevices, failedDevices,
+                            session, key, payload, retryDevices, failedDevices, 30000,
                         );
 
                         await this._notifyFailedOlmDevices(session, key, failedDevices);
@@ -521,6 +521,33 @@ MegolmEncryption.prototype._encryptAndSendKeysToDevices = function(
     }
 
     return Promise.all(promises).then(() => {
+        // prune out any devices that encryptMessageForDevice could not encrypt for,
+        // in which case it will have just not added anything to the ciphertext object.
+        // There's no point sending messages to devices if we couldn't encrypt to them,
+        // since that's effectively a blank message.
+        for (const userId of Object.keys(contentMap)) {
+            for (const deviceId of Object.keys(contentMap[userId])) {
+                if (Object.keys(contentMap[userId][deviceId].ciphertext).length === 0) {
+                    logger.log(
+                        "No ciphertext for device " +
+                        userId + ":" + deviceId + ": pruning",
+                    );
+                    delete contentMap[userId][deviceId];
+                }
+            }
+            // No devices left for that user? Strip that too.
+            if (Object.keys(contentMap[userId]).length === 0) {
+                logger.log("Pruned all devices for user " + userId);
+                delete contentMap[userId];
+            }
+        }
+
+        // Is there anything left?
+        if (Object.keys(contentMap).length === 0) {
+            logger.log("No users left to send to: aborting");
+            return;
+        }
+
         return this._baseApis.sendToDevice("m.room.encrypted", contentMap).then(() => {
             // store that we successfully uploaded the keys of the current slice
             for (const userId of Object.keys(contentMap)) {
@@ -1296,7 +1323,6 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
         keysClaimed = event.getKeysClaimed();
     }
 
-    logger.log(`Received and adding key for megolm session ${senderKey}|${sessionId}`);
     return this._olmDevice.addInboundGroupSession(
         content.room_id, senderKey, forwardingKeyChain, sessionId,
         content.session_key, keysClaimed,
@@ -1555,7 +1581,8 @@ MegolmDecryption.prototype.importRoomKey = function(session) {
 };
 
 /**
- * Have another go at decrypting events after we receive a key
+ * Have another go at decrypting events after we receive a key. Resolves once
+ * decryption has been re-attempted on all events.
  *
  * @private
  * @param {String} senderKey
@@ -1574,21 +1601,17 @@ MegolmDecryption.prototype._retryDecryption = async function(senderKey, sessionI
         return true;
     }
 
-    pending.delete(sessionId);
-    if (pending.size === 0) {
-        this._pendingEvents[senderKey];
-    }
+    logger.debug("Retrying decryption on events", [...pending]);
 
     await Promise.all([...pending].map(async (ev) => {
         try {
-            await ev.attemptDecryption(this._crypto);
+            await ev.attemptDecryption(this._crypto, true);
         } catch (e) {
             // don't die if something goes wrong
         }
     }));
 
-    // ev.attemptDecryption will re-add to this._pendingEvents if an event
-    // couldn't be decrypted
+    // If decrypted successfully, they'll have been removed from _pendingEvents
     return !((this._pendingEvents[senderKey] || {})[sessionId]);
 };
 

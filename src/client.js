@@ -35,7 +35,12 @@ import {StubStore} from "./store/stub";
 import {createNewMatrixCall} from "./webrtc/call";
 import * as utils from './utils';
 import {sleep} from './utils';
-import {MatrixError, PREFIX_MEDIA_R0, PREFIX_UNSTABLE} from "./http-api";
+import {
+    MatrixError,
+    PREFIX_MEDIA_R0,
+    PREFIX_UNSTABLE,
+    retryNetworkOperation,
+} from "./http-api";
 import {getHttpUriForMxc} from "./content-repo";
 import * as ContentHelpers from "./content-helpers";
 import * as olmlib from "./crypto/olmlib";
@@ -48,6 +53,7 @@ import {keyFromAuthData} from './crypto/key_passphrase';
 import {randomString} from './randomstring';
 import {PushProcessor} from "./pushprocessor";
 import {encodeBase64, decodeBase64} from "./crypto/olmlib";
+import { User } from "./models/user";
 
 const SCROLLBACK_DELAY_MS = 3000;
 export const CRYPTO_ENABLED = isCryptoAvailable();
@@ -731,6 +737,7 @@ MatrixClient.prototype.initCrypto = async function() {
         "crypto.roomKeyRequestCancellation",
         "crypto.warning",
         "crypto.devicesUpdated",
+        "crypto.willUpdateDevices",
         "deviceVerificationChanged",
         "userTrustStatusChanged",
         "crossSigning.keysChanged",
@@ -819,9 +826,9 @@ MatrixClient.prototype.downloadKeys = function(userIds, forceDownload) {
  *
  * @param {string} userId the user to list keys for.
  *
- * @return {Promise<module:crypto/deviceinfo[]>} list of devices
+ * @return {module:crypto/deviceinfo[]} list of devices
  */
-MatrixClient.prototype.getStoredDevicesForUser = async function(userId) {
+MatrixClient.prototype.getStoredDevicesForUser = function(userId) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
@@ -834,9 +841,9 @@ MatrixClient.prototype.getStoredDevicesForUser = async function(userId) {
  * @param {string} userId the user to list keys for.
  * @param {string} deviceId unique identifier for the device
  *
- * @return {Promise<?module:crypto/deviceinfo>} device or null
+ * @return {module:crypto/deviceinfo} device or null
  */
-MatrixClient.prototype.getStoredDevice = async function(userId, deviceId) {
+MatrixClient.prototype.getStoredDevice = function(userId, deviceId) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
@@ -1303,7 +1310,6 @@ wrapCryptoFuncs(MatrixClient, [
     "bootstrapSecretStorage",
     "addSecretStorageKey",
     "hasSecretStorageKey",
-    "secretStorageKeyNeedsUpgrade",
     "storeSecret",
     "getSecret",
     "isSecretStored",
@@ -1357,7 +1363,8 @@ MatrixClient.prototype.cancelAndResendEventRoomKeyRequest = function(event) {
 };
 
 /**
- * Enable end-to-end encryption for a room.
+ * Enable end-to-end encryption for a room. This does not modify room state.
+ * Any messages sent before the returned promise resolves will be sent unencrypted.
  * @param {string} roomId The room ID to enable encryption in.
  * @param {object} config The encryption config for the room.
  * @return {Promise} A promise that will resolve when encryption is set up.
@@ -1429,15 +1436,17 @@ MatrixClient.prototype.exportRoomKeys = function() {
  * Import a list of room keys previously exported by exportRoomKeys
  *
  * @param {Object[]} keys a list of session export objects
+ * @param {Object} opts
+ * @param {Function} opts.progressCallback called with an object that has a "stage" param
  *
  * @return {Promise} a promise which resolves when the keys
  *    have been imported
  */
-MatrixClient.prototype.importRoomKeys = function(keys) {
+MatrixClient.prototype.importRoomKeys = function(keys, opts) {
     if (!this._crypto) {
         throw new Error("End-to-end encryption disabled");
     }
-    return this._crypto.importRoomKeys(keys);
+    return this._crypto.importRoomKeys(keys, opts);
 };
 
 /**
@@ -1497,11 +1506,15 @@ MatrixClient.prototype.isKeyBackupTrusted = function(info) {
 
 /**
  * @returns {bool} true if the client is configured to back up keys to
- *     the server, otherwise false.
+ *     the server, otherwise false. If we haven't completed a successful check
+ *     of key backup status yet, returns null.
  */
 MatrixClient.prototype.getKeyBackupEnabled = function() {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
+    }
+    if (!this._crypto._checkedForBackup) {
+        return null;
     }
     return Boolean(this._crypto.backupKey);
 };
@@ -1870,7 +1883,10 @@ MatrixClient.prototype.restoreKeyBackupWithCache = async function(
 
 MatrixClient.prototype._restoreKeyBackup = function(
     privKey, targetRoomId, targetSessionId, backupInfo,
-    { cacheCompleteCallback }={}, // For sequencing during tests
+    {
+        cacheCompleteCallback, // For sequencing during tests
+        progressCallback,
+    }={},
 ) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
@@ -1904,6 +1920,12 @@ MatrixClient.prototype._restoreKeyBackup = function(
     .catch((e) => {
         console.warn("Error caching session backup key:", e);
     }).then(cacheCompleteCallback);
+
+    if (progressCallback) {
+        progressCallback({
+            stage: "fetch",
+        });
+    }
 
     return this._http.authedRequest(
         undefined, "GET", path.path, path.queryData, undefined,
@@ -1939,7 +1961,7 @@ MatrixClient.prototype._restoreKeyBackup = function(
             }
         }
 
-        return this.importRoomKeys(keys);
+        return this.importRoomKeys(keys, { progressCallback });
     }).then(() => {
         return this._crypto.setTrustedBackupPubKey(backupPubKey);
     }).then(() => {
@@ -2075,6 +2097,7 @@ MatrixClient.prototype.getUsers = function() {
 
 /**
  * Set account data event for the current user.
+ * It will retry the request up to 5 times.
  * @param {string} eventType The event type
  * @param {Object} contents the contents object for the event
  * @param {module:client.callback} callback Optional.
@@ -2086,9 +2109,13 @@ MatrixClient.prototype.setAccountData = function(eventType, contents, callback) 
         $userId: this.credentials.userId,
         $type: eventType,
     });
-    return this._http.authedRequest(
-        callback, "PUT", path, undefined, contents,
-    );
+    const promise = retryNetworkOperation(5, () => {
+        return this._http.authedRequest(undefined, "PUT", path, undefined, contents);
+    });
+    if (callback) {
+        promise.then(result => callback(null, result), callback);
+    }
+    return promise;
 };
 
 /**
@@ -2123,9 +2150,17 @@ MatrixClient.prototype.getAccountDataFromServer = async function(eventType) {
         $userId: this.credentials.userId,
         $type: eventType,
     });
-    return this._http.authedRequest(
-        undefined, "GET", path, undefined,
-    );
+    try {
+        const result = await this._http.authedRequest(
+            undefined, "GET", path, undefined,
+        );
+        return result;
+    } catch (e) {
+        if (e.data && e.data.errcode === 'M_NOT_FOUND') {
+            return null;
+        }
+        throw e;
+    }
 };
 
 /**
@@ -2439,6 +2474,7 @@ MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
     const localEvent = new MatrixEvent(Object.assign(eventObject, {
         event_id: "~" + roomId + ":" + txnId,
         user_id: this.credentials.userId,
+        sender: this.credentials.userId,
         room_id: roomId,
         origin_server_ts: new Date().getTime(),
     }));
@@ -4499,64 +4535,54 @@ MatrixClient.prototype.getFilter = function(userId, filterId, allowCached) {
  * @param {Filter} filter
  * @return {Promise<String>} Filter ID
  */
-MatrixClient.prototype.getOrCreateFilter = function(filterName, filter) {
+MatrixClient.prototype.getOrCreateFilter = async function(filterName, filter) {
     const filterId = this.store.getFilterIdByName(filterName);
-    let promise = Promise.resolve();
-    const self = this;
+    let existingId = undefined;
 
     if (filterId) {
         // check that the existing filter matches our expectations
-        promise = self.getFilter(self.credentials.userId,
-                         filterId, true,
-        ).then(function(existingFilter) {
-            const oldDef = existingFilter.getDefinition();
-            const newDef = filter.getDefinition();
+        try {
+            const existingFilter =
+                await this.getFilter(this.credentials.userId, filterId, true);
+            if (existingFilter) {
+                const oldDef = existingFilter.getDefinition();
+                const newDef = filter.getDefinition();
 
-            if (utils.deepCompare(oldDef, newDef)) {
-                // super, just use that.
-                // debuglog("Using existing filter ID %s: %s", filterId,
-                //          JSON.stringify(oldDef));
-                return Promise.resolve(filterId);
+                if (utils.deepCompare(oldDef, newDef)) {
+                    // super, just use that.
+                    // debuglog("Using existing filter ID %s: %s", filterId,
+                    //          JSON.stringify(oldDef));
+                    existingId = filterId;
+                }
             }
-            // debuglog("Existing filter ID %s: %s; new filter: %s",
-            //          filterId, JSON.stringify(oldDef), JSON.stringify(newDef));
-            self.store.setFilterIdByName(filterName, undefined);
-            return undefined;
-        }, function(error) {
+        } catch (error) {
             // Synapse currently returns the following when the filter cannot be found:
             // {
             //     errcode: "M_UNKNOWN",
             //     name: "M_UNKNOWN",
             //     message: "No row found",
-            //     data: Object, httpStatus: 404
             // }
-            if (error.httpStatus === 404 &&
-                (error.errcode === "M_UNKNOWN" || error.errcode === "M_NOT_FOUND")) {
-                // Clear existing filterId from localStorage
-                // if it no longer exists on the server
-                self.store.setFilterIdByName(filterName, undefined);
-                // Return a undefined value for existingId further down the promise chain
-                return undefined;
-            } else {
+            if (error.errcode !== "M_UNKNOWN" && error.errcode !== "M_NOT_FOUND") {
                 throw error;
             }
-        });
+        }
+        // if the filter doesn't exist anymore on the server, remove from store
+        if (!existingId) {
+            this.store.setFilterIdByName(filterName, undefined);
+        }
     }
 
-    return promise.then(function(existingId) {
-        if (existingId) {
-            return existingId;
-        }
+    if (existingId) {
+        return existingId;
+    }
 
-        // create a new filter
-        return self.createFilter(filter.getDefinition(),
-        ).then(function(createdFilter) {
-            // debuglog("Created new filter ID %s: %s", createdFilter.filterId,
-            //          JSON.stringify(createdFilter.getDefinition()));
-            self.store.setFilterIdByName(filterName, createdFilter.filterId);
-            return createdFilter.filterId;
-        });
-    });
+    // create a new filter
+    const createdFilter = await this.createFilter(filter.getDefinition());
+
+    // debuglog("Created new filter ID %s: %s", createdFilter.filterId,
+    //          JSON.stringify(createdFilter.getDefinition()));
+    this.store.setFilterIdByName(filterName, createdFilter.filterId);
+    return createdFilter.filterId;
 };
 
 
@@ -4732,6 +4758,13 @@ MatrixClient.prototype.startClient = async function(opts) {
         opts = {
             initialSyncLimit: opts,
         };
+    }
+
+    // Create our own user object artificially (instead of waiting for sync)
+    // so it's always available, even if the user is not in any rooms etc.
+    const userId = this.getUserId();
+    if (userId) {
+        this.store.storeUser(new User(userId));
     }
 
     if (this._crypto) {
@@ -5247,17 +5280,20 @@ function _resolve(callback, resolve, res) {
     resolve(res);
 }
 
-function _PojoToMatrixEventMapper(client) {
+function _PojoToMatrixEventMapper(client, options) {
+    const preventReEmit = Boolean(options && options.preventReEmit);
     function mapper(plainOldJsObject) {
         const event = new MatrixEvent(plainOldJsObject);
         if (event.isEncrypted()) {
-            client.reEmitter.reEmit(event, [
-                "Event.decrypted",
-            ]);
+            if (!preventReEmit) {
+                client.reEmitter.reEmit(event, [
+                    "Event.decrypted",
+                ]);
+            }
             event.attemptDecryption(client._crypto);
         }
         const room = client.getRoom(event.getRoomId());
-        if (room) {
+        if (room && !preventReEmit) {
             room.reEmitter.reEmit(event, ["Event.replaced"]);
         }
         return event;
@@ -5266,10 +5302,12 @@ function _PojoToMatrixEventMapper(client) {
 }
 
 /**
+ * @param {object} [options]
+ * @param {bool} options.preventReEmit don't reemit events emitted on an event mapped by this mapper on the client
  * @return {Function}
  */
-MatrixClient.prototype.getEventMapper = function() {
-    return _PojoToMatrixEventMapper(this);
+MatrixClient.prototype.getEventMapper = function(options = undefined) {
+    return _PojoToMatrixEventMapper(this, options);
 };
 
 /**
@@ -5553,6 +5591,22 @@ MatrixClient.prototype.generateClientSecret = function() {
  * matrixClient.on("accountData", function(event){
  *   myAccountData[event.type] = event.content;
  * });
+ */
+
+/**
+ * Fires whenever the stored devices for a user have changed
+ * @event module:client~MatrixClient#"crypto.devicesUpdated"
+ * @param {String[]} users A list of user IDs that were updated
+ * @param {bool} initialFetch If true, the store was empty (apart
+ *     from our own device) and has been seeded.
+ */
+
+/**
+ * Fires whenever the stored devices for a user will be updated
+ * @event module:client~MatrixClient#"crypto.willUpdateDevices"
+ * @param {String[]} users A list of user IDs that will be updated
+ * @param {bool} initialFetch If true, the store is empty (apart
+ *     from our own device) and is being seeded.
  */
 
 /**

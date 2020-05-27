@@ -169,7 +169,9 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     this._deviceList.on(
         'userCrossSigningUpdated', this._onDeviceListUserCrossSigningUpdated,
     );
-    this._reEmitter.reEmit(this._deviceList, ["crypto.devicesUpdated"]);
+    this._reEmitter.reEmit(this._deviceList, [
+        "crypto.devicesUpdated", "crypto.willUpdateDevices",
+    ]);
 
     // the last time we did a check for the number of one-time-keys on the
     // server.
@@ -223,6 +225,11 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     this._toDeviceVerificationRequests = new ToDeviceRequests();
     this._inRoomVerificationRequests = new InRoomRequests();
 
+    // This flag will be unset whilst the client processes a sync response
+    // so that we don't start requesting keys until we've actually finished
+    // processing the response.
+    this._sendKeyRequestsImmediately = false;
+
     const cryptoCallbacks = this._baseApis._cryptoCallbacks || {};
     const cacheCallbacks = createCryptoStoreCacheCallbacks(cryptoStore);
 
@@ -233,7 +240,7 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     );
 
     this._secretStorage = new SecretStorage(
-        baseApis, cryptoCallbacks, this._crossSigningInfo,
+        baseApis, cryptoCallbacks,
     );
 
     // Assuming no app-supplied callback, default to getting from SSSS.
@@ -306,7 +313,8 @@ Crypto.prototype.init = async function(opts) {
         'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
         (txn) => {
             this._cryptoStore.getCrossSigningKeys(txn, (keys) => {
-                if (keys) {
+                // can be an empty object after resetting cross-signing keys, see _storeTrustedSelfKeys
+                if (keys && Object.keys(keys).length !== 0) {
                     logger.log("Loaded cross-signing public keys from crypto store");
                     this._crossSigningInfo.setKeys(keys);
                 }
@@ -432,6 +440,14 @@ Crypto.prototype.isCrossSigningReady = async function() {
  * up, then no changes are made, so this is safe to run to ensure secret storage
  * is ready for use.
  *
+ * This function
+ * - creates a new Secure Secret Storage key if no default key exists
+ *   - if a key backup exists, it is migrated to store the key in the Secret
+ *     Storage
+ * - creates a backup if none exists, and one is requested
+ * - migrates Secure Secret Storage to use the latest algorithm, if an outdated
+ *   algorithm is found
+ *
  * @param {function} [opts.authUploadDeviceSigningKeys] Optional. Function
  * called to await an interactive auth flow when uploading device signing keys.
  * Args:
@@ -501,172 +517,160 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             return key;
         };
 
+    // create a new SSSS key and set it as default
+    const createSSSS = async (opts, privateKey) => {
+        opts = opts || {};
+        if (privateKey) {
+            opts.key = privateKey;
+        }
+
+        const keyId = await this.addSecretStorageKey(
+            SECRET_STORAGE_ALGORITHM_V1_AES, opts,
+        );
+        await this.setDefaultSecretStorageKeyId(keyId);
+
+        if (privateKey) {
+            // cache the private key so that we can access it again
+            ssssKeys[keyId] = privateKey;
+        }
+        return keyId;
+    };
+
+    // reset the cross-signing keys
+    const resetCrossSigning = async () => {
+        this._baseApis._cryptoCallbacks.saveCrossSigningKeys =
+            keys => Object.assign(crossSigningPrivateKeys, keys);
+        this._baseApis._cryptoCallbacks.getCrossSigningKey =
+            name => crossSigningPrivateKeys[name];
+        await this.resetCrossSigningKeys(
+            CrossSigningLevel.MASTER,
+            { authUploadDeviceSigningKeys },
+        );
+    };
+
+    const ensureCanCheckPassphrase = async (keyId, keyInfo) => {
+        if (!keyInfo.mac) {
+            const key = await this._baseApis._cryptoCallbacks.getSecretStorageKey(
+                {keys: {[keyId]: keyInfo}}, "",
+            );
+            if (key) {
+                const keyData = key[1];
+                ssssKeys[keyId] = keyData;
+                const {iv, mac} = await SecretStorage._calculateKeyCheck(keyData);
+                keyInfo.iv = iv;
+                keyInfo.mac = mac;
+
+                await this._baseApis.setAccountData(
+                    `m.secret_storage.key.${keyId}`, keyInfo,
+                );
+            }
+        }
+    };
+
     try {
+        const oldSSSSKey = await this.getSecretStorageKey();
+        const [oldKeyId, oldKeyInfo] = oldSSSSKey || [null, null];
         const decryptionKeys =
               await this._crossSigningInfo.isStoredInSecretStorage(this._secretStorage);
         const inStorage = !setupNewSecretStorage && decryptionKeys;
-        if (decryptionKeys && !(Object.values(decryptionKeys).some(
-            info => info.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES,
-        ))) {
-            // we already have cross-signing keys, but they're encrypted using
-            // the old algorithm
-            logger.log("Switching to symmetric");
-            const keys = {};
-            // fetch the cross-signing private keys (needed to sign the new
-            // SSSS key).  We store the cross-signing keys, and temporarily set
-            // a callback so that when the private key is needed while setting
-            // things up, we can provide it.
-            this._baseApis._cryptoCallbacks.getCrossSigningKey =
-                name => crossSigningPrivateKeys[name];
-            for (const type of ["master", "self_signing", "user_signing"]) {
-                const secretName = `m.cross_signing.${type}`;
-                const secret = await this.getSecret(secretName);
-                keys[type] = secret;
-                crossSigningPrivateKeys[type] = olmlib.decodeBase64(secret);
-            }
-            await this.checkOwnCrossSigningTrust();
-            const opts = {};
-            let oldKeyId = null;
-            for (const [keyId, keyInfo] of Object.entries(decryptionKeys)) {
-                // See if the old key was generated from a passphrase.  If
-                // yes, use the same settings.
-                if (keyId in ssssKeys) {
-                    oldKeyId = keyId;
-                    if (keyInfo.passphrase) {
-                        opts.passphrase = keyInfo.passphrase;
-                    }
-                    break;
-                }
-            }
-            if (oldKeyId) {
-                opts.key = ssssKeys[oldKeyId];
-            }
-            // create new symmetric SSSS key and set it as default
-            newKeyId = await this.addSecretStorageKey(
-                SECRET_STORAGE_ALGORITHM_V1_AES, opts,
-            );
-            if (oldKeyId) {
-                ssssKeys[newKeyId] = ssssKeys[oldKeyId];
-            }
-            await this.setDefaultSecretStorageKeyId(newKeyId);
-            // re-encrypt all the keys with the new key
-            for (const type of ["master", "self_signing", "user_signing"]) {
-                const secretName = `m.cross_signing.${type}`;
-                await this.storeSecret(secretName, keys[type], [newKeyId]);
-            }
-        } else if (!this._crossSigningInfo.getId() || !inStorage) {
-            // create new cross-signing keys if necessary.
+
+        if (!inStorage && !keyBackupInfo) {
+            // either we don't have anything, or we've been asked to restart
+            // from scratch
             logger.log(
-                "Cross-signing public and/or private keys not found, " +
-                "checking secret storage for private keys",
-            );
-            if (inStorage) {
-                logger.log("Cross-signing private keys found in secret storage");
-                await this.checkOwnCrossSigningTrust();
-            } else {
-                logger.log(
-                    "Cross-signing private keys not found in secret storage, " +
+                "Cross-signing private keys not found in secret storage, " +
                     "creating new keys",
-                );
-                this._baseApis._cryptoCallbacks.saveCrossSigningKeys =
-                    keys => Object.assign(crossSigningPrivateKeys, keys);
-                this._baseApis._cryptoCallbacks.getCrossSigningKey =
-                    name => crossSigningPrivateKeys[name];
-                await this.resetCrossSigningKeys(
-                    CrossSigningLevel.MASTER,
-                    { authUploadDeviceSigningKeys },
-                );
+            );
+
+            await resetCrossSigning();
+
+            if (
+                setupNewSecretStorage ||
+                !oldKeyInfo ||
+                oldKeyInfo.algorithm !== SECRET_STORAGE_ALGORITHM_V1_AES
+            ) {
+                // if we already have a usable default SSSS key and aren't resetting SSSS just use it.
+                // otherwise, create a new one
+                // Note: we leave the old SSSS key in place: there could be other secrets using it, in theory.
+                // We could move them to the new key but a) that would mean we'd need to prompt for the old
+                // passphrase, and b) it's not clear that would be the right thing to do anyway.
+                const { keyInfo, privateKey } = await createSecretStorageKey();
+                newKeyId = await createSSSS(keyInfo, privateKey);
+            }
+
+            if (oldKeyInfo && oldKeyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
+                await ensureCanCheckPassphrase(oldKeyId, oldKeyInfo);
+            }
+        } else if (!inStorage && keyBackupInfo) {
+            // we have an existing backup, but no SSSS
+
+            logger.log("Secret storage default key not found, using key backup key");
+
+            // if we have the backup key already cached, use it; otherwise use the
+            // callback to prompt for the key
+            const backupKey = await this.getSessionBackupPrivateKey() ||
+                              await getKeyBackupPassphrase();
+
+            // create new cross-signing keys
+            await resetCrossSigning();
+
+            // create a new SSSS key and use the backup key as the new SSSS key
+            const opts = {};
+
+            if (
+                keyBackupInfo.auth_data.private_key_salt &&
+                keyBackupInfo.auth_data.private_key_iterations
+            ) {
+                opts.passphrase = {
+                    algorithm: "m.pbkdf2",
+                    iterations: keyBackupInfo.auth_data.private_key_iterations,
+                    salt: keyBackupInfo.auth_data.private_key_salt,
+                    bits: 256,
+                };
+            }
+
+            newKeyId = await createSSSS(opts, backupKey);
+
+            // store the backup key in secret storage
+            await this.storeSecret(
+                "m.megolm_backup.v1", olmlib.encodeBase64(backupKey), [newKeyId],
+            );
+
+            // The backup is trusted because the user provided the private key.
+            // Sign the backup with the cross signing key so the key backup can
+            // be trusted via cross-signing.
+            logger.log("Adding cross signing signature to key backup");
+            await this._crossSigningInfo.signObject(
+                keyBackupInfo.auth_data, "master",
+            );
+            await this._baseApis._http.authedRequest(
+                undefined, "PUT", "/room_keys/version/" + keyBackupInfo.version,
+                undefined, keyBackupInfo,
+                {prefix: httpApi.PREFIX_UNSTABLE},
+            );
+        } else if (!this._crossSigningInfo.getId()) {
+            // we have SSSS, but we don't know if the server's cross-signing
+            // keys should be trusted
+            logger.log("Cross-signing private keys found in secret storage");
+
+            // fetch the private keys and set up our local copy of the keys for
+            // use
+            await this.checkOwnCrossSigningTrust();
+
+            if (oldKeyInfo && oldKeyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
+                // make sure that the default key has the information needed to
+                // check the passphrase
+                await ensureCanCheckPassphrase(oldKeyId, oldKeyInfo);
             }
         } else {
+            // we have SSSS and we cross-signing is already set up
             logger.log("Cross signing keys are present in secret storage");
-        }
 
-        // Check if we need to create a new secret storage key
-        // - we're resetting secret storage
-        // - we don't have a default secret storage key yet
-        // - our default secret storage key is using an older algorithm
-        // We will also run this part if we created a new secret storage key
-        // above, so that we can (re-)encrypt the backup with it.
-        const defaultSSSSKey = await this.getSecretStorageKey();
-        if (setupNewSecretStorage || newKeyId || !defaultSSSSKey
-            || defaultSSSSKey[1].algorithm !== SECRET_STORAGE_ALGORITHM_V1_AES) {
-            if (keyBackupInfo) {
-                // if we already have a backup key, use the same key as the
-                // secret storage key
-                logger.log("Secret storage default key not found, using key backup key");
-
-                const backupKey = await getKeyBackupPassphrase();
-
-                if (!newKeyId) {
-                    const opts = {};
-
-                    if (
-                        keyBackupInfo.auth_data.private_key_salt &&
-                        keyBackupInfo.auth_data.private_key_iterations
-                    ) {
-                        opts.passphrase = {
-                            algorithm: "m.pbkdf2",
-                            iterations: keyBackupInfo.auth_data.private_key_iterations,
-                            salt: keyBackupInfo.auth_data.private_key_salt,
-                            bits: 256,
-                        };
-                    }
-
-                    // use the backup key as the new ssss key
-                    ssssKeys[newKeyId] = backupKey;
-                    opts.key = backupKey;
-
-                    newKeyId = await this.addSecretStorageKey(
-                        SECRET_STORAGE_ALGORITHM_V1_AES, opts,
-                    );
-                    await this.setDefaultSecretStorageKeyId(newKeyId);
-                }
-
-                // if this key backup is trusted, sign it with the cross signing key
-                // so the key backup can be trusted via cross-signing.
-                const backupSigStatus = await this.checkKeyBackup(keyBackupInfo);
-                if (backupSigStatus.trustInfo.usable) {
-                    logger.log("Adding cross signing signature to key backup");
-                    await this._crossSigningInfo.signObject(
-                        keyBackupInfo.auth_data, "master",
-                    );
-                    await this._baseApis._http.authedRequest(
-                        undefined, "PUT", "/room_keys/version/" + keyBackupInfo.version,
-                        undefined, keyBackupInfo,
-                        {prefix: httpApi.PREFIX_UNSTABLE},
-                    );
-                    await this.storeSecret(
-                        "m.megolm_backup.v1", olmlib.encodeBase64(backupKey), [newKeyId],
-                    );
-                } else {
-                    logger.log(
-                        "Key backup is NOT TRUSTED: NOT adding cross signing signature",
-                    );
-                }
-            } else {
-                if (!newKeyId) {
-                    logger.log("Secret storage default key not found, creating new key");
-                    const { keyInfo, privateKey } = await createSecretStorageKey();
-                    if (keyInfo && privateKey) {
-                        keyInfo.key = privateKey;
-                    }
-                    newKeyId = await this.addSecretStorageKey(
-                        SECRET_STORAGE_ALGORITHM_V1_AES,
-                        keyInfo,
-                    );
-                    await this.setDefaultSecretStorageKeyId(newKeyId);
-                    ssssKeys[newKeyId] = privateKey;
-                }
-                if (await this.isSecretStored("m.megolm_backup.v1")) {
-                    // we created a new SSSS, and we previously encrypted the
-                    // backup key with the old SSSS key, so re-encrypt with the
-                    // new key
-                    const backupKey = await this.getSecret("m.megolm_backup.v1");
-                    await this.storeSecret("m.megolm_backup.v1", backupKey, [newKeyId]);
-                }
+            if (oldKeyInfo && oldKeyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
+                // make sure that the default key has the information needed to
+                // check the passphrase
+                await ensureCanCheckPassphrase(oldKeyId, oldKeyInfo);
             }
-        } else {
-            logger.log("Have secret storage key");
         }
 
         // If cross-signing keys were reset, store them in Secure Secret Storage.
@@ -676,11 +680,6 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         // See also https://github.com/vector-im/riot-web/issues/11635
         if (Object.keys(crossSigningPrivateKeys).length) {
             logger.log("Storing cross-signing private keys in secret storage");
-            // SSSS expects its keys to be signed by cross-signing master key.
-            // Since we have just reset cross-signing keys, we need to re-sign the
-            // SSSS default key with the new cross-signing master key so that the
-            // following storage step can proceed.
-            await this._secretStorage.signKey();
             // Assuming no app-supplied callback, default to storing in SSSS.
             if (!appCallbacks.saveCrossSigningKeys) {
                 await CrossSigningInfo.storeInSecretStorage(
@@ -711,7 +710,9 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         const sessionBackupKey = await this.getSecret('m.megolm_backup.v1');
         if (sessionBackupKey) {
             logger.info("Got session backup key from secret storage: caching");
-            await this.storeSessionBackupPrivateKey(sessionBackupKey);
+            const decodedBackupKey =
+                new Uint8Array(olmlib.decodeBase64(sessionBackupKey));
+            await this.storeSessionBackupPrivateKey(decodedBackupKey);
         }
     } finally {
         // Restore the original callbacks. NB. we must do this by manipulating
@@ -734,10 +735,6 @@ Crypto.prototype.addSecretStorageKey = function(algorithm, opts, keyID) {
 
 Crypto.prototype.hasSecretStorageKey = function(keyID) {
     return this._secretStorage.hasKey(keyID);
-};
-
-Crypto.prototype.secretStorageKeyNeedsUpgrade = function(keyID) {
-    return this._secretStorage.keyNeedsUpgrade(keyID);
 };
 
 Crypto.prototype.getSecretStorageKey = function(keyID) {
@@ -800,7 +797,7 @@ Crypto.prototype.checkSecretStoragePrivateKey = function(privateKey, expectedPub
  * Fetches the backup private key, if cached
  * @returns {Promise} the key, if any, or null
  */
-Crypto.prototype.getSessionBackupPrivateKey = async function() {
+Crypto.prototype.getSessionBackupPrivateKey = function() {
     return new Promise((resolve) => {
         this._cryptoStore.doTxn(
             'readonly',
@@ -822,6 +819,9 @@ Crypto.prototype.getSessionBackupPrivateKey = async function() {
  * @returns {Promise} so you can catch failures
  */
 Crypto.prototype.storeSessionBackupPrivateKey = async function(key) {
+    if (!(key instanceof Uint8Array)) {
+        throw new Error(`storeSessionBackupPrivateKey expects Uint8Array, got ${key}`);
+    }
     return this._cryptoStore.doTxn(
         'readwrite',
         [IndexedDBCryptoStore.STORE_ACCOUNT],
@@ -1141,13 +1141,18 @@ Crypto.prototype._onDeviceListUserCrossSigningUpdated = async function(userId) {
             // If it's not changed, just make sure everything is up to date
             await this.checkOwnCrossSigningTrust();
         } else {
-            this.emit("crossSigning.keysChanged", {});
             // We'll now be in a state where cross-signing on the account is not trusted
             // because our locally stored cross-signing keys will not match the ones
-            // on the server for our account. The app must call checkOwnCrossSigningTrust()
-            // to fix this.
-            // XXX: Do we need to do something to emit events saying every device has become
-            // untrusted?
+            // on the server for our account. So we clear our own stored cross-signing keys,
+            // effectively disabling cross-signing until the user gets verified by the device
+            // that reset the keys
+            this._storeTrustedSelfKeys(null);
+            // emit cross-signing has been disabled
+            this.emit("crossSigning.keysChanged", {});
+            // as the trust for our own user has changed,
+            // also emit an event for this
+            this.emit("userTrustStatusChanged",
+                this._userId, this.checkUserTrust(userId));
         }
     } else {
         await this._checkDeviceVerifications(userId);
@@ -1303,7 +1308,11 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
  * @param {object} keys The new trusted set of keys
  */
 Crypto.prototype._storeTrustedSelfKeys = async function(keys) {
-    this._crossSigningInfo.setKeys(keys);
+    if (keys) {
+        this._crossSigningInfo.setKeys(keys);
+    } else {
+        this._crossSigningInfo.clearKeys();
+    }
     await this._cryptoStore.doTxn(
         'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
         (txn) => {
@@ -1368,8 +1377,9 @@ Crypto.prototype._checkAndStartKeyBackup = async function() {
         backupInfo = await this._baseApis.getKeyBackupVersion();
     } catch (e) {
         logger.log("Error checking for active key backup", e);
-        if (e.httpStatus / 100 === 4) {
-            // well that's told us. we won't try again.
+        if (e.httpStatus === 404) {
+            // 404 is returned when the key backup does not exist, so that
+            // counts as successfully checking.
             this._checkedForBackup = true;
         }
         return null;
@@ -1912,6 +1922,10 @@ Crypto.prototype.setDeviceVerification = async function(
 
         if (!this._crossSigningInfo.getId() && userId === this._crossSigningInfo.userId) {
             this._storeTrustedSelfKeys(xsk.keys);
+            // This will cause our own user trust to change, so emit the event
+            this.emit(
+                "userTrustStatusChanged", this._userId, this.checkUserTrust(userId),
+            );
         }
 
         // Now sign the master key with our user signing key (unless it's ourself)
@@ -2054,7 +2068,8 @@ Crypto.prototype.requestVerification = function(userId, devices) {
     if (existingRequest) {
         return Promise.resolve(existingRequest);
     }
-    const channel = new ToDeviceChannel(this._baseApis, userId, devices);
+    const channel = new ToDeviceChannel(this._baseApis, userId, devices,
+        ToDeviceChannel.makeTransactionId());
     return this._requestVerificationWithChannel(
         userId,
         channel,
@@ -2067,6 +2082,10 @@ Crypto.prototype._requestVerificationWithChannel = async function(
 ) {
     let request = new VerificationRequest(
         channel, this._verificationMethods, this._baseApis);
+    // if transaction id is already known, add request
+    if (channel.transactionId) {
+        requestsMap.setRequestByChannel(channel, request);
+    }
     await request.sendRequest();
     // don't replace the request created by a racing remote echo
     const racingRequest = requestsMap.getRequestByChannel(channel);
@@ -2434,17 +2453,37 @@ Crypto.prototype.exportRoomKeys = async function() {
  * Import a list of room keys previously exported by exportRoomKeys
  *
  * @param {Object[]} keys a list of session export objects
+ * @param {Object} opts
+ * @param {Function} opts.progressCallback called with an object which has a stage param
  * @return {Promise} a promise which resolves once the keys have been imported
  */
-Crypto.prototype.importRoomKeys = function(keys) {
+Crypto.prototype.importRoomKeys = function(keys, opts = {}) {
+    let successes = 0;
+    let failures = 0;
+    const total = keys.length;
+
+    function updateProgress() {
+        opts.progressCallback({
+            stage: "load_keys",
+            successes,
+            failures,
+            total,
+        });
+    }
+
     return Promise.all(keys.map((key) => {
         if (!key.room_id || !key.algorithm) {
             logger.warn("ignoring room key entry with missing fields", key);
+            failures++;
+            if (opts.progressCallback) { updateProgress(); }
             return null;
         }
 
         const alg = this._getRoomDecryptor(key.room_id, key.algorithm);
-        return alg.importRoomKey(key);
+        return alg.importRoomKey(key).finally((r) => {
+            successes++;
+            if (opts.progressCallback) { updateProgress(); }
+        });
     }));
 };
 
@@ -2760,9 +2799,13 @@ Crypto.prototype.handleDeviceListChanges = async function(syncData, syncDeviceLi
  * @return {Promise} a promise that resolves when the key request is queued
  */
 Crypto.prototype.requestRoomKey = function(requestBody, recipients, resend=false) {
-    return this._outgoingRoomKeyRequestManager.sendRoomKeyRequest(
+    return this._outgoingRoomKeyRequestManager.queueRoomKeyRequest(
         requestBody, recipients, resend,
-    ).catch((e) => {
+    ).then(() => {
+        if (this._sendKeyRequestsImmediately) {
+            this._outgoingRoomKeyRequestManager.sendQueuedRequests();
+        }
+    }).catch((e) => {
         // this normally means we couldn't talk to the store
         logger.error(
             'Error requesting key for event', e,
@@ -2827,6 +2870,8 @@ Crypto.prototype.onSyncWillProcess = async function(syncData) {
         this._deviceList.startTrackingDeviceList(this._userId);
         this._roomDeviceTrackingState = {};
     }
+
+    this._sendKeyRequestsImmediately = false;
 };
 
 /**
@@ -2858,6 +2903,14 @@ Crypto.prototype.onSyncCompleted = async function(syncData) {
     if (!syncData.catchingUp) {
         _maybeUploadOneTimeKeys(this);
         this._processReceivedRoomKeyRequests();
+
+        // likewise don't start requesting keys until we've caught up
+        // on to_device messages, otherwise we'll request keys that we're
+        // just about to get.
+        this._outgoingRoomKeyRequestManager.sendQueuedRequests();
+
+        // Sync has finished so send key requests straight away.
+        this._sendKeyRequestsImmediately = true;
     }
 };
 
@@ -3374,6 +3427,19 @@ Crypto.prototype._processReceivedRoomKeyRequest = async function(req) {
                 " with device " + userId + ":" + device.deviceId, e,
             );
         }
+        return;
+    }
+
+    if (deviceId === this._deviceId) {
+        // We'll always get these because we send room key requests to
+        // '*' (ie. 'all devices') which includes the sending device,
+        // so ignore requests from ourself because apart from it being
+        // very silly, it won't work because an Olm session cannot send
+        // messages to itself.
+        // The log here is probably superfluous since we know this will
+        // always happen, but let's log anyway for now just in case it
+        // causes issues.
+        logger.log("Ignoring room key request from ourselves");
         return;
     }
 

@@ -310,6 +310,13 @@ export class CrossSigningInfo extends EventEmitter {
         }
     }
 
+    /**
+     * unsets the keys, used when another session has reset the keys, to disable cross-signing
+     */
+    clearKeys() {
+        this.keys = {};
+    }
+
     setKeys(keys) {
         const signingKeys = {};
         if (keys.master) {
@@ -644,6 +651,11 @@ export function createCryptoStoreCacheCallbacks(store) {
             });
         },
         storeCrossSigningKeyCache: function(type, key) {
+            if (!(key instanceof Uint8Array)) {
+                throw new Error(
+                    `storeCrossSigningKeyCache expects Uint8Array, got ${key}`,
+                );
+            }
             return store.doTxn(
                 'readwrite',
                 [IndexedDBCryptoStore.STORE_ACCOUNT],

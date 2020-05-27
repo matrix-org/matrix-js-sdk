@@ -59,8 +59,8 @@ export function decodeRecoveryKey(recoverykey) {
         throw new Error("Incorrect length");
     }
 
-    return result.slice(
+    return Uint8Array.from(result.slice(
         OLM_RECOVERY_KEY_PREFIX.length,
         OLM_RECOVERY_KEY_PREFIX.length + global.Olm.PRIVATE_KEY_LENGTH,
-    );
+    ));
 }

@@ -207,6 +207,25 @@ export async function ensureOlmSessionsForDevices(
         for (const deviceInfo of devices) {
             const deviceId = deviceInfo.deviceId;
             const key = deviceInfo.getIdentityKey();
+
+            if (key === olmDevice.deviceCurve25519Key) {
+                // We should never be trying to start a session with ourself.
+                // Apart from talking to yourself being the first sign of madness,
+                // olm sessions can't do this because they get confused when
+                // they get a message and see that the 'other side' has started a
+                // new chain when this side has an active sender chain.
+                // If you see this message being logged in the wild, we should find
+                // the thing that is trying to send Olm messages to itself and fix it.
+                logger.info("Attempted to start session with ourself! Ignoring");
+                // We must fill in the section in the return value though, as callers
+                // expect it to be there.
+                result[userId][deviceId] = {
+                    device: deviceInfo,
+                    sessionId: null,
+                };
+                continue;
+            }
+
             if (!olmDevice._sessionsInProgress[key]) {
                 // pre-emptively mark the session as in-progress to avoid race
                 // conditions.  If we find that we already have a session, then
@@ -238,6 +257,11 @@ export async function ensureOlmSessionsForDevices(
                 delete resolveSession[key];
             }
             if (sessionId === null || force) {
+                if (force) {
+                    logger.info("Forcing new Olm session for " + userId + ":" + deviceId);
+                } else {
+                    logger.info("Making new Olm session for " + userId + ":" + deviceId);
+                }
                 devicesWithoutSession.push([userId, deviceId]);
             }
             result[userId][deviceId] = {
@@ -277,6 +301,14 @@ export async function ensureOlmSessionsForDevices(
             const deviceInfo = devices[j];
             const deviceId = deviceInfo.deviceId;
             const key = deviceInfo.getIdentityKey();
+
+            if (key === olmDevice.deviceCurve25519Key) {
+                // We've already logged about this above. Skip here too
+                // otherwise we'll log saying there are no one-time keys
+                // which will be confusing.
+                continue;
+            }
+
             if (result[userId][deviceId].sessionId && !force) {
                 // we already have a result for this device
                 continue;

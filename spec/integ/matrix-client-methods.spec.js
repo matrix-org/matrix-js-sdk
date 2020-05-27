@@ -347,8 +347,8 @@ describe("MatrixClient", function() {
 
             httpBackend.when("POST", "/keys/query").check(function(req) {
                 expect(req.data).toEqual({device_keys: {
-                    'boris': {},
-                    'chaz': {},
+                    'boris': [],
+                    'chaz': [],
                 }});
             }).respond(200, {
                 device_keys: {
