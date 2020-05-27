@@ -97,7 +97,7 @@ describe("InteractiveAuth", function() {
         // first we expect a call to doRequest
         doRequest.mockImplementation(function(authData) {
             logger.log("request1", authData);
-            expect(authData).toEqual({});
+            expect(authData).toEqual(null); // first request should be null
             const err = new MatrixError({
                 session: "sessionId",
                 flows: [
@@ -156,7 +156,7 @@ describe("InteractiveAuth", function() {
 
         doRequest.mockImplementation(function(authData) {
             logger.log("request1", authData);
-            expect(authData).toEqual({});
+            expect(authData).toEqual(null); // first request should be null
             const err = new MatrixError({
                 session: "sessionId",
                 flows: [],
