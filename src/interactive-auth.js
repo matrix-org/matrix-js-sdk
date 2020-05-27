@@ -143,11 +143,13 @@ InteractiveAuth.prototype = {
             this._resolveFunc = resolve;
             this._rejectFunc = reject;
 
-            // if we have no flows, try a request (we'll have
-            // just a session ID in _data if resuming)
-            if (this._data && !this._data.flows) {
+            const hasFlows = this._data && this._data.flows;
+
+            // if we have no flows, try a request to acquire the flows
+            if (!hasFlows) {
                 if (this._busyChangedCallback) this._busyChangedCallback(true);
-                this._doRequest(this._data).finally(() => {
+                // Do a fresh request as we're just acquiring flows.
+                this._doRequest(null).finally(() => {
                     if (this._busyChangedCallback) this._busyChangedCallback(false);
                 });
             } else {
@@ -264,8 +266,7 @@ InteractiveAuth.prototype = {
             }
         }
 
-        // use the sessionid from the last request.
-        // but keep the null in authData if this is the first stage.
+        // use the sessionid from the last request, if one is present.
         let auth;
         if (this._data.session) {
             auth = {
