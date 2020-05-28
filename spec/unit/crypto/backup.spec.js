@@ -546,7 +546,7 @@ describe("MegolmBackup", function() {
             const key = Uint8Array.from([1, 2, 3, 4, 5, 6, 7, 8]);
             await client._crypto.storeSessionBackupPrivateKey(key);
             const result = await client._crypto.getSessionBackupPrivateKey();
-            expect(result).toEqual(key);
+            expect(new Uint8Array(result)).toEqual(key);
         });
 
         it('caches session backup keys as it encounters them', async function() {

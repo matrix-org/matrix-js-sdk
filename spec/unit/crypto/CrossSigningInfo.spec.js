@@ -25,6 +25,7 @@ import {
 import {MemoryCryptoStore} from '../../../src/crypto/store/memory-crypto-store';
 import 'fake-indexeddb/auto';
 import 'jest-localstorage-mock';
+import {OlmDevice} from "../../../src/crypto/OlmDevice";
 
 const userId = "@alice:example.com";
 
@@ -233,8 +234,9 @@ describe.each([
 
     it("should cache data to the store and retrieve it", async () => {
         await store.startup();
+        const olmDevice = new OlmDevice(store);
         const { getCrossSigningKeyCache, storeCrossSigningKeyCache } =
-          createCryptoStoreCacheCallbacks(store);
+              createCryptoStoreCacheCallbacks(store, olmDevice);
         await storeCrossSigningKeyCache("self_signing", testKey);
 
         // If we've not saved anything, don't expect anything
@@ -243,6 +245,6 @@ describe.each([
         expect(nokey).toBeNull();
 
         const key = await getCrossSigningKeyCache("self_signing", "");
-        expect(key).toEqual(testKey);
+        expect(new Uint8Array(key)).toEqual(testKey);
     });
 });
