@@ -245,6 +245,6 @@ describe.each([
         expect(nokey).toBeNull();
 
         const key = await getCrossSigningKeyCache("self_signing", "");
-        expect(key).toEqual(testKey);
+        expect(new Uint8Array(key)).toEqual(testKey);
     });
 });
