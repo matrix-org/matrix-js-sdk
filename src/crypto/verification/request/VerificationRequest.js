@@ -26,10 +26,10 @@ import {
 import {QRCodeData, SCAN_QR_CODE_METHOD} from "../QRCode";
 
 // How long after the event's timestamp that the request times out
-const TIMEOUT_FROM_EVENT_TS = 10 * 1000 * 60; // 10 minutes
+const TIMEOUT_FROM_EVENT_TS = 10 * 60 * 1000; // 10 minutes
 
 // How long after we receive the event that the request times out
-const TIMEOUT_FROM_EVENT_RECEIPT = 2 * 1000 * 60; // 2 minutes
+const TIMEOUT_FROM_EVENT_RECEIPT = 2 * 60 * 1000; // 2 minutes
 
 // to avoid almost expired verification notifications
 // from showing a notification and almost immediately
