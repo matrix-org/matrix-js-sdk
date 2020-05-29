@@ -25,10 +25,12 @@ import {
 } from "../Error";
 import {QRCodeData, SCAN_QR_CODE_METHOD} from "../QRCode";
 
-// the recommended amount of time before a verification request
-// should be (automatically) cancelled without user interaction
-// and ignored.
-const VERIFICATION_REQUEST_TIMEOUT = 10 * 60 * 1000; //10m
+// How long after the event's timestamp that the request times out
+const TIMEOUT_FROM_EVENT_TS = 10 * 1000;//60 * 1000; //10m
+
+// How long after we receive the event that the request times out
+const TIMEOUT_FROM_EVENT_RECEIPT = 2 * 1000;//60 * 1000; //2m
+
 // to avoid almost expired verification notifications
 // from showing a notification and almost immediately
 // disappearing, also ignore verification requests that
@@ -80,6 +82,9 @@ export class VerificationRequest extends EventEmitter {
         // cross-signing identity reset between the .ready and .start event
         // and signing the wrong key after .start
         this._qrCodeData = null;
+
+        // The timestamp when we received the request event from the other side
+        this._requestReceivedAt = null;
     }
 
     /**
@@ -169,8 +174,12 @@ export class VerificationRequest extends EventEmitter {
     get timeout() {
         const requestEvent = this._getEventByEither(REQUEST_TYPE);
         if (requestEvent) {
-            const elapsed = Date.now() - this.channel.getTimestamp(requestEvent);
-            return Math.max(0, VERIFICATION_REQUEST_TIMEOUT - elapsed);
+            const expiresAtByReceipt = this._requestReceivedAt + TIMEOUT_FROM_EVENT_RECEIPT;
+            const expiresAtByTs = this.channel.getTimestamp(requestEvent) + TIMEOUT_FROM_EVENT_TS;
+
+            const effectiveExpiresAt = Math.min(expiresAtByReceipt, expiresAtByTs);
+
+            return Math.max(0, effectiveExpiresAt - Date.now());
         }
         return 0;
     }
@@ -656,9 +665,7 @@ export class VerificationRequest extends EventEmitter {
         }
         const wasObserveOnly = this._observeOnly;
 
-        this._adjustObserveOnly(event, isLiveEvent);
-
-        if (!this.observeOnly && !isRemoteEcho) {
+        if (!wasObserveOnly && !isRemoteEcho) {
             if (await this._cancelOnError(type, event)) {
                 return;
             }
@@ -678,6 +685,8 @@ export class VerificationRequest extends EventEmitter {
 
         const oldPhase = this.phase;
         this._addEvent(type, event, isSentByUs);
+
+        this._adjustObserveOnly(event, isLiveEvent);
 
         // this will create if needed the verifier so needs to happen before calling it
         const newTransitions = this._applyPhaseTransitions();
@@ -791,16 +800,8 @@ export class VerificationRequest extends EventEmitter {
         if (!isLiveEvent) {
             this._observeOnly = true;
         }
-        // a timestamp is not provided on all to_device events
-        const timestamp = this.channel.getTimestamp(event);
-        if (Number.isFinite(timestamp)) {
-            const elapsed = Date.now() - timestamp;
-            // don't allow interaction on old requests
-            if (elapsed > (VERIFICATION_REQUEST_TIMEOUT - VERIFICATION_REQUEST_MARGIN) ||
-                elapsed < -(VERIFICATION_REQUEST_TIMEOUT / 2)
-            ) {
-                this._observeOnly = true;
-            }
+        if (this.timeout < TIMEOUT_FROM_EVENT_TS - VERIFICATION_REQUEST_MARGIN) {
+            this._observeOnly = true;
         }
     }
 
@@ -819,6 +820,8 @@ export class VerificationRequest extends EventEmitter {
                     this._eventsByThem.delete(type);
                 }
             }
+            // also remember when we received the request event
+            this._requestReceivedAt = Date.now();
         }
     }
 
