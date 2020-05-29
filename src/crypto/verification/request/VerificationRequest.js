@@ -170,22 +170,26 @@ export class VerificationRequest extends EventEmitter {
         return this._chosenMethod;
     }
 
+    calculateEventTimeout(event) {
+        let effectiveExpiresAt = this.channel.getTimestamp(event)
+            + TIMEOUT_FROM_EVENT_TS;
+
+        if (this._requestReceivedAt && !this.initiatedByMe &&
+            this.phase <= PHASE_REQUESTED
+        ) {
+            const expiresAtByReceipt = this._requestReceivedAt
+                + TIMEOUT_FROM_EVENT_RECEIPT;
+            effectiveExpiresAt = Math.min(effectiveExpiresAt, expiresAtByReceipt);
+        }
+
+        return Math.max(0, effectiveExpiresAt - Date.now());
+    }
+
     /** The current remaining amount of ms before the request should be automatically cancelled */
     get timeout() {
         const requestEvent = this._getEventByEither(REQUEST_TYPE);
         if (requestEvent) {
-            let effectiveExpiresAt = this.channel.getTimestamp(requestEvent)
-                + TIMEOUT_FROM_EVENT_TS;
-
-            if (this._requestReceivedAt && !this.initiatedByMe &&
-                this.phase <= PHASE_REQUESTED
-            ) {
-                const expiresAtByReceipt = this._requestReceivedAt
-                    + TIMEOUT_FROM_EVENT_RECEIPT;
-                effectiveExpiresAt = Math.min(effectiveExpiresAt, expiresAtByReceipt);
-            }
-
-            return Math.max(0, effectiveExpiresAt - Date.now());
+            return this.calculateEventTimeout(requestEvent);
         }
         return 0;
     }
@@ -671,6 +675,8 @@ export class VerificationRequest extends EventEmitter {
         }
         const wasObserveOnly = this._observeOnly;
 
+        this._adjustObserveOnly(event, isLiveEvent);
+
         if (!wasObserveOnly && !isRemoteEcho) {
             if (await this._cancelOnError(type, event)) {
                 return;
@@ -691,8 +697,6 @@ export class VerificationRequest extends EventEmitter {
 
         const oldPhase = this.phase;
         this._addEvent(type, event, isSentByUs);
-
-        this._adjustObserveOnly(event, isLiveEvent);
 
         // this will create if needed the verifier so needs to happen before calling it
         const newTransitions = this._applyPhaseTransitions();
@@ -816,7 +820,7 @@ export class VerificationRequest extends EventEmitter {
         if (!isLiveEvent) {
             this._observeOnly = true;
         }
-        if (this.timeout < VERIFICATION_REQUEST_MARGIN) {
+        if (this.calculateEventTimeout(event) < VERIFICATION_REQUEST_MARGIN) {
             this._observeOnly = true;
         }
     }
