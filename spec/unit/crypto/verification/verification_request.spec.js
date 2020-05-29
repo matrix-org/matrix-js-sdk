@@ -119,6 +119,8 @@ async function distributeEvent(ownRequest, theirRequest, event) {
     await theirRequest.channel.handleEvent(event, theirRequest, true);
 }
 
+jest.useFakeTimers();
+
 describe("verification request unit tests", function() {
     beforeAll(function() {
         setupWebcrypto();
@@ -245,5 +247,39 @@ describe("verification request unit tests", function() {
 
         expect(bob1Request.done).toBe(true);
         expect(bob2Request.done).toBe(true);
+    });
+
+    it("request times out after 10 minutes", async function() {
+        const alice = makeMockClient("@alice:matrix.tld", "device1");
+        const bob = makeMockClient("@bob:matrix.tld", "device1");
+        const aliceRequest = new VerificationRequest(
+            new InRoomChannel(alice, "!room", bob.getUserId()), new Map(), alice);
+        await aliceRequest.sendRequest();
+        const [requestEvent] = alice.popEvents();
+        await aliceRequest.channel.handleEvent(requestEvent, aliceRequest, true,
+            true, true);
+
+        expect(aliceRequest.cancelled).toBe(false);
+        expect(aliceRequest._cancellingUserId).toBe(undefined);
+        jest.advanceTimersByTime(10 * 60 * 1000);
+        expect(aliceRequest._cancellingUserId).toBe(alice.getUserId());
+    });
+
+    it("request times out 2 minutes after receipt", async function() {
+        const alice = makeMockClient("@alice:matrix.tld", "device1");
+        const bob = makeMockClient("@bob:matrix.tld", "device1");
+        const aliceRequest = new VerificationRequest(
+            new InRoomChannel(alice, "!room", bob.getUserId()), new Map(), alice);
+        await aliceRequest.sendRequest();
+        const [requestEvent] = alice.popEvents();
+        const bobRequest = new VerificationRequest(
+            new InRoomChannel(bob, "!room"), new Map(), bob);
+
+        await bobRequest.channel.handleEvent(requestEvent, bobRequest, true);
+
+        expect(bobRequest.cancelled).toBe(false);
+        expect(bobRequest._cancellingUserId).toBe(undefined);
+        jest.advanceTimersByTime(2 * 60 * 1000);
+        expect(bobRequest._cancellingUserId).toBe(bob.getUserId());
     });
 });
