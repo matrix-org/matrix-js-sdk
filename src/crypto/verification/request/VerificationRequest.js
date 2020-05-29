@@ -677,7 +677,7 @@ export class VerificationRequest extends EventEmitter {
 
         this._adjustObserveOnly(event, isLiveEvent);
 
-        if (!wasObserveOnly && !isRemoteEcho) {
+        if (!this.observeOnly && !isRemoteEcho) {
             if (await this._cancelOnError(type, event)) {
                 return;
             }
