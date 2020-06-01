@@ -3511,46 +3511,6 @@ MatrixClient.prototype.setPresence = function(opts, callback) {
     );
 };
 
-function _presenceList(callback, client, opts, method) {
-  const path = utils.encodeUri("/presence/list/$userId", {
-      $userId: client.credentials.userId,
-  });
-  return client._http.authedRequest(callback, method, path, undefined, opts);
-}
-
-/**
-* Retrieve current user presence list.
-* @param {module:client.callback} callback Optional.
-* @return {Promise} Resolves: TODO
-* @return {module:http-api.MatrixError} Rejects: with an error response.
-*/
-MatrixClient.prototype.getPresenceList = function(callback) {
-  return _presenceList(callback, this, undefined, "GET");
-};
-
-/**
-* Add users to the current user presence list.
-* @param {module:client.callback} callback Optional.
-* @param {string[]} userIds
-* @return {Promise} Resolves: TODO
-* @return {module:http-api.MatrixError} Rejects: with an error response.
-*/
-MatrixClient.prototype.inviteToPresenceList = function(callback, userIds) {
-  const opts = {"invite": userIds};
-  return _presenceList(callback, this, opts, "POST");
-};
-
-/**
-* Drop users from the current user presence list.
-* @param {module:client.callback} callback Optional.
-* @param {string[]} userIds
-* @return {Promise} Resolves: TODO
-* @return {module:http-api.MatrixError} Rejects: with an error response.
-**/
-MatrixClient.prototype.dropFromPresenceList = function(callback, userIds) {
-  const opts = {"drop": userIds};
-  return _presenceList(callback, this, opts, "POST");
-};
 
 /**
  * Retrieve older messages from the given room and put them in the timeline.
