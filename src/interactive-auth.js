@@ -143,11 +143,13 @@ InteractiveAuth.prototype = {
             this._resolveFunc = resolve;
             this._rejectFunc = reject;
 
-            // if we have no flows, try a request (we'll have
-            // just a session ID in _data if resuming)
-            if (!this._data.flows) {
+            const hasFlows = this._data && this._data.flows;
+
+            // if we have no flows, try a request to acquire the flows
+            if (!hasFlows) {
                 if (this._busyChangedCallback) this._busyChangedCallback(true);
-                this._doRequest(this._data).finally(() => {
+                // Do a fresh request as we're just acquiring flows.
+                this._doRequest(null).finally(() => {
                     if (this._busyChangedCallback) this._busyChangedCallback(false);
                 });
             } else {
@@ -268,11 +270,16 @@ InteractiveAuth.prototype = {
             }
         }
 
-        // use the sessionid from the last request.
-        const auth = {
-            session: this._data.session,
-        };
-        utils.extend(auth, authData);
+        // use the sessionid from the last request, if one is present.
+        let auth;
+        if (this._data.session) {
+            auth = {
+                session: this._data.session,
+            };
+            utils.extend(auth, authData);
+        } else {
+            auth = authData;
+        }
 
         try {
             // NB. the 'background' flag is deprecated by the busyChanged
@@ -329,7 +336,7 @@ InteractiveAuth.prototype = {
         } catch (error) {
             // sometimes UI auth errors don't come with flows
             const errorFlows = error.data ? error.data.flows : null;
-            const haveFlows = Boolean(this._data.flows) || Boolean(errorFlows);
+            const haveFlows = this._data.flows || Boolean(errorFlows);
             if (error.httpStatus !== 401 || !error.data || !haveFlows) {
                 // doesn't look like an interactive-auth failure.
                 if (!background) {
@@ -424,7 +431,7 @@ InteractiveAuth.prototype = {
             return;
         }
 
-        if (this._data.errcode || this._data.error) {
+        if (this._data && this._data.errcode || this._data.error) {
             this._stateUpdatedCallback(nextStage, {
                 errcode: this._data.errcode || "",
                 error: this._data.error || "",

@@ -206,9 +206,6 @@ MatrixBaseApis.prototype.register = function(
         inhibitLogin = undefined;
     }
 
-    if (auth === undefined || auth === null) {
-        auth = {};
-    }
     if (sessionId) {
         auth.session = sessionId;
     }

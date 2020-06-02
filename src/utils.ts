@@ -373,6 +373,7 @@ export function extend() {
     const target = arguments[0] || {};
     for (let i = 1; i < arguments.length; i++) {
         const source = arguments[i];
+        if (!source) continue;
         for (const propName in source) { // eslint-disable-line guard-for-in
             target[propName] = source[propName];
         }
