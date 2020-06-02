@@ -329,7 +329,7 @@ export function MatrixClient(opts) {
     this._isGuest = false;
     this._ongoingScrollbacks = {};
     this.timelineSupport = Boolean(opts.timelineSupport);
-    this.urlPreviewCache = {};
+    this.urlPreviewCache = {}; // key=preview key, value=Promise for preview (may be an error)
     this._notifTimelineSet = null;
     this.unstableClientRelationAggregation = !!opts.unstableClientRelationAggregation;
 
@@ -2991,25 +2991,32 @@ MatrixClient.prototype.setRoomReadMarkers = async function(
  * May return synthesized attributes if the URL lacked OG meta.
  */
 MatrixClient.prototype.getUrlPreview = function(url, ts, callback) {
+    // bucket the timestamp to the nearest minute to prevent excessive spam to the server
+    // Surely 60-second accuracy is enough for anyone.
+    ts = Math.floor(ts / 60000) * 60000;
+
     const key = ts + "_" + url;
-    const og = this.urlPreviewCache[key];
-    if (og) {
-        return Promise.resolve(og);
+
+    // If there's already a request in flight (or we've handled it), return that instead.
+    const cachedPreview = this.urlPreviewCache[key];
+    if (cachedPreview) {
+        if (callback) {
+            cachedPreview.then(callback).catch(callback);
+        }
+        return cachedPreview;
     }
 
-    const self = this;
-    return this._http.authedRequest(
+    const resp = this._http.authedRequest(
         callback, "GET", "/preview_url", {
             url: url,
             ts: ts,
         }, undefined, {
             prefix: PREFIX_MEDIA_R0,
         },
-    ).then(function(response) {
-        // TODO: expire cache occasionally
-        self.urlPreviewCache[key] = response;
-        return response;
-    });
+    );
+    // TODO: Expire the URL preview cache sometimes
+    this.urlPreviewCache[key] = resp;
+    return resp;
 };
 
 /**
