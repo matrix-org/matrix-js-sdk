@@ -3000,6 +3000,9 @@ MatrixClient.prototype.getUrlPreview = function(url, ts, callback) {
     // If there's already a request in flight (or we've handled it), return that instead.
     const cachedPreview = this.urlPreviewCache[key];
     if (cachedPreview) {
+        if (callback) {
+            cachedPreview.then(callback).catch(callback);
+        }
         return cachedPreview;
     }
 
