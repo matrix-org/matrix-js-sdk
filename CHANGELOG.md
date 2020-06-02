@@ -1,3 +1,30 @@
+Changes in [6.2.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v6.2.0-rc.1) (2020-06-02)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v6.1.0...v6.2.0-rc.1)
+
+ * Make auth argument in the register request compliant with r0.6.0
+   [\#1304](https://github.com/matrix-org/matrix-js-sdk/pull/1304)
+ * Send the wrong auth params with the right auth params
+   [\#1393](https://github.com/matrix-org/matrix-js-sdk/pull/1393)
+ * encrypt cached keys with pickle key
+   [\#1387](https://github.com/matrix-org/matrix-js-sdk/pull/1387)
+ * Fix replying to key share requests
+   [\#1385](https://github.com/matrix-org/matrix-js-sdk/pull/1385)
+ * Add dist to package.json files so CDNs can serve it
+   [\#1384](https://github.com/matrix-org/matrix-js-sdk/pull/1384)
+ * Fix getVersion warning saying undefined room
+   [\#1382](https://github.com/matrix-org/matrix-js-sdk/pull/1382)
+ * Combine the two places we processed client-level default push rules
+   [\#1379](https://github.com/matrix-org/matrix-js-sdk/pull/1379)
+ * make MAC check robust against unpadded vs padded base64 differences
+   [\#1378](https://github.com/matrix-org/matrix-js-sdk/pull/1378)
+ * Remove key backup format migration
+   [\#1375](https://github.com/matrix-org/matrix-js-sdk/pull/1375)
+ * Add simple browserify browser-matrix.js tests
+   [\#1241](https://github.com/matrix-org/matrix-js-sdk/pull/1241)
+ * support new key agreement method for SAS
+   [\#1376](https://github.com/matrix-org/matrix-js-sdk/pull/1376)
+
 Changes in [6.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v6.1.0) (2020-05-19)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v6.1.0-rc.1...v6.1.0)
