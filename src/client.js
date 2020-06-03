@@ -4806,7 +4806,7 @@ MatrixClient.prototype.startClient = async function(opts) {
     this._syncApi.sync();
 
     if (opts.clientWellKnownPollPeriod !== undefined) {
-        this._clientWellKnownInterval =
+        this._clientWellKnownIntervalID =
             setInterval(() => {
                 this._fetchClientWellKnown();
             }, 1000 * opts.clientWellKnownPollPeriod);
@@ -4868,8 +4868,8 @@ MatrixClient.prototype.stopClient = function() {
         this._peekSync.stopPeeking();
     }
     global.clearTimeout(this._checkTurnServersTimeoutID);
-    if (this._clientWellKnownInterval !== undefined) {
-        global.clearInterval(this._clientWellKnownInterval);
+    if (this._clientWellKnownIntervalID !== undefined) {
+        global.clearInterval(this._clientWellKnownIntervalID);
     }
 };
 
