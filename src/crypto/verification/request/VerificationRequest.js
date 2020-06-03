@@ -25,15 +25,17 @@ import {
 } from "../Error";
 import {QRCodeData, SCAN_QR_CODE_METHOD} from "../QRCode";
 
-// the recommended amount of time before a verification request
-// should be (automatically) cancelled without user interaction
-// and ignored.
-const VERIFICATION_REQUEST_TIMEOUT = 10 * 60 * 1000; //10m
+// How long after the event's timestamp that the request times out
+const TIMEOUT_FROM_EVENT_TS = 10 * 60 * 1000; // 10 minutes
+
+// How long after we receive the event that the request times out
+const TIMEOUT_FROM_EVENT_RECEIPT = 2 * 60 * 1000; // 2 minutes
+
 // to avoid almost expired verification notifications
 // from showing a notification and almost immediately
 // disappearing, also ignore verification requests that
 // are this amount of time away from expiring.
-const VERIFICATION_REQUEST_MARGIN = 3 * 1000; //3s
+const VERIFICATION_REQUEST_MARGIN = 3 * 1000; // 3 seconds
 
 
 export const EVENT_PREFIX = "m.key.verification.";
@@ -80,6 +82,9 @@ export class VerificationRequest extends EventEmitter {
         // cross-signing identity reset between the .ready and .start event
         // and signing the wrong key after .start
         this._qrCodeData = null;
+
+        // The timestamp when we received the request event from the other side
+        this._requestReceivedAt = null;
     }
 
     /**
@@ -165,12 +170,26 @@ export class VerificationRequest extends EventEmitter {
         return this._chosenMethod;
     }
 
+    calculateEventTimeout(event) {
+        let effectiveExpiresAt = this.channel.getTimestamp(event)
+            + TIMEOUT_FROM_EVENT_TS;
+
+        if (this._requestReceivedAt && !this.initiatedByMe &&
+            this.phase <= PHASE_REQUESTED
+        ) {
+            const expiresAtByReceipt = this._requestReceivedAt
+                + TIMEOUT_FROM_EVENT_RECEIPT;
+            effectiveExpiresAt = Math.min(effectiveExpiresAt, expiresAtByReceipt);
+        }
+
+        return Math.max(0, effectiveExpiresAt - Date.now());
+    }
+
     /** The current remaining amount of ms before the request should be automatically cancelled */
     get timeout() {
         const requestEvent = this._getEventByEither(REQUEST_TYPE);
         if (requestEvent) {
-            const elapsed = Date.now() - this.channel.getTimestamp(requestEvent);
-            return Math.max(0, VERIFICATION_REQUEST_TIMEOUT - elapsed);
+            return this.calculateEventTimeout(requestEvent);
         }
         return 0;
     }
@@ -735,7 +754,7 @@ export class VerificationRequest extends EventEmitter {
 
     _setupTimeout(phase) {
         const shouldTimeout = !this._timeoutTimer && !this.observeOnly &&
-            phase === PHASE_REQUESTED && this.initiatedByMe;
+            phase === PHASE_REQUESTED;
 
         if (shouldTimeout) {
             this._timeoutTimer = setTimeout(this._cancelOnTimeout, this.timeout);
@@ -754,7 +773,17 @@ export class VerificationRequest extends EventEmitter {
 
     _cancelOnTimeout = () => {
         try {
-            this.cancel({reason: "Other party didn't accept in time", code: "m.timeout"});
+            if (this.initiatedByMe) {
+                this.cancel({
+                    reason: "Other party didn't accept in time",
+                    code: "m.timeout",
+                });
+            } else {
+                this.cancel({
+                    reason: "User didn't accept in time",
+                    code: "m.timeout",
+                });
+            }
         } catch (err) {
             logger.error("Error while cancelling verification request", err);
         }
@@ -791,16 +820,8 @@ export class VerificationRequest extends EventEmitter {
         if (!isLiveEvent) {
             this._observeOnly = true;
         }
-        // a timestamp is not provided on all to_device events
-        const timestamp = this.channel.getTimestamp(event);
-        if (Number.isFinite(timestamp)) {
-            const elapsed = Date.now() - timestamp;
-            // don't allow interaction on old requests
-            if (elapsed > (VERIFICATION_REQUEST_TIMEOUT - VERIFICATION_REQUEST_MARGIN) ||
-                elapsed < -(VERIFICATION_REQUEST_TIMEOUT / 2)
-            ) {
-                this._observeOnly = true;
-            }
+        if (this.calculateEventTimeout(event) < VERIFICATION_REQUEST_MARGIN) {
+            this._observeOnly = true;
         }
     }
 
@@ -819,6 +840,8 @@ export class VerificationRequest extends EventEmitter {
                     this._eventsByThem.delete(type);
                 }
             }
+            // also remember when we received the request event
+            this._requestReceivedAt = Date.now();
         }
     }
 
