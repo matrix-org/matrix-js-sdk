@@ -54,6 +54,7 @@ import {randomString} from './randomstring';
 import {PushProcessor} from "./pushprocessor";
 import {encodeBase64, decodeBase64} from "./crypto/olmlib";
 import { User } from "./models/user";
+import {AutoDiscovery} from "./autodiscovery";
 
 const SCROLLBACK_DELAY_MS = 3000;
 export const CRYPTO_ENABLED = isCryptoAvailable();
@@ -4719,6 +4720,9 @@ MatrixClient.prototype.deactivateSynapseUser = function(userId) {
  * @param {Boolean=} opts.lazyLoadMembers True to not load all membership events during
  * initial sync but fetch them when needed by calling `loadOutOfBandMembers`
  * This will override the filter option at this moment.
+ * @param {Number=} opts.clientWellKnownPollPeriod The number of seconds between polls
+ * to /.well-known/matrix/client, undefined to disable. This should be in the order of hours.
+ * Default: undefined.
  */
 MatrixClient.prototype.startClient = async function(opts) {
     if (this.clientRunning) {
@@ -4767,6 +4771,29 @@ MatrixClient.prototype.startClient = async function(opts) {
     this._clientOpts = opts;
     this._syncApi = new SyncApi(this, opts);
     this._syncApi.sync();
+
+    if (opts.clientWellKnownPollPeriod !== undefined) {
+        this._clientWellKnownIntervalID =
+            setInterval(() => {
+                this._fetchClientWellKnown();
+            }, 1000 * opts.clientWellKnownPollPeriod);
+        this._fetchClientWellKnown();
+    }
+};
+
+MatrixClient.prototype._fetchClientWellKnown = async function() {
+    try {
+        this._clientWellKnown = await AutoDiscovery.getRawClientConfig(this.getDomain());
+        this.emit("WellKnown.client", this._clientWellKnown);
+    } catch (err) {
+        logger.error("Failed to get client well-known", err);
+        this._clientWellKnown = undefined;
+        this.emit("WellKnown.error", err);
+    }
+};
+
+MatrixClient.prototype.getClientWellKnown = function() {
+    return this._clientWellKnown;
 };
 
 /**
@@ -4808,6 +4835,9 @@ MatrixClient.prototype.stopClient = function() {
         this._peekSync.stopPeeking();
     }
     global.clearTimeout(this._checkTurnServersTimeoutID);
+    if (this._clientWellKnownIntervalID !== undefined) {
+        global.clearInterval(this._clientWellKnownIntervalID);
+    }
 };
 
 /**
