@@ -753,7 +753,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
  *
  */
 export function fixBackupKey(key) {
-    if (key.indexOf(",") < 0) {
+    if (typeof key !== "string" || key.indexOf(",") < 0) {
         return null;
     }
     const fixedKey = Uint8Array.from(key.split(","), x => parseInt(x));
