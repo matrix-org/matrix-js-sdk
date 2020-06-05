@@ -20,6 +20,7 @@ import {SECRET_STORAGE_ALGORITHM_V1_AES} from "../../../src/crypto/SecretStorage
 import {MatrixEvent} from "../../../src/models/event";
 import {TestClient} from '../../TestClient';
 import {makeTestClients} from './verification/util';
+import {encryptAES} from "../../../src/crypto/aes";
 
 import * as utils from "../../../src/utils";
 
