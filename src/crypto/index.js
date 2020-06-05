@@ -844,7 +844,7 @@ Crypto.prototype.getSessionBackupPrivateKey = async function() {
     });
 
     // make sure we have a Uint8Array, rather than a string
-    if (key && typeof(key === "string")) {
+    if (key && typeof key === "string") {
         key = new Uint8Array(olmlib.decodeBase64(fixBackupKey(key) || key));
         await this.storeSessionBackupPrivateKey(key);
     }
