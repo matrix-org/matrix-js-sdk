@@ -1,3 +1,10 @@
+Changes in [6.2.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v6.2.1) (2020-06-05)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v6.2.0...v6.2.1)
+
+ * Bring back backup key format migration
+   [\#1399](https://github.com/matrix-org/matrix-js-sdk/pull/1399)
+
 Changes in [6.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v6.2.0) (2020-06-04)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v6.2.0-rc.1...v6.2.0)
