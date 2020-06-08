@@ -534,9 +534,26 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         }
     };
 
+    const ensureCanCheckPassphrase = async (keyId, keyInfo) => {
+        if (!keyInfo.mac) {
+            const key = await this._baseApis._cryptoCallbacks.getSecretStorageKey(
+                {keys: {[keyId]: keyInfo}}, "",
+            );
+            if (key) {
+                const keyData = key[1];
+                builder.ssssCryptoCallbacks.addPrivateKey(keyId, keyData);
+                const {iv, mac} = await SecretStorage._calculateKeyCheck(keyData);
+                keyInfo.iv = iv;
+                keyInfo.mac = mac;
+
+                await builder.accountDataClientAdapter.setAccountData(
+                    `m.secret_storage.key.${keyId}`, keyInfo,
+                );
+            }
+        }
+    };
 
     const oldSSSSKey = await this.getSecretStorageKey();
-    // TODO: oldKeyId is not used because we need to restore ensureCanCheckPassphrase behaviour
     const [oldKeyId, oldKeyInfo] = oldSSSSKey || [null, null];
     const decryptionKeys =
           await this._crossSigningInfo.isStoredInSecretStorage(this._secretStorage);
@@ -613,22 +630,30 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         // keys should be trusted
         logger.log("Cross-signing private keys found in secret storage");
 
+        // TODO: take this use case out of bootstrapping
         // fetch the private keys and set up our local copy of the keys for
         // use
-        // TODO: check if this doesn't have any side-effects
-        // spoiler: it does
         //
         // so if some other device resets the cross-signing keys,
         // we mark them as untrusted from _onDeviceListUserCrossSigningUpdated
         // you can either fix this by hitting the verify this session which (might?) call this method,
         // or the reset button in the settings
-        //
-        // perhaps we can detect this case and not make an builder for it and just do it?
-        throw new Error("this is not supported yet");
-        // await this.checkOwnCrossSigningTrust();
+        await this.checkOwnCrossSigningTrust();
+
+        if (oldKeyInfo && oldKeyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
+            // make sure that the default key has the information needed to
+            // check the passphrase
+            await ensureCanCheckPassphrase(oldKeyId, oldKeyInfo);
+        }
     } else {
         // we have SSSS and we cross-signing is already set up
         logger.log("Cross signing keys are present in secret storage");
+
+        if (oldKeyInfo && oldKeyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
+            // make sure that the default key has the information needed to
+            // check the passphrase
+            await ensureCanCheckPassphrase(oldKeyId, oldKeyInfo);
+        }
     }
 
     const crossSigningPrivateKeys = builder.crossSigningCallbacks.privateKeys;
