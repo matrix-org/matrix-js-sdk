@@ -84,7 +84,7 @@ export function PushProcessor(client) {
         // $glob: RegExp,
     };
 
-    const matchingRuleFromKindSet = (ev, kindset, device) => {
+    const matchingRuleFromKindSet = (ev, kindset) => {
         for (let ruleKindIndex = 0;
                 ruleKindIndex < RULEKINDS_IN_ORDER.length;
                 ++ruleKindIndex) {
@@ -97,7 +97,7 @@ export function PushProcessor(client) {
                     continue;
                 }
 
-                const rawrule = templateRuleToRaw(kind, rule, device);
+                const rawrule = templateRuleToRaw(kind, rule);
                 if (!rawrule) {
                     continue;
                 }
@@ -111,7 +111,7 @@ export function PushProcessor(client) {
         return null;
     };
 
-    const templateRuleToRaw = function(kind, tprule, device) {
+    const templateRuleToRaw = function(kind, tprule) {
         const rawrule = {
             'rule_id': tprule.rule_id,
             'actions': tprule.actions,
@@ -153,19 +153,12 @@ export function PushProcessor(client) {
                 });
                 break;
         }
-        if (device) {
-            rawrule.conditions.push({
-                'kind': 'device',
-                'profile_tag': device,
-            });
-        }
         return rawrule;
     };
 
     const eventFulfillsCondition = function(cond, ev) {
         const condition_functions = {
             "event_match": eventFulfillsEventMatchCondition,
-            "device": eventFulfillsDeviceCondition,
             "contains_display_name": eventFulfillsDisplayNameCondition,
             "room_member_count": eventFulfillsRoomMemberCountCondition,
             "sender_notification_permission": eventFulfillsSenderNotifPermCondition,
@@ -257,10 +250,6 @@ export function PushProcessor(client) {
         return content.body.search(pat) > -1;
     };
 
-    const eventFulfillsDeviceCondition = function(cond, ev) {
-        return false; // XXX: Allow a profile tag to be set for the web client instance
-    };
-
     const eventFulfillsEventMatchCondition = function(cond, ev) {
         if (!cond.key) {
             return false;
@@ -325,23 +314,13 @@ export function PushProcessor(client) {
     };
 
     const matchingRuleForEventWithRulesets = function(ev, rulesets) {
-        if (!rulesets || !rulesets.device) {
+        if (!rulesets) {
             return null;
         }
-        if (ev.getSender() == client.credentials.userId) {
+        if (ev.getSender() === client.credentials.userId) {
             return null;
         }
 
-        const allDevNames = Object.keys(rulesets.device);
-        for (let i = 0; i < allDevNames.length; ++i) {
-            const devname = allDevNames[i];
-            const devrules = rulesets.device[devname];
-
-            const matchingRule = matchingRuleFromKindSet(devrules, devname);
-            if (matchingRule) {
-                return matchingRule;
-            }
-        }
         return matchingRuleFromKindSet(ev, rulesets.global);
     };
 
@@ -392,7 +371,7 @@ export function PushProcessor(client) {
      * @return {object} The push rule, or null if no such rule was found
      */
     this.getPushRuleById = function(ruleId) {
-        for (const scope of ['device', 'global']) {
+        for (const scope of ['global']) {
             if (client.pushRules[scope] === undefined) continue;
 
             for (const kind of RULEKINDS_IN_ORDER) {
