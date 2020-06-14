@@ -90,6 +90,9 @@ export function PushProcessor(client) {
                 ++ruleKindIndex) {
             const kind = RULEKINDS_IN_ORDER[ruleKindIndex];
             const ruleset = kindset[kind];
+            if (!ruleset) {
+                continue;
+            }
 
             for (let ruleIndex = 0; ruleIndex < ruleset.length; ++ruleIndex) {
                 const rule = ruleset[ruleIndex];
