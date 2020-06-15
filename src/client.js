@@ -1978,7 +1978,11 @@ MatrixClient.prototype._restoreKeyBackup = function(
             }
         }
 
-        return this.importRoomKeys(keys, { progressCallback, untrusted: true, source: "backup" });
+        return this.importRoomKeys(keys, {
+            progressCallback,
+            untrusted: true,
+            source: "backup",
+        });
     }).then(() => {
         return this._crypto.setTrustedBackupPubKey(backupPubKey);
     }).then(() => {
