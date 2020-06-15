@@ -1201,6 +1201,7 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
         senderCurve25519Key: res.senderKey,
         claimedEd25519Key: res.keysClaimed.ed25519,
         forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
+        untrusted: res.untrusted,
     };
 };
 
@@ -1548,8 +1549,10 @@ MegolmDecryption.prototype._buildKeyForwardingMessage = async function(
  * @inheritdoc
  *
  * @param {module:crypto/OlmDevice.MegolmSessionData} session
+ * @param {string} source where the key comes from
  */
-MegolmDecryption.prototype.importRoomKey = function(session) {
+MegolmDecryption.prototype.importRoomKey = function(session, opts) {
+    opts = opts || {};
     return this._olmDevice.addInboundGroupSession(
         session.room_id,
         session.sender_key,
@@ -1558,8 +1561,9 @@ MegolmDecryption.prototype.importRoomKey = function(session) {
         session.session_key,
         session.sender_claimed_keys,
         true,
+        opts.untrusted ? { untrusted: opts.untrusted } : {},
     ).then(() => {
-        if (this._crypto.backupInfo) {
+        if (this._crypto.backupInfo && opts.source !== "backup") {
             // don't wait for it to complete
             this._crypto.backupGroupSession(
                 session.room_id,

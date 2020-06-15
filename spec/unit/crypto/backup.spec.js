@@ -517,6 +517,7 @@ describe("MegolmBackup", function() {
                 return megolmDecryption.decryptEvent(ENCRYPTED_EVENT);
             }).then((res) => {
                 expect(res.clearEvent.content).toEqual('testytest');
+                expect(res.untrusted).toBeTruthy(); // keys from backup are untrusted
             });
         });
 

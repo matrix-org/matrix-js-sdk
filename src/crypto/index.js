@@ -2238,8 +2238,13 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
 
     const forwardingChain = event.getForwardingCurve25519KeyChain();
     if (forwardingChain.length > 0) {
-        // we got this event from somewhere else
+        // we got the key this event from somewhere else
         // TODO: check if we can trust the forwarders.
+        return null;
+    }
+
+    if (event.isUntrusted()) {
+        // we got the key for this event from a source that we consider untrusted
         return null;
     }
 
@@ -2525,7 +2530,7 @@ Crypto.prototype.importRoomKeys = function(keys, opts = {}) {
         }
 
         const alg = this._getRoomDecryptor(key.room_id, key.algorithm);
-        return alg.importRoomKey(key).finally((r) => {
+        return alg.importRoomKey(key, opts).finally((r) => {
             successes++;
             if (opts.progressCallback) { updateProgress(); }
         });
