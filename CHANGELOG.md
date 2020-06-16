@@ -1,3 +1,10 @@
+Changes in [6.2.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v6.2.2) (2020-06-16)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v6.2.1...v6.2.2)
+
+ * Use existing session id for fetching flows as to not get a new session
+   [\#1407](https://github.com/matrix-org/matrix-js-sdk/pull/1407)
+
 Changes in [6.2.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v6.2.1) (2020-06-05)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v6.2.0...v6.2.1)
