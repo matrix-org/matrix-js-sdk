@@ -694,7 +694,13 @@ utils.extend(MatrixEvent.prototype, {
         return this._forwardingCurve25519KeyChain;
     },
 
-    isUntrusted: function() {
+    /**
+     * Whether the decryption key was obtained from an untrusted source. If so,
+     * we cannot verify the authenticity of the message.
+     *
+     * @return {boolean}
+     */
+    isKeySourceUntrusted: function() {
         return this._untrusted;
     },
 

@@ -1549,12 +1549,11 @@ MegolmDecryption.prototype._buildKeyForwardingMessage = async function(
  * @inheritdoc
  *
  * @param {module:crypto/OlmDevice.MegolmSessionData} session
- * @param {object} opts options for the import
- * @param {boolean} opts.untrusted whether the key should be considered as untrusted
- * @param {string} opts.source where the key came from
+ * @param {object} [opts={}] options for the import
+ * @param {boolean} [opts.untrusted] whether the key should be considered as untrusted
+ * @param {string} [opts.source where] the key came from
  */
-MegolmDecryption.prototype.importRoomKey = function(session, opts) {
-    opts = opts || {};
+MegolmDecryption.prototype.importRoomKey = function(session, opts = {}) {
     return this._olmDevice.addInboundGroupSession(
         session.room_id,
         session.sender_key,

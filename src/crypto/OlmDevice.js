@@ -992,14 +992,13 @@ OlmDevice.prototype._getInboundGroupSession = function(
  * @param {Object<string, string>} keysClaimed Other keys the sender claims.
  * @param {boolean} exportFormat true if the megolm keys are in export format
  *    (ie, they lack an ed25519 signature)
- * @param {Object} extraSessionData any other data to be include with the session
+ * @param {Object} [extraSessionData={}] any other data to be include with the session
  */
 OlmDevice.prototype.addInboundGroupSession = async function(
     roomId, senderKey, forwardingCurve25519KeyChain,
     sessionId, sessionKey, keysClaimed,
-    exportFormat, extraSessionData,
+    exportFormat, extraSessionData = {},
 ) {
-    extraSessionData = extraSessionData || {};
     await this._cryptoStore.doTxn(
         'readwrite', [
             IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,

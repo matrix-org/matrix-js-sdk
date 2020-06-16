@@ -2243,7 +2243,7 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
         return null;
     }
 
-    if (event.isUntrusted()) {
+    if (event.isKeySourceUntrusted()) {
         // we got the key for this event from a source that we consider untrusted
         return null;
     }
