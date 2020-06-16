@@ -148,8 +148,14 @@ InteractiveAuth.prototype = {
             // if we have no flows, try a request to acquire the flows
             if (!hasFlows) {
                 if (this._busyChangedCallback) this._busyChangedCallback(true);
-                // Do a fresh request as we're just acquiring flows.
-                this._doRequest(null).finally(() => {
+                // use the existing sessionid, if one is present.
+                let auth = null;
+                if (this._data.session) {
+                    auth = {
+                        session: this._data.session,
+                    };
+                }
+                this._doRequest(auth).finally(() => {
                     if (this._busyChangedCallback) this._busyChangedCallback(false);
                 });
             } else {
