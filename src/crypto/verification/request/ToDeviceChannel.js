@@ -358,9 +358,9 @@ export class ToDeviceRequests {
     }
 
     getRequestsInProgress(userId) {
-        const requests = this._requestsByUserId.get(userId);
-        if (requests) {
-            return Array.from(requests.values()).filter(r => r.pending);
+        const requestsByTxnId = this._requestsByUserId.get(userId);
+        if (requestsByTxnId) {
+            return Array.from(requestsByTxnId.values()).filter(r => r.pending);
         }
         return [];
     }
