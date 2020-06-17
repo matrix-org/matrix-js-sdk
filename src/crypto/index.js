@@ -507,27 +507,6 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     // the ID of the new SSSS key, if we create one
     let newKeyId = null;
 
-    // cache SSSS keys so that we don't need to constantly pester the user about it
-    const ssssKeys = {};
-
-    this._baseApis._cryptoCallbacks.getSecretStorageKey =
-        async ({keys}, name) => {
-            // if we already have a key that works, return it
-            for (const keyId of Object.keys(keys)) {
-                if (ssssKeys[keyId]) {
-                    return [keyId, ssssKeys[keyId]];
-                }
-            }
-
-            // otherwise, prompt the user and cache it
-            const key = await appCallbacks.getSecretStorageKey({keys}, name);
-            if (key) {
-                const [keyId, keyData] = key;
-                ssssKeys[keyId] = keyData;
-            }
-            return key;
-        };
-
     // create a new SSSS key and set it as default
     const createSSSS = async (opts, privateKey) => {
         opts = opts || {};
@@ -535,15 +514,16 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             opts.key = privateKey;
         }
 
-        const keyId = await this.addSecretStorageKey(
+        const keyId = await secretStorage.addKey(
             SECRET_STORAGE_ALGORITHM_V1_AES, opts,
         );
-        await this.setDefaultSecretStorageKeyId(keyId);
 
         if (privateKey) {
-            // cache the private key so that we can access it again
-            ssssKeys[keyId] = privateKey;
+            // make the private key available to encrypt 4S secrets
+            builder.ssssCryptoCallbacks.addPrivateKey(keyId, privateKey);
         }
+
+        await secretStorage.setDefaultKeyId(keyId);
         return keyId;
     };
 
@@ -566,12 +546,12 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             );
             if (key) {
                 const keyData = key[1];
-                ssssKeys[keyId] = keyData;
+                builder.ssssCryptoCallbacks.addPrivateKey(keyId, keyData);
                 const {iv, mac} = await SecretStorage._calculateKeyCheck(keyData);
                 keyInfo.iv = iv;
                 keyInfo.mac = mac;
 
-                await this._baseApis.setAccountData(
+                await builder.setAccountData(
                     `m.secret_storage.key.${keyId}`, keyInfo,
                 );
             }
@@ -746,6 +726,8 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         Object.assign(this._baseApis._cryptoCallbacks, appCallbacks);
     }
 
+    const operation = builder.buildOperation();
+    await operation.apply(this);
     logger.log("Secure Secret Storage ready");
 };
 

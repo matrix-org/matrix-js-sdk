@@ -18,6 +18,69 @@ export class EncryptionSetupBuilder {
         this.accountDataClientAdapter = new AccountDataClientAdapter(accountData);
         this.crossSigningCallbacks = new CrossSigningCallbacks();
         this.ssssCryptoCallbacks = new SSSSCryptoCallbacks();
+
+        this._crossSigningKeys = null;
+        this._keySignatures = null;
+        this._keyBackupInfo = null;
+    }
+
+
+    /**
+     * @param {String} type
+     * @param {Object} content
+     * @return {Promise}
+     */
+    setAccountData(type, content) {
+        return this.accountDataClientAdapter.setAccountData(type, content);
+    }
+
+    /**
+     * builds the operation containing all the parts that have been added to the builder
+     * @return {EncryptionSetupOperation}
+     */
+    buildOperation() {
+        const accountData = this.accountDataClientAdapter._values;
+        return new EncryptionSetupOperation(
+            accountData,
+            this._crossSigningKeys,
+            this._keyBackupInfo,
+            this._keySignatures,
+        );
+    }
+
+/**
+ * Can be created from EncryptionSetupBuilder, or
+ * (in a follow-up PR, not implemented yet) restored from storage, to retry.
+ *
+ * It does not have knowledge of any private keys, unlike the builder.
+ */
+export class EncryptionSetupOperation {
+    /**
+     * @param  {Map<String, Object>} accountData
+     * @param  {Object} crossSigningKeys
+     * @param  {Object} keyBackupInfo
+     * @param  {Object} keySignatures
+     */
+    constructor(accountData, crossSigningKeys, keyBackupInfo, keySignatures) {
+        this._accountData = accountData;
+        this._crossSigningKeys = crossSigningKeys;
+        this._keyBackupInfo = keyBackupInfo;
+        this._keySignatures = keySignatures;
+    }
+
+    /**
+     * Runs the (remaining part of, in the future) operation by sending requests to the server.
+     * @param  {Crypto} crypto
+     */
+    async apply(crypto) {
+        const baseApis = crypto._baseApis;
+        // set account data
+        if (this._accountData) {
+            for (const [type, content] of this._accountData) {
+                await baseApis.setAccountData(type, content);
+            }
+        }
+        }
     }
 }
 
