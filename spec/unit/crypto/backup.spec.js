@@ -27,6 +27,7 @@ import {MockStorageApi} from "../../MockStorageApi";
 import * as testUtils from "../../test-utils";
 import {OlmDevice} from "../../../src/crypto/OlmDevice";
 import {Crypto} from "../../../src/crypto";
+import {resetCrossSigningKeys} from "./crypto-utils";
 
 const Olm = global.Olm;
 
@@ -332,7 +333,7 @@ describe("MegolmBackup", function() {
             client.on("crossSigning.getKey", function(e) {
                 e.done(privateKeys[e.type]);
             });
-            await client.resetCrossSigningKeys();
+            await resetCrossSigningKeys(client);
             let numCalls = 0;
             await new Promise((resolve, reject) => {
                 client._http.authedRequest = function(

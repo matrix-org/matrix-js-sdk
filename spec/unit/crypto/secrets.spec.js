@@ -21,6 +21,7 @@ import {MatrixEvent} from "../../../src/models/event";
 import {TestClient} from '../../TestClient';
 import {makeTestClients} from './verification/util';
 import {encryptAES} from "../../../src/crypto/aes";
+import {resetCrossSigningKeys, createSecretStorageKey} from "./crypto-utils";
 
 import * as utils from "../../../src/utils";
 
@@ -190,7 +191,7 @@ describe("Secrets", function() {
                 }),
             ]);
         };
-        alice.resetCrossSigningKeys();
+        resetCrossSigningKeys(alice);
 
         const newKeyId = await alice.addSecretStorageKey(
             SECRET_STORAGE_ALGORITHM_V1_AES,
@@ -325,7 +326,7 @@ describe("Secrets", function() {
                 this.emit("accountData", event);
             };
 
-            await bob.bootstrapSecretStorage();
+            await bob.bootstrapSecretStorage({createSecretStorageKey});
 
             const crossSigning = bob._crypto._crossSigningInfo;
             const secretStorage = bob._crypto._secretStorage;
