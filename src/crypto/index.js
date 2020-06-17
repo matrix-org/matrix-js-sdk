@@ -585,10 +585,6 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                 const { keyInfo, privateKey } = await createSecretStorageKey();
                 newKeyId = await createSSSS(keyInfo, privateKey);
             }
-
-            if (oldKeyInfo && oldKeyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
-                await ensureCanCheckPassphrase(oldKeyId, oldKeyInfo);
-            }
         } else if (!inStorage && keyBackupInfo) {
             // we have an existing backup, but no SSSS
 
