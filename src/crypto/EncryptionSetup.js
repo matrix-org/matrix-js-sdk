@@ -1,5 +1,10 @@
 import {MatrixEvent} from "../models/event";
 import {EventEmitter} from "events";
+import {createCryptoStoreCacheCallbacks} from "./CrossSigning";
+import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
+import {
+    PREFIX_UNSTABLE,
+} from "../http-api";
 
 /**
  * Builds an EncryptionSetupOperation by calling any of the add.. methods.
@@ -22,6 +27,32 @@ export class EncryptionSetupBuilder {
         this._crossSigningKeys = null;
         this._keySignatures = null;
         this._keyBackupInfo = null;
+    }
+
+    /**
+     * Adds new cross-signing public keys
+     * @param {Object} auth auth dictionary needed to upload the new keys
+     * @param {Object} keys the new keys
+     */
+    addCrossSigningKeys(auth, keys) {
+        this._crossSigningKeys = {auth, keys};
+    }
+
+    /**
+     * Add signatures from a given user and device/x-sign key
+     * Used to sign the new cross-signing key with the device key
+     *
+     * @param {String} userId
+     * @param {String} deviceId
+     * @param {String} signature
+     */
+    addKeySignature(userId, deviceId, signature) {
+        if (!this._keySignatures) {
+            this._keySignatures = {};
+        }
+        const userSignatures = this._keySignatures[userId] || {};
+        this._keySignatures[userId] = userSignatures;
+        userSignatures[deviceId] = signature;
     }
 
 
@@ -47,6 +78,37 @@ export class EncryptionSetupBuilder {
             this._keySignatures,
         );
     }
+
+    /**
+     * Stores the created keys locally.
+     *
+     * This does not yet store the operation in a way that it can be restored,
+     * but that is the idea in the future.
+     *
+     * @param  {Crypto} crypto
+     * @return {Promise}
+     */
+    async persist(crypto) {
+        // store self_signing and user_signing private key in cache
+        if (this._crossSigningKeys) {
+            const cacheCallbacks = createCryptoStoreCacheCallbacks(
+                crypto._cryptoStore, crypto._olmDevice);
+            for (const type of ["self_signing", "user_signing"]) {
+                // logger.log(`Cache ${type} cross-signing private key locally`);
+                const privateKey = this.crossSigningCallbacks.privateKeys.get(type);
+                await cacheCallbacks.storeCrossSigningKeyCache(type, privateKey);
+            }
+            // store own cross-sign pubkeys as trusted
+            await crypto._cryptoStore.doTxn(
+                'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+                (txn) => {
+                    crypto._cryptoStore.storeCrossSigningKeys(
+                        txn, this._crossSigningKeys.keys);
+                },
+            );
+        }
+    }
+}
 
 /**
  * Can be created from EncryptionSetupBuilder, or
@@ -79,6 +141,24 @@ export class EncryptionSetupOperation {
             for (const [type, content] of this._accountData) {
                 await baseApis.setAccountData(type, content);
             }
+        }
+        // upload cross-signing keys
+        if (this._crossSigningKeys) {
+            const keys = {};
+            for (const [name, key] of Object.entries(this._crossSigningKeys.keys)) {
+                keys[name + "_key"] = key;
+            }
+            await baseApis.uploadDeviceSigningKeys(
+                this._crossSigningKeys.auth,
+                keys,
+            );
+            // pass the new keys to the main instance of our own CrossSigningInfo.
+            crypto._crossSigningInfo.setKeys(this._crossSigningKeys.keys);
+        }
+        // upload first cross-signing signatures with the new key
+        // (e.g. signing our own device)
+        if (this._keySignatures) {
+            await baseApis.uploadKeySignatures(this._keySignatures);
         }
         }
     }

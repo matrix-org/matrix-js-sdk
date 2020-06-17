@@ -476,7 +476,7 @@ Crypto.prototype.isCrossSigningReady = async function() {
  *     SecretStorage#addKey: an object with `passphrase` and/or `pubkey` fields.
  */
 Crypto.prototype.bootstrapSecretStorage = async function({
-    authUploadDeviceSigningKeys,
+    authUploadDeviceSigningKeys = async func => await func(),
     createSecretStorageKey = async () => ({ }),
     keyBackupInfo,
     setupNewKeyBackup,
@@ -484,17 +484,6 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     getKeyBackupPassphrase,
 } = {}) {
     logger.log("Bootstrapping Secure Secret Storage");
-
-    // Create cross-signing keys if they don't exist, as we want to sign the SSSS default
-    // key with the cross-signing master key. The cross-signing master key is also used
-    // to verify the signature on the SSSS default key when adding secrets, so we
-    // effectively need it for both reading and writing secrets.
-    const crossSigningPrivateKeys = {};
-
-    // If we happen to reset cross-signing keys here, then we want access to the
-    // cross-signing private keys, but only for the scope of this method, so we
-    // use temporary callbacks to weave them through the various APIs.
-    const appCallbacks = Object.assign({}, this._baseApis._cryptoCallbacks);
     const builder = new EncryptionSetupBuilder(this._baseApis.store.accountData);
     const secretStorage = new SecretStorage(
         builder.accountDataClientAdapter,
@@ -529,14 +518,24 @@ Crypto.prototype.bootstrapSecretStorage = async function({
 
     // reset the cross-signing keys
     const resetCrossSigning = async () => {
-        this._baseApis._cryptoCallbacks.saveCrossSigningKeys =
-            keys => Object.assign(crossSigningPrivateKeys, keys);
-        this._baseApis._cryptoCallbacks.getCrossSigningKey =
-            name => crossSigningPrivateKeys[name];
-        await this.resetCrossSigningKeys(
-            CrossSigningLevel.MASTER,
-            { authUploadDeviceSigningKeys },
-        );
+        crossSigningInfo.resetKeys();
+        // sign master key with device key
+        await this._signObject(crossSigningInfo.keys.master);
+
+        await authUploadDeviceSigningKeys(authDict => {
+            builder.addCrossSigningKeys(authDict, crossSigningInfo.keys);
+            return Promise.resolve();
+        });
+
+        // cross-sign own device
+        const device = this._deviceList.getStoredDevice(this._userId, this._deviceId);
+        const deviceSignature = await crossSigningInfo.signDevice(this._userId, device);
+        builder.addKeySignature(this._userId, this._deviceId, deviceSignature);
+
+        if (keyBackupInfo) {
+            await crossSigningInfo.signObject(keyBackupInfo.auth_data, "master");
+            builder.addSessionBackup(keyBackupInfo);
+        }
     };
 
     const ensureCanCheckPassphrase = async (keyId, keyInfo) => {
@@ -631,7 +630,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             // Sign the backup with the cross signing key so the key backup can
             // be trusted via cross-signing.
             logger.log("Adding cross signing signature to key backup");
-            await this._crossSigningInfo.signObject(
+            await crossSigningInfo.signObject(
                 keyBackupInfo.auth_data, "master",
             );
             await this._baseApis._http.authedRequest(
@@ -664,18 +663,16 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             }
         }
 
-        // If cross-signing keys were reset, store them in Secure Secret Storage.
-        // This is done in a separate step so we can ensure secret storage has its
-        // own key first.
-        // XXX: We need to think about how to re-do these steps if they fail.
-        // See also https://github.com/vector-im/riot-web/issues/11635
-        if (Object.keys(crossSigningPrivateKeys).length) {
+        const crossSigningPrivateKeys = builder.crossSigningCallbacks.privateKeys;
+        if (crossSigningPrivateKeys.size) {
             logger.log("Storing cross-signing private keys in secret storage");
             // Assuming no app-supplied callback, default to storing in SSSS.
-            if (!appCallbacks.saveCrossSigningKeys) {
+            if (!this._baseApis._cryptoCallbacks.saveCrossSigningKeys) {
+                // this is writing to in-memory account data in builder.accountDataClientAdapter
+                // so won't fail
                 await CrossSigningInfo.storeInSecretStorage(
                     crossSigningPrivateKeys,
-                    this._secretStorage,
+                    secretStorage,
                 );
             }
         }
@@ -688,13 +685,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             await this._baseApis.createKeyBackupVersion(info);
         }
 
-        // Call `getCrossSigningKey` for side effect of caching private keys for
-        // future gossiping to other devices if enabled via app level callbacks.
         if (this._crossSigningInfo._cacheCallbacks) {
-            for (const type of ["self_signing", "user_signing"]) {
-                logger.log(`Cache ${type} cross-signing private key locally`);
-                await this._crossSigningInfo.getCrossSigningKey(type);
-            }
         }
 
         // and likewise for the session backup key
@@ -728,6 +719,10 @@ Crypto.prototype.bootstrapSecretStorage = async function({
 
         const operation = builder.buildOperation();
         await operation.apply(this);
+        // this persists private keys and public keys as trusted,
+        // only do this if apply succeeded for now as retry isn't in place yet
+        await builder.persist(this);
+    }
     logger.log("Secure Secret Storage ready");
 };
 
