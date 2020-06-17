@@ -637,8 +637,14 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             // keys should be trusted
             logger.log("Cross-signing private keys found in secret storage");
 
+            // TODO: take this use case out of bootstrapping
             // fetch the private keys and set up our local copy of the keys for
             // use
+            //
+            // so if some other device resets the cross-signing keys,
+            // we mark them as untrusted from _onDeviceListUserCrossSigningUpdated
+            // you can either fix this by hitting the verify this session which (might?) call this method,
+            // or the reset button in the settings
             await this.checkOwnCrossSigningTrust();
 
             if (oldKeyInfo && oldKeyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
