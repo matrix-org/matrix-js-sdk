@@ -34,7 +34,6 @@ import {DeviceInfo} from "./deviceinfo";
 import * as algorithms from "./algorithms";
 import {
     CrossSigningInfo,
-    CrossSigningLevel,
     DeviceTrustLevel,
     UserTrustLevel,
     createCryptoStoreCacheCallbacks,
@@ -50,11 +49,10 @@ import {
 } from './verification/QRCode';
 import {SAS} from './verification/SAS';
 import {keyFromPassphrase} from './key_passphrase';
-import {encodeRecoveryKey} from './recoverykey';
+import {encodeRecoveryKey, decodeRecoveryKey} from './recoverykey';
 import {VerificationRequest} from "./verification/request/VerificationRequest";
 import {InRoomChannel, InRoomRequests} from "./verification/request/InRoomChannel";
 import {ToDeviceChannel, ToDeviceRequests} from "./verification/request/ToDeviceChannel";
-import * as httpApi from "../http-api";
 import {IllegalMethod} from "./verification/IllegalMethod";
 import {KeySignatureUploadError} from "../errors";
 import {decryptAES, encryptAES} from './aes';
@@ -622,7 +620,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             newKeyId = await createSSSS(opts, backupKey);
 
             // store the backup key in secret storage
-            await this.storeSecret(
+            await secretStorage.store(
                 "m.megolm_backup.v1", olmlib.encodeBase64(backupKey), [newKeyId],
             );
 
@@ -633,11 +631,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             await crossSigningInfo.signObject(
                 keyBackupInfo.auth_data, "master",
             );
-            await this._baseApis._http.authedRequest(
-                undefined, "PUT", "/room_keys/version/" + keyBackupInfo.version,
-                undefined, keyBackupInfo,
-                {prefix: httpApi.PREFIX_UNSTABLE},
-            );
+            builder.addSessionBackup(keyBackupInfo);
         } else if (!this._crossSigningInfo.getId()) {
             // we have SSSS, but we don't know if the server's cross-signing
             // keys should be trusted
@@ -680,30 +674,45 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         if (setupNewKeyBackup && !keyBackupInfo) {
             const info = await this._baseApis.prepareKeyBackupVersion(
                 null /* random key */,
-                { secureSecretStorage: true },
+                // don't write to secret storage, as it will write to this._secretStorage.
+                // Here, we want to capture all the side-effects of bootstrapping,
+                // and want to write to the local secretStorage object
+                { secureSecretStorage: false },
             );
-            await this._baseApis.createKeyBackupVersion(info);
-        }
+            // write the key ourselves to 4S
+            const privateKey = decodeRecoveryKey(info.recovery_key);
+            await secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(privateKey));
 
-        if (this._crossSigningInfo._cacheCallbacks) {
+            // create keyBackupInfo object to add to builder
+            const data = {
+                algorithm: info.algorithm,
+                auth_data: info.auth_data,
+            };
+            // sign with cross-sign master key
+            await crossSigningInfo.signObject(data.auth_data, "master");
+            // sign with the device fingerprint
+            await this._signObject(data.auth_data);
+
+
+            builder.addSessionBackup(data);
         }
 
         // and likewise for the session backup key
-        const sessionBackupKey = await this.getSecret('m.megolm_backup.v1');
+        const sessionBackupKey = await secretStorage.get('m.megolm_backup.v1');
         if (sessionBackupKey) {
             logger.info("Got session backup key from secret storage: caching");
             // fix up the backup key if it's in the wrong format, and replace
             // in secret storage
             const fixedBackupKey = fixBackupKey(sessionBackupKey);
             if (fixedBackupKey) {
-                await this.storeSecret(
-                    "m.megolm_backup.v1", fixedBackupKey, [newKeyId || oldKeyId],
+                await secretStorage.store("m.megolm_backup.v1",
+                    fixedBackupKey, [newKeyId || oldKeyId],
                 );
             }
             const decodedBackupKey = new Uint8Array(olmlib.decodeBase64(
                 fixedBackupKey || sessionBackupKey,
             ));
-            await this.storeSessionBackupPrivateKey(decodedBackupKey);
+            await builder.addSessionBackupPrivateKeyToCache(decodedBackupKey);
         }
     } finally {
         // Restore the original callbacks. NB. we must do this by manipulating

@@ -39,6 +39,29 @@ export class EncryptionSetupBuilder {
     }
 
     /**
+     * Adds the key backup info to be updated on the server
+     *
+     * Used either to create a new key backup, or add signatures
+     * from the new MSK.
+     *
+     * @param {Object} keyBackupInfo as received from/sent to the server
+     */
+    addSessionBackup(keyBackupInfo) {
+        this._keyBackupInfo = keyBackupInfo;
+    }
+
+    /**
+     * Adds the session backup private key to be updated in the local cache
+     *
+     * Used after fixing the format of the key
+     *
+     * @param {Uint8Array} privateKey
+     */
+    addSessionBackupPrivateKeyToCache(privateKey) {
+        this._sessionBackupPrivateKey = privateKey;
+    }
+
+    /**
      * Add signatures from a given user and device/x-sign key
      * Used to sign the new cross-signing key with the device key
      *
@@ -107,6 +130,10 @@ export class EncryptionSetupBuilder {
                 },
             );
         }
+        // store session backup key in cache
+        if (this._sessionBackupPrivateKey) {
+            await crypto.storeSessionBackupPrivateKey(this._sessionBackupPrivateKey);
+        }
     }
 }
 
@@ -160,6 +187,29 @@ export class EncryptionSetupOperation {
         if (this._keySignatures) {
             await baseApis.uploadKeySignatures(this._keySignatures);
         }
+        // need to create/update key backup info
+        if (this._keyBackupInfo) {
+            if (this._keyBackupInfo.version) {
+                // session backup signature
+                // The backup is trusted because the user provided the private key.
+                // Sign the backup with the cross signing key so the key backup can
+                // be trusted via cross-signing.
+                await baseApis._http.authedRequest(
+                    undefined, "PUT", "/room_keys/version/" + this._keyBackupInfo.version,
+                    undefined, {
+                        algorithm: this._keyBackupInfo.algorithm,
+                        auth_data: this._keyBackupInfo.auth_data,
+                    },
+                    {prefix: PREFIX_UNSTABLE},
+                );
+            } else {
+                // add new key backup
+                await baseApis._http.authedRequest(
+                    undefined, "POST", "/room_keys/version",
+                    undefined, this._keyBackupInfo,
+                    {prefix: PREFIX_UNSTABLE},
+                );
+            }
         }
     }
 }
