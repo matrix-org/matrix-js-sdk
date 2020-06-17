@@ -473,6 +473,7 @@ Crypto.prototype.isCrossSigningReady = async function() {
  *     {Promise} A promise which resolves to key creation data for
  *     SecretStorage#addKey: an object with `passphrase` and/or `pubkey` fields.
  */
+
 Crypto.prototype.bootstrapSecretStorage = async function({
     authUploadDeviceSigningKeys = async func => await func(),
     createSecretStorageKey = async () => ({ }),
@@ -880,57 +881,6 @@ Crypto.prototype.checkCrossSigningPrivateKey = function(privateKey, expectedPubl
     } finally {
         if (signing) signing.free();
     }
-};
-
-/**
- * Generate new cross-signing keys.
- *
- * @param {CrossSigningLevel} [level] the level of cross-signing to reset.  New
- * keys will be created for the given level and below.  Defaults to
- * regenerating all keys.
- * @param {function} [opts.authUploadDeviceSigningKeys] Optional. Function
- * called to await an interactive auth flow when uploading device signing keys.
- * Args:
- *     {function} A function that makes the request requiring auth. Receives the
- *     auth data as an object.
- */
-Crypto.prototype.resetCrossSigningKeys = async function(level, {
-    authUploadDeviceSigningKeys = async func => await func(),
-} = {}) {
-    logger.info(`Resetting cross-signing keys at level ${level}`);
-    // Copy old keys (usually empty) in case we need to revert
-    const oldKeys = Object.assign({}, this._crossSigningInfo.keys);
-    try {
-        await this._crossSigningInfo.resetKeys(level);
-        await this._signObject(this._crossSigningInfo.keys.master);
-
-        // send keys to server first before storing as trusted locally
-        // to ensure upload succeeds
-        const keys = {};
-        for (const [name, key] of Object.entries(this._crossSigningInfo.keys)) {
-            keys[name + "_key"] = key;
-        }
-        await authUploadDeviceSigningKeys(async authDict => {
-            await this._baseApis.uploadDeviceSigningKeys(authDict, keys);
-        });
-
-        // write a copy locally so we know these are trusted keys
-        await this._cryptoStore.doTxn(
-            'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
-            (txn) => {
-                this._cryptoStore.storeCrossSigningKeys(txn, this._crossSigningInfo.keys);
-            },
-        );
-    } catch (e) {
-        // If anything failed here, revert the keys so we know to try again from the start
-        // next time.
-        logger.error("Resetting cross-signing keys failed, revert to previous keys", e);
-        this._crossSigningInfo.keys = oldKeys;
-        throw e;
-    }
-    this._baseApis.emit("crossSigning.keysChanged", {});
-    await this._afterCrossSigningLocalKeyChange();
-    logger.info("Cross-signing key reset complete");
 };
 
 /**
