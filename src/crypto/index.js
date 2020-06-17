@@ -726,8 +726,8 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         Object.assign(this._baseApis._cryptoCallbacks, appCallbacks);
     }
 
-    const operation = builder.buildOperation();
-    await operation.apply(this);
+        const operation = builder.buildOperation();
+        await operation.apply(this);
     logger.log("Secure Secret Storage ready");
 };
 
