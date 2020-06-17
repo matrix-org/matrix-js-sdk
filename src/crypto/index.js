@@ -39,6 +39,7 @@ import {
     UserTrustLevel,
     createCryptoStoreCacheCallbacks,
 } from './CrossSigning';
+import {EncryptionSetupBuilder} from "./EncryptionSetup";
 import {SECRET_STORAGE_ALGORITHM_V1_AES, SecretStorage} from './SecretStorage';
 import {OutgoingRoomKeyRequestManager} from './OutgoingRoomKeyRequestManager';
 import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
@@ -494,6 +495,14 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     // cross-signing private keys, but only for the scope of this method, so we
     // use temporary callbacks to weave them through the various APIs.
     const appCallbacks = Object.assign({}, this._baseApis._cryptoCallbacks);
+    const builder = new EncryptionSetupBuilder(this._baseApis.store.accountData);
+    const secretStorage = new SecretStorage(
+        builder.accountDataClientAdapter,
+        builder.ssssCryptoCallbacks);
+    const crossSigningInfo = new CrossSigningInfo(
+            this._userId,
+            builder.crossSigningCallbacks,
+            builder.crossSigningCallbacks);
 
     // the ID of the new SSSS key, if we create one
     let newKeyId = null;
