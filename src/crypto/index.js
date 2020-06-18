@@ -522,8 +522,15 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         await this._signObject(crossSigningInfo.keys.master);
 
         await authUploadDeviceSigningKeys(authDict => {
-            builder.addCrossSigningKeys(authDict, crossSigningInfo.keys);
-            return Promise.resolve();
+            if (authDict) {
+                builder.addCrossSigningKeys(authDict, crossSigningInfo.keys);
+                return Promise.resolve();
+            } else {
+                // This callback also gets called to obtain the IUA flows,
+                // so do a call to obtain those if we don't have the authDict yet
+                // We should get called again at a later point with the authDict.
+                return this._baseApis.uploadDeviceSigningKeys(null, {});
+            }
         });
 
         // cross-sign own device
