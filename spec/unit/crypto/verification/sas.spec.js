@@ -22,6 +22,7 @@ import {DeviceInfo} from "../../../../src/crypto/deviceinfo";
 import {verificationMethods} from "../../../../src/crypto";
 import * as olmlib from "../../../../src/crypto/olmlib";
 import {logger} from "../../../../src/logger";
+import {resetCrossSigningKeys} from "../crypto-utils";
 
 const Olm = global.Olm;
 
@@ -288,12 +289,12 @@ describe("SAS verification", function() {
             );
             alice.httpBackend.when('POST', '/keys/signatures/upload').respond(200, {});
             alice.httpBackend.flush(undefined, 2);
-            await alice.client.resetCrossSigningKeys();
+            await resetCrossSigningKeys(alice.client);
             bob.httpBackend.when('POST', '/keys/device_signing/upload').respond(200, {});
             bob.httpBackend.when('POST', '/keys/signatures/upload').respond(200, {});
             bob.httpBackend.flush(undefined, 2);
 
-            await bob.client.resetCrossSigningKeys();
+            await resetCrossSigningKeys(bob.client);
 
             bob.client._crypto._deviceList.storeCrossSigningForUser(
                 "@alice:example.com", {
