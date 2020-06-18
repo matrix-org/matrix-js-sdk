@@ -70,7 +70,10 @@ describe("Cross Signing", function() {
         alice.setAccountData = async () => {};
         alice.getAccountDataFromServer = async () => {};
         // set Alice's cross-signing key
-        await alice.bootstrapSecretStorage({createSecretStorageKey});
+        await alice.bootstrapSecretStorage({
+            createSecretStorageKey,
+            authUploadDeviceSigningKeys: async func => await func({}),
+        });
         expect(alice.uploadDeviceSigningKeys).toHaveBeenCalled();
     });
 

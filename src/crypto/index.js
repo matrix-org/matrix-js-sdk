@@ -449,11 +449,11 @@ Crypto.prototype.isCrossSigningReady = async function() {
  * - migrates Secure Secret Storage to use the latest algorithm, if an outdated
  *   algorithm is found
  *
- * @param {function} [opts.authUploadDeviceSigningKeys] Optional. Function
+ * @param {function} opts.authUploadDeviceSigningKeys Function
  * called to await an interactive auth flow when uploading device signing keys.
  * Args:
  *     {function} A function that makes the request requiring auth. Receives the
- *     auth data as an object.
+ *     auth data as an object. Can be called multiple times, first with an empty authDict, to obtain the flows.
  * @param {function} [opts.createSecretStorageKey] Optional. Function
  * called to await a secret storage key creation flow.
  * Returns:
@@ -475,7 +475,7 @@ Crypto.prototype.isCrossSigningReady = async function() {
  */
 
 Crypto.prototype.bootstrapSecretStorage = async function({
-    authUploadDeviceSigningKeys = async func => await func(),
+    authUploadDeviceSigningKeys,
     createSecretStorageKey = async () => ({ }),
     keyBackupInfo,
     setupNewKeyBackup,

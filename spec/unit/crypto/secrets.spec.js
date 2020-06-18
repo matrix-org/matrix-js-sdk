@@ -326,7 +326,10 @@ describe("Secrets", function() {
                 this.emit("accountData", event);
             };
 
-            await bob.bootstrapSecretStorage({createSecretStorageKey});
+            await bob.bootstrapSecretStorage({
+                createSecretStorageKey,
+                authUploadDeviceSigningKeys: async func => await func({}),
+            });
 
             const crossSigning = bob._crypto._crossSigningInfo;
             const secretStorage = bob._crypto._secretStorage;
@@ -382,6 +385,7 @@ describe("Secrets", function() {
                     keyInfo: { pubkey: storagePublicKey },
                     privateKey: storagePrivateKey,
                 }),
+                authUploadDeviceSigningKeys: async func => await func({}),
             });
 
             // Clear local cross-signing keys and read from secret storage
@@ -390,7 +394,9 @@ describe("Secrets", function() {
                 crossSigning.toStorage(),
             );
             crossSigning.keys = {};
-            await bob.bootstrapSecretStorage();
+            await bob.bootstrapSecretStorage({
+                authUploadDeviceSigningKeys: async func => await func({}),
+            });
 
             expect(crossSigning.getId()).toBeTruthy();
             expect(await crossSigning.isStoredInSecretStorage(secretStorage))
@@ -511,7 +517,9 @@ describe("Secrets", function() {
                 this.emit("accountData", event);
             };
 
-            await alice.bootstrapSecretStorage();
+            await alice.bootstrapSecretStorage({
+                authUploadDeviceSigningKeys: async func => await func({}),
+            });
 
             expect(alice.getAccountData("m.secret_storage.default_key").getContent())
                 .toEqual({key: "key_id"});
@@ -651,7 +659,9 @@ describe("Secrets", function() {
                 this.emit("accountData", event);
             };
 
-            await alice.bootstrapSecretStorage();
+            await alice.bootstrapSecretStorage({
+                authUploadDeviceSigningKeys: async func => await func({}),
+            });
 
             const backupKey = alice.getAccountData("m.megolm_backup.v1")
                 .getContent();
