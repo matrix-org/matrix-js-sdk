@@ -970,6 +970,20 @@ MatrixClient.prototype.findVerificationRequestDMInProgress = function(roomId) {
 };
 
 /**
+ * Returns all to-device verification requests that are already in progress for the given user id
+ *
+ * @param {string} userId the ID of the user to query
+ *
+ * @returns {module:crypto/verification/request/VerificationRequest[]} the VerificationRequests that are in progress
+ */
+MatrixClient.prototype.getVerificationRequestsToDeviceInProgress = function(userId) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    return this._crypto.getVerificationRequestsToDeviceInProgress(userId);
+};
+
+/**
  * Request a key verification from another user.
  *
  * @param {string} userId the user to request verification with

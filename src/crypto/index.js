@@ -2090,6 +2090,10 @@ Crypto.prototype.findVerificationRequestDMInProgress = function(roomId) {
     return this._inRoomVerificationRequests.findRequestInProgress(roomId);
 };
 
+Crypto.prototype.getVerificationRequestsToDeviceInProgress = function(userId) {
+    return this._toDeviceVerificationRequests.getRequestsInProgress(userId);
+};
+
 Crypto.prototype.requestVerificationDM = function(userId, roomId) {
     const existingRequest = this._inRoomVerificationRequests.
         findRequestInProgress(roomId);

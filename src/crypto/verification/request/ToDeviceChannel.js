@@ -356,4 +356,12 @@ export class ToDeviceRequests {
             }
         }
     }
+
+    getRequestsInProgress(userId) {
+        const requestsByTxnId = this._requestsByUserId.get(userId);
+        if (requestsByTxnId) {
+            return Array.from(requestsByTxnId.values()).filter(r => r.pending);
+        }
+        return [];
+    }
 }
