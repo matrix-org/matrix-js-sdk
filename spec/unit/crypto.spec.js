@@ -49,7 +49,8 @@ describe("Crypto", function() {
             event.getWireContent = () => {return {algorithm: olmlib.MEGOLM_ALGORITHM};};
             event.getForwardingCurve25519KeyChain = () => ["not empty"];
             event.isKeySourceUntrusted = () => false;
-            event.getClaimedEd25519Key = () => 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+            event.getClaimedEd25519Key =
+                () => 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 
             encryptionInfo = client.getEventEncryptionInfo(event);
             expect(encryptionInfo.encrypted).toBeTruthy();
@@ -60,8 +61,10 @@ describe("Crypto", function() {
             event.getForwardingCurve25519KeyChain = () => [];
             event.isKeySourceUntrusted = () => true;
             const device = new DeviceInfo("FLIBBLE");
-            device.keys["curve25519:FLIBBLE"] = 'YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI';
-            device.keys["ed25519:FLIBBLE"] = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+            device.keys["curve25519:FLIBBLE"] =
+                'YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI';
+            device.keys["ed25519:FLIBBLE"] =
+                'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
             client._crypto._deviceList.getDeviceByIdentityKey = () => device;
 
             encryptionInfo = client.getEventEncryptionInfo(event);
@@ -72,7 +75,8 @@ describe("Crypto", function() {
 
             // known sender, trusted megolm key, but bad ed25519key
             event.isKeySourceUntrusted = () => false;
-            device.keys["ed25519:FLIBBLE"] = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
+            device.keys["ed25519:FLIBBLE"] =
+                'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
 
             encryptionInfo = client.getEventEncryptionInfo(event);
             expect(encryptionInfo.encrypted).toBeTruthy();
