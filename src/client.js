@@ -1186,6 +1186,23 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
 };
 
 /**
+ * Get information about the encryption of an event
+ *
+ * @function module:client~MatrixClient#getEventEncryptionInfo
+ *
+ * @param {module:models/event.MatrixEvent} event event to be checked
+ *
+ * @return {object} An object with the fields:
+ *    - encrypted: whether the event is encrypted
+ *    - senderKey: the sender's key
+ *    - algorithm: the algorithm used to encrypt the event
+ *    - authenticated: whether we can be sure that the owner of the senderKey
+ *      sent the event
+ *    - sender: the sender's device information
+ *    - mismatchedSender: if the event's ed25519 and curve25519 keys don't match
+ */
+
+/**
  * Create a recovery key from a user-supplied passphrase.
  * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
@@ -1313,6 +1330,7 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
  */
 
 wrapCryptoFuncs(MatrixClient, [
+    "getEventEncryptionInfo",
     "createRecoveryKeyFromPassphrase",
     "bootstrapSecretStorage",
     "addSecretStorageKey",
