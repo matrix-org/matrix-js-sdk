@@ -1193,13 +1193,15 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
  * @param {module:models/event.MatrixEvent} event event to be checked
  *
  * @return {object} An object with the fields:
- *    - encrypted: whether the event is encrypted
+ *    - encrypted: whether the event is encrypted (if not encrypted, some of the
+ *      other properties may not be set)
  *    - senderKey: the sender's key
  *    - algorithm: the algorithm used to encrypt the event
  *    - authenticated: whether we can be sure that the owner of the senderKey
  *      sent the event
- *    - sender: the sender's device information
+ *    - sender: the sender's device information, if available
  *    - mismatchedSender: if the event's ed25519 and curve25519 keys don't match
+ *      (only meaningful if `sender` is set)
  */
 
 /**
