@@ -395,7 +395,7 @@ RoomState.prototype._setStateEvent = function(event) {
 RoomState.prototype._getStateEventMatching = function(event) {
     if (!this.events[event.getType()]) return null;
     return this.events[event.getType()][event.getStateKey()];
-}
+};
 
 RoomState.prototype._updateMember = function(member) {
     // this member may have a power level already, so set it.
