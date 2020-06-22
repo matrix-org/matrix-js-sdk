@@ -259,13 +259,14 @@ class AccountDataClientAdapter extends EventEmitter {
      * @return {Promise}
      */
     setAccountData(type, content) {
+        const lastEvent = this._values.get(type);
         this._values.set(type, content);
         // ensure accountData is emitted on the next tick,
         // as SecretStorage listens for it while calling this method
         // and it seems to rely on this.
         return Promise.resolve().then(() => {
             const event = new MatrixEvent({type, content});
-            this.emit("accountData", event);
+            this.emit("accountData", event, lastEvent);
         });
     }
 }

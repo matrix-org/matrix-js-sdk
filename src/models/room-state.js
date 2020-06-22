@@ -306,6 +306,7 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
             return;
         }
 
+        const lastStateEvent = self._getStateEventMatching(event);
         self._setStateEvent(event);
         if (event.getType() === "m.room.member") {
             _updateDisplayNameCache(
@@ -313,7 +314,7 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
             );
             _updateThirdPartyTokenCache(self, event);
         }
-        self.emit("RoomState.events", event, self);
+        self.emit("RoomState.events", event, self, lastStateEvent);
     });
 
     // update higher level data structures. This needs to be done AFTER the
@@ -390,6 +391,11 @@ RoomState.prototype._setStateEvent = function(event) {
     }
     this.events[event.getType()][event.getStateKey()] = event;
 };
+
+RoomState.prototype._getStateEventMatching = function(event) {
+    if (!this.events[event.getType()]) return null;
+    return this.events[event.getType()][event.getStateKey()];
+}
 
 RoomState.prototype._updateMember = function(member) {
     // this member may have a power level already, so set it.
@@ -769,8 +775,12 @@ function _updateDisplayNameCache(roomState, userId, displayName) {
  * @param {MatrixEvent} event The matrix event which caused this event to fire.
  * @param {RoomState} state The room state whose RoomState.events dictionary
  * was updated.
+ * @param {MatrixEvent} prevEvent The event being replaced by the new state, if
+ * known. Note that this can differ from `getPrevContent()` on the new state event
+ * as this is the store's view of the last state, not the previous state provided
+ * by the server.
  * @example
- * matrixClient.on("RoomState.events", function(event, state){
+ * matrixClient.on("RoomState.events", function(event, state, prevEvent){
  *   var newStateEvent = event;
  * });
  */
