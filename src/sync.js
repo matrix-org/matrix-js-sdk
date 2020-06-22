@@ -1023,18 +1023,23 @@ SyncApi.prototype._processSyncResponse = async function(
     // handle non-room account_data
     if (data.account_data && utils.isArray(data.account_data.events)) {
         const events = data.account_data.events.map(client.getEventMapper());
+        const prevEventsMap = events.reduce((m, c) => {
+            m[c.getId()] = client.store.getAccountData(c.getType());
+            return m;
+        }, {});
         client.store.storeAccountDataEvents(events);
         events.forEach(
             function(accountDataEvent) {
                 // Honour push rules that come down the sync stream but also
                 // honour push rules that were previously cached. Base rules
-                // will be updated when we recieve push rules via getPushRules
+                // will be updated when we receive push rules via getPushRules
                 // (see SyncApi.prototype.sync) before syncing over the network.
                 if (accountDataEvent.getType() === 'm.push_rules') {
                     const rules = accountDataEvent.getContent();
                     client.pushRules = PushProcessor.rewriteDefaultRules(rules);
                 }
-                client.emit("accountData", accountDataEvent);
+                const prevEvent = prevEventsMap[accountDataEvent.getId()];
+                client.emit("accountData", accountDataEvent, prevEvent);
                 return accountDataEvent;
             },
         );

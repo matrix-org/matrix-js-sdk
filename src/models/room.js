@@ -1793,8 +1793,9 @@ Room.prototype.addAccountData = function(events) {
         if (event.getType() === "m.tag") {
             this.addTags(event);
         }
+        const lastEvent = this.accountData[event.getType()];
         this.accountData[event.getType()] = event;
-        this.emit("Room.accountData", event, this);
+        this.emit("Room.accountData", event, this, lastEvent);
     }
 };
 
@@ -1991,8 +1992,10 @@ function memberNamesToRoomName(names, count = (names.length + 1)) {
  * @event module:client~MatrixClient#"Room.accountData"
  * @param {event} event The account_data event
  * @param {Room} room The room whose account_data was updated.
+ * @param {MatrixEvent} prevEvent The event being replaced by
+ * the new account data, if known.
  * @example
- * matrixClient.on("Room.accountData", function(event, room){
+ * matrixClient.on("Room.accountData", function(event, room, oldEvent){
  *   if (event.getType() === "m.room.colorscheme") {
  *       applyColorScheme(event.getContents());
  *   }
