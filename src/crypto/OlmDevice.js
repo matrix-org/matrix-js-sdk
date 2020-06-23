@@ -992,11 +992,12 @@ OlmDevice.prototype._getInboundGroupSession = function(
  * @param {Object<string, string>} keysClaimed Other keys the sender claims.
  * @param {boolean} exportFormat true if the megolm keys are in export format
  *    (ie, they lack an ed25519 signature)
+ * @param {Object} [extraSessionData={}] any other data to be include with the session
  */
 OlmDevice.prototype.addInboundGroupSession = async function(
     roomId, senderKey, forwardingCurve25519KeyChain,
     sessionId, sessionKey, keysClaimed,
-    exportFormat,
+    exportFormat, extraSessionData = {},
 ) {
     await this._cryptoStore.doTxn(
         'readwrite', [
@@ -1043,12 +1044,12 @@ OlmDevice.prototype.addInboundGroupSession = async function(
                             " with first index " + session.first_known_index(),
                         );
 
-                        const sessionData = {
+                        const sessionData = Object.assign({}, extraSessionData, {
                             room_id: roomId,
                             session: session.pickle(this._pickleKey),
                             keysClaimed: keysClaimed,
                             forwardingCurve25519KeyChain: forwardingCurve25519KeyChain,
-                        };
+                        });
 
                         this._cryptoStore.storeEndToEndInboundGroupSession(
                             senderKey, sessionId, sessionData, txn,
@@ -1224,6 +1225,7 @@ OlmDevice.prototype.decryptGroupMessage = async function(
                         forwardingCurve25519KeyChain: (
                             sessionData.forwardingCurve25519KeyChain || []
                         ),
+                        untrusted: sessionData.untrusted,
                     };
                 },
             );

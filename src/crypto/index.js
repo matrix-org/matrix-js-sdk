@@ -2184,8 +2184,13 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
 
     const forwardingChain = event.getForwardingCurve25519KeyChain();
     if (forwardingChain.length > 0) {
-        // we got this event from somewhere else
+        // we got the key this event from somewhere else
         // TODO: check if we can trust the forwarders.
+        return null;
+    }
+
+    if (event.isKeySourceUntrusted()) {
+        // we got the key for this event from a source that we consider untrusted
         return null;
     }
 
@@ -2225,6 +2230,76 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
     }
 
     return device;
+};
+
+/**
+ * Get information about the encryption of an event
+ *
+ * @param {module:models/event.MatrixEvent} event event to be checked
+ *
+ * @return {object} An object with the fields:
+ *    - encrypted: whether the event is encrypted (if not encrypted, some of the
+ *      other properties may not be set)
+ *    - senderKey: the sender's key
+ *    - algorithm: the algorithm used to encrypt the event
+ *    - authenticated: whether we can be sure that the owner of the senderKey
+ *      sent the event
+ *    - sender: the sender's device information, if available
+ *    - mismatchedSender: if the event's ed25519 and curve25519 keys don't match
+ *      (only meaningful if `sender` is set)
+ */
+Crypto.prototype.getEventEncryptionInfo = function(event) {
+    const ret = {};
+
+    ret.senderKey = event.getSenderKey();
+    ret.algorithm = event.getWireContent().algorithm;
+
+    if (!ret.senderKey || !ret.algorithm) {
+        ret.encrypted = false;
+        return ret;
+    }
+    ret.encrypted = true;
+
+    const forwardingChain = event.getForwardingCurve25519KeyChain();
+    if (forwardingChain.length > 0 || event.isKeySourceUntrusted()) {
+        // we got the key this event from somewhere else
+        // TODO: check if we can trust the forwarders.
+        ret.authenticated = false;
+    } else {
+        ret.authenticated = true;
+    }
+
+    // senderKey is the Curve25519 identity key of the device which the event
+    // was sent from. In the case of Megolm, it's actually the Curve25519
+    // identity key of the device which set up the Megolm session.
+
+    ret.sender = this._deviceList.getDeviceByIdentityKey(
+        ret.algorithm, ret.senderKey,
+    );
+
+    // so far so good, but now we need to check that the sender of this event
+    // hadn't advertised someone else's Curve25519 key as their own. We do that
+    // by checking the Ed25519 claimed by the event (or, in the case of megolm,
+    // the event which set up the megolm session), to check that it matches the
+    // fingerprint of the purported sending device.
+    //
+    // (see https://github.com/vector-im/vector-web/issues/2215)
+
+    const claimedKey = event.getClaimedEd25519Key();
+    if (!claimedKey) {
+        logger.warn("Event " + event.getId() + " claims no ed25519 key: " +
+                     "cannot verify sending device");
+        ret.mismatchedSender = true;
+    }
+
+    if (ret.sender && claimedKey !== ret.sender.getFingerprint()) {
+        logger.warn(
+            "Event " + event.getId() + " claims ed25519 key " + claimedKey +
+                "but sender device has key " + ret.sender.getFingerprint());
+        ret.mismatchedSender = true;
+    }
+
+    return ret;
 };
 
 /**
@@ -2471,7 +2546,7 @@ Crypto.prototype.importRoomKeys = function(keys, opts = {}) {
         }
 
         const alg = this._getRoomDecryptor(key.room_id, key.algorithm);
-        return alg.importRoomKey(key).finally((r) => {
+        return alg.importRoomKey(key, opts).finally((r) => {
             successes++;
             if (opts.progressCallback) { updateProgress(); }
         });

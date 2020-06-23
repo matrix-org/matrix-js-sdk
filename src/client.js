@@ -1172,20 +1172,23 @@ wrapCryptoFuncs(MatrixClient, [
 ]);
 
 /**
- * Check if the sender of an event is verified
- * The cross-signing API is currently UNSTABLE and may change without notice.
+ * Get information about the encryption of an event
  *
- * @param {MatrixEvent} event event to be checked
+ * @function module:client~MatrixClient#getEventEncryptionInfo
  *
- * @returns {DeviceTrustLevel}
+ * @param {module:models/event.MatrixEvent} event event to be checked
+ *
+ * @return {object} An object with the fields:
+ *    - encrypted: whether the event is encrypted (if not encrypted, some of the
+ *      other properties may not be set)
+ *    - senderKey: the sender's key
+ *    - algorithm: the algorithm used to encrypt the event
+ *    - authenticated: whether we can be sure that the owner of the senderKey
+ *      sent the event
+ *    - sender: the sender's device information, if available
+ *    - mismatchedSender: if the event's ed25519 and curve25519 keys don't match
+ *      (only meaningful if `sender` is set)
  */
-MatrixClient.prototype.checkEventSenderTrust = async function(event) {
-    const device = await this.getEventSenderDeviceInfo(event);
-    if (!device) {
-        return 0;
-    }
-    return await this._crypto.checkDeviceTrust(event.getSender(), device.deviceId);
-};
 
 /**
  * Create a recovery key from a user-supplied passphrase.
@@ -1315,6 +1318,7 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
  */
 
 wrapCryptoFuncs(MatrixClient, [
+    "getEventEncryptionInfo",
     "createRecoveryKeyFromPassphrase",
     "bootstrapSecretStorage",
     "addSecretStorageKey",
@@ -1980,7 +1984,11 @@ MatrixClient.prototype._restoreKeyBackup = function(
             }
         }
 
-        return this.importRoomKeys(keys, { progressCallback });
+        return this.importRoomKeys(keys, {
+            progressCallback,
+            untrusted: true,
+            source: "backup",
+        });
     }).then(() => {
         return this._crypto.setTrustedBackupPubKey(backupPubKey);
     }).then(() => {

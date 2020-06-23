@@ -144,6 +144,10 @@ export const MatrixEvent = function(
      */
     this._forwardingCurve25519KeyChain = [];
 
+    /* where the decryption key is untrusted
+     */
+    this._untrusted = null;
+
     /* if we have a process decrypting this event, a Promise which resolves
      * when it is finished. Normally null.
      */
@@ -599,6 +603,7 @@ utils.extend(MatrixEvent.prototype, {
             decryptionResult.claimedEd25519Key || null;
         this._forwardingCurve25519KeyChain =
             decryptionResult.forwardingCurve25519KeyChain || [];
+        this._untrusted = decryptionResult.untrusted || false;
     },
 
     /**
@@ -687,6 +692,16 @@ utils.extend(MatrixEvent.prototype, {
      */
     getForwardingCurve25519KeyChain: function() {
         return this._forwardingCurve25519KeyChain;
+    },
+
+    /**
+     * Whether the decryption key was obtained from an untrusted source. If so,
+     * we cannot verify the authenticity of the message.
+     *
+     * @return {boolean}
+     */
+    isKeySourceUntrusted: function() {
+        return this._untrusted;
     },
 
     getUnsigned: function() {

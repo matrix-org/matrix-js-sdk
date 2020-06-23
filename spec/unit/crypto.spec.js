@@ -10,6 +10,7 @@ import * as olmlib from "../../src/crypto/olmlib";
 import {sleep} from "../../src/utils";
 import {EventEmitter} from "events";
 import {CRYPTO_ENABLED} from "../../src/client";
+import {DeviceInfo} from "../../src/crypto/deviceinfo";
 
 const Olm = global.Olm;
 
@@ -26,6 +27,66 @@ describe("Crypto", function() {
         expect(Crypto.getOlmVersion()[0]).toEqual(3);
     });
 
+    describe("encrypted events", function() {
+        it("provides encryption information", async function() {
+            const client = (new TestClient(
+                "@alice:example.com", "deviceid",
+            )).client;
+            await client.initCrypto();
+
+            // unencrypted event
+            const event = {
+                getId: () => "$event_id",
+                getSenderKey: () => null,
+                getWireContent: () => {return {};},
+            };
+
+            let encryptionInfo = client.getEventEncryptionInfo(event);
+            expect(encryptionInfo.encrypted).toBeFalsy();
+
+            // unknown sender (e.g. deleted device), forwarded megolm key (untrusted)
+            event.getSenderKey = () => 'YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI';
+            event.getWireContent = () => {return {algorithm: olmlib.MEGOLM_ALGORITHM};};
+            event.getForwardingCurve25519KeyChain = () => ["not empty"];
+            event.isKeySourceUntrusted = () => false;
+            event.getClaimedEd25519Key =
+                () => 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+
+            encryptionInfo = client.getEventEncryptionInfo(event);
+            expect(encryptionInfo.encrypted).toBeTruthy();
+            expect(encryptionInfo.authenticated).toBeFalsy();
+            expect(encryptionInfo.sender).toBeFalsy();
+
+            // known sender, megolm key from backup
+            event.getForwardingCurve25519KeyChain = () => [];
+            event.isKeySourceUntrusted = () => true;
+            const device = new DeviceInfo("FLIBBLE");
+            device.keys["curve25519:FLIBBLE"] =
+                'YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI';
+            device.keys["ed25519:FLIBBLE"] =
+                'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+            client._crypto._deviceList.getDeviceByIdentityKey = () => device;
+
+            encryptionInfo = client.getEventEncryptionInfo(event);
+            expect(encryptionInfo.encrypted).toBeTruthy();
+            expect(encryptionInfo.authenticated).toBeFalsy();
+            expect(encryptionInfo.sender).toBeTruthy();
+            expect(encryptionInfo.mismatchedSender).toBeFalsy();
+
+            // known sender, trusted megolm key, but bad ed25519key
+            event.isKeySourceUntrusted = () => false;
+            device.keys["ed25519:FLIBBLE"] =
+                'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
+
+            encryptionInfo = client.getEventEncryptionInfo(event);
+            expect(encryptionInfo.encrypted).toBeTruthy();
+            expect(encryptionInfo.authenticated).toBeTruthy();
+            expect(encryptionInfo.sender).toBeTruthy();
+            expect(encryptionInfo.mismatchedSender).toBeTruthy();
+
+            client.stopClient();
+        });
+    });
 
     describe('Session management', function() {
         const otkResponse = {
