@@ -1,3 +1,9 @@
+Changes in [7.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v7.0.0) (2020-06-23)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v7.0.0-rc.1...v7.0.0)
+
+* No changes since rc.1
+
 Changes in [7.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v7.0.0-rc.1) (2020-06-17)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v6.2.2...v7.0.0-rc.1)
