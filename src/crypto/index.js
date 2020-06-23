@@ -2323,7 +2323,6 @@ Crypto.prototype.getEventEncryptionInfo = function(event) {
         ret.authenticated = true;
     }
 
-
     // senderKey is the Curve25519 identity key of the device which the event
     // was sent from. In the case of Megolm, it's actually the Curve25519
     // identity key of the device which set up the Megolm session.

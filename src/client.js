@@ -1170,22 +1170,6 @@ wrapCryptoFuncs(MatrixClient, [
 ]);
 
 /**
- * Check if the sender of an event is verified
- * The cross-signing API is currently UNSTABLE and may change without notice.
- *
- * @param {MatrixEvent} event event to be checked
- *
- * @returns {DeviceTrustLevel}
- */
-MatrixClient.prototype.checkEventSenderTrust = async function(event) {
-    const device = await this.getEventSenderDeviceInfo(event);
-    if (!device) {
-        return 0;
-    }
-    return await this._crypto.checkDeviceTrust(event.getSender(), device.deviceId);
-};
-
-/**
  * Get information about the encryption of an event
  *
  * @function module:client~MatrixClient#getEventEncryptionInfo
