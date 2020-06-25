@@ -122,6 +122,10 @@ export function Room(roomId, client, myUserId, opts) {
     opts = opts || {};
     opts.pendingEventOrdering = opts.pendingEventOrdering || "chronological";
 
+    // In some cases, we add listeners for every displayed Matrix event, so it's
+    // common to have quite a few more than the default limit.
+    this.setMaxListeners(100);
+
     this.reEmitter = new ReEmitter(this);
 
     if (["chronological", "detached"].indexOf(opts.pendingEventOrdering) === -1) {
