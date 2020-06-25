@@ -113,9 +113,9 @@ export function setCryptoStoreFactory(fac) {
     cryptoStoreFactory = fac;
 }
 
-
 interface ICreateClientOpts {
     baseUrl: string;
+    idBaseUrl?: string;
     store?: Store;
     cryptoStore?: CryptoStore;
     scheduler?: MatrixScheduler;
