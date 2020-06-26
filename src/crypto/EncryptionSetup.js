@@ -18,11 +18,12 @@ import {
 export class EncryptionSetupBuilder {
     /**
      * @param  {Object.<String, MatrixEvent>} accountData pre-existing account data, will only be read, not written.
+     * @param {CryptoCallbacks} delegateCryptoCallbacks crypto callbacks to delegate to if the key isn't in cache yet
      */
-    constructor(accountData) {
+    constructor(accountData, delegateCryptoCallbacks) {
         this.accountDataClientAdapter = new AccountDataClientAdapter(accountData);
         this.crossSigningCallbacks = new CrossSigningCallbacks();
-        this.ssssCryptoCallbacks = new SSSSCryptoCallbacks();
+        this.ssssCryptoCallbacks = new SSSSCryptoCallbacks(delegateCryptoCallbacks);
 
         this._crossSigningKeys = null;
         this._keySignatures = null;
@@ -308,16 +309,28 @@ class CrossSigningCallbacks {
  * the SecretStorage crypto callbacks
  */
 class SSSSCryptoCallbacks {
-    constructor() {
+    constructor(delegateCryptoCallbacks) {
         this._privateKeys = new Map();
+        this._delegateCryptoCallbacks = delegateCryptoCallbacks;
     }
 
-    getSecretStorageKey({ keys }, name) {
+    async getSecretStorageKey({ keys }, name) {
         for (const keyId of Object.keys(keys)) {
             const privateKey = this._privateKeys.get(keyId);
             if (privateKey) {
                 return [keyId, privateKey];
             }
+        }
+        // if we don't have the key cached yet, ask
+        // for it to the general crypto callbacks and cache it
+        if (this._delegateCryptoCallbacks) {
+            const result = await this._delegateCryptoCallbacks.
+                getSecretStorageKey({keys}, name);
+            if (result) {
+                const [keyId, privateKey] = result;
+                this._privateKeys.set(keyId, privateKey);
+            }
+            return result;
         }
     }
 

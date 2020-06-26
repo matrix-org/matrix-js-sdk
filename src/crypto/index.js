@@ -483,7 +483,11 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     getKeyBackupPassphrase,
 } = {}) {
     logger.log("Bootstrapping Secure Secret Storage");
-    const builder = new EncryptionSetupBuilder(this._baseApis.store.accountData);
+    const delegateCryptoCallbacks = this._baseApis._cryptoCallbacks;
+    const builder = new EncryptionSetupBuilder(
+        this._baseApis.store.accountData,
+        delegateCryptoCallbacks,
+    );
     const secretStorage = new SecretStorage(
         builder.accountDataClientAdapter,
         builder.ssssCryptoCallbacks);
