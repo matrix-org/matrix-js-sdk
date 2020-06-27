@@ -1180,6 +1180,15 @@ SyncApi.prototype._processSyncResponse = async function(
             }
         }
 
+        let unreadCount = joinObj.unread_count;
+        // XXX: remove the MSC-prefixed field once it has been stable for some time
+        if (unreadCount === undefined && joinObj["org.matrix.msc2654.unread_count"]) {
+            unreadCount = joinObj["org.matrix.msc2654.unread_count"];
+        }
+        if (unreadCount !== undefined) {
+            room.setUnreadNotificationCount("unread", unreadCount);
+        }
+
         joinObj.timeline = joinObj.timeline || {};
 
         if (joinObj.isBrandNewRoom) {
