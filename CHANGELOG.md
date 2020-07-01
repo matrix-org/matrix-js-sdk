@@ -1,3 +1,23 @@
+Changes in [7.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v7.1.0-rc.1) (2020-07-01)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v7.0.0...v7.1.0-rc.1)
+
+ * Ask general crypto callbacks for 4S privkey if operation adapter doesn't
+   have it yet
+   [\#1414](https://github.com/matrix-org/matrix-js-sdk/pull/1414)
+ * Fix ICreateClientOpts missing idBaseUrl
+   [\#1413](https://github.com/matrix-org/matrix-js-sdk/pull/1413)
+ * Increase max event listeners for rooms
+   [\#1411](https://github.com/matrix-org/matrix-js-sdk/pull/1411)
+ * Don't trust keys megolm received from backup for verifying the sender
+   [\#1406](https://github.com/matrix-org/matrix-js-sdk/pull/1406)
+ * Raise the last known account data / state event for an update
+   [\#1410](https://github.com/matrix-org/matrix-js-sdk/pull/1410)
+ * Isolate encryption bootstrap side-effects
+   [\#1380](https://github.com/matrix-org/matrix-js-sdk/pull/1380)
+ * Add method to get current in-flight to-device requests
+   [\#1405](https://github.com/matrix-org/matrix-js-sdk/pull/1405)
+
 Changes in [7.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v7.0.0) (2020-06-23)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v7.0.0-rc.1...v7.0.0)
