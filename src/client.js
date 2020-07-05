@@ -4849,15 +4849,16 @@ MatrixClient.prototype._storeClientOptions = function() {
  * @return {Promise<string[]>} Resolves to a set of rooms
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype._unstable_getSharedRooms = function(userId) {
+MatrixClient.prototype._unstable_getSharedRooms = async function(userId) {
     const path = utils.encodeUri("/user/$userId/shared_rooms/$otherUserId", {
         $userId: this.credentials.userId,
         $otherUserId: userId,
     });
-    return this._http.authedRequest(
+    const res = await this._http.authedRequest(
         undefined, "GET", path, undefined, undefined,
         {prefix: PREFIX_UNSTABLE},
     );
+    return res.rooms;
 };
 
 /**
