@@ -4844,6 +4844,23 @@ MatrixClient.prototype._storeClientOptions = function() {
 };
 
 /**
+ * Gets a set of room IDs in common with another user
+ * @param {string} userId The userId to check.
+ * @return {Promise<string[]>} Resolves to a set of rooms
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixClient.prototype._unstable_getSharedRooms = function(userId) {
+    const path = utils.encodeUri("/user/$userId/shared_rooms/$otherUserId", {
+        $userId: this.credentials.userId,
+        $otherUserId: userId,
+    });
+    return this._http.authedRequest(
+        undefined, "GET", path, undefined, undefined,
+        {prefix: PREFIX_UNSTABLE},
+    );
+};
+
+/**
  * High level helper method to stop the client from polling and allow a
  * clean shutdown.
  */
