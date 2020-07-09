@@ -288,7 +288,7 @@ function printMemberList(room) {
 }
 
 function printRoomInfo(room) {
-    var eventDict = room.currentState.events;
+    var eventMap = room.currentState.events;
     var eTypeHeader = "    Event Type(state_key)    ";
     var sendHeader = "        Sender        ";
     // pad content to 100
@@ -300,14 +300,15 @@ function printRoomInfo(room) {
     var contentHeader = padSide + "Content" + padSide;
     print(eTypeHeader+sendHeader+contentHeader);
     print(new Array(100).join("-"));
-    Object.keys(eventDict).forEach(function(eventType) {
+    eventMap.keys().forEach(function(eventType) {
         if (eventType === "m.room.member") { return; } // use /members instead.
-        Object.keys(eventDict[eventType]).forEach(function(stateKey) {
+        var eventEventMap = eventMap.get(eventType);
+        eventEventMap.keys().forEach(function(stateKey) {
             var typeAndKey = eventType + (
                 stateKey.length > 0 ? "("+stateKey+")" : ""
             );
             var typeStr = fixWidth(typeAndKey, eTypeHeader.length);
-            var event = eventDict[eventType][stateKey];
+            var event = eventEventMap.get(stateKey);
             var sendStr = fixWidth(event.getSender(), sendHeader.length);
             var contentStr = fixWidth(
                 JSON.stringify(event.getContent()), contentHeader.length
