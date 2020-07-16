@@ -68,7 +68,7 @@ export function RoomState(roomId, oobMemberFlags = undefined) {
     this.members = {
         // userId: RoomMember
     };
-    this.events = new Map(); // { eventType: { stateKey: MatrixEvent } }
+    this.events = new Map(); // Map<eventType, Map<stateKey, MatrixEvent>>
     this.paginationToken = null;
 
     this._sentinels = {
