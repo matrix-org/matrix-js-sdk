@@ -16,49 +16,49 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type Request from "request";
+import type Request from 'request';
 
-import {MemoryCryptoStore} from "./crypto/store/memory-crypto-store";
-import {LocalStorageCryptoStore} from "./crypto/store/localStorage-crypto-store";
-import {IndexedDBCryptoStore} from "./crypto/store/indexeddb-crypto-store";
-import {MemoryStore} from "./store/memory";
-import {StubStore} from "./store/stub";
-import {LocalIndexedDBStoreBackend} from "./store/indexeddb-local-backend";
-import {RemoteIndexedDBStoreBackend} from "./store/indexeddb-remote-backend";
-import {MatrixScheduler} from "./scheduler";
-import {MatrixClient} from "./client";
+import {MemoryCryptoStore} from './crypto/store/memory-crypto-store';
+import {LocalStorageCryptoStore} from './crypto/store/localStorage-crypto-store';
+import {IndexedDBCryptoStore} from './crypto/store/indexeddb-crypto-store';
+import {MemoryStore} from './store/memory';
+import {StubStore} from './store/stub';
+import {LocalIndexedDBStoreBackend} from './store/indexeddb-local-backend';
+import {RemoteIndexedDBStoreBackend} from './store/indexeddb-remote-backend';
+import {MatrixScheduler} from './scheduler';
+import {MatrixClient} from './client';
 
-export * from "./client";
-export * from "./http-api";
-export * from "./autodiscovery";
-export * from "./sync-accumulator";
-export * from "./errors";
-export * from "./models/event";
-export * from "./models/room";
-export * from "./models/group";
-export * from "./models/event-timeline";
-export * from "./models/event-timeline-set";
-export * from "./models/room-member";
-export * from "./models/room-state";
-export * from "./models/user";
-export * from "./scheduler";
-export * from "./filter";
-export * from "./timeline-window";
-export * from "./interactive-auth";
-export * from "./service-types";
-export * from "./store/memory";
-export * from "./store/indexeddb";
-export * from "./store/session/webstorage";
-export * from "./crypto/store/memory-crypto-store";
-export * from "./crypto/store/indexeddb-crypto-store";
-export * from "./content-repo";
-export const ContentHelpers = import("./content-helpers");
+export * from './client';
+export * from './http-api';
+export * from './autodiscovery';
+export * from './sync-accumulator';
+export * from './errors';
+export * from './models/event';
+export * from './models/room';
+export * from './models/group';
+export * from './models/event-timeline';
+export * from './models/event-timeline-set';
+export * from './models/room-member';
+export * from './models/room-state';
+export * from './models/user';
+export * from './scheduler';
+export * from './filter';
+export * from './timeline-window';
+export * from './interactive-auth';
+export * from './service-types';
+export * from './store/memory';
+export * from './store/indexeddb';
+export * from './store/session/webstorage';
+export * from './crypto/store/memory-crypto-store';
+export * from './crypto/store/indexeddb-crypto-store';
+export * from './content-repo';
+export const ContentHelpers = import('./content-helpers');
 export {
     createNewMatrixCall,
     setAudioOutput as setMatrixCallAudioOutput,
     setAudioInput as setMatrixCallAudioInput,
     setVideoInput as setMatrixCallVideoInput,
-} from "./webrtc/call";
+} from './webrtc/call';
 
 
 // expose the underlying request object so different environments can use
@@ -146,9 +146,9 @@ interface ICreateClientOpts {
  * <code>opts</code>.
  */
 export function createClient(opts: ICreateClientOpts | string) {
-    if (typeof opts === "string") {
+    if (typeof opts === 'string') {
         opts = {
-            "baseUrl": opts as string,
+            'baseUrl': opts as string,
         };
     }
     opts.request = opts.request || requestInstance;
@@ -187,7 +187,7 @@ export function createClient(opts: ICreateClientOpts | string) {
  * @param {requestCallback} callback The request callback.
  */
 
- /**
+/**
   * The request callback interface for performing HTTP requests. This matches the
   * API for the {@link https://github.com/request/request#requestoptions-callback|
   * request NPM module}. The SDK will implement a callback which meets this
