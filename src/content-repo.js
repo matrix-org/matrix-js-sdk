@@ -75,35 +75,3 @@ export function getHttpUriForMxc(baseUrl, mxc, width, height,
         (utils.keys(params).length === 0 ? "" :
         ("?" + utils.encodeParams(params))) + fragment;
 }
-
-/**
- * Get an identicon URL from an arbitrary string.
- * @param {string} baseUrl The base homeserver url which has a content repo.
- * @param {string} identiconString The string to create an identicon for.
- * @param {Number} width The desired width of the image in pixels. Default: 96.
- * @param {Number} height The desired height of the image in pixels. Default: 96.
- * @return {string} The complete URL to the identicon.
- * @deprecated This is no longer in the specification.
- */
-export function getIdenticonUri(baseUrl, identiconString, width, height) {
-    if (!identiconString) {
-        return null;
-    }
-    if (!width) {
-        width = 96;
-    }
-    if (!height) {
-        height = 96;
-    }
-    const params = {
-        width: width,
-        height: height,
-    };
-
-    const path = utils.encodeUri("/_matrix/media/unstable/identicon/$ident", {
-        $ident: identiconString,
-    });
-    return baseUrl + path +
-        (utils.keys(params).length === 0 ? "" :
-            ("?" + utils.encodeParams(params)));
-}

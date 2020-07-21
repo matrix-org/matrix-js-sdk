@@ -1,4 +1,4 @@
-import {getHttpUriForMxc, getIdenticonUri} from "../../src/content-repo";
+import {getHttpUriForMxc} from "../../src/content-repo";
 
 describe("ContentRepo", function() {
     const baseUrl = "https://my.home.server";
@@ -53,33 +53,6 @@ describe("ContentRepo", function() {
             const mxcUri = "mxc://server.name/resourceid#automade";
             expect(getHttpUriForMxc(baseUrl, mxcUri)).toEqual(
                 baseUrl + "/_matrix/media/r0/download/server.name/resourceid#automade",
-            );
-        });
-    });
-
-    describe("getIdenticonUri", function() {
-        it("should do nothing for null input", function() {
-            expect(getIdenticonUri(null)).toEqual(null);
-        });
-
-        it("should set w/h by default to 96", function() {
-            expect(getIdenticonUri(baseUrl, "foobar")).toEqual(
-                baseUrl + "/_matrix/media/unstable/identicon/foobar" +
-                "?width=96&height=96",
-            );
-        });
-
-        it("should be able to set custom w/h", function() {
-            expect(getIdenticonUri(baseUrl, "foobar", 32, 64)).toEqual(
-                baseUrl + "/_matrix/media/unstable/identicon/foobar" +
-                "?width=32&height=64",
-            );
-        });
-
-        it("should URL encode the identicon string", function() {
-            expect(getIdenticonUri(baseUrl, "foo#bar", 32, 64)).toEqual(
-                baseUrl + "/_matrix/media/unstable/identicon/foo%23bar" +
-                "?width=32&height=64",
             );
         });
     });

@@ -45,12 +45,6 @@ describe("Room", function() {
             expect(url.indexOf("flibble/wibble")).not.toEqual(-1);
         });
 
-        it("should return an identicon HTTP URL if allowDefault was set and there " +
-        "was no m.room.avatar event", function() {
-            const url = room.getAvatarUrl(hsUrl, 64, 64, "crop", true);
-            expect(url.indexOf("http")).toEqual(0); // don't care about form
-        });
-
         it("should return nothing if there is no m.room.avatar and allowDefault=false",
         function() {
             const url = room.getAvatarUrl(hsUrl, 64, 64, "crop", false);
