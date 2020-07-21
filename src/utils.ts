@@ -392,7 +392,7 @@ export function runPolyfills() {
     // SOURCE:
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/filter
     if (!Array.prototype.filter) {
-        Array.prototype.filter = function(fun: Function, thisArg?: any) {
+        Array.prototype.filter = function(fun: Function/*, thisArg*/, ...restProps) {
             if (this === void 0 || this === null) {
                 throw new TypeError();
             }
@@ -404,7 +404,7 @@ export function runPolyfills() {
             }
 
             const res = [];
-            const thisArg = thisArg ? thisArg : void 0;
+            const thisArg = restProps ? restProps[0] : void 0;
             for (let i = 0; i < len; i++) {
                 if (i in t) {
                     const val = t[i];
