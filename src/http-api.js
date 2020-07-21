@@ -890,7 +890,7 @@ function getResponseContentType(response) {
 
     try {
         return parseContentType(contentType);
-    } catch(e) {
+    } catch (e) {
         throw new Error(`Error parsing Content-Type '${contentType}': ${e}`);
     }
 }

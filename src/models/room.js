@@ -1904,14 +1904,14 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
     // let's try to figure out who was here before
     let leftNames = otherNames;
     // if we didn't have heroes, try finding them in the room state
-    if(!leftNames.length) {
+    if (!leftNames.length) {
         leftNames = room.currentState.getMembers().filter((m) => {
             return m.userId !== userId &&
                 m.membership !== "invite" &&
                 m.membership !== "join";
         }).map((m) => m.name);
     }
-    if(leftNames.length) {
+    if (leftNames.length) {
         return `Empty room (was ${memberNamesToRoomName(leftNames)})`;
     } else {
         return "Empty room";

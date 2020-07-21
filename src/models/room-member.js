@@ -286,9 +286,9 @@ RoomMember.prototype.getAvatarUrl =
  * @return {string} the mxc avatar url
  */
 RoomMember.prototype.getMxcAvatarUrl = function() {
-    if(this.events.member) {
+    if (this.events.member) {
         return this.events.member.getDirectionalContent().avatar_url;
-    } else if(this.user) {
+    } else if (this.user) {
         return this.user.avatarUrl;
     }
     return null;

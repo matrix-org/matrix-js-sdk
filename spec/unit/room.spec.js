@@ -1379,7 +1379,7 @@ describe("Room", function() {
             let hasThrown = false;
             try {
                 await room.loadMembersIfNeeded();
-            } catch(err) {
+            } catch (err) {
                 hasThrown = true;
             }
             expect(hasThrown).toEqual(true);

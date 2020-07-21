@@ -2374,7 +2374,7 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
     // after all the in-memory state (_roomEncryptors and _roomList) has been updated
     // to avoid races when calling this method multiple times. Hence keep a hold of the promise.
     let storeConfigPromise = null;
-    if(!existingConfig) {
+    if (!existingConfig) {
         storeConfigPromise = this._roomList.setRoomEncryption(roomId, config);
     }
 
@@ -2407,7 +2407,7 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
         // which is never used (inside riot at least)
         // but didn't want to remove it as it technically would
         // be a breaking change.
-        if(!this.inhibitDeviceQuery) {
+        if (!this.inhibitDeviceQuery) {
             this._deviceList.refreshOutdatedDeviceLists();
         }
     } else {
