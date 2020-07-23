@@ -164,12 +164,16 @@ export const MatrixEvent = function(
      * so it can be easily accessed from the timeline.
      */
     this.verificationRequest = null;
+
+    /* The txnId with which this event was sent if it was during this session,
+       allows for a unique ID which does not change when the event comes back down sync.
+     */
+    this._txnId = null;
 };
 utils.inherits(MatrixEvent, EventEmitter);
 
 
 utils.extend(MatrixEvent.prototype, {
-
     /**
      * Get the event_id for this event.
      * @return {string} The event ID, e.g. <code>$143350589368169JsLZx:localhost
@@ -1084,6 +1088,14 @@ utils.extend(MatrixEvent.prototype, {
 
     setVerificationRequest: function(request) {
         this.verificationRequest = request;
+    },
+
+    setTxnId(txnId) {
+        this._txnId = txnId;
+    },
+
+    getTxnId() {
+        return this._txnId;
     },
 });
 
