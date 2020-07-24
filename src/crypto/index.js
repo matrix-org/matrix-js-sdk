@@ -413,7 +413,7 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
  *
  * If this function returns false, bootstrapSecretStorage() can be used
  * to fix things such that it returns true. That is to say, after
- * bootstrapSecretStorage() completes sucessfully, this function should
+ * bootstrapSecretStorage() completes successfully, this function should
  * return true.
  *
  * The cross-signing API is currently UNSTABLE and may change without notice.
