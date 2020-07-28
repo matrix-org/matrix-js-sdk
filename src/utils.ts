@@ -467,7 +467,8 @@ export function runPolyfills() {
 
             // 8. Repeat, while k < len
             while (k < len) {
-                let kValue; let mappedValue;
+                let kValue;
+                let mappedValue;
 
                 // a. Let Pk be ToString(k).
                 //   This is implicit for LHS operands of the in operator
