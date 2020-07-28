@@ -20,9 +20,6 @@ limitations under the License.
  * @module utils
  */
 
-// We do some funky stuff in this module
-/* eslint-disable no-extend-native */
-
 import unhomoglyph from 'unhomoglyph';
 
 /**
@@ -32,12 +29,12 @@ import unhomoglyph from 'unhomoglyph';
  * @return {string} The encoded string e.g. foo=bar&baz=taz
  */
 export function encodeParams(params: Record<string, string>): string {
-    let qs = '';
+    let qs = "";
     for (const key in params) {
         if (!params.hasOwnProperty(key)) {
             continue;
         }
-        qs += '&' + encodeURIComponent(key) + '=' +
+        qs += "&" + encodeURIComponent(key) + "=" +
                 encodeURIComponent(params[key]);
     }
     return qs.substring(1);
@@ -217,7 +214,7 @@ export function removeElement<T>(
  * @return {boolean} True if it is a function.
  */
 export function isFunction(value: any) {
-    return Object.prototype.toString.call(value) === '[object Function]';
+    return Object.prototype.toString.call(value) === "[object Function]";
 }
 
 /**
@@ -240,7 +237,7 @@ export function isArray(value: any) {
 export function checkObjectHasKeys(obj: object, keys_: string[]) {
     for (let i = 0; i < keys_.length; i++) {
         if (!obj.hasOwnProperty(keys_[i])) {
-            throw new Error('Missing required key: ' + keys_[i]);
+            throw new Error("Missing required key: " + keys_[i]);
         }
     }
 }
@@ -257,7 +254,7 @@ export function checkObjectHasNoAdditionalKeys(obj: object, allowedKeys: string[
             continue;
         }
         if (allowedKeys.indexOf(key) === -1) {
-            throw new Error('Unknown key: ' + key);
+            throw new Error("Unknown key: " + key);
         }
     }
 }
@@ -392,6 +389,7 @@ export function runPolyfills() {
     // SOURCE:
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/filter
     if (!Array.prototype.filter) {
+        // eslint-disable-next-line no-extend-native
         Array.prototype.filter = function(fun: Function/*, thisArg*/, ...restProps) {
             if (this === void 0 || this === null) {
                 throw new TypeError();
@@ -419,7 +417,6 @@ export function runPolyfills() {
                     }
                 }
             }
-
             return res;
         };
     }
@@ -431,8 +428,10 @@ export function runPolyfills() {
     // Production steps of ECMA-262, Edition 5, 15.4.4.19
     // Reference: http://es5.github.io/#x15.4.4.19
     if (!Array.prototype.map) {
+        // eslint-disable-next-line no-extend-native
         Array.prototype.map = function(callback, thisArg) {
-            let T; let k;
+            let T;
+            let k;
 
             if (this === null || this === undefined) {
                 throw new TypeError(' this is null or not defined');
@@ -521,8 +520,10 @@ export function runPolyfills() {
     // Production steps of ECMA-262, Edition 5, 15.4.4.18
     // Reference: http://es5.github.io/#x15.4.4.18
     if (!Array.prototype.forEach) {
+        // eslint-disable-next-line no-extend-native
         Array.prototype.forEach = function(callback, thisArg) {
-            let T; let k;
+            let T;
+            let k;
 
             if (this === null || this === undefined) {
                 throw new TypeError(' this is null or not defined');
@@ -539,7 +540,7 @@ export function runPolyfills() {
 
             // 4. If IsCallable(callback) is false, throw a TypeError exception.
             // See: http://es5.github.com/#x9.11
-            if (typeof callback !== 'function') {
+            if (typeof callback !== "function") {
                 throw new TypeError(callback + ' is not a function');
             }
 
@@ -673,7 +674,7 @@ export function removeHiddenChars(str: string): string {
 const removeHiddenCharsRegex = /[\u2000-\u200F\u202A-\u202F\u0300-\u036f\uFEFF\s]/g;
 
 export function escapeRegExp(string: string): string {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export function globToRegexp(glob: string, extended: any): string {
@@ -696,7 +697,7 @@ export function globToRegexp(glob: string, extended: any): string {
 }
 
 export function ensureNoTrailingSlash(url: string): string {
-    if (url && url.endsWith('/')) {
+    if (url && url.endsWith("/")) {
         return url.substr(0, url.length - 1);
     } else {
         return url;

@@ -16,8 +16,8 @@ limitations under the License.
 */
 
 export function randomString(len: number): string {
-    let ret = '';
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let ret = "";
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
     for (let i = 0; i < len; ++i) {
         ret += chars.charAt(Math.floor(Math.random() * chars.length));

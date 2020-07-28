@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as matrixcs from './matrix';
-import * as utils from './utils';
-import request from 'request';
+import * as matrixcs from "./matrix";
+import * as utils from "./utils";
+import request from "request";
 
 matrixcs.request(request);
 utils.runPolyfills();
@@ -29,5 +29,5 @@ try {
     console.log('nodejs was compiled without crypto support');
 }
 
-export * from './matrix';
+export * from "./matrix";
 export default matrixcs;
