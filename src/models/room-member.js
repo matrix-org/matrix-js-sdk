@@ -20,7 +20,7 @@ limitations under the License.
  */
 
 import {EventEmitter} from "events";
-import {getHttpUriForMxc, getIdenticonUri} from "../content-repo";
+import {getHttpUriForMxc} from "../content-repo";
 import * as utils from "../utils";
 
 /**
@@ -274,10 +274,6 @@ RoomMember.prototype.getAvatarUrl =
     );
     if (httpUrl) {
         return httpUrl;
-    } else if (allowDefault) {
-        return getIdenticonUri(
-            baseUrl, this.userId, width, height,
-        );
     }
     return null;
 };

@@ -23,7 +23,7 @@ limitations under the License.
 import {EventEmitter} from "events";
 import {EventTimelineSet} from "./event-timeline-set";
 import {EventTimeline} from "./event-timeline";
-import {getHttpUriForMxc, getIdenticonUri} from "../content-repo";
+import {getHttpUriForMxc} from "../content-repo";
 import * as utils from "../utils";
 import {EventStatus, MatrixEvent} from "./event";
 import {RoomMember} from "./room-member";
@@ -817,10 +817,6 @@ Room.prototype.getAvatarUrl = function(baseUrl, width, height, resizeMethod,
     if (mainUrl) {
         return getHttpUriForMxc(
             baseUrl, mainUrl, width, height, resizeMethod,
-        );
-    } else if (allowDefault) {
-        return getIdenticonUri(
-            baseUrl, this.roomId, width, height,
         );
     }
 

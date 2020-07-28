@@ -2523,7 +2523,7 @@ MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
     const type = localEvent.getType();
     logger.log(`sendEvent of type ${type} in ${roomId} with txnId ${txnId}`);
 
-    localEvent._txnId = txnId;
+    localEvent.setTxnId(txnId);
     localEvent.setStatus(EventStatus.SENDING);
 
     // add this event immediately to the local store as 'sending'.
@@ -2691,7 +2691,11 @@ function _updatePendingEventStatus(room, event, newStatus) {
 }
 
 function _sendEventHttpRequest(client, event) {
-    const txnId = event._txnId ? event._txnId : client.makeTxnId();
+    let txnId = event.getTxnId();
+    if (!txnId) {
+        txnId = client.makeTxnId();
+        event.setTxnId(txnId);
+    }
 
     const pathParams = {
         $roomId: event.getRoomId(),
