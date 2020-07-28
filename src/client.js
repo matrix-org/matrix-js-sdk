@@ -1925,7 +1925,7 @@ MatrixClient.prototype._restoreKeyBackup = function(
     let backupPubKey;
     try {
         backupPubKey = decryption.init_with_private_key(privKey);
-    } catch(e) {
+    } catch (e) {
         decryption.free();
         throw e;
     }
@@ -3801,7 +3801,9 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
         return pendingRequest;
     }
 
-    let path, params, promise;
+    let path;
+    let params;
+    let promise;
     const self = this;
 
     if (isNotifTimeline) {
@@ -4221,7 +4223,8 @@ MatrixClient.prototype.getRoomPushRule = function(scope, roomId) {
  */
 MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
     const self = this;
-    let deferred, hasDontNotifyRule;
+    let deferred;
+    let hasDontNotifyRule;
 
     // Get the existing room-kind push rule if any
     const roomPushRule = this.getRoomPushRule(scope, roomId);

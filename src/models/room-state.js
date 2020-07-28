@@ -673,7 +673,7 @@ RoomState.prototype._maySendEventOfType = function(eventType, userId, state) {
         const userPowerLevel = power_levels.users && power_levels.users[userId];
         if (Number.isFinite(userPowerLevel)) {
             powerLevel = userPowerLevel;
-        } else if(Number.isFinite(power_levels.users_default)) {
+        } else if (Number.isFinite(power_levels.users_default)) {
             powerLevel = power_levels.users_default;
         }
 

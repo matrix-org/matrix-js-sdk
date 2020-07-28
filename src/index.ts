@@ -22,6 +22,7 @@ matrixcs.request(request);
 utils.runPolyfills();
 
 try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const crypto = require('crypto');
     utils.setCrypto(crypto);
 } catch (err) {

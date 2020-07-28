@@ -176,7 +176,7 @@ MatrixCall.prototype.placeScreenSharingCall =
         debuglog("Got screen stream, requesting audio stream...");
         const audioConstraints = _getUserMediaVideoContraints('voice');
         _placeCallWithConstraints(self, audioConstraints);
-    } catch(err) {
+    } catch (err) {
         self.emit("error",
             callError(
                 MatrixCall.ERR_NO_USER_MEDIA,

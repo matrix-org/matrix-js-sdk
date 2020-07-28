@@ -187,7 +187,7 @@ export function createClient(opts: ICreateClientOpts | string) {
  * @param {requestCallback} callback The request callback.
  */
 
- /**
+/**
   * The request callback interface for performing HTTP requests. This matches the
   * API for the {@link https://github.com/request/request#requestoptions-callback|
   * request NPM module}. The SDK will implement a callback which meets this
