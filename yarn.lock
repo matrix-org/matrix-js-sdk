@@ -2707,11 +2707,6 @@ eslint-config-google@^0.14.0:
   resolved "https://registry.yarnpkg.com/eslint-config-google/-/eslint-config-google-0.14.0.tgz#4f5f8759ba6e11b424294a219dbfa18c508bcc1a"
   integrity sha512-WsbX4WbjuMvTdeVL6+J3rK1RGhCTqjsFjX7UMSMgZiyxxaNLkoJENbrGExzERFeoTpGw3F3FypTiWAP9ZXzkEw==
 
-eslint-config-google@^0.7.1:
-  version "0.7.1"
-  resolved "https://registry.yarnpkg.com/eslint-config-google/-/eslint-config-google-0.7.1.tgz#5598f8498e9e078420f34b80495b8d959f651fb2"
-  integrity sha1-VZj4SY6eB4Qg80uASVuNlZ9lH7I=
-
 eslint-config-matrix-org@^0.1.2:
   version "0.1.2"
   resolved "https://registry.yarnpkg.com/eslint-config-matrix-org/-/eslint-config-matrix-org-0.1.2.tgz#b5d7e193e4f3fc5041905967b53c5ddd6924c793"
