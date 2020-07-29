@@ -77,7 +77,6 @@
     "eslint": "7.3.1",
     "eslint-config-matrix-org": "^0.1.2",
     "eslint-plugin-babel": "^5.3.0",
-    "eslint-plugin-jest": "^23.0.4",
     "exorcist": "^1.0.1",
     "fake-indexeddb": "^3.0.0",
     "jest": "^24.9.0",
