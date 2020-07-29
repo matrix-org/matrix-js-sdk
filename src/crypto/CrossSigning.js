@@ -72,7 +72,7 @@ export class CrossSigningInfo extends EventEmitter {
      * @returns {Array} An array with [ public key, Olm.PkSigning ]
      */
     async getCrossSigningKey(type, expectedPubkey) {
-        const shouldCache = ["self_signing", "user_signing"].indexOf(type) >= 0;
+        const shouldCache = ["master", "self_signing", "user_signing"].indexOf(type) >= 0;
 
         if (!this._callbacks.getCrossSigningKey) {
             throw new Error("No getCrossSigningKey callback supplied");
