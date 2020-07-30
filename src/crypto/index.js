@@ -1399,6 +1399,12 @@ Crypto.prototype._checkAndStartKeyBackup = async function() {
             );
             this._baseApis.disableKeyBackup();
             this._baseApis.enableKeyBackup(backupInfo);
+            // We're now using a new backup, so schedule all the keys we have to be
+            // uploaded to the new backup. This is a bit of a workaround to upload
+            // keys to a new backup in *most* cases, but it won't cover all cases
+            // because we don't remember what backup version we uploaded keys to:
+            // see https://github.com/vector-im/riot-web/issues/14833
+            await this.scheduleAllGroupSessionsForBackup();
         } else {
             logger.log("Backup version " + backupInfo.version + " still current");
         }
