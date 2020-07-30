@@ -2712,7 +2712,8 @@ Crypto.prototype.scheduleAllGroupSessionsForBackup = async function() {
 /**
  * Marks all group sessions as needing to be backed up without scheduling
  * them to upload in the background.
- * @returns {Promise<int>} Resolves to the number of sessions requiring a backup.
+ * @returns {Promise<int>} Resolves to the number of sessions now requiring a backup
+ *     (which will be equal to the number of sessions in the store).
  */
 Crypto.prototype.flagAllGroupSessionsForBackup = async function() {
     await this._cryptoStore.doTxn(
@@ -2733,6 +2734,14 @@ Crypto.prototype.flagAllGroupSessionsForBackup = async function() {
     const remaining = await this._cryptoStore.countSessionsNeedingBackup();
     this.emit("crypto.keyBackupSessionsRemaining", remaining);
     return remaining;
+};
+
+/**
+ * Counts the number of end to end session keys that are waiting to be backed up
+ * @returns {Promise<int>} Resolves to the number of sessions requiring backup
+ */
+Crypto.prototype.countSessionsNeedingBackup = function() {
+    return this._cryptoStore.countSessionsNeedingBackup();
 };
 
 /**

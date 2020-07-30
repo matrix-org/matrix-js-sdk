@@ -1169,6 +1169,7 @@ wrapCryptoFuncs(MatrixClient, [
     "isCrossSigningReady",
     "getCryptoTrustCrossSignedDevices",
     "setCryptoTrustCrossSignedDevices",
+    "countSessionsNeedingBackup",
 ]);
 
 /**
