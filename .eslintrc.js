@@ -2,7 +2,6 @@ module.exports = {
     extends: ["matrix-org"],
     plugins: [
         "babel",
-        "jest",
     ],
     env: {
         browser: true,
