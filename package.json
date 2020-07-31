@@ -87,7 +87,6 @@
     "rimraf": "^3.0.0",
     "terser": "^4.4.3",
     "tsify": "^4.0.1",
-    "tslint": "^5.20.1",
     "typescript": "^3.7.3"
   },
   "jest": {
