@@ -10,7 +10,7 @@
 #   npm; typically installed by Node.js
 #   yarn; install via brew (macOS) or similar (https://yarnpkg.com/docs/install/)
 #
-# Note: this script is also used to release matrix-react-sdk and riot-web.
+# Note: this script is also used to release matrix-react-sdk and element-web.
 
 set -e
 

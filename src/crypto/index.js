@@ -1403,7 +1403,7 @@ Crypto.prototype._checkAndStartKeyBackup = async function() {
             // uploaded to the new backup. This is a bit of a workaround to upload
             // keys to a new backup in *most* cases, but it won't cover all cases
             // because we don't remember what backup version we uploaded keys to:
-            // see https://github.com/vector-im/riot-web/issues/14833
+            // see https://github.com/vector-im/element-web/issues/14833
             await this.scheduleAllGroupSessionsForBackup();
         } else {
             logger.log("Backup version " + backupInfo.version + " still current");
@@ -2410,7 +2410,7 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
 
         await this.trackRoomDevices(roomId);
         // TODO: this flag is only not used from MatrixClient::setRoomEncryption
-        // which is never used (inside riot at least)
+        // which is never used (inside Element at least)
         // but didn't want to remove it as it technically would
         // be a breaking change.
         if (!this.inhibitDeviceQuery) {
@@ -2984,7 +2984,7 @@ Crypto.prototype.onSyncCompleted = async function(syncData) {
     // we don't start uploading one-time keys until we've caught up with
     // to-device messages, to help us avoid throwing away one-time-keys that we
     // are about to receive messages for
-    // (https://github.com/vector-im/riot-web/issues/2782).
+    // (https://github.com/vector-im/element-web/issues/2782).
     if (!syncData.catchingUp) {
         _maybeUploadOneTimeKeys(this);
         this._processReceivedRoomKeyRequests();
