@@ -664,6 +664,7 @@ export function removeHiddenChars(str: string): string {
     if (typeof str === "string") {
         return unhomoglyph(str.normalize('NFD').replace(removeHiddenCharsRegex, ''));
     }
+    return "";
 }
 
 // Regex matching bunch of unicode control characters and otherwise misleading/invisible characters.
