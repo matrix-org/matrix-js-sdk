@@ -119,7 +119,7 @@ function keyFromRecoverySession(session, decryptionKey) {
  * callback that returns a Promise<String> of an identity access token to supply
  * with identity requests. If the object is unset, no access token will be
  * supplied.
- * See also https://github.com/vector-im/riot-web/issues/10615 which seeks to
+ * See also https://github.com/vector-im/element-web/issues/10615 which seeks to
  * replace the previous approach of manual access tokens params with this
  * callback throughout the SDK.
  *
@@ -380,7 +380,7 @@ export function MatrixClient(opts) {
             ? !!actions.tweaks.highlight : false;
         if (oldHighlight !== newHighlight || currentCount > 0) {
             // TODO: Handle mentions received while the client is offline
-            // See also https://github.com/vector-im/riot-web/issues/9069
+            // See also https://github.com/vector-im/element-web/issues/9069
             if (!room.hasUserReadEvent(this.getUserId(), event.getId())) {
                 let newCount = currentCount;
                 if (newHighlight && !oldHighlight) newCount++;
@@ -398,7 +398,7 @@ export function MatrixClient(opts) {
 
     // Like above, we have to listen for read receipts from ourselves in order to
     // correctly handle notification counts on encrypted rooms.
-    // This fixes https://github.com/vector-im/riot-web/issues/9421
+    // This fixes https://github.com/vector-im/element-web/issues/9421
     this.on("Room.receipt", (event, room) => {
         if (room && this.isRoomEncrypted(room.roomId)) {
             // Figure out if we've read something or if it's just informational
