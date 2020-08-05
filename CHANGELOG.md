@@ -1,3 +1,23 @@
+Changes in [8.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.0.1) (2020-08-05)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.0.1-rc.1...v8.0.1)
+
+ * Filter out non-string display names
+   [\#1434](https://github.com/matrix-org/matrix-js-sdk/pull/1434)
+
+Changes in [8.0.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.0.1-rc.1) (2020-07-31)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.0.0...v8.0.1-rc.1)
+
+ * Remove redundant lint dependencies
+   [\#1426](https://github.com/matrix-org/matrix-js-sdk/pull/1426)
+ * Upload all keys when we start using a new key backup version
+   [\#1428](https://github.com/matrix-org/matrix-js-sdk/pull/1428)
+ * Expose countSessionsNeedingBackup
+   [\#1429](https://github.com/matrix-org/matrix-js-sdk/pull/1429)
+ * Configure and use new eslint package
+   [\#1422](https://github.com/matrix-org/matrix-js-sdk/pull/1422)
+
 Changes in [8.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.0.0) (2020-07-27)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v7.1.0...v8.0.0)
