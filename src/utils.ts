@@ -661,7 +661,10 @@ export function isNumber(value: any): boolean {
  * @return {string} a string with the hidden characters removed
  */
 export function removeHiddenChars(str: string): string {
-    return unhomoglyph(str.normalize('NFD').replace(removeHiddenCharsRegex, ''));
+    if (typeof str === "string") {
+        return unhomoglyph(str.normalize('NFD').replace(removeHiddenCharsRegex, ''));
+    }
+    return "";
 }
 
 // Regex matching bunch of unicode control characters and otherwise misleading/invisible characters.
