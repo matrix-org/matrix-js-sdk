@@ -1,0 +1,1013 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    
+    <meta charset="utf-8">
+    <title>JSDoc: crypto/verification/request/VerificationRequest.js</title>
+
+    <script src="https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="./build/entry.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link href="https://fonts.googleapis.com/css?family=Muli:100,400,700|Oswald:300|Inconsolata,700" rel="stylesheet">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css" integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous">
+    <link type="text/css" rel="stylesheet" href="https://jmblog.github.io/color-themes-for-google-code-prettify/themes/tomorrow-night.min.css">
+    <link type="text/css" rel="stylesheet" href="styles/app.min.css">
+    <link type="text/css" rel="stylesheet" href="styles/iframe.css">
+    
+</head>
+
+<body>
+    <div id="stickyNavbarOverlay"></div>
+    <div class="top-navbar">
+        <div class="container">
+            <nav class="navbar" role="navigation" aria-label="main navigation">
+                <div class="navbar-brand">
+                    
+                    
+                        <h1 class="navbar-item">Documentation</h1>
+                    
+                    <a id="hamburger" role="button" class="navbar-burger" aria-label="menu" aria-expanded="false">
+                        <span aria-hidden="true"></span>
+                        <span aria-hidden="true"></span>
+                        <span aria-hidden="true"></span>
+                    </a>
+                </div>
+                
+            </nav>
+        </div>
+    </div>
+    <div class="container">
+        <div class="columns">
+            <div class="column is-3" id="sidebarNav">
+                <div class="sidebar">
+                    <nav>
+                        <h2><a href="index.html">Home</a></h2><div class="category"><h3>Modules</h3><ul><li><a href="crypto_DeviceList%250A%250AManages%2520the%2520list%2520of%2520other%2520users_%2520devicesmodule_.html">crypto/DeviceList
+
+Manages the list of other users' devices</a></li><li><a href="crypto_RoomList%250A%250AManages%2520the%2520list%2520of%2520encrypted%2520roomsmodule_.html">crypto/RoomList
+
+Manages the list of encrypted rooms</a></li><li><a href="module-auto-discovery.html">auto-discovery</a></li><li><a href="module-base-apis.html">base-apis</a></li><li><a href="module-client.html">client</a></li><li><a href="module-content-repo.html">content-repo</a></li><li><a href="module-ContentHelpers.html">ContentHelpers</a></li><li><a href="module-crypto.html">crypto</a></li><li><a href="module-crypto_algorithms.html">crypto/algorithms</a></li><li><a href="module-crypto_algorithms_base.html">crypto/algorithms/base</a></li><li><a href="module-crypto_algorithms_megolm.html">crypto/algorithms/megolm</a></li><li><a href="module-crypto_algorithms_olm.html">crypto/algorithms/olm</a></li><li><a href="module-crypto_CrossSigning.html">crypto/CrossSigning</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_OutgoingRoomKeyRequestManager.html">crypto/OutgoingRoomKeyRequestManager</a></li><li><a href="module-crypto_SecretStorage.html">crypto/SecretStorage</a></li><li><a href="module-crypto_store_base.html">crypto/store/base</a></li><li><a href="module-crypto_store_indexeddb-crypto-store.html">crypto/store/indexeddb-crypto-store</a></li><li><a href="module-crypto_store_localStorage-crypto-store.html">crypto/store/localStorage-crypto-store</a></li><li><a href="module-crypto_store_memory-crypto-store.html">crypto/store/memory-crypto-store</a></li><li><a href="module-crypto_verification_Base.html">crypto/verification/Base</a></li><li><a href="module-crypto_verification_Error.html">crypto/verification/Error</a></li><li><a href="module-crypto_verification_IllegalMethod.html">crypto/verification/IllegalMethod</a></li><li><a href="module-crypto_verification_QRCode.html">crypto/verification/QRCode</a></li><li><a href="module-crypto_verification_SAS.html">crypto/verification/SAS</a></li><li><a href="module-filter.html">filter</a></li><li><a href="module-filter-component.html">filter-component</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-logger.html">logger</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_event-context.html">models/event-context</a></li><li><a href="module-models_event-timeline.html">models/event-timeline</a></li><li><a href="module-models_event-timeline-set.html">models/event-timeline-set</a></li><li><a href="module-models_group.html">models/group</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_search-result.html">models/search-result</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-pushprocessor.html">pushprocessor</a></li><li><a href="module-ReEmitter.html">ReEmitter</a></li><li><a href="module-scheduler.html">scheduler</a></li><li><a href="module-store_indexeddb.html">store/indexeddb</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-store_session_webstorage.html">store/session/webstorage</a></li><li><a href="module-store_stub.html">store/stub</a></li><li><a href="module-sync-accumulator.html">sync-accumulator</a></li><li><a href="module-timeline-window.html">timeline-window</a></li><li><a href="module-utils.html">utils</a></li><li><a href="module-webrtc_call.html">webrtc/call</a></li><li><a href="olmlib%250A%250AUtilities%2520common%2520to%2520olm%2520encryption%2520algorithmsmodule_.html">olmlib
+
+Utilities common to olm encryption algorithms</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="AccountDataClientAdapter.html">AccountDataClientAdapter</a></li><li><a href="Backend.html">Backend</a></li><li><a href="CrossSigningCallbacks.html">CrossSigningCallbacks</a></li><li><a href="crypto_DeviceList%250A%250AManages%2520the%2520list%2520of%2520other%2520users_%2520devicesmodule_-DeviceListUpdateSerialiser.html">DeviceListUpdateSerialiser</a></li><li><a href="EncryptionSetupBuilder.html">EncryptionSetupBuilder</a></li><li><a href="EncryptionSetupOperation.html">EncryptionSetupOperation</a></li><li><a href="IndexedDBStoreWorker.html">IndexedDBStoreWorker</a></li><li><a href="InRoomChannel.html">InRoomChannel</a></li><li><a href="LocalIndexedDBStoreBackend.html">LocalIndexedDBStoreBackend</a></li><li><a href="module-auto-discovery.AutoDiscovery.html">AutoDiscovery</a></li><li><a href="module-auto-discovery.AutoDiscovery.FAIL_ERROR.html">FAIL_ERROR</a></li><li><a href="module-auto-discovery.AutoDiscovery.FAIL_PROMPT.html">FAIL_PROMPT</a></li><li><a href="module-auto-discovery.AutoDiscovery.PROMPT.html">PROMPT</a></li><li><a href="module-auto-discovery.AutoDiscovery.SUCCESS.html">SUCCESS</a></li><li><a href="module-auto-discovery-DiscoveredClientConfig.html">DiscoveredClientConfig</a></li><li><a href="module-base-apis.MatrixBaseApis.html">MatrixBaseApis</a></li><li><a href="module-client.MatrixClient.html">MatrixClient</a></li><li><a href="module-crypto.html">crypto</a></li><li><a href="module-crypto_algorithms_base.DecryptionAlgorithm.html">DecryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_base.DecryptionError.html">DecryptionError</a></li><li><a href="module-crypto_algorithms_base.EncryptionAlgorithm.html">EncryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_base.UnknownDeviceError.html">UnknownDeviceError</a></li><li><a href="module-crypto_algorithms_megolm-MegolmDecryption.html">MegolmDecryption</a></li><li><a href="module-crypto_algorithms_megolm-MegolmEncryption.html">MegolmEncryption</a></li><li><a href="module-crypto_algorithms_olm-OlmDecryption.html">OlmDecryption</a></li><li><a href="module-crypto_algorithms_olm-OlmEncryption.html">OlmEncryption</a></li><li><a href="module-crypto_CrossSigning.CrossSigningInfo.html">CrossSigningInfo</a></li><li><a href="module-crypto_CrossSigning.DeviceTrustLevel.html">DeviceTrustLevel</a></li><li><a href="module-crypto_CrossSigning.UserTrustLevel.html">UserTrustLevel</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_DeviceList.html">crypto/DeviceList
+
+Manages the list of other users' devicesmodule:.DeviceList</a></li><li><a href="module-crypto_OlmDevice.html">crypto/OlmDevice</a></li><li><a href="module-crypto_RoomList.html">crypto/RoomList
+
+Manages the list of encrypted roomsmodule:.RoomList</a></li><li><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html">IndexedDBCryptoStore</a></li><li><a href="module-crypto_store_localStorage-crypto-store.LocalStorageCryptoStore.html">LocalStorageCryptoStore</a></li><li><a href="module-crypto_store_memory-crypto-store.MemoryCryptoStore.html">MemoryCryptoStore</a></li><li><a href="module-crypto_verification_Base.VerificationBase.html">VerificationBase</a></li><li><a href="module-crypto_verification_IllegalMethod-crypto_verification_IllegalMethod_IllegalMethod.html">crypto/verification/IllegalMethod/IllegalMethod</a></li><li><a href="module-crypto_verification_QRCode-crypto_verification_QRCode_ReciprocateQRCode.html">crypto/verification/QRCode/ReciprocateQRCode</a></li><li><a href="module-crypto_verification_SAS.html">crypto/verification/SAS</a></li><li><a href="module-crypto-IncomingRoomKeyRequest.html">IncomingRoomKeyRequest</a></li><li><a href="module-crypto-IncomingRoomKeyRequestCancellation.html">IncomingRoomKeyRequestCancellation</a></li><li><a href="module-filter.Filter.html">Filter</a></li><li><a href="module-filter-component.FilterComponent.html">FilterComponent</a></li><li><a href="module-http-api.ConnectionError.html">ConnectionError</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_event-context.EventContext.html">EventContext</a></li><li><a href="module-models_event-timeline.EventTimeline.html">EventTimeline</a></li><li><a href="module-models_event-timeline-set.EventTimelineSet.html">EventTimelineSet</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.RoomState.html">RoomState</a></li><li><a href="module-models_room-summary.RoomSummary.html">RoomSummary</a></li><li><a href="module-models_search-result.SearchResult.html">SearchResult</a></li><li><a href="module-models_user.User.html">User</a></li><li><a href="module-pushprocessor.PushProcessor.html">PushProcessor</a></li><li><a href="module-scheduler.MatrixScheduler.html">MatrixScheduler</a></li><li><a href="module-store_indexeddb.IndexedDBStore.html">IndexedDBStore</a></li><li><a href="module-store_memory.MemoryStore.html">MemoryStore</a></li><li><a href="module-store_session_webstorage.WebStorageSessionStore.html">WebStorageSessionStore</a></li><li><a href="module-store_stub.StubStore.html">StubStore</a></li><li><a href="module-sync-accumulator.SyncAccumulator.html">SyncAccumulator</a></li><li><a href="module-timeline-window.TimelineWindow.html">TimelineWindow</a></li><li><a href="module-webrtc_call.MatrixCall.html">MatrixCall</a></li><li><a href="Relations.html">Relations</a></li><li><a href="RemoteIndexedDBStoreBackend.html">RemoteIndexedDBStoreBackend</a></li><li><a href="SSSSCryptoCallbacks.html">SSSSCryptoCallbacks</a></li><li><a href="SyncApi.html">SyncApi</a></li><li><a href="ToDeviceChannel.html">ToDeviceChannel</a></li></ul><h3>Interfaces</h3><ul><li><a href="module-crypto_store_base-CryptoStore.html">CryptoStore</a></li></ul><h3>Events</h3><ul><li><a href="global.html#event:%2522change%2522wheneverthestateoftherequestobjecthaschanged.">"change" whenever the state of the request object has changed.</a></li><li><a href="module-client.html#~event:MatrixClient%2522accountData%2522">MatrixClient"accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Call.incoming%2522">MatrixClient"Call.incoming"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crossSigning.keysChanged%2522">MatrixClient"crossSigning.keysChanged"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.devicesUpdated%2522">MatrixClient"crypto.devicesUpdated"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.keyBackupStatus%2522">MatrixClient"crypto.keyBackupStatus"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.roomKeyRequest%2522">MatrixClient"crypto.roomKeyRequest"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.roomKeyRequestCancellation%2522">MatrixClient"crypto.roomKeyRequestCancellation"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.secrets.requestCancelled%2522">MatrixClient"crypto.secrets.requestCancelled"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.suggestKeyRestore%2522">MatrixClient"crypto.suggestKeyRestore"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.verification.request.unknown%2522">MatrixClient"crypto.verification.request.unknown"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.verification.request%2522">MatrixClient"crypto.verification.request"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.warning%2522">MatrixClient"crypto.warning"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.willUpdateDevices%2522">MatrixClient"crypto.willUpdateDevices"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deleteRoom%2522">MatrixClient"deleteRoom"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deviceVerificationChanged%2522">MatrixClient"deviceVerificationChanged"</a></li><li><a href="module-client.html#~event:MatrixClient%2522event%2522">MatrixClient"event"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group.myMembership%2522">MatrixClient"Group.myMembership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group.profile%2522">MatrixClient"Group.profile"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group%2522">MatrixClient"Group"</a></li><li><a href="module-client.html#~event:MatrixClient%2522no_consent%2522">MatrixClient"no_consent"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.accountData%2522">MatrixClient"Room.accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.localEchoUpdated%2522">MatrixClient"Room.localEchoUpdated"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.name%2522">MatrixClient"Room.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.receipt%2522">MatrixClient"Room.receipt"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.redaction%2522">MatrixClient"Room.redaction"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.redactionCancelled%2522">MatrixClient"Room.redactionCancelled"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.tags%2522">MatrixClient"Room.tags"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timeline%2522">MatrixClient"Room.timeline"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timelineReset%2522">MatrixClient"Room.timelineReset"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room%2522">MatrixClient"Room"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.membership%2522">MatrixClient"RoomMember.membership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.name%2522">MatrixClient"RoomMember.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.powerLevel%2522">MatrixClient"RoomMember.powerLevel"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.typing%2522">MatrixClient"RoomMember.typing"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.events%2522">MatrixClient"RoomState.events"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.members%2522">MatrixClient"RoomState.members"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.newMember%2522">MatrixClient"RoomState.newMember"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Session.logged_out%2522">MatrixClient"Session.logged_out"</a></li><li><a href="module-client.html#~event:MatrixClient%2522sync%2522">MatrixClient"sync"</a></li><li><a href="module-client.html#~event:MatrixClient%2522toDeviceEvent%2522">MatrixClient"toDeviceEvent"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.avatarUrl%2522">MatrixClient"User.avatarUrl"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.currentlyActive%2522">MatrixClient"User.currentlyActive"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.displayName%2522">MatrixClient"User.displayName"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.lastPresenceTs%2522">MatrixClient"User.lastPresenceTs"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.presence%2522">MatrixClient"User.presence"</a></li><li><a href="module-client.html#~event:MatrixClient%2522userTrustStatusChanged%2522">MatrixClient"userTrustStatusChanged"</a></li><li><a href="module-models_event.html#.event:MatrixEvent%2522Event.decrypted%2522">MatrixEvent"Event.decrypted"</a></li><li><a href="module-webrtc_call.html#~event:MatrixCall%2522error%2522">MatrixCall"error"</a></li></ul><h3>Global</h3><ul><li><a href="global.html#_initialiseFromExportedDevice">_initialiseFromExportedDevice</a></li><li><a href="global.html#clearTimeout">clearTimeout</a></li><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#decryptBrowser">decryptBrowser</a></li><li><a href="global.html#decryptNode">decryptNode</a></li><li><a href="global.html#encryptBrowser">encryptBrowser</a></li><li><a href="global.html#encryptNode">encryptNode</a></li><li><a href="global.html#exists">exists</a></li><li><a href="global.html#getRequest">getRequest</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#selectQuery">selectQuery</a></li><li><a href="global.html#setCryptoStoreFactory">setCryptoStoreFactory</a></li><li><a href="global.html#setNow">setNow</a></li><li><a href="global.html#setTimeout">setTimeout</a></li><li><a href="global.html#wrapRequest">wrapRequest</a></li></ul></div>
+                    </nav>
+                </div>
+            </div>
+            <div class="column is-9-desktop">
+                <div class="content" id="main-content-wrapper">
+                    <header class="page-title">
+                        <p>Source</p>
+                        <h1>crypto/verification/request/VerificationRequest.js</h1>
+                    </header>
+
+                    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/*
+Copyright 2018 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+import {logger} from '../../../logger';
+import {EventEmitter} from 'events';
+import {
+    errorFactory,
+    errorFromEvent,
+    newUnexpectedMessageError,
+    newUnknownMethodError,
+} from "../Error";
+import {QRCodeData, SCAN_QR_CODE_METHOD} from "../QRCode";
+
+// How long after the event's timestamp that the request times out
+const TIMEOUT_FROM_EVENT_TS = 10 * 60 * 1000; // 10 minutes
+
+// How long after we receive the event that the request times out
+const TIMEOUT_FROM_EVENT_RECEIPT = 2 * 60 * 1000; // 2 minutes
+
+// to avoid almost expired verification notifications
+// from showing a notification and almost immediately
+// disappearing, also ignore verification requests that
+// are this amount of time away from expiring.
+const VERIFICATION_REQUEST_MARGIN = 3 * 1000; // 3 seconds
+
+
+export const EVENT_PREFIX = "m.key.verification.";
+export const REQUEST_TYPE = EVENT_PREFIX + "request";
+export const START_TYPE = EVENT_PREFIX + "start";
+export const CANCEL_TYPE = EVENT_PREFIX + "cancel";
+export const DONE_TYPE = EVENT_PREFIX + "done";
+export const READY_TYPE = EVENT_PREFIX + "ready";
+
+export const PHASE_UNSENT = 1;
+export const PHASE_REQUESTED = 2;
+export const PHASE_READY = 3;
+export const PHASE_STARTED = 4;
+export const PHASE_CANCELLED = 5;
+export const PHASE_DONE = 6;
+
+
+/**
+ * State machine for verification requests.
+ * Things that differ based on what channel is used to
+ * send and receive verification events are put in `InRoomChannel` or `ToDeviceChannel`.
+ * @event "change" whenever the state of the request object has changed.
+ */
+export class VerificationRequest extends EventEmitter {
+    constructor(channel, verificationMethods, client) {
+        super();
+        this.channel = channel;
+        this.channel._request = this;
+        this._verificationMethods = verificationMethods;
+        this._client = client;
+        this._commonMethods = [];
+        this._setPhase(PHASE_UNSENT, false);
+        this._eventsByUs = new Map();
+        this._eventsByThem = new Map();
+        this._observeOnly = false;
+        this._timeoutTimer = null;
+        this._accepting = false;
+        this._declining = false;
+        this._verifierHasFinished = false;
+        this._cancelled = false;
+        this._chosenMethod = null;
+        // we keep a copy of the QR Code data (including other user master key) around
+        // for QR reciprocate verification, to protect against
+        // cross-signing identity reset between the .ready and .start event
+        // and signing the wrong key after .start
+        this._qrCodeData = null;
+
+        // The timestamp when we received the request event from the other side
+        this._requestReceivedAt = null;
+    }
+
+    /**
+     * Stateless validation logic not specific to the channel.
+     * Invoked by the same static method in either channel.
+     * @param {string} type the "symbolic" event type, as returned by the `getEventType` function on the channel.
+     * @param {MatrixEvent} event the event to validate. Don't call getType() on it but use the `type` parameter instead.
+     * @param {MatrixClient} client the client to get the current user and device id from
+     * @returns {bool} whether the event is valid and should be passed to handleEvent
+     */
+    static validateEvent(type, event, client) {
+        const content = event.getContent();
+
+
+        if (!type || !type.startsWith(EVENT_PREFIX)) {
+            return false;
+        }
+
+        // from here on we're fairly sure that this is supposed to be
+        // part of a verification request, so be noisy when rejecting something
+        if (!content) {
+            logger.log("VerificationRequest: validateEvent: no content");
+            return false;
+        }
+
+        if (type === REQUEST_TYPE || type === READY_TYPE) {
+            if (!Array.isArray(content.methods)) {
+                logger.log("VerificationRequest: validateEvent: " +
+                    "fail because methods");
+                return false;
+            }
+        }
+
+        if (type === REQUEST_TYPE || type === READY_TYPE || type === START_TYPE) {
+            if (typeof content.from_device !== "string" ||
+                content.from_device.length === 0
+            ) {
+                logger.log("VerificationRequest: validateEvent: "+
+                    "fail because from_device");
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    get invalid() {
+        return this.phase === PHASE_UNSENT;
+    }
+
+    /** returns whether the phase is PHASE_REQUESTED */
+    get requested() {
+        return this.phase === PHASE_REQUESTED;
+    }
+
+    /** returns whether the phase is PHASE_CANCELLED */
+    get cancelled() {
+        return this.phase === PHASE_CANCELLED;
+    }
+
+    /** returns whether the phase is PHASE_READY */
+    get ready() {
+        return this.phase === PHASE_READY;
+    }
+
+    /** returns whether the phase is PHASE_STARTED */
+    get started() {
+        return this.phase === PHASE_STARTED;
+    }
+
+    /** returns whether the phase is PHASE_DONE */
+    get done() {
+        return this.phase === PHASE_DONE;
+    }
+
+    /** once the phase is PHASE_STARTED (and !initiatedByMe) or PHASE_READY: common methods supported by both sides */
+    get methods() {
+        return this._commonMethods;
+    }
+
+    /** the method picked in the .start event */
+    get chosenMethod() {
+        return this._chosenMethod;
+    }
+
+    calculateEventTimeout(event) {
+        let effectiveExpiresAt = this.channel.getTimestamp(event)
+            + TIMEOUT_FROM_EVENT_TS;
+
+        if (this._requestReceivedAt &amp;&amp; !this.initiatedByMe &amp;&amp;
+            this.phase &lt;= PHASE_REQUESTED
+        ) {
+            const expiresAtByReceipt = this._requestReceivedAt
+                + TIMEOUT_FROM_EVENT_RECEIPT;
+            effectiveExpiresAt = Math.min(effectiveExpiresAt, expiresAtByReceipt);
+        }
+
+        return Math.max(0, effectiveExpiresAt - Date.now());
+    }
+
+    /** The current remaining amount of ms before the request should be automatically cancelled */
+    get timeout() {
+        const requestEvent = this._getEventByEither(REQUEST_TYPE);
+        if (requestEvent) {
+            return this.calculateEventTimeout(requestEvent);
+        }
+        return 0;
+    }
+
+    /**
+     * The key verification request event.
+     * @returns {MatrixEvent} The request event, or falsey if not found.
+     */
+    get requestEvent() {
+        return this._getEventByEither(REQUEST_TYPE);
+    }
+
+    /** current phase of the request. Some properties might only be defined in a current phase. */
+    get phase() {
+        return this._phase;
+    }
+
+    /** The verifier to do the actual verification, once the method has been established. Only defined when the `phase` is PHASE_STARTED. */
+    get verifier() {
+        return this._verifier;
+    }
+
+    get canAccept() {
+        return this.phase &lt; PHASE_READY &amp;&amp; !this._accepting &amp;&amp; !this._declining;
+    }
+
+    get accepting() {
+        return this._accepting;
+    }
+
+    get declining() {
+        return this._declining;
+    }
+
+    /** whether this request has sent it's initial event and needs more events to complete */
+    get pending() {
+        return !this.observeOnly &amp;&amp;
+            this._phase !== PHASE_DONE &amp;&amp;
+            this._phase !== PHASE_CANCELLED;
+    }
+
+    /** Only set after a .ready if the other party can scan a QR code */
+    get qrCodeData() {
+        return this._qrCodeData;
+    }
+
+    /** Checks whether the other party supports a given verification method.
+     *  This is useful when setting up the QR code UI, as it is somewhat asymmetrical:
+     *  if the other party supports SCAN_QR, we should show a QR code in the UI, and vice versa.
+     *  For methods that need to be supported by both ends, use the `methods` property.
+     *  @param {string} method the method to check
+     *  @param {boolean} force to check even if the phase is not ready or started yet, internal usage
+     *  @return {bool} whether or not the other party said the supported the method */
+    otherPartySupportsMethod(method, force = false) {
+        if (!force &amp;&amp; !this.ready &amp;&amp; !this.started) {
+            return false;
+        }
+        const theirMethodEvent = this._eventsByThem.get(REQUEST_TYPE) ||
+            this._eventsByThem.get(READY_TYPE);
+        if (!theirMethodEvent) {
+            // if we started straight away with .start event,
+            // we are assuming that the other side will support the
+            // chosen method, so return true for that.
+            if (this.started &amp;&amp; this.initiatedByMe) {
+                const myStartEvent = this._eventsByUs.get(START_TYPE);
+                const content = myStartEvent &amp;&amp; myStartEvent.getContent();
+                const myStartMethod = content &amp;&amp; content.method;
+                return method == myStartMethod;
+            }
+            return false;
+        }
+        const content = theirMethodEvent.getContent();
+        if (!content) {
+            return false;
+        }
+        const {methods} = content;
+        if (!Array.isArray(methods)) {
+            return false;
+        }
+
+        return methods.includes(method);
+    }
+
+    /** Whether this request was initiated by the syncing user.
+     * For InRoomChannel, this is who sent the .request event.
+     * For ToDeviceChannel, this is who sent the .start event
+     */
+    get initiatedByMe() {
+        // event created by us but no remote echo has been received yet
+        const noEventsYet = (this._eventsByUs.size + this._eventsByThem.size) === 0;
+        if (this._phase === PHASE_UNSENT &amp;&amp; noEventsYet) {
+            return true;
+        }
+        const hasMyRequest = this._eventsByUs.has(REQUEST_TYPE);
+        const hasTheirRequest = this._eventsByThem.has(REQUEST_TYPE);
+        if (hasMyRequest &amp;&amp; !hasTheirRequest) {
+            return true;
+        }
+        if (!hasMyRequest &amp;&amp; hasTheirRequest) {
+            return false;
+        }
+        const hasMyStart = this._eventsByUs.has(START_TYPE);
+        const hasTheirStart = this._eventsByThem.has(START_TYPE);
+        if (hasMyStart &amp;&amp; !hasTheirStart) {
+            return true;
+        }
+        return false;
+    }
+
+    /** The id of the user that initiated the request */
+    get requestingUserId() {
+        if (this.initiatedByMe) {
+            return this._client.getUserId();
+        } else {
+            return this.otherUserId;
+        }
+    }
+
+    /** The id of the user that (will) receive(d) the request */
+    get receivingUserId() {
+        if (this.initiatedByMe) {
+            return this.otherUserId;
+        } else {
+            return this._client.getUserId();
+        }
+    }
+
+    /** The user id of the other party in this request */
+    get otherUserId() {
+        return this.channel.userId;
+    }
+
+    get isSelfVerification() {
+        return this._client.getUserId() === this.otherUserId;
+    }
+
+    /**
+     * The id of the user that cancelled the request,
+     * only defined when phase is PHASE_CANCELLED
+     */
+    get cancellingUserId() {
+        const myCancel = this._eventsByUs.get(CANCEL_TYPE);
+        const theirCancel = this._eventsByThem.get(CANCEL_TYPE);
+
+        if (myCancel &amp;&amp; (!theirCancel || myCancel.getId() &lt; theirCancel.getId())) {
+            return myCancel.getSender();
+        }
+        if (theirCancel) {
+            return theirCancel.getSender();
+        }
+        return undefined;
+    }
+
+    /**
+     * The cancellation code e.g m.user which is responsible for cancelling this verification
+     */
+    get cancellationCode() {
+        const ev = this._getEventByEither(CANCEL_TYPE);
+        return ev ? ev.getContent().code : null;
+    }
+
+    get observeOnly() {
+        return this._observeOnly;
+    }
+
+
+    /**
+     * Gets which device the verification should be started with
+     * given the events sent so far in the verification. This is the
+     * same algorithm used to determine which device to send the
+     * verification to when no specific device is specified.
+     * @returns {{userId: *, deviceId: *}} The device information
+     */
+    get targetDevice() {
+        const theirFirstEvent =
+            this._eventsByThem.get(REQUEST_TYPE) ||
+            this._eventsByThem.get(READY_TYPE) ||
+            this._eventsByThem.get(START_TYPE);
+        const theirFirstContent = theirFirstEvent.getContent();
+        const fromDevice = theirFirstContent.from_device;
+        return {
+            userId: this.otherUserId,
+            deviceId: fromDevice,
+        };
+    }
+
+    /* Start the key verification, creating a verifier and sending a .start event.
+     * If no previous events have been sent, pass in `targetDevice` to set who to direct this request to.
+     * @param {string} method the name of the verification method to use.
+     * @param {string?} targetDevice.userId the id of the user to direct this request to
+     * @param {string?} targetDevice.deviceId the id of the device to direct this request to
+     * @returns {VerifierBase} the verifier of the given method
+     */
+    beginKeyVerification(method, targetDevice = null) {
+        // need to allow also when unsent in case of to_device
+        if (!this.observeOnly &amp;&amp; !this._verifier) {
+            const validStartPhase =
+                this.phase === PHASE_REQUESTED ||
+                this.phase === PHASE_READY ||
+                (this.phase === PHASE_UNSENT &amp;&amp;
+                    this.channel.constructor.canCreateRequest(START_TYPE));
+            if (validStartPhase) {
+                // when called on a request that was initiated with .request event
+                // check the method is supported by both sides
+                if (this._commonMethods.length &amp;&amp; !this._commonMethods.includes(method)) {
+                    throw newUnknownMethodError();
+                }
+                this._verifier = this._createVerifier(method, null, targetDevice);
+                if (!this._verifier) {
+                    throw newUnknownMethodError();
+                }
+                this._chosenMethod = method;
+            }
+        }
+        return this._verifier;
+    }
+
+    /**
+     * sends the initial .request event.
+     * @returns {Promise} resolves when the event has been sent.
+     */
+    async sendRequest() {
+        if (!this.observeOnly &amp;&amp; this._phase === PHASE_UNSENT) {
+            const methods = [...this._verificationMethods.keys()];
+            await this.channel.send(REQUEST_TYPE, {methods});
+        }
+    }
+
+    /**
+     * Cancels the request, sending a cancellation to the other party
+     * @param {string?} error.reason the error reason to send the cancellation with
+     * @param {string?} error.code the error code to send the cancellation with
+     * @returns {Promise} resolves when the event has been sent.
+     */
+    async cancel({reason = "User declined", code = "m.user"} = {}) {
+        if (!this.observeOnly &amp;&amp; this._phase !== PHASE_CANCELLED) {
+            this._declining = true;
+            this.emit("change");
+            if (this._verifier) {
+                return this._verifier.cancel(errorFactory(code, reason)());
+            } else {
+                this._cancellingUserId = this._client.getUserId();
+                await this.channel.send(CANCEL_TYPE, {code, reason});
+            }
+        }
+    }
+
+    /**
+     * Accepts the request, sending a .ready event to the other party
+     * @returns {Promise} resolves when the event has been sent.
+     */
+    async accept() {
+        if (!this.observeOnly &amp;&amp; this.phase === PHASE_REQUESTED &amp;&amp; !this.initiatedByMe) {
+            const methods = [...this._verificationMethods.keys()];
+            this._accepting = true;
+            this.emit("change");
+            await this.channel.send(READY_TYPE, {methods});
+        }
+    }
+
+    /**
+     * Can be used to listen for state changes until the callback returns true.
+     * @param {Function} fn callback to evaluate whether the request is in the desired state.
+     *                      Takes the request as an argument.
+     * @returns {Promise} that resolves once the callback returns true
+     * @throws {Error} when the request is cancelled
+     */
+    waitFor(fn) {
+        return new Promise((resolve, reject) => {
+            const check = () => {
+                let handled = false;
+                if (fn(this)) {
+                    resolve(this);
+                    handled = true;
+                } else if (this.cancelled) {
+                    reject(new Error("cancelled"));
+                    handled = true;
+                }
+                if (handled) {
+                    this.off("change", check);
+                }
+                return handled;
+            };
+            if (!check()) {
+                this.on("change", check);
+            }
+        });
+    }
+
+    _setPhase(phase, notify = true) {
+        this._phase = phase;
+        if (notify) {
+            this.emit("change");
+        }
+    }
+
+    _getEventByEither(type) {
+        return this._eventsByThem.get(type) || this._eventsByUs.get(type);
+    }
+
+    _getEventBy(type, byThem) {
+        if (byThem) {
+            return this._eventsByThem.get(type);
+        } else {
+            return this._eventsByUs.get(type);
+        }
+    }
+
+    _calculatePhaseTransitions() {
+        const transitions = [{phase: PHASE_UNSENT}];
+        const phase = () => transitions[transitions.length - 1].phase;
+
+        // always pass by .request first to be sure channel.userId has been set
+        const hasRequestByThem = this._eventsByThem.has(REQUEST_TYPE);
+        const requestEvent = this._getEventBy(REQUEST_TYPE, hasRequestByThem);
+        if (requestEvent) {
+            transitions.push({phase: PHASE_REQUESTED, event: requestEvent});
+        }
+
+        const readyEvent =
+            requestEvent &amp;&amp; this._getEventBy(READY_TYPE, !hasRequestByThem);
+        if (readyEvent &amp;&amp; phase() === PHASE_REQUESTED) {
+            transitions.push({phase: PHASE_READY, event: readyEvent});
+        }
+
+        let startEvent;
+        if (readyEvent || !requestEvent) {
+            const theirStartEvent = this._eventsByThem.get(START_TYPE);
+            const ourStartEvent = this._eventsByUs.get(START_TYPE);
+            // any party can send .start after a .ready or unsent
+            if (theirStartEvent &amp;&amp; ourStartEvent) {
+                startEvent = theirStartEvent.getSender() &lt; ourStartEvent.getSender() ?
+                    theirStartEvent : ourStartEvent;
+            } else {
+                startEvent = theirStartEvent ? theirStartEvent : ourStartEvent;
+            }
+        } else {
+            startEvent = this._getEventBy(START_TYPE, !hasRequestByThem);
+        }
+        if (startEvent) {
+            const fromRequestPhase = phase() === PHASE_REQUESTED &amp;&amp;
+                requestEvent.getSender() !== startEvent.getSender();
+            const fromUnsentPhase = phase() === PHASE_UNSENT &amp;&amp;
+                this.channel.constructor.canCreateRequest(START_TYPE);
+            if (fromRequestPhase || phase() === PHASE_READY || fromUnsentPhase) {
+                transitions.push({phase: PHASE_STARTED, event: startEvent});
+            }
+        }
+
+        const ourDoneEvent = this._eventsByUs.get(DONE_TYPE);
+        if (this._verifierHasFinished || (ourDoneEvent &amp;&amp; phase() === PHASE_STARTED)) {
+            transitions.push({phase: PHASE_DONE});
+        }
+
+        const cancelEvent = this._getEventByEither(CANCEL_TYPE);
+        if ((this._cancelled || cancelEvent) &amp;&amp; phase() !== PHASE_DONE) {
+            transitions.push({phase: PHASE_CANCELLED, event: cancelEvent});
+            return transitions;
+        }
+
+        return transitions;
+    }
+
+    _transitionToPhase(transition) {
+        const {phase, event} = transition;
+        // get common methods
+        if (phase === PHASE_REQUESTED || phase === PHASE_READY) {
+            if (!this._wasSentByOwnDevice(event)) {
+                const content = event.getContent();
+                this._commonMethods =
+                    content.methods.filter(m => this._verificationMethods.has(m));
+            }
+        }
+        // detect if we're not a party in the request, and we should just observe
+        if (!this.observeOnly) {
+            // if requested or accepted by one of my other devices
+            if (phase === PHASE_REQUESTED ||
+                phase === PHASE_STARTED ||
+                phase === PHASE_READY
+            ) {
+                if (
+                    this.channel.receiveStartFromOtherDevices &amp;&amp;
+                    this._wasSentByOwnUser(event) &amp;&amp;
+                    !this._wasSentByOwnDevice(event)
+                ) {
+                    this._observeOnly = true;
+                }
+            }
+        }
+        // create verifier
+        if (phase === PHASE_STARTED) {
+            const {method} = event.getContent();
+            if (!this._verifier &amp;&amp; !this.observeOnly) {
+                this._verifier = this._createVerifier(method, event);
+                if (!this._verifier) {
+                    this.cancel({
+                        code: "m.unknown_method",
+                        reason: `Unknown method: ${method}`,
+                    });
+                } else {
+                    this._chosenMethod = method;
+                }
+            }
+        }
+    }
+
+    _applyPhaseTransitions() {
+        const transitions = this._calculatePhaseTransitions();
+        const existingIdx = transitions.findIndex(t => t.phase === this.phase);
+        // trim off phases we already went through, if any
+        const newTransitions = transitions.slice(existingIdx + 1);
+        // transition to all new phases
+        for (const transition of newTransitions) {
+            this._transitionToPhase(transition);
+        }
+        return newTransitions;
+    }
+
+    _isWinningStartRace(newEvent) {
+        if (newEvent.getType() !== START_TYPE) {
+            return false;
+        }
+        const oldEvent = this._verifier.startEvent;
+
+        let oldRaceIdentifier;
+        if (this.isSelfVerification) {
+            // if the verifier does not have a startEvent,
+            // it is because it's still sending and we are on the initator side
+            // we know we are sending a .start event because we already
+            // have a verifier (checked in calling method)
+            if (oldEvent) {
+                const oldContent = oldEvent.getContent();
+                oldRaceIdentifier = oldContent &amp;&amp; oldContent.from_device;
+            } else {
+                oldRaceIdentifier = this._client.getDeviceId();
+            }
+        } else {
+            if (oldEvent) {
+                oldRaceIdentifier = oldEvent.getSender();
+            } else {
+                oldRaceIdentifier = this._client.getUserId();
+            }
+        }
+
+        let newRaceIdentifier;
+        if (this.isSelfVerification) {
+            const newContent = newEvent.getContent();
+            newRaceIdentifier = newContent &amp;&amp; newContent.from_device;
+        } else {
+            newRaceIdentifier = newEvent.getSender();
+        }
+        return newRaceIdentifier &lt; oldRaceIdentifier;
+    }
+
+    hasEventId(eventId) {
+        for (const event of this._eventsByUs.values()) {
+            if (event.getId() === eventId) {
+                return true;
+            }
+        }
+        for (const event of this._eventsByThem.values()) {
+            if (event.getId() === eventId) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Changes the state of the request and verifier in response to a key verification event.
+     * @param {string} type the "symbolic" event type, as returned by the `getEventType` function on the channel.
+     * @param {MatrixEvent} event the event to handle. Don't call getType() on it but use the `type` parameter instead.
+     * @param {bool} isLiveEvent whether this is an even received through sync or not
+     * @param {bool} isRemoteEcho whether this is the remote echo of an event sent by the same device
+     * @param {bool} isSentByUs whether this event is sent by a party that can accept and/or observe the request like one of our peers.
+     *   For InRoomChannel this means any device for the syncing user. For ToDeviceChannel, just the syncing device.
+     * @returns {Promise} a promise that resolves when any requests as an anwser to the passed-in event are sent.
+     */
+    async handleEvent(type, event, isLiveEvent, isRemoteEcho, isSentByUs) {
+        // if reached phase cancelled or done, ignore anything else that comes
+        if (this.done || this.cancelled) {
+            return;
+        }
+        const wasObserveOnly = this._observeOnly;
+
+        this._adjustObserveOnly(event, isLiveEvent);
+
+        if (!this.observeOnly &amp;&amp; !isRemoteEcho) {
+            if (await this._cancelOnError(type, event)) {
+                return;
+            }
+        }
+
+        // This assumes verification won't need to send an event with
+        // the same type for the same party twice.
+        // This is true for QR and SAS verification, and was
+        // added here to prevent verification getting cancelled
+        // when the server duplicates an event (https://github.com/matrix-org/synapse/issues/3365)
+        const isDuplicateEvent = isSentByUs ?
+            this._eventsByUs.has(type) :
+            this._eventsByThem.has(type);
+        if (isDuplicateEvent) {
+            return;
+        }
+
+        const oldPhase = this.phase;
+        this._addEvent(type, event, isSentByUs);
+
+        // this will create if needed the verifier so needs to happen before calling it
+        const newTransitions = this._applyPhaseTransitions();
+        try {
+            // only pass events from the other side to the verifier,
+            // no remote echos of our own events
+            if (this._verifier &amp;&amp; !this.observeOnly) {
+                const newEventWinsRace = this._isWinningStartRace(event);
+                if (this._verifier.canSwitchStartEvent(event) &amp;&amp; newEventWinsRace) {
+                    this._verifier.switchStartEvent(event);
+                } else if (!isRemoteEcho) {
+                    if (type === CANCEL_TYPE || (this._verifier.events
+                        &amp;&amp; this._verifier.events.includes(type))) {
+                        this._verifier.handleEvent(event);
+                    }
+                }
+            }
+
+            if (newTransitions.length) {
+                // create QRCodeData if the other side can scan
+                // important this happens before emitting a phase change,
+                // so listeners can rely on it being there already
+                // We only do this for live events because it is important that
+                // we sign the keys that were in the QR code, and not the keys
+                // we happen to have at some later point in time.
+                if (isLiveEvent &amp;&amp; newTransitions.some(t => t.phase === PHASE_READY)) {
+                    const shouldGenerateQrCode =
+                        this.otherPartySupportsMethod(SCAN_QR_CODE_METHOD, true);
+                    if (shouldGenerateQrCode) {
+                        this._qrCodeData = await QRCodeData.create(this, this._client);
+                    }
+                }
+
+                const lastTransition = newTransitions[newTransitions.length - 1];
+                const {phase} = lastTransition;
+
+                this._setupTimeout(phase);
+                // set phase as last thing as this emits the "change" event
+                this._setPhase(phase);
+            } else if (this._observeOnly !== wasObserveOnly) {
+                this.emit("change");
+            }
+        } finally {
+            // log events we processed so we can see from rageshakes what events were added to a request
+            logger.log(`Verification request ${this.channel.transactionId}: ` +
+                `${type} event with id:${event.getId()}, ` +
+                `content:${JSON.stringify(event.getContent())} ` +
+                `deviceId:${this.channel.deviceId}, ` +
+                `sender:${event.getSender()}, isSentByUs:${isSentByUs}, ` +
+                `isLiveEvent:${isLiveEvent}, isRemoteEcho:${isRemoteEcho}, ` +
+                `phase:${oldPhase}=>${this.phase}, ` +
+                `observeOnly:${wasObserveOnly}=>${this._observeOnly}`);
+        }
+    }
+
+    _setupTimeout(phase) {
+        const shouldTimeout = !this._timeoutTimer &amp;&amp; !this.observeOnly &amp;&amp;
+            phase === PHASE_REQUESTED;
+
+        if (shouldTimeout) {
+            this._timeoutTimer = setTimeout(this._cancelOnTimeout, this.timeout);
+        }
+        if (this._timeoutTimer) {
+            const shouldClear = phase === PHASE_STARTED ||
+                phase === PHASE_READY ||
+                phase === PHASE_DONE ||
+                phase === PHASE_CANCELLED;
+            if (shouldClear) {
+                clearTimeout(this._timeoutTimer);
+                this._timeoutTimer = null;
+            }
+        }
+    }
+
+    _cancelOnTimeout = () => {
+        try {
+            if (this.initiatedByMe) {
+                this.cancel({
+                    reason: "Other party didn't accept in time",
+                    code: "m.timeout",
+                });
+            } else {
+                this.cancel({
+                    reason: "User didn't accept in time",
+                    code: "m.timeout",
+                });
+            }
+        } catch (err) {
+            logger.error("Error while cancelling verification request", err);
+        }
+    };
+
+    async _cancelOnError(type, event) {
+        if (type === START_TYPE) {
+            const method = event.getContent().method;
+            if (!this._verificationMethods.has(method)) {
+                await this.cancel(errorFromEvent(newUnknownMethodError()));
+                return true;
+            }
+        }
+
+        const isUnexpectedRequest = type === REQUEST_TYPE &amp;&amp; this.phase !== PHASE_UNSENT;
+        const isUnexpectedReady = type === READY_TYPE &amp;&amp; this.phase !== PHASE_REQUESTED;
+        // only if phase has passed from PHASE_UNSENT should we cancel, because events
+        // are allowed to come in in any order (at least with InRoomChannel). So we only know
+        // we're dealing with a valid request we should participate in once we've moved to PHASE_REQUESTED
+        // before that, we could be looking at somebody elses verification request and we just
+        // happen to be in the room
+        if (this.phase !== PHASE_UNSENT &amp;&amp; (isUnexpectedRequest || isUnexpectedReady)) {
+            logger.warn(`Cancelling, unexpected ${type} verification ` +
+                `event from ${event.getSender()}`);
+            const reason = `Unexpected ${type} event in phase ${this.phase}`;
+            await this.cancel(errorFromEvent(newUnexpectedMessageError({reason})));
+            return true;
+        }
+        return false;
+    }
+
+    _adjustObserveOnly(event, isLiveEvent) {
+        // don't send out events for historical requests
+        if (!isLiveEvent) {
+            this._observeOnly = true;
+        }
+        if (this.calculateEventTimeout(event) &lt; VERIFICATION_REQUEST_MARGIN) {
+            this._observeOnly = true;
+        }
+    }
+
+    _addEvent(type, event, isSentByUs) {
+        if (isSentByUs) {
+            this._eventsByUs.set(type, event);
+        } else {
+            this._eventsByThem.set(type, event);
+        }
+
+        // once we know the userId of the other party (from the .request event)
+        // see if any event by anyone else crept into this._eventsByThem
+        if (type === REQUEST_TYPE) {
+            for (const [type, event] of this._eventsByThem.entries()) {
+                if (event.getSender() !== this.otherUserId) {
+                    this._eventsByThem.delete(type);
+                }
+            }
+            // also remember when we received the request event
+            this._requestReceivedAt = Date.now();
+        }
+    }
+
+    _createVerifier(method, startEvent = null, targetDevice = null) {
+        if (!targetDevice) {
+            targetDevice = this.targetDevice;
+        }
+        const {userId, deviceId} = targetDevice;
+
+        const VerifierCtor = this._verificationMethods.get(method);
+        if (!VerifierCtor) {
+            logger.warn("could not find verifier constructor for method", method);
+            return;
+        }
+        return new VerifierCtor(
+            this.channel,
+            this._client,
+            userId,
+            deviceId,
+            startEvent,
+            this,
+        );
+    }
+
+    _wasSentByOwnUser(event) {
+        return event.getSender() === this._client.getUserId();
+    }
+
+    // only for .request, .ready or .start
+    _wasSentByOwnDevice(event) {
+        if (!this._wasSentByOwnUser(event)) {
+            return false;
+        }
+        const content = event.getContent();
+        if (!content || content.from_device !== this._client.getDeviceId()) {
+            return false;
+        }
+        return true;
+    }
+
+    onVerifierCancelled() {
+        this._cancelled = true;
+        // move to cancelled phase
+        const newTransitions = this._applyPhaseTransitions();
+        if (newTransitions.length) {
+            this._setPhase(newTransitions[newTransitions.length - 1].phase);
+        }
+    }
+
+    onVerifierFinished() {
+        this.channel.send("m.key.verification.done", {});
+        this._verifierHasFinished = true;
+        // move to .done phase
+        const newTransitions = this._applyPhaseTransitions();
+        if (newTransitions.length) {
+            this._setPhase(newTransitions[newTransitions.length - 1].phase);
+        }
+    }
+
+    getEventFromOtherParty(type) {
+        return this._eventsByThem.get(type);
+    }
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+<footer class="footer">
+    <div class="content has-text-centered">
+        <p>Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.4</a> on Wed Aug 05 2020 15:30:04 GMT+0100 (British Summer Time)</p>
+        <p class="sidebar-created-by">
+            <a href="https://github.com/SoftwareBrothers/better-docs" target="_blank">BetterDocs theme</a> provided with <i class="fas fa-heart"></i> by
+            <a href="http://softwarebrothers.co" target="_blank">SoftwareBrothers - JavaScript Development Agency</a>
+        </p>
+    </div>
+</footer>
+
+
+<script src="scripts/app.min.js"></script>
+<script>PR.prettyPrint();</script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
