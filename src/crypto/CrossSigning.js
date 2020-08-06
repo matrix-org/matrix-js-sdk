@@ -761,6 +761,7 @@ export async function requestKeysDuringVerification(baseApis, userId, deviceId) 
         // We call getCrossSigningKey() for its side-effects
         return Promise.race([
             Promise.all([
+                crossSigning.getCrossSigningKey("master"),
                 crossSigning.getCrossSigningKey("self_signing"),
                 crossSigning.getCrossSigningKey("user_signing"),
                 backupKeyPromise,
