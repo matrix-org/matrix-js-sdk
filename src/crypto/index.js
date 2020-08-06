@@ -1221,6 +1221,20 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     if (oldSelfSigningId !== newCrossSigning.getId("self_signing")) {
         logger.info("Got new self-signing key", newCrossSigning.getId("self_signing"));
 
+        // Try to cache the self-signing private key as a side-effect
+        let signing = null;
+        try {
+            const ret = await this._crossSigningInfo.getCrossSigningKey(
+                "self_signing", newCrossSigning.getId("self_signing"),
+            );
+            signing = ret[1];
+            logger.info(
+                "Got matching private key from callback for new public self-signing key",
+            );
+        } finally {
+            if (signing) signing.free();
+        }
+
         const device = this._deviceList.getStoredDevice(this._userId, this._deviceId);
         const signedDevice = await this._crossSigningInfo.signDevice(
             this._userId, device,
@@ -1229,6 +1243,20 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     }
     if (oldUserSigningId !== newCrossSigning.getId("user_signing")) {
         logger.info("Got new user-signing key", newCrossSigning.getId("user_signing"));
+
+        // Try to cache the user-signing private key as a side-effect
+        let signing = null;
+        try {
+            const ret = await this._crossSigningInfo.getCrossSigningKey(
+                "user_signing", newCrossSigning.getId("user_signing"),
+            );
+            signing = ret[1];
+            logger.info(
+                "Got matching private key from callback for new public user-signing key",
+            );
+        } finally {
+            if (signing) signing.free();
+        }
     }
 
     if (masterChanged) {
