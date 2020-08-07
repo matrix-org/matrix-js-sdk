@@ -38,7 +38,7 @@ const testKey = new Uint8Array([
 ]);
 
 const types = [
-    { type: "master", shouldCache: false },
+    { type: "master", shouldCache: true },
     { type: "self_signing", shouldCache: true },
     { type: "user_signing", shouldCache: true },
     { type: "invalid", shouldCache: false },

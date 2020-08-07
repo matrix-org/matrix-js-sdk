@@ -373,6 +373,7 @@ export class SecretStorage extends EventEmitter {
         const requestId = this._baseApis.makeTxnId();
 
         const requestControl = this._requests[requestId] = {
+            name,
             devices,
         };
         const promise = new Promise((resolve, reject) => {
@@ -536,6 +537,10 @@ export class SecretStorage extends EventEmitter {
                 return;
             }
 
+            logger.log(
+                `Successfully received secret ${requestControl.name} ` +
+                `from ${deviceInfo.deviceId}`,
+            );
             requestControl.resolve(content.secret);
         }
     }

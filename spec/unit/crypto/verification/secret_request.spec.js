@@ -54,6 +54,7 @@ describe("self-verifications", () => {
             cacheCallbacks,
         );
         _crossSigningInfo.keys = {
+            master: { keys: { X: testKeyPub } },
             self_signing: { keys: { X: testKeyPub } },
             user_signing: { keys: { X: testKeyPub } },
         };
@@ -96,9 +97,9 @@ describe("self-verifications", () => {
 
         const result = await verification.done();
 
-        /* We should request, and store, two cross signing key and the key backup key */
-        expect(cacheCallbacks.storeCrossSigningKeyCache.mock.calls.length).toBe(2);
-        expect(_secretStorage.request.mock.calls.length).toBe(3);
+        /* We should request, and store, 3 cross signing keys and the key backup key */
+        expect(cacheCallbacks.storeCrossSigningKeyCache.mock.calls.length).toBe(3);
+        expect(_secretStorage.request.mock.calls.length).toBe(4);
 
         expect(cacheCallbacks.storeCrossSigningKeyCache.mock.calls[0][1])
           .toEqual(testKey);

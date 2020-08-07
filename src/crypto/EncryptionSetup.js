@@ -1,3 +1,4 @@
+import { logger } from "../logger";
 import {MatrixEvent} from "../models/event";
 import {EventEmitter} from "events";
 import {createCryptoStoreCacheCallbacks} from "./CrossSigning";
@@ -113,12 +114,12 @@ export class EncryptionSetupBuilder {
      * @return {Promise}
      */
     async persist(crypto) {
-        // store self_signing and user_signing private key in cache
+        // store private keys in cache
         if (this._crossSigningKeys) {
             const cacheCallbacks = createCryptoStoreCacheCallbacks(
                 crypto._cryptoStore, crypto._olmDevice);
-            for (const type of ["self_signing", "user_signing"]) {
-                // logger.log(`Cache ${type} cross-signing private key locally`);
+            for (const type of ["master", "self_signing", "user_signing"]) {
+                logger.log(`Cache ${type} cross-signing private key locally`);
                 const privateKey = this.crossSigningCallbacks.privateKeys.get(type);
                 await cacheCallbacks.storeCrossSigningKeyCache(type, privateKey);
             }

@@ -26,6 +26,8 @@ import {logger} from '../logger';
 import {IndexedDBCryptoStore} from '../crypto/store/indexeddb-crypto-store';
 import {decryptAES, encryptAES} from './aes';
 
+const KEY_REQUEST_TIMEOUT_MS = 1000 * 60;
+
 function publicKeyFromKeyInfo(keyInfo) {
     // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
     // We assume only a single key, and we want the bare form without type
@@ -72,7 +74,7 @@ export class CrossSigningInfo extends EventEmitter {
      * @returns {Array} An array with [ public key, Olm.PkSigning ]
      */
     async getCrossSigningKey(type, expectedPubkey) {
-        const shouldCache = ["self_signing", "user_signing"].indexOf(type) >= 0;
+        const shouldCache = ["master", "self_signing", "user_signing"].indexOf(type) >= 0;
 
         if (!this._callbacks.getCrossSigningKey) {
             throw new Error("No getCrossSigningKey callback supplied");
@@ -676,4 +678,97 @@ export function createCryptoStoreCacheCallbacks(store, olmdevice) {
             );
         },
     };
+}
+
+/**
+ * Request cross-signing keys from another device during verification.
+ *
+ * @param {module:base-apis~MatrixBaseApis} baseApis base Matrix API interface
+ * @param {string} userId The user ID being verified
+ * @param {string} deviceId The device ID being verified
+ */
+export async function requestKeysDuringVerification(baseApis, userId, deviceId) {
+    // If this is a self-verification, ask the other party for keys
+    if (baseApis.getUserId() !== userId) {
+        return;
+    }
+    console.log("Cross-signing: Self-verification done; requesting keys");
+    // This happens asynchronously, and we're not concerned about waiting for
+    // it.  We return here in order to test.
+    return new Promise((resolve, reject) => {
+        const client = baseApis;
+        const original = client._crypto._crossSigningInfo;
+
+        // We already have all of the infrastructure we need to validate and
+        // cache cross-signing keys, so instead of replicating that, here we set
+        // up callbacks that request them from the other device and call
+        // CrossSigningInfo.getCrossSigningKey() to validate/cache
+        const crossSigning = new CrossSigningInfo(
+            original.userId,
+            { getCrossSigningKey: async (type) => {
+                console.debug("Cross-signing: requesting secret",
+                                type, deviceId);
+                const { promise } = client.requestSecret(
+                    `m.cross_signing.${type}`, [deviceId],
+                );
+                const result = await promise;
+                const decoded = decodeBase64(result);
+                return Uint8Array.from(decoded);
+            } },
+            original._cacheCallbacks,
+        );
+        crossSigning.keys = original.keys;
+
+        // XXX: get all keys out if we get one key out
+        // https://github.com/vector-im/element-web/issues/12604
+        // then change here to reject on the timeout
+        // Requests can be ignored, so don't wait around forever
+        const timeout = new Promise((resolve, reject) => {
+            setTimeout(
+                resolve,
+                KEY_REQUEST_TIMEOUT_MS,
+                new Error("Timeout"),
+            );
+        });
+
+        // also request and cache the key backup key
+        const backupKeyPromise = new Promise(async resolve => {
+            const cachedKey = await client._crypto.getSessionBackupPrivateKey();
+            if (!cachedKey) {
+                logger.info("No cached backup key found. Requesting...");
+                const secretReq = client.requestSecret(
+                    'm.megolm_backup.v1', [deviceId],
+                );
+                const base64Key = await secretReq.promise;
+                logger.info("Got key backup key, decoding...");
+                const decodedKey = decodeBase64(base64Key);
+                logger.info("Decoded backup key, storing...");
+                client._crypto.storeSessionBackupPrivateKey(
+                    Uint8Array.from(decodedKey),
+                );
+                logger.info("Backup key stored. Starting backup restore...");
+                const backupInfo = await client.getKeyBackupVersion();
+                // no need to await for this - just let it go in the bg
+                client.restoreKeyBackupWithCache(
+                    undefined, undefined, backupInfo,
+                ).then(() => {
+                    logger.info("Backup restored.");
+                });
+            }
+            resolve();
+        });
+
+        // We call getCrossSigningKey() for its side-effects
+        return Promise.race([
+            Promise.all([
+                crossSigning.getCrossSigningKey("master"),
+                crossSigning.getCrossSigningKey("self_signing"),
+                crossSigning.getCrossSigningKey("user_signing"),
+                backupKeyPromise,
+            ]),
+            timeout,
+        ]).then(resolve, reject);
+    }).catch((e) => {
+        console.warn("Cross-signing: failure while requesting keys:", e);
+    });
 }
