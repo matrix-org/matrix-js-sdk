@@ -436,10 +436,9 @@ Crypto.prototype.isCrossSigningReady = async function() {
 
 
 /**
- * Bootstrap Secure Secret Storage if needed by creating a default key and
- * signing it with the cross-signing master key. If everything is already set
- * up, then no changes are made, so this is safe to run to ensure secret storage
- * is ready for use.
+ * Bootstrap Secure Secret Storage if needed by creating a default key. If everything is
+ * already set up, then no changes are made, so this is safe to run to ensure secret
+ * storage is ready for use.
  *
  * This function
  * - creates a new Secure Secret Storage key if no default key exists
