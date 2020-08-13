@@ -1094,6 +1094,7 @@ function wrapCryptoFuncs(MatrixClient, names) {
 
 /**
  * Get the user's cross-signing key ID.
+ *
  * The cross-signing API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#getCrossSigningId
@@ -1105,6 +1106,7 @@ function wrapCryptoFuncs(MatrixClient, names) {
 
 /**
  * Get the cross signing information for a given user.
+ *
  * The cross-signing API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#getStoredCrossSigningForUser
@@ -1115,6 +1117,7 @@ function wrapCryptoFuncs(MatrixClient, names) {
 
 /**
  * Check whether a given user is trusted.
+ *
  * The cross-signing API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#checkUserTrust
@@ -1125,6 +1128,7 @@ function wrapCryptoFuncs(MatrixClient, names) {
 
 /**
  * Check whether a given device is trusted.
+ *
  * The cross-signing API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#checkDeviceTrust
@@ -1137,6 +1141,7 @@ function wrapCryptoFuncs(MatrixClient, names) {
 /**
  * Check the copy of our cross-signing key that we have in the device list and
  * see if we can get the private key. If so, mark it as trusted.
+ *
  * The cross-signing API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#checkOwnCrossSigningTrust
@@ -1146,6 +1151,7 @@ function wrapCryptoFuncs(MatrixClient, names) {
  * Checks that a given cross-signing private key matches a given public key.
  * This can be used by the getCrossSigningKey callback to verify that the
  * private key it is about to supply is the one that was requested.
+ *
  * The cross-signing API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#checkCrossSigningPrivateKey
@@ -1196,6 +1202,7 @@ wrapCryptoFuncs(MatrixClient, [
 
 /**
  * Create a recovery key from a user-supplied passphrase.
+ *
  * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#createRecoveryKeyFromPassphrase
@@ -1208,22 +1215,43 @@ wrapCryptoFuncs(MatrixClient, [
  */
 
 /**
- * Bootstrap Secure Secret Storage if needed by creating a default key and signing it with
- * the cross-signing master key. If everything is already set up, then no
- * changes are made, so this is safe to run to ensure secret storage is ready
- * for use.
+ * Bootstrap Secure Secret Storage if needed by creating a default key. If everything is
+ * already set up, then no changes are made, so this is safe to run to ensure secret
+ * storage is ready for use.
+ *
  * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
- * @function module:client~MatrixClient#bootstrapSecretStorage
- * @param {function} [opts.authUploadDeviceSigningKeys] Optional. Function
- * called to await an interactive auth flow when uploading device signing keys.
- * Args:
- *     {function} A function that makes the request requiring auth. Receives the
- *     auth data as an object.
+ * This function
+ * - creates a new Secure Secret Storage key if no default key exists
+ *   - if a key backup exists, it is migrated to store the key in the Secret
+ *     Storage
+ * - creates a backup if none exists, and one is requested
+ * - migrates Secure Secret Storage to use the latest algorithm, if an outdated
+ *   algorithm is found
+ *
+ * @param {function} [opts.createSecretStorageKey] Optional. Function
+ * called to await a secret storage key creation flow.
+ * Returns:
+ *     {Promise<Object>} Object with public key metadata, encoded private
+ *     recovery key which should be disposed of after displaying to the user,
+ *     and raw private key to avoid round tripping if needed.
+ * @param {object} [opts.keyBackupInfo] The current key backup object. If passed,
+ * the passphrase and recovery key from this backup will be used.
+ * @param {bool} [opts.setupNewKeyBackup] If true, a new key backup version will be
+ * created and the private key stored in the new SSSS store. Ignored if keyBackupInfo
+ * is supplied.
+ * @param {bool} [opts.setupNewSecretStorage] Optional. Reset even if keys already exist.
+ * @param {func} [opts.getKeyBackupPassphrase] Optional. Function called to get the user's
+ *     current key backup passphrase. Should return a promise that resolves with a Buffer
+ *     containing the key, or rejects if the key cannot be obtained.
+ * Returns:
+ *     {Promise} A promise which resolves to key creation data for
+ *     SecretStorage#addKey: an object with `passphrase` and/or `pubkey` fields.
  */
 
 /**
  * Add a key for encrypting secrets.
+ *
  * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#addSecretStorageKey
@@ -1238,6 +1266,7 @@ wrapCryptoFuncs(MatrixClient, [
 
 /**
  * Check whether we have a key with a given ID.
+ *
  * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#hasSecretStorageKey
@@ -1247,7 +1276,8 @@ wrapCryptoFuncs(MatrixClient, [
  */
 
 /**
- * Store an encrypted secret on the server
+ * Store an encrypted secret on the server.
+ *
  * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#storeSecret
@@ -1259,6 +1289,7 @@ wrapCryptoFuncs(MatrixClient, [
 
 /**
  * Get a secret from storage.
+ *
  * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#getSecret
@@ -1269,6 +1300,7 @@ wrapCryptoFuncs(MatrixClient, [
 
 /**
  * Check if a secret is stored on the server.
+ *
  * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#isSecretStored
@@ -1283,6 +1315,7 @@ wrapCryptoFuncs(MatrixClient, [
 
 /**
  * Request a secret from another device.
+ *
  * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#requestSecret
@@ -1294,6 +1327,7 @@ wrapCryptoFuncs(MatrixClient, [
 
 /**
  * Get the current default key ID for encrypting secrets.
+ *
  * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#getDefaultSecretStorageKeyId
@@ -1303,6 +1337,7 @@ wrapCryptoFuncs(MatrixClient, [
 
 /**
  * Set the current default key ID for encrypting secrets.
+ *
  * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#setDefaultSecretStorageKeyId
@@ -1313,6 +1348,7 @@ wrapCryptoFuncs(MatrixClient, [
  * Checks that a given secret storage private key matches a given public key.
  * This can be used by the getSecretStorageKey callback to verify that the
  * private key it is about to supply is the one that was requested.
+ *
  * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#checkSecretStoragePrivateKey
