@@ -1,3 +1,20 @@
+Changes in [8.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.1.0-rc.1) (2020-08-13)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.0.1...v8.1.0-rc.1)
+
+ * Update on Promises
+   [\#1438](https://github.com/matrix-org/matrix-js-sdk/pull/1438)
+ * Store and request master cross-signing key
+   [\#1437](https://github.com/matrix-org/matrix-js-sdk/pull/1437)
+ * Filter out non-string display names
+   [\#1433](https://github.com/matrix-org/matrix-js-sdk/pull/1433)
+ * Bump elliptic from 6.5.2 to 6.5.3
+   [\#1427](https://github.com/matrix-org/matrix-js-sdk/pull/1427)
+ * Replace Riot with Element in docs and comments
+   [\#1431](https://github.com/matrix-org/matrix-js-sdk/pull/1431)
+ * Remove leftover bits of TSLint
+   [\#1430](https://github.com/matrix-org/matrix-js-sdk/pull/1430)
+
 Changes in [8.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.0.1) (2020-08-05)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.0.1-rc.1...v8.0.1)
