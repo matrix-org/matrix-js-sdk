@@ -3499,7 +3499,7 @@ MatrixClient.prototype.__makeForwardLocalEcho = function(room, eventId, targetRo
     if (!event) {
         return null;
     }
-    const contentCopy = {...event.getWireContent()}
+    const contentCopy = {...event.getWireContent()};
     if (!contentCopy["net.maunium.msc2730.forwarded"]) {
         const member = room.getMember(event.getSender());
         // We don't have the exact data that the event will contain,
@@ -3512,7 +3512,7 @@ MatrixClient.prototype.__makeForwardLocalEcho = function(room, eventId, targetRo
                 displayname: member.name,
                 avatar_url: member.getMxcAvatarUrl(),
             } : {},
-        }
+        };
     }
     const localEvent = new MatrixEvent({
         event_id: "~" + targetRoom.roomId + ":" + txnId,
@@ -3535,7 +3535,7 @@ MatrixClient.prototype.__makeForwardLocalEcho = function(room, eventId, targetRo
         throw new Error("Event blocked by other events not yet sent");
     }
     return localEvent;
-}
+};
 
 MatrixClient.prototype._unstable_forwardEvent = async function(roomId, eventId, targetRoomId, txnId) {
     if (!await this.doesServerSupportUnstableFeature("net.maunium.msc2730")) {
@@ -3555,7 +3555,7 @@ MatrixClient.prototype._unstable_forwardEvent = async function(roomId, eventId, 
         $txnId: txnId,
     });
     return this._http.authedRequest(
-        undefined, "PUT", path, undefined, {}, {prefix: PREFIX_UNSTABLE}
+        undefined, "PUT", path, undefined, {}, {prefix: PREFIX_UNSTABLE},
     ).then((res) => {
         if (targetRoom && localEvent) {
             targetRoom.updatePendingEvent(localEvent, EventStatus.SENT, res.event_id);
@@ -3568,8 +3568,8 @@ MatrixClient.prototype._unstable_forwardEvent = async function(roomId, eventId, 
             _updatePendingEventStatus(targetRoom, localEvent, EventStatus.NOT_SENT);
         }
         throw err;
-    })
-}
+    });
+};
 
 /**
  * Sets a new status message for the user. The message may be null/falsey
