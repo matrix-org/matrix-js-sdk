@@ -3491,6 +3491,86 @@ MatrixClient.prototype.mxcUrlToHttp =
     );
 };
 
+MatrixClient.prototype.__makeForwardLocalEcho = function(room, eventId, targetRoom, txnId) {
+    if (!room || !targetRoom) {
+        return null;
+    }
+    const event = room.findEventById(eventId);
+    if (!event) {
+        return null;
+    }
+    const contentCopy = {...event.getWireContent()}
+    if (!contentCopy["net.maunium.msc2730.forwarded"]) {
+        const member = room.getMember(event.getSender());
+        // We don't have the exact data that the event will contain,
+        // so just fill the relevant fields for the local echo.
+        contentCopy["net.maunium.msc2730.forwarded"] = {
+            room_id: room.roomId,
+            sender: event.getSender(),
+            origin_server_ts: event.getTs(),
+            unsigned: member ? {
+                displayname: member.name,
+                avatar_url: member.getMxcAvatarUrl(),
+            } : {},
+        }
+    }
+    const localEvent = new MatrixEvent({
+        event_id: "~" + targetRoom.roomId + ":" + txnId,
+        sender: this.credentials.userId,
+        room_id: targetRoom.roomId,
+        type: event.getType(),
+        content: contentCopy,
+        origin_server_ts: new Date().getTime(),
+        unsigned: {
+            "net.maunium.msc2730.forwarded": {
+                valid: true,
+                event_id: event.getId(),
+            },
+        },
+    });
+    localEvent.setTxnId(txnId);
+    localEvent.setStatus(EventStatus.SENDING);
+    targetRoom.addPendingEvent(localEvent, txnId);
+    if (localEvent.status === EventStatus.NOT_SENT) {
+        throw new Error("Event blocked by other events not yet sent");
+    }
+    return localEvent;
+}
+
+MatrixClient.prototype._unstable_forwardEvent = async function(roomId, eventId, targetRoomId, txnId) {
+    if (!await this.doesServerSupportUnstableFeature("net.maunium.msc2730")) {
+        throw Error("Server does not support verifiable forwarded events");
+    }
+    if (!txnId) {
+        txnId = this.makeTxnId();
+    }
+
+    const room = this.getRoom(roomId);
+    const targetRoom = this.getRoom(targetRoomId);
+    const localEvent = this.__makeForwardLocalEcho(room, eventId, targetRoom, txnId);
+    const path = utils.encodeUri("/net.maunium.msc2730/rooms/$roomId/event/$eventId/forward/$targetRoomId/$txnId", {
+        $roomId: roomId,
+        $eventId: eventId,
+        $targetRoomId: targetRoomId,
+        $txnId: txnId,
+    });
+    return this._http.authedRequest(
+        undefined, "PUT", path, undefined, {}, {prefix: PREFIX_UNSTABLE}
+    ).then((res) => {
+        if (targetRoom && localEvent) {
+            targetRoom.updatePendingEvent(localEvent, EventStatus.SENT, res.event_id);
+        }
+        return res;
+    }, (err) => {
+        logger.error("Error forwarding event", err.stack || err);
+        if (localEvent) {
+            localEvent.error = err;
+            _updatePendingEventStatus(targetRoom, localEvent, EventStatus.NOT_SENT);
+        }
+        throw err;
+    })
+}
+
 /**
  * Sets a new status message for the user. The message may be null/falsey
  * to clear the message.
