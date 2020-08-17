@@ -1,3 +1,9 @@
+Changes in [8.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.1.0) (2020-08-17)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.1.0-rc.1...v8.1.0)
+
+* No changes since rc.1
+
 Changes in [8.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.1.0-rc.1) (2020-08-13)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.0.1...v8.1.0-rc.1)
