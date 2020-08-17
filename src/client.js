@@ -442,14 +442,18 @@ export function MatrixClient(opts) {
 utils.inherits(MatrixClient, EventEmitter);
 utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);
 
+const DEHYDRATION_ALGORITHM = "m.dehydration.v1.olm";
+
 /**
- * @param {string} loginType
+ * Log in, trying to rehydrate a device if available.  The client must have
+ * been initialized with a `cryptoCallback.getDehydrationKey` option.
+ *
+ * @param {string} loginType  The login type.
  * @param {Object} data
- * @param {string} key The key to decrypt with.
- * @return {Promise} Resolves: TODO
+ * @return {Promise} Resolves: to a login request result.
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype.loginWithRehydration = async function(loginType, data, key) {
+MatrixClient.prototype.loginWithRehydration = async function(loginType, data) {
     const loginData = {
         "org.matrix.msc2697.restore_device": true,
     };
@@ -464,8 +468,14 @@ MatrixClient.prototype.loginWithRehydration = async function(loginType, data, ke
 
     const account = new global.Olm.Account();
     try {
-        console.log("unpickling device");
-        account.unpickle(key, loginResult.device_data);
+        const deviceData = loginResult.device_data;
+        if (deviceData.algorithm !== DEHYDRATION_ALGORITHM) {
+            throw new Error("Wrong algorithm");
+        }
+        const key = await this._cryptoCallbacks.getDehydrationKey(deviceData.passphrase);
+        console.log("unpickling dehydrated device");
+        account.unpickle(key, deviceData.account);
+        // FIXME: retry asking for key if unpickle fails?
 
         const rehydrateResult = await this._http.request(
             undefined,
@@ -505,17 +515,36 @@ MatrixClient.prototype.loginWithRehydration = async function(loginType, data, ke
     }
 };
 
-MatrixClient.prototype.dehydrateDevice = async function(key) {
+/**
+ * Store a new dehydrated device on the server.  The client must have been
+ * initialized with a `cryptoCallbacks.generateDehydrationKey` option.
+ *
+ * @return {Promise} A promise that resolves when the dehydrated device is stored.
+ */
+MatrixClient.prototype.dehydrateDevice = async function() {
     // FIXME: move to crypto/index.js?
+    const keyInfo = await this._cryptoCallbacks.generateDehydrationKey();
+    // create the account and all the necessary keys
     const account = new global.Olm.Account();
     account.create();
     const e2eKeys = JSON.parse(account.identity_keys());
+
     const maxKeys = account.max_number_of_one_time_keys();
     // FIXME: generate in small batches?
     account.generate_one_time_keys(maxKeys / 2);
     const otks = JSON.parse(account.one_time_keys());
     account.mark_keys_as_published();
-    const pickledAccount = account.pickle(key);
+
+    // dehydrate the account and store it on the server
+    const pickledAccount = account.pickle(keyInfo.key);
+
+    const deviceData = {
+        algorithm: DEHYDRATION_ALGORITHM,
+        account: pickledAccount,
+    };
+    if (keyInfo.passphrase) {
+        deviceData.passphrase = keyInfo.passphrase;
+    }
 
     const dehydrateResult = await this._http.authedRequest(
         undefined,
@@ -523,7 +552,7 @@ MatrixClient.prototype.dehydrateDevice = async function(key) {
         "/device/dehydrate",
         undefined,
         {
-            device_data: pickledAccount,
+            device_data: deviceData,
             // FIXME: initial device name?
         },
         {
@@ -531,6 +560,7 @@ MatrixClient.prototype.dehydrateDevice = async function(key) {
         },
     );
 
+    // send the keys to the server
     const deviceId = dehydrateResult.device_id;
     const deviceKeys = {
         algorithms: this._crypto._supportedAlgorithms,
@@ -554,10 +584,10 @@ MatrixClient.prototype.dehydrateDevice = async function(key) {
         const k = {
             key: key,
         };
-        const otkSignature = account.sign(anotherjson.stringify(k));
+        const signature = account.sign(anotherjson.stringify(k));
         k.signatures = {
             [this.credentials.userId]: {
-                [`ed25519:${deviceId}`]: otkSignature,
+                [`ed25519:${deviceId}`]: signature,
             },
         };
         oneTimeKeys[`signed_curve25519:${keyId}`] = k;
