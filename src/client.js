@@ -4849,12 +4849,12 @@ MatrixClient.prototype._storeClientOptions = function() {
  * @return {Promise<string[]>} Resolves to a set of rooms
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype._unstable_getSharedRooms = async function() {
+MatrixClient.prototype._unstable_getSharedRooms = async function(userId) {
     if (!(await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666"))) {
         throw Error('Server does not support shared_rooms API');
     }
     const path = utils.encodeUri("/uk.half-shot.msc2666/user/shared_rooms/$userId", {
-        $userId: this.credentials.userId,
+        $userId: userId,
     });
     const res = await this._http.authedRequest(
         undefined, "GET", path, undefined, undefined,
