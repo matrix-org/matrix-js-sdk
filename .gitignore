@@ -13,7 +13,6 @@ out
 /dist
 /lib
 /specbuild
-/res
 
 # version file and tarball created by `npm pack` / `yarn pack`
 /git-revision.txt
