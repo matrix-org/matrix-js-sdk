@@ -453,7 +453,8 @@ Crypto.prototype.isCrossSigningReady = async function() {
  * called to await an interactive auth flow when uploading device signing keys.
  * Args:
  *     {function} A function that makes the request requiring auth. Receives the
- *     auth data as an object. Can be called multiple times, first with an empty authDict, to obtain the flows.
+ *     auth data as an object. Can be called multiple times, first with an empty
+ *     authDict, to obtain the flows.
  * @param {function} [opts.createSecretStorageKey] Optional. Function
  * called to await a secret storage key creation flow.
  * Returns:
@@ -525,17 +526,9 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         // sign master key with device key
         await this._signObject(crossSigningInfo.keys.master);
 
-        await authUploadDeviceSigningKeys(authDict => {
-            if (authDict) {
-                builder.addCrossSigningKeys(authDict, crossSigningInfo.keys);
-                return Promise.resolve();
-            } else {
-                // This callback also gets called to obtain the IUA flows,
-                // so do a call to obtain those if we don't have the authDict yet
-                // We should get called again at a later point with the authDict.
-                return this._baseApis.uploadDeviceSigningKeys(null, {});
-            }
-        });
+        // Store auth flow helper function, as we need to call it when uploading
+        // to ensure we handle auth errors properly.
+        builder.addCrossSigningKeys(authUploadDeviceSigningKeys, crossSigningInfo.keys);
 
         // cross-sign own device
         const device = this._deviceList.getStoredDevice(this._userId, this._deviceId);

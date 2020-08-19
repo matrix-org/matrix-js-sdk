@@ -18,7 +18,7 @@ import {
  */
 export class EncryptionSetupBuilder {
     /**
-     * @param  {Object.<String, MatrixEvent>} accountData pre-existing account data, will only be read, not written.
+     * @param {Object.<String, MatrixEvent>} accountData pre-existing account data, will only be read, not written.
      * @param {CryptoCallbacks} delegateCryptoCallbacks crypto callbacks to delegate to if the key isn't in cache yet
      */
     constructor(accountData, delegateCryptoCallbacks) {
@@ -33,11 +33,17 @@ export class EncryptionSetupBuilder {
 
     /**
      * Adds new cross-signing public keys
-     * @param {Object} auth auth dictionary needed to upload the new keys
+     *
+     * @param {function} authUpload Function called to await an interactive auth
+     * flow when uploading device signing keys.
+     * Args:
+     *     {function} A function that makes the request requiring auth. Receives
+     *     the auth data as an object. Can be called multiple times, first with
+     *     an empty authDict, to obtain the flows.
      * @param {Object} keys the new keys
      */
-    addCrossSigningKeys(auth, keys) {
-        this._crossSigningKeys = {auth, keys};
+    addCrossSigningKeys(authUpload, keys) {
+        this._crossSigningKeys = {authUpload, keys};
     }
 
     /**
@@ -177,10 +183,13 @@ export class EncryptionSetupOperation {
             for (const [name, key] of Object.entries(this._crossSigningKeys.keys)) {
                 keys[name + "_key"] = key;
             }
-            await baseApis.uploadDeviceSigningKeys(
-                this._crossSigningKeys.auth,
-                keys,
-            );
+
+            // We must only call `uploadDeviceSigningKeys` from inside this auth
+            // helper to ensure we properly handle auth errors.
+            await this._crossSigningKeys.authUpload(authDict => {
+                return baseApis.uploadDeviceSigningKeys(authDict, keys);
+            });
+
             // pass the new keys to the main instance of our own CrossSigningInfo.
             crypto._crossSigningInfo.setKeys(this._crossSigningKeys.keys);
         }
