@@ -4817,11 +4817,18 @@ MatrixClient.prototype._fetchClientWellKnown = async function() {
         logger.error("Failed to get client well-known", err);
         this._clientWellKnown = undefined;
         this.emit("WellKnown.error", err);
+    } finally {
+        this.emit("WellKnown.attempted");
+        this._clientWellKnownFetchAttempted = true;
     }
 };
 
 MatrixClient.prototype.getClientWellKnown = function() {
     return this._clientWellKnown;
+};
+
+MatrixClient.prototype.haveAttemptedFetchingClientWellKnown = function() {
+    return this._clientWellKnownFetchAttempted;
 };
 
 /**
