@@ -448,18 +448,33 @@ const DEHYDRATION_ALGORITHM = "m.dehydration.v1.olm";
  * Log in, trying to rehydrate a device if available.  The client must have
  * been initialized with a `cryptoCallback.getDehydrationKey` option.
  *
- * @param {string} loginType  The login type.
- * @param {Object} data
- * @return {Promise} Resolves: to a login request result.
+ * @param {string} loginFunc  The login function to use. e.g. "loginWithPassword"
+ * @param {...*} args arguments to pass to the login function.
+ * @return {Promise} Resolves: to a login request result.  If a dehydrated
+ * device was found, it will include an `_olm_account` property, which will be
+ * an Olm Account to use.
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype.loginWithRehydration = async function(loginType, data) {
-    const loginData = {
-        "org.matrix.msc2697.restore_device": true,
-    };
-    Object.assign(loginData, data);
+MatrixClient.prototype.loginWithRehydration = async function(loginFunc, ...args) {
+    const origLogin = this.login;
 
-    const loginResult = await this.login(loginType, loginData);
+    function rehydrationLoginWrapper(loginType, data, callback) {
+        const loginData = {
+            "org.matrix.msc2697.restore_device": true,
+        };
+        Object.assign(loginData, data);
+
+        return origLogin.call(this, loginType, loginData, callback); // eslint-disable-line babel/no-invalid-this
+    }
+
+    this.login = rehydrationLoginWrapper;
+
+    let loginResult;
+    try {
+        loginResult = await this[loginFunc](...args);
+    } finally {
+        this.login = origLogin;
+    }
 
     if (!loginResult.device_data) {
         console.info("no dehydrated device found");
