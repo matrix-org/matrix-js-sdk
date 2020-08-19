@@ -412,8 +412,10 @@ MatrixCall.prototype.answer = function() {
     }
 
     if (!this.localAVStream && !this.waitForLocalAVStream) {
+        const constraints = _getUserMediaVideoContraints(this.type);
+        logger.log("Getting user media with constraints", constraints);
         this.webRtc.getUserMedia(
-            _getUserMediaVideoContraints(this.type),
+            constraints,
             hookCallback(self, self._maybeGotUserMediaForAnswer),
             hookCallback(self, self._maybeGotUserMediaForAnswer),
         );
@@ -1205,6 +1207,7 @@ const _sendCandidateQueue = function(self) {
 };
 
 const _placeCallWithConstraints = function(self, constraints) {
+    logger.log("Getting user media with constraints", constraints);
     self.client.callList[self.callId] = self;
     self.webRtc.getUserMedia(
         constraints,
