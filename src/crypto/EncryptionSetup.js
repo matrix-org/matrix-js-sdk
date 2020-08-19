@@ -171,12 +171,6 @@ export class EncryptionSetupOperation {
      */
     async apply(crypto) {
         const baseApis = crypto._baseApis;
-        // set account data
-        if (this._accountData) {
-            for (const [type, content] of this._accountData) {
-                await baseApis.setAccountData(type, content);
-            }
-        }
         // upload cross-signing keys
         if (this._crossSigningKeys) {
             const keys = {};
@@ -192,6 +186,12 @@ export class EncryptionSetupOperation {
 
             // pass the new keys to the main instance of our own CrossSigningInfo.
             crypto._crossSigningInfo.setKeys(this._crossSigningKeys.keys);
+        }
+        // set account data
+        if (this._accountData) {
+            for (const [type, content] of this._accountData) {
+                await baseApis.setAccountData(type, content);
+            }
         }
         // upload first cross-signing signatures with the new key
         // (e.g. signing our own device)
