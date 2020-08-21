@@ -1129,7 +1129,11 @@ const _tryPlayRemoteAudioStream = async function(self) {
         const player = self.getRemoteAudioElement();
 
         // if audioOutput is non-default:
-        if (audioOutput) await player.setSinkId(audioOutput);
+        try {
+            if (audioOutput) await player.setSinkId(audioOutput);
+        } catch (e) {
+            logger.warn("Couldn't set requested audio output device: using default", e);
+        }
 
         player.autoplay = true;
         self.assignElement(player, self.remoteAStream, "remoteAudio");
