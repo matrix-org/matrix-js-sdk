@@ -403,7 +403,7 @@ MatrixCall.prototype._initWithHangup = function(event) {
  * Answer a call.
  */
 MatrixCall.prototype.answer = function() {
-    debuglog("Answering call %s of type %s", this.callId, this.type);
+    debuglog(`Answering call ${this.callId} of type ${this.type}`);
     const self = this;
 
     if (self._answerContent) {
@@ -1067,7 +1067,7 @@ const terminate = function(self, hangupParty, hangupReason, shouldEmit) {
 };
 
 const stopAllMedia = function(self) {
-    debuglog("stopAllMedia (stream=%s)", self.localAVStream);
+    debuglog(`stopAllMedia (stream=${self.localAVStream})`);
     if (self.localAVStream) {
         forAllTracksOnStream(self.localAVStream, function(t) {
             if (t.stop) {
@@ -1190,8 +1190,8 @@ const _sendCandidateQueue = function(self) {
 
         if (self.candidateSendTries > 5) {
             debuglog(
-                "Failed to send candidates on attempt %s. Giving up for now.",
-                self.candidateSendTries,
+                "Failed to send candidates on attempt " + self.candidateSendTries +
+                ". Giving up for now.",
             );
             self.candidateSendTries = 0;
             return;
