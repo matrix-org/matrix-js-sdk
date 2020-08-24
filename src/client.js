@@ -357,6 +357,9 @@ export function MatrixClient(opts) {
 
     this._cachedCapabilities = null; // { capabilities: {}, lastUpdated: timestamp }
 
+    this._clientWellKnown = undefined;
+    this._clientWellKnownPromise = undefined;
+
     // The SDK doesn't really provide a clean way for events to recalculate the push
     // actions for themselves, so we have to kinda help them out when they are encrypted.
     // We do this so that push rules are correctly executed on events in their decrypted
@@ -4810,25 +4813,21 @@ MatrixClient.prototype.startClient = async function(opts) {
 };
 
 MatrixClient.prototype._fetchClientWellKnown = async function() {
-    try {
-        this._clientWellKnown = await AutoDiscovery.getRawClientConfig(this.getDomain());
-        this.emit("WellKnown.client", this._clientWellKnown);
-    } catch (err) {
-        logger.error("Failed to get client well-known", err);
-        this._clientWellKnown = undefined;
-        this.emit("WellKnown.error", err);
-    } finally {
-        this.emit("WellKnown.attempted");
-        this._clientWellKnownFetchAttempted = true;
-    }
+    // `getRawClientConfig` does not throw or reject on network errors, instead
+    // it absorbs errors and returns `{}`.
+    this._clientWellKnownPromise = AutoDiscovery.getRawClientConfig(
+        this.getDomain(),
+    );
+    this._clientWellKnown = await this._clientWellKnownPromise;
+    this.emit("WellKnown.client", this._clientWellKnown);
 };
 
 MatrixClient.prototype.getClientWellKnown = function() {
     return this._clientWellKnown;
 };
 
-MatrixClient.prototype.haveAttemptedFetchingClientWellKnown = function() {
-    return this._clientWellKnownFetchAttempted;
+MatrixClient.prototype.waitForClientWellKnown = function() {
+    return this._clientWellKnownPromise;
 };
 
 /**
