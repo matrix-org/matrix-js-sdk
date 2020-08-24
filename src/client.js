@@ -5704,6 +5704,13 @@ MatrixClient.prototype.generateClientSecret = function() {
  * @param {string} data.request_id The ID of the original request.
  */
 
+/**
+ * Fires when the client .well-known info is fetched.
+ *
+ * @event module:client~MatrixClient#"WellKnown.client"
+ * @param {object} data The JSON object returned by the server
+ */
+
 // EventEmitter JSDocs
 
 /**
