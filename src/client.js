@@ -357,6 +357,9 @@ export function MatrixClient(opts) {
 
     this._cachedCapabilities = null; // { capabilities: {}, lastUpdated: timestamp }
 
+    this._clientWellKnown = undefined;
+    this._clientWellKnownPromise = undefined;
+
     // The SDK doesn't really provide a clean way for events to recalculate the push
     // actions for themselves, so we have to kinda help them out when they are encrypted.
     // We do this so that push rules are correctly executed on events in their decrypted
@@ -4810,18 +4813,21 @@ MatrixClient.prototype.startClient = async function(opts) {
 };
 
 MatrixClient.prototype._fetchClientWellKnown = async function() {
-    try {
-        this._clientWellKnown = await AutoDiscovery.getRawClientConfig(this.getDomain());
-        this.emit("WellKnown.client", this._clientWellKnown);
-    } catch (err) {
-        logger.error("Failed to get client well-known", err);
-        this._clientWellKnown = undefined;
-        this.emit("WellKnown.error", err);
-    }
+    // `getRawClientConfig` does not throw or reject on network errors, instead
+    // it absorbs errors and returns `{}`.
+    this._clientWellKnownPromise = AutoDiscovery.getRawClientConfig(
+        this.getDomain(),
+    );
+    this._clientWellKnown = await this._clientWellKnownPromise;
+    this.emit("WellKnown.client", this._clientWellKnown);
 };
 
 MatrixClient.prototype.getClientWellKnown = function() {
     return this._clientWellKnown;
+};
+
+MatrixClient.prototype.waitForClientWellKnown = function() {
+    return this._clientWellKnownPromise;
 };
 
 /**
@@ -5696,6 +5702,13 @@ MatrixClient.prototype.generateClientSecret = function() {
  * @param {string} data.device_id The device ID of the client that had requested the
  *     secret.
  * @param {string} data.request_id The ID of the original request.
+ */
+
+/**
+ * Fires when the client .well-known info is fetched.
+ *
+ * @event module:client~MatrixClient#"WellKnown.client"
+ * @param {object} data The JSON object returned by the server
  */
 
 // EventEmitter JSDocs
