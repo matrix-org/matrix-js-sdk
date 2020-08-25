@@ -66,6 +66,24 @@ export class CrossSigningInfo extends EventEmitter {
         this.crossSigningVerifiedBefore = false;
     }
 
+    static fromStorage(obj, userId) {
+        const res = new CrossSigningInfo(userId);
+        for (const prop in obj) {
+            if (obj.hasOwnProperty(prop)) {
+                res[prop] = obj[prop];
+            }
+        }
+        return res;
+    }
+
+    toStorage() {
+        return {
+            keys: this.keys,
+            firstUse: this.firstUse,
+            crossSigningVerifiedBefore: this.crossSigningVerifiedBefore,
+        };
+    }
+
     /**
      * Calls the app callback to ask for a private key
      * @param {string} type The key type ("master", "self_signing", or "user_signing")
@@ -125,24 +143,6 @@ export class CrossSigningInfo extends EventEmitter {
         throw new Error(
             "Key type " + type + " from getCrossSigningKey callback did not match",
         );
-    }
-
-    static fromStorage(obj, userId) {
-        const res = new CrossSigningInfo(userId);
-        for (const prop in obj) {
-            if (obj.hasOwnProperty(prop)) {
-                res[prop] = obj[prop];
-            }
-        }
-        return res;
-    }
-
-    toStorage() {
-        return {
-            keys: this.keys,
-            firstUse: this.firstUse,
-            crossSigningVerifiedBefore: this.crossSigningVerifiedBefore,
-        };
     }
 
     /**
