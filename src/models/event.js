@@ -626,7 +626,7 @@ utils.extend(MatrixEvent.prototype, {
      * @return {boolean} True if this event is encrypted.
      */
     isEncrypted: function() {
-        return this.event.type === "m.room.encrypted";
+        return !this.isState() && this.event.type === "m.room.encrypted";
     },
 
     /**
