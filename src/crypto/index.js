@@ -496,11 +496,11 @@ Crypto.prototype.bootstrapCrossSigning = async function({
         this._baseApis.store.accountData,
         delegateCryptoCallbacks,
     );
-
     const crossSigningInfo = new CrossSigningInfo(
         this._userId,
         builder.crossSigningCallbacks,
-        builder.crossSigningCallbacks);
+        builder.crossSigningCallbacks,
+    );
 
     // Reset the cross-signing keys
     const resetCrossSigning = async () => {
@@ -632,7 +632,8 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     );
     const secretStorage = new SecretStorage(
         builder.accountDataClientAdapter,
-        builder.ssssCryptoCallbacks);
+        builder.ssssCryptoCallbacks,
+    );
 
     // the ID of the new SSSS key, if we create one
     let newKeyId = null;
