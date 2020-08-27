@@ -1176,6 +1176,7 @@ wrapCryptoFuncs(MatrixClient, [
     "legacyDeviceVerification",
     "prepareToEncrypt",
     "isCrossSigningReady",
+    "bootstrapCrossSigning",
     "getCryptoTrustCrossSignedDevices",
     "setCryptoTrustCrossSignedDevices",
     "countSessionsNeedingBackup",
@@ -1360,6 +1361,7 @@ wrapCryptoFuncs(MatrixClient, [
 wrapCryptoFuncs(MatrixClient, [
     "getEventEncryptionInfo",
     "createRecoveryKeyFromPassphrase",
+    "isSecretStorageReady",
     "bootstrapSecretStorage",
     "addSecretStorageKey",
     "hasSecretStorageKey",

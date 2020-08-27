@@ -86,6 +86,7 @@ export class CrossSigningInfo extends EventEmitter {
 
     /**
      * Calls the app callback to ask for a private key
+     *
      * @param {string} type The key type ("master", "self_signing", or "user_signing")
      * @param {string} expectedPubkey The matching public key or undefined to use
      *     the stored public key for the given key type.
@@ -202,6 +203,38 @@ export class CrossSigningInfo extends EventEmitter {
     static async getFromSecretStorage(type, secretStorage) {
         const encodedKey = await secretStorage.get(`m.cross_signing.${type}`);
         return decodeBase64(encodedKey);
+    }
+
+    /**
+     * Check whether the private keys exist in the local key cache.
+     *
+     * @returns {boolean} True if all keys are stored in the local cache.
+     */
+    async isStoredInKeyCache() {
+        const cacheCallbacks = this._cacheCallbacks;
+        if (!cacheCallbacks) return false;
+        for (const type of ["master", "self_signing", "user_signing"]) {
+            if (!await cacheCallbacks.getCrossSigningKeyCache(type)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Get cross-signing private keys from the local cache.
+     *
+     * @returns {Map} A map from key type (string) to private key (Uint8Array)
+     */
+    async getCrossSigningKeysFromCache() {
+        const keys = new Map();
+        const cacheCallbacks = this._cacheCallbacks;
+        if (!cacheCallbacks) return keys;
+        for (const type of ["master", "self_signing", "user_signing"]) {
+            const privKey = await cacheCallbacks.getCrossSigningKeyCache(type);
+            keys.set(type, privKey);
+        }
+        return keys;
     }
 
     /**
