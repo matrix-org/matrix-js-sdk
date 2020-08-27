@@ -444,7 +444,7 @@ Crypto.prototype.isCrossSigningReady = async function() {
  * bootstrapSecretStorage() completes successfully, this function should
  * return true.
  *
- * The secret storage API is currently UNSTABLE and may change without notice.
+ * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
  * @return {bool} True if secret storage is ready to be used on this device
  */
@@ -473,6 +473,8 @@ Crypto.prototype.isSecretStorageReady = async function() {
  * This function:
  * - creates new cross-signing keys if they are not found locally cached nor in
  *   secret storage (if it has been setup)
+ *
+ * The cross-signing API is currently UNSTABLE and may change without notice.
  *
  * @param {function} opts.authUploadDeviceSigningKeys Function
  * called to await an interactive auth flow when uploading device signing keys.
@@ -593,6 +595,8 @@ Crypto.prototype.bootstrapCrossSigning = async function({
  * - creates a backup if none exists, and one is requested
  * - migrates Secure Secret Storage to use the latest algorithm, if an outdated
  *   algorithm is found
+ *
+ * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
  * @param {function} [opts.createSecretStorageKey] Optional. Function
  * called to await a secret storage key creation flow.

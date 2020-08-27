@@ -1164,8 +1164,48 @@ function wrapCryptoFuncs(MatrixClient, names) {
  * Perform any background tasks that can be done before a message is ready to
  * send, in order to speed up sending of the message.
  *
+ * @function module:client~MatrixClient#prepareToEncrypt
  * @param {module:models/room} room the room the event is in
  */
+
+/**
+ * Checks whether cross signing:
+ * - is enabled on this account and trusted by this device
+ * - has private keys either cached locally or stored in secret storage
+ *
+ * If this function returns false, bootstrapCrossSigning() can be used
+ * to fix things such that it returns true. That is to say, after
+ * bootstrapCrossSigning() completes successfully, this function should
+ * return true.
+ *
+ * The cross-signing API is currently UNSTABLE and may change without notice.
+ *
+ * @function module:client~MatrixClient#isCrossSigningReady
+ * @return {bool} True if cross-signing is ready to be used on this device
+ */
+
+/**
+ * Bootstrap cross-signing by creating keys if needed. If everything is already
+ * set up, then no changes are made, so this is safe to run to ensure
+ * cross-signing is ready for use.
+ *
+ * This function:
+ * - creates new cross-signing keys if they are not found locally cached nor in
+ *   secret storage (if it has been setup)
+ *
+ * The cross-signing API is currently UNSTABLE and may change without notice.
+ *
+ * @function module:client~MatrixClient#bootstrapCrossSigning
+ * @param {function} opts.authUploadDeviceSigningKeys Function
+ * called to await an interactive auth flow when uploading device signing keys.
+ * @param {bool} [opts.setupNewCrossSigning] Optional. Reset even if keys
+ * already exist.
+ * Args:
+ *     {function} A function that makes the request requiring auth. Receives the
+ *     auth data as an object. Can be called multiple times, first with an empty
+ *     authDict, to obtain the flows.
+ */
+
 wrapCryptoFuncs(MatrixClient, [
     "getCrossSigningId",
     "getStoredCrossSigningForUser",
@@ -1216,11 +1256,26 @@ wrapCryptoFuncs(MatrixClient, [
  */
 
 /**
+ * Checks whether secret storage:
+ * - is enabled on this account
+ * - is storing cross-signing private keys
+ * - is storing session backup key (if enabled)
+ *
+ * If this function returns false, bootstrapSecretStorage() can be used
+ * to fix things such that it returns true. That is to say, after
+ * bootstrapSecretStorage() completes successfully, this function should
+ * return true.
+ *
+ * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
+ *
+ * @function module:client~MatrixClient#isSecretStorageReady
+ * @return {bool} True if secret storage is ready to be used on this device
+ */
+
+/**
  * Bootstrap Secure Secret Storage if needed by creating a default key. If everything is
  * already set up, then no changes are made, so this is safe to run to ensure secret
  * storage is ready for use.
- *
- * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
  * This function
  * - creates a new Secure Secret Storage key if no default key exists
@@ -1230,6 +1285,7 @@ wrapCryptoFuncs(MatrixClient, [
  * - migrates Secure Secret Storage to use the latest algorithm, if an outdated
  *   algorithm is found
  *
+ * @function module:client~MatrixClient#bootstrapSecretStorage
  * @param {function} [opts.createSecretStorageKey] Optional. Function
  * called to await a secret storage key creation flow.
  * Returns:
