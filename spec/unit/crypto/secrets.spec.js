@@ -326,9 +326,11 @@ describe("Secrets", function() {
                 this.emit("accountData", event);
             };
 
+            await bob.bootstrapCrossSigning({
+                authUploadDeviceSigningKeys: async func => await func({}),
+            });
             await bob.bootstrapSecretStorage({
                 createSecretStorageKey,
-                authUploadDeviceSigningKeys: async func => await func({}),
             });
 
             const crossSigning = bob._crypto._crossSigningInfo;
@@ -379,13 +381,15 @@ describe("Secrets", function() {
             const secretStorage = bob._crypto._secretStorage;
 
             // Set up cross-signing keys from scratch with specific storage key
+            await bob.bootstrapCrossSigning({
+                authUploadDeviceSigningKeys: async func => await func({}),
+            });
             await bob.bootstrapSecretStorage({
                 createSecretStorageKey: async () => ({
                     // `pubkey` not used anymore with symmetric 4S
                     keyInfo: { pubkey: storagePublicKey },
                     privateKey: storagePrivateKey,
                 }),
-                authUploadDeviceSigningKeys: async func => await func({}),
             });
 
             // Clear local cross-signing keys and read from secret storage
@@ -394,7 +398,7 @@ describe("Secrets", function() {
                 crossSigning.toStorage(),
             );
             crossSigning.keys = {};
-            await bob.bootstrapSecretStorage({
+            await bob.bootstrapCrossSigning({
                 authUploadDeviceSigningKeys: async func => await func({}),
             });
 
@@ -517,9 +521,7 @@ describe("Secrets", function() {
                 this.emit("accountData", event);
             };
 
-            await alice.bootstrapSecretStorage({
-                authUploadDeviceSigningKeys: async func => await func({}),
-            });
+            await alice.bootstrapSecretStorage();
 
             expect(alice.getAccountData("m.secret_storage.default_key").getContent())
                 .toEqual({key: "key_id"});
@@ -659,9 +661,7 @@ describe("Secrets", function() {
                 this.emit("accountData", event);
             };
 
-            await alice.bootstrapSecretStorage({
-                authUploadDeviceSigningKeys: async func => await func({}),
-            });
+            await alice.bootstrapSecretStorage();
 
             const backupKey = alice.getAccountData("m.megolm_backup.v1")
                 .getContent();
