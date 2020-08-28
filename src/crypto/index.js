@@ -539,6 +539,12 @@ Crypto.prototype.bootstrapCrossSigning = async function({
             "Cross-signing private keys not found locally or in secret storage, " +
             "creating new keys",
         );
+        // If a user has multiple devices, it important to only call bootstrap
+        // as part of some UI flow (and not silently during startup), as they
+        // may have setup cross-signing on a platform which has not saved keys
+        // to secret storage, and this would reset them. In such a case, you
+        // should prompt the user to verify any existing devices first (and
+        // request private keys from those devices) before calling bootstrap.
         await resetCrossSigning();
     } else if (publicKeysOnDevice && privateKeysInCache) {
         logger.log(
