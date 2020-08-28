@@ -235,6 +235,14 @@ function keyFromRecoverySession(session, decryptionKey) {
  *       }
  *   {string} name the name of the value we want to read out of SSSS, for UI purposes.
  *
+ * @param {function} [opts.cryptoCallbacks.cacheSecretStorageKey]
+ * Optional. Function called when a new encryption key for secret storage
+ * has been created. This allows the application a chance to cache this key if
+ * desired to avoid user prompts.
+ * Args:
+ *   {string} keyId the ID of the new key
+ *   {Uint8Array} key the new private key
+ *
  * @param {function} [opts.cryptoCallbacks.onSecretRequested]
  * Optional. Function called when a request for a secret is received from another
  * device.
