@@ -570,7 +570,7 @@ Crypto.prototype.bootstrapCrossSigning = async function({
             builder.accountDataClientAdapter,
             builder.ssssCryptoCallbacks);
         if (await secretStorage.hasKey()) {
-            logger.log("Storing cross-signing private keys in secret storage");
+            logger.log("Storing new cross-signing private keys in secret storage");
             // This is writing to in-memory account data in
             // builder.accountDataClientAdapter so won't fail
             await CrossSigningInfo.storeInSecretStorage(
@@ -763,7 +763,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         await this.isCrossSigningReady() &&
         (newKeyId || !await this._crossSigningInfo.isStoredInSecretStorage(secretStorage))
     ) {
-        logger.log("Storing cross-signing private keys in secret storage");
+        logger.log("Copying cross-signing private keys from cache to secret storage");
         const crossSigningPrivateKeys =
             await this._crossSigningInfo.getCrossSigningKeysFromCache();
         // This is writing to in-memory account data in
