@@ -800,7 +800,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         builder.addSessionBackup(data);
     }
 
-    // and likewise for the session backup key
+    // Cache the session backup key
     const sessionBackupKey = await secretStorage.get('m.megolm_backup.v1');
     if (sessionBackupKey) {
         logger.info("Got session backup key from secret storage: caching");
