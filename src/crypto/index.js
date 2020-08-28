@@ -761,7 +761,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     if (
         !this._baseApis._cryptoCallbacks.saveCrossSigningKeys &&
         await this.isCrossSigningReady() &&
-        !await this._crossSigningInfo.isStoredInSecretStorage(secretStorage)
+        (newKeyId || !await this._crossSigningInfo.isStoredInSecretStorage(secretStorage))
     ) {
         logger.log("Storing cross-signing private keys in secret storage");
         const crossSigningPrivateKeys =
