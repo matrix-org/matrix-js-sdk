@@ -534,16 +534,16 @@ Crypto.prototype.bootstrapCrossSigning = async function({
         privateKeysInStorage
     );
 
-    if (publicKeysOnDevice && privateKeysInCache) {
-        logger.log(
-            "Cross-signing public keys trusted and private keys found locally",
-        );
-    } else if (!privateKeysExistSomewhere || setupNewCrossSigning) {
+    if (!privateKeysExistSomewhere || setupNewCrossSigning) {
         logger.log(
             "Cross-signing private keys not found locally or in secret storage, " +
             "creating new keys",
         );
         await resetCrossSigning();
+    } else if (publicKeysOnDevice && privateKeysInCache) {
+        logger.log(
+            "Cross-signing public keys trusted and private keys found locally",
+        );
     } else if (privateKeysInStorage) {
         logger.log(
             "Cross-signing private keys not found locally, but they are available " +
