@@ -30,7 +30,7 @@ module.exports = {
         "no-async-promise-executor": "off",
     },
     overrides: [{
-        "files": ["src/**/*.{ts, tsx}"],
+        "files": ["src/**/*.ts"],
         "extends": ["matrix-org/ts"],
         "rules": {
             // While we're converting to ts we make heavy use of this
