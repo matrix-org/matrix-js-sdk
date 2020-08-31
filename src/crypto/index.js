@@ -56,6 +56,7 @@ import {ToDeviceChannel, ToDeviceRequests} from "./verification/request/ToDevice
 import {IllegalMethod} from "./verification/IllegalMethod";
 import {KeySignatureUploadError} from "../errors";
 import {decryptAES, encryptAES} from './aes';
+import {DehydrationManager} from './dehydration';
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -242,6 +243,8 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     this._secretStorage = new SecretStorage(
         baseApis, cryptoCallbacks,
     );
+
+    this._dehydrationManager = new DehydrationManager(baseApis);
 
     // Assuming no app-supplied callback, default to getting from SSSS.
     if (!cryptoCallbacks.getCrossSigningKey && cryptoCallbacks.getSecretStorageKey) {

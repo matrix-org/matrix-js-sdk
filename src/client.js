@@ -55,7 +55,7 @@ import {PushProcessor} from "./pushprocessor";
 import {encodeBase64, decodeBase64} from "./crypto/olmlib";
 import { User } from "./models/user";
 import {AutoDiscovery} from "./autodiscovery";
-import anotherjson from "another-json";
+import {DEHYDRATION_ALGORITHM} from "./crypto/dehydration";
 
 const SCROLLBACK_DELAY_MS = 3000;
 export const CRYPTO_ENABLED = isCryptoAvailable();
@@ -442,13 +442,12 @@ export function MatrixClient(opts) {
 utils.inherits(MatrixClient, EventEmitter);
 utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);
 
-const DEHYDRATION_ALGORITHM = "m.dehydration.v1.olm";
-
 /**
  * Log in, trying to rehydrate a device if available.  The client must have
  * been initialized with a `cryptoCallback.getDehydrationKey` option.
  *
  * @param {string} loginFunc  The login function to use. e.g. "loginWithPassword"
+ *    or `null` if using base_apis.login
  * @param {...*} args arguments to pass to the login function.
  * @return {Promise} Resolves: to a login request result.  If a dehydrated
  * device was found, it will include an `_olm_account` property, which will be
@@ -467,13 +466,17 @@ MatrixClient.prototype.loginWithRehydration = async function(loginFunc, ...args)
         return origLogin.call(this, loginType, loginData, callback); // eslint-disable-line babel/no-invalid-this
     }
 
-    this.login = rehydrationLoginWrapper;
-
     let loginResult;
-    try {
-        loginResult = await this[loginFunc](...args);
-    } finally {
-        this.login = origLogin;
+    if (loginFunc === null) {
+        loginResult = await rehydrationLoginWrapper.call(this, ...args);
+    } else {
+        this.login = rehydrationLoginWrapper;
+
+        try {
+            loginResult = await this[loginFunc](...args);
+        } finally {
+            this.login = origLogin;
+        }
     }
 
     if (!loginResult.device_data) {
@@ -487,10 +490,11 @@ MatrixClient.prototype.loginWithRehydration = async function(loginFunc, ...args)
         if (deviceData.algorithm !== DEHYDRATION_ALGORITHM) {
             throw new Error("Wrong algorithm");
         }
-        const key = await this._cryptoCallbacks.getDehydrationKey(deviceData.passphrase);
+        const key = await this._cryptoCallbacks.getDehydrationKey(deviceData);
         console.log("unpickling dehydrated device");
         account.unpickle(key, deviceData.account);
         // FIXME: retry asking for key if unpickle fails?
+        console.log("unpickled device");
 
         const rehydrateResult = await this._http.request(
             undefined,
@@ -509,11 +513,13 @@ MatrixClient.prototype.loginWithRehydration = async function(loginFunc, ...args)
         if (rehydrateResult.device_id === loginResult.device_id) {
             console.info("using dehydrated device");
             rehydrateResult._olm_account = account;
+        } else {
+            console.info("not using dehydrated device");
         }
         return rehydrateResult;
-    } catch {
+    } catch (e) {
         account.free();
-        console.warn("could not unpickle");
+        console.warn("could not unpickle", e);
         return await this._http.request(
             undefined,
             "POST",
@@ -537,87 +543,18 @@ MatrixClient.prototype.loginWithRehydration = async function(loginFunc, ...args)
  * @return {Promise} A promise that resolves when the dehydrated device is stored.
  */
 MatrixClient.prototype.dehydrateDevice = async function() {
-    // FIXME: move to crypto/index.js?
-    const keyInfo = await this._cryptoCallbacks.generateDehydrationKey();
-    // create the account and all the necessary keys
-    const account = new global.Olm.Account();
-    account.create();
-    const e2eKeys = JSON.parse(account.identity_keys());
-
-    const maxKeys = account.max_number_of_one_time_keys();
-    // FIXME: generate in small batches?
-    account.generate_one_time_keys(maxKeys / 2);
-    const otks = JSON.parse(account.one_time_keys());
-    account.mark_keys_as_published();
-
-    // dehydrate the account and store it on the server
-    const pickledAccount = account.pickle(keyInfo.key);
-
-    const deviceData = {
-        algorithm: DEHYDRATION_ALGORITHM,
-        account: pickledAccount,
-    };
-    if (keyInfo.passphrase) {
-        deviceData.passphrase = keyInfo.passphrase;
+    if (!this._crypto) {
+        throw new Error("End-to-end encryption disabled");
     }
+    return await this._crypto._dehydrationManager.dehydrateDevice();
+};
 
-    const dehydrateResult = await this._http.authedRequest(
-        undefined,
-        "POST",
-        "/device/dehydrate",
-        undefined,
-        {
-            device_data: deviceData,
-            // FIXME: initial device name?
-        },
-        {
-            prefix: "/_matrix/client/unstable/org.matrix.msc2697",
-        },
-    );
-
-    // send the keys to the server
-    const deviceId = dehydrateResult.device_id;
-    const deviceKeys = {
-        algorithms: this._crypto._supportedAlgorithms,
-        device_id: deviceId,
-        user_id: this.credentials.userId,
-        keys: {
-            [`ed25519:${deviceId}`]: e2eKeys.ed25519,
-            [`curve25519:${deviceId}`]: e2eKeys.curve25519,
-        },
-    };
-    const deviceSignature = account.sign(anotherjson.stringify(deviceKeys));
-    deviceKeys.signatures = {
-        [this.credentials.userId]: {
-            [`ed25519:${deviceId}`]: deviceSignature,
-        },
-    };
-    await this._crypto._crossSigningInfo.signObject(deviceKeys, "self_signing");
-
-    const oneTimeKeys = {};
-    for (const [keyId, key] of Object.entries(otks.curve25519)) {
-        const k = {
-            key: key,
-        };
-        const signature = account.sign(anotherjson.stringify(k));
-        k.signatures = {
-            [this.credentials.userId]: {
-                [`ed25519:${deviceId}`]: signature,
-            },
-        };
-        oneTimeKeys[`signed_curve25519:${keyId}`] = k;
+MatrixClient.prototype.cacheDehydrationKey = async function(key, keyInfo) {
+    if (!(this._crypto)) {
+        logger.warn('not exporting device if crypto is not enabled');
+        return;
     }
-
-    await this._http.authedRequest(
-        undefined,
-        "POST",
-        "/keys/upload/" + encodeURI(deviceId),
-        undefined,
-        {
-            device_keys: deviceKeys,
-            one_time_keys: oneTimeKeys,
-        },
-    );
+    return await this._crypto._dehydrationManager.cacheDehydrationKey(key, keyInfo);
 };
 
 MatrixClient.prototype.exportDevice = async function() {
