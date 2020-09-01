@@ -1,3 +1,17 @@
+Changes in [8.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.2.0) (2020-09-01)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.2.0-rc.1...v8.2.0)
+
+## Security notice
+
+JS SDK 8.2.0 fixes an issue where encrypted state events could break incoming call handling.
+Thanks to @awesome-michael from Awesome Technologies for responsibly disclosing this via Matrix's
+Security Disclosure Policy.
+
+## All changes
+
+* No changes since rc.1
+
 Changes in [8.2.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.2.0-rc.1) (2020-08-26)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.1.0...v8.2.0-rc.1)
