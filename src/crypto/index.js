@@ -427,7 +427,7 @@ Crypto.prototype.isCrossSigningReady = async function() {
         )
     );
 
-    return (
+    return !!(
         publicKeysOnDevice &&
         privateKeysExistSomewhere
     );
@@ -458,7 +458,7 @@ Crypto.prototype.isSecretStorageReady = async function() {
         this._baseApis.isKeyBackupKeyStored()
     );
 
-    return (
+    return !!(
         secretStorageKeyInAccount &&
         privateKeysInStorage &&
         sessionBackupInStorage
