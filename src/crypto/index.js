@@ -2122,9 +2122,18 @@ Crypto.prototype.setDeviceVerification = async function(
     // do cross-signing
     if (verified && userId === this._userId) {
         logger.info("Own device " + deviceId + " marked verified: signing");
-        const device = await this._crossSigningInfo.signDevice(
-            userId, DeviceInfo.fromStorage(dev, deviceId),
-        );
+
+        // Signing only needed if other device not already signed
+        let device;
+        const deviceTrust = this.checkDeviceTrust(userId, deviceId);
+        if (deviceTrust.isCrossSigningVerified()) {
+            logger.log(`Own device ${deviceId} already cross-signing verified`);
+        } else {
+            device = await this._crossSigningInfo.signDevice(
+                userId, DeviceInfo.fromStorage(dev, deviceId),
+            );
+        }
+
         if (device) {
             const upload = async ({shouldEmit}) => {
                 logger.info("Uploading signature for " + deviceId);
