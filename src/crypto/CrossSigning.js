@@ -202,6 +202,9 @@ export class CrossSigningInfo extends EventEmitter {
      */
     static async getFromSecretStorage(type, secretStorage) {
         const encodedKey = await secretStorage.get(`m.cross_signing.${type}`);
+        if (!encodedKey) {
+            return null;
+        }
         return decodeBase64(encodedKey);
     }
 
