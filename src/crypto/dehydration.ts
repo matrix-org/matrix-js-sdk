@@ -180,7 +180,9 @@ export class DehydrationManager {
                     [`ed25519:${deviceId}`]: deviceSignature,
                 },
             };
-            await this.crypto._crossSigningInfo.signObject(deviceKeys, "self_signing");
+            if (this.crypto._crossSigningInfo.getId(self_signing)) {
+                await this.crypto._crossSigningInfo.signObject(deviceKeys, "self_signing");
+            }
 
             console.log("Preparing one-time keys");
             const oneTimeKeys = {};
