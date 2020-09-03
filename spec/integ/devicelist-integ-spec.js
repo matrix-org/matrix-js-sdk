@@ -140,7 +140,7 @@ describe("DeviceList management:", function() {
 
     it("We should not get confused by out-of-order device query responses",
        () => {
-           // https://github.com/vector-im/riot-web/issues/3126
+           // https://github.com/vector-im/element-web/issues/3126
            aliceTestClient.expectKeyQuery({device_keys: {'@alice:localhost': {}}});
            return aliceTestClient.start().then(() => {
                aliceTestClient.httpBackend.when('GET', '/sync').respond(
@@ -271,7 +271,7 @@ describe("DeviceList management:", function() {
            });
        }).timeout(3000);
 
-    // https://github.com/vector-im/riot-web/issues/4983
+    // https://github.com/vector-im/element-web/issues/4983
     describe("Alice should know she has stale device lists", () => {
         beforeEach(async function() {
             await aliceTestClient.start();

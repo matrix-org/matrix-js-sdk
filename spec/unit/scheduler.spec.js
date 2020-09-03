@@ -143,7 +143,7 @@ describe("MatrixScheduler", function() {
         deferA.reject({});
         try {
             await globalA;
-        } catch(err) {
+        } catch (err) {
             await Promise.resolve();
             expect(procCount).toEqual(2);
         }

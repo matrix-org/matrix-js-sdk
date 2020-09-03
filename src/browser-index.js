@@ -34,7 +34,7 @@ matrixcs.request(function(opts, fn) {
 let indexedDB;
 try {
     indexedDB = global.indexedDB;
-} catch(e) {}
+} catch (e) {}
 
 // if our browser (appears to) support indexeddb, use an indexeddb crypto store.
 if (indexedDB) {

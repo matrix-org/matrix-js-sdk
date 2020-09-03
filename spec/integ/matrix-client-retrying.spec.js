@@ -90,7 +90,7 @@ describe("MatrixClient retrying", function() {
         // wait for the localecho of ev1 to be updated
         const p3 = new Promise((resolve, reject) => {
             room.on("Room.localEchoUpdated", (ev0) => {
-                if(ev0 === ev1) {
+                if (ev0 === ev1) {
                     resolve();
                 }
             });

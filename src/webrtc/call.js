@@ -176,7 +176,7 @@ MatrixCall.prototype.placeScreenSharingCall =
         debuglog("Got screen stream, requesting audio stream...");
         const audioConstraints = _getUserMediaVideoContraints('voice');
         _placeCallWithConstraints(self, audioConstraints);
-    } catch(err) {
+    } catch (err) {
         self.emit("error",
             callError(
                 MatrixCall.ERR_NO_USER_MEDIA,
@@ -403,7 +403,7 @@ MatrixCall.prototype._initWithHangup = function(event) {
  * Answer a call.
  */
 MatrixCall.prototype.answer = function() {
-    debuglog("Answering call %s of type %s", this.callId, this.type);
+    debuglog(`Answering call ${this.callId} of type ${this.type}`);
     const self = this;
 
     if (self._answerContent) {
@@ -412,8 +412,10 @@ MatrixCall.prototype.answer = function() {
     }
 
     if (!this.localAVStream && !this.waitForLocalAVStream) {
+        const constraints = _getUserMediaVideoContraints(this.type);
+        logger.log("Getting user media with constraints", constraints);
         this.webRtc.getUserMedia(
-            _getUserMediaVideoContraints(this.type),
+            constraints,
             hookCallback(self, self._maybeGotUserMediaForAnswer),
             hookCallback(self, self._maybeGotUserMediaForAnswer),
         );
@@ -1065,7 +1067,7 @@ const terminate = function(self, hangupParty, hangupReason, shouldEmit) {
 };
 
 const stopAllMedia = function(self) {
-    debuglog("stopAllMedia (stream=%s)", self.localAVStream);
+    debuglog(`stopAllMedia (stream=${self.localAVStream})`);
     if (self.localAVStream) {
         forAllTracksOnStream(self.localAVStream, function(t) {
             if (t.stop) {
@@ -1127,7 +1129,11 @@ const _tryPlayRemoteAudioStream = async function(self) {
         const player = self.getRemoteAudioElement();
 
         // if audioOutput is non-default:
-        if (audioOutput) await player.setSinkId(audioOutput);
+        try {
+            if (audioOutput) await player.setSinkId(audioOutput);
+        } catch (e) {
+            logger.warn("Couldn't set requested audio output device: using default", e);
+        }
 
         player.autoplay = true;
         self.assignElement(player, self.remoteAStream, "remoteAudio");
@@ -1188,8 +1194,8 @@ const _sendCandidateQueue = function(self) {
 
         if (self.candidateSendTries > 5) {
             debuglog(
-                "Failed to send candidates on attempt %s. Giving up for now.",
-                self.candidateSendTries,
+                "Failed to send candidates on attempt " + self.candidateSendTries +
+                ". Giving up for now.",
             );
             self.candidateSendTries = 0;
             return;
@@ -1205,6 +1211,7 @@ const _sendCandidateQueue = function(self) {
 };
 
 const _placeCallWithConstraints = function(self, constraints) {
+    logger.log("Getting user media with constraints", constraints);
     self.client.callList[self.callId] = self;
     self.webRtc.getUserMedia(
         constraints,

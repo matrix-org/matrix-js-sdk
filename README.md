@@ -182,10 +182,8 @@ you can pass the result of the promise into it with something like:
   matrixClient.someMethod(arg1, arg2).nodeify(callback);
 ```
 
-The main thing to note is that it is an error to discard the result of a
-promise-returning function, as that will cause exceptions to go unobserved. If
-you have nothing better to do with the result, just call ``.done()`` on it. See
-http://documentup.com/kriskowal/q/#the-end for more information.
+The main thing to note is that it is problematic to discard the result of a
+promise-returning function, as that will cause exceptions to go unobserved.
 
 Methods which return a promise show this in their documentation.
 

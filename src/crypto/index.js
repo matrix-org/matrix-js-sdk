@@ -416,7 +416,7 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
  *
  * If this function returns false, bootstrapSecretStorage() can be used
  * to fix things such that it returns true. That is to say, after
- * bootstrapSecretStorage() completes sucessfully, this function should
+ * bootstrapSecretStorage() completes successfully, this function should
  * return true.
  *
  * The cross-signing API is currently UNSTABLE and may change without notice.
@@ -456,7 +456,8 @@ Crypto.prototype.isCrossSigningReady = async function() {
  * called to await an interactive auth flow when uploading device signing keys.
  * Args:
  *     {function} A function that makes the request requiring auth. Receives the
- *     auth data as an object. Can be called multiple times, first with an empty authDict, to obtain the flows.
+ *     auth data as an object. Can be called multiple times, first with an empty
+ *     authDict, to obtain the flows.
  * @param {function} [opts.createSecretStorageKey] Optional. Function
  * called to await a secret storage key creation flow.
  * Returns:
@@ -528,17 +529,9 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         // sign master key with device key
         await this._signObject(crossSigningInfo.keys.master);
 
-        await authUploadDeviceSigningKeys(authDict => {
-            if (authDict) {
-                builder.addCrossSigningKeys(authDict, crossSigningInfo.keys);
-                return Promise.resolve();
-            } else {
-                // This callback also gets called to obtain the IUA flows,
-                // so do a call to obtain those if we don't have the authDict yet
-                // We should get called again at a later point with the authDict.
-                return this._baseApis.uploadDeviceSigningKeys(null, {});
-            }
-        });
+        // Store auth flow helper function, as we need to call it when uploading
+        // to ensure we handle auth errors properly.
+        builder.addCrossSigningKeys(authUploadDeviceSigningKeys, crossSigningInfo.keys);
 
         // cross-sign own device
         const device = this._deviceList.getStoredDevice(this._userId, this._deviceId);
@@ -1224,6 +1217,20 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     if (oldSelfSigningId !== newCrossSigning.getId("self_signing")) {
         logger.info("Got new self-signing key", newCrossSigning.getId("self_signing"));
 
+        // Try to cache the self-signing private key as a side-effect
+        let signing = null;
+        try {
+            const ret = await this._crossSigningInfo.getCrossSigningKey(
+                "self_signing", newCrossSigning.getId("self_signing"),
+            );
+            signing = ret[1];
+            logger.info(
+                "Got matching private key from callback for new public self-signing key",
+            );
+        } finally {
+            if (signing) signing.free();
+        }
+
         const device = this._deviceList.getStoredDevice(this._userId, this._deviceId);
         const signedDevice = await this._crossSigningInfo.signDevice(
             this._userId, device,
@@ -1232,6 +1239,20 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     }
     if (oldUserSigningId !== newCrossSigning.getId("user_signing")) {
         logger.info("Got new user-signing key", newCrossSigning.getId("user_signing"));
+
+        // Try to cache the user-signing private key as a side-effect
+        let signing = null;
+        try {
+            const ret = await this._crossSigningInfo.getCrossSigningKey(
+                "user_signing", newCrossSigning.getId("user_signing"),
+            );
+            signing = ret[1];
+            logger.info(
+                "Got matching private key from callback for new public user-signing key",
+            );
+        } finally {
+            if (signing) signing.free();
+        }
     }
 
     if (masterChanged) {
@@ -1402,6 +1423,12 @@ Crypto.prototype._checkAndStartKeyBackup = async function() {
             );
             this._baseApis.disableKeyBackup();
             this._baseApis.enableKeyBackup(backupInfo);
+            // We're now using a new backup, so schedule all the keys we have to be
+            // uploaded to the new backup. This is a bit of a workaround to upload
+            // keys to a new backup in *most* cases, but it won't cover all cases
+            // because we don't remember what backup version we uploaded keys to:
+            // see https://github.com/vector-im/element-web/issues/14833
+            await this.scheduleAllGroupSessionsForBackup();
         } else {
             logger.log("Backup version " + backupInfo.version + " still current");
         }
@@ -2401,7 +2428,7 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
     // after all the in-memory state (_roomEncryptors and _roomList) has been updated
     // to avoid races when calling this method multiple times. Hence keep a hold of the promise.
     let storeConfigPromise = null;
-    if(!existingConfig) {
+    if (!existingConfig) {
         storeConfigPromise = this._roomList.setRoomEncryption(roomId, config);
     }
 
@@ -2431,10 +2458,10 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
 
         await this.trackRoomDevices(roomId);
         // TODO: this flag is only not used from MatrixClient::setRoomEncryption
-        // which is never used (inside riot at least)
+        // which is never used (inside Element at least)
         // but didn't want to remove it as it technically would
         // be a breaking change.
-        if(!this.inhibitDeviceQuery) {
+        if (!this.inhibitDeviceQuery) {
             this._deviceList.refreshOutdatedDeviceLists();
         }
     } else {
@@ -2739,7 +2766,8 @@ Crypto.prototype.scheduleAllGroupSessionsForBackup = async function() {
 /**
  * Marks all group sessions as needing to be backed up without scheduling
  * them to upload in the background.
- * @returns {Promise<int>} Resolves to the number of sessions requiring a backup.
+ * @returns {Promise<int>} Resolves to the number of sessions now requiring a backup
+ *     (which will be equal to the number of sessions in the store).
  */
 Crypto.prototype.flagAllGroupSessionsForBackup = async function() {
     await this._cryptoStore.doTxn(
@@ -2760,6 +2788,14 @@ Crypto.prototype.flagAllGroupSessionsForBackup = async function() {
     const remaining = await this._cryptoStore.countSessionsNeedingBackup();
     this.emit("crypto.keyBackupSessionsRemaining", remaining);
     return remaining;
+};
+
+/**
+ * Counts the number of end to end session keys that are waiting to be backed up
+ * @returns {Promise<int>} Resolves to the number of sessions requiring backup
+ */
+Crypto.prototype.countSessionsNeedingBackup = function() {
+    return this._cryptoStore.countSessionsNeedingBackup();
 };
 
 /**
@@ -2996,7 +3032,7 @@ Crypto.prototype.onSyncCompleted = async function(syncData) {
     // we don't start uploading one-time keys until we've caught up with
     // to-device messages, to help us avoid throwing away one-time-keys that we
     // are about to receive messages for
-    // (https://github.com/vector-im/riot-web/issues/2782).
+    // (https://github.com/vector-im/element-web/issues/2782).
     if (!syncData.catchingUp) {
         _maybeUploadOneTimeKeys(this);
         this._processReceivedRoomKeyRequests();

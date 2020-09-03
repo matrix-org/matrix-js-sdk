@@ -790,7 +790,7 @@ class DeviceListUpdateSerialiser {
 
             // yield to other things that want to execute in between users, to
             // avoid wedging the CPU
-            // (https://github.com/vector-im/riot-web/issues/3158)
+            // (https://github.com/vector-im/element-web/issues/3158)
             //
             // of course we ought to do this in a web worker or similar, but
             // this serves as an easy solution for now.

@@ -120,7 +120,7 @@ function keyFromRecoverySession(session, decryptionKey) {
  * callback that returns a Promise<String> of an identity access token to supply
  * with identity requests. If the object is unset, no access token will be
  * supplied.
- * See also https://github.com/vector-im/riot-web/issues/10615 which seeks to
+ * See also https://github.com/vector-im/element-web/issues/10615 which seeks to
  * replace the previous approach of manual access tokens params with this
  * callback throughout the SDK.
  *
@@ -358,6 +358,9 @@ export function MatrixClient(opts) {
 
     this._cachedCapabilities = null; // { capabilities: {}, lastUpdated: timestamp }
 
+    this._clientWellKnown = undefined;
+    this._clientWellKnownPromise = undefined;
+
     // The SDK doesn't really provide a clean way for events to recalculate the push
     // actions for themselves, so we have to kinda help them out when they are encrypted.
     // We do this so that push rules are correctly executed on events in their decrypted
@@ -381,7 +384,7 @@ export function MatrixClient(opts) {
             ? !!actions.tweaks.highlight : false;
         if (oldHighlight !== newHighlight || currentCount > 0) {
             // TODO: Handle mentions received while the client is offline
-            // See also https://github.com/vector-im/riot-web/issues/9069
+            // See also https://github.com/vector-im/element-web/issues/9069
             if (!room.hasUserReadEvent(this.getUserId(), event.getId())) {
                 let newCount = currentCount;
                 if (newHighlight && !oldHighlight) newCount++;
@@ -399,7 +402,7 @@ export function MatrixClient(opts) {
 
     // Like above, we have to listen for read receipts from ourselves in order to
     // correctly handle notification counts on encrypted rooms.
-    // This fixes https://github.com/vector-im/riot-web/issues/9421
+    // This fixes https://github.com/vector-im/element-web/issues/9421
     this.on("Room.receipt", (event, room) => {
         if (room && this.isRoomEncrypted(room.roomId)) {
             // Figure out if we've read something or if it's just informational
@@ -1285,6 +1288,7 @@ wrapCryptoFuncs(MatrixClient, [
     "isCrossSigningReady",
     "getCryptoTrustCrossSignedDevices",
     "setCryptoTrustCrossSignedDevices",
+    "countSessionsNeedingBackup",
 ]);
 
 /**
@@ -2041,7 +2045,7 @@ MatrixClient.prototype._restoreKeyBackup = function(
     let backupPubKey;
     try {
         backupPubKey = decryption.init_with_private_key(privKey);
-    } catch(e) {
+    } catch (e) {
         decryption.free();
         throw e;
     }
@@ -3917,7 +3921,9 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
         return pendingRequest;
     }
 
-    let path, params, promise;
+    let path;
+    let params;
+    let promise;
     const self = this;
 
     if (isNotifTimeline) {
@@ -4337,7 +4343,8 @@ MatrixClient.prototype.getRoomPushRule = function(scope, roomId) {
  */
 MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
     const self = this;
-    let deferred, hasDontNotifyRule;
+    let deferred;
+    let hasDontNotifyRule;
 
     // Get the existing room-kind push rule if any
     const roomPushRule = this.getRoomPushRule(scope, roomId);
@@ -4922,18 +4929,21 @@ MatrixClient.prototype.startClient = async function(opts) {
 };
 
 MatrixClient.prototype._fetchClientWellKnown = async function() {
-    try {
-        this._clientWellKnown = await AutoDiscovery.getRawClientConfig(this.getDomain());
-        this.emit("WellKnown.client", this._clientWellKnown);
-    } catch (err) {
-        logger.error("Failed to get client well-known", err);
-        this._clientWellKnown = undefined;
-        this.emit("WellKnown.error", err);
-    }
+    // `getRawClientConfig` does not throw or reject on network errors, instead
+    // it absorbs errors and returns `{}`.
+    this._clientWellKnownPromise = AutoDiscovery.getRawClientConfig(
+        this.getDomain(),
+    );
+    this._clientWellKnown = await this._clientWellKnownPromise;
+    this.emit("WellKnown.client", this._clientWellKnown);
 };
 
 MatrixClient.prototype.getClientWellKnown = function() {
     return this._clientWellKnown;
+};
+
+MatrixClient.prototype.waitForClientWellKnown = function() {
+    return this._clientWellKnownPromise;
 };
 
 /**
@@ -5808,6 +5818,13 @@ MatrixClient.prototype.generateClientSecret = function() {
  * @param {string} data.device_id The device ID of the client that had requested the
  *     secret.
  * @param {string} data.request_id The ID of the original request.
+ */
+
+/**
+ * Fires when the client .well-known info is fetched.
+ *
+ * @event module:client~MatrixClient#"WellKnown.client"
+ * @param {object} data The JSON object returned by the server
  */
 
 // EventEmitter JSDocs
