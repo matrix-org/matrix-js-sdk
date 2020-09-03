@@ -1361,6 +1361,15 @@ SyncApi.prototype._processSyncResponse = async function(
         const currentCount = data.device_one_time_keys_count.signed_curve25519 || 0;
         this.opts.crypto.updateOneTimeKeyCount(currentCount);
     }
+    if (this.opts.crypto && data.device_unused_fallback_keys) {
+        // The presence of device_unused_fallback_keys indicates that the
+        // server supports fallback keys. If there's no unused
+        // signed_curve25519 fallback key we need a new one.
+        this.opts.crypto.setNeedsNewFallback(
+            data.device_unused_fallback_keys instanceof Array
+                && !data.device_unused_fallback_keys.includes("signed_curve25519"),
+        );
+    }
 };
 
 /**
