@@ -478,6 +478,36 @@ OlmDevice.prototype.generateOneTimeKeys = function(numKeys) {
 };
 
 /**
+ * Generate a new fallback keys
+ *
+ * @return {Promise} Resolved once the account is saved back having generated the key
+ */
+OlmDevice.prototype.generateFallbackKey = async function() {
+    await this._cryptoStore.doTxn(
+        'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._getAccount(txn, (account) => {
+                account.generate_fallback_key();
+                this._storeAccount(txn, account);
+            });
+        },
+    );
+};
+
+OlmDevice.prototype.getFallbackKey = async function() {
+    let result;
+    await this._cryptoStore.doTxn(
+        'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._getAccount(txn, (account) => {
+                result = JSON.parse(account.fallback_key());
+            });
+        },
+    );
+    return result;
+};
+
+/**
  * Generate a new outbound session
  *
  * The new session will be stored in the cryptoStore.

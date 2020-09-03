@@ -1818,6 +1818,14 @@ Crypto.prototype.updateOneTimeKeyCount = function(currentCount) {
     }
 };
 
+Crypto.prototype.setNeedsNewFallback = function(needsNewFallback) {
+    this._needsNewFallback = !!needsNewFallback;
+}
+
+Crypto.prototype.getNeedsNewFallback = function() {
+    return this._needsNewFallback;
+}
+
 // check if it's time to upload one-time keys, and do so if so.
 function _maybeUploadOneTimeKeys(crypto) {
     // frequency with which to check & upload one-time keys
@@ -1865,27 +1873,31 @@ function _maybeUploadOneTimeKeys(crypto) {
     // out stale private keys that won't receive a message.
     const keyLimit = Math.floor(maxOneTimeKeys / 2);
 
-    function uploadLoop(keyCount) {
-        if (keyLimit <= keyCount) {
-            // If we don't need to generate any more keys then we are done.
-            return Promise.resolve();
-        }
+    async function uploadLoop(keyCount) {
+        while (keyLimit > keyCount || crypto.getNeedsNewFallback()) {
+            // Ask olm to generate new one time keys, then upload them to synapse.
+            if (keyLimit > keyCount) {
+                console.info("generating oneTimeKeys");
+                const keysThisLoop = Math.min(keyLimit - keyCount, maxKeysPerCycle);
+                await crypto._olmDevice.generateOneTimeKeys(keysThisLoop);
+            }
 
-        const keysThisLoop = Math.min(keyLimit - keyCount, maxKeysPerCycle);
+            if (crypto.getNeedsNewFallback()) {
+                console.info("generating fallback key");
+                await crypto._olmDevice.generateFallbackKey();
+            }
 
-        // Ask olm to generate new one time keys, then upload them to synapse.
-        return crypto._olmDevice.generateOneTimeKeys(keysThisLoop).then(() => {
-            return _uploadOneTimeKeys(crypto);
-        }).then((res) => {
+            console.info("calling _uploadOneTimeKeys");
+            const res = await _uploadOneTimeKeys(crypto);
             if (res.one_time_key_counts && res.one_time_key_counts.signed_curve25519) {
                 // if the response contains a more up to date value use this
                 // for the next loop
-                return uploadLoop(res.one_time_key_counts.signed_curve25519);
+                keyCount = res.one_time_key_counts.signed_curve25519;
             } else {
                 throw new Error("response for uploading keys does not contain "
-                              + "one_time_key_counts.signed_curve25519");
+                                + "one_time_key_counts.signed_curve25519");
             }
-        });
+        }
     }
 
     crypto._oneTimeKeyCheckInProgress = true;
@@ -1917,10 +1929,21 @@ function _maybeUploadOneTimeKeys(crypto) {
 
 // returns a promise which resolves to the response
 async function _uploadOneTimeKeys(crypto) {
+    const promises = [];
+
+    const fallbackJson = {};
+    if (crypto.getNeedsNewFallback()) {
+        const fallbackKeys = await crypto._olmDevice.getFallbackKey();
+        for (const [keyId, key] of Object.entries(fallbackKeys.curve25519)) {
+            const k = { key };
+            fallbackJson["signed_curve25519:" + keyId] = k;
+            promises.push(crypto._signObject(k));
+        }
+        crypto.setNeedsNewFallback(false);
+    }
+
     const oneTimeKeys = await crypto._olmDevice.getOneTimeKeys();
     const oneTimeJson = {};
-
-    const promises = [];
 
     for (const keyId in oneTimeKeys.curve25519) {
         if (oneTimeKeys.curve25519.hasOwnProperty(keyId)) {
@@ -1936,6 +1959,7 @@ async function _uploadOneTimeKeys(crypto) {
 
     const res = await crypto._baseApis.uploadKeysRequest({
         one_time_keys: oneTimeJson,
+        fallback_keys: fallbackJson,
     });
 
     await crypto._olmDevice.markKeysAsPublished();
