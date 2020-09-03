@@ -120,6 +120,12 @@ interface ICreateClientOpts {
     cryptoStore?: CryptoStore;
     scheduler?: MatrixScheduler;
     request?: Request;
+    userId?: string;
+    accessToken?: string;
+    identityServer?: any;
+    localTimeoutMs?: number;
+    useAuthorizationHeader?: boolean;
+    queryParams?: Record<string, unknown>;
 }
 
 /**
