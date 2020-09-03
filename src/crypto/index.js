@@ -244,7 +244,7 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
         baseApis, cryptoCallbacks,
     );
 
-    this._dehydrationManager = new DehydrationManager(baseApis);
+    this._dehydrationManager = new DehydrationManager(this);
 
     // Assuming no app-supplied callback, default to getting from SSSS.
     if (!cryptoCallbacks.getCrossSigningKey && cryptoCallbacks.getSecretStorageKey) {

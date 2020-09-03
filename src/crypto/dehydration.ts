@@ -19,140 +19,215 @@ import {IndexedDBCryptoStore} from '../crypto/store/indexeddb-crypto-store';
 import {decryptAES, encryptAES} from './aes';
 import anotherjson from "another-json";
 
-export const DEHYDRATION_ALGORITHM = "m.dehydration.v1.olm";
+export const DEHYDRATION_ALGORITHM = "org.matrix.msc2697.v1.olm.libolm_pickle";
+
+const oneweek = 7 * 24 * 60 * 60 * 1000;
 
 export class DehydrationManager {
-    constructor(private client) {}
-    async cacheDehydrationKey(key, keyInfo = {}): Promise<void> {
-        const pickleKey = Buffer.from(this.client._crypto._olmDevice._pickleKey);
-        key = await encryptAES(encodeBase64(key), pickleKey, DEHYDRATION_ALGORITHM);
-        this.client._crypto._cryptoStore.doTxn(
-            'readwrite',
+    private inProgress: boolean = false;
+    private timeoutId: any;
+    private key: Uint8Array;
+    private keyInfo: {[props: string]: any};
+    constructor(private crypto) {
+        this.getDehydrationKeyFromCache();
+    }
+    async getDehydrationKeyFromCache(): Promise<void> {
+        return this.crypto._cryptoStore.doTxn(
+            'readonly',
             [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
-                this.client._crypto._cryptoStore.storeSecretStorePrivateKey(
-                    txn, DEHYDRATION_ALGORITHM, {keyInfo, key},
+                this.crypto._cryptoStore.getSecretStorePrivateKey(
+                    txn,
+                    async (result) => {
+                        if (result) {
+                            const {key, keyInfo, time} = result;
+                            const pickleKey = Buffer.from(this.crypto._olmDevice._pickleKey);
+                            const decrypted = await decryptAES(key, pickleKey, DEHYDRATION_ALGORITHM);
+                            this.key = decodeBase64(decrypted);
+                            this.keyInfo = keyInfo;
+                            const now = Date.now();
+                            const delay = Math.max(1, time + oneweek - now);
+                            this.timeoutId = global.setTimeout(
+                                this.dehydrateDevice.bind(this), delay,
+                            );
+                        }
+                    },
+                    DEHYDRATION_ALGORITHM,
                 );
             },
         );
     }
-    async dehydrateDevice(): Promise<void> {
-        console.log("Attempting to dehydrate device");
-        const {keyInfo, key} = await new Promise((resolve) => {
-            return this.client._crypto._cryptoStore.doTxn(
-                'readonly',
+    async setDehydrationKey(key: Uint8Array, keyInfo: {[props: string]: any} = {}): Promise<void> {
+        if (!key) {
+            // unsetting the key -- cancel any pending dehydration task
+            if (this.timeoutId) {
+                global.clearTimeout(this.timeoutId);
+                this.timeoutId = undefined;
+            }
+            // clear storage
+            this.crypto._cryptoStore.doTxn(
+                'readwrite',
                 [IndexedDBCryptoStore.STORE_ACCOUNT],
                 (txn) => {
-                    this.client._crypto._cryptoStore.getSecretStorePrivateKey(
-                        txn, resolve, DEHYDRATION_ALGORITHM,
+                    this.crypto._cryptoStore.storeSecretStorePrivateKey(
+                        txn, DEHYDRATION_ALGORITHM, null,
                     );
                 },
             );
-        });
-        // FIXME: abort nicely if key not found
-        const pickleKey = Buffer.from(this.client._crypto._olmDevice._pickleKey);
-        const decrypted = await decryptAES(key, pickleKey, DEHYDRATION_ALGORITHM);
-        const decryptedKey = decodeBase64(decrypted);
-
-        console.log("Creating account");
-        // create the account and all the necessary keys
-        const account = new global.Olm.Account();
-        account.create();
-        const e2eKeys = JSON.parse(account.identity_keys());
-
-        const maxKeys = account.max_number_of_one_time_keys();
-        // FIXME: generate in small batches?
-        account.generate_one_time_keys(maxKeys / 2);
-        account.generate_fallback_key();
-        const otks = JSON.parse(account.one_time_keys());
-        const fallbacks = JSON.parse(account.fallback_key());
-        account.mark_keys_as_published();
-
-        // dehydrate the account and store it on the server
-        const pickledAccount = account.pickle(decryptedKey);
-
-        const deviceData: {[props: string]: any} = {
-            algorithm: DEHYDRATION_ALGORITHM,
-            account: pickledAccount,
-        };
-        if (keyInfo.passphrase) {
-            deviceData.passphrase = keyInfo.passphrase;
+            this.key = undefined;
+            this.keyInfo = undefined;
+            return;
         }
 
-        console.log("Uploading account to server");
-        const dehydrateResult = await this.client._http.authedRequest(
-            undefined,
-            "POST",
-            "/device/dehydrate",
-            undefined,
-            {
-                device_data: deviceData,
-                // FIXME: initial device name?
-            },
-            {
-                prefix: "/_matrix/client/unstable/org.matrix.msc2697",
-            },
-        );
+        // Check to see if it's the same key as before.  If it's different,
+        // dehydrate a new device.  If it's the same, we can keep the same
+        // device.  (Assume that keyInfo will be the same if the key is the same.)
+        let matches: boolean = this.key && key.length == this.key.length;
+        for (let i = 0; matches && i < key.length; i++) {
+            if (key[i] != this.key[i]) {
+                matches = false;
+            }
+        }
+        if (!matches) {
+            this.key = key;
+            this.keyInfo = keyInfo;
+            // start dehydration in the background
+            this.dehydrateDevice();
+        }
+    }
+    private async dehydrateDevice(): Promise<void> {
+        if (this.inProgress) {
+            console.log("Dehydration already in progress -- not starting new dehydration");
+            return;
+        }
+        this.inProgress = true;
+        if (this.timeoutId) {
+            global.clearTimeout(this.timeoutId);
+            this.timeoutId = undefined;
+        }
+        try {
+            const pickleKey = Buffer.from(this.crypto._olmDevice._pickleKey);
 
-        // send the keys to the server
-        const deviceId = dehydrateResult.device_id;
-        console.log("Preparing device keys", deviceId);
-        const deviceKeys = {
-            algorithms: this.client._crypto._supportedAlgorithms,
-            device_id: deviceId,
-            user_id: this.client.credentials.userId,
-            keys: {
-                [`ed25519:${deviceId}`]: e2eKeys.ed25519,
-                [`curve25519:${deviceId}`]: e2eKeys.curve25519,
-            },
-            signatures: {},
-        };
-        const deviceSignature = account.sign(anotherjson.stringify(deviceKeys));
-        deviceKeys.signatures = {
-            [this.client.credentials.userId]: {
-                [`ed25519:${deviceId}`]: deviceSignature,
-            },
-        };
-        await this.client._crypto._crossSigningInfo.signObject(deviceKeys, "self_signing");
+            // update the crypto store with the timestamp
+            const key = await encryptAES(encodeBase64(this.key), pickleKey, DEHYDRATION_ALGORITHM);
+            this.crypto._cryptoStore.doTxn(
+                'readwrite',
+                [IndexedDBCryptoStore.STORE_ACCOUNT],
+                (txn) => {
+                    this.crypto._cryptoStore.storeSecretStorePrivateKey(
+                        txn, DEHYDRATION_ALGORITHM, {keyInfo: this.keyInfo, key, time: Date.now()},
+                    );
+                },
+            );
+            console.log("Attempting to dehydrate device");
 
-        console.log("Preparing one-time keys");
-        const oneTimeKeys = {};
-        for (const [keyId, key] of Object.entries(otks.curve25519)) {
-            const k = {key, signatures: {}};
-            const signature = account.sign(anotherjson.stringify(k));
-            k.signatures = {
-                [this.client.credentials.userId]: {
-                    [`ed25519:${deviceId}`]: signature,
+            console.log("Creating account");
+            // create the account and all the necessary keys
+            const account = new global.Olm.Account();
+            account.create();
+            const e2eKeys = JSON.parse(account.identity_keys());
+
+            const maxKeys = account.max_number_of_one_time_keys();
+            // FIXME: generate in small batches?
+            account.generate_one_time_keys(maxKeys / 2);
+            account.generate_fallback_key();
+            const otks = JSON.parse(account.one_time_keys());
+            const fallbacks = JSON.parse(account.fallback_key());
+            account.mark_keys_as_published();
+
+            // dehydrate the account and store it on the server
+            const pickledAccount = account.pickle(new Uint8Array(this.key));
+
+            const deviceData: {[props: string]: any} = {
+                algorithm: DEHYDRATION_ALGORITHM,
+                account: pickledAccount,
+            };
+            if (this.keyInfo.passphrase) {
+                deviceData.passphrase = this.keyInfo.passphrase;
+            }
+
+            console.log("Uploading account to server");
+            const dehydrateResult = await this.crypto._baseApis._http.authedRequest(
+                undefined,
+                "POST",
+                "/device/dehydrate",
+                undefined,
+                {
+                    device_data: deviceData,
+                    // FIXME: initial device name?
+                },
+                {
+                    prefix: "/_matrix/client/unstable/org.matrix.msc2697",
+                },
+            );
+
+            // send the keys to the server
+            const deviceId = dehydrateResult.device_id;
+            console.log("Preparing device keys", deviceId);
+            const deviceKeys = {
+                algorithms: this.crypto._supportedAlgorithms,
+                device_id: deviceId,
+                user_id: this.crypto._userId,
+                keys: {
+                    [`ed25519:${deviceId}`]: e2eKeys.ed25519,
+                    [`curve25519:${deviceId}`]: e2eKeys.curve25519,
+                },
+                signatures: {},
+            };
+            const deviceSignature = account.sign(anotherjson.stringify(deviceKeys));
+            deviceKeys.signatures = {
+                [this.crypto._userId]: {
+                    [`ed25519:${deviceId}`]: deviceSignature,
                 },
             };
-            oneTimeKeys[`signed_curve25519:${keyId}`] = k;
-        }
+            await this.crypto._crossSigningInfo.signObject(deviceKeys, "self_signing");
 
-        console.log("Preparing fallback keys");
-        const fallbackKeys = {};
-        for (const [keyId, key] of Object.entries(fallbacks.curve25519)) {
-            const k = {key, signatures: {}};
-            const signature = account.sign(anotherjson.stringify(k));
-            k.signatures = {
-                [this.client.credentials.userId]: {
-                    [`ed25519:${deviceId}`]: signature,
+            console.log("Preparing one-time keys");
+            const oneTimeKeys = {};
+            for (const [keyId, key] of Object.entries(otks.curve25519)) {
+                const k = {key, signatures: {}};
+                const signature = account.sign(anotherjson.stringify(k));
+                k.signatures = {
+                    [this.crypto._userId]: {
+                        [`ed25519:${deviceId}`]: signature,
+                    },
+                };
+                oneTimeKeys[`signed_curve25519:${keyId}`] = k;
+            }
+
+            console.log("Preparing fallback keys");
+            const fallbackKeys = {};
+            for (const [keyId, key] of Object.entries(fallbacks.curve25519)) {
+                const k = {key, signatures: {}};
+                const signature = account.sign(anotherjson.stringify(k));
+                k.signatures = {
+                    [this.crypto._userId]: {
+                        [`ed25519:${deviceId}`]: signature,
+                    },
+                };
+                fallbackKeys[`signed_curve25519:${keyId}`] = k;
+            }
+
+            console.log("Uploading keys to server");
+            await this.crypto._baseApis._http.authedRequest(
+                undefined,
+                "POST",
+                "/keys/upload/" + encodeURI(deviceId),
+                undefined,
+                {
+                    device_keys: deviceKeys,
+                    one_time_keys: oneTimeKeys,
+                    fallback_keys: fallbackKeys,
                 },
-            };
-            fallbackKeys[`signed_curve25519:${keyId}`] = k;
-        }
+            );
+            console.log("Done");
 
-        console.log("Uploading keys to server");
-        await this.client._http.authedRequest(
-            undefined,
-            "POST",
-            "/keys/upload/" + encodeURI(deviceId),
-            undefined,
-            {
-                device_keys: deviceKeys,
-                one_time_keys: oneTimeKeys,
-                fallback_keys: fallbackKeys,
-            },
-        );
-        console.log("Done");
+            // dehydrate again in a week
+            this.timeoutId = global.setTimeout(
+                this.dehydrateDevice.bind(this), oneweek,
+            );
+        } finally {
+            this.inProgress = false;
+        }
     }
 }

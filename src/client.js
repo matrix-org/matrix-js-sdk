@@ -455,6 +455,10 @@ utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.loginWithRehydration = async function(loginFunc, ...args) {
+    if (!global.Olm || !this._cryptoCallbacks
+        || !this._cryptoCallbacks.getDehydrationKey) {
+        return (loginFunc === null ? this.login : this[loginFunc]).call(this, ...args);
+    }
     const origLogin = this.login;
 
     function rehydrationLoginWrapper(loginType, data, callback) {
@@ -537,24 +541,20 @@ MatrixClient.prototype.loginWithRehydration = async function(loginFunc, ...args)
 };
 
 /**
- * Store a new dehydrated device on the server.  The client must have been
- * initialized with a `cryptoCallbacks.generateDehydrationKey` option.
+ * Set the dehydration key.  This will also periodically dehydrate devices to
+ * the server.
  *
+ * @param {Uint8Array} key the dehydration key
+ * @param {object} [keyInfo] Information about the key.  Primarily for
+ *     information about how to generate the key from a passphrase.
  * @return {Promise} A promise that resolves when the dehydrated device is stored.
  */
-MatrixClient.prototype.dehydrateDevice = async function() {
-    if (!this._crypto) {
-        throw new Error("End-to-end encryption disabled");
-    }
-    return await this._crypto._dehydrationManager.dehydrateDevice();
-};
-
-MatrixClient.prototype.cacheDehydrationKey = async function(key, keyInfo) {
+MatrixClient.prototype.setDehydrationKey = async function(key, keyInfo = {}) {
     if (!(this._crypto)) {
-        logger.warn('not exporting device if crypto is not enabled');
+        logger.warn('not dehydrating device if crypto is not enabled');
         return;
     }
-    return await this._crypto._dehydrationManager.cacheDehydrationKey(key, keyInfo);
+    return await this._crypto._dehydrationManager.setDehydrationKey(key, keyInfo);
 };
 
 MatrixClient.prototype.exportDevice = async function() {
