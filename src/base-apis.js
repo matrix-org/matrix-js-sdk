@@ -462,8 +462,26 @@ MatrixBaseApis.prototype.getFallbackAuthUrl = function(loginType, authSessionId)
  * room_alias: {string(opt)}}</code>
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixBaseApis.prototype.createRoom = function(options, callback) {
-    // valid options include: room_alias_name, visibility, invite
+MatrixBaseApis.prototype.createRoom = async function(options, callback) {
+    // some valid options include: room_alias_name, visibility, invite
+
+    // inject the id_access_token if inviting 3rd party addresses
+    const invitesNeedingToken = (options.invite_3pid || [])
+        .filter(i => !i.id_access_token);
+    if (
+        invitesNeedingToken.length > 0 &&
+        this.identityServer &&
+        this.identityServer.getAccessToken &&
+        await this.doesServerAcceptIdentityAccessToken()
+    ) {
+        const identityAccessToken = await this.identityServer.getAccessToken();
+        if (identityAccessToken) {
+            for (const invite of invitesNeedingToken) {
+                invite.id_access_token = identityAccessToken;
+            }
+        }
+    }
+
     return this._http.authedRequest(
         callback, "POST", "/createRoom", undefined, options,
     );
