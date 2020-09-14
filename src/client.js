@@ -248,12 +248,12 @@ function keyFromRecoverySession(session, decryptionKey) {
  * device.
  * Args:
  *   {string} name The name of the secret being requested.
- *   {string} user_id (string) The user ID of the client requesting
- *   {string} device_id The device ID of the client requesting the secret.
- *   {string} request_id The ID of the request. Used to match a
+ *   {string} userId The user ID of the client requesting
+ *   {string} deviceId The device ID of the client requesting the secret.
+ *   {string} requestId The ID of the request. Used to match a
  *     corresponding `crypto.secrets.request_cancelled`. The request ID will be
  *     unique per sender, device pair.
- *   {DeviceTrustLevel} device_trust: The trust status of the device requesting
+ *   {DeviceTrustLevel} deviceTrust: The trust status of the device requesting
  *     the secret as returned by {@link module:client~MatrixClient#checkDeviceTrust}.
  */
 export function MatrixClient(opts) {
