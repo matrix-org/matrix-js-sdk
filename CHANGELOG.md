@@ -1,3 +1,24 @@
+Changes in [8.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.3.0) (2020-09-14)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.3.0-rc.1...v8.3.0)
+
+* No changes since rc.1
+
+Changes in [8.3.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.3.0-rc.1) (2020-09-09)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.2.0...v8.3.0-rc.1)
+
+ * Add missing options in ICreateClientOpts
+   [\#1452](https://github.com/matrix-org/matrix-js-sdk/pull/1452)
+ * Ensure ready functions return boolean values
+   [\#1457](https://github.com/matrix-org/matrix-js-sdk/pull/1457)
+ * Handle missing cross-signing keys gracefully
+   [\#1456](https://github.com/matrix-org/matrix-js-sdk/pull/1456)
+ * Fix eslint ts override tsx matching
+   [\#1451](https://github.com/matrix-org/matrix-js-sdk/pull/1451)
+ * Untangle cross-signing and secret storage
+   [\#1450](https://github.com/matrix-org/matrix-js-sdk/pull/1450)
+
 Changes in [8.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.2.0) (2020-09-01)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.2.0-rc.1...v8.2.0)
