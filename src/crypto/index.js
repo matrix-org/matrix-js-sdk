@@ -1820,11 +1820,11 @@ Crypto.prototype.updateOneTimeKeyCount = function(currentCount) {
 
 Crypto.prototype.setNeedsNewFallback = function(needsNewFallback) {
     this._needsNewFallback = !!needsNewFallback;
-}
+};
 
 Crypto.prototype.getNeedsNewFallback = function() {
     return this._needsNewFallback;
-}
+};
 
 // check if it's time to upload one-time keys, and do so if so.
 function _maybeUploadOneTimeKeys(crypto) {
