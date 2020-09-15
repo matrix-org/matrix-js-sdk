@@ -30,7 +30,7 @@ This SDK targets Node 10 for compatibility, which translates to ES6. If you're u
 a bundler like webpack you'll likely have to transpile dependencies, including this
 SDK, to match your target browsers.
 
-Using `yarn` instead of `npm` is recommended. Please see the Yarn [install guide](https://yarnpkg.com/docs/install/) 
+Using `yarn` instead of `npm` is recommended. Please see the Yarn [install guide](https://classic.yarnpkg.com/en/docs/install) 
 if you do not have it already.
 
 ``yarn add matrix-js-sdk``
