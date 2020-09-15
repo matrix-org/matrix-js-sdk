@@ -182,6 +182,10 @@ function keyFromRecoverySession(session, decryptionKey) {
  * Optional. Whether to allow a fallback ICE server should be used for negotiating a
  * WebRTC connection if the homeserver doesn't provide any servers. Defaults to false.
  *
+ * @param {boolean} [opts.usingE2EProxy]
+ * Optional. Whether to allow sending messages to encrypted rooms when encryption
+ * hasn't been enabled. This is useful if you are using a E2E proxy. Defaults to false.
+ *
  * @param {object} opts.cryptoCallbacks Optional. Callbacks for crypto and cross-signing.
  *     The cross-signing API is currently UNSTABLE and may change without notice.
  *
@@ -265,6 +269,8 @@ export function MatrixClient(opts) {
     this.olmVersion = null; // Populated after initCrypto is done
 
     this.reEmitter = new ReEmitter(this);
+
+    this.usingE2EProxy = opts.usingE2EProxy;
 
     this.store = opts.store || new StubStore();
 
@@ -2746,6 +2752,13 @@ function _encryptEventIfNeeded(client, event, room) {
 
     if (!client.isRoomEncrypted(event.getRoomId())) {
         // looks like this room isn't encrypted.
+        return null;
+    }
+
+    if (!client._crypto && client.usingE2EProxy) {
+        // The client has opted to allow sending messages to encrypted
+        // rooms even if the room is encrypted, and we haven't setup
+        // crypto. This is useful for users of matrix-org/pantalaimon
         return null;
     }
 
