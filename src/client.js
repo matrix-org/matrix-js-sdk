@@ -184,7 +184,7 @@ function keyFromRecoverySession(session, decryptionKey) {
  *
  * @param {boolean} [opts.usingExternalCrypto]
  * Optional. Whether to allow sending messages to encrypted rooms when encryption
- * is not available internally within this SDK. This is useful if you are using an external 
+ * is not available internally within this SDK. This is useful if you are using an external
  * E2E proxy, for example. Defaults to false.
  *
  * @param {object} opts.cryptoCallbacks Optional. Callbacks for crypto and cross-signing.
@@ -271,7 +271,7 @@ export function MatrixClient(opts) {
 
     this.reEmitter = new ReEmitter(this);
 
-    this.usingE2EProxy = opts.usingE2EProxy;
+    this.usingExternalCrypto = opts.usingExternalCrypto;
 
     this.store = opts.store || new StubStore();
 
@@ -2756,7 +2756,7 @@ function _encryptEventIfNeeded(client, event, room) {
         return null;
     }
 
-    if (!client._crypto && client.usingE2EProxy) {
+    if (!client._crypto && client.usingExternalCrypto) {
         // The client has opted to allow sending messages to encrypted
         // rooms even if the room is encrypted, and we haven't setup
         // crypto. This is useful for users of matrix-org/pantalaimon
