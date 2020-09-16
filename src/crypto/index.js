@@ -1800,8 +1800,8 @@ function _maybeUploadOneTimeKeys(crypto) {
                 // for the next loop
                 keyCount = res.one_time_key_counts.signed_curve25519;
             } else {
-                throw new Error("response for uploading keys does not contain "
-                                + "one_time_key_counts.signed_curve25519");
+                throw new Error("response for uploading keys does not contain " +
+                                "one_time_key_counts.signed_curve25519");
             }
         }
     }
