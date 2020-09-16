@@ -182,9 +182,10 @@ function keyFromRecoverySession(session, decryptionKey) {
  * Optional. Whether to allow a fallback ICE server should be used for negotiating a
  * WebRTC connection if the homeserver doesn't provide any servers. Defaults to false.
  *
- * @param {boolean} [opts.usingE2EProxy]
+ * @param {boolean} [opts.usingExternalCrypto]
  * Optional. Whether to allow sending messages to encrypted rooms when encryption
- * hasn't been enabled. This is useful if you are using a E2E proxy. Defaults to false.
+ * is not available internally within this SDK. This is useful if you are using an external 
+ * E2E proxy, for example. Defaults to false.
  *
  * @param {object} opts.cryptoCallbacks Optional. Callbacks for crypto and cross-signing.
  *     The cross-signing API is currently UNSTABLE and may change without notice.
