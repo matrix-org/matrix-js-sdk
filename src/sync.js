@@ -1366,8 +1366,8 @@ SyncApi.prototype._processSyncResponse = async function(
         // server supports fallback keys. If there's no unused
         // signed_curve25519 fallback key we need a new one.
         this.opts.crypto.setNeedsNewFallback(
-            data.device_unused_fallback_keys instanceof Array
-                && !data.device_unused_fallback_keys.includes("signed_curve25519"),
+            data.device_unused_fallback_keys instanceof Array &&
+            !data.device_unused_fallback_keys.includes("signed_curve25519"),
         );
     }
 };
