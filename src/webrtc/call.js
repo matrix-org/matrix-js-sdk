@@ -92,6 +92,8 @@ export function MatrixCall(opts) {
     this.screenSharingStream = null;
 
     this._answerContent = null;
+
+    this._sentEndOfCandidates = false;
 }
 /** The length of time a call can be ringing for. */
 MatrixCall.CALL_TIMEOUT_MS = 60000;
@@ -703,12 +705,29 @@ MatrixCall.prototype._gotLocalIceCandidate = function(event) {
 
         // As with the offer, note we need to make a copy of this object, not
         // pass the original: that broke in Chrome ~m43.
+        if (event.candidate.candidate !== '' || !this._sentEndOfCandidates) {
+            const c = {
+                candidate: event.candidate.candidate,
+                sdpMid: event.candidate.sdpMid,
+                sdpMLineIndex: event.candidate.sdpMLineIndex,
+            };
+            sendCandidate(this, c);
+
+            if (event.candidate.candidate === '') this._sentEndOfCandidates = true;
+        }
+    }
+};
+
+MatrixCall.prototype._onIceGatheringStateChange = function(event) {
+    debuglog("ice gathering state changed to " + this.peerConn.iceGatheringState);
+    if (this.peerConn.iceGatheringState === 'complete' && !this._sentEndOfCandidates) {
+        // If we didn't get an empty-string candidate to signal the end of candidates,
+        // create one ourselves now gathering has finished.
         const c = {
-            candidate: event.candidate.candidate,
-            sdpMid: event.candidate.sdpMid,
-            sdpMLineIndex: event.candidate.sdpMLineIndex,
+            candidate: '',
         };
         sendCandidate(this, c);
+        this._sentEndOfCandidates = true;
     }
 };
 
@@ -1231,6 +1250,7 @@ const _createPeerConnection = function(self) {
     pc.oniceconnectionstatechange = hookCallback(self, self._onIceConnectionStateChanged);
     pc.onsignalingstatechange = hookCallback(self, self._onSignallingStateChanged);
     pc.onicecandidate = hookCallback(self, self._gotLocalIceCandidate);
+    pc.onicegatheringstatechange = hookCallback(self, self._onIceGatheringStateChange);
     pc.onaddstream = hookCallback(self, self._onAddStream);
     return pc;
 };
