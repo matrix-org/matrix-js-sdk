@@ -1296,13 +1296,12 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
                 'master', seenPubkey,
             );
             signing = ret[1];
-            if (!signing) {
-                throw new Error("Cross-signing master private key not available");
-            }
+            logger.info("Got cross-signing master private key");
+        } catch (e) {
+            logger.error("Cross-signing master private key not available", e);
         } finally {
             if (signing) signing.free();
         }
-        logger.info("Got cross-signing master private key");
     }
 
     const oldSelfSigningId = this._crossSigningInfo.getId("self_signing");
@@ -1328,6 +1327,8 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
             );
             signing = ret[1];
             logger.info("Got cross-signing self-signing private key");
+        } catch (e) {
+            logger.error("Cross-signing self-signing private key not available", e);
         } finally {
             if (signing) signing.free();
         }
@@ -1350,6 +1351,8 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
             );
             signing = ret[1];
             logger.info("Got cross-signing user-signing private key");
+        } catch (e) {
+            logger.error("Cross-signing user-signing private key not available", e);
         } finally {
             if (signing) signing.free();
         }
