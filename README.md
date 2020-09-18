@@ -30,7 +30,7 @@ This SDK targets Node 10 for compatibility, which translates to ES6. If you're u
 a bundler like webpack you'll likely have to transpile dependencies, including this
 SDK, to match your target browsers.
 
-Using `yarn` instead of `npm` is recommended. Please see the Yarn [install guide](https://yarnpkg.com/docs/install/) 
+Using `yarn` instead of `npm` is recommended. Please see the Yarn [install guide](https://classic.yarnpkg.com/en/docs/install) 
 if you do not have it already.
 
 ``yarn add matrix-js-sdk``
@@ -182,10 +182,8 @@ you can pass the result of the promise into it with something like:
   matrixClient.someMethod(arg1, arg2).nodeify(callback);
 ```
 
-The main thing to note is that it is an error to discard the result of a
-promise-returning function, as that will cause exceptions to go unobserved. If
-you have nothing better to do with the result, just call ``.done()`` on it. See
-http://documentup.com/kriskowal/q/#the-end for more information.
+The main thing to note is that it is problematic to discard the result of a
+promise-returning function, as that will cause exceptions to go unobserved.
 
 Methods which return a promise show this in their documentation.
 

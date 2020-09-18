@@ -92,6 +92,8 @@ export function MatrixCall(opts) {
     this.screenSharingStream = null;
 
     this._answerContent = null;
+
+    this._sentEndOfCandidates = false;
 }
 /** The length of time a call can be ringing for. */
 MatrixCall.CALL_TIMEOUT_MS = 60000;
@@ -176,7 +178,7 @@ MatrixCall.prototype.placeScreenSharingCall =
         debuglog("Got screen stream, requesting audio stream...");
         const audioConstraints = _getUserMediaVideoContraints('voice');
         _placeCallWithConstraints(self, audioConstraints);
-    } catch(err) {
+    } catch (err) {
         self.emit("error",
             callError(
                 MatrixCall.ERR_NO_USER_MEDIA,
@@ -403,7 +405,7 @@ MatrixCall.prototype._initWithHangup = function(event) {
  * Answer a call.
  */
 MatrixCall.prototype.answer = function() {
-    debuglog("Answering call %s of type %s", this.callId, this.type);
+    debuglog(`Answering call ${this.callId} of type ${this.type}`);
     const self = this;
 
     if (self._answerContent) {
@@ -412,8 +414,10 @@ MatrixCall.prototype.answer = function() {
     }
 
     if (!this.localAVStream && !this.waitForLocalAVStream) {
+        const constraints = _getUserMediaVideoContraints(this.type);
+        logger.log("Getting user media with constraints", constraints);
         this.webRtc.getUserMedia(
-            _getUserMediaVideoContraints(this.type),
+            constraints,
             hookCallback(self, self._maybeGotUserMediaForAnswer),
             hookCallback(self, self._maybeGotUserMediaForAnswer),
         );
@@ -701,12 +705,29 @@ MatrixCall.prototype._gotLocalIceCandidate = function(event) {
 
         // As with the offer, note we need to make a copy of this object, not
         // pass the original: that broke in Chrome ~m43.
+        if (event.candidate.candidate !== '' || !this._sentEndOfCandidates) {
+            const c = {
+                candidate: event.candidate.candidate,
+                sdpMid: event.candidate.sdpMid,
+                sdpMLineIndex: event.candidate.sdpMLineIndex,
+            };
+            sendCandidate(this, c);
+
+            if (event.candidate.candidate === '') this._sentEndOfCandidates = true;
+        }
+    }
+};
+
+MatrixCall.prototype._onIceGatheringStateChange = function(event) {
+    debuglog("ice gathering state changed to " + this.peerConn.iceGatheringState);
+    if (this.peerConn.iceGatheringState === 'complete' && !this._sentEndOfCandidates) {
+        // If we didn't get an empty-string candidate to signal the end of candidates,
+        // create one ourselves now gathering has finished.
         const c = {
-            candidate: event.candidate.candidate,
-            sdpMid: event.candidate.sdpMid,
-            sdpMLineIndex: event.candidate.sdpMLineIndex,
+            candidate: '',
         };
         sendCandidate(this, c);
+        this._sentEndOfCandidates = true;
     }
 };
 
@@ -1065,7 +1086,7 @@ const terminate = function(self, hangupParty, hangupReason, shouldEmit) {
 };
 
 const stopAllMedia = function(self) {
-    debuglog("stopAllMedia (stream=%s)", self.localAVStream);
+    debuglog(`stopAllMedia (stream=${self.localAVStream})`);
     if (self.localAVStream) {
         forAllTracksOnStream(self.localAVStream, function(t) {
             if (t.stop) {
@@ -1127,7 +1148,11 @@ const _tryPlayRemoteAudioStream = async function(self) {
         const player = self.getRemoteAudioElement();
 
         // if audioOutput is non-default:
-        if (audioOutput) await player.setSinkId(audioOutput);
+        try {
+            if (audioOutput) await player.setSinkId(audioOutput);
+        } catch (e) {
+            logger.warn("Couldn't set requested audio output device: using default", e);
+        }
 
         player.autoplay = true;
         self.assignElement(player, self.remoteAStream, "remoteAudio");
@@ -1188,8 +1213,8 @@ const _sendCandidateQueue = function(self) {
 
         if (self.candidateSendTries > 5) {
             debuglog(
-                "Failed to send candidates on attempt %s. Giving up for now.",
-                self.candidateSendTries,
+                "Failed to send candidates on attempt " + self.candidateSendTries +
+                ". Giving up for now.",
             );
             self.candidateSendTries = 0;
             return;
@@ -1205,6 +1230,7 @@ const _sendCandidateQueue = function(self) {
 };
 
 const _placeCallWithConstraints = function(self, constraints) {
+    logger.log("Getting user media with constraints", constraints);
     self.client.callList[self.callId] = self;
     self.webRtc.getUserMedia(
         constraints,
@@ -1224,6 +1250,7 @@ const _createPeerConnection = function(self) {
     pc.oniceconnectionstatechange = hookCallback(self, self._onIceConnectionStateChanged);
     pc.onsignalingstatechange = hookCallback(self, self._onSignallingStateChanged);
     pc.onicecandidate = hookCallback(self, self._gotLocalIceCandidate);
+    pc.onicegatheringstatechange = hookCallback(self, self._onIceGatheringStateChange);
     pc.onaddstream = hookCallback(self, self._onAddStream);
     return pc;
 };

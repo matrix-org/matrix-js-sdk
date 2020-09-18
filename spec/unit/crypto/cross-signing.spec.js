@@ -20,7 +20,8 @@ import anotherjson from 'another-json';
 import * as olmlib from "../../../src/crypto/olmlib";
 import {TestClient} from '../../TestClient';
 import {HttpResponse, setHttpResponses} from '../../test-utils';
-import {resetCrossSigningKeys, createSecretStorageKey} from "./crypto-utils";
+import { resetCrossSigningKeys } from "./crypto-utils";
+import { MatrixError } from '../../../src/http-api';
 
 async function makeTestClient(userInfo, options, keys) {
     if (!keys) keys = {};
@@ -70,11 +71,61 @@ describe("Cross Signing", function() {
         alice.setAccountData = async () => {};
         alice.getAccountDataFromServer = async () => {};
         // set Alice's cross-signing key
-        await alice.bootstrapSecretStorage({
-            createSecretStorageKey,
+        await alice.bootstrapCrossSigning({
             authUploadDeviceSigningKeys: async func => await func({}),
         });
         expect(alice.uploadDeviceSigningKeys).toHaveBeenCalled();
+    });
+
+    it("should abort bootstrap if device signing auth fails", async function() {
+        const alice = await makeTestClient(
+            {userId: "@alice:example.com", deviceId: "Osborne2"},
+        );
+        alice.uploadDeviceSigningKeys = async (auth, keys) => {
+            const errorResponse = {
+                session: "sessionId",
+                flows: [
+                    {
+                        stages: [
+                            "m.login.password",
+                        ],
+                    },
+                ],
+                params: {},
+            };
+
+            // If we're not just polling for flows, add on error rejecting the
+            // auth attempt.
+            if (auth) {
+                Object.assign(errorResponse, {
+                    completed: [],
+                    error: "Invalid password",
+                    errcode: "M_FORBIDDEN",
+                });
+            }
+
+            const error = new MatrixError(errorResponse);
+            error.httpStatus == 401;
+            throw error;
+        };
+        alice.uploadKeySignatures = async () => {};
+        alice.setAccountData = async () => {};
+        alice.getAccountDataFromServer = async () => { };
+        const authUploadDeviceSigningKeys = async func => await func({});
+
+        // Try bootstrap, expecting `authUploadDeviceSigningKeys` to pass
+        // through failure, stopping before actually applying changes.
+        let bootstrapDidThrow = false;
+        try {
+            await alice.bootstrapCrossSigning({
+                authUploadDeviceSigningKeys,
+            });
+        } catch (e) {
+            if (e.errcode === "M_FORBIDDEN") {
+                bootstrapDidThrow = true;
+            }
+        }
+        expect(bootstrapDidThrow).toBeTruthy();
     });
 
     it("should upload a signature when a user is verified", async function() {

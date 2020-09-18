@@ -430,7 +430,7 @@ export class SAS extends Base {
                         try {
                             await this._sendMAC(olmSAS, macMethod);
                             resolve();
-                        } catch(err) {
+                        } catch (err) {
                             reject(err);
                         }
                     },

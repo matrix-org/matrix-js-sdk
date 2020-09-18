@@ -131,7 +131,7 @@ export class Backend {
 
         cursorReq.onsuccess = (ev) => {
             const cursor = ev.target.result;
-            if(!cursor) {
+            if (!cursor) {
                 // no match found
                 callback(null);
                 return;

@@ -1015,7 +1015,7 @@ MegolmEncryption.prototype._getDevicesInRoom = async function(room) {
     // with them, which means that they will have announced any new devices via
     // device_lists in their /sync response.  This cache should then be maintained
     // using all the device_lists changes and left fields.
-    // See https://github.com/vector-im/riot-web/issues/2305 for details.
+    // See https://github.com/vector-im/element-web/issues/2305 for details.
     const devices = await this._crypto.downloadKeys(roomMembers, false);
     const blocked = {};
     // remove any blocked devices
@@ -1109,7 +1109,7 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
     //
     // then, if the key turns up while decryption is in progress (and
     // decryption fails), we will schedule a retry.
-    // (fixes https://github.com/vector-im/riot-web/issues/5001)
+    // (fixes https://github.com/vector-im/element-web/issues/5001)
     this._addEventToPendingList(event);
 
     let res;

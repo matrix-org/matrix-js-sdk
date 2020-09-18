@@ -701,7 +701,7 @@ SyncApi.prototype._syncFromCache = async function(savedSync) {
 
     try {
         await this._processSyncResponse(syncEventData, data);
-    } catch(e) {
+    } catch (e) {
         logger.error("Error processing cached sync", e.stack || e);
     }
 
@@ -774,7 +774,7 @@ SyncApi.prototype._sync = async function(syncOptions) {
 
     try {
         await this._processSyncResponse(syncEventData, data);
-    } catch(e) {
+    } catch (e) {
         // log the exception with stack if we have it, else fall back
         // to the plain description
         logger.error("Caught /sync error", e.stack || e);
@@ -894,7 +894,7 @@ SyncApi.prototype._onSyncError = function(err, syncOptions) {
     logger.error("/sync error %s", err);
     logger.error(err);
 
-    if(this._shouldAbortSync(err)) {
+    if (this._shouldAbortSync(err)) {
         return;
     }
 
