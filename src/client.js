@@ -368,7 +368,7 @@ export function MatrixClient(opts) {
 
     // Cache of the server's /versions response
     // TODO: This should expire: https://github.com/matrix-org/matrix-js-sdk/issues/1020
-    this._serverVersionsCache = null;
+    this._serverVersionsPromise = null;
 
     this._cachedCapabilities = null; // { capabilities: {}, lastUpdated: timestamp }
 
@@ -4995,19 +4995,22 @@ MatrixClient.prototype.stopClient = function() {
  * unstable APIs it supports
  * @return {Promise<object>} The server /versions response
  */
-MatrixClient.prototype.getVersions = async function() {
-    if (this._serverVersionsCache === null) {
-        this._serverVersionsCache = await this._http.request(
-            undefined, // callback
-            "GET", "/_matrix/client/versions",
-            undefined, // queryParams
-            undefined, // data
-            {
-                prefix: '',
-            },
-        );
+MatrixClient.prototype.getVersions = function() {
+    if (this._serverVersionsPromise) {
+        return this._serverVersionsPromise;
     }
-    return this._serverVersionsCache;
+
+    this._serverVersionsPromise = this._http.request(
+        undefined, // callback
+        "GET", "/_matrix/client/versions",
+        undefined, // queryParams
+        undefined, // data
+        {
+            prefix: '',
+        },
+    );
+
+    return this._serverVersionsPromise;
 };
 
 /**
