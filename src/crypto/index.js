@@ -1265,6 +1265,10 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     // downloaded via the device list.
     await this.downloadKeys([this._userId]);
 
+    // Also check which private keys are locally cached.
+    const crossSigningPrivateKeys =
+        await this._crossSigningInfo.getCrossSigningKeysFromCache();
+
     // If we see an update to our own master key, check it against the master
     // key we have and, if it matches, mark it as verified
 
@@ -1281,9 +1285,11 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     const seenPubkey = newCrossSigning.getId();
     const masterChanged = this._crossSigningInfo.getId() !== seenPubkey;
     if (masterChanged) {
-        // try to get the private key if the master key changed
         logger.info("Got new master public key", seenPubkey);
-
+    }
+    // Try to get the private key if the master key changed or was not cached.
+    if (masterChanged || !crossSigningPrivateKeys.has("master")) {
+        logger.info("Attempting to retrieve cross-signing master private key");
         let signing = null;
         try {
             const ret = await this._crossSigningInfo.getCrossSigningKey(
@@ -1296,8 +1302,7 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
         } finally {
             if (signing) signing.free();
         }
-
-        logger.info("Got matching private key from callback for new public master key");
+        logger.info("Got cross-signing master private key");
     }
 
     const oldSelfSigningId = this._crossSigningInfo.getId("self_signing");
@@ -1306,21 +1311,23 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     // Update the version of our keys in our cross-signing object and the local store
     this._storeTrustedSelfKeys(newCrossSigning.keys);
 
+    const selfSigningChanged = oldSelfSigningId !== newCrossSigning.getId("self_signing");
+    const userSigningChanged = oldUserSigningId !== newCrossSigning.getId("user_signing");
+
     const keySignatures = {};
 
-    if (oldSelfSigningId !== newCrossSigning.getId("self_signing")) {
+    if (selfSigningChanged) {
         logger.info("Got new self-signing key", newCrossSigning.getId("self_signing"));
-
-        // Try to cache the self-signing private key as a side-effect
+    }
+    if (selfSigningChanged || !crossSigningPrivateKeys.has("self_signing")) {
+        logger.info("Attempting to retrieve cross-signing self-signing private key");
         let signing = null;
         try {
             const ret = await this._crossSigningInfo.getCrossSigningKey(
                 "self_signing", newCrossSigning.getId("self_signing"),
             );
             signing = ret[1];
-            logger.info(
-                "Got matching private key from callback for new public self-signing key",
-            );
+            logger.info("Got cross-signing self-signing private key");
         } finally {
             if (signing) signing.free();
         }
@@ -1331,19 +1338,18 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
         );
         keySignatures[this._deviceId] = signedDevice;
     }
-    if (oldUserSigningId !== newCrossSigning.getId("user_signing")) {
+    if (userSigningChanged) {
         logger.info("Got new user-signing key", newCrossSigning.getId("user_signing"));
-
-        // Try to cache the user-signing private key as a side-effect
+    }
+    if (userSigningChanged || !crossSigningPrivateKeys.has("user_signing")) {
+        logger.info("Attempting to retrieve cross-signing user-signing private key");
         let signing = null;
         try {
             const ret = await this._crossSigningInfo.getCrossSigningKey(
                 "user_signing", newCrossSigning.getId("user_signing"),
             );
             signing = ret[1];
-            logger.info(
-                "Got matching private key from callback for new public user-signing key",
-            );
+            logger.info("Got cross-signing user-signing private key");
         } finally {
             if (signing) signing.free();
         }
