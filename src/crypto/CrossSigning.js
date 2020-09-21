@@ -235,6 +235,9 @@ export class CrossSigningInfo extends EventEmitter {
         if (!cacheCallbacks) return keys;
         for (const type of ["master", "self_signing", "user_signing"]) {
             const privKey = await cacheCallbacks.getCrossSigningKeyCache(type);
+            if (!privKey) {
+                continue;
+            }
             keys.set(type, privKey);
         }
         return keys;
