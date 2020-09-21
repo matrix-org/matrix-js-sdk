@@ -1280,7 +1280,6 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
 
     const seenPubkey = newCrossSigning.getId();
     const masterChanged = this._crossSigningInfo.getId() !== seenPubkey;
-    // Try to get the private key if the master key changed or was not cached.
     if (masterChanged) {
         logger.info("Got new master public key", seenPubkey);
         logger.info("Attempting to retrieve cross-signing master private key");
