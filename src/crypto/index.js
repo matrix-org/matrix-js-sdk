@@ -1265,10 +1265,6 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     // downloaded via the device list.
     await this.downloadKeys([this._userId]);
 
-    // Also check which private keys are locally cached.
-    const crossSigningPrivateKeys =
-        await this._crossSigningInfo.getCrossSigningKeysFromCache();
-
     // If we see an update to our own master key, check it against the master
     // key we have and, if it matches, mark it as verified
 
@@ -1284,11 +1280,9 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
 
     const seenPubkey = newCrossSigning.getId();
     const masterChanged = this._crossSigningInfo.getId() !== seenPubkey;
+    // Try to get the private key if the master key changed or was not cached.
     if (masterChanged) {
         logger.info("Got new master public key", seenPubkey);
-    }
-    // Try to get the private key if the master key changed or was not cached.
-    if (masterChanged || !crossSigningPrivateKeys.has("master")) {
         logger.info("Attempting to retrieve cross-signing master private key");
         let signing = null;
         try {
@@ -1317,8 +1311,6 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
 
     if (selfSigningChanged) {
         logger.info("Got new self-signing key", newCrossSigning.getId("self_signing"));
-    }
-    if (selfSigningChanged || !crossSigningPrivateKeys.has("self_signing")) {
         logger.info("Attempting to retrieve cross-signing self-signing private key");
         let signing = null;
         try {
@@ -1341,8 +1333,6 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     }
     if (userSigningChanged) {
         logger.info("Got new user-signing key", newCrossSigning.getId("user_signing"));
-    }
-    if (userSigningChanged || !crossSigningPrivateKeys.has("user_signing")) {
         logger.info("Attempting to retrieve cross-signing user-signing private key");
         let signing = null;
         try {
