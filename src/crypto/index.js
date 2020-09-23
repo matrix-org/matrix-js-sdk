@@ -534,6 +534,15 @@ Crypto.prototype.bootstrapCrossSigning = async function({
         privateKeysInStorage
     );
 
+    // Log all relevant state for easier parsing of debug logs.
+    logger.log({
+        setupNewCrossSigning,
+        publicKeysOnDevice,
+        privateKeysInCache,
+        privateKeysInStorage,
+        privateKeysExistSomewhere,
+    });
+
     if (!privateKeysExistSomewhere || setupNewCrossSigning) {
         logger.log(
             "Cross-signing private keys not found locally or in secret storage, " +
@@ -690,6 +699,15 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         oldKeyInfo &&
         oldKeyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES
     );
+
+    // Log all relevant state for easier parsing of debug logs.
+    logger.log({
+        keyBackupInfo,
+        setupNewKeyBackup,
+        setupNewSecretStorage,
+        storageExists,
+        oldKeyInfo,
+    });
 
     if (!storageExists && !keyBackupInfo) {
         // either we don't have anything, or we've been asked to restart
