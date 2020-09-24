@@ -19,6 +19,23 @@ import {IndexedDBCryptoStore} from '../crypto/store/indexeddb-crypto-store';
 import {decryptAES, encryptAES} from './aes';
 import anotherjson from "another-json";
 
+// FIXME: these types should eventually go in a different file
+type Signatures = Record<string, Record<string, string>>;
+
+interface DeviceKeys {
+    algorithms: Array<string>;
+    device_id: string;
+    user_id: string;
+    keys: Record<string, string>;
+    signatures?: Signatures;
+}
+
+interface OneTimeKey {
+    key: string;
+    fallback?: boolean;
+    signatures?: Signatures;
+}
+
 export const DEHYDRATION_ALGORITHM = "org.matrix.msc2697.v1.olm.libolm_pickle";
 
 const oneweek = 7 * 24 * 60 * 60 * 1000;
@@ -131,8 +148,8 @@ export class DehydrationManager {
             // FIXME: generate in small batches?
             account.generate_one_time_keys(maxKeys / 2);
             account.generate_fallback_key();
-            const otks = JSON.parse(account.one_time_keys());
-            const fallbacks = JSON.parse(account.fallback_key());
+            const otks: Record<string,string> = JSON.parse(account.one_time_keys());
+            const fallbacks: Record<string,string> = JSON.parse(account.fallback_key());
             account.mark_keys_as_published();
 
             // dehydrate the account and store it on the server
@@ -164,7 +181,7 @@ export class DehydrationManager {
             // send the keys to the server
             const deviceId = dehydrateResult.device_id;
             console.log("Preparing device keys", deviceId);
-            const deviceKeys = {
+            const deviceKeys: DeviceKeys = {
                 algorithms: this.crypto._supportedAlgorithms,
                 device_id: deviceId,
                 user_id: this.crypto._userId,
@@ -172,7 +189,6 @@ export class DehydrationManager {
                     [`ed25519:${deviceId}`]: e2eKeys.ed25519,
                     [`curve25519:${deviceId}`]: e2eKeys.curve25519,
                 },
-                signatures: {},
             };
             const deviceSignature = account.sign(anotherjson.stringify(deviceKeys));
             deviceKeys.signatures = {
@@ -187,7 +203,7 @@ export class DehydrationManager {
             console.log("Preparing one-time keys");
             const oneTimeKeys = {};
             for (const [keyId, key] of Object.entries(otks.curve25519)) {
-                const k = {key, signatures: {}};
+                const k: OneTimeKey = {key};
                 const signature = account.sign(anotherjson.stringify(k));
                 k.signatures = {
                     [this.crypto._userId]: {
@@ -200,7 +216,7 @@ export class DehydrationManager {
             console.log("Preparing fallback keys");
             const fallbackKeys = {};
             for (const [keyId, key] of Object.entries(fallbacks.curve25519)) {
-                const k = {key, signatures: {}};
+                const k: OneTimeKey = {key, fallback: true};
                 const signature = account.sign(anotherjson.stringify(k));
                 k.signatures = {
                     [this.crypto._userId]: {
