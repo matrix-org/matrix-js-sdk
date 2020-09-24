@@ -1935,7 +1935,7 @@ async function _uploadOneTimeKeys(crypto) {
     if (crypto.getNeedsNewFallback()) {
         const fallbackKeys = await crypto._olmDevice.getFallbackKey();
         for (const [keyId, key] of Object.entries(fallbackKeys.curve25519)) {
-            const k = { key };
+            const k = { key, fallback: true };
             fallbackJson["signed_curve25519:" + keyId] = k;
             promises.push(crypto._signObject(k));
         }
