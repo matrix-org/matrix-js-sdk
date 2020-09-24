@@ -1959,7 +1959,7 @@ async function _uploadOneTimeKeys(crypto) {
 
     const res = await crypto._baseApis.uploadKeysRequest({
         one_time_keys: oneTimeJson,
-        fallback_keys: fallbackJson,
+        "org.matrix.msc2732.fallback_keys": fallbackJson,
     });
 
     await crypto._olmDevice.markKeysAsPublished();
