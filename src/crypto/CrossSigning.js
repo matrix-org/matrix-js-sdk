@@ -211,13 +211,16 @@ export class CrossSigningInfo extends EventEmitter {
     /**
      * Check whether the private keys exist in the local key cache.
      *
+     * @param {string} [type] The type of key to get. One of "master",
+     * "self_signing", or "user_signing". Optional, will check all by default.
      * @returns {boolean} True if all keys are stored in the local cache.
      */
-    async isStoredInKeyCache() {
+    async isStoredInKeyCache(type) {
         const cacheCallbacks = this._cacheCallbacks;
         if (!cacheCallbacks) return false;
-        for (const type of ["master", "self_signing", "user_signing"]) {
-            if (!await cacheCallbacks.getCrossSigningKeyCache(type)) {
+        const types = [type] || ["master", "self_signing", "user_signing"];
+        for (const t of types) {
+            if (!await cacheCallbacks.getCrossSigningKeyCache(t)) {
                 return false;
             }
         }
