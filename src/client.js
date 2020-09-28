@@ -5231,7 +5231,11 @@ function setupCallEventHandler(client) {
                     // This call has previously been answered or hung up: ignore it
                     return;
                 }
-                callEventHandler(e);
+                try {
+                    callEventHandler(e);
+                } catch (e) {
+                    logger.error("Caught exception handling call event", e);
+                }
             });
             callEventBuffer = [];
         }
@@ -5257,7 +5261,11 @@ function setupCallEventHandler(client) {
                 } else {
                     // This one wasn't buffered so just run the event handler for it
                     // straight away
-                    callEventHandler(event);
+                    try {
+                        callEventHandler(event);
+                    } catch (e) {
+                        logger.error("Caught exception handling call event", e);
+                    }
                 }
             });
         }
