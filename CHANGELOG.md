@@ -1,3 +1,41 @@
+Changes in [8.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.4.0) (2020-09-28)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.4.0-rc.1...v8.4.0)
+
+ * Only sign key backup with cross-signing keys when available
+   [\#1482](https://github.com/matrix-org/matrix-js-sdk/pull/1482)
+
+Changes in [8.4.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.4.0-rc.1) (2020-09-23)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.3.0...v8.4.0-rc.1)
+
+ * If there are extraParams set, ensure that queryParams is defined
+   [\#1477](https://github.com/matrix-org/matrix-js-sdk/pull/1477)
+ * Add diagnostics to security bootstrap paths
+   [\#1475](https://github.com/matrix-org/matrix-js-sdk/pull/1475)
+ * Switch to a combination of better-docs and docdash
+   [\#1459](https://github.com/matrix-org/matrix-js-sdk/pull/1459)
+ * Undo attempts to cache private keys aggressively
+   [\#1474](https://github.com/matrix-org/matrix-js-sdk/pull/1474)
+ * Repair secret storage reset, cache keys when missing
+   [\#1472](https://github.com/matrix-org/matrix-js-sdk/pull/1472)
+ * Prevent parallel getVersions calls
+   [\#1471](https://github.com/matrix-org/matrix-js-sdk/pull/1471)
+ * Send end-of-candidates
+   [\#1473](https://github.com/matrix-org/matrix-js-sdk/pull/1473)
+ * Add a function for checking the /versions flag for forced e2ee
+   [\#1470](https://github.com/matrix-org/matrix-js-sdk/pull/1470)
+ * Add option to allow users of pantialaimon to use the SDK
+   [\#1469](https://github.com/matrix-org/matrix-js-sdk/pull/1469)
+ * Fixed Yarn broken link
+   [\#1468](https://github.com/matrix-org/matrix-js-sdk/pull/1468)
+ * some TypeScript and doc fixes
+   [\#1466](https://github.com/matrix-org/matrix-js-sdk/pull/1466)
+ * Remove Travis CI reference
+   [\#1464](https://github.com/matrix-org/matrix-js-sdk/pull/1464)
+ * Inject identity server token for 3pid invites on createRoom
+   [\#1463](https://github.com/matrix-org/matrix-js-sdk/pull/1463)
+
 Changes in [8.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.3.0) (2020-09-14)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.3.0-rc.1...v8.3.0)
