@@ -1,3 +1,10 @@
+Changes in [8.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.4.0) (2020-09-28)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.4.0-rc.1...v8.4.0)
+
+ * Only sign key backup with cross-signing keys when available
+   [\#1482](https://github.com/matrix-org/matrix-js-sdk/pull/1482)
+
 Changes in [8.4.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.4.0-rc.1) (2020-09-23)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.3.0...v8.4.0-rc.1)
