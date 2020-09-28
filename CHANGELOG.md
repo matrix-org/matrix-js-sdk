@@ -1,3 +1,12 @@
+Changes in [8.4.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.4.1) (2020-09-28)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.4.0...v8.4.1)
+
+ * Catch exception from call event handler
+   [\#1486](https://github.com/matrix-org/matrix-js-sdk/pull/1486)
+ * Ignore invalid candidates
+   [\#1485](https://github.com/matrix-org/matrix-js-sdk/pull/1485)
+
 Changes in [8.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.4.0) (2020-09-28)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.4.0-rc.1...v8.4.0)
