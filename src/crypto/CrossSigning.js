@@ -218,7 +218,7 @@ export class CrossSigningInfo extends EventEmitter {
     async isStoredInKeyCache(type) {
         const cacheCallbacks = this._cacheCallbacks;
         if (!cacheCallbacks) return false;
-        const types = [type] || ["master", "self_signing", "user_signing"];
+        const types = type ? [type] : ["master", "self_signing", "user_signing"];
         for (const t of types) {
             if (!await cacheCallbacks.getCrossSigningKeyCache(t)) {
                 return false;
