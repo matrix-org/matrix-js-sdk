@@ -758,10 +758,20 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         // The backup is trusted because the user provided the private key.
         // Sign the backup with the cross-signing key so the key backup can
         // be trusted via cross-signing.
-        logger.log("Adding cross signing signature to key backup");
-        await this._crossSigningInfo.signObject(
-            keyBackupInfo.auth_data, "master",
-        );
+        if (
+            this._crossSigningInfo.getId() &&
+            this._crossSigningInfo.isStoredInKeyCache("master")
+        ) {
+            logger.log("Adding cross-signing signature to key backup");
+            await this._crossSigningInfo.signObject(
+                keyBackupInfo.auth_data, "master",
+            );
+        } else {
+            logger.warn(
+                "Cross-signing keys not available, skipping signature on key backup",
+            );
+        }
+
         builder.addSessionBackup(keyBackupInfo);
     } else {
         // 4S is already set up
@@ -810,8 +820,20 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             algorithm: info.algorithm,
             auth_data: info.auth_data,
         };
-        // sign with cross-sign master key
-        await this._crossSigningInfo.signObject(data.auth_data, "master");
+
+        if (
+            this._crossSigningInfo.getId() &&
+            this._crossSigningInfo.isStoredInKeyCache("master")
+        ) {
+            // sign with cross-sign master key
+            logger.log("Adding cross-signing signature to key backup");
+            await this._crossSigningInfo.signObject(data.auth_data, "master");
+        } else {
+            logger.warn(
+                "Cross-signing keys not available, skipping signature on key backup",
+            );
+        }
+
         // sign with the device fingerprint
         await this._signObject(data.auth_data);
 
