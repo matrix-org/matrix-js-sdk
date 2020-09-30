@@ -18,6 +18,7 @@ import {decodeBase64, encodeBase64} from './olmlib';
 import {IndexedDBCryptoStore} from '../crypto/store/indexeddb-crypto-store';
 import {decryptAES, encryptAES} from './aes';
 import anotherjson from "another-json";
+import {logger} from '../logger';
 
 // FIXME: these types should eventually go in a different file
 type Signatures = Record<string, Record<string, string>>;
@@ -114,7 +115,7 @@ export class DehydrationManager {
     }
     private async dehydrateDevice(): Promise<void> {
         if (this.inProgress) {
-            console.log("Dehydration already in progress -- not starting new dehydration");
+            logger.log("Dehydration already in progress -- not starting new dehydration");
             return;
         }
         this.inProgress = true;
@@ -136,9 +137,9 @@ export class DehydrationManager {
                     );
                 },
             );
-            console.log("Attempting to dehydrate device");
+            logger.log("Attempting to dehydrate device");
 
-            console.log("Creating account");
+            logger.log("Creating account");
             // create the account and all the necessary keys
             const account = new global.Olm.Account();
             account.create();
@@ -163,7 +164,7 @@ export class DehydrationManager {
                 deviceData.passphrase = this.keyInfo.passphrase;
             }
 
-            console.log("Uploading account to server");
+            logger.log("Uploading account to server");
             const dehydrateResult = await this.crypto._baseApis._http.authedRequest(
                 undefined,
                 "PUT",
@@ -180,7 +181,7 @@ export class DehydrationManager {
 
             // send the keys to the server
             const deviceId = dehydrateResult.device_id;
-            console.log("Preparing device keys", deviceId);
+            logger.log("Preparing device keys", deviceId);
             const deviceKeys: DeviceKeys = {
                 algorithms: this.crypto._supportedAlgorithms,
                 device_id: deviceId,
@@ -200,7 +201,7 @@ export class DehydrationManager {
                 await this.crypto._crossSigningInfo.signObject(deviceKeys, "self_signing");
             }
 
-            console.log("Preparing one-time keys");
+            logger.log("Preparing one-time keys");
             const oneTimeKeys = {};
             for (const [keyId, key] of Object.entries(otks.curve25519)) {
                 const k: OneTimeKey = {key};
@@ -213,7 +214,7 @@ export class DehydrationManager {
                 oneTimeKeys[`signed_curve25519:${keyId}`] = k;
             }
 
-            console.log("Preparing fallback keys");
+            logger.log("Preparing fallback keys");
             const fallbackKeys = {};
             for (const [keyId, key] of Object.entries(fallbacks.curve25519)) {
                 const k: OneTimeKey = {key, fallback: true};
@@ -226,19 +227,19 @@ export class DehydrationManager {
                 fallbackKeys[`signed_curve25519:${keyId}`] = k;
             }
 
-            console.log("Uploading keys to server");
+            logger.log("Uploading keys to server");
             await this.crypto._baseApis._http.authedRequest(
                 undefined,
                 "POST",
                 "/keys/upload/" + encodeURI(deviceId),
                 undefined,
                 {
-                    device_keys: deviceKeys,
-                    one_time_keys: oneTimeKeys,
-                    fallback_keys: fallbackKeys,
+                    "device_keys": deviceKeys,
+                    "one_time_keys": oneTimeKeys,
+                    "org.matrix.msc2732.fallback_keys": fallbackKeys,
                 },
             );
-            console.log("Done dehydrating");
+            logger.log("Done dehydrating");
 
             // dehydrate again in a week
             this.timeoutId = global.setTimeout(

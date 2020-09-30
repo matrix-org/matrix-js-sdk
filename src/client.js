@@ -490,12 +490,12 @@ MatrixClient.prototype.rehydrateDevice = async function() {
             },
         );
     } catch (e) {
-        console.info("could not get dehydrated device", e);
+        logger.info("could not get dehydrated device", e);
         return;
     }
 
     if (!getDeviceResult.device_data || !getDeviceResult.device_id) {
-        console.info("no dehydrated device found");
+        logger.info("no dehydrated device found");
         return;
     }
 
@@ -503,10 +503,10 @@ MatrixClient.prototype.rehydrateDevice = async function() {
     try {
         const deviceData = getDeviceResult.device_data;
         if (deviceData.algorithm !== DEHYDRATION_ALGORITHM) {
-            console.warn("Wrong algorithm for dehydrated device");
+            logger.warn("Wrong algorithm for dehydrated device");
             return;
         }
-        console.log("unpickling dehydrated device");
+        logger.log("unpickling dehydrated device");
         const key = await this._cryptoCallbacks.getDehydrationKey(
             deviceData,
             (k) => {
@@ -515,7 +515,7 @@ MatrixClient.prototype.rehydrateDevice = async function() {
             },
         );
         account.unpickle(key, deviceData.account);
-        console.log("unpickled device");
+        logger.log("unpickled device");
 
         const rehydrateResult = await this._http.authedRequest(
             undefined,
@@ -532,7 +532,7 @@ MatrixClient.prototype.rehydrateDevice = async function() {
 
         if (rehydrateResult.success === true) {
             this.deviceId = getDeviceResult.device_id;
-            console.info("using dehydrated device");
+            logger.info("using dehydrated device");
             const pickleKey = this.pickleKey || "DEFAULT_KEY";
             this._exportedOlmDeviceToImport = {
                 pickledAccount: account.pickle(pickleKey),
@@ -543,12 +543,12 @@ MatrixClient.prototype.rehydrateDevice = async function() {
             return this.deviceId;
         } else {
             account.free();
-            console.info("not using dehydrated device");
+            logger.info("not using dehydrated device");
             return;
         }
     } catch (e) {
         account.free();
-        console.warn("could not unpickle", e);
+        logger.warn("could not unpickle", e);
     }
 };
 
