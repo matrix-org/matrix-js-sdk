@@ -166,15 +166,15 @@ export class DehydrationManager {
             console.log("Uploading account to server");
             const dehydrateResult = await this.crypto._baseApis._http.authedRequest(
                 undefined,
-                "POST",
-                "/device/dehydrate",
+                "PUT",
+                "/dehydrated_device",
                 undefined,
                 {
                     device_data: deviceData,
                     // FIXME: initial device name?
                 },
                 {
-                    prefix: "/_matrix/client/unstable/org.matrix.msc2697",
+                    prefix: "/_matrix/client/unstable/org.matrix.msc2697.v2",
                 },
             );
 
@@ -238,7 +238,7 @@ export class DehydrationManager {
                     fallback_keys: fallbackKeys,
                 },
             );
-            console.log("Done");
+            console.log("Done dehydrating");
 
             // dehydrate again in a week
             this.timeoutId = global.setTimeout(

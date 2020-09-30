@@ -461,100 +461,94 @@ utils.inherits(MatrixClient, EventEmitter);
 utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);
 
 /**
- * Log in, trying to rehydrate a device if available.  The client must have
- * been initialized with a `cryptoCallback.getDehydrationKey` option.
+ * Try to rehydrate a device if available.  The client must have been
+ * initialized with a `cryptoCallback.getDehydrationKey` option, and this
+ * function must be called before initCrypto and startClient are called.
  *
- * @param {string} loginFunc  The login function to use. e.g. "loginWithPassword"
- *    or `null` if using base_apis.login
- * @param {...*} args arguments to pass to the login function.
- * @return {Promise} Resolves: to a login request result.  If a dehydrated
- * device was found, it will include an `_olm_account` property, which will be
- * an Olm Account to use.
+ * @return {Promise} Resolves to undefined if a device could not be dehydrated, or
+ *     to the new device ID if the dehydration was successful.
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype.loginWithRehydration = async function(loginFunc, ...args) {
-    if (!global.Olm || !this._cryptoCallbacks
-        || !this._cryptoCallbacks.getDehydrationKey) {
-        return (loginFunc === null ? this.login : this[loginFunc]).call(this, ...args);
-    }
-    const origLogin = this.login;
-
-    function rehydrationLoginWrapper(loginType, data, callback) {
-        const loginData = {
-            "org.matrix.msc2697.restore_device": true,
-        };
-        Object.assign(loginData, data);
-
-        return origLogin.call(this, loginType, loginData, callback); // eslint-disable-line babel/no-invalid-this
+MatrixClient.prototype.rehydrateDevice = async function() {
+    if (this._crypto) {
+        throw new Error("Cannot rehydrate device after crypto is initialized");
     }
 
-    let loginResult;
-    if (loginFunc === null) {
-        loginResult = await rehydrationLoginWrapper.call(this, ...args);
-    } else {
-        this.login = rehydrationLoginWrapper;
-
-        try {
-            loginResult = await this[loginFunc](...args);
-        } finally {
-            this.login = origLogin;
-        }
+    if (!this._cryptoCallbacks.getDehydrationKey) {
+        return;
     }
 
-    if (!loginResult.device_data) {
+    let getDeviceResult;
+    try {
+        getDeviceResult = await this._http.authedRequest(
+            undefined,
+            "GET",
+            "/dehydrated_device",
+            undefined, undefined,
+            {
+                prefix: "/_matrix/client/unstable/org.matrix.msc2697.v2",
+            },
+        );
+    } catch (e) {
+        console.info("could not get dehydrated device", e);
+        return;
+    }
+
+    if (!getDeviceResult.device_data || !getDeviceResult.device_id) {
         console.info("no dehydrated device found");
-        return loginResult;
+        return;
     }
 
     const account = new global.Olm.Account();
     try {
-        const deviceData = loginResult.device_data;
+        const deviceData = getDeviceResult.device_data;
         if (deviceData.algorithm !== DEHYDRATION_ALGORITHM) {
-            throw new Error("Wrong algorithm");
+            console.warn("Wrong algorithm for dehydrated device");
+            return;
         }
-        const key = await this._cryptoCallbacks.getDehydrationKey(deviceData);
         console.log("unpickling dehydrated device");
+        const key = await this._cryptoCallbacks.getDehydrationKey(
+            deviceData,
+            (k) => {
+                // copy the key so that it doesn't get clobbered
+                account.unpickle(new Uint8Array(k), deviceData.account);
+            }
+        );
         account.unpickle(key, deviceData.account);
-        // FIXME: retry asking for key if unpickle fails?
         console.log("unpickled device");
 
-        const rehydrateResult = await this._http.request(
+        const rehydrateResult = await this._http.authedRequest(
             undefined,
             "POST",
-            "/restore_device",
+            "/dehydrated_device/claim",
             undefined,
             {
-                rehydrate: true,
-                dehydration_token: loginResult.dehydration_token,
+                device_id: getDeviceResult.device_id,
             },
             {
-                prefix: "/_matrix/client/unstable/org.matrix.msc2697",
+                prefix: "/_matrix/client/unstable/org.matrix.msc2697.v2",
             },
         );
 
-        if (rehydrateResult.device_id === loginResult.device_id) {
+        if (rehydrateResult.success === true) {
+            this.deviceId = getDeviceResult.device_id;
             console.info("using dehydrated device");
-            rehydrateResult._olm_account = account;
+            const pickleKey = this.pickleKey || "DEFAULT_KEY";
+            this._exportedOlmDeviceToImport = {
+                pickledAccount: account.pickle(pickleKey),
+                sessions: [],
+                pickleKey: pickleKey,
+            };
+            account.free();
+            return this.deviceId;
         } else {
+            account.free();
             console.info("not using dehydrated device");
+            return;
         }
-        return rehydrateResult;
     } catch (e) {
         account.free();
         console.warn("could not unpickle", e);
-        return await this._http.request(
-            undefined,
-            "POST",
-            "/restore_device",
-            undefined,
-            {
-                rehydrate: false,
-                dehydration_token: loginResult.dehydration_token,
-            },
-            {
-                prefix: "/_matrix/client/unstable/org.matrix.msc2697",
-            },
-        );
     }
 };
 
