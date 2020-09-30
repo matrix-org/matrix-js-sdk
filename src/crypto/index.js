@@ -1958,7 +1958,7 @@ async function _uploadOneTimeKeys(crypto) {
     await Promise.all(promises);
 
     const res = await crypto._baseApis.uploadKeysRequest({
-        one_time_keys: oneTimeJson,
+        "one_time_keys": oneTimeJson,
         "org.matrix.msc2732.fallback_keys": fallbackJson,
     });
 
