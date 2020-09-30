@@ -1365,10 +1365,10 @@ SyncApi.prototype._processSyncResponse = async function(
         // The presence of device_unused_fallback_keys indicates that the
         // server supports fallback keys. If there's no unused
         // signed_curve25519 fallback key we need a new one.
-        const unused_fallback_keys = data["org.matrix.msc2732.device_unused_fallback_keys"];
+        const unusedFallbackKeys = data["org.matrix.msc2732.device_unused_fallback_keys"];
         this.opts.crypto.setNeedsNewFallback(
-            unused_fallback_keys instanceof Array &&
-            !unused_fallback_keys.includes("signed_curve25519"),
+            unusedFallbackKeys instanceof Array &&
+            !unusedFallbackKeys.includes("signed_curve25519"),
         );
     }
 };
