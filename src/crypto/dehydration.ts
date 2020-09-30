@@ -24,8 +24,8 @@ type Signatures = Record<string, Record<string, string>>;
 
 interface DeviceKeys {
     algorithms: Array<string>;
-    device_id: string; // eslint-disable-line camel-case
-    user_id: string; // eslint-disable-line camel-case
+    device_id: string; // eslint-disable-line camelcase
+    user_id: string; // eslint-disable-line camelcase
     keys: Record<string, string>;
     signatures?: Signatures;
 }
