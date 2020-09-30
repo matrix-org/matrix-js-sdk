@@ -512,7 +512,7 @@ MatrixClient.prototype.rehydrateDevice = async function() {
             (k) => {
                 // copy the key so that it doesn't get clobbered
                 account.unpickle(new Uint8Array(k), deviceData.account);
-            }
+            },
         );
         account.unpickle(key, deviceData.account);
         console.log("unpickled device");
