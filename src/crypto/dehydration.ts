@@ -70,7 +70,7 @@ export class DehydrationManager {
                             );
                         }
                     },
-                    DEHYDRATION_ALGORITHM,
+                    "dehydration",
                 );
             },
         );
@@ -88,7 +88,7 @@ export class DehydrationManager {
                 [IndexedDBCryptoStore.STORE_ACCOUNT],
                 (txn) => {
                     this.crypto._cryptoStore.storeSecretStorePrivateKey(
-                        txn, DEHYDRATION_ALGORITHM, null,
+                        txn, "dehydration", null,
                     );
                 },
             );
@@ -133,7 +133,7 @@ export class DehydrationManager {
                 [IndexedDBCryptoStore.STORE_ACCOUNT],
                 (txn) => {
                     this.crypto._cryptoStore.storeSecretStorePrivateKey(
-                        txn, DEHYDRATION_ALGORITHM, {keyInfo: this.keyInfo, key, time: Date.now()},
+                        txn, "dehydration", {keyInfo: this.keyInfo, key, time: Date.now()},
                     );
                 },
             );
