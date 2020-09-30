@@ -46,6 +46,7 @@ export class DehydrationManager {
     private timeoutId: any;
     private key: Uint8Array;
     private keyInfo: {[props: string]: any};
+    private deviceDisplayName: string;
     constructor(private crypto) {
         this.getDehydrationKeyFromCache();
     }
@@ -58,11 +59,12 @@ export class DehydrationManager {
                     txn,
                     async (result) => {
                         if (result) {
-                            const {key, keyInfo, time} = result;
+                            const {key, keyInfo, deviceDisplayName, time} = result;
                             const pickleKey = Buffer.from(this.crypto._olmDevice._pickleKey);
                             const decrypted = await decryptAES(key, pickleKey, DEHYDRATION_ALGORITHM);
                             this.key = decodeBase64(decrypted);
                             this.keyInfo = keyInfo;
+                            this.deviceDisplayName = deviceDisplayName;
                             const now = Date.now();
                             const delay = Math.max(1, time + oneweek - now);
                             this.timeoutId = global.setTimeout(
@@ -75,7 +77,10 @@ export class DehydrationManager {
             },
         );
     }
-    async setDehydrationKey(key: Uint8Array, keyInfo: {[props: string]: any} = {}): Promise<void> {
+    async setDehydrationKey(
+        key: Uint8Array, keyInfo: {[props: string]: any} = {},
+        deviceDisplayName: string = undefined
+    ): Promise<void> {
         if (!key) {
             // unsetting the key -- cancel any pending dehydration task
             if (this.timeoutId) {
@@ -99,7 +104,8 @@ export class DehydrationManager {
 
         // Check to see if it's the same key as before.  If it's different,
         // dehydrate a new device.  If it's the same, we can keep the same
-        // device.  (Assume that keyInfo will be the same if the key is the same.)
+        // device.  (Assume that keyInfo and deviceDisplayNamme will be the
+        // same if the key is the same.)
         let matches: boolean = this.key && key.length == this.key.length;
         for (let i = 0; matches && i < key.length; i++) {
             if (key[i] != this.key[i]) {
@@ -109,6 +115,7 @@ export class DehydrationManager {
         if (!matches) {
             this.key = key;
             this.keyInfo = keyInfo;
+            this.deviceDisplayName = deviceDisplayName;
             // start dehydration in the background
             this.dehydrateDevice();
         }
@@ -133,7 +140,13 @@ export class DehydrationManager {
                 [IndexedDBCryptoStore.STORE_ACCOUNT],
                 (txn) => {
                     this.crypto._cryptoStore.storeSecretStorePrivateKey(
-                        txn, "dehydration", {keyInfo: this.keyInfo, key, time: Date.now()},
+                        txn, "dehydration",
+                        {
+                            keyInfo: this.keyInfo,
+                            key,
+                            deviceDisplayName: this.deviceDisplayName,
+                            time: Date.now()
+                        },
                     );
                 },
             );
@@ -172,7 +185,7 @@ export class DehydrationManager {
                 undefined,
                 {
                     device_data: deviceData,
-                    // FIXME: initial device name?
+                    initial_device_display_name: this.deviceDisplayName,
                 },
                 {
                     prefix: "/_matrix/client/unstable/org.matrix.msc2697.v2",

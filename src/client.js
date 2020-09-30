@@ -559,14 +559,20 @@ MatrixClient.prototype.rehydrateDevice = async function() {
  * @param {Uint8Array} key the dehydration key
  * @param {object} [keyInfo] Information about the key.  Primarily for
  *     information about how to generate the key from a passphrase.
+ * @param {string} [deviceDisplayName] The device display name for the
+ *     dehydrated device.
  * @return {Promise} A promise that resolves when the dehydrated device is stored.
  */
-MatrixClient.prototype.setDehydrationKey = async function(key, keyInfo = {}) {
+MatrixClient.prototype.setDehydrationKey = async function(
+    key, keyInfo = {}, deviceDisplayName = undefined,
+) {
     if (!(this._crypto)) {
         logger.warn('not dehydrating device if crypto is not enabled');
         return;
     }
-    return await this._crypto._dehydrationManager.setDehydrationKey(key, keyInfo);
+    return await this._crypto._dehydrationManager.setDehydrationKey(
+        key, keyInfo, deviceDisplayName,
+    );
 };
 
 MatrixClient.prototype.exportDevice = async function() {
