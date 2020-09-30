@@ -28,4 +28,55 @@ declare global {
     interface Global {
         Olm: Olm;
     }
+
+    interface MediaDevices {
+        // This is experimental and types don't know about it yet
+        // https://github.com/microsoft/TypeScript/issues/33232
+        getDisplayMedia(constraints: MediaStreamConstraints): Promise<MediaStream>;
+    }
+
+    interface HTMLAudioElement {
+        // setSinkId is experimental and typescript doesn't know about it
+        setSinkId(outputId: string);
+    }
+
+    interface RTCPeerConnection {
+        // Old callback based API that types don't know about
+        // We should update to use the new Promise API
+        setRemoteDescription(description: RTCSessionDescription, success, failure);
+    }
+
+    interface RTCPeerConnection {
+        // addStream is deprecated and we should stop using it
+        addStream(s: MediaStream);
+        onaddstream;
+
+        // More callback-based APIs we need to stop using
+        createOffer(success, failure, options: object);
+        setLocalDescription(RTCSessionDescription, success, failure);
+        createAnswer(success, failure, options: object);
+    }
+
+    interface MediaStreamTrack {
+        // Apparently this was not implemented in Chrome when the code was written,
+        // so possibly we just made it up? We should stop using it.
+        onstarted;
+    }
+
+    interface MediaStream {
+        // More things that may never have existed
+        onstarted;
+        onended;
+        oninactive;
+
+        stop();
+    }
+
+    interface DummyInterfaceWeShouldntBeUsingThis {}
+
+    interface Navigator {
+        // We check for the webkit-prefixed getUserMedia to detect if we're
+        // on webkit: we should check if we still need to do this
+        webkitGetUserMedia: DummyInterfaceWeShouldntBeUsingThis;
+    }
 }
