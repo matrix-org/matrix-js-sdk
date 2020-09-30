@@ -79,7 +79,7 @@ export class DehydrationManager {
     }
     async setDehydrationKey(
         key: Uint8Array, keyInfo: {[props: string]: any} = {},
-        deviceDisplayName: string = undefined
+        deviceDisplayName: string = undefined,
     ): Promise<void> {
         if (!key) {
             // unsetting the key -- cancel any pending dehydration task
@@ -145,7 +145,7 @@ export class DehydrationManager {
                             keyInfo: this.keyInfo,
                             key,
                             deviceDisplayName: this.deviceDisplayName,
-                            time: Date.now()
+                            time: Date.now(),
                         },
                     );
                 },
