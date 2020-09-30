@@ -24,8 +24,8 @@ type Signatures = Record<string, Record<string, string>>;
 
 interface DeviceKeys {
     algorithms: Array<string>;
-    device_id: string;
-    user_id: string;
+    device_id: string; // eslint-disable-line camel-case
+    user_id: string; // eslint-disable-line camel-case
     keys: Record<string, string>;
     signatures?: Signatures;
 }
@@ -41,7 +41,7 @@ export const DEHYDRATION_ALGORITHM = "org.matrix.msc2697.v1.olm.libolm_pickle";
 const oneweek = 7 * 24 * 60 * 60 * 1000;
 
 export class DehydrationManager {
-    private inProgress: boolean = false;
+    private inProgress = false;
     private timeoutId: any;
     private key: Uint8Array;
     private keyInfo: {[props: string]: any};
@@ -148,8 +148,8 @@ export class DehydrationManager {
             // FIXME: generate in small batches?
             account.generate_one_time_keys(maxKeys / 2);
             account.generate_fallback_key();
-            const otks: Record<string,string> = JSON.parse(account.one_time_keys());
-            const fallbacks: Record<string,string> = JSON.parse(account.fallback_key());
+            const otks: Record<string, string> = JSON.parse(account.one_time_keys());
+            const fallbacks: Record<string, string> = JSON.parse(account.fallback_key());
             account.mark_keys_as_published();
 
             // dehydrate the account and store it on the server
