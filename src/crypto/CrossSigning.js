@@ -734,7 +734,7 @@ export async function requestKeysDuringVerification(baseApis, userId, deviceId) 
     if (baseApis.getUserId() !== userId) {
         return;
     }
-    console.log("Cross-signing: Self-verification done; requesting keys");
+    logger.log("Cross-signing: Self-verification done; requesting keys");
     // This happens asynchronously, and we're not concerned about waiting for
     // it.  We return here in order to test.
     return new Promise((resolve, reject) => {
@@ -748,7 +748,7 @@ export async function requestKeysDuringVerification(baseApis, userId, deviceId) 
         const crossSigning = new CrossSigningInfo(
             original.userId,
             { getCrossSigningKey: async (type) => {
-                console.debug("Cross-signing: requesting secret",
+                logger.debug("Cross-signing: requesting secret",
                                 type, deviceId);
                 const { promise } = client.requestSecret(
                     `m.cross_signing.${type}`, [deviceId],
@@ -811,6 +811,6 @@ export async function requestKeysDuringVerification(baseApis, userId, deviceId) 
             timeout,
         ]).then(resolve, reject);
     }).catch((e) => {
-        console.warn("Cross-signing: failure while requesting keys:", e);
+        logger.warn("Cross-signing: failure while requesting keys:", e);
     });
 }

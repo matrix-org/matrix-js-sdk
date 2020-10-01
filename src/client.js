@@ -2054,7 +2054,7 @@ MatrixClient.prototype._restoreKeyBackup = function(
     // This is async.
     this._crypto.storeSessionBackupPrivateKey(privKey)
     .catch((e) => {
-        console.warn("Error caching session backup key:", e);
+        logger.warn("Error caching session backup key:", e);
     }).then(cacheCompleteCallback);
 
     if (progressCallback) {

@@ -31,5 +31,5 @@ try {
     const crypto = require('crypto');
     utils.setCrypto(crypto);
 } catch (err) {
-    console.log('nodejs was compiled without crypto support: some tests will fail');
+    logger.log('nodejs was compiled without crypto support: some tests will fail');
 }

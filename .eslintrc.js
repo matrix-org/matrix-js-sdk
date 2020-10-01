@@ -28,6 +28,8 @@ module.exports = {
         "indent": "off",
         "no-constant-condition": "off",
         "no-async-promise-executor": "off",
+        // We use a `logger` intermediary module
+        "no-console": "error",
     },
     overrides: [{
         "files": ["src/**/*.ts"],

@@ -26,6 +26,7 @@ import {
     newUserCancelledError,
 } from './Error';
 import {encodeUnpaddedBase64, decodeBase64} from "../olmlib";
+import {logger} from '../../logger';
 
 export const SHOW_QR_CODE_METHOD = "m.qr_code.show.v1";
 export const SCAN_QR_CODE_METHOD = "m.qr_code.scan.v1";
@@ -94,7 +95,7 @@ export class ReciprocateQRCode extends Base {
             if (!targetKey) throw newKeyMismatchError();
 
             if (keyInfo !== targetKey) {
-                console.error("key ID from key info does not match");
+                logger.error("key ID from key info does not match");
                 throw newKeyMismatchError();
             }
             for (const deviceKeyId in device.keys) {
@@ -102,7 +103,7 @@ export class ReciprocateQRCode extends Base {
                 const deviceTargetKey = keys[deviceKeyId];
                 if (!deviceTargetKey) throw newKeyMismatchError();
                 if (device.keys[deviceKeyId] !== deviceTargetKey) {
-                    console.error("master key does not match");
+                    logger.error("master key does not match");
                     throw newKeyMismatchError();
                 }
             }

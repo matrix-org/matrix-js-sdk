@@ -247,7 +247,7 @@ export class SecretStorage extends EventEmitter {
         ) {
             const hasKey = await this.hasKey(keys[0]);
             if (hasKey) {
-                console.log("Fixing up passthrough secret: " + name);
+                logger.log("Fixing up passthrough secret: " + name);
                 await this.storePassthrough(name, keys[0]);
                 const newData = await this._baseApis.getAccountDataFromServer(name);
                 return newData;

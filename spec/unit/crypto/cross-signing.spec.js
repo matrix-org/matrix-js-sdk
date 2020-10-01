@@ -22,6 +22,7 @@ import {TestClient} from '../../TestClient';
 import {HttpResponse, setHttpResponses} from '../../test-utils';
 import { resetCrossSigningKeys } from "./crypto-utils";
 import { MatrixError } from '../../../src/http-api';
+import {logger} from '../../../src/logger';
 
 async function makeTestClient(userInfo, options, keys) {
     if (!keys) keys = {};
@@ -49,7 +50,7 @@ async function makeTestClient(userInfo, options, keys) {
 
 describe("Cross Signing", function() {
     if (!global.Olm) {
-        console.warn('Not running megolm backup unit tests: libolm not present');
+        logger.warn('Not running megolm backup unit tests: libolm not present');
         return;
     }
 

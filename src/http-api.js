@@ -961,7 +961,7 @@ export async function retryNetworkOperation(maxAttempts, callback) {
         try {
             if (attempts > 0) {
                 const timeout = 1000 * Math.pow(2, attempts);
-                console.log(`network operation failed ${attempts} times,` +
+                logger.log(`network operation failed ${attempts} times,` +
                     ` retrying in ${timeout}ms...`);
                 await new Promise(r => setTimeout(r, timeout));
             }
