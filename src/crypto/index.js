@@ -146,7 +146,7 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
                     method,
                 );
             } else {
-                console.warn(`Excluding unknown verification method ${method}`);
+                logger.warn(`Excluding unknown verification method ${method}`);
             }
         }
     } else {

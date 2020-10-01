@@ -16,6 +16,7 @@ limitations under the License.
 */
 
 import {escapeRegExp, globToRegexp, isNullOrUndefined} from "./utils";
+import {logger} from './logger';
 
 /**
  * @module pushprocessor
@@ -444,7 +445,7 @@ PushProcessor.rewriteDefaultRules = function(incomingRules) {
         } else {
             // Add the rule
             const ruleId = override.rule_id;
-            console.warn(`Adding default global override for ${ruleId}`);
+            logger.warn(`Adding default global override for ${ruleId}`);
             globalOverrides.push(override);
         }
     }
