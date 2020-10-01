@@ -84,32 +84,73 @@ enum CallParty {
     REMOTE = 'remote',
 }
 
+enum MediaQueueId {
+    REMOTE_VIDEO = 'remote_video',
+    REMOTE_AUDIO = 'remote_audio',
+    LOCAL_VIDEO = 'local_video',
+}
+
 enum CallErrorCode {
     /** An error code when the local client failed to create an offer. */
-    ERR_LOCAL_OFFER_FAILED = "local_offer_failed",
+    LOCAL_OFFER_FAILED = 'local_offer_failed',
     /**
      * An error code when there is no local mic/camera to use. This may be because
      * the hardware isn't plugged in, or the user has explicitly denied access.
      */
-    ERR_NO_USER_MEDIA = "no_user_media",
+    NO_USER_MEDIA = 'no_user_media',
 
-    /*
-    * Error code used when a call event failed to send
-    * because unknown devices were present in the room
-    */
-    ERR_UNKNOWN_DEVICES = "unknown_devices",
+    /**
+     * Error code used when a call event failed to send
+     * because unknown devices were present in the room
+     */
+    UNKNOWN_DEVICES = 'unknown_devices',
 
-    /*
-    * Error code usewd when we fail to send the invite
-    * for some reason other than there being unknown devices
-    */
-    ERR_SEND_INVITE = "send_invite",
+    /**
+     * Error code usewd when we fail to send the invite
+     * for some reason other than there being unknown devices
+     */
+    SEND_INVITE = 'send_invite',
 
-    /*
-    * Error code usewd when we fail to send the answer
-    * for some reason other than there being unknown devices
-    */
-    ERR_SEND_ANSWER = "send_answer",
+    /**
+     * An answer could not be created
+     */
+    CREATE_ANSWER = 'create_answer',
+
+    /**
+     * Error code usewd when we fail to send the answer
+     * for some reason other than there being unknown devices
+     */
+    SEND_ANSWER = 'send_answer',
+
+    /**
+     * The session description from the other side could not be set
+     */
+    SET_REMOTE_DESCRIPTION = 'set_remote_description',
+
+    /**
+     * The session description from this side could not be set
+     */
+    SET_LOCAL_DESCRIPTION = 'set_local_description',
+
+    /**
+     * A different device answered the call
+     */
+    ANSWERED_ELSEWHERE = 'answered_elsewhere',
+
+    /**
+     * No media connection could be established to the other party
+     */
+    ICE_FAILED = 'ice_failed',
+
+    /**
+     * The invite timed out whilst waiting for an answer
+     */
+    INVITE_TIMEOUT = 'invite_timeout',
+
+    /**
+     * The call was replaced by another call
+     */
+    REPLACED = 'replaced',
 }
 
 /** The fallback ICE server to use for STUN or TURN protocols. */
@@ -161,9 +202,8 @@ export class MatrixCall extends EventEmitter {
     private remoteVideoElement: HTMLVideoElement;
     private remoteAudioElement: HTMLAudioElement;
     private screenSharingStream: MediaStream;
+    private remoteStream: MediaStream;
     private localAVStream: MediaStream;
-    private remoteAVStream: MediaStream;
-    private remoteAStream: MediaStream;
     private answerContent: object;
     private waitForLocalAVStream: boolean;
     // XXX: This is either the invite or answer from remote...
@@ -205,6 +245,7 @@ export class MatrixCall extends EventEmitter {
         this.mediaPromises = Object.create(null);
 
         this.sentEndOfCandidates = false;
+        this.remoteStream = new MediaStream();
     }
 
     /**
@@ -233,7 +274,6 @@ export class MatrixCall extends EventEmitter {
         this.remoteVideoElement = remoteVideoElement;
         this.placeCallWithConstraints(getUserMediaVideoContraints(CallType.VIDEO));
         this.type = CallType.VIDEO;
-        this.tryPlayRemoteStream();
     }
 
     /**
@@ -259,90 +299,20 @@ export class MatrixCall extends EventEmitter {
         } catch (err) {
             this.emit("error",
                 new CallError(
-                    CallErrorCode.ERR_NO_USER_MEDIA,
+                    CallErrorCode.NO_USER_MEDIA,
                     "Failed to get screen-sharing stream: ", err,
                 ),
             );
         }
 
         this.type = CallType.VIDEO;
-        this.tryPlayRemoteStream();
     }
 
-    /**
-     * Play the given HTMLMediaElement, serialising the operation into a chain
-     * of promises to avoid racing access to the element
-     * @param {Element} element HTMLMediaElement element to play
-     * @param {string} queueId Arbitrary ID to track the chain of promises to be used
-     */
-    playElement(element: HTMLMediaElement, queueId: string) {
-        logger.log("queuing play on " + queueId + " and element " + element);
-        // XXX: FIXME: Does this leak elements, given the old promises
-        // may hang around and retain a reference to them?
-        if (this.mediaPromises[queueId]) {
-            // XXX: these promises can fail (e.g. by <video/> being unmounted whilst
-            // pending receiving media to play - e.g. whilst switching between
-            // rooms before answering an inbound call), and throw unhandled exceptions.
-            // However, we should soldier on as best we can even if they fail, given
-            // these failures may be non-fatal (as in the case of unmounts)
-            this.mediaPromises[queueId] =
-                this.mediaPromises[queueId].then(function() {
-                    logger.log("previous promise completed for " + queueId);
-                    return element.play();
-                }, function() {
-                    logger.log("previous promise failed for " + queueId);
-                    return element.play();
-                });
+    private queueMediaOperation(queueId: MediaQueueId, operation: () => any) {
+        if (this.mediaPromises[queueId] !== undefined) {
+            this.mediaPromises[queueId] = this.mediaPromises[queueId].then(operation, operation);
         } else {
-            this.mediaPromises[queueId] = element.play();
-        }
-    }
-
-    /**
-     * Pause the given HTMLMediaElement, serialising the operation into a chain
-     * of promises to avoid racing access to the element
-     * @param {Element} element HTMLMediaElement element to pause
-     * @param {string} queueId Arbitrary ID to track the chain of promises to be used
-     */
-    pauseElement(element: HTMLMediaElement, queueId: string) {
-        logger.log("queuing pause on " + queueId + " and element " + element);
-        if (this.mediaPromises[queueId]) {
-            this.mediaPromises[queueId] =
-                this.mediaPromises[queueId].then(function() {
-                    logger.log("previous promise completed for " + queueId);
-                    return element.pause();
-                }, function() {
-                    logger.log("previous promise failed for " + queueId);
-                    return element.pause();
-                });
-        } else {
-            // pause doesn't return a promise, so just run it
-            element.pause();
-        }
-    }
-
-    /**
-     * Assign the given HTMLMediaElement by setting the .src attribute on it,
-     * serialising the operation into a chain of promises to avoid racing access
-     * to the element
-     * @param {Element} element HTMLMediaElement element to pause
-     * @param {MediaStream} srcObject the srcObject attribute value to assign to the element
-     * @param {string} queueId Arbitrary ID to track the chain of promises to be used
-     */
-    assignElement(element: HTMLMediaElement, srcObject: MediaStream, queueId: string) {
-        logger.log("queuing assign on " + queueId + " element " + element + " for " +
-            srcObject);
-        if (this.mediaPromises[queueId]) {
-            this.mediaPromises[queueId] =
-                this.mediaPromises[queueId].then(function() {
-                    logger.log("previous promise completed for " + queueId);
-                    element.srcObject = srcObject;
-                }, function() {
-                    logger.log("previous promise failed for " + queueId);
-                    element.srcObject = srcObject;
-                });
-        } else {
-            element.srcObject = srcObject;
+            this.mediaPromises[queueId] = Promise.resolve(operation());
         }
     }
 
@@ -382,14 +352,12 @@ export class MatrixCall extends EventEmitter {
 
         if (element && this.localAVStream && this.type === CallType.VIDEO) {
             element.autoplay = true;
-            this.assignElement(element, this.localAVStream, "localVideo");
-            element.muted = true;
-            setTimeout(() => {
-                const vel = this.getLocalVideoElement();
-                if (vel.play) {
-                    this.playElement(vel, "localVideo");
-                }
-            }, 0);
+
+            this.queueMediaOperation(MediaQueueId.LOCAL_VIDEO, () => {
+                element.srcObject = this.localAVStream;
+                element.muted = true;
+                return element.play();
+            });
         }
     }
 
@@ -399,8 +367,18 @@ export class MatrixCall extends EventEmitter {
      * @param {Element} element The <code>&lt;video&gt;</code> DOM element.
      */
     setRemoteVideoElement(element : HTMLVideoElement) {
+        element.autoplay = true;
+
+        // if we already have an audio element set, use that instead and mute the audio
+        // on this video element.
+        if (this.remoteAudioElement) element.muted = true;
+
         this.remoteVideoElement = element;
-        this.tryPlayRemoteStream();
+
+        this.queueMediaOperation(MediaQueueId.REMOTE_VIDEO, () => {
+            element.srcObject = this.remoteStream;
+            return element.play();
+        });
     }
 
     /**
@@ -409,27 +387,41 @@ export class MatrixCall extends EventEmitter {
      * The audio will *not* be rendered from the remoteVideoElement.
      * @param {Element} element The <code>&lt;video&gt;</code> DOM element.
      */
-    setRemoteAudioElement(element : HTMLAudioElement) {
+    async setRemoteAudioElement(element : HTMLAudioElement) {
+        element.autoplay = true;
+
         this.remoteVideoElement.muted = true;
         this.remoteAudioElement = element;
         this.remoteAudioElement.muted = false;
-        this.tryPlayRemoteAudioStream();
+
+        this.queueMediaOperation(MediaQueueId.REMOTE_AUDIO, async () => {
+            // if audioOutput is non-default:
+            try {
+                if (audioOutput) await element.setSinkId(audioOutput);
+            } catch (e) {
+                logger.warn("Couldn't set requested audio output device: using default", e);
+            }
+
+            element.srcObject = this.remoteStream;
+            return element.play();
+        });
     }
 
     /**
      * Configure this call from an invite event. Used by MatrixClient.
      * @param {MatrixEvent} event The m.call.invite event
      */
-    initWithInvite(event : any) {
+    async initWithInvite(event : any) {
         this.msg = event.getContent();
         this.peerConn = this.createPeerConnection();
-        if (this.peerConn) {
-            this.peerConn.setRemoteDescription(
-                this.msg.offer,
-                this.onSetRemoteDescriptionSuccess,
-                this.onSetRemoteDescriptionError,
-            );
+        try {
+            await this.peerConn.setRemoteDescription(this.msg.offer);
+        } catch (e) {
+            logger.debug("Failed to set remote description", e);
+            this.terminate(CallParty.LOCAL, CallErrorCode.SET_REMOTE_DESCRIPTION, false);
+            return;
         }
+
         this.setState(CallState.RINGING);
         this.direction = CallDirection.INBOUND;
 
@@ -442,9 +434,9 @@ export class MatrixCall extends EventEmitter {
             this.msg.offer.sdp &&
             this.msg.offer.sdp.indexOf('m=video') > -1
         ) {
-            this.type = CallType.VOICE;
-        } else {
             this.type = CallType.VIDEO;
+        } else {
+            this.type = CallType.VOICE;
         }
 
         if (event.getAge()) {
@@ -478,7 +470,7 @@ export class MatrixCall extends EventEmitter {
     /**
      * Answer a call.
      */
-    answer() {
+    async answer() {
         logger.debug(`Answering call ${this.callId} of type ${this.type}`);
 
         if (this.answerContent) {
@@ -489,14 +481,17 @@ export class MatrixCall extends EventEmitter {
         if (!this.localAVStream && !this.waitForLocalAVStream) {
             const constraints = getUserMediaVideoContraints(this.type);
             logger.log("Getting user media with constraints", constraints);
-            navigator.getUserMedia(
-                constraints,
-                this.maybeGotUserMediaForAnswer,
-                this.maybeGotUserMediaForAnswer,
-            );
             this.setState(CallState.WAIT_LOCAL_MEDIA);
+
+            try {
+                const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+                this.gotUserMediaForAnswer(mediaStream);
+            } catch (e) {
+                this.getUserMediaFailed(e);
+                return
+            }
         } else if (this.localAVStream) {
-            this.maybeGotUserMediaForAnswer(this.localAVStream);
+            this.gotUserMediaForAnswer(this.localAVStream);
         } else if (this.waitForLocalAVStream) {
             this.setState(CallState.WAIT_LOCAL_MEDIA);
         }
@@ -514,11 +509,11 @@ export class MatrixCall extends EventEmitter {
             newCall.waitForLocalAVStream = true;
         } else if (this.state === CallState.CREATE_OFFER) {
             logger.debugl("Handing local stream to new call");
-            newCall.maybeGotUserMediaForAnswer(this.localAVStream);
+            newCall.gotUserMediaForAnswer(this.localAVStream);
             delete(this.localAVStream);
         } else if (this.state === CallState.INVITE_SENT) {
             logger.debug("Handing local stream to new call");
-            newCall.maybeGotUserMediaForAnswer(this.localAVStream);
+            newCall.gotUserMediaForAnswer(this.localAVStream);
             delete(this.localAVStream);
         }
         newCall.localVideoElement = this.localVideoElement;
@@ -526,7 +521,7 @@ export class MatrixCall extends EventEmitter {
         newCall.remoteAudioElement = this.remoteAudioElement;
         this.successor = newCall;
         this.emit("replaced", newCall);
-        this.hangup("replaced", true);
+        this.hangup(CallErrorCode.REPLACED, true);
     }
 
     /**
@@ -534,11 +529,11 @@ export class MatrixCall extends EventEmitter {
      * @param {string} reason The reason why the call is being hung up.
      * @param {boolean} suppressEvent True to suppress emitting an event.
      */
-    hangup(reason: string, suppressEvent: boolean) {
+    hangup(reason: CallErrorCode, suppressEvent: boolean) {
         if (this.state === CallState.ENDED) return;
 
         logger.debug("Ending call " + this.callId);
-        this.terminate("local", reason, !suppressEvent);
+        this.terminate(CallParty.LOCAL, reason, !suppressEvent);
         const content = {
             version: 0,
             call_id: this.callId,
@@ -605,71 +600,53 @@ export class MatrixCall extends EventEmitter {
      * Internal
      * @param {Object} stream
      */
-    private maybeGotUserMediaForInvite = (streamOrError: any) => {
+    private gotUserMediaForInvite = async (stream: MediaStream) => {
         if (this.successor) {
-            this.successor.maybeGotUserMediaForAnswer(streamOrError);
+            this.successor.gotUserMediaForAnswer(stream);
             return;
         }
         if (this.state === CallState.ENDED) {
             return;
         }
-        logger.debug("maybeGotUserMediaForInvite -> " + this.type);
+        logger.debug("gotUserMediaForInvite -> " + this.type);
 
-        // XXX: switch away from callbacks API
-        const error = streamOrError;
-        const constraints = {
-            'mandatory': {
-                'OfferToReceiveAudio': true,
-                'OfferToReceiveVideo': this.type === CallType.VIDEO,
-            },
-        };
-        if (streamOrError instanceof MediaStream) {
-            const videoEl = this.getLocalVideoElement();
+        const videoEl = this.getLocalVideoElement();
 
-            if (videoEl && this.type === CallType.VIDEO) {
+        if (videoEl && this.type === CallType.VIDEO) {
+            this.queueMediaOperation(MediaQueueId.LOCAL_VIDEO, () => {
                 videoEl.autoplay = true;
                 if (this.screenSharingStream) {
                     logger.debug(
                         "Setting screen sharing stream to the local video element",
                     );
-                    this.assignElement(videoEl, this.screenSharingStream, "localVideo");
+                    videoEl.srcObject = this.screenSharingStream;
                 } else {
-                    this.assignElement(videoEl, streamOrError, "localVideo");
+                    videoEl.srcObject = stream;
                 }
                 videoEl.muted = true;
-                setTimeout(() => {
-                    const vel = this.getLocalVideoElement();
-                    if (vel.play) {
-                        this.playElement(vel, "localVideo");
-                    }
-                }, 0);
-            }
-
-            if (this.screenSharingStream) {
-                this.screenSharingStream.addTrack(streamOrError.getAudioTracks()[0]);
-                streamOrError = this.screenSharingStream;
-            }
-
-            this.localAVStream = streamOrError;
-            // why do we enable audio (and only audio) tracks here? -- matthew
-            setTracksEnabled(streamOrError.getAudioTracks(), true);
-            this.peerConn = this.createPeerConnection();
-            this.peerConn.addStream(streamOrError);
-        } else if (error.name === 'PermissionDeniedError') {
-            logger.debug('User denied access to camera/microphone.' +
-                ' Or possibly you are using an insecure domain. Receiving only.');
-            this.peerConn = this.createPeerConnection();
-        } else {
-            logger.debug('Failed to getUserMedia: ' + error.name);
-            this.getUserMediaFailed(error);
-            return;
+                return videoEl.play();
+            });
         }
 
-        this.peerConn.createOffer(
-            this.gotLocalOffer,
-            this.getLocalOfferFailed,
-            constraints,
-        );
+        this.localAVStream = stream;
+        // why do we enable audio (and only audio) tracks here? -- matthew
+        setTracksEnabled(stream.getAudioTracks(), true);
+        this.peerConn = this.createPeerConnection();
+
+        for (const audioTrack of stream.getAudioTracks()) {
+            this.peerConn.addTrack(audioTrack);
+        }
+        for (const videoTrack of (this.screenSharingStream || stream).getVideoTracks()) {
+            this.peerConn.addTrack(videoTrack);
+        }
+
+        try {
+            const myOffer = await this.peerConn.createOffer();
+            this.gotLocalOffer(myOffer);
+        } catch (e) {
+            this.getLocalOfferFailed(e);
+            return;
+        }
         this.setState(CallState.CREATE_OFFER);
     };
 
@@ -684,10 +661,10 @@ export class MatrixCall extends EventEmitter {
             this.setState(CallState.RINGING);
             this.client.cancelPendingEvent(error.event);
 
-            let code = CallErrorCode.ERR_SEND_ANSWER;
+            let code = CallErrorCode.SEND_ANSWER;
             let message = "Failed to send answer";
             if (error.name == 'UnknownDeviceError') {
-                code = CallErrorCode.ERR_UNKNOWN_DEVICES;
+                code = CallErrorCode.UNKNOWN_DEVICES;
                 message = "Unknown devices present in the room";
             }
             this.emit("error", new CallError(code, message, error));
@@ -695,71 +672,59 @@ export class MatrixCall extends EventEmitter {
         });
     }
 
-    /**
-     * Internal
-     * @param {Object} stream
-     */
-    private maybeGotUserMediaForAnswer = (streamOrError: any) => {
+    private gotUserMediaForAnswer = async (stream: MediaStream) => {
         if (this.state === CallState.ENDED) {
             return;
         }
 
-        // XXX: we use the same function as the success and error callback: we should
-        // this was an untraditional choice to start with but now the callbacks API
-        // is deprecated anyway and we should just use promises.
-        const error = streamOrError;
-        if (streamOrError instanceof MediaStream) {
-            const localVidEl = this.getLocalVideoElement();
+        const localVidEl = this.getLocalVideoElement();
 
-            if (localVidEl && this.type === CallType.VIDEO) {
+        if (localVidEl && this.type === CallType.VIDEO) {
+            this.queueMediaOperation(MediaQueueId.LOCAL_VIDEO, () => {
                 localVidEl.autoplay = true;
-                this.assignElement(localVidEl, streamOrError, "localVideo");
-                localVidEl.muted = true;
-                setTimeout(() => {
-                    const vel = this.getLocalVideoElement();
-                    if (vel.play) {
-                        this.playElement(vel, "localVideo");
-                    }
-                }, 0);
-            }
+                localVidEl.srcObject = stream;
 
-            this.localAVStream = streamOrError;
-            setTracksEnabled(streamOrError.getAudioTracks(), true);
-            this.peerConn.addStream(streamOrError);
-        } else if (error.name === 'PermissionDeniedError') {
-            logger.debug('User denied access to camera/microphone.' +
-                ' Or possibly you are using an insecure domain. Receiving only.');
-        } else {
-            logger.debug('Failed to getUserMedia: ' + error.name);
-            this.getUserMediaFailed(error);
+                localVidEl.muted = true;
+                return localVidEl.play();
+            });
+        }
+
+        this.localAVStream = stream;
+        setTracksEnabled(stream.getAudioTracks(), true);
+        for (const track of stream.getTracks()) {
+            this.peerConn.addTrack(track);
+        }
+
+        this.setState(CallState.CREATE_ANSWER);
+
+        let myAnswer;
+        try {
+            myAnswer = await this.peerConn.createAnswer();
+        } catch (err) {
+            logger.debug("Failed to create answer: ", err);
+            this.terminate(CallParty.LOCAL, CallErrorCode.CREATE_ANSWER, true);
             return;
         }
 
-        const constraints = {
-            'mandatory': {
-                'OfferToReceiveAudio': true,
-                'OfferToReceiveVideo': this.type === CallType.VIDEO,
-            },
-        };
-        this.peerConn.createAnswer((description) => {
-            logger.debug("Created answer: ", description);
-            this.peerConn.setLocalDescription(description, () => {
-                this.answerContent = {
-                    version: 0,
-                    call_id: this.callId,
-                    answer: {
-                        sdp: this.peerConn.localDescription.sdp,
-                        type: this.peerConn.localDescription.type,
-                    },
-                };
-                this.sendAnswer();
-            }, function() {
-                logger.debug("Error setting local description!");
-            });
-        }, function(err) {
-            logger.debug("Failed to create answer: " + err);
-        }, constraints);
-        this.setState(CallState.CREATE_ANSWER);
+        try {
+            await this.peerConn.setLocalDescription(myAnswer);
+
+            this.answerContent = {
+                version: 0,
+                call_id: this.callId,
+                answer: {
+                    sdp: this.peerConn.localDescription.sdp,
+                    // type is now deprecated as of Matrix VoIP v1, but
+                    // required to still be sent for backwards compat
+                    type: this.peerConn.localDescription.type,
+                },
+            };
+            this.sendAnswer();
+        } catch (err) {
+            logger.debug("Error setting local description!", err);
+            this.terminate(CallParty.LOCAL, CallErrorCode.SET_LOCAL_DESCRIPTION, true);
+            return;
+        }
     };
 
     /**
@@ -827,19 +792,23 @@ export class MatrixCall extends EventEmitter {
      * Used by MatrixClient.
      * @param {Object} msg
      */
-    receivedAnswer(msg: any) {
+    async receivedAnswer(msg: any) {
         if (this.state === CallState.ENDED) {
             return;
         }
 
-        this.peerConn.setRemoteDescription(msg.answer,
-            this.onSetRemoteDescriptionSuccess,
-            this.onSetRemoteDescriptionError,
-        );
+        try {
+            this.peerConn.setRemoteDescription(msg.answer);
+        } catch (e) {
+            logger.debug("Failed to set remote description", e);
+            this.terminate(CallParty.LOCAL, CallErrorCode.SET_REMOTE_DESCRIPTION, false);
+            return;
+        }
+
         this.setState(CallState.CONNECTING);
     }
 
-    private gotLocalOffer = (description: RTCSessionDescription) => {
+    private gotLocalOffer = async (description: RTCSessionDescriptionInit) => {
         logger.debug("Created offer: ", description);
 
         if (this.state === CallState.ENDED) {
@@ -848,66 +817,80 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        this.peerConn.setLocalDescription(description, () => {
-            const content = {
-                version: 0,
-                call_id: this.callId,
-                // OpenWebRTC appears to add extra stuff (like the DTLS fingerprint)
-                // to the description when setting it on the peerconnection.
-                // According to the spec it should only add ICE
-                // candidates. Any ICE candidates that have already been generated
-                // at this point will probably be sent both in the offer and separately.
-                // Also, note that we have to make a new object here, copying the
-                // type and sdp properties.
-                // Passing the RTCSessionDescription object as-is doesn't work in
-                // Chrome (as of about m43).
-                offer: {
-                    sdp: this.peerConn.localDescription.sdp,
-                    type: this.peerConn.localDescription.type,
-                },
-                lifetime: CALL_TIMEOUT_MS,
-            };
-            this.sendEvent('m.call.invite', content).then(() => {
-                this.setState(CallState.INVITE_SENT);
-                setTimeout(() => {
-                    if (this.state === CallState.INVITE_SENT) {
-                        this.hangup('invite_timeout', false);
-                    }
-                }, CALL_TIMEOUT_MS);
-            }).catch((error) => {
-                let code = CallErrorCode.ERR_SEND_INVITE;
-                let message = "Failed to send invite";
-                if (error.name == 'UnknownDeviceError') {
-                    code = CallErrorCode.ERR_UNKNOWN_DEVICES;
-                    message = "Unknown devices present in the room";
-                }
+        try {
+            await this.peerConn.setLocalDescription(description);
+        } catch (err) {
+            logger.debug("Error setting local description!", err);
+            this.terminate(CallParty.LOCAL, CallErrorCode.SET_LOCAL_DESCRIPTION, true);
+            return
+        }
 
-                this.client.cancelPendingEvent(error.event);
-                this.terminate("local", code, false);
-                this.emit("error", new CallError(code, message, error));
-                throw error;
-            });
-        }, function() {
-            logger.debug("Error setting local description!");
-        });
+        const content = {
+            version: 0,
+            call_id: this.callId,
+            // OpenWebRTC appears to add extra stuff (like the DTLS fingerprint)
+            // to the description when setting it on the peerconnection.
+            // According to the spec it should only add ICE
+            // candidates. Any ICE candidates that have already been generated
+            // at this point will probably be sent both in the offer and separately.
+            // Also, note that we have to make a new object here, copying the
+            // type and sdp properties.
+            // Passing the RTCSessionDescription object as-is doesn't work in
+            // Chrome (as of about m43).
+            offer: {
+                sdp: this.peerConn.localDescription.sdp,
+                // type now deprecated in Matrix VoIP v1, but
+                // required to still be sent for backwards compat
+                type: this.peerConn.localDescription.type,
+            },
+            lifetime: CALL_TIMEOUT_MS,
+        };
+        try {
+            await this.sendEvent('m.call.invite', content);
+            this.setState(CallState.INVITE_SENT);
+            setTimeout(() => {
+                if (this.state === CallState.INVITE_SENT) {
+                    this.hangup(CallErrorCode.INVITE_TIMEOUT, false);
+                }
+            }, CALL_TIMEOUT_MS);
+        } catch (error) {
+            let code = CallErrorCode.SEND_INVITE;
+            let message = "Failed to send invite";
+            if (error.name == 'UnknownDeviceError') {
+                code = CallErrorCode.UNKNOWN_DEVICES;
+                message = "Unknown devices present in the room";
+            }
+
+            this.client.cancelPendingEvent(error.event);
+            this.terminate(CallParty.LOCAL, code, false);
+            this.emit("error", new CallError(code, message, error));
+        }
     };
 
     private getLocalOfferFailed = (err: Error) => {
+        logger.error("Failed to get local offer", err);
+
+        this.terminate(CallParty.LOCAL, CallErrorCode.LOCAL_OFFER_FAILED, false);
         this.emit(
             "error",
             new CallError(
-                CallErrorCode.ERR_LOCAL_OFFER_FAILED,
-                "Failed to start audio for call!", err,
+                CallErrorCode.LOCAL_OFFER_FAILED,
+                "Failed to get local offer!", err,
             ),
         );
     };
 
     private getUserMediaFailed = (err: Error) => {
-        this.terminate("local", 'user_media_failed', false);
+        if (this.successor) {
+            this.successor.getUserMediaFailed(err);
+            return;
+        }
+
+        this.terminate(CallParty.LOCAL, CallErrorCode.NO_USER_MEDIA, false);
         this.emit(
             "error",
             new CallError(
-                CallErrorCode.ERR_NO_USER_MEDIA,
+                CallErrorCode.NO_USER_MEDIA,
                 "Couldn't start capturing media! Is your microphone set up and " +
                 "does this app have permission?", err,
             ),
@@ -927,7 +910,7 @@ export class MatrixCall extends EventEmitter {
                 this.peerConn.iceConnectionState == 'connected') {
             this.setState(CallState.CONNECTED);
         } else if (this.peerConn.iceConnectionState == 'failed') {
-            this.hangup('ice_failed', false);
+            this.hangup(CallErrorCode.ICE_FAILED, false);
         }
     };
 
@@ -938,84 +921,24 @@ export class MatrixCall extends EventEmitter {
         );
     };
 
-    private onSetRemoteDescriptionSuccess = () => {
-        logger.debug("Set remote description");
-    };
+    private onTrack = (ev: RTCTrackEvent) => {
+        logger.debug(`Track id ${ev.track.id} of kind ${ev.track.kind} added`);
 
-    onSetRemoteDescriptionError = (e: Error) => {
-        logger.debug("Failed to set remote description", e);
-    };
-
-    private onAddStream = (event: MediaStreamEvent) => {
-        logger.debug("Stream id " + event.stream.id + " added");
-
-        const s = event.stream;
-
-        if (s.getVideoTracks().length > 0) {
+        if (ev.track.kind == 'video') {
             this.type = CallType.VIDEO;
-            this.remoteAVStream = s;
-            this.remoteAStream = s;
-        } else {
-            this.type = CallType.VOICE;
-            this.remoteAStream = s;
         }
 
-        forAllTracksOnStream(s, (t) => {
-            logger.debug("Track id " + t.id + " added");
-            // not currently implemented in chrome
-            t.onstarted = this.onRemoteStreamTrackStarted;
-        });
-
-        if (event.stream.oninactive !== undefined) {
-            event.stream.oninactive = this.onRemoteStreamEnded;
-        } else {
-            // onended is deprecated from Chrome 54
-            event.stream.onended = this.onRemoteStreamEnded;
-        }
-
-        // not currently implemented in chrome
-        event.stream.onstarted = this.onRemoteStreamStarted;
-
-        if (this.type === CallType.VIDEO) {
-            this.tryPlayRemoteStream();
-            this.tryPlayRemoteAudioStream();
-        } else {
-            this.tryPlayRemoteAudioStream();
-        }
-    };
-
-    private onRemoteStreamStarted = (event: Event) => {
-        this.setState(CallState.CONNECTED);
-    };
-
-    /**
-     * Internal
-     * @private
-     * @param {Object} event
-     */
-    private onRemoteStreamEnded = (event: Event) => {
-        logger.debug("Remote stream ended");
-        this.hangupParty = CallParty.REMOTE;
-        this.setState(CallState.ENDED);
-        this.stopAllMedia();
-        if (this.peerConn.signalingState != 'closed') {
-            this.peerConn.close();
-        }
-        this.emit("hangup", this);
-    };
-
-    private onRemoteStreamTrackStarted = (event: Event) => {
-        this.setState(CallState.CONNECTED);
+        this.remoteStream.addTrack(ev.track);
     };
 
     onHangupReceived = (msg) => {
         logger.debug("Hangup received");
-        this.terminate("remote", msg.reason, true);
+        this.terminate(CallParty.REMOTE, msg.reason, true);
     };
 
     onAnsweredElsewhere = (msg) => {
         logger.debug("Answered elsewhere");
-        this.terminate("remote", "answered_elsewhere", true);
+        this.terminate(CallParty.REMOTE, CallErrorCode.ANSWERED_ELSEWHERE, true);
     };
 
     setState(state: CallState) {
@@ -1030,7 +953,7 @@ export class MatrixCall extends EventEmitter {
      * @param {Object} content
      * @return {Promise}
      */
-    sendEvent(eventType: string, content: object) {
+    private sendEvent(eventType: string, content: object) {
         return this.client.sendEvent(this.roomId, eventType, content);
     }
 
@@ -1043,7 +966,7 @@ export class MatrixCall extends EventEmitter {
         // means we tried to pick (ie. started generating candidates) and then failed to
         // send the answer and went back to the ringing state. Queue up the candidates
         // to send if we sucessfully send the answer.
-        if (this.state == CallState.RINGING) return;
+        if (this.state === CallState.RINGING) return;
 
         if (this.candidateSendTries === 0) {
             setTimeout(() => {
@@ -1052,24 +975,30 @@ export class MatrixCall extends EventEmitter {
         }
     }
 
-    private terminate(hangupParty, hangupReason, shouldEmit: boolean) {
-        if (this.getRemoteVideoElement()) {
-            if (this.getRemoteVideoElement().pause) {
-                this.pauseElement(this.getRemoteVideoElement(), "remoteVideo");
-            }
-            this.assignElement(this.getRemoteVideoElement(), null, "remoteVideo");
+    private terminate(hangupParty: CallParty, hangupReason: CallErrorCode, shouldEmit: boolean) {
+        if (this.state === CallState.ENDED) return;
+
+        const remoteVid = this.getRemoteVideoElement();
+        const remoteAud = this.getRemoteAudioElement();
+        const localVid = this.getLocalVideoElement();
+
+        if (remoteVid) {
+            this.queueMediaOperation(MediaQueueId.REMOTE_VIDEO, () => {
+                remoteVid.pause();
+                remoteVid.srcObject = null;
+            });
         }
-        if (this.getRemoteAudioElement()) {
-            if (this.getRemoteAudioElement().pause) {
-                this.pauseElement(this.getRemoteAudioElement(), "remoteAudio");
-            }
-            this.assignElement(this.getRemoteAudioElement(), null, "remoteAudio");
+        if (remoteAud) {
+            this.queueMediaOperation(MediaQueueId.REMOTE_AUDIO, () => {
+                remoteAud.pause();
+                remoteAud.srcObject = null;
+            });
         }
-        if (this.getLocalVideoElement()) {
-            if (this.getLocalVideoElement().pause) {
-                this.pauseElement(this.getLocalVideoElement(), "localVideo");
-            }
-            this.assignElement(this.getLocalVideoElement(), null, "localVideo");
+        if (localVid) {
+            this.queueMediaOperation(MediaQueueId.LOCAL_VIDEO, () => {
+                localVid.pause();
+                localVid.srcObject = null;
+            });
         }
         this.hangupParty = hangupParty;
         this.hangupReason = hangupReason;
@@ -1086,76 +1015,18 @@ export class MatrixCall extends EventEmitter {
     private stopAllMedia() {
         logger.debug(`stopAllMedia (stream=${this.localAVStream})`);
         if (this.localAVStream) {
-            forAllTracksOnStream(this.localAVStream, function(t) {
-                if (t.stop) {
-                    t.stop();
-                }
-            });
-            // also call stop on the main stream so firefox will stop sharing
-            // the mic
-            if (this.localAVStream.stop) {
-                this.localAVStream.stop();
+            for (const track of this.localAVStream.getTracks()) {
+                track.stop();
             }
         }
         if (this.screenSharingStream) {
-            forAllTracksOnStream(this.screenSharingStream, function(t) {
-                if (t.stop) {
-                    t.stop();
-                }
-            });
-            if (this.screenSharingStream.stop) {
-                this.screenSharingStream.stop();
+            for (const track of this.screenSharingStream.getTracks()) {
+                track.stop();
             }
         }
-        if (this.remoteAVStream) {
-            forAllTracksOnStream(this.remoteAVStream, function(t) {
-                if (t.stop) {
-                    t.stop();
-                }
-            });
-        }
-        if (this.remoteAStream) {
-            forAllTracksOnStream(this.remoteAStream, function(t) {
-                if (t.stop) {
-                    t.stop();
-                }
-            });
-        }
-    }
 
-    private tryPlayRemoteStream() {
-        if (this.getRemoteVideoElement() && this.remoteAVStream) {
-            const player = this.getRemoteVideoElement();
-            player.autoplay = true;
-            this.assignElement(player, this.remoteAVStream, "remoteVideo");
-            setTimeout(() => {
-                const vel = this.getRemoteVideoElement();
-                if (vel.play) {
-                    this.playElement(vel, "remoteVideo");
-                }
-            }, 0);
-        }
-    }
-
-    private async tryPlayRemoteAudioStream() {
-        if (this.getRemoteAudioElement() && this.remoteAStream) {
-            const player = this.getRemoteAudioElement();
-
-            // if audioOutput is non-default:
-            try {
-                if (audioOutput) await player.setSinkId(audioOutput);
-            } catch (e) {
-                logger.warn("Couldn't set requested audio output device: using default", e);
-            }
-
-            player.autoplay = true;
-            this.assignElement(player, this.remoteAStream, "remoteAudio");
-            setTimeout(() => {
-                const ael = this.getRemoteAudioElement();
-                if (ael.play) {
-                    this.playElement(ael, "remoteAudio");
-                }
-            }, 0);
+        for (const track of this.remoteStream.getTracks()) {
+            track.stop();
         }
     }
 
@@ -1207,17 +1078,19 @@ export class MatrixCall extends EventEmitter {
         });
     }
 
-    private placeCallWithConstraints(constraints: MediaStreamConstraints) {
+    private async placeCallWithConstraints(constraints: MediaStreamConstraints) {
         logger.log("Getting user media with constraints", constraints);
         this.client.callList[this.callId] = this;
-        navigator.getUserMedia(
-            constraints,
-            this.maybeGotUserMediaForInvite,
-            this.maybeGotUserMediaForInvite,
-        );
         this.setState(CallState.WAIT_LOCAL_MEDIA);
         this.direction = CallDirection.OUTBOUND;
         this.config = constraints;
+        try {
+            const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+            this.gotUserMediaForInvite(mediaStream);
+        } catch (e) {
+            this.getUserMediaFailed(e);
+            return;
+        }
     }
 
     private createPeerConnection(): RTCPeerConnection {
@@ -1225,11 +1098,13 @@ export class MatrixCall extends EventEmitter {
             iceTransportPolicy: this.forceTURN ? 'relay' : undefined,
             iceServers: this.turnServers,
         });
-        pc.oniceconnectionstatechange = this.onIceConnectionStateChanged;
-        pc.onsignalingstatechange = this.onSignallingStateChanged;
-        pc.onicecandidate = this.gotLocalIceCandidate;
-        pc.onicegatheringstatechange = this.onIceGatheringStateChange;
-        pc.onaddstream = this.onAddStream;
+
+        pc.addEventListener('iceconnectionstatechange', this.onIceConnectionStateChanged);
+        pc.addEventListener('signalingstatechange', this.onSignallingStateChanged);
+        pc.addEventListener('icecandidate', this.gotLocalIceCandidate);
+        pc.addEventListener('icegatheringstatechange', this.onIceGatheringStateChange);
+        pc.addEventListener('track', this.onTrack);
+
         return pc;
     }
 }
@@ -1275,25 +1150,6 @@ function getUserMediaVideoContraints(callType: CallType) {
                 },
             };
     }
-}
-
-function forAllVideoTracksOnStream(s: MediaStream, f: (t: MediaStreamTrack) => void) {
-    const tracks = s.getVideoTracks();
-    for (let i = 0; i < tracks.length; i++) {
-        f(tracks[i]);
-    }
-}
-
-function forAllAudioTracksOnStream(s: MediaStream, f: (t: MediaStreamTrack) => void) {
-    const tracks = s.getAudioTracks();
-    for (let i = 0; i < tracks.length; i++) {
-        f(tracks[i]);
-    }
-}
-
-function forAllTracksOnStream(s: MediaStream, f: (t: MediaStreamTrack) => void) {
-    forAllVideoTracksOnStream(s, f);
-    forAllAudioTracksOnStream(s, f);
 }
 
 let audioOutput: string;

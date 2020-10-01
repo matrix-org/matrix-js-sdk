@@ -40,38 +40,6 @@ declare global {
         setSinkId(outputId: string);
     }
 
-    interface RTCPeerConnection {
-        // Old callback based API that types don't know about
-        // We should update to use the new Promise API
-        setRemoteDescription(description: RTCSessionDescription, success, failure);
-    }
-
-    interface RTCPeerConnection {
-        // addStream is deprecated and we should stop using it
-        addStream(s: MediaStream);
-        onaddstream;
-
-        // More callback-based APIs we need to stop using
-        createOffer(success, failure, options: object);
-        setLocalDescription(RTCSessionDescription, success, failure);
-        createAnswer(success, failure, options: object);
-    }
-
-    interface MediaStreamTrack {
-        // Apparently this was not implemented in Chrome when the code was written,
-        // so possibly we just made it up? We should stop using it.
-        onstarted;
-    }
-
-    interface MediaStream {
-        // More things that may never have existed
-        onstarted;
-        onended;
-        oninactive;
-
-        stop();
-    }
-
     interface DummyInterfaceWeShouldntBeUsingThis {}
 
     interface Navigator {
