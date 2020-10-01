@@ -75,8 +75,8 @@ enum CallType {
 }
 
 enum CallDirection {
-    INBOUND,
-    OUTBOUND,
+    INBOUND = 'inbound',
+    OUTBOUND = 'outbound',
 }
 
 enum CallParty {
@@ -147,12 +147,11 @@ export class MatrixCall extends EventEmitter {
     state: CallState;
     hangupParty: CallParty;
     hangupReason: string;
+    direction: CallDirection;
 
     private client: any; // Fix when client is TSified
-    private direction: CallDirection;
     private forceTURN: boolean;
     private turnServers: Array<TurnServer>;
-    private didConnect: boolean;
     private candidateSendQueue: Array<RTCIceCandidate>;
     private candidateSendTries: number;
     private mediaPromises: { [queueId: string]: Promise<void>; };
@@ -192,7 +191,6 @@ export class MatrixCall extends EventEmitter {
 
         this.callId = "c" + new Date().getTime() + Math.random();
         this.state = CallState.FLEDGLING;
-        this.didConnect = false;
 
         // A queue for candidates waiting to go out.
         // We try to amalgamate candidates into a single candidate message where
@@ -928,7 +926,6 @@ export class MatrixCall extends EventEmitter {
         if (this.peerConn.iceConnectionState == 'completed' ||
                 this.peerConn.iceConnectionState == 'connected') {
             this.setState(CallState.CONNECTED);
-            this.didConnect = true;
         } else if (this.peerConn.iceConnectionState == 'failed') {
             this.hangup('ice_failed', false);
         }
