@@ -2170,7 +2170,7 @@ MatrixClient.prototype._restoreKeyBackup = function(
     // This is async.
     this._crypto.storeSessionBackupPrivateKey(privKey)
     .catch((e) => {
-        console.warn("Error caching session backup key:", e);
+        logger.warn("Error caching session backup key:", e);
     }).then(cacheCompleteCallback);
 
     if (progressCallback) {
@@ -2974,14 +2974,19 @@ function _sendEventHttpRequest(client, event) {
  * @param {string} eventId
  * @param {string} [txnId]  transaction id. One will be made up if not
  *    supplied.
- * @param {module:client.callback} callback Optional.
+ * @param {object|module:client.callback} callbackOrOpts
+ *    Options to pass on, may contain `reason`.
+ *    Can be callback for backwards compatibility.
  * @return {Promise} Resolves: TODO
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype.redactEvent = function(roomId, eventId, txnId, callback) {
+MatrixClient.prototype.redactEvent = function(roomId, eventId, txnId, callbackOrOpts) {
+    const opts = typeof(callbackOrOpts) === 'object' ? callbackOrOpts : {};
+    const reason = opts.reason;
+    const callback = typeof(callbackOrOpts) === 'function' ? callbackOrOpts : undefined;
     return this._sendCompleteEvent(roomId, {
         type: "m.room.redaction",
-        content: {},
+        content: { reason: reason },
         redacts: eventId,
     }, txnId, callback);
 };
@@ -5347,7 +5352,11 @@ function setupCallEventHandler(client) {
                     // This call has previously been answered or hung up: ignore it
                     return;
                 }
-                callEventHandler(e);
+                try {
+                    callEventHandler(e);
+                } catch (e) {
+                    logger.error("Caught exception handling call event", e);
+                }
             });
             callEventBuffer = [];
         }
@@ -5373,7 +5382,11 @@ function setupCallEventHandler(client) {
                 } else {
                     // This one wasn't buffered so just run the event handler for it
                     // straight away
-                    callEventHandler(event);
+                    try {
+                        callEventHandler(event);
+                    } catch (e) {
+                        logger.error("Caught exception handling call event", e);
+                    }
                 }
             });
         }

@@ -22,6 +22,7 @@ import {TestClient} from '../../TestClient';
 import {makeTestClients} from './verification/util';
 import {encryptAES} from "../../../src/crypto/aes";
 import {resetCrossSigningKeys, createSecretStorageKey} from "./crypto-utils";
+import {logger} from '../../../src/logger';
 
 import * as utils from "../../../src/utils";
 
@@ -29,7 +30,7 @@ try {
     const crypto = require('crypto');
     utils.setCrypto(crypto);
 } catch (err) {
-    console.log('nodejs was compiled without crypto support');
+    logger.log('nodejs was compiled without crypto support');
 }
 
 async function makeTestClient(userInfo, options) {
@@ -60,7 +61,7 @@ function sign(obj, key, userId) {
 
 describe("Secrets", function() {
     if (!global.Olm) {
-        console.warn('Not running megolm backup unit tests: libolm not present');
+        logger.warn('Not running megolm backup unit tests: libolm not present');
         return;
     }
 

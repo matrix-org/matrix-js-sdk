@@ -327,6 +327,7 @@ if [ -z "$skip_jsdoc" ]; then
         $release index.html
     git add "$release"
     git commit --no-verify -m "Add jsdoc for $release" index.html "$release"
+    git push origin gh-pages
 fi
 
 # if it is a pre-release, leave it on the release branch for now.
@@ -341,11 +342,8 @@ git checkout master
 git pull
 git merge "$rel_branch"
 
-# push master and docs (if generated) to github
+# push master to github
 git push origin master
-if [ -z "$skip_jsdoc" ]; then
-    git push origin gh-pages
-fi
 
 # finally, merge master back onto develop (if it exists)
 if [ $(git branch -lr | grep origin/develop -c) -ge 1 ]; then

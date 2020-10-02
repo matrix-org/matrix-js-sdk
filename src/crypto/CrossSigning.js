@@ -211,13 +211,16 @@ export class CrossSigningInfo extends EventEmitter {
     /**
      * Check whether the private keys exist in the local key cache.
      *
+     * @param {string} [type] The type of key to get. One of "master",
+     * "self_signing", or "user_signing". Optional, will check all by default.
      * @returns {boolean} True if all keys are stored in the local cache.
      */
-    async isStoredInKeyCache() {
+    async isStoredInKeyCache(type) {
         const cacheCallbacks = this._cacheCallbacks;
         if (!cacheCallbacks) return false;
-        for (const type of ["master", "self_signing", "user_signing"]) {
-            if (!await cacheCallbacks.getCrossSigningKeyCache(type)) {
+        const types = type ? [type] : ["master", "self_signing", "user_signing"];
+        for (const t of types) {
+            if (!await cacheCallbacks.getCrossSigningKeyCache(t)) {
                 return false;
             }
         }
@@ -235,6 +238,9 @@ export class CrossSigningInfo extends EventEmitter {
         if (!cacheCallbacks) return keys;
         for (const type of ["master", "self_signing", "user_signing"]) {
             const privKey = await cacheCallbacks.getCrossSigningKeyCache(type);
+            if (!privKey) {
+                continue;
+            }
             keys.set(type, privKey);
         }
         return keys;
@@ -728,7 +734,7 @@ export async function requestKeysDuringVerification(baseApis, userId, deviceId) 
     if (baseApis.getUserId() !== userId) {
         return;
     }
-    console.log("Cross-signing: Self-verification done; requesting keys");
+    logger.log("Cross-signing: Self-verification done; requesting keys");
     // This happens asynchronously, and we're not concerned about waiting for
     // it.  We return here in order to test.
     return new Promise((resolve, reject) => {
@@ -742,7 +748,7 @@ export async function requestKeysDuringVerification(baseApis, userId, deviceId) 
         const crossSigning = new CrossSigningInfo(
             original.userId,
             { getCrossSigningKey: async (type) => {
-                console.debug("Cross-signing: requesting secret",
+                logger.debug("Cross-signing: requesting secret",
                                 type, deviceId);
                 const { promise } = client.requestSecret(
                     `m.cross_signing.${type}`, [deviceId],
@@ -805,6 +811,6 @@ export async function requestKeysDuringVerification(baseApis, userId, deviceId) 
             timeout,
         ]).then(resolve, reject);
     }).catch((e) => {
-        console.warn("Cross-signing: failure while requesting keys:", e);
+        logger.warn("Cross-signing: failure while requesting keys:", e);
     });
 }

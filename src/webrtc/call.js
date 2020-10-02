@@ -741,6 +741,13 @@ MatrixCall.prototype._gotRemoteIceCandidate = function(cand) {
         //debuglog("Ignoring remote ICE candidate because call has ended");
         return;
     }
+    if (
+            (cand.sdpMid === null || cand.sdpMid === undefined) &&
+            (cand.sdpMLineIndex === null || cand.sdpMLineIndex === undefined)
+    ) {
+        debuglog("Ignoring remote ICE candidate with no sdpMid or sdpMLineIndex");
+        return;
+    }
     debuglog("Got remote ICE " + cand.sdpMid + " candidate: " + cand.candidate);
     this.peerConn.addIceCandidate(
         new this.webRtc.RtcIceCandidate(cand),
