@@ -634,10 +634,10 @@ export class MatrixCall extends EventEmitter {
         this.peerConn = this.createPeerConnection();
 
         for (const audioTrack of stream.getAudioTracks()) {
-            this.peerConn.addTrack(audioTrack);
+            this.peerConn.addTrack(audioTrack, stream);
         }
         for (const videoTrack of (this.screenSharingStream || stream).getVideoTracks()) {
-            this.peerConn.addTrack(videoTrack);
+            this.peerConn.addTrack(videoTrack, stream);
         }
 
         try {
@@ -692,7 +692,7 @@ export class MatrixCall extends EventEmitter {
         this.localAVStream = stream;
         setTracksEnabled(stream.getAudioTracks(), true);
         for (const track of stream.getTracks()) {
-            this.peerConn.addTrack(track);
+            this.peerConn.addTrack(track, stream);
         }
 
         this.setState(CallState.CREATE_ANSWER);
