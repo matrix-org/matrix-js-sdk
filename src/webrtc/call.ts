@@ -245,7 +245,6 @@ export class MatrixCall extends EventEmitter {
         this.mediaPromises = Object.create(null);
 
         this.sentEndOfCandidates = false;
-        this.remoteStream = new MediaStream();
     }
 
     /**
@@ -367,6 +366,8 @@ export class MatrixCall extends EventEmitter {
      * @param {Element} element The <code>&lt;video&gt;</code> DOM element.
      */
     setRemoteVideoElement(element : HTMLVideoElement) {
+        if (element === this.remoteVideoElement) return;
+
         element.autoplay = true;
 
         // if we already have an audio element set, use that instead and mute the audio
@@ -375,10 +376,12 @@ export class MatrixCall extends EventEmitter {
 
         this.remoteVideoElement = element;
 
-        this.queueMediaOperation(MediaQueueId.REMOTE_VIDEO, () => {
-            element.srcObject = this.remoteStream;
-            return element.play();
-        });
+        if (this.remoteStream) {
+            this.queueMediaOperation(MediaQueueId.REMOTE_VIDEO, () => {
+                element.srcObject = this.remoteStream;
+                return element.play();
+            });
+        }
     }
 
     /**
@@ -388,23 +391,13 @@ export class MatrixCall extends EventEmitter {
      * @param {Element} element The <code>&lt;video&gt;</code> DOM element.
      */
     async setRemoteAudioElement(element : HTMLAudioElement) {
-        element.autoplay = true;
+        if (element === this.remoteAudioElement) return;
 
         this.remoteVideoElement.muted = true;
         this.remoteAudioElement = element;
         this.remoteAudioElement.muted = false;
 
-        this.queueMediaOperation(MediaQueueId.REMOTE_AUDIO, async () => {
-            // if audioOutput is non-default:
-            try {
-                if (audioOutput) await element.setSinkId(audioOutput);
-            } catch (e) {
-                logger.warn("Couldn't set requested audio output device: using default", e);
-            }
-
-            element.srcObject = this.remoteStream;
-            return element.play();
-        });
+        if (this.remoteStream) this.playRemoteAudio();
     }
 
     /**
@@ -928,8 +921,81 @@ export class MatrixCall extends EventEmitter {
             this.type = CallType.VIDEO;
         }
 
-        this.remoteStream.addTrack(ev.track);
+        // This is relatively complex as we may get any number of tracks that may
+        // be in any number of streams, or not in streams at all, etc.
+        // I'm not entirely sure how this API is supposed to be used: it would
+        // be nice to know when the browser is finished telling us about a bunch
+        // of tracks so we could go & figure out which ones to use in which streams,
+        // but it doesn't. There was an 'addstream' event, but that is now deprecated.
+
+        // The base case is that there will be one stream with one audio track, or in
+        // the case of a video call, and audio and video track.
+
+        // This algorithm is not perfect and will fail in edge cases such as a streamless
+        // track being added first, followed by a normal audio + video stream.
+
+        const haveStream = this.remoteStream !== undefined;
+        if (!haveStream) {
+            // If we don't currently have a stream, use one this track is already in
+            if (ev.streams.length > 0) {
+                this.remoteStream = ev.streams[0];
+            } else {
+                // ...unless it's a streamless track, in which case we'll need to make
+                // our own stream.
+                this.remoteStream = new MediaStream();
+            }
+        }
+
+        // if this track isn't in a stream, add it to the one we have.
+        // This basically assumes all the tracks are streamless, otherwise it
+        // will end up adding the track to a stream provided by the RTCPeerConnection,
+        // which would be weird.
+        if (ev.streams.length === 0) this.remoteStream.addTrack(ev.track);
+
+        // If we've just gained our stream, wire it up to the media object
+        if (!haveStream) {
+            if (this.remoteVideoElement) {
+                this.queueMediaOperation(MediaQueueId.REMOTE_VIDEO, async () => {
+                    this.remoteVideoElement.srcObject = this.remoteStream;
+                    try {
+                        await this.remoteVideoElement.play();
+                    } catch (e) {
+                        logger.error("Failed to play remote video element", e);
+                    }
+                });
+            }
+
+            if (this.remoteAudioElement) {
+                this.playRemoteAudio();
+            }
+        }
     };
+
+    playRemoteAudio() {
+        this.queueMediaOperation(MediaQueueId.REMOTE_AUDIO, async () => {
+            this.remoteAudioElement.srcObject = this.remoteStream;
+
+            // if audioOutput is non-default:
+            try {
+                if (audioOutput) {
+                    // This seems quite unreliable in Chrome, although I haven't yet managed to make a jsfiddle where
+                    // it fails.
+                    // It seems reliable if you set the sink ID after setting the srcObject and then set the sink ID
+                    // back to the default after the call is over
+                    logger.info("Setting audio sink to " + audioOutput + ", was " + this.remoteAudioElement.sinkId);
+                    await this.remoteAudioElement.setSinkId(audioOutput);
+                }
+            } catch (e) {
+                logger.warn("Couldn't set requested audio output device: using default", e);
+            }
+
+            try {
+                await this.remoteAudioElement.play();
+            } catch (e) {
+                logger.error("Failed to play remote video element", e);
+            }
+        });
+    }
 
     onHangupReceived = (msg) => {
         logger.debug("Hangup received");
@@ -989,9 +1055,16 @@ export class MatrixCall extends EventEmitter {
             });
         }
         if (remoteAud) {
-            this.queueMediaOperation(MediaQueueId.REMOTE_AUDIO, () => {
+            this.queueMediaOperation(MediaQueueId.REMOTE_AUDIO, async () => {
                 remoteAud.pause();
                 remoteAud.srcObject = null;
+                try {
+                    // As per comment in playRemoteAudio, setting the sink ID back to the default
+                    // once the call is over makes setSinkId work reliably.
+                    await this.remoteAudioElement.setSinkId('')
+                } catch (e) {
+                    logger.warn("Failed to set sink ID back to default");
+                }
             });
         }
         if (localVid) {
