@@ -848,6 +848,7 @@ class DeviceListUpdateSerialiser {
 
             await _updateStoredDeviceKeysForUser(
                 this._olmDevice, userId, userStore, dkResponse || {},
+                this._baseApis.getUserId(), this._baseApis.deviceId,
             );
 
             // put the updates into the object that will be returned as our results
@@ -885,8 +886,9 @@ class DeviceListUpdateSerialiser {
 }
 
 
-async function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
-        userResult) {
+async function _updateStoredDeviceKeysForUser(
+    _olmDevice, userId, userStore, userResult, localUserId, localDeviceId,
+) {
     let updated = false;
 
     // remove any devices in the store which aren't in the response
@@ -896,6 +898,13 @@ async function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
         }
 
         if (!(deviceId in userResult)) {
+            if (userId === localUserId && deviceId === localDeviceId) {
+                logger.warn(
+                    `Local device ${deviceId} missing from sync, skipping removal`,
+                );
+                continue;
+            }
+
             logger.log("Device " + userId + ":" + deviceId +
                 " has been removed");
             delete userStore[deviceId];
