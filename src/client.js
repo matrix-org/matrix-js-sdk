@@ -55,6 +55,7 @@ import {PushProcessor} from "./pushprocessor";
 import {encodeBase64, decodeBase64} from "./crypto/olmlib";
 import { User } from "./models/user";
 import {AutoDiscovery} from "./autodiscovery";
+import {DEHYDRATION_ALGORITHM} from "./crypto/dehydration";
 
 const SCROLLBACK_DELAY_MS = 3000;
 export const CRYPTO_ENABLED = isCryptoAvailable();
@@ -458,6 +459,121 @@ export function MatrixClient(opts) {
 }
 utils.inherits(MatrixClient, EventEmitter);
 utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);
+
+/**
+ * Try to rehydrate a device if available.  The client must have been
+ * initialized with a `cryptoCallback.getDehydrationKey` option, and this
+ * function must be called before initCrypto and startClient are called.
+ *
+ * @return {Promise} Resolves to undefined if a device could not be dehydrated, or
+ *     to the new device ID if the dehydration was successful.
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixClient.prototype.rehydrateDevice = async function() {
+    if (this._crypto) {
+        throw new Error("Cannot rehydrate device after crypto is initialized");
+    }
+
+    if (!this._cryptoCallbacks.getDehydrationKey) {
+        return;
+    }
+
+    let getDeviceResult;
+    try {
+        getDeviceResult = await this._http.authedRequest(
+            undefined,
+            "GET",
+            "/dehydrated_device",
+            undefined, undefined,
+            {
+                prefix: "/_matrix/client/unstable/org.matrix.msc2697.v2",
+            },
+        );
+    } catch (e) {
+        logger.info("could not get dehydrated device", e);
+        return;
+    }
+
+    if (!getDeviceResult.device_data || !getDeviceResult.device_id) {
+        logger.info("no dehydrated device found");
+        return;
+    }
+
+    const account = new global.Olm.Account();
+    try {
+        const deviceData = getDeviceResult.device_data;
+        if (deviceData.algorithm !== DEHYDRATION_ALGORITHM) {
+            logger.warn("Wrong algorithm for dehydrated device");
+            return;
+        }
+        logger.log("unpickling dehydrated device");
+        const key = await this._cryptoCallbacks.getDehydrationKey(
+            deviceData,
+            (k) => {
+                // copy the key so that it doesn't get clobbered
+                account.unpickle(new Uint8Array(k), deviceData.account);
+            },
+        );
+        account.unpickle(key, deviceData.account);
+        logger.log("unpickled device");
+
+        const rehydrateResult = await this._http.authedRequest(
+            undefined,
+            "POST",
+            "/dehydrated_device/claim",
+            undefined,
+            {
+                device_id: getDeviceResult.device_id,
+            },
+            {
+                prefix: "/_matrix/client/unstable/org.matrix.msc2697.v2",
+            },
+        );
+
+        if (rehydrateResult.success === true) {
+            this.deviceId = getDeviceResult.device_id;
+            logger.info("using dehydrated device");
+            const pickleKey = this.pickleKey || "DEFAULT_KEY";
+            this._exportedOlmDeviceToImport = {
+                pickledAccount: account.pickle(pickleKey),
+                sessions: [],
+                pickleKey: pickleKey,
+            };
+            account.free();
+            return this.deviceId;
+        } else {
+            account.free();
+            logger.info("not using dehydrated device");
+            return;
+        }
+    } catch (e) {
+        account.free();
+        logger.warn("could not unpickle", e);
+    }
+};
+
+/**
+ * Set the dehydration key.  This will also periodically dehydrate devices to
+ * the server.
+ *
+ * @param {Uint8Array} key the dehydration key
+ * @param {object} [keyInfo] Information about the key.  Primarily for
+ *     information about how to generate the key from a passphrase.
+ * @param {string} [deviceDisplayName] The device display name for the
+ *     dehydrated device.
+ * @return {Promise} A promise that resolves when the dehydrated device is stored.
+ */
+MatrixClient.prototype.setDehydrationKey = async function(
+    key, keyInfo = {}, deviceDisplayName = undefined,
+) {
+    if (!(this._crypto)) {
+        logger.warn('not dehydrating device if crypto is not enabled');
+        return;
+    }
+    return await this._crypto._dehydrationManager.setDehydrationKey(
+        key, keyInfo, deviceDisplayName,
+    );
+};
 
 MatrixClient.prototype.exportDevice = async function() {
     if (!(this._crypto)) {
