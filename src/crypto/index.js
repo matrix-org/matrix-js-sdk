@@ -1918,17 +1918,17 @@ function _maybeUploadOneTimeKeys(crypto) {
         while (keyLimit > keyCount || crypto.getNeedsNewFallback()) {
             // Ask olm to generate new one time keys, then upload them to synapse.
             if (keyLimit > keyCount) {
-                console.info("generating oneTimeKeys");
+                logger.info("generating oneTimeKeys");
                 const keysThisLoop = Math.min(keyLimit - keyCount, maxKeysPerCycle);
                 await crypto._olmDevice.generateOneTimeKeys(keysThisLoop);
             }
 
             if (crypto.getNeedsNewFallback()) {
-                console.info("generating fallback key");
+                logger.info("generating fallback key");
                 await crypto._olmDevice.generateFallbackKey();
             }
 
-            console.info("calling _uploadOneTimeKeys");
+            logger.info("calling _uploadOneTimeKeys");
             const res = await _uploadOneTimeKeys(crypto);
             if (res.one_time_key_counts && res.one_time_key_counts.signed_curve25519) {
                 // if the response contains a more up to date value use this
