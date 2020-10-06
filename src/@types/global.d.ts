@@ -22,10 +22,6 @@ declare global {
     namespace NodeJS {
         interface Global {
             localStorage: Storage;
-            Olm: Olm;
         }
-    }
-    interface Global {
-        Olm: Olm;
     }
 }
