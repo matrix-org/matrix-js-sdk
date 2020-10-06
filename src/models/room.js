@@ -374,6 +374,20 @@ Room.prototype.hasPendingEvent = function(eventId) {
 };
 
 /**
+ * Get a specific event from the pending event list, if configured, undefined otherwise.
+ *
+ * @param {string} eventId The event ID to check for.
+ * @return {MatrixEvent}
+ */
+Room.prototype.getPendingEvent = function(eventId) {
+    if (this._opts.pendingEventOrdering !== "detached") {
+        return null;
+    }
+
+    return this._pendingEventList.find(event => event.getId() === eventId);
+};
+
+/**
  * Get the live unfiltered timeline for this room.
  *
  * @return {module:models/event-timeline~EventTimeline} live timeline

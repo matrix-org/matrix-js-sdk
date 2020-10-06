@@ -806,7 +806,7 @@ EventTimelineSet.prototype.aggregateRelations = function(event) {
             this.room,
         );
         isNewRelations = true;
-        relatesToEvent = this.findEventById(relatesToEventId);
+        relatesToEvent = this.findEventById(relatesToEventId) || this.room.getPendingEvent(relatesToEventId);
         if (relatesToEvent) {
             relationsWithEventType.setTargetEvent(relatesToEvent);
         }
