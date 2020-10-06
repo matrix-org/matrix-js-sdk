@@ -2403,7 +2403,7 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
     if (claimedKey !== device.getFingerprint()) {
         logger.warn(
             "Event " + event.getId() + " claims ed25519 key " + claimedKey +
-                "but sender device has key " + device.getFingerprint());
+                " but sender device has key " + device.getFingerprint());
         return null;
     }
 
