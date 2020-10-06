@@ -392,7 +392,7 @@ export class MatrixCall extends EventEmitter {
      * The audio will *not* be rendered from the remoteVideoElement.
      * @param {Element} element The <code>&lt;video&gt;</code> DOM element.
      */
-    async setRemoteAudioElement(element : HTMLAudioElement) {
+    async setRemoteAudioElement(element: HTMLAudioElement) {
         if (element === this.remoteAudioElement) return;
 
         this.remoteVideoElement.muted = true;
@@ -406,7 +406,7 @@ export class MatrixCall extends EventEmitter {
      * Configure this call from an invite event. Used by MatrixClient.
      * @param {MatrixEvent} event The m.call.invite event
      */
-    async initWithInvite(event : any) {
+    async initWithInvite(event: any) {
         this.msg = event.getContent();
         this.peerConn = this.createPeerConnection();
         try {
@@ -454,7 +454,7 @@ export class MatrixCall extends EventEmitter {
      * Configure this call from a hangup event. Used by MatrixClient.
      * @param {MatrixEvent} event The m.call.hangup event
      */
-    initWithHangup(event : any) {
+    initWithHangup(event: any) {
         // perverse as it may seem, sometimes we want to instantiate a call with a
         // hangup message (because when getting the state of the room on load, events
         // come in reverse order and we want to remember that a call has been hung up)
