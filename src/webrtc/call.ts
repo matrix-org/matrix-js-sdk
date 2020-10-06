@@ -59,15 +59,15 @@ interface TurnServer {
 
 // NB. These are snake_case for API compatability
 enum CallState {
-    FLEDGLING = "fledgling",
-    INVITE_SENT = "invite_sent",
-    WAIT_LOCAL_MEDIA = "wait_local_media",
-    CREATE_OFFER = "create_offer",
-    CREATE_ANSWER = "create_answer",
-    CONNECTING = "connecting",
-    CONNECTED = "connected",
-    RINGING = "ringing",
-    ENDED = "ended",
+    FLEDGLING = 'fledgling',
+    INVITE_SENT = 'invite_sent',
+    WAIT_LOCAL_MEDIA = 'wait_local_media',
+    CREATE_OFFER = 'create_offer',
+    CREATE_ANSWER = 'create_answer',
+    CONNECTING = 'connecting',
+    CONNECTED = 'connected',
+    RINGING = 'ringing',
+    ENDED = 'ended',
 }
 
 enum CallType {
@@ -91,6 +91,7 @@ enum MediaQueueId {
     LOCAL_VIDEO = 'LocalVideo',
 }
 
+// These are also snake_case for API compatability
 enum CallErrorCode {
     /** An error code when the local client failed to create an offer. */
     LOCAL_OFFER_FAILED = 'local_offer_failed',
