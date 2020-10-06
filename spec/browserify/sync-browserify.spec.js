@@ -99,5 +99,5 @@ describe("Browserify Test", function() {
                 client.once("sync.unexpectedError", reject);
             }),
         ]);
-    }, 10000);
+    }, 20000);
 });
