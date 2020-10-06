@@ -374,7 +374,7 @@ Room.prototype.hasPendingEvent = function(eventId) {
 };
 
 /**
- * Get a specific event from the pending event list, if configured, undefined otherwise.
+ * Get a specific event from the pending event list, if configured, null otherwise.
  *
  * @param {string} eventId The event ID to check for.
  * @return {MatrixEvent}
