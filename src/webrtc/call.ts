@@ -24,6 +24,7 @@ limitations under the License.
 import {logger} from '../logger';
 import {EventEmitter} from "events";
 import * as utils from "../utils";
+import MatrixEvent from "../models/event"
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
@@ -404,7 +405,7 @@ export class MatrixCall extends EventEmitter {
      * Configure this call from an invite event. Used by MatrixClient.
      * @param {MatrixEvent} event The m.call.invite event
      */
-    async initWithInvite(event: any) {
+    async initWithInvite(event: MatrixEvent) {
         this.msg = event.getContent();
         this.peerConn = this.createPeerConnection();
         try {
@@ -452,7 +453,7 @@ export class MatrixCall extends EventEmitter {
      * Configure this call from a hangup event. Used by MatrixClient.
      * @param {MatrixEvent} event The m.call.hangup event
      */
-    initWithHangup(event: any) {
+    initWithHangup(event: MatrixEvent) {
         // perverse as it may seem, sometimes we want to instantiate a call with a
         // hangup message (because when getting the state of the room on load, events
         // come in reverse order and we want to remember that a call has been hung up)
@@ -785,7 +786,7 @@ export class MatrixCall extends EventEmitter {
      * Used by MatrixClient.
      * @param {Object} msg
      */
-    async receivedAnswer(msg: any) {
+    async receivedAnswer(msg: MatrixEvent) {
         if (this.state === CallState.Ended) {
             return;
         }
