@@ -55,6 +55,7 @@ import {PushProcessor} from "./pushprocessor";
 import {encodeBase64, decodeBase64} from "./crypto/olmlib";
 import { User } from "./models/user";
 import {AutoDiscovery} from "./autodiscovery";
+import {DEHYDRATION_ALGORITHM} from "./crypto/dehydration";
 
 const SCROLLBACK_DELAY_MS = 3000;
 export const CRYPTO_ENABLED = isCryptoAvailable();
@@ -182,6 +183,11 @@ function keyFromRecoverySession(session, decryptionKey) {
  * Optional. Whether to allow a fallback ICE server should be used for negotiating a
  * WebRTC connection if the homeserver doesn't provide any servers. Defaults to false.
  *
+ * @param {boolean} [opts.usingExternalCrypto]
+ * Optional. Whether to allow sending messages to encrypted rooms when encryption
+ * is not available internally within this SDK. This is useful if you are using an external
+ * E2E proxy, for example. Defaults to false.
+ *
  * @param {object} opts.cryptoCallbacks Optional. Callbacks for crypto and cross-signing.
  *     The cross-signing API is currently UNSTABLE and may change without notice.
  *
@@ -265,6 +271,8 @@ export function MatrixClient(opts) {
     this.olmVersion = null; // Populated after initCrypto is done
 
     this.reEmitter = new ReEmitter(this);
+
+    this.usingExternalCrypto = opts.usingExternalCrypto;
 
     this.store = opts.store || new StubStore();
 
@@ -359,9 +367,9 @@ export function MatrixClient(opts) {
     // The pushprocessor caches useful things, so keep one and re-use it
     this._pushProcessor = new PushProcessor(this);
 
-    // Cache of the server's /versions response
+    // Promise to a response of the server's /versions response
     // TODO: This should expire: https://github.com/matrix-org/matrix-js-sdk/issues/1020
-    this._serverVersionsCache = null;
+    this._serverVersionsPromise = null;
 
     this._cachedCapabilities = null; // { capabilities: {}, lastUpdated: timestamp }
 
@@ -451,6 +459,121 @@ export function MatrixClient(opts) {
 }
 utils.inherits(MatrixClient, EventEmitter);
 utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);
+
+/**
+ * Try to rehydrate a device if available.  The client must have been
+ * initialized with a `cryptoCallback.getDehydrationKey` option, and this
+ * function must be called before initCrypto and startClient are called.
+ *
+ * @return {Promise} Resolves to undefined if a device could not be dehydrated, or
+ *     to the new device ID if the dehydration was successful.
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixClient.prototype.rehydrateDevice = async function() {
+    if (this._crypto) {
+        throw new Error("Cannot rehydrate device after crypto is initialized");
+    }
+
+    if (!this._cryptoCallbacks.getDehydrationKey) {
+        return;
+    }
+
+    let getDeviceResult;
+    try {
+        getDeviceResult = await this._http.authedRequest(
+            undefined,
+            "GET",
+            "/dehydrated_device",
+            undefined, undefined,
+            {
+                prefix: "/_matrix/client/unstable/org.matrix.msc2697.v2",
+            },
+        );
+    } catch (e) {
+        logger.info("could not get dehydrated device", e);
+        return;
+    }
+
+    if (!getDeviceResult.device_data || !getDeviceResult.device_id) {
+        logger.info("no dehydrated device found");
+        return;
+    }
+
+    const account = new global.Olm.Account();
+    try {
+        const deviceData = getDeviceResult.device_data;
+        if (deviceData.algorithm !== DEHYDRATION_ALGORITHM) {
+            logger.warn("Wrong algorithm for dehydrated device");
+            return;
+        }
+        logger.log("unpickling dehydrated device");
+        const key = await this._cryptoCallbacks.getDehydrationKey(
+            deviceData,
+            (k) => {
+                // copy the key so that it doesn't get clobbered
+                account.unpickle(new Uint8Array(k), deviceData.account);
+            },
+        );
+        account.unpickle(key, deviceData.account);
+        logger.log("unpickled device");
+
+        const rehydrateResult = await this._http.authedRequest(
+            undefined,
+            "POST",
+            "/dehydrated_device/claim",
+            undefined,
+            {
+                device_id: getDeviceResult.device_id,
+            },
+            {
+                prefix: "/_matrix/client/unstable/org.matrix.msc2697.v2",
+            },
+        );
+
+        if (rehydrateResult.success === true) {
+            this.deviceId = getDeviceResult.device_id;
+            logger.info("using dehydrated device");
+            const pickleKey = this.pickleKey || "DEFAULT_KEY";
+            this._exportedOlmDeviceToImport = {
+                pickledAccount: account.pickle(pickleKey),
+                sessions: [],
+                pickleKey: pickleKey,
+            };
+            account.free();
+            return this.deviceId;
+        } else {
+            account.free();
+            logger.info("not using dehydrated device");
+            return;
+        }
+    } catch (e) {
+        account.free();
+        logger.warn("could not unpickle", e);
+    }
+};
+
+/**
+ * Set the dehydration key.  This will also periodically dehydrate devices to
+ * the server.
+ *
+ * @param {Uint8Array} key the dehydration key
+ * @param {object} [keyInfo] Information about the key.  Primarily for
+ *     information about how to generate the key from a passphrase.
+ * @param {string} [deviceDisplayName] The device display name for the
+ *     dehydrated device.
+ * @return {Promise} A promise that resolves when the dehydrated device is stored.
+ */
+MatrixClient.prototype.setDehydrationKey = async function(
+    key, keyInfo = {}, deviceDisplayName = undefined,
+) {
+    if (!(this._crypto)) {
+        logger.warn('not dehydrating device if crypto is not enabled');
+        return;
+    }
+    return await this._crypto._dehydrationManager.setDehydrationKey(
+        key, keyInfo, deviceDisplayName,
+    );
+};
 
 MatrixClient.prototype.exportDevice = async function() {
     if (!(this._crypto)) {
@@ -2047,7 +2170,7 @@ MatrixClient.prototype._restoreKeyBackup = function(
     // This is async.
     this._crypto.storeSessionBackupPrivateKey(privKey)
     .catch((e) => {
-        console.warn("Error caching session backup key:", e);
+        logger.warn("Error caching session backup key:", e);
     }).then(cacheCompleteCallback);
 
     if (progressCallback) {
@@ -2749,6 +2872,13 @@ function _encryptEventIfNeeded(client, event, room) {
         return null;
     }
 
+    if (!client._crypto && client.usingExternalCrypto) {
+        // The client has opted to allow sending messages to encrypted
+        // rooms even if the room is encrypted, and we haven't setup
+        // crypto. This is useful for users of matrix-org/pantalaimon
+        return null;
+    }
+
     if (event.getType() === "m.reaction") {
         // For reactions, there is a very little gained by encrypting the entire
         // event, as relation data is already kept in the clear. Event
@@ -2844,14 +2974,19 @@ function _sendEventHttpRequest(client, event) {
  * @param {string} eventId
  * @param {string} [txnId]  transaction id. One will be made up if not
  *    supplied.
- * @param {module:client.callback} callback Optional.
+ * @param {object|module:client.callback} callbackOrOpts
+ *    Options to pass on, may contain `reason`.
+ *    Can be callback for backwards compatibility.
  * @return {Promise} Resolves: TODO
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype.redactEvent = function(roomId, eventId, txnId, callback) {
+MatrixClient.prototype.redactEvent = function(roomId, eventId, txnId, callbackOrOpts) {
+    const opts = typeof(callbackOrOpts) === 'object' ? callbackOrOpts : {};
+    const reason = opts.reason;
+    const callback = typeof(callbackOrOpts) === 'function' ? callbackOrOpts : undefined;
     return this._sendCompleteEvent(roomId, {
         type: "m.room.redaction",
-        content: {},
+        content: { reason: reason },
         redacts: eventId,
     }, txnId, callback);
 };
@@ -4981,19 +5116,22 @@ MatrixClient.prototype.stopClient = function() {
  * unstable APIs it supports
  * @return {Promise<object>} The server /versions response
  */
-MatrixClient.prototype.getVersions = async function() {
-    if (this._serverVersionsCache === null) {
-        this._serverVersionsCache = await this._http.request(
-            undefined, // callback
-            "GET", "/_matrix/client/versions",
-            undefined, // queryParams
-            undefined, // data
-            {
-                prefix: '',
-            },
-        );
+MatrixClient.prototype.getVersions = function() {
+    if (this._serverVersionsPromise) {
+        return this._serverVersionsPromise;
     }
-    return this._serverVersionsCache;
+
+    this._serverVersionsPromise = this._http.request(
+        undefined, // callback
+        "GET", "/_matrix/client/versions",
+        undefined, // queryParams
+        undefined, // data
+        {
+            prefix: '',
+        },
+    );
+
+    return this._serverVersionsPromise;
 };
 
 /**
@@ -5090,6 +5228,20 @@ MatrixClient.prototype.doesServerSupportUnstableFeature = async function(feature
     if (!response) return false;
     const unstableFeatures = response["unstable_features"];
     return unstableFeatures && !!unstableFeatures[feature];
+};
+
+/**
+ * Query the server to see if it is forcing encryption to be enabled for
+ * a given room preset, based on the /versions response.
+ * @param {string} presetName The name of the preset to check.
+ * @returns {Promise<boolean>} true if the server is forcing encryption
+ * for the preset.
+ */
+MatrixClient.prototype.doesServerForceEncryptionForPreset = async function(presetName) {
+    const response = await this.getVersions();
+    if (!response) return false;
+    const unstableFeatures = response["unstable_features"];
+    return unstableFeatures && !!unstableFeatures[`io.element.e2ee_forced.${presetName}`];
 };
 
 /**
@@ -5200,7 +5352,11 @@ function setupCallEventHandler(client) {
                     // This call has previously been answered or hung up: ignore it
                     return;
                 }
-                callEventHandler(e);
+                try {
+                    callEventHandler(e);
+                } catch (e) {
+                    logger.error("Caught exception handling call event", e);
+                }
             });
             callEventBuffer = [];
         }
@@ -5226,7 +5382,11 @@ function setupCallEventHandler(client) {
                 } else {
                     // This one wasn't buffered so just run the event handler for it
                     // straight away
-                    callEventHandler(event);
+                    try {
+                        callEventHandler(event);
+                    } catch (e) {
+                        logger.error("Caught exception handling call event", e);
+                    }
                 }
             });
         }

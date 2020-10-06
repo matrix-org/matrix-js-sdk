@@ -26,6 +26,7 @@ import {MemoryCryptoStore} from '../../../src/crypto/store/memory-crypto-store';
 import 'fake-indexeddb/auto';
 import 'jest-localstorage-mock';
 import {OlmDevice} from "../../../src/crypto/OlmDevice";
+import {logger} from '../../../src/logger';
 
 const userId = "@alice:example.com";
 
@@ -51,7 +52,7 @@ const masterKeyPub = "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk";
 
 describe("CrossSigningInfo.getCrossSigningKey", function() {
     if (!global.Olm) {
-        console.warn('Not running megolm backup unit tests: libolm not present');
+        logger.warn('Not running megolm backup unit tests: libolm not present');
         return;
     }
 

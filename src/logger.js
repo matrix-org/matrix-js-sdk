@@ -40,11 +40,13 @@ log.methodFactory = function(methodName, logLevel, loggerName) {
             methodName === "warn" ||
             methodName === "trace" ||
             methodName === "info";
+        /* eslint-disable no-console */
         if (supportedByConsole) {
             return console[methodName](...args);
         } else {
             return console.log(...args);
         }
+        /* eslint-enable no-console */
     };
 };
 

@@ -18,12 +18,13 @@ limitations under the License.
 import {TestClient} from '../../../TestClient';
 import {MatrixEvent} from "../../../../src/models/event";
 import nodeCrypto from "crypto";
+import {logger} from '../../../../src/logger';
 
 export async function makeTestClients(userInfos, options) {
     const clients = [];
     const clientMap = {};
     const sendToDevice = function(type, map) {
-        // console.log(this.getUserId(), "sends", type, map);
+        // logger.log(this.getUserId(), "sends", type, map);
         for (const [userId, devMap] of Object.entries(map)) {
             if (userId in clientMap) {
                 for (const [deviceId, msg] of Object.entries(devMap)) {
@@ -67,7 +68,7 @@ export async function makeTestClients(userInfos, options) {
         setImmediate(() => {
             for (const tc of clients) {
                 if (tc.client === this) { // eslint-disable-line babel/no-invalid-this
-                    console.log("sending remote echo!!");
+                    logger.log("sending remote echo!!");
                     tc.client.emit("Room.timeline", remoteEcho);
                 } else {
                     tc.client.emit("Room.timeline", event);

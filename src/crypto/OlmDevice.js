@@ -144,7 +144,7 @@ OlmDevice.prototype.init = async function(opts = {}) {
     try {
         if (fromExportedDevice) {
             if (pickleKey) {
-                console.warn(
+                logger.warn(
                     'ignoring opts.pickleKey'
                     + ' because opts.fromExportedDevice is present.',
                 );

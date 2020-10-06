@@ -56,6 +56,7 @@ import {ToDeviceChannel, ToDeviceRequests} from "./verification/request/ToDevice
 import {IllegalMethod} from "./verification/IllegalMethod";
 import {KeySignatureUploadError} from "../errors";
 import {decryptAES, encryptAES} from './aes';
+import {DehydrationManager} from './dehydration';
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -146,7 +147,7 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
                     method,
                 );
             } else {
-                console.warn(`Excluding unknown verification method ${method}`);
+                logger.warn(`Excluding unknown verification method ${method}`);
             }
         }
     } else {
@@ -242,6 +243,8 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     this._secretStorage = new SecretStorage(
         baseApis, cryptoCallbacks,
     );
+
+    this._dehydrationManager = new DehydrationManager(this);
 
     // Assuming no app-supplied callback, default to getting from SSSS.
     if (!cryptoCallbacks.getCrossSigningKey && cryptoCallbacks.getSecretStorageKey) {
@@ -534,6 +537,15 @@ Crypto.prototype.bootstrapCrossSigning = async function({
         privateKeysInStorage
     );
 
+    // Log all relevant state for easier parsing of debug logs.
+    logger.log({
+        setupNewCrossSigning,
+        publicKeysOnDevice,
+        privateKeysInCache,
+        privateKeysInStorage,
+        privateKeysExistSomewhere,
+    });
+
     if (!privateKeysExistSomewhere || setupNewCrossSigning) {
         logger.log(
             "Cross-signing private keys not found locally or in secret storage, " +
@@ -691,6 +703,15 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         oldKeyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES
     );
 
+    // Log all relevant state for easier parsing of debug logs.
+    logger.log({
+        keyBackupInfo,
+        setupNewKeyBackup,
+        setupNewSecretStorage,
+        storageExists,
+        oldKeyInfo,
+    });
+
     if (!storageExists && !keyBackupInfo) {
         // either we don't have anything, or we've been asked to restart
         // from scratch
@@ -740,10 +761,20 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         // The backup is trusted because the user provided the private key.
         // Sign the backup with the cross-signing key so the key backup can
         // be trusted via cross-signing.
-        logger.log("Adding cross signing signature to key backup");
-        await this._crossSigningInfo.signObject(
-            keyBackupInfo.auth_data, "master",
-        );
+        if (
+            this._crossSigningInfo.getId() &&
+            this._crossSigningInfo.isStoredInKeyCache("master")
+        ) {
+            logger.log("Adding cross-signing signature to key backup");
+            await this._crossSigningInfo.signObject(
+                keyBackupInfo.auth_data, "master",
+            );
+        } else {
+            logger.warn(
+                "Cross-signing keys not available, skipping signature on key backup",
+            );
+        }
+
         builder.addSessionBackup(keyBackupInfo);
     } else {
         // 4S is already set up
@@ -792,8 +823,20 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             algorithm: info.algorithm,
             auth_data: info.auth_data,
         };
-        // sign with cross-sign master key
-        await this._crossSigningInfo.signObject(data.auth_data, "master");
+
+        if (
+            this._crossSigningInfo.getId() &&
+            this._crossSigningInfo.isStoredInKeyCache("master")
+        ) {
+            // sign with cross-sign master key
+            logger.log("Adding cross-signing signature to key backup");
+            await this._crossSigningInfo.signObject(data.auth_data, "master");
+        } else {
+            logger.warn(
+                "Cross-signing keys not available, skipping signature on key backup",
+            );
+        }
+
         // sign with the device fingerprint
         await this._signObject(data.auth_data);
 
@@ -1281,23 +1324,20 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     const seenPubkey = newCrossSigning.getId();
     const masterChanged = this._crossSigningInfo.getId() !== seenPubkey;
     if (masterChanged) {
-        // try to get the private key if the master key changed
         logger.info("Got new master public key", seenPubkey);
-
+        logger.info("Attempting to retrieve cross-signing master private key");
         let signing = null;
         try {
             const ret = await this._crossSigningInfo.getCrossSigningKey(
                 'master', seenPubkey,
             );
             signing = ret[1];
-            if (!signing) {
-                throw new Error("Cross-signing master private key not available");
-            }
+            logger.info("Got cross-signing master private key");
+        } catch (e) {
+            logger.error("Cross-signing master private key not available", e);
         } finally {
             if (signing) signing.free();
         }
-
-        logger.info("Got matching private key from callback for new public master key");
     }
 
     const oldSelfSigningId = this._crossSigningInfo.getId("self_signing");
@@ -1306,21 +1346,23 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     // Update the version of our keys in our cross-signing object and the local store
     this._storeTrustedSelfKeys(newCrossSigning.keys);
 
+    const selfSigningChanged = oldSelfSigningId !== newCrossSigning.getId("self_signing");
+    const userSigningChanged = oldUserSigningId !== newCrossSigning.getId("user_signing");
+
     const keySignatures = {};
 
-    if (oldSelfSigningId !== newCrossSigning.getId("self_signing")) {
+    if (selfSigningChanged) {
         logger.info("Got new self-signing key", newCrossSigning.getId("self_signing"));
-
-        // Try to cache the self-signing private key as a side-effect
+        logger.info("Attempting to retrieve cross-signing self-signing private key");
         let signing = null;
         try {
             const ret = await this._crossSigningInfo.getCrossSigningKey(
                 "self_signing", newCrossSigning.getId("self_signing"),
             );
             signing = ret[1];
-            logger.info(
-                "Got matching private key from callback for new public self-signing key",
-            );
+            logger.info("Got cross-signing self-signing private key");
+        } catch (e) {
+            logger.error("Cross-signing self-signing private key not available", e);
         } finally {
             if (signing) signing.free();
         }
@@ -1331,19 +1373,18 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
         );
         keySignatures[this._deviceId] = signedDevice;
     }
-    if (oldUserSigningId !== newCrossSigning.getId("user_signing")) {
+    if (userSigningChanged) {
         logger.info("Got new user-signing key", newCrossSigning.getId("user_signing"));
-
-        // Try to cache the user-signing private key as a side-effect
+        logger.info("Attempting to retrieve cross-signing user-signing private key");
         let signing = null;
         try {
             const ret = await this._crossSigningInfo.getCrossSigningKey(
                 "user_signing", newCrossSigning.getId("user_signing"),
             );
             signing = ret[1];
-            logger.info(
-                "Got matching private key from callback for new public user-signing key",
-            );
+            logger.info("Got cross-signing user-signing private key");
+        } catch (e) {
+            logger.error("Cross-signing user-signing private key not available", e);
         } finally {
             if (signing) signing.free();
         }
@@ -2386,7 +2427,7 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
     if (claimedKey !== device.getFingerprint()) {
         logger.warn(
             "Event " + event.getId() + " claims ed25519 key " + claimedKey +
-                "but sender device has key " + device.getFingerprint());
+                " but sender device has key " + device.getFingerprint());
         return null;
     }
 

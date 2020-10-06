@@ -72,6 +72,8 @@ describe('DeviceList', function() {
     function createTestDeviceList() {
         const baseApis = {
             downloadKeysForUsers: downloadSpy,
+            getUserId: () => '@test1:sw1v.org',
+            deviceId: 'HGKAWHRVJQ',
         };
         const mockOlm = {
             verifySignature: function(key, message, signature) {},

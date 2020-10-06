@@ -651,12 +651,10 @@ MatrixHttpApi.prototype = {
 
         const self = this;
         if (this.opts.extraParams) {
-            for (const key in this.opts.extraParams) {
-                if (!this.opts.extraParams.hasOwnProperty(key)) {
-                    continue;
-                }
-                queryParams[key] = this.opts.extraParams[key];
-            }
+            queryParams = {
+              ...queryParams,
+              ...this.opts.extraParams,
+            };
         }
 
         const headers = utils.extend({}, opts.headers || {});
@@ -963,7 +961,7 @@ export async function retryNetworkOperation(maxAttempts, callback) {
         try {
             if (attempts > 0) {
                 const timeout = 1000 * Math.pow(2, attempts);
-                console.log(`network operation failed ${attempts} times,` +
+                logger.log(`network operation failed ${attempts} times,` +
                     ` retrying in ${timeout}ms...`);
                 await new Promise(r => setTimeout(r, timeout));
             }

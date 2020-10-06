@@ -16,6 +16,7 @@ limitations under the License.
 
 import {EventEmitter} from 'events';
 import {EventStatus} from '../models/event';
+import {logger} from '../logger';
 
 /**
  * A container for relation events that supports easy access to common ways of
@@ -60,7 +61,7 @@ export class Relations extends EventEmitter {
 
         const relation = event.getRelation();
         if (!relation) {
-            console.error("Event must have relation info");
+            logger.error("Event must have relation info");
             return;
         }
 
@@ -68,7 +69,7 @@ export class Relations extends EventEmitter {
         const eventType = event.getType();
 
         if (this.relationType !== relationType || this.eventType !== eventType) {
-            console.error("Event relation info doesn't match this container");
+            logger.error("Event relation info doesn't match this container");
             return;
         }
 
@@ -104,7 +105,7 @@ export class Relations extends EventEmitter {
 
         const relation = event.getRelation();
         if (!relation) {
-            console.error("Event must have relation info");
+            logger.error("Event must have relation info");
             return;
         }
 
@@ -112,7 +113,7 @@ export class Relations extends EventEmitter {
         const eventType = event.getType();
 
         if (this.relationType !== relationType || this.eventType !== eventType) {
-            console.error("Event relation info doesn't match this container");
+            logger.error("Event relation info doesn't match this container");
             return;
         }
 
