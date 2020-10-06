@@ -57,6 +57,7 @@ interface TurnServer {
     ttl?: number,
 }
 
+// NB. These are snake_case for API compatability
 enum CallState {
     FLEDGLING = "fledgling",
     INVITE_SENT = "invite_sent",
@@ -85,9 +86,9 @@ enum CallParty {
 }
 
 enum MediaQueueId {
-    REMOTE_VIDEO = 'remote_video',
-    REMOTE_AUDIO = 'remote_audio',
-    LOCAL_VIDEO = 'local_video',
+    REMOTE_VIDEO = 'RemoteVideo',
+    REMOTE_AUDIO = 'RemoteAudio',
+    LOCAL_VIDEO = 'LocalVideo',
 }
 
 enum CallErrorCode {
