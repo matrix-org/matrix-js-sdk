@@ -340,14 +340,13 @@ export class SyncAccumulator {
                 // corresponds to the first event in the timeline
                 let transformedEvent;
                 if (!fromDatabase) {
-                    console.log("transforming event");
                     transformedEvent = Object.assign({}, e);
                     const age = e.unsigned ? e.unsigned.age : e.age;
                     transformedEvent._localTs = Date.now() - age;
                 } else {
                     transformedEvent = e;
                 }
-                
+
                 currentData._timeline.push({
                     event: transformedEvent,
                     token: index === 0 ? data.timeline.prev_batch : null,
