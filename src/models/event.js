@@ -904,6 +904,8 @@ utils.extend(MatrixEvent.prototype, {
     /**
      * Set an event that replaces the content of this event, through an m.replace relation.
      *
+     * @fires module:models/event.MatrixEvent#"Event.replaced"
+     *
      * @param {MatrixEvent?} newEvent the event with the replacing content, if any.
      */
     makeReplaced(newEvent) {
