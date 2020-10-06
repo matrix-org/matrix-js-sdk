@@ -36,7 +36,7 @@ declare global {
     }
 
     interface HTMLAudioElement {
-        // sinkId & setSinkId are experimental and typescript doesn't know about it
+        // sinkId & setSinkId are experimental and typescript doesn't know about them
         sinkId: string;
         setSinkId(outputId: string);
     }
