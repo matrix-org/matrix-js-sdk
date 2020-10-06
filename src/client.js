@@ -5404,10 +5404,6 @@ function setupCallEventHandler(client) {
                 return; // ignore invites you send
             }
 
-            // XXX: age is always wrong for events from a stored sync so this doesn't
-            // really work. getLocalAge works by comparing the event's timestamp to the
-            // local system clock so is probably worse (ie. if your clock was over a minute
-            // fast, you wouldn't be able to receive any calls at all).
             if (event.getAge() > content.lifetime) {
                 return; // expired call
             }
@@ -5438,13 +5434,13 @@ function setupCallEventHandler(client) {
             }
 
             call.callId = content.call_id;
-            call.initWithInvite(event);
+            call._initWithInvite(event);
             client.callList[call.callId] = call;
 
             // if we stashed candidate events for that call ID, play them back now
             if (candidatesByCall[call.callId]) {
                 for (i = 0; i < candidatesByCall[call.callId].length; i++) {
-                    call.gotRemoteIceCandidate(
+                    call._gotRemoteIceCandidate(
                         candidatesByCall[call.callId][i],
                     );
                 }
@@ -5476,7 +5472,7 @@ function setupCallEventHandler(client) {
                         "Glare detected: answering incoming call " + call.callId +
                         " and canceling outgoing call " + existingCall.callId,
                     );
-                    existingCall.replacedBy(call);
+                    existingCall._replacedBy(call);
                     call.answer();
                 } else {
                     logger.log(
@@ -5494,10 +5490,10 @@ function setupCallEventHandler(client) {
             }
             if (event.getSender() === client.credentials.userId) {
                 if (call.state === 'ringing') {
-                    call.onAnsweredElsewhere(content);
+                    call._onAnsweredElsewhere(content);
                 }
             } else {
-                call.receivedAnswer(content);
+                call._receivedAnswer(content);
             }
         } else if (event.getType() === 'm.call.candidates') {
             if (event.getSender() === client.credentials.userId) {
@@ -5513,7 +5509,7 @@ function setupCallEventHandler(client) {
                 ].concat(content.candidates);
             } else {
                 for (i = 0; i < content.candidates.length; i++) {
-                    call.gotRemoteIceCandidate(content.candidates[i]);
+                    call._gotRemoteIceCandidate(content.candidates[i]);
                 }
             }
         } else if (event.getType() === 'm.call.hangup') {
@@ -5526,12 +5522,12 @@ function setupCallEventHandler(client) {
                 call = createNewMatrixCall(client, event.getRoomId());
                 if (call) {
                     call.callId = content.call_id;
-                    call.initWithHangup(event);
+                    call._initWithHangup(event);
                     client.callList[content.call_id] = call;
                 }
             } else {
                 if (call.state !== 'ended') {
-                    call.onHangupReceived(content);
+                    call._onHangupReceived(content);
                     delete client.callList[content.call_id];
                 }
             }
