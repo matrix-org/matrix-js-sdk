@@ -5475,9 +5475,8 @@ function _PojoToMatrixEventMapper(client, options) {
             }
             event.attemptDecryption(client._crypto);
         }
-        const room = client.getRoom(event.getRoomId());
-        if (room && !preventReEmit) {
-            room.reEmitter.reEmit(event, ["Event.replaced"]);
+        if (!preventReEmit) {
+            client.reEmitter.reEmit(event, ["Event.replaced"]);
         }
         return event;
     }
