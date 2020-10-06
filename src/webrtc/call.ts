@@ -57,102 +57,100 @@ interface TurnServer {
     ttl?: number,
 }
 
-// NB. These are snake_case for API compatability
 enum CallState {
-    FLEDGLING = 'fledgling',
-    INVITE_SENT = 'invite_sent',
-    WAIT_LOCAL_MEDIA = 'wait_local_media',
-    CREATE_OFFER = 'create_offer',
-    CREATE_ANSWER = 'create_answer',
-    CONNECTING = 'connecting',
-    CONNECTED = 'connected',
-    RINGING = 'ringing',
-    ENDED = 'ended',
+    Fledgling = 'fledgling',
+    InviteSent = 'invite_sent',
+    WaitLocalMedia = 'wait_local_media',
+    CreateOffer = 'create_offer',
+    CreateAnswer = 'create_answer',
+    Connecting = 'connecting',
+    Connected = 'connected',
+    Ringing = 'ringing',
+    Ended = 'ended',
 }
 
 enum CallType {
-    VOICE = 'voice',
-    VIDEO = 'video',
+    Voice = 'voice',
+    Video = 'video',
 }
 
 enum CallDirection {
-    INBOUND = 'inbound',
-    OUTBOUND = 'outbound',
+    Inbound = 'inbound',
+    Outbound = 'outbound',
 }
 
 enum CallParty {
-    LOCAL = 'local',
-    REMOTE = 'remote',
+    Local = 'local',
+    Remote = 'remote',
 }
 
 enum MediaQueueId {
-    REMOTE_VIDEO = 'RemoteVideo',
-    REMOTE_AUDIO = 'RemoteAudio',
-    LOCAL_VIDEO = 'LocalVideo',
+    RemoteVideo = 'remote_video',
+    RemoteAudio = 'remote_audio',
+    LocalVideo = 'local_video',
 }
 
-// These are also snake_case for API compatability
 enum CallErrorCode {
     /** An error code when the local client failed to create an offer. */
-    LOCAL_OFFER_FAILED = 'local_offer_failed',
+    LocalOfferFailed = 'local_offer_failed',
     /**
      * An error code when there is no local mic/camera to use. This may be because
      * the hardware isn't plugged in, or the user has explicitly denied access.
      */
-    NO_USER_MEDIA = 'no_user_media',
+    NoUserMedia = 'no_user_media',
 
     /**
      * Error code used when a call event failed to send
      * because unknown devices were present in the room
      */
-    UNKNOWN_DEVICES = 'unknown_devices',
+    UnknownDevices = 'unknown_devices',
 
     /**
      * Error code usewd when we fail to send the invite
      * for some reason other than there being unknown devices
      */
-    SEND_INVITE = 'send_invite',
+    SendInvite = 'send_invite',
 
     /**
      * An answer could not be created
      */
-    CREATE_ANSWER = 'create_answer',
+    CreateAnswer = 'create_answer',
 
     /**
      * Error code usewd when we fail to send the answer
      * for some reason other than there being unknown devices
      */
-    SEND_ANSWER = 'send_answer',
+    SendAnswer = 'send_answer',
 
     /**
      * The session description from the other side could not be set
      */
-    SET_REMOTE_DESCRIPTION = 'set_remote_description',
+    SetRemoteDescription = 'set_remote_description',
 
     /**
      * The session description from this side could not be set
      */
-    SET_LOCAL_DESCRIPTION = 'set_local_description',
+    SetLocalDescription = 'set_local_description',
 
     /**
      * A different device answered the call
      */
-    ANSWERED_ELSEWHERE = 'answered_elsewhere',
+    AnsweredElsewhere = 'answered_elsewhere',
 
     /**
      * No media connection could be established to the other party
      */
-    ICE_FAILED = 'ice_failed',
+    IceFailed = 'ice_failed',
 
     /**
      * The invite timed out whilst waiting for an answer
      */
-    INVITE_TIMEOUT = 'invite_timeout',
+    InviteTimeout = 'invite_timeout',
 
     /**
      * The call was replaced by another call
      */
-    REPLACED = 'replaced',
+    Replaced = 'replaced',
 }
 
 /** The fallback ICE server to use for STUN or TURN protocols. */
@@ -232,7 +230,7 @@ export class MatrixCall extends EventEmitter {
         }
 
         this.callId = "c" + new Date().getTime() + Math.random();
-        this.state = CallState.FLEDGLING;
+        this.state = CallState.Fledgling;
 
         // A queue for candidates waiting to go out.
         // We try to amalgamate candidates into a single candidate message where
@@ -256,8 +254,8 @@ export class MatrixCall extends EventEmitter {
     placeVoiceCall() {
         logger.debug("placeVoiceCall");
         this.checkForErrorListener();
-        this.placeCallWithConstraints(getUserMediaVideoContraints(CallType.VOICE));
-        this.type = CallType.VOICE;
+        this.placeCallWithConstraints(getUserMediaVideoContraints(CallType.Voice));
+        this.type = CallType.Voice;
     }
 
     /**
@@ -273,8 +271,8 @@ export class MatrixCall extends EventEmitter {
         this.checkForErrorListener();
         this.localVideoElement = localVideoElement;
         this.remoteVideoElement = remoteVideoElement;
-        this.placeCallWithConstraints(getUserMediaVideoContraints(CallType.VIDEO));
-        this.type = CallType.VIDEO;
+        this.placeCallWithConstraints(getUserMediaVideoContraints(CallType.Video));
+        this.type = CallType.Video;
     }
 
     /**
@@ -295,18 +293,18 @@ export class MatrixCall extends EventEmitter {
         try {
             this.screenSharingStream = await navigator.mediaDevices.getDisplayMedia({'audio': false});
             logger.debug("Got screen stream, requesting audio stream...");
-            const audioConstraints = getUserMediaVideoContraints(CallType.VOICE);
+            const audioConstraints = getUserMediaVideoContraints(CallType.Voice);
             this.placeCallWithConstraints(audioConstraints);
         } catch (err) {
             this.emit("error",
                 new CallError(
-                    CallErrorCode.NO_USER_MEDIA,
+                    CallErrorCode.NoUserMedia,
                     "Failed to get screen-sharing stream: ", err,
                 ),
             );
         }
 
-        this.type = CallType.VIDEO;
+        this.type = CallType.Video;
     }
 
     private queueMediaOperation(queueId: MediaQueueId, operation: () => any) {
@@ -351,10 +349,10 @@ export class MatrixCall extends EventEmitter {
     setLocalVideoElement(element : HTMLVideoElement) {
         this.localVideoElement = element;
 
-        if (element && this.localAVStream && this.type === CallType.VIDEO) {
+        if (element && this.localAVStream && this.type === CallType.Video) {
             element.autoplay = true;
 
-            this.queueMediaOperation(MediaQueueId.LOCAL_VIDEO, () => {
+            this.queueMediaOperation(MediaQueueId.LocalVideo, () => {
                 element.srcObject = this.localAVStream;
                 element.muted = true;
                 return element.play();
@@ -379,7 +377,7 @@ export class MatrixCall extends EventEmitter {
         this.remoteVideoElement = element;
 
         if (this.remoteStream) {
-            this.queueMediaOperation(MediaQueueId.REMOTE_VIDEO, () => {
+            this.queueMediaOperation(MediaQueueId.RemoteVideo, () => {
                 element.srcObject = this.remoteStream;
                 return element.play();
             });
@@ -413,12 +411,12 @@ export class MatrixCall extends EventEmitter {
             await this.peerConn.setRemoteDescription(this.msg.offer);
         } catch (e) {
             logger.debug("Failed to set remote description", e);
-            this.terminate(CallParty.LOCAL, CallErrorCode.SET_REMOTE_DESCRIPTION, false);
+            this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
             return;
         }
 
-        this.setState(CallState.RINGING);
-        this.direction = CallDirection.INBOUND;
+        this.setState(CallState.Ringing);
+        this.direction = CallDirection.Inbound;
 
         // firefox and OpenWebRTC's RTCPeerConnection doesn't add streams until it
         // starts getting media on them so we need to figure out whether a video
@@ -429,17 +427,17 @@ export class MatrixCall extends EventEmitter {
             this.msg.offer.sdp &&
             this.msg.offer.sdp.indexOf('m=video') > -1
         ) {
-            this.type = CallType.VIDEO;
+            this.type = CallType.Video;
         } else {
-            this.type = CallType.VOICE;
+            this.type = CallType.Voice;
         }
 
         if (event.getAge()) {
             setTimeout(() => {
-                if (this.state == CallState.RINGING) {
+                if (this.state == CallState.Ringing) {
                     logger.debug("Call invite has expired. Hanging up.");
-                    this.hangupParty = CallParty.REMOTE; // effectively
-                    this.setState(CallState.ENDED);
+                    this.hangupParty = CallParty.Remote; // effectively
+                    this.setState(CallState.Ended);
                     this.stopAllMedia();
                     if (this.peerConn.signalingState != 'closed') {
                         this.peerConn.close();
@@ -459,7 +457,7 @@ export class MatrixCall extends EventEmitter {
         // hangup message (because when getting the state of the room on load, events
         // come in reverse order and we want to remember that a call has been hung up)
         this.msg = event.getContent();
-        this.setState(CallState.ENDED);
+        this.setState(CallState.Ended);
     }
 
     /**
@@ -476,7 +474,7 @@ export class MatrixCall extends EventEmitter {
         if (!this.localAVStream && !this.waitForLocalAVStream) {
             const constraints = getUserMediaVideoContraints(this.type);
             logger.log("Getting user media with constraints", constraints);
-            this.setState(CallState.WAIT_LOCAL_MEDIA);
+            this.setState(CallState.WaitLocalMedia);
 
             try {
                 const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -488,7 +486,7 @@ export class MatrixCall extends EventEmitter {
         } else if (this.localAVStream) {
             this.gotUserMediaForAnswer(this.localAVStream);
         } else if (this.waitForLocalAVStream) {
-            this.setState(CallState.WAIT_LOCAL_MEDIA);
+            this.setState(CallState.WaitLocalMedia);
         }
     }
 
@@ -499,14 +497,14 @@ export class MatrixCall extends EventEmitter {
      */
     replacedBy(newCall: MatrixCall) {
         logger.debug(this.callId + " being replaced by " + newCall.callId);
-        if (this.state === CallState.WAIT_LOCAL_MEDIA) {
+        if (this.state === CallState.WaitLocalMedia) {
             logger.debug("Telling new call to wait for local media");
             newCall.waitForLocalAVStream = true;
-        } else if (this.state === CallState.CREATE_OFFER) {
+        } else if (this.state === CallState.CreateOffer) {
             logger.debugl("Handing local stream to new call");
             newCall.gotUserMediaForAnswer(this.localAVStream);
             delete(this.localAVStream);
-        } else if (this.state === CallState.INVITE_SENT) {
+        } else if (this.state === CallState.InviteSent) {
             logger.debug("Handing local stream to new call");
             newCall.gotUserMediaForAnswer(this.localAVStream);
             delete(this.localAVStream);
@@ -516,7 +514,7 @@ export class MatrixCall extends EventEmitter {
         newCall.remoteAudioElement = this.remoteAudioElement;
         this.successor = newCall;
         this.emit("replaced", newCall);
-        this.hangup(CallErrorCode.REPLACED, true);
+        this.hangup(CallErrorCode.Replaced, true);
     }
 
     /**
@@ -525,10 +523,10 @@ export class MatrixCall extends EventEmitter {
      * @param {boolean} suppressEvent True to suppress emitting an event.
      */
     hangup(reason: CallErrorCode, suppressEvent: boolean) {
-        if (this.state === CallState.ENDED) return;
+        if (this.state === CallState.Ended) return;
 
         logger.debug("Ending call " + this.callId);
-        this.terminate(CallParty.LOCAL, reason, !suppressEvent);
+        this.terminate(CallParty.Local, reason, !suppressEvent);
         const content = {
             version: 0,
             call_id: this.callId,
@@ -600,15 +598,15 @@ export class MatrixCall extends EventEmitter {
             this.successor.gotUserMediaForAnswer(stream);
             return;
         }
-        if (this.state === CallState.ENDED) {
+        if (this.state === CallState.Ended) {
             return;
         }
         logger.debug("gotUserMediaForInvite -> " + this.type);
 
         const videoEl = this.getLocalVideoElement();
 
-        if (videoEl && this.type === CallType.VIDEO) {
-            this.queueMediaOperation(MediaQueueId.LOCAL_VIDEO, () => {
+        if (videoEl && this.type === CallType.Video) {
+            this.queueMediaOperation(MediaQueueId.LocalVideo, () => {
                 videoEl.autoplay = true;
                 if (this.screenSharingStream) {
                     logger.debug(
@@ -642,24 +640,24 @@ export class MatrixCall extends EventEmitter {
             this.getLocalOfferFailed(e);
             return;
         }
-        this.setState(CallState.CREATE_OFFER);
+        this.setState(CallState.CreateOffer);
     };
 
     private sendAnswer() {
         this.sendEvent('m.call.answer', this.answerContent).then(() => {
-            this.setState(CallState.CONNECTING);
+            this.setState(CallState.Connecting);
             // If this isn't the first time we've tried to send the answer,
             // we may have candidates queued up, so send them now.
             this.sendCandidateQueue();
         }).catch((error) => {
             // We've failed to answer: back to the ringing state
-            this.setState(CallState.RINGING);
+            this.setState(CallState.Ringing);
             this.client.cancelPendingEvent(error.event);
 
-            let code = CallErrorCode.SEND_ANSWER;
+            let code = CallErrorCode.SendAnswer;
             let message = "Failed to send answer";
             if (error.name == 'UnknownDeviceError') {
-                code = CallErrorCode.UNKNOWN_DEVICES;
+                code = CallErrorCode.UnknownDevices;
                 message = "Unknown devices present in the room";
             }
             this.emit("error", new CallError(code, message, error));
@@ -668,14 +666,14 @@ export class MatrixCall extends EventEmitter {
     }
 
     private gotUserMediaForAnswer = async (stream: MediaStream) => {
-        if (this.state === CallState.ENDED) {
+        if (this.state === CallState.Ended) {
             return;
         }
 
         const localVidEl = this.getLocalVideoElement();
 
-        if (localVidEl && this.type === CallType.VIDEO) {
-            this.queueMediaOperation(MediaQueueId.LOCAL_VIDEO, () => {
+        if (localVidEl && this.type === CallType.Video) {
+            this.queueMediaOperation(MediaQueueId.LocalVideo, () => {
                 localVidEl.autoplay = true;
                 localVidEl.srcObject = stream;
 
@@ -690,14 +688,14 @@ export class MatrixCall extends EventEmitter {
             this.peerConn.addTrack(track, stream);
         }
 
-        this.setState(CallState.CREATE_ANSWER);
+        this.setState(CallState.CreateAnswer);
 
         let myAnswer;
         try {
             myAnswer = await this.peerConn.createAnswer();
         } catch (err) {
             logger.debug("Failed to create answer: ", err);
-            this.terminate(CallParty.LOCAL, CallErrorCode.CREATE_ANSWER, true);
+            this.terminate(CallParty.Local, CallErrorCode.CreateAnswer, true);
             return;
         }
 
@@ -717,7 +715,7 @@ export class MatrixCall extends EventEmitter {
             this.sendAnswer();
         } catch (err) {
             logger.debug("Error setting local description!", err);
-            this.terminate(CallParty.LOCAL, CallErrorCode.SET_LOCAL_DESCRIPTION, true);
+            this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);
             return;
         }
     };
@@ -733,7 +731,7 @@ export class MatrixCall extends EventEmitter {
                 event.candidate.candidate,
             );
 
-            if (this.state == CallState.ENDED) return;
+            if (this.state == CallState.Ended) return;
 
             // As with the offer, note we need to make a copy of this object, not
             // pass the original: that broke in Chrome ~m43.
@@ -768,7 +766,7 @@ export class MatrixCall extends EventEmitter {
      * @param {Object} cand
      */
     gotRemoteIceCandidate(cand: RTCIceCandidate) {
-        if (this.state == CallState.ENDED) {
+        if (this.state == CallState.Ended) {
             //debuglog("Ignoring remote ICE candidate because call has ended");
             return;
         }
@@ -788,7 +786,7 @@ export class MatrixCall extends EventEmitter {
      * @param {Object} msg
      */
     async receivedAnswer(msg: any) {
-        if (this.state === CallState.ENDED) {
+        if (this.state === CallState.Ended) {
             return;
         }
 
@@ -796,17 +794,17 @@ export class MatrixCall extends EventEmitter {
             this.peerConn.setRemoteDescription(msg.answer);
         } catch (e) {
             logger.debug("Failed to set remote description", e);
-            this.terminate(CallParty.LOCAL, CallErrorCode.SET_REMOTE_DESCRIPTION, false);
+            this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
             return;
         }
 
-        this.setState(CallState.CONNECTING);
+        this.setState(CallState.Connecting);
     }
 
     private gotLocalOffer = async (description: RTCSessionDescriptionInit) => {
         logger.debug("Created offer: ", description);
 
-        if (this.state === CallState.ENDED) {
+        if (this.state === CallState.Ended) {
             logger.debug("Ignoring newly created offer on call ID " + this.callId +
                 " because the call has ended");
             return;
@@ -816,7 +814,7 @@ export class MatrixCall extends EventEmitter {
             await this.peerConn.setLocalDescription(description);
         } catch (err) {
             logger.debug("Error setting local description!", err);
-            this.terminate(CallParty.LOCAL, CallErrorCode.SET_LOCAL_DESCRIPTION, true);
+            this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);
             return
         }
 
@@ -842,22 +840,22 @@ export class MatrixCall extends EventEmitter {
         };
         try {
             await this.sendEvent('m.call.invite', content);
-            this.setState(CallState.INVITE_SENT);
+            this.setState(CallState.InviteSent);
             setTimeout(() => {
-                if (this.state === CallState.INVITE_SENT) {
-                    this.hangup(CallErrorCode.INVITE_TIMEOUT, false);
+                if (this.state === CallState.InviteSent) {
+                    this.hangup(CallErrorCode.InviteTimeout, false);
                 }
             }, CALL_TIMEOUT_MS);
         } catch (error) {
-            let code = CallErrorCode.SEND_INVITE;
+            let code = CallErrorCode.SendInvite;
             let message = "Failed to send invite";
             if (error.name == 'UnknownDeviceError') {
-                code = CallErrorCode.UNKNOWN_DEVICES;
+                code = CallErrorCode.UnknownDevices;
                 message = "Unknown devices present in the room";
             }
 
             this.client.cancelPendingEvent(error.event);
-            this.terminate(CallParty.LOCAL, code, false);
+            this.terminate(CallParty.Local, code, false);
             this.emit("error", new CallError(code, message, error));
         }
     };
@@ -865,11 +863,11 @@ export class MatrixCall extends EventEmitter {
     private getLocalOfferFailed = (err: Error) => {
         logger.error("Failed to get local offer", err);
 
-        this.terminate(CallParty.LOCAL, CallErrorCode.LOCAL_OFFER_FAILED, false);
+        this.terminate(CallParty.Local, CallErrorCode.LocalOfferFailed, false);
         this.emit(
             "error",
             new CallError(
-                CallErrorCode.LOCAL_OFFER_FAILED,
+                CallErrorCode.LocalOfferFailed,
                 "Failed to get local offer!", err,
             ),
         );
@@ -881,11 +879,11 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        this.terminate(CallParty.LOCAL, CallErrorCode.NO_USER_MEDIA, false);
+        this.terminate(CallParty.Local, CallErrorCode.NoUserMedia, false);
         this.emit(
             "error",
             new CallError(
-                CallErrorCode.NO_USER_MEDIA,
+                CallErrorCode.NoUserMedia,
                 "Couldn't start capturing media! Is your microphone set up and " +
                 "does this app have permission?", err,
             ),
@@ -893,7 +891,7 @@ export class MatrixCall extends EventEmitter {
     };
 
     onIceConnectionStateChanged = () => {
-        if (this.state === CallState.ENDED) {
+        if (this.state === CallState.Ended) {
             return; // because ICE can still complete as we're ending the call
         }
         logger.debug(
@@ -903,9 +901,9 @@ export class MatrixCall extends EventEmitter {
         // chrome doesn't implement any of the 'onstarted' events yet
         if (this.peerConn.iceConnectionState == 'completed' ||
                 this.peerConn.iceConnectionState == 'connected') {
-            this.setState(CallState.CONNECTED);
+            this.setState(CallState.Connected);
         } else if (this.peerConn.iceConnectionState == 'failed') {
-            this.hangup(CallErrorCode.ICE_FAILED, false);
+            this.hangup(CallErrorCode.IceFailed, false);
         }
     };
 
@@ -920,7 +918,7 @@ export class MatrixCall extends EventEmitter {
         logger.debug(`Track id ${ev.track.id} of kind ${ev.track.kind} added`);
 
         if (ev.track.kind == 'video') {
-            this.type = CallType.VIDEO;
+            this.type = CallType.Video;
         }
 
         // This is relatively complex as we may get any number of tracks that may
@@ -957,7 +955,7 @@ export class MatrixCall extends EventEmitter {
         // If we've just gained our stream, wire it up to the media object
         if (!haveStream) {
             if (this.remoteVideoElement) {
-                this.queueMediaOperation(MediaQueueId.REMOTE_VIDEO, async () => {
+                this.queueMediaOperation(MediaQueueId.RemoteVideo, async () => {
                     this.remoteVideoElement.srcObject = this.remoteStream;
                     try {
                         await this.remoteVideoElement.play();
@@ -974,7 +972,7 @@ export class MatrixCall extends EventEmitter {
     };
 
     playRemoteAudio() {
-        this.queueMediaOperation(MediaQueueId.REMOTE_AUDIO, async () => {
+        this.queueMediaOperation(MediaQueueId.RemoteAudio, async () => {
             this.remoteAudioElement.srcObject = this.remoteStream;
 
             // if audioOutput is non-default:
@@ -1001,12 +999,12 @@ export class MatrixCall extends EventEmitter {
 
     onHangupReceived = (msg) => {
         logger.debug("Hangup received");
-        this.terminate(CallParty.REMOTE, msg.reason, true);
+        this.terminate(CallParty.Remote, msg.reason, true);
     };
 
     onAnsweredElsewhere = (msg) => {
         logger.debug("Answered elsewhere");
-        this.terminate(CallParty.REMOTE, CallErrorCode.ANSWERED_ELSEWHERE, true);
+        this.terminate(CallParty.Remote, CallErrorCode.AnsweredElsewhere, true);
     };
 
     setState(state: CallState) {
@@ -1034,7 +1032,7 @@ export class MatrixCall extends EventEmitter {
         // means we tried to pick (ie. started generating candidates) and then failed to
         // send the answer and went back to the ringing state. Queue up the candidates
         // to send if we sucessfully send the answer.
-        if (this.state === CallState.RINGING) return;
+        if (this.state === CallState.Ringing) return;
 
         if (this.candidateSendTries === 0) {
             setTimeout(() => {
@@ -1044,20 +1042,20 @@ export class MatrixCall extends EventEmitter {
     }
 
     private terminate(hangupParty: CallParty, hangupReason: CallErrorCode, shouldEmit: boolean) {
-        if (this.state === CallState.ENDED) return;
+        if (this.state === CallState.Ended) return;
 
         const remoteVid = this.getRemoteVideoElement();
         const remoteAud = this.getRemoteAudioElement();
         const localVid = this.getLocalVideoElement();
 
         if (remoteVid) {
-            this.queueMediaOperation(MediaQueueId.REMOTE_VIDEO, () => {
+            this.queueMediaOperation(MediaQueueId.RemoteVideo, () => {
                 remoteVid.pause();
                 remoteVid.srcObject = null;
             });
         }
         if (remoteAud) {
-            this.queueMediaOperation(MediaQueueId.REMOTE_AUDIO, async () => {
+            this.queueMediaOperation(MediaQueueId.RemoteAudio, async () => {
                 remoteAud.pause();
                 remoteAud.srcObject = null;
                 try {
@@ -1070,14 +1068,14 @@ export class MatrixCall extends EventEmitter {
             });
         }
         if (localVid) {
-            this.queueMediaOperation(MediaQueueId.LOCAL_VIDEO, () => {
+            this.queueMediaOperation(MediaQueueId.LocalVideo, () => {
                 localVid.pause();
                 localVid.srcObject = null;
             });
         }
         this.hangupParty = hangupParty;
         this.hangupReason = hangupReason;
-        this.setState(CallState.ENDED);
+        this.setState(CallState.Ended);
         this.stopAllMedia();
         if (this.peerConn && this.peerConn.signalingState !== 'closed') {
             this.peerConn.close();
@@ -1156,8 +1154,8 @@ export class MatrixCall extends EventEmitter {
     private async placeCallWithConstraints(constraints: MediaStreamConstraints) {
         logger.log("Getting user media with constraints", constraints);
         this.client.callList[this.callId] = this;
-        this.setState(CallState.WAIT_LOCAL_MEDIA);
-        this.direction = CallDirection.OUTBOUND;
+        this.setState(CallState.WaitLocalMedia);
+        this.direction = CallDirection.Outbound;
         this.config = constraints;
         try {
             const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -1203,13 +1201,13 @@ function getUserMediaVideoContraints(callType: CallType) {
     const isWebkit = !!window.navigator.webkitGetUserMedia;
 
     switch (callType) {
-        case CallType.VOICE:
+        case CallType.Voice:
             return {
                 audio: {
                     deviceId: audioInput ? {ideal: audioInput} : undefined,
                 }, video: false,
             };
-        case CallType.VIDEO:
+        case CallType.Video:
             return {
                 audio: {
                     deviceId: audioInput ? {ideal: audioInput} : undefined,
