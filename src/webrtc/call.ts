@@ -1261,7 +1261,7 @@ export function setVideoInput(deviceId: string) { videoInput = deviceId; }
  * since it's only possible to set this option on outbound calls.
  * @return {MatrixCall} the call or null if the browser doesn't support calling.
  */
-export function createNewMatrixCall(client: any, roomId: string, options: CallOpts) {
+export function createNewMatrixCall(client: any, roomId: string, options?: CallOpts) {
     // typeof prevents Node from erroring on an undefined reference
     if (typeof(window) === 'undefined' || typeof(document) === 'undefined') {
         logger.error("No window or document object: WebRTC is not supported in this environement");
