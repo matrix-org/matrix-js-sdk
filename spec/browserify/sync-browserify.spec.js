@@ -99,5 +99,5 @@ describe("Browserify Test", function() {
                 client.once("sync.unexpectedError", reject);
             }),
         ]);
-    }, 10000);
+    }, 20000); // additional timeout as this test can take quite a while
 });

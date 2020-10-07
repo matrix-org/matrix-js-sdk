@@ -84,9 +84,16 @@ describe("CrossSigningInfo.getCrossSigningKey", function() {
         const info = new CrossSigningInfo(userId, {
             getCrossSigningKey: () => testKey,
         });
-        const [pubKey, ab] = await info.getCrossSigningKey("master", masterKeyPub);
+        const [pubKey, pkSigning] = await info.getCrossSigningKey("master", masterKeyPub);
         expect(pubKey).toEqual(masterKeyPub);
-        expect(ab).toEqual({a: 106712, b: 106712});
+        // check that the pkSigning object corresponds to the pubKey
+        const signature = pkSigning.sign("message");
+        const util = new global.Olm.Utility();
+        try {
+            util.ed25519_verify(pubKey, "message", signature);
+        } finally {
+            util.free();
+        }
     });
 
     it.each(types)("should request a key from the cache callback (if set)" +
