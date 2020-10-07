@@ -31,6 +31,9 @@ export enum EventType {
     RoomGuestAccess = "m.room.guest_access",
     RoomServerAcl = "m.room_server_acl",
     RoomTombstone = "m.room.tombstone",
+    /**
+     * @deprecated Should not be used.
+     */
     RoomAliases = "m.room.aliases", // deprecated https://matrix.org/docs/spec/client_server/r0.6.1#historical-events
 
     // Room timeline events
