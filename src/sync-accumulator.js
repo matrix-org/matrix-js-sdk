@@ -341,6 +341,9 @@ export class SyncAccumulator {
                 let transformedEvent;
                 if (!fromDatabase) {
                     transformedEvent = Object.assign({}, e);
+                    if (transformedEvent.unsigned !== undefined) {
+                        transformedEvent.unsigned = Object.assign({}, transformedEvent.unsigned);
+                    }
                     const age = e.unsigned ? e.unsigned.age : e.age;
                     if (age !== undefined) transformedEvent._localTs = Date.now() - age;
                 } else {
@@ -509,6 +512,10 @@ export class SyncAccumulator {
                     // directly rather than turning it into age to then immediately be
                     // transformed back again into a local timestamp.
                     transformedEvent = Object.assign({}, msgData.event);
+                    if (transformedEvent.unsigned !== undefined) {
+                        transformedEvent.unsigned = Object.assign({}, transformedEvent.unsigned);
+                    }
+                    delete transformedEvent._localTs;
                     transformedEvent.unsigned = transformedEvent.unsigned || {};
                     transformedEvent.unsigned.age = Date.now() - msgData.event._localTs;
                 } else {

@@ -17,6 +17,39 @@ limitations under the License.
 
 import {SyncAccumulator} from "../../src/sync-accumulator";
 
+// The event body & unsigned object get frozen to assert that they don't get altered
+// by the impl
+const RES_WITH_AGE = {
+    next_batch: "abc",
+    rooms: {
+        invite: {},
+        leave: {},
+        join: {
+            "!foo:bar": {
+                account_data: { events: [] },
+                ephemeral: { events: [] },
+                unread_notifications: {},
+                timeline: {
+                    events: [
+                        Object.freeze({
+                            content: {
+                                body: "This thing is happening right now!",
+                            },
+                            origin_server_ts: 123456789,
+                            sender: "@alice:localhost",
+                            type: "m.room.message",
+                            unsigned: Object.freeze({
+                                age: 50,
+                            }),
+                        }),
+                    ],
+                    prev_batch: "something",
+                },
+            },
+        },
+    },
+};
+
 describe("SyncAccumulator", function() {
     let sa;
 
@@ -370,57 +403,36 @@ describe("SyncAccumulator", function() {
         });
 
         it("should return correctly adjusted age attributes", () => {
-            const startingAge = 50;
             const delta = 1000;
             const startingTs = 1000;
-
-            const res = {
-                next_batch: "abc",
-                rooms: {
-                    invite: {},
-                    leave: {},
-                    join: {
-                        "!foo:bar": {
-                            account_data: { events: [] },
-                            ephemeral: { events: [] },
-                            unread_notifications: {},
-                            timeline: {
-                                events: [
-                                    {
-                                        content: {
-                                            body: "This thing is happening right now!",
-                                        },
-                                        origin_server_ts: 123456789,
-                                        sender: "@alice:localhost",
-                                        type: "m.room.message",
-                                        unsigned: {
-                                            age: startingAge,
-                                        }
-                                    },
-                                ],
-                                prev_batch: "something",
-                            },
-                        },
-                    },
-                },
-            };
 
             const oldDateNow = Date.now;
             try {
                 Date.now = jest.fn();
                 Date.now.mockReturnValue(startingTs);
 
-                sa.accumulate(res);
+                sa.accumulate(RES_WITH_AGE);
 
                 Date.now.mockReturnValue(startingTs + delta);
 
                 const output = sa.getJSON();
                 expect(output.roomsData.join["!foo:bar"].timeline.events[0].unsigned.age).toEqual(
-                    startingAge + delta,
+                    RES_WITH_AGE.rooms.join["!foo:bar"].timeline.events[0].unsigned.age + delta,
+                );
+                expect(Object.keys(output.roomsData.join["!foo:bar"].timeline.events[0])).toEqual(
+                    Object.keys(RES_WITH_AGE.rooms.join["!foo:bar"].timeline.events[0]),
                 );
             } finally {
                 Date.now = oldDateNow;
             }
+        });
+
+        it("should mangle age without adding extra keys", () => {
+            sa.accumulate(RES_WITH_AGE);
+            const output = sa.getJSON();
+            expect(Object.keys(output.roomsData.join["!foo:bar"].timeline.events[0])).toEqual(
+                Object.keys(RES_WITH_AGE.rooms.join["!foo:bar"].timeline.events[0]),
+            );
         });
     });
 });
