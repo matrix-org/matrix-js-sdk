@@ -1,3 +1,38 @@
+Changes in [8.5.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.5.0-rc.1) (2020-10-07)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.4.1...v8.5.0-rc.1)
+
+ * Add support for olm fallback keys
+   [\#1467](https://github.com/matrix-org/matrix-js-sdk/pull/1467)
+ * Fix editing local echoes not updating them in real time
+   [\#1492](https://github.com/matrix-org/matrix-js-sdk/pull/1492)
+ * Fix re-emit of Event.replaced to be on client and not room
+   [\#1491](https://github.com/matrix-org/matrix-js-sdk/pull/1491)
+ * Add space to log line
+   [\#1496](https://github.com/matrix-org/matrix-js-sdk/pull/1496)
+ * Revert "Convert call.js to Typescript & update WebRTC APIs"
+   [\#1493](https://github.com/matrix-org/matrix-js-sdk/pull/1493)
+ * Convert call.js to Typescript & update WebRTC APIs
+   [\#1487](https://github.com/matrix-org/matrix-js-sdk/pull/1487)
+ * Dehydrate and rehydrate devices
+   [\#1436](https://github.com/matrix-org/matrix-js-sdk/pull/1436)
+ * Keep local device after processing device list sync
+   [\#1490](https://github.com/matrix-org/matrix-js-sdk/pull/1490)
+ * Enforce logger module via lint rules
+   [\#1489](https://github.com/matrix-org/matrix-js-sdk/pull/1489)
+ * Extend method redactEvent with reason
+   [\#1462](https://github.com/matrix-org/matrix-js-sdk/pull/1462)
+ * Catch exception from call event handler
+   [\#1484](https://github.com/matrix-org/matrix-js-sdk/pull/1484)
+ * Ignore invalid candidates
+   [\#1483](https://github.com/matrix-org/matrix-js-sdk/pull/1483)
+ * Always push docs if they are generated
+   [\#1478](https://github.com/matrix-org/matrix-js-sdk/pull/1478)
+ * Only sign key backup with cross-signing keys when available
+   [\#1481](https://github.com/matrix-org/matrix-js-sdk/pull/1481)
+ * Upgrade dependencies
+   [\#1479](https://github.com/matrix-org/matrix-js-sdk/pull/1479)
+
 Changes in [8.4.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.4.1) (2020-09-28)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.4.0...v8.4.1)
