@@ -500,6 +500,14 @@ export class SyncAccumulator {
 
                 let transformedEvent;
                 if (!forDatabase && msgData.event._localTs) {
+                    // This means we have to copy each event so we can fix it up to
+                    // set a correct 'age' parameter whilst keeping the local timestamp
+                    // on our stored event. If this turns out to be a bottleneck, it could
+                    // be optimised either by doing this in the main process after the data
+                    // has been structured-cloned to go between the worker & main process,
+                    // or special-casing data from saved syncs to read the local timstamp
+                    // directly rather than turning it into age to then immediately be
+                    // transformed back again into a local timestamp.
                     transformedEvent = Object.assign({}, msgData.event);
                     transformedEvent.unsigned = transformedEvent.unsigned || {};
                     transformedEvent.unsigned.age = Date.now() - msgData.event._localTs;
