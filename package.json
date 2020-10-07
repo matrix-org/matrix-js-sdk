@@ -84,7 +84,7 @@
     "jest-localstorage-mock": "^2.4.3",
     "jsdoc": "^3.6.6",
     "matrix-mock-request": "^1.2.3",
-    "olm": "https://packages.matrix.org/npm/olm/olm-3.1.4.tgz",
+    "olm": "https://packages.matrix.org/npm/olm/olm-3.2.1.tgz",
     "rimraf": "^3.0.2",
     "terser": "^4.8.0",
     "tsify": "^4.0.2",
