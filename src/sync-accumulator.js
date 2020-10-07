@@ -342,7 +342,7 @@ export class SyncAccumulator {
                 if (!fromDatabase) {
                     transformedEvent = Object.assign({}, e);
                     const age = e.unsigned ? e.unsigned.age : e.age;
-                    transformedEvent._localTs = Date.now() - age;
+                    if (age !== undefined) transformedEvent._localTs = Date.now() - age;
                 } else {
                     transformedEvent = e;
                 }
