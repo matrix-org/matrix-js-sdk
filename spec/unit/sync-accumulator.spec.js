@@ -368,6 +368,60 @@ describe("SyncAccumulator", function() {
             expect(summary["m.joined_member_count"]).toEqual(5);
             expect(summary["m.heroes"]).toEqual(["@bob:bar"]);
         });
+
+        it("should return correctly adjusted age attributes", () => {
+            const startingAge = 50;
+            const delta = 1000;
+            const startingTs = 1000;
+
+            const res = {
+                next_batch: "abc",
+                rooms: {
+                    invite: {},
+                    leave: {},
+                    join: {
+                        "!foo:bar": {
+                            account_data: { events: [] },
+                            ephemeral: { events: [] },
+                            unread_notifications: {},
+                            timeline: {
+                                events: [
+                                    {
+                                        content: {
+                                            body: "This thing is happening right now!",
+                                        },
+                                        origin_server_ts: 123456789,
+                                        sender: "@alice:localhost",
+                                        type: "m.room.message",
+                                        unsigned: {
+                                            age: startingAge,
+                                        }
+                                    },
+                                ],
+                                prev_batch: "something",
+                            },
+                        },
+                    },
+                },
+            };
+
+            const oldDateNow = Date.now;
+            try {
+                Date.now = jest.fn();
+                Date.now.mockReturnValue(startingTs);
+
+                sa.accumulate(res);
+
+                Date.now.mockReturnValue(startingTs + delta);
+
+                const output = sa.getJSON();
+                expect(output.roomsData.join["!foo:bar"].timeline.events[0].unsigned.age).toEqual(
+                    startingAge + delta,
+                );
+            } finally {
+                Date.now = oldDateNow;
+            }
+        });
     });
 });
 
