@@ -226,7 +226,7 @@ LocalIndexedDBStoreBackend.prototype = {
                 account_data: {
                     events: accountData,
                 },
-            });
+            }, true);
         });
     },
 
@@ -416,7 +416,7 @@ LocalIndexedDBStoreBackend.prototype = {
     },
 
     syncToDatabase: function(userTuples) {
-        const syncData = this._syncAccumulator.getJSON();
+        const syncData = this._syncAccumulator.getJSON(true);
 
         return Promise.all([
             this._persistUserPresenceEvents(userTuples),

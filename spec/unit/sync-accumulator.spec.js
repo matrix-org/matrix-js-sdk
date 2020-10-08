@@ -17,6 +17,39 @@ limitations under the License.
 
 import {SyncAccumulator} from "../../src/sync-accumulator";
 
+// The event body & unsigned object get frozen to assert that they don't get altered
+// by the impl
+const RES_WITH_AGE = {
+    next_batch: "abc",
+    rooms: {
+        invite: {},
+        leave: {},
+        join: {
+            "!foo:bar": {
+                account_data: { events: [] },
+                ephemeral: { events: [] },
+                unread_notifications: {},
+                timeline: {
+                    events: [
+                        Object.freeze({
+                            content: {
+                                body: "This thing is happening right now!",
+                            },
+                            origin_server_ts: 123456789,
+                            sender: "@alice:localhost",
+                            type: "m.room.message",
+                            unsigned: Object.freeze({
+                                age: 50,
+                            }),
+                        }),
+                    ],
+                    prev_batch: "something",
+                },
+            },
+        },
+    },
+};
+
 describe("SyncAccumulator", function() {
     let sa;
 
@@ -367,6 +400,39 @@ describe("SyncAccumulator", function() {
             expect(summary["m.invited_member_count"]).toEqual(2);
             expect(summary["m.joined_member_count"]).toEqual(5);
             expect(summary["m.heroes"]).toEqual(["@bob:bar"]);
+        });
+
+        it("should return correctly adjusted age attributes", () => {
+            const delta = 1000;
+            const startingTs = 1000;
+
+            const oldDateNow = Date.now;
+            try {
+                Date.now = jest.fn();
+                Date.now.mockReturnValue(startingTs);
+
+                sa.accumulate(RES_WITH_AGE);
+
+                Date.now.mockReturnValue(startingTs + delta);
+
+                const output = sa.getJSON();
+                expect(output.roomsData.join["!foo:bar"].timeline.events[0].unsigned.age).toEqual(
+                    RES_WITH_AGE.rooms.join["!foo:bar"].timeline.events[0].unsigned.age + delta,
+                );
+                expect(Object.keys(output.roomsData.join["!foo:bar"].timeline.events[0])).toEqual(
+                    Object.keys(RES_WITH_AGE.rooms.join["!foo:bar"].timeline.events[0]),
+                );
+            } finally {
+                Date.now = oldDateNow;
+            }
+        });
+
+        it("should mangle age without adding extra keys", () => {
+            sa.accumulate(RES_WITH_AGE);
+            const output = sa.getJSON();
+            expect(Object.keys(output.roomsData.join["!foo:bar"].timeline.events[0])).toEqual(
+                Object.keys(RES_WITH_AGE.rooms.join["!foo:bar"].timeline.events[0]),
+            );
         });
     });
 });
