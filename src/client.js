@@ -490,7 +490,7 @@ MatrixClient.prototype.rehydrateDevice = async function() {
             },
         );
     } catch (e) {
-        logger.info("could not get dehydrated device", e);
+        logger.info("could not get dehydrated device", e.toString());
         return;
     }
 
