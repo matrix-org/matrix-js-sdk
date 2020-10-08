@@ -433,7 +433,7 @@ export class MatrixCall extends EventEmitter {
             this.type = CallType.Voice;
         }
 
-        if (event.getAge()) {
+        if (event.getLocalAge()) {
             setTimeout(() => {
                 if (this.state == CallState.Ringing) {
                     logger.debug("Call invite has expired. Hanging up.");
@@ -445,7 +445,7 @@ export class MatrixCall extends EventEmitter {
                     }
                     this.emit("hangup");
                 }
-            }, this.msg.lifetime - event.getAge());
+            }, this.msg.lifetime - event.getLocalAge());
         }
     }
 

@@ -19,6 +19,10 @@ import {logger} from '../logger';
 import { createNewMatrixCall, MatrixCall, CallErrorCode, CallState, CallDirection } from './call';
 import { EventType } from '../@types/event';
 
+// Don't ring unless we'd be ringing for at least 3 seconds: the user needs some
+// time to press the 'accept' button
+const RING_GRACE_PERIOD = 3000;
+
 export class CallEventHandler {
     client: any;
     calls: Map<string, MatrixCall>;
@@ -119,11 +123,7 @@ export class CallEventHandler {
                 return; // ignore invites you send
             }
 
-            // XXX: age is always wrong for events from a stored sync so this doesn't
-            // really work. getLocalAge works by comparing the event's timestamp to the
-            // local system clock so is probably worse (ie. if your clock was over a minute
-            // fast, you wouldn't be able to receive any calls at all).
-            if (event.getAge() > content.lifetime) {
+            if (event.getLocalAge() > content.lifetime - RING_GRACE_PERIOD) {
                 return; // expired call
             }
 
