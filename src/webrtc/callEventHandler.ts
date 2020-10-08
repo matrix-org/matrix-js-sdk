@@ -16,7 +16,8 @@ limitations under the License.
 
 import MatrixEvent from '../models/event';
 import {logger} from '../logger';
-import { createNewMatrixCall, MatrixCall, CallErrorCode } from './call';
+import { createNewMatrixCall, MatrixCall, CallErrorCode, CallState, CallDirection } from './call';
+import { EventType } from '../@types/event';
 
 export class CallEventHandler {
     client: any;
@@ -55,15 +56,15 @@ export class CallEventHandler {
             // inspect the buffer and mark all calls which have been answered
             // or hung up before passing them to the call event handler.
             for (const ev of this.callEventBuffer) {
-                if (ev.getType() === "m.call.answer" ||
-                        ev.getType() === "m.call.hangup") {
+                if (ev.getType() === EventType.CallAnswer ||
+                        ev.getType() === EventType.CallHangup) {
                     ignoreCallIds.add(ev.getContent().call_id);
                 }
             }
             // now loop through the buffer chronologically and inject them
             for (const e of this.callEventBuffer) {
                 if (
-                    e.getType() === "m.call.invite" &&
+                    e.getType() === EventType.CallInvite &&
                     ignoreCallIds.has(e.getContent().call_id)
                 ) {
                     // This call has previously been answered or hung up: ignore it
@@ -113,7 +114,7 @@ export class CallEventHandler {
         let call = content.call_id ? this.calls.get(content.call_id) : undefined;
         //console.info("RECV %s content=%s", event.getType(), JSON.stringify(content));
 
-        if (event.getType() === "m.call.invite") {
+        if (event.getType() === EventType.CallInvite) {
             if (event.getSender() === this.client.credentials.userId) {
                 return; // ignore invites you send
             }
@@ -126,14 +127,13 @@ export class CallEventHandler {
                 return; // expired call
             }
 
-            if (call && call.state === "ended") {
+            if (call && call.state === CallState.Ended) {
                 return; // stale/old invite event
             }
             if (call) {
                 logger.log(
-                    "WARN: Already have a MatrixCall with id %s but got an " +
-                    "invite. Clobbering.",
-                    content.call_id,
+                    `WARN: Already have a MatrixCall with id ${content.call_id} but got an ` +
+                    `invite. Clobbering.`,
                 );
             }
 
@@ -166,8 +166,8 @@ export class CallEventHandler {
             let existingCall;
             for (const thisCall of this.calls.values()) {
                 if (call.roomId === thisCall.roomId &&
-                        thisCall.direction === 'outbound' &&
-                        (["wait_local_media", "create_offer", "invite_sent"].indexOf(
+                        thisCall.direction === CallDirection.Outbound &&
+                        ([CallState.WaitLocalMedia, CallState.CreateOffer, CallState.InviteSent].indexOf(
                             thisCall.state) !== -1)) {
                     existingCall = thisCall;
                     break;
@@ -179,8 +179,8 @@ export class CallEventHandler {
                 // we've got an invite, pick the incoming call because we know
                 // we haven't sent our invite yet otherwise, pick whichever
                 // call has the lowest call ID (by string comparison)
-                if (existingCall.state === 'wait_local_media' ||
-                        existingCall.state === 'create_offer' ||
+                if (existingCall.state === CallState.WaitLocalMedia ||
+                        existingCall.state === CallState.CreateOffer ||
                         existingCall.callId > call.callId) {
                     logger.log(
                         "Glare detected: answering incoming call " + call.callId +
@@ -198,18 +198,18 @@ export class CallEventHandler {
             } else {
                 this.client.emit("Call.incoming", call);
             }
-        } else if (event.getType() === 'm.call.answer') {
+        } else if (event.getType() === EventType.CallAnswer) {
             if (!call) {
                 return;
             }
             if (event.getSender() === this.client.credentials.userId) {
-                if (call.state === 'ringing') {
+                if (call.state === CallState.Ringing) {
                     call.onAnsweredElsewhere(content);
                 }
             } else {
                 call.receivedAnswer(content);
             }
-        } else if (event.getType() === 'm.call.candidates') {
+        } else if (event.getType() === EventType.CallCandidates) {
             if (event.getSender() === this.client.credentials.userId) {
                 return;
             }
@@ -226,7 +226,7 @@ export class CallEventHandler {
                     call.gotRemoteIceCandidate(cand);
                 }
             }
-        } else if (event.getType() === 'm.call.hangup') {
+        } else if (event.getType() === EventType.CallHangup) {
             // Note that we also observe our own hangups here so we can see
             // if we've already rejected a call that would otherwise be valid
             if (!call) {
@@ -240,7 +240,7 @@ export class CallEventHandler {
                     this.calls.set(content.call_id, call);
                 }
             } else {
-                if (call.state !== 'ended') {
+                if (call.state !== CallState.Ended) {
                     call.onHangupReceived(content);
                     this.calls.delete(content.call_id);
                 }

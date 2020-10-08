@@ -58,7 +58,7 @@ interface TurnServer {
     ttl?: number,
 }
 
-enum CallState {
+export enum CallState {
     Fledgling = 'fledgling',
     InviteSent = 'invite_sent',
     WaitLocalMedia = 'wait_local_media',
@@ -70,17 +70,17 @@ enum CallState {
     Ended = 'ended',
 }
 
-enum CallType {
+export enum CallType {
     Voice = 'voice',
     Video = 'video',
 }
 
-enum CallDirection {
+export enum CallDirection {
     Inbound = 'inbound',
     Outbound = 'outbound',
 }
 
-enum CallParty {
+export enum CallParty {
     Local = 'local',
     Remote = 'remote',
 }
