@@ -45,10 +45,10 @@ import MatrixEvent from "../models/event"
  */
 
 interface CallOpts {
-    roomId: string,
-    client: any, // Fix when client is TSified
-    forceTURN: boolean,
-    turnServers: Array<TurnServer>,
+    roomId?: string,
+    client?: any, // Fix when client is TSified
+    forceTURN?: boolean,
+    turnServers?: Array<TurnServer>,
 }
 
 interface TurnServer {
@@ -91,7 +91,7 @@ enum MediaQueueId {
     LocalVideo = 'local_video',
 }
 
-enum CallErrorCode {
+export enum CallErrorCode {
     /** An error code when the local client failed to create an offer. */
     LocalOfferFailed = 'local_offer_failed',
     /**
