@@ -47,7 +47,7 @@ export class CallEventHandler {
         this.client.on("event", this.onEvent);
     }
 
-    stop() {
+    public stop() {
         this.client.removeEventListener("sync", this.evaluateEventBuffer);
         this.client.removeEventListener("event", this.onEvent);
     }
