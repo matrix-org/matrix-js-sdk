@@ -645,8 +645,8 @@ export class MatrixCall extends EventEmitter {
     };
 
     private sendAnswer() {
+        this.setState(CallState.Connecting);
         this.sendEvent('m.call.answer', this.answerContent).then(() => {
-            this.setState(CallState.Connecting);
             // If this isn't the first time we've tried to send the answer,
             // we may have candidates queued up, so send them now.
             this.sendCandidateQueue();
@@ -896,12 +896,11 @@ export class MatrixCall extends EventEmitter {
             return; // because ICE can still complete as we're ending the call
         }
         logger.debug(
-            "Ice connection state changed to: " + this.peerConn.iceConnectionState,
+            "ICE connection state changed to: " + this.peerConn.iceConnectionState,
         );
         // ideally we'd consider the call to be connected when we get media but
         // chrome doesn't implement any of the 'onstarted' events yet
-        if (this.peerConn.iceConnectionState == 'completed' ||
-                this.peerConn.iceConnectionState == 'connected') {
+        if (this.peerConn.iceConnectionState == 'connected') {
             this.setState(CallState.Connected);
         } else if (this.peerConn.iceConnectionState == 'failed') {
             this.hangup(CallErrorCode.IceFailed, false);
@@ -1099,8 +1098,10 @@ export class MatrixCall extends EventEmitter {
             }
         }
 
-        for (const track of this.remoteStream.getTracks()) {
-            track.stop();
+        if (this.remoteStream) {
+            for (const track of this.remoteStream.getTracks()) {
+                track.stop();
+            }
         }
     }
 
@@ -1174,6 +1175,7 @@ export class MatrixCall extends EventEmitter {
             iceServers: this.turnServers,
         });
 
+        // 'connectionstatechange' would be better, but firefox doesn't implement that.
         pc.addEventListener('iceconnectionstatechange', this.onIceConnectionStateChanged);
         pc.addEventListener('signalingstatechange', this.onSignallingStateChanged);
         pc.addEventListener('icecandidate', this.gotLocalIceCandidate);
