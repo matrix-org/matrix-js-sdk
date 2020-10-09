@@ -336,6 +336,8 @@ export function MatrixClient(opts) {
     if (call) {
         this._callEventHandler = new CallEventHandler(this);
         this._supportsVoip = true;
+    } else {
+        this._callEventHandler = null;
     }
     this._syncingRetry = null;
     this._syncApi = null;
@@ -372,8 +374,6 @@ export function MatrixClient(opts) {
 
     this._clientWellKnown = undefined;
     this._clientWellKnownPromise = undefined;
-
-    this._callEventHandler = null;
 
     // The SDK doesn't really provide a clean way for events to recalculate the push
     // actions for themselves, so we have to kinda help them out when they are encrypted.

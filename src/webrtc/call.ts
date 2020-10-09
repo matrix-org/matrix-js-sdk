@@ -1154,7 +1154,8 @@ export class MatrixCall extends EventEmitter {
 
     private async placeCallWithConstraints(constraints: MediaStreamConstraints) {
         logger.log("Getting user media with constraints", constraints);
-        this.client.callList[this.callId] = this;
+        // XXX Find a better way to do this
+        this.client._callEventHandler.calls.set(this.callId, this);
         this.setState(CallState.WaitLocalMedia);
         this.direction = CallDirection.Outbound;
         this.config = constraints;
