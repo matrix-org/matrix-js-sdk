@@ -166,10 +166,15 @@ export class CallEventHandler {
             // Were we trying to call that user (room)?
             let existingCall;
             for (const thisCall of this.calls.values()) {
-                if (call.roomId === thisCall.roomId &&
-                        thisCall.direction === CallDirection.Outbound &&
-                        ([CallState.WaitLocalMedia, CallState.CreateOffer, CallState.InviteSent].indexOf(
-                            thisCall.state) !== -1)) {
+                const isCalling = [CallState.WaitLocalMedia, CallState.CreateOffer, CallState.InviteSent].includes(
+                    thisCall.state,
+                );
+
+                if (
+                    call.roomId === thisCall.roomId &&
+                    thisCall.direction === CallDirection.Outbound &&
+                    isCalling
+                ) {
                     existingCall = thisCall;
                     break;
                 }
