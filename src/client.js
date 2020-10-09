@@ -235,7 +235,14 @@ function keyFromRecoverySession(session, decryptionKey) {
  *       {
  *           keys: {
  *               <key name>: {
- *                   pubkey: {UInt8Array}
+ *                   "algorithm": "m.secret_storage.v1.aes-hmac-sha2",
+ *                   "passphrase": {
+ *                       "algorithm": "m.pbkdf2",
+ *                       "iterations": 500000,
+ *                       "salt": "..."
+ *                   },
+ *                   "iv": "...",
+ *                   "mac": "..."
  *               }, ...
  *           }
  *       }
@@ -247,6 +254,7 @@ function keyFromRecoverySession(session, decryptionKey) {
  * desired to avoid user prompts.
  * Args:
  *   {string} keyId the ID of the new key
+ *   {object} keyInfo Infomation about the key as above for `getSecretStorageKey`
  *   {Uint8Array} key the new private key
  *
  * @param {function} [opts.cryptoCallbacks.onSecretRequested]
@@ -1434,7 +1442,7 @@ wrapCryptoFuncs(MatrixClient, [
  *     containing the key, or rejects if the key cannot be obtained.
  * Returns:
  *     {Promise} A promise which resolves to key creation data for
- *     SecretStorage#addKey: an object with `passphrase` and/or `pubkey` fields.
+ *     SecretStorage#addKey: an object with `passphrase` etc fields.
  */
 
 /**
@@ -1449,7 +1457,9 @@ wrapCryptoFuncs(MatrixClient, [
  * @param {string} [keyName] the name of the key.  If not given, a random
  *     name will be generated.
  *
- * @return {string} the name of the key
+ * @return {object} An object with:
+ *     keyId: {string} the ID of the key
+ *     keyInfo: {object} details about the key (iv, mac, passphrase)
  */
 
 /**
@@ -2009,7 +2019,7 @@ MatrixClient.prototype.isValidRecoveryKey = function(recoveryKey) {
  *
  * @param {string} password Passphrase
  * @param {object} backupInfo Backup metadata from `checkKeyBackup`
- * @return {Promise<Buffer>} key backup key
+ * @return {Promise<Uint8Array>} key backup key
  */
 MatrixClient.prototype.keyBackupKeyFromPassword = function(
     password, backupInfo,
@@ -2024,7 +2034,7 @@ MatrixClient.prototype.keyBackupKeyFromPassword = function(
  * The cross-signing API is currently UNSTABLE and may change without notice.
  *
  * @param {string} recoveryKey The recovery key
- * @return {Buffer} key backup key
+ * @return {Uint8Array} key backup key
  */
 MatrixClient.prototype.keyBackupKeyFromRecoveryKey = function(recoveryKey) {
     return decodeRecoveryKey(recoveryKey);
