@@ -92,6 +92,9 @@ enum MediaQueueId {
 }
 
 export enum CallErrorCode {
+    /** The user chose to end the call */
+    UserHangup = 'user_hangup',
+
     /** An error code when the local client failed to create an offer. */
     LocalOfferFailed = 'local_offer_failed',
     /**
@@ -531,8 +534,10 @@ export class MatrixCall extends EventEmitter {
         const content = {
             version: 0,
             call_id: this.callId,
-            reason: reason,
         };
+        // Continue to send no reason for user hangups temporarily, until
+        // clients understand the user_hangup reason (voip v1)
+        if (reason !== CallErrorCode.UserHangup) content['reason'] = reason;
         this.sendEvent('m.call.hangup', content);
     }
 
