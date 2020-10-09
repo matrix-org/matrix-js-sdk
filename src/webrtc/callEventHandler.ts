@@ -18,18 +18,19 @@ import MatrixEvent from '../models/event';
 import {logger} from '../logger';
 import { createNewMatrixCall, MatrixCall, CallErrorCode, CallState, CallDirection } from './call';
 import { EventType } from '../@types/event';
+import { MatrixClient } from '../client';
 
 // Don't ring unless we'd be ringing for at least 3 seconds: the user needs some
 // time to press the 'accept' button
 const RING_GRACE_PERIOD = 3000;
 
 export class CallEventHandler {
-    client: any;
+    client: MatrixClient;
     calls: Map<string, MatrixCall>;
-    callEventBuffer: Array<MatrixEvent>;
+    callEventBuffer: MatrixEvent[];
     candidatesByCall: Map<string, Array<RTCIceCandidate>>;
 
-    constructor(client: any) {
+    constructor(client: MatrixClient) {
         this.client = client;
         this.calls = new Map<string, MatrixCall>();
         // The sync code always emits one event at a time, so it will patiently
