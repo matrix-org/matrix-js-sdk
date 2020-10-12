@@ -85,6 +85,13 @@ export enum CallParty {
     Remote = 'remote',
 }
 
+export enum CallEvent {
+    Hangup = 'hangup',
+    State = 'state',
+    Error = 'error',
+    Replaced = 'replaced',
+}
+
 enum MediaQueueId {
     RemoteVideo = 'remote_video',
     RemoteAudio = 'remote_audio',
@@ -300,7 +307,7 @@ export class MatrixCall extends EventEmitter {
             const audioConstraints = getUserMediaVideoContraints(CallType.Voice);
             this.placeCallWithConstraints(audioConstraints);
         } catch (err) {
-            this.emit("error",
+            this.emit(CallEvent.Error,
                 new CallError(
                     CallErrorCode.NoUserMedia,
                     "Failed to get screen-sharing stream: ", err,
@@ -446,7 +453,7 @@ export class MatrixCall extends EventEmitter {
                     if (this.peerConn.signalingState != 'closed') {
                         this.peerConn.close();
                     }
-                    this.emit("hangup");
+                    this.emit(CallEvent.Hangup);
                 }
             }, this.msg.lifetime - event.getLocalAge());
         }
@@ -517,7 +524,7 @@ export class MatrixCall extends EventEmitter {
         newCall.remoteVideoElement = this.remoteVideoElement;
         newCall.remoteAudioElement = this.remoteAudioElement;
         this.successor = newCall;
-        this.emit("replaced", newCall);
+        this.emit(CallEvent.Replaced, newCall);
         this.hangup(CallErrorCode.Replaced, true);
     }
 
@@ -666,7 +673,7 @@ export class MatrixCall extends EventEmitter {
                 code = CallErrorCode.UnknownDevices;
                 message = "Unknown devices present in the room";
             }
-            this.emit("error", new CallError(code, message, error));
+            this.emit(CallEvent.Error, new CallError(code, message, error));
             throw error;
         });
     }
@@ -862,7 +869,7 @@ export class MatrixCall extends EventEmitter {
 
             this.client.cancelPendingEvent(error.event);
             this.terminate(CallParty.Local, code, false);
-            this.emit("error", new CallError(code, message, error));
+            this.emit(CallEvent.Error, new CallError(code, message, error));
         }
     };
 
@@ -871,7 +878,7 @@ export class MatrixCall extends EventEmitter {
 
         this.terminate(CallParty.Local, CallErrorCode.LocalOfferFailed, false);
         this.emit(
-            "error",
+            CallEvent.Error,
             new CallError(
                 CallErrorCode.LocalOfferFailed,
                 "Failed to get local offer!", err,
@@ -887,7 +894,7 @@ export class MatrixCall extends EventEmitter {
 
         this.terminate(CallParty.Local, CallErrorCode.NoUserMedia, false);
         this.emit(
-            "error",
+            CallEvent.Error,
             new CallError(
                 CallErrorCode.NoUserMedia,
                 "Couldn't start capturing media! Is your microphone set up and " +
@@ -1015,7 +1022,7 @@ export class MatrixCall extends EventEmitter {
     setState(state: CallState) {
         const oldState = this.state;
         this.state = state;
-        this.emit("state", state, oldState);
+        this.emit(CallEvent.State, state, oldState);
     }
 
     /**
@@ -1086,7 +1093,7 @@ export class MatrixCall extends EventEmitter {
             this.peerConn.close();
         }
         if (shouldEmit) {
-            this.emit("hangup", self);
+            this.emit(CallEvent.Hangup, self);
         }
     }
 
