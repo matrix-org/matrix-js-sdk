@@ -45,10 +45,10 @@ import MatrixEvent from "../models/event"
  */
 
 interface CallOpts {
-    roomId: string,
-    client: any, // Fix when client is TSified
-    forceTURN: boolean,
-    turnServers: Array<TurnServer>,
+    roomId?: string,
+    client?: any, // Fix when client is TSified
+    forceTURN?: boolean,
+    turnServers?: Array<TurnServer>,
 }
 
 interface TurnServer {
@@ -58,7 +58,7 @@ interface TurnServer {
     ttl?: number,
 }
 
-enum CallState {
+export enum CallState {
     Fledgling = 'fledgling',
     InviteSent = 'invite_sent',
     WaitLocalMedia = 'wait_local_media',
@@ -70,17 +70,17 @@ enum CallState {
     Ended = 'ended',
 }
 
-enum CallType {
+export enum CallType {
     Voice = 'voice',
     Video = 'video',
 }
 
-enum CallDirection {
+export enum CallDirection {
     Inbound = 'inbound',
     Outbound = 'outbound',
 }
 
-enum CallParty {
+export enum CallParty {
     Local = 'local',
     Remote = 'remote',
 }
@@ -91,7 +91,7 @@ enum MediaQueueId {
     LocalVideo = 'local_video',
 }
 
-enum CallErrorCode {
+export enum CallErrorCode {
     /** An error code when the local client failed to create an offer. */
     LocalOfferFailed = 'local_offer_failed',
     /**
@@ -433,7 +433,7 @@ export class MatrixCall extends EventEmitter {
             this.type = CallType.Voice;
         }
 
-        if (event.getAge()) {
+        if (event.getLocalAge()) {
             setTimeout(() => {
                 if (this.state == CallState.Ringing) {
                     logger.debug("Call invite has expired. Hanging up.");
@@ -445,7 +445,7 @@ export class MatrixCall extends EventEmitter {
                     }
                     this.emit("hangup");
                 }
-            }, this.msg.lifetime - event.getAge());
+            }, this.msg.lifetime - event.getLocalAge());
         }
     }
 
@@ -1154,7 +1154,8 @@ export class MatrixCall extends EventEmitter {
 
     private async placeCallWithConstraints(constraints: MediaStreamConstraints) {
         logger.log("Getting user media with constraints", constraints);
-        this.client.callList[this.callId] = this;
+        // XXX Find a better way to do this
+        this.client._callEventHandler.calls.set(this.callId, this);
         this.setState(CallState.WaitLocalMedia);
         this.direction = CallDirection.Outbound;
         this.config = constraints;
