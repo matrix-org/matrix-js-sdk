@@ -416,22 +416,19 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
+        // According to previous comments in this file, firefox at some point did not
+        // add streams until media started ariving on them. Testing latest firefox
+        // (81 at time of writing), this is no longer a problem, so let's do it the correct way.
+        if (!this.remoteStream || this.remoteStream.getTracks().length === 0) {
+            logger.error("No remote stream or no tracks after setting remote description!");
+            this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
+            return;
+        }
+
+        this.type = this.remoteStream.getTracks().some(t => t.kind === 'video') ? CallType.Video : CallType.Voice;
+
         this.setState(CallState.Ringing);
         this.direction = CallDirection.Inbound;
-
-        // firefox and OpenWebRTC's RTCPeerConnection doesn't add streams until it
-        // starts getting media on them so we need to figure out whether a video
-        // channel has been offered by ourselves.
-        // XXX: This comment is probably outdated: check & remove this if so
-        if (
-            this.msg.offer &&
-            this.msg.offer.sdp &&
-            this.msg.offer.sdp.indexOf('m=video') > -1
-        ) {
-            this.type = CallType.Video;
-        } else {
-            this.type = CallType.Voice;
-        }
 
         if (event.getLocalAge()) {
             setTimeout(() => {
@@ -917,10 +914,6 @@ export class MatrixCall extends EventEmitter {
 
     private onTrack = (ev: RTCTrackEvent) => {
         logger.debug(`Track id ${ev.track.id} of kind ${ev.track.kind} added`);
-
-        if (ev.track.kind == 'video') {
-            this.type = CallType.Video;
-        }
 
         // This is relatively complex as we may get any number of tracks that may
         // be in any number of streams, or not in streams at all, etc.
