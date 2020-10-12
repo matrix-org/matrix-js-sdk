@@ -148,10 +148,10 @@ export interface ICreateClientOpts {
 
 export interface ICryptoCallbacks {
     getCrossSigningKey?: (keyType: string, pubKey: Uint8Array) => Promise<Uint8Array>;
-    saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => unknown;
+    saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
     shouldUpgradeDeviceVerifications?: (
         users: Record<string, any>
-    ) => Promise<Array<string>>;
+    ) => Promise<string[]>;
     getSecretStorageKey?: (
         keys: {keys: Record<string, ISecretStorageKeyInfo>}, name: string
     ) => Promise<[string, Uint8Array] | null>;
