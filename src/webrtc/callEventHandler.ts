@@ -48,8 +48,8 @@ export class CallEventHandler {
     }
 
     public stop() {
-        this.client.removeEventListener("sync", this.evaluateEventBuffer);
-        this.client.removeEventListener("event", this.onEvent);
+        this.client.removeListener("sync", this.evaluateEventBuffer);
+        this.client.removeListener("event", this.onEvent);
     }
 
     private evaluateEventBuffer = () => {
