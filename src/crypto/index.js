@@ -633,7 +633,7 @@ Crypto.prototype.bootstrapCrossSigning = async function({
  *     containing the key, or rejects if the key cannot be obtained.
  * Returns:
  *     {Promise} A promise which resolves to key creation data for
- *     SecretStorage#addKey: an object with `passphrase` and/or `pubkey` fields.
+ *     SecretStorage#addKey: an object with `passphrase` etc fields.
  */
 Crypto.prototype.bootstrapSecretStorage = async function({
     createSecretStorageKey = async () => ({ }),
@@ -663,13 +663,13 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             opts.key = privateKey;
         }
 
-        const keyId = await secretStorage.addKey(
+        const { keyId, keyInfo } = await secretStorage.addKey(
             SECRET_STORAGE_ALGORITHM_V1_AES, opts,
         );
 
         if (privateKey) {
             // make the private key available to encrypt 4S secrets
-            builder.ssssCryptoCallbacks.addPrivateKey(keyId, privateKey);
+            builder.ssssCryptoCallbacks.addPrivateKey(keyId, keyInfo, privateKey);
         }
 
         await secretStorage.setDefaultKeyId(keyId);
@@ -682,9 +682,9 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                 {keys: {[keyId]: keyInfo}}, "",
             );
             if (key) {
-                const keyData = key[1];
-                builder.ssssCryptoCallbacks.addPrivateKey(keyId, keyData);
-                const {iv, mac} = await SecretStorage._calculateKeyCheck(keyData);
+                const privateKey = key[1];
+                builder.ssssCryptoCallbacks.addPrivateKey(keyId, keyInfo, privateKey);
+                const {iv, mac} = await SecretStorage._calculateKeyCheck(privateKey);
                 keyInfo.iv = iv;
                 keyInfo.mac = mac;
 

@@ -1,7 +1,7 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2019, 2020 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -113,7 +113,7 @@ export function setCryptoStoreFactory(fac) {
     cryptoStoreFactory = fac;
 }
 
-interface ICreateClientOpts {
+export interface ICreateClientOpts {
     baseUrl: string;
     idBaseUrl?: string;
     store?: Store;
@@ -126,6 +126,7 @@ interface ICreateClientOpts {
     identityServer?: any;
     localTimeoutMs?: number;
     useAuthorizationHeader?: boolean;
+    timelineSupport?: boolean;
     queryParams?: Record<string, unknown>;
     deviceToImport?: {
         olmDevice: {
@@ -136,26 +137,54 @@ interface ICreateClientOpts {
         userId: string;
         deviceId: string;
     };
+    pickleKey?: string;
     sessionStore?: any;
     unstableClientRelationAggregation?: boolean;
     verificationMethods?: Array<any>;
     forceTURN?: boolean;
     fallbackICEServerAllowed?: boolean;
-    cryptoCallbacks?: {
-        getCrossSigningKey?: (keyType: string, pubKey: Uint8Array) => Promise<Uint8Array>;
-        saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => unknown;
-        shouldUpgradeDeviceVerifications?: (
-            users: Record<string, any>
-        ) => Promise<Array<string>>;
-        getSecretStorageKey?: (
-            keys: {keys: Record<string, {pubkey: Uint8Array}>}, name: string
-        ) => Promise<[string, Uint8Array] | null>;
-        cacheSecretStorageKey?: (keyId: string, key: Uint8Array) => unknown;
-        onSecretRequested?: (
-            name: string, userId: string, deviceId: string,
-            requestId: string, deviceTrust: any
-        ) => Promise<string>;
+    cryptoCallbacks?: ICryptoCallbacks;
+}
+
+export interface ICryptoCallbacks {
+    getCrossSigningKey?: (keyType: string, pubKey: Uint8Array) => Promise<Uint8Array>;
+    saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
+    shouldUpgradeDeviceVerifications?: (
+        users: Record<string, any>
+    ) => Promise<string[]>;
+    getSecretStorageKey?: (
+        keys: {keys: Record<string, ISecretStorageKeyInfo>}, name: string
+    ) => Promise<[string, Uint8Array] | null>;
+    cacheSecretStorageKey?: (
+        keyId: string, keyInfo: ISecretStorageKeyInfo, key: Uint8Array
+    ) => void;
+    onSecretRequested?: (
+        userId: string, deviceId: string,
+        requestId: string, secretName: string, deviceTrust: IDeviceTrustLevel
+    ) => Promise<string>;
+    getDehydrationKey?: (
+        keyInfo: ISecretStorageKeyInfo,
+        checkFunc: (Uint8Array) => void,
+    ) => Promise<Uint8Array>;
+}
+
+// TODO: Move this to `SecretStorage` once converted
+export interface ISecretStorageKeyInfo {
+    passphrase?: {
+        algorithm: "m.pbkdf2";
+        iterations: number;
+        salt: string;
     };
+    iv?: string;
+    mac?: string;
+}
+
+// TODO: Move this to `CrossSigning` once converted
+export interface IDeviceTrustLevel {
+    isVerified(): boolean;
+    isCrossSigningVerified(): boolean;
+    isLocallyVerified(): boolean;
+    isTofu(): boolean;
 }
 
 /**

@@ -194,7 +194,7 @@ describe("Secrets", function() {
         };
         resetCrossSigningKeys(alice);
 
-        const newKeyId = await alice.addSecretStorageKey(
+        const { keyId: newKeyId } = await alice.addSecretStorageKey(
             SECRET_STORAGE_ALGORITHM_V1_AES,
         );
         // we don't await on this because it waits for the event to come down the sync
@@ -226,8 +226,8 @@ describe("Secrets", function() {
             ],
             {
                 cryptoCallbacks: {
-                    onSecretRequested: e => {
-                        expect(e.name).toBe("foo");
+                    onSecretRequested: (userId, deviceId, requestId, secretName, deviceTrust) => {
+                        expect(secretName).toBe("foo");
                         return "bar";
                     },
                 },
