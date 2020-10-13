@@ -26,7 +26,7 @@ import anotherjson from "another-json";
 import {PkSigning} from "olm";
 
 import OlmDevice from "./OlmDevice";
-import DeviceInfo from "./DeviceInfo";
+import DeviceInfo from "./deviceinfo";
 import MatrixBaseApis from "../base-apis";
 import {logger} from '../logger';
 import * as utils from "../utils";

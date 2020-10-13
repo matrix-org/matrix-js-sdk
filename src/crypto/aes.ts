@@ -215,6 +215,8 @@ async function deriveKeysBrowser(key, name) {
         {
             name: "HKDF",
             salt: zeroSalt,
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore: https://github.com/microsoft/TypeScript-DOM-lib-generator/pull/879
             info: (new TextEncoder().encode(name)),
             hash: "SHA-256",
         },
