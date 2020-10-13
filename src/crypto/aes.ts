@@ -52,15 +52,17 @@ async function encryptNode(data: string, key: Uint8Array, name: string, ivStr?: 
     const [aesKey, hmacKey] = deriveKeysNode(key, name);
 
     const cipher = crypto.createCipheriv("aes-256-ctr", aesKey, iv);
-    const ciphertext = cipher.update(data, "utf8", "base64")
-          + cipher.final("base64");
+    const ciphertext = Buffer.concat([
+        cipher.update(data, "utf8"),
+        cipher.final(),
+    ]);
 
     const hmac = crypto.createHmac("sha256", hmacKey)
-        .update(ciphertext, "base64").digest("base64");
+        .update(ciphertext).digest("base64");
 
     return {
         iv: encodeBase64(iv),
-        ciphertext: ciphertext,
+        ciphertext: ciphertext.toString("base64"),
         mac: hmac,
     };
 }
@@ -84,7 +86,8 @@ async function decryptNode(data: IData, key: Uint8Array, name: string) {
     const [aesKey, hmacKey] = deriveKeysNode(key, name);
 
     const hmac = crypto.createHmac("sha256", hmacKey)
-        .update(data.ciphertext, "base64").digest("base64").replace(/=+$/g, '');
+        .update(Buffer.from(data.ciphertext, "base64"))
+        .digest("base64").replace(/=+$/g, '');
 
     if (hmac !== data.mac.replace(/=+$/g, '')) {
         throw new Error(`Error decrypting secret ${name}: bad MAC`);
