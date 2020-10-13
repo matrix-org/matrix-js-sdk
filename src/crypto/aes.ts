@@ -21,7 +21,7 @@ const subtleCrypto = (typeof window !== "undefined" && window.crypto) ?
     (window.crypto.subtle || window.crypto.webkitSubtle) : null;
 
 // salt for HKDF, with 8 bytes of zeros
-const zerosalt = new Uint8Array(8);
+const zeroSalt = new Uint8Array(8);
 
 /**
  * encrypt a string in Node.js
@@ -52,7 +52,7 @@ async function encryptNode(data: string, key: Uint8Array, name: string, ivStr?: 
     const [aesKey, hmacKey] = deriveKeysNode(key, name);
 
     const cipher = crypto.createCipheriv("aes-256-ctr", aesKey, iv);
-    const ciphertext = cipher.update(data, "utf-8", "base64")
+    const ciphertext = cipher.update(data, "utf8", "base64")
           + cipher.final("base64");
 
     const hmac = crypto.createHmac("sha256", hmacKey)
@@ -93,21 +93,21 @@ async function decryptNode(data: IData, key: Uint8Array, name: string) {
     const decipher = crypto.createDecipheriv(
         "aes-256-ctr", aesKey, decodeBase64(data.iv),
     );
-    return decipher.update(data.ciphertext, "base64", "utf-8")
-          + decipher.final("utf-8");
+    return decipher.update(data.ciphertext, "base64", "utf8")
+          + decipher.final("utf8");
 }
 
 function deriveKeysNode(key, name) {
     const crypto = getCrypto();
-    const prk = crypto.createHmac("sha256", zerosalt)
+    const prk = crypto.createHmac("sha256", zeroSalt)
         .update(key).digest();
 
     const b = Buffer.alloc(1, 1);
     const aesKey = crypto.createHmac("sha256", prk)
-        .update(name, "utf-8").update(b).digest();
+        .update(name, "utf8").update(b).digest();
     b[0] = 2;
     const hmacKey = crypto.createHmac("sha256", prk)
-        .update(aesKey).update(name, "utf-8").update(b).digest();
+        .update(aesKey).update(name, "utf8").update(b).digest();
 
     return [aesKey, hmacKey];
 }
@@ -214,7 +214,7 @@ async function deriveKeysBrowser(key, name) {
     const keybits = await subtleCrypto.deriveBits(
         {
             name: "HKDF",
-            salt: zerosalt,
+            salt: zeroSalt,
             info: (new TextEncoder().encode(name)),
             hash: "SHA-256",
         },
