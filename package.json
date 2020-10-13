@@ -67,6 +67,7 @@
     "@babel/preset-env": "^7.11.5",
     "@babel/preset-typescript": "^7.10.4",
     "@babel/register": "^7.11.5",
+    "@types/bs58": "^4.0.1",
     "@types/node": "12",
     "@types/request": "^2.48.5",
     "babel-eslint": "^10.1.0",

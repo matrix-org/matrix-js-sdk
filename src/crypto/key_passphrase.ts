@@ -21,7 +21,15 @@ const DEFAULT_ITERATIONS = 500000;
 
 const DEFAULT_BITSIZE = 256;
 
-export async function keyFromAuthData(authData, password) {
+interface IAuthData {
+    /* eslint-disable camelcase */
+    private_key_salt: string;
+    private_key_iterations: number;
+    private_key_bits?: number;
+    /* eslint-enable camelcase */
+}
+
+export async function keyFromAuthData(authData: IAuthData, password: string) {
     if (!global.Olm) {
         throw new Error("Olm is not available");
     }
@@ -40,7 +48,7 @@ export async function keyFromAuthData(authData, password) {
     );
 }
 
-export async function keyFromPassphrase(password) {
+export async function keyFromPassphrase(password: string) {
     if (!global.Olm) {
         throw new Error("Olm is not available");
     }
@@ -52,7 +60,7 @@ export async function keyFromPassphrase(password) {
     return { key, salt, iterations: DEFAULT_ITERATIONS };
 }
 
-export async function deriveKey(password, salt, iterations, numBits = DEFAULT_BITSIZE) {
+export async function deriveKey(password: string, salt: string, iterations: number, numBits = DEFAULT_BITSIZE) {
     const subtleCrypto = global.crypto.subtle;
     const TextEncoder = global.TextEncoder;
     if (!subtleCrypto || !TextEncoder) {

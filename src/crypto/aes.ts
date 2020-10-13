@@ -31,7 +31,7 @@ const zerosalt = new Uint8Array(8);
  * @param {string} name the name of the secret
  * @param {string} ivStr the initialization vector to use
  */
-async function encryptNode(data, key, name, ivStr) {
+async function encryptNode(data: string, key: Uint8Array, name: string, ivStr?: string) {
     const crypto = getCrypto();
     if (!crypto) {
         throw new Error("No usable crypto implementation");
@@ -75,7 +75,7 @@ async function encryptNode(data, key, name, ivStr) {
  * @param {Uint8Array} key the encryption key to use
  * @param {string} name the name of the secret
  */
-async function decryptNode(data, key, name) {
+async function decryptNode(data: IData, key: Uint8Array, name: string) {
     const crypto = getCrypto();
     if (!crypto) {
         throw new Error("No usable crypto implementation");
@@ -120,7 +120,7 @@ function deriveKeysNode(key, name) {
  * @param {string} name the name of the secret
  * @param {string} ivStr the initialization vector to use
  */
-async function encryptBrowser(data, key, name, ivStr) {
+async function encryptBrowser(data: string, key: Uint8Array, name: string, ivStr?: string) {
     let iv;
     if (ivStr) {
         iv = decodeBase64(ivStr);
@@ -160,6 +160,12 @@ async function encryptBrowser(data, key, name, ivStr) {
     };
 }
 
+interface IData {
+    ciphertext: string;
+    iv: string;
+    mac: string;
+}
+
 /**
  * decrypt a string in the browser
  *
@@ -170,7 +176,7 @@ async function encryptBrowser(data, key, name, ivStr) {
  * @param {Uint8Array} key the encryption key to use
  * @param {string} name the name of the secret
  */
-async function decryptBrowser(data, key, name) {
+async function decryptBrowser(data: IData, key: Uint8Array, name: string) {
     const [aesKey, hmacKey] = await deriveKeysBrowser(key, name);
 
     const ciphertext = decodeBase64(data.ciphertext);
@@ -241,11 +247,11 @@ async function deriveKeysBrowser(key, name) {
     return await Promise.all([aesProm, hmacProm]);
 }
 
-export function encryptAES(...args) {
-    return subtleCrypto ? encryptBrowser(...args) : encryptNode(...args);
+export function encryptAES(data: string, key: Uint8Array, name: string, ivStr?: string) {
+    return subtleCrypto ? encryptBrowser(data, key, name, ivStr) : encryptNode(data, key, name, ivStr);
 }
 
-export function decryptAES(...args) {
-    return subtleCrypto ? decryptBrowser(...args) : decryptNode(...args);
+export function decryptAES(data: IData, key: Uint8Array, name: string) {
+    return subtleCrypto ? decryptBrowser(data, key, name) : decryptNode(data, key, name);
 }
 

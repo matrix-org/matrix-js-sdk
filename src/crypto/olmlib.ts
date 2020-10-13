@@ -22,24 +22,36 @@ limitations under the License.
  * Utilities common to olm encryption algorithms
  */
 
+import anotherjson from "another-json";
+import {PkSigning} from "olm";
+
+import OlmDevice from "./OlmDevice";
+import DeviceInfo from "./DeviceInfo";
+import MatrixBaseApis from "../base-apis";
 import {logger} from '../logger';
 import * as utils from "../utils";
-import anotherjson from "another-json";
+import {OneTimeKey} from "./dehydration";
+
+enum Algorithm {
+    Olm = "m.olm.v1.curve25519-aes-sha2",
+    Megolm = "m.megolm.v1.aes-sha2",
+    MegolmBackup = "m.megolm_backup.v1.curve25519-aes-sha2",
+}
 
 /**
  * matrix algorithm tag for olm
  */
-export const OLM_ALGORITHM = "m.olm.v1.curve25519-aes-sha2";
+export const OLM_ALGORITHM = Algorithm.Olm;
 
 /**
  * matrix algorithm tag for megolm
  */
-export const MEGOLM_ALGORITHM = "m.megolm.v1.aes-sha2";
+export const MEGOLM_ALGORITHM = Algorithm.Megolm;
 
 /**
  * matrix algorithm tag for megolm backups
  */
-export const MEGOLM_BACKUP_ALGORITHM = "m.megolm_backup.v1.curve25519-aes-sha2";
+export const MEGOLM_BACKUP_ALGORITHM = Algorithm.MegolmBackup;
 
 
 /**
@@ -59,9 +71,13 @@ export const MEGOLM_BACKUP_ALGORITHM = "m.megolm_backup.v1.curve25519-aes-sha2";
  *    has been encrypted into `resultsObject`
  */
 export async function encryptMessageForDevice(
-    resultsObject,
-    ourUserId, ourDeviceId, olmDevice, recipientUserId, recipientDevice,
-    payloadFields,
+    resultsObject: Record<string, string>,
+    ourUserId: string,
+    ourDeviceId: string,
+    olmDevice: OlmDevice,
+    recipientUserId: string,
+    recipientDevice: DeviceInfo,
+    payloadFields: Record<string, any>,
 ) {
     const deviceKey = recipientDevice.getIdentityKey();
     const sessionId = await olmDevice.getSessionIdForDevice(deviceKey);
@@ -130,7 +146,9 @@ export async function encryptMessageForDevice(
  *    a map from userId to deviceId to {@link module:crypto~OlmSessionResult}
  */
 export async function getExistingOlmSessions(
-    olmDevice, baseApis, devicesByUser,
+    olmDevice: OlmDevice,
+    baseApis: MatrixBaseApis,
+    devicesByUser: Record<string, DeviceInfo[]>,
 ) {
     const devicesWithoutSession = {};
     const sessions = {};
@@ -188,9 +206,16 @@ export async function getExistingOlmSessions(
  *    {@link module:crypto~OlmSessionResult}
  */
 export async function ensureOlmSessionsForDevices(
-    olmDevice, baseApis, devicesByUser, force, otkTimeout, failedServers,
+    olmDevice: OlmDevice,
+    baseApis: MatrixBaseApis,
+    devicesByUser: Record<string, DeviceInfo[]>,
+    force: boolean,
+    otkTimeout: number,
+    failedServers: string[],
 ) {
     if (typeof force === "number") {
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore - backwards compatibility
         failedServers = otkTimeout;
         otkTimeout = force;
         force = false;
@@ -200,7 +225,7 @@ export async function ensureOlmSessionsForDevices(
         // [userId, deviceId], ...
     ];
     const result = {};
-    const resolveSession = {};
+    const resolveSession: Record<string, {resolve(v?: string): void, reject(e: Error): void}> = {};
 
     for (const [userId, devices] of Object.entries(devicesByUser)) {
         result[userId] = {};
@@ -237,9 +262,9 @@ export async function ensureOlmSessionsForDevices(
                                 delete olmDevice._sessionsInProgress[key];
                                 resolve(...args);
                             },
-                            reject: (...args) => {
+                            reject: (e: Error) => {
                                 delete olmDevice._sessionsInProgress[key];
-                                reject(...args);
+                                reject(e);
                             },
                         };
                     },
@@ -293,10 +318,10 @@ export async function ensureOlmSessionsForDevices(
         failedServers.push(...Object.keys(res.failures));
     }
 
-    const otk_res = res.one_time_keys || {};
+    const otkRes = res.one_time_keys || {};
     const promises = [];
     for (const [userId, devices] of Object.entries(devicesByUser)) {
-        const userRes = otk_res[userId] || {};
+        const userRes = otkRes[userId] || {};
         for (let j = 0; j < devices.length; j++) {
             const deviceInfo = devices[j];
             const deviceId = deviceInfo.deviceId;
@@ -354,7 +379,12 @@ export async function ensureOlmSessionsForDevices(
     return result;
 }
 
-async function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceInfo) {
+async function _verifyKeyAndStartSession(
+    olmDevice: OlmDevice,
+    oneTimeKey: OneTimeKey,
+    userId: string,
+    deviceInfo: DeviceInfo,
+): Promise<string> {
     const deviceId = deviceInfo.deviceId;
     try {
         await verifySignature(
@@ -386,6 +416,10 @@ async function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceIn
     return sid;
 }
 
+interface IObject {
+    unsigned: object;
+    signatures: object;
+}
 
 /**
  * Verify the signature on an object
@@ -404,7 +438,11 @@ async function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceIn
  * or rejects with an Error if it is bad.
  */
 export async function verifySignature(
-    olmDevice, obj, signingUserId, signingDeviceId, signingKey,
+    olmDevice: OlmDevice,
+    obj: OneTimeKey | IObject,
+    signingUserId: string,
+    signingDeviceId: string,
+    signingKey: string,
 ) {
     const signKeyId = "ed25519:" + signingDeviceId;
     const signatures = obj.signatures || {};
@@ -417,7 +455,9 @@ export async function verifySignature(
     // prepare the canonical json: remove unsigned and signatures, and stringify with
     // anotherjson
     const mangledObj = Object.assign({}, obj);
-    delete mangledObj.unsigned;
+    if ("unsigned" in mangledObj) {
+        delete mangledObj.unsigned;
+    }
     delete mangledObj.signatures;
     const json = anotherjson.stringify(mangledObj);
 
@@ -433,14 +473,14 @@ export async function verifySignature(
  * @param {Olm.PkSigning|Uint8Array} key the signing object or the private key
  * seed
  * @param {string} userId The user ID who owns the signing key
- * @param {string} pubkey The public key (ignored if key is a seed)
+ * @param {string} pubKey The public key (ignored if key is a seed)
  * @returns {string} the signature for the object
  */
-export function pkSign(obj, key, userId, pubkey) {
+export function pkSign(obj: IObject, key: PkSigning, userId: string, pubKey: string): string {
     let createdKey = false;
     if (key instanceof Uint8Array) {
         const keyObj = new global.Olm.PkSigning();
-        pubkey = keyObj.init_with_seed(key);
+        pubKey = keyObj.init_with_seed(key);
         key = keyObj;
         createdKey = true;
     }
@@ -452,7 +492,7 @@ export function pkSign(obj, key, userId, pubkey) {
         const mysigs = sigs[userId] || {};
         sigs[userId] = mysigs;
 
-        return mysigs['ed25519:' + pubkey] = key.sign(anotherjson.stringify(obj));
+        return mysigs['ed25519:' + pubKey] = key.sign(anotherjson.stringify(obj));
     } finally {
         obj.signatures = sigs;
         if (unsigned) obj.unsigned = unsigned;
@@ -465,11 +505,11 @@ export function pkSign(obj, key, userId, pubkey) {
 /**
  * Verify a signed JSON object
  * @param {Object} obj Object to verify
- * @param {string} pubkey The public key to use to verify
+ * @param {string} pubKey The public key to use to verify
  * @param {string} userId The user ID who signed the object
  */
-export function pkVerify(obj, pubkey, userId) {
-    const keyId = "ed25519:" + pubkey;
+export function pkVerify(obj: IObject, pubKey: string, userId: string) {
+    const keyId = "ed25519:" + pubKey;
     if (!(obj.signatures && obj.signatures[userId] && obj.signatures[userId][keyId])) {
         throw new Error("No signature");
     }
@@ -480,7 +520,7 @@ export function pkVerify(obj, pubkey, userId) {
     const unsigned = obj.unsigned;
     if (obj.unsigned) delete obj.unsigned;
     try {
-        util.ed25519_verify(pubkey, anotherjson.stringify(obj), signature);
+        util.ed25519_verify(pubKey, anotherjson.stringify(obj), signature);
     } finally {
         obj.signatures = sigs;
         if (unsigned) obj.unsigned = unsigned;
@@ -493,7 +533,7 @@ export function pkVerify(obj, pubkey, userId) {
  * @param {Uint8Array} uint8Array The data to encode.
  * @return {string} The base64.
  */
-export function encodeBase64(uint8Array) {
+export function encodeBase64(uint8Array: ArrayBuffer): string {
     return Buffer.from(uint8Array).toString("base64");
 }
 
@@ -502,7 +542,7 @@ export function encodeBase64(uint8Array) {
  * @param {Uint8Array} uint8Array The data to encode.
  * @return {string} The unpadded base64.
  */
-export function encodeUnpaddedBase64(uint8Array) {
+export function encodeUnpaddedBase64(uint8Array: Uint8Array): string {
     return encodeBase64(uint8Array).replace(/=+$/g, '');
 }
 
@@ -511,6 +551,6 @@ export function encodeUnpaddedBase64(uint8Array) {
  * @param {string} base64 The base64 to decode.
  * @return {Uint8Array} The decoded data.
  */
-export function decodeBase64(base64) {
+export function decodeBase64(base64: string): Uint8Array {
     return Buffer.from(base64, "base64");
 }

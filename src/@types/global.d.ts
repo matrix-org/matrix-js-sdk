@@ -23,7 +23,12 @@ declare global {
     namespace NodeJS {
         interface Global {
             localStorage: Storage;
+            Olm: typeof Olm;
         }
+    }
+
+    interface Crypto {
+        webkitSubtle?: Window["crypto"]["subtle"];
     }
 
     interface MediaDevices {
