@@ -85,6 +85,13 @@ export enum CallParty {
     Remote = 'remote',
 }
 
+export enum CallEvent {
+    Hangup = 'hangup',
+    State = 'state',
+    Error = 'error',
+    Replaced = 'replaced',
+}
+
 enum MediaQueueId {
     RemoteVideo = 'remote_video',
     RemoteAudio = 'remote_audio',
@@ -92,6 +99,9 @@ enum MediaQueueId {
 }
 
 export enum CallErrorCode {
+    /** The user chose to end the call */
+    UserHangup = 'user_hangup',
+
     /** An error code when the local client failed to create an offer. */
     LocalOfferFailed = 'local_offer_failed',
     /**
@@ -297,7 +307,7 @@ export class MatrixCall extends EventEmitter {
             const audioConstraints = getUserMediaVideoContraints(CallType.Voice);
             this.placeCallWithConstraints(audioConstraints);
         } catch (err) {
-            this.emit("error",
+            this.emit(CallEvent.Error,
                 new CallError(
                     CallErrorCode.NoUserMedia,
                     "Failed to get screen-sharing stream: ", err,
@@ -440,7 +450,7 @@ export class MatrixCall extends EventEmitter {
                     if (this.peerConn.signalingState != 'closed') {
                         this.peerConn.close();
                     }
-                    this.emit("hangup");
+                    this.emit(CallEvent.Hangup);
                 }
             }, this.msg.lifetime - event.getLocalAge());
         }
@@ -511,7 +521,7 @@ export class MatrixCall extends EventEmitter {
         newCall.remoteVideoElement = this.remoteVideoElement;
         newCall.remoteAudioElement = this.remoteAudioElement;
         this.successor = newCall;
-        this.emit("replaced", newCall);
+        this.emit(CallEvent.Replaced, newCall);
         this.hangup(CallErrorCode.Replaced, true);
     }
 
@@ -528,8 +538,10 @@ export class MatrixCall extends EventEmitter {
         const content = {
             version: 0,
             call_id: this.callId,
-            reason: reason,
         };
+        // Continue to send no reason for user hangups temporarily, until
+        // clients understand the user_hangup reason (voip v1)
+        if (reason !== CallErrorCode.UserHangup) content['reason'] = reason;
         this.sendEvent('m.call.hangup', content);
     }
 
@@ -642,8 +654,8 @@ export class MatrixCall extends EventEmitter {
     };
 
     private sendAnswer() {
+        this.setState(CallState.Connecting);
         this.sendEvent('m.call.answer', this.answerContent).then(() => {
-            this.setState(CallState.Connecting);
             // If this isn't the first time we've tried to send the answer,
             // we may have candidates queued up, so send them now.
             this.sendCandidateQueue();
@@ -658,7 +670,7 @@ export class MatrixCall extends EventEmitter {
                 code = CallErrorCode.UnknownDevices;
                 message = "Unknown devices present in the room";
             }
-            this.emit("error", new CallError(code, message, error));
+            this.emit(CallEvent.Error, new CallError(code, message, error));
             throw error;
         });
     }
@@ -854,7 +866,7 @@ export class MatrixCall extends EventEmitter {
 
             this.client.cancelPendingEvent(error.event);
             this.terminate(CallParty.Local, code, false);
-            this.emit("error", new CallError(code, message, error));
+            this.emit(CallEvent.Error, new CallError(code, message, error));
         }
     };
 
@@ -863,7 +875,7 @@ export class MatrixCall extends EventEmitter {
 
         this.terminate(CallParty.Local, CallErrorCode.LocalOfferFailed, false);
         this.emit(
-            "error",
+            CallEvent.Error,
             new CallError(
                 CallErrorCode.LocalOfferFailed,
                 "Failed to get local offer!", err,
@@ -879,7 +891,7 @@ export class MatrixCall extends EventEmitter {
 
         this.terminate(CallParty.Local, CallErrorCode.NoUserMedia, false);
         this.emit(
-            "error",
+            CallEvent.Error,
             new CallError(
                 CallErrorCode.NoUserMedia,
                 "Couldn't start capturing media! Is your microphone set up and " +
@@ -893,12 +905,11 @@ export class MatrixCall extends EventEmitter {
             return; // because ICE can still complete as we're ending the call
         }
         logger.debug(
-            "Ice connection state changed to: " + this.peerConn.iceConnectionState,
+            "ICE connection state changed to: " + this.peerConn.iceConnectionState,
         );
         // ideally we'd consider the call to be connected when we get media but
         // chrome doesn't implement any of the 'onstarted' events yet
-        if (this.peerConn.iceConnectionState == 'completed' ||
-                this.peerConn.iceConnectionState == 'connected') {
+        if (this.peerConn.iceConnectionState == 'connected') {
             this.setState(CallState.Connected);
         } else if (this.peerConn.iceConnectionState == 'failed') {
             this.hangup(CallErrorCode.IceFailed, false);
@@ -1004,7 +1015,7 @@ export class MatrixCall extends EventEmitter {
     setState(state: CallState) {
         const oldState = this.state;
         this.state = state;
-        this.emit("state", state, oldState);
+        this.emit(CallEvent.State, state, oldState);
     }
 
     /**
@@ -1075,7 +1086,7 @@ export class MatrixCall extends EventEmitter {
             this.peerConn.close();
         }
         if (shouldEmit) {
-            this.emit("hangup", self);
+            this.emit(CallEvent.Hangup, self);
         }
     }
 
@@ -1092,8 +1103,10 @@ export class MatrixCall extends EventEmitter {
             }
         }
 
-        for (const track of this.remoteStream.getTracks()) {
-            track.stop();
+        if (this.remoteStream) {
+            for (const track of this.remoteStream.getTracks()) {
+                track.stop();
+            }
         }
     }
 
@@ -1167,6 +1180,7 @@ export class MatrixCall extends EventEmitter {
             iceServers: this.turnServers,
         });
 
+        // 'connectionstatechange' would be better, but firefox doesn't implement that.
         pc.addEventListener('iceconnectionstatechange', this.onIceConnectionStateChanged);
         pc.addEventListener('signalingstatechange', this.onSignallingStateChanged);
         pc.addEventListener('icecandidate', this.gotLocalIceCandidate);
