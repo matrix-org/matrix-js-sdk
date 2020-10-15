@@ -232,7 +232,7 @@ export class CallEventHandler {
                     call.gotRemoteIceCandidate(cand);
                 }
             }
-        } else if (event.getType() === EventType.CallHangup) {
+        } else if ([EventType.CallHangup, EventType.CallReject].includes(event.getType())) {
             // Note that we also observe our own hangups here so we can see
             // if we've already rejected a call that would otherwise be valid
             if (!call) {
@@ -247,7 +247,11 @@ export class CallEventHandler {
                 }
             } else {
                 if (call.state !== CallState.Ended) {
-                    call.onHangupReceived(content);
+                    if (event.getType() === EventType.CallHangup) {
+                        call.onHangupReceived(content);
+                    } else {
+                        call.onRejectReceived(content);
+                    }
                     this.calls.delete(content.call_id);
                 }
             }
