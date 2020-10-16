@@ -58,10 +58,13 @@ const DUMMY_SDP = (
 );
 
 class MockRTCPeerConnection {
+    localDescription: RTCSessionDescription;
+
     constructor() {
         this.localDescription = {
             sdp: DUMMY_SDP,
-            type: '',
+            type: 'offer',
+            toJSON: function() {},
         };
     }
 
@@ -91,6 +94,7 @@ describe('Call', function() {
 
         global.navigator = {
             mediaDevices: {
+                // @ts-ignore Mock
                 getUserMedia: () => {
                     return {
                         getTracks: () => [],
@@ -102,14 +106,18 @@ describe('Call', function() {
         };
 
         global.window = {
+            // @ts-ignore Mock
             RTCPeerConnection: MockRTCPeerConnection,
+            // @ts-ignore Mock
             RTCSessionDescription: {},
+            // @ts-ignore Mock
             RTCIceCandidate: {},
             getUserMedia: {},
         };
+        // @ts-ignore Mock
         global.document = {};
 
-        client = new TestClient();
+        client = new TestClient("@alice:foo", "somedevice", "token", undefined, {});
         call = new MatrixCall({
             client: client.client,
             roomId: '!foo:bar',
