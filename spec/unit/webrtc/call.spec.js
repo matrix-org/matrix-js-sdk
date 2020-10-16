@@ -20,13 +20,14 @@ import {MatrixCall} from '../../../src/webrtc/call';
 const DUMMY_SDP = (
     "v=0\r\n" +
     "o=- 5022425983810148698 2 IN IP4 127.0.0.1\r\n" +
-    "s=-\r\nt=0 0\r\na=group:BUNDLE 0\r\n" + 
+    "s=-\r\nt=0 0\r\na=group:BUNDLE 0\r\n" +
     "a=msid-semantic: WMS h3wAi7s8QpiQMH14WG3BnDbmlOqo9I5ezGZA\r\n" +
     "m=audio 9 UDP/TLS/RTP/SAVPF 111 103 104 9 0 8 106 105 13 110 112 113 126\r\n" +
     "c=IN IP4 0.0.0.0\r\na=rtcp:9 IN IP4 0.0.0.0\r\na=ice-ufrag:hLDR\r\n" +
     "a=ice-pwd:bMGD9aOldHWiI+6nAq/IIlRw\r\n" +
     "a=ice-options:trickle\r\n" +
-    "a=fingerprint:sha-256 E4:94:84:F9:4A:98:8A:56:F5:5F:FD:AF:72:B9:32:89:49:5C:4B:9A:4A:15:8E:41:8A:F3:69:E4:39:52:DC:D6\r\n" +
+    "a=fingerprint:sha-256 E4:94:84:F9:4A:98:8A:56:F5:5F:FD:AF:72:B9:32:89:49:5C:4B:9A:" +
+        "4A:15:8E:41:8A:F3:69:E4:39:52:DC:D6\r\n" +
     "a=setup:active\r\n" +
     "a=mid:0\r\n" +
     "a=extmap:1 urn:ietf:params:rtp-hdrext:ssrc-audio-level\r\n" +
@@ -61,7 +62,7 @@ class MockRTCPeerConnection {
         this.localDescription = {
             sdp: DUMMY_SDP,
             type: '',
-        }
+        };
     }
 
     addEventListener() {}
@@ -96,8 +97,8 @@ describe('Call', function() {
                         getAudioTracks: () => [],
                         getVideoTracks: () => [],
                     };
-                }
-            }
+                },
+            },
         };
 
         global.window = {
@@ -132,37 +133,41 @@ describe('Call', function() {
             party_id: 'the_correct_party_id',
             answer: {
                 sdp: DUMMY_SDP,
-            }
+            },
         });
 
         call.peerConn.addIceCandidate = jest.fn();
         call.onRemoteIceCandidatesReceived({
-            getContent: () => { return {
-                version: 0,
-                call_id: call.callId,
-                party_id: 'the_correct_party_id',
-                candidates: [
-                    {
-                        candidate: '',
-                        sdpMid: '',
-                    }
-                ]
-            }},
+            getContent: () => {
+                return {
+                    version: 0,
+                    call_id: call.callId,
+                    party_id: 'the_correct_party_id',
+                    candidates: [
+                        {
+                            candidate: '',
+                            sdpMid: '',
+                        },
+                    ],
+                };
+            },
         });
         expect(call.peerConn.addIceCandidate.mock.calls.length).toBe(1);
 
         call.onRemoteIceCandidatesReceived({
-            getContent: () => { return {
-                version: 0,
-                call_id: call.callId,
-                party_id: 'some_other_party_id',
-                candidates: [
-                    {
-                        candidate: '',
-                        sdpMid: '',
-                    }
-                ]
-            }},
+            getContent: () => {
+                return {
+                    version: 0,
+                    call_id: call.callId,
+                    party_id: 'some_other_party_id',
+                    candidates: [
+                        {
+                            candidate: '',
+                            sdpMid: '',
+                        },
+                    ],
+                };
+            },
         });
         expect(call.peerConn.addIceCandidate.mock.calls.length).toBe(1);
     });
