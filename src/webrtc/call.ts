@@ -1061,7 +1061,9 @@ export class MatrixCall extends EventEmitter {
     onHangupReceived = (msg) => {
         logger.debug("Hangup received");
 
-        if (!this.partyIdMatches(msg)) {
+        // party ID must match (our chosen partner hanging up the call) or be undefined (we haven't chosen
+        // a partner yet but we're treating the hangup as a reject as per VoIP v0)
+        if (!this.partyIdMatches(msg) && this.opponentPartyId !== undefined) {
             logger.info(`Ignoring message from party ID ${msg.party_id}: our partner is ${this.opponentPartyId}`);
             return;
         }
