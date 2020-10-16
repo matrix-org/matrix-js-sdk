@@ -231,6 +231,10 @@ export class MatrixCall extends EventEmitter {
     private config: MediaStreamConstraints;
     private successor: MatrixCall;
     private opponentVersion: number;
+    private ourPartyId: string;
+    // The party ID of the other side: undefined if we haven't chosen a partner
+    // yet, null if we have but they didn't send a party ID.
+    private opponentPartyId: string;
 
     constructor(opts: CallOpts) {
         super();
@@ -238,6 +242,7 @@ export class MatrixCall extends EventEmitter {
         this.client = opts.client;
         this.type = null;
         this.forceTURN = opts.forceTURN;
+        this.ourPartyId = this.client.deviceId;
         // Array of Objects with urls, username, credential keys
         this.turnServers = opts.turnServers || [];
         if (this.turnServers.length === 0 && this.client.isFallbackICEServerAllowed()) {
@@ -449,6 +454,7 @@ export class MatrixCall extends EventEmitter {
         this.setState(CallState.Ringing);
         this.direction = CallDirection.Inbound;
         this.opponentVersion = this.msg.version;
+        this.opponentPartyId = this.msg.party_id || null;
 
         if (event.getLocalAge()) {
             setTimeout(() => {
@@ -545,14 +551,11 @@ export class MatrixCall extends EventEmitter {
 
         logger.debug("Ending call " + this.callId);
         this.terminate(CallParty.Local, reason, !suppressEvent);
-        const content = {
-            version: VOIP_PROTO_VERSION,
-            call_id: this.callId,
-        };
+        const content = {};
         // Continue to send no reason for user hangups temporarily, until
         // clients understand the user_hangup reason (voip v1)
         if (reason !== CallErrorCode.UserHangup) content['reason'] = reason;
-        this.sendEvent('m.call.hangup', content);
+        this.sendVoipEvent('m.call.hangup', {});
     }
 
     /**
@@ -575,11 +578,7 @@ export class MatrixCall extends EventEmitter {
 
         logger.debug("Rejecting call: " + this.callId);
         this.terminate(CallParty.Local, CallErrorCode.UserHangup, true);
-        const content = {
-            version: VOIP_PROTO_VERSION,
-            call_id: this.callId,
-        };
-        this.sendEvent('m.call.reject', content);
+        this.sendVoipEvent('m.call.reject', {});
     }
 
     /**
@@ -692,7 +691,7 @@ export class MatrixCall extends EventEmitter {
 
     private sendAnswer() {
         this.setState(CallState.Connecting);
-        this.sendEvent('m.call.answer', this.answerContent).then(() => {
+        this.sendVoipEvent('m.call.answer', this.answerContent).then(() => {
             // If this isn't the first time we've tried to send the answer,
             // we may have candidates queued up, so send them now.
             this.sendCandidateQueue();
@@ -750,8 +749,6 @@ export class MatrixCall extends EventEmitter {
             await this.peerConn.setLocalDescription(myAnswer);
 
             this.answerContent = {
-                version: VOIP_PROTO_VERSION,
-                call_id: this.callId,
                 answer: {
                     sdp: this.peerConn.localDescription.sdp,
                     // type is now deprecated as of Matrix VoIP v1, but
@@ -808,24 +805,37 @@ export class MatrixCall extends EventEmitter {
         }
     };
 
-    /**
-     * Used by MatrixClient.
-     * @param {Object} cand
-     */
-    gotRemoteIceCandidate(cand: RTCIceCandidate) {
+    onRemoteIceCandidatesReceived(ev: MatrixEvent) {
         if (this.state == CallState.Ended) {
             //debuglog("Ignoring remote ICE candidate because call has ended");
             return;
         }
-        if (
-            (cand.sdpMid === null || cand.sdpMid === undefined) &&
-            (cand.sdpMLineIndex === null || cand.sdpMLineIndex === undefined)
-        ) {
-            logger.debug("Ignoring remote ICE candidate with no sdpMid or sdpMLineIndex");
+
+        if (!this.partyIdMatches(ev.getContent())) {
+            logger.info(
+                `Ignoring candidates from party ID ${ev.getContent().party_id}: ` +
+                `we have chosen party ID ${this.opponentPartyId}`,
+            );
             return;
         }
-        logger.debug("Got remote ICE " + cand.sdpMid + " candidate: " + cand.candidate);
-        this.peerConn.addIceCandidate(cand);
+
+        const cands = ev.getContent().candidates;
+        if (!cands) {
+            logger.info("Ignoring candidates event with no candidates!");
+            return;
+        }
+
+        for (const cand of cands) {
+            if (
+                (cand.sdpMid === null || cand.sdpMid === undefined) &&
+                (cand.sdpMLineIndex === null || cand.sdpMLineIndex === undefined)
+            ) {
+                logger.debug("Ignoring remote ICE candidate with no sdpMid or sdpMLineIndex");
+                return;
+            }
+            logger.debug("Got remote ICE " + cand.sdpMid + " candidate: " + cand.candidate);
+            this.peerConn.addIceCandidate(cand);
+        }
     }
 
     /**
@@ -837,10 +847,19 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
+        if (this.opponentPartyId !== undefined) {
+            logger.info(
+                `Ignoring answer from party ID ${msg.party_id}: ` +
+                `we already have an answer/reject from ${this.opponentPartyId}`,
+            );
+            return;
+        }
+
         this.opponentVersion = msg.version;
+        this.opponentPartyId = msg.party_id || null;
 
         try {
-            this.peerConn.setRemoteDescription(msg.answer);
+            await this.peerConn.setRemoteDescription(msg.answer);
         } catch (e) {
             logger.debug("Failed to set remote description", e);
             this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
@@ -868,8 +887,6 @@ export class MatrixCall extends EventEmitter {
         }
 
         const content = {
-            version: VOIP_PROTO_VERSION,
-            call_id: this.callId,
             // OpenWebRTC appears to add extra stuff (like the DTLS fingerprint)
             // to the description when setting it on the peerconnection.
             // According to the spec it should only add ICE
@@ -888,7 +905,7 @@ export class MatrixCall extends EventEmitter {
             lifetime: CALL_TIMEOUT_MS,
         };
         try {
-            await this.sendEvent('m.call.invite', content);
+            await this.sendVoipEvent('m.call.invite', content);
             this.setState(CallState.InviteSent);
             setTimeout(() => {
                 if (this.state === CallState.InviteSent) {
@@ -1043,12 +1060,22 @@ export class MatrixCall extends EventEmitter {
 
     onHangupReceived = (msg) => {
         logger.debug("Hangup received");
+
+        if (!this.partyIdMatches(msg)) {
+            logger.info(`Ignoring message from party ID ${msg.party_id}: our partner is ${this.opponentPartyId}`);
+            return;
+        }
+
         // default reason is user_hangup
         this.terminate(CallParty.Remote, msg.reason || CallErrorCode.UserHangup, true);
     };
 
     onRejectReceived = (msg) => {
         logger.debug("Reject received");
+
+        // No need to check party_id for reject because if we'd received either
+        // an answer or reject, we wouldn't be in state InviteSent
+
         if (this.state === CallState.InviteSent) {
             this.terminate(CallParty.Remote, CallErrorCode.UserHangup, true);
         } else {
@@ -1073,8 +1100,12 @@ export class MatrixCall extends EventEmitter {
      * @param {Object} content
      * @return {Promise}
      */
-    private sendEvent(eventType: string, content: object) {
-        return this.client.sendEvent(this.roomId, eventType, content);
+    private sendVoipEvent(eventType: string, content: object) {
+        return this.client.sendEvent(this.roomId, eventType, Object.assign({}, content, {
+            version: VOIP_PROTO_VERSION,
+            call_id: this.callId,
+            party_id: this.ourPartyId,
+        }));
     }
 
     sendCandidate(content: RTCIceCandidate) {
@@ -1176,12 +1207,10 @@ export class MatrixCall extends EventEmitter {
         this.candidateSendQueue = [];
         ++this.candidateSendTries;
         const content = {
-            version: VOIP_PROTO_VERSION,
-            call_id: this.callId,
             candidates: cands,
         };
         logger.debug("Attempting to send " + cands.length + " candidates");
-        this.sendEvent('m.call.candidates', content).then(() => {
+        this.sendVoipEvent('m.call.candidates', content).then(() => {
             this.candidateSendTries = 0;
             this.sendCandidateQueue();
         }, (error) => {
@@ -1224,7 +1253,7 @@ export class MatrixCall extends EventEmitter {
     }
 
     private createPeerConnection(): RTCPeerConnection {
-        const pc = new RTCPeerConnection({
+        const pc = new window.RTCPeerConnection({
             iceTransportPolicy: this.forceTURN ? 'relay' : undefined,
             iceServers: this.turnServers,
         });
@@ -1237,6 +1266,12 @@ export class MatrixCall extends EventEmitter {
         pc.addEventListener('track', this.onTrack);
 
         return pc;
+    }
+
+    private partyIdMatches(msg): boolean {
+        // They must either match or both be absent (in which case opponentPartyId will be null)
+        const msgPartyId = msg.party_id || null;
+        return msgPartyId === this.opponentPartyId;
     }
 }
 
@@ -1256,7 +1291,7 @@ function isTracksEnabled(tracks: Array<MediaStreamTrack>) {
 }
 
 function getUserMediaVideoContraints(callType: CallType) {
-    const isWebkit = !!window.navigator.webkitGetUserMedia;
+    const isWebkit = !!navigator.webkitGetUserMedia;
 
     switch (callType) {
         case CallType.Voice:
@@ -1332,7 +1367,7 @@ export function createNewMatrixCall(client: any, roomId: string, options?: CallO
     try {
         const supported = Boolean(
             window.RTCPeerConnection || window.RTCSessionDescription ||
-            window.RTCIceCandidate || navigator.getUserMedia,
+            window.RTCIceCandidate || navigator.mediaDevices,
         );
         if (!supported) {
             logger.error("WebRTC is not supported in this browser / environment");
