@@ -1143,7 +1143,7 @@ export class MatrixCall extends EventEmitter {
             if (this.candidateSendTries > 5) {
                 logger.debug(
                     "Failed to send candidates on attempt " + this.candidateSendTries +
-                    ". Giving up for now.",
+                    ". Giving up for now.", error,
                 );
                 this.candidateSendTries = 0;
                 return;
@@ -1151,7 +1151,7 @@ export class MatrixCall extends EventEmitter {
 
             const delayMs = 500 * Math.pow(2, this.candidateSendTries);
             ++this.candidateSendTries;
-            logger.debug("Failed to send candidates. Retrying in " + delayMs + "ms");
+            logger.debug("Failed to send candidates. Retrying in " + delayMs + "ms", error);
             setTimeout(() => {
                 this.sendCandidateQueue();
             }, delayMs);
