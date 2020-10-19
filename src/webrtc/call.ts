@@ -164,6 +164,14 @@ export enum CallErrorCode {
     Replaced = 'replaced',
 }
 
+/**
+ * The version field that we set in m.call.* events
+ * Once we are able to speak v1 VoIP sufficiently, this
+ * bumped to 1. While we partially speak v1 VoIP, it remains
+ * as 0.
+ */
+const VOIP_PROTO_VERSION = 0;
+
 /** The fallback ICE server to use for STUN or TURN protocols. */
 const FALLBACK_ICE_SERVER = 'stun:turn.matrix.org';
 
@@ -222,6 +230,7 @@ export class MatrixCall extends EventEmitter {
     // XXX: I don't know why this is called 'config'.
     private config: MediaStreamConstraints;
     private successor: MatrixCall;
+    private opponentVersion: number;
 
     constructor(opts: CallOpts) {
         super();
@@ -439,6 +448,7 @@ export class MatrixCall extends EventEmitter {
 
         this.setState(CallState.Ringing);
         this.direction = CallDirection.Inbound;
+        this.opponentVersion = this.msg.version;
 
         if (event.getLocalAge()) {
             setTimeout(() => {
@@ -457,7 +467,7 @@ export class MatrixCall extends EventEmitter {
     }
 
     /**
-     * Configure this call from a hangup event. Used by MatrixClient.
+     * Configure this call from a hangup or reject event. Used by MatrixClient.
      * @param {MatrixEvent} event The m.call.hangup event
      */
     initWithHangup(event: MatrixEvent) {
@@ -536,13 +546,40 @@ export class MatrixCall extends EventEmitter {
         logger.debug("Ending call " + this.callId);
         this.terminate(CallParty.Local, reason, !suppressEvent);
         const content = {
-            version: 0,
+            version: VOIP_PROTO_VERSION,
             call_id: this.callId,
         };
         // Continue to send no reason for user hangups temporarily, until
         // clients understand the user_hangup reason (voip v1)
         if (reason !== CallErrorCode.UserHangup) content['reason'] = reason;
         this.sendEvent('m.call.hangup', content);
+    }
+
+    /**
+     * Reject a call
+     * This used to be done by calling hangup, but is a separate method and protocol
+     * event as of MSC2746.
+     */
+    reject() {
+        if (this.state !== CallState.Ringing) {
+            throw Error("Call must be in 'ringing' state to reject!");
+        }
+
+        if (this.opponentVersion < 1) {
+            logger.info(
+                `Opponent version is less than 1 (${this.opponentVersion}): sending hangup instead of reject`,
+            );
+            this.hangup(CallErrorCode.UserHangup, true);
+            return;
+        }
+
+        logger.debug("Rejecting call: " + this.callId);
+        this.terminate(CallParty.Local, CallErrorCode.UserHangup, true);
+        const content = {
+            version: VOIP_PROTO_VERSION,
+            call_id: this.callId,
+        };
+        this.sendEvent('m.call.reject', content);
     }
 
     /**
@@ -713,7 +750,7 @@ export class MatrixCall extends EventEmitter {
             await this.peerConn.setLocalDescription(myAnswer);
 
             this.answerContent = {
-                version: 0,
+                version: VOIP_PROTO_VERSION,
                 call_id: this.callId,
                 answer: {
                     sdp: this.peerConn.localDescription.sdp,
@@ -800,6 +837,8 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
+        this.opponentVersion = msg.version;
+
         try {
             this.peerConn.setRemoteDescription(msg.answer);
         } catch (e) {
@@ -829,7 +868,7 @@ export class MatrixCall extends EventEmitter {
         }
 
         const content = {
-            version: 0,
+            version: VOIP_PROTO_VERSION,
             call_id: this.callId,
             // OpenWebRTC appears to add extra stuff (like the DTLS fingerprint)
             // to the description when setting it on the peerconnection.
@@ -1004,7 +1043,17 @@ export class MatrixCall extends EventEmitter {
 
     onHangupReceived = (msg) => {
         logger.debug("Hangup received");
-        this.terminate(CallParty.Remote, msg.reason, true);
+        // default reason is user_hangup
+        this.terminate(CallParty.Remote, msg.reason || CallErrorCode.UserHangup, true);
+    };
+
+    onRejectReceived = (msg) => {
+        logger.debug("Reject received");
+        if (this.state === CallState.InviteSent) {
+            this.terminate(CallParty.Remote, CallErrorCode.UserHangup, true);
+        } else {
+            logger.debug(`Call is in state: ${this.state}: ignoring reject`);
+        }
     };
 
     onAnsweredElsewhere = (msg) => {
@@ -1127,7 +1176,7 @@ export class MatrixCall extends EventEmitter {
         this.candidateSendQueue = [];
         ++this.candidateSendTries;
         const content = {
-            version: 0,
+            version: VOIP_PROTO_VERSION,
             call_id: this.callId,
             candidates: cands,
         };
