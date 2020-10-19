@@ -28,7 +28,7 @@ export class CallEventHandler {
     client: MatrixClient;
     calls: Map<string, MatrixCall>;
     callEventBuffer: MatrixEvent[];
-    candidatesByCall: Map<string, Array<RTCIceCandidate>>;
+    candidateEventsByCall: Map<string, Array<MatrixEvent>>;
 
     constructor(client: MatrixClient) {
         this.client = client;
@@ -42,7 +42,7 @@ export class CallEventHandler {
         // This happens quite often, eg. replaying sync from storage, catchup sync
         // after loading and after we've been offline for a bit.
         this.callEventBuffer = [];
-        this.candidatesByCall = new Map<string, Array<RTCIceCandidate>>();
+        this.candidateEventsByCall = new Map<string, Array<MatrixEvent>>();
         this.client.on("sync", this.evaluateEventBuffer);
         this.client.on("event", this.onEvent);
     }
@@ -157,9 +157,9 @@ export class CallEventHandler {
             this.calls.set(call.callId, call);
 
             // if we stashed candidate events for that call ID, play them back now
-            if (this.candidatesByCall.get(call.callId)) {
-                for (const cand of this.candidatesByCall.get(call.callId)) {
-                    call.gotRemoteIceCandidate(cand);
+            if (this.candidateEventsByCall.get(call.callId)) {
+                for (const ev of this.candidateEventsByCall.get(call.callId)) {
+                    call.onRemoteIceCandidatesReceived(ev);
                 }
             }
 
@@ -221,16 +221,12 @@ export class CallEventHandler {
             }
             if (!call) {
                 // store the candidates; we may get a call eventually.
-                if (!this.candidatesByCall.has(content.call_id)) {
-                    this.candidatesByCall.set(content.call_id, []);
+                if (!this.candidateEventsByCall.has(content.call_id)) {
+                    this.candidateEventsByCall.set(content.call_id, []);
                 }
-                this.candidatesByCall.set(content.call_id, this.candidatesByCall.get(
-                    content.call_id,
-                ).concat(content.candidates));
+                this.candidateEventsByCall.get(content.call_id).push(event);
             } else {
-                for (const cand of content.candidates) {
-                    call.gotRemoteIceCandidate(cand);
-                }
+                call.onRemoteIceCandidatesReceived(event);
             }
         } else if ([EventType.CallHangup, EventType.CallReject].includes(event.getType())) {
             // Note that we also observe our own hangups here so we can see
