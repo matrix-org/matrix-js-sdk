@@ -11,7 +11,7 @@ In a browser
 ------------
 Download the browser version from
 https://github.com/matrix-org/matrix-js-sdk/releases/latest and add that as a
-``<script>`` to your page. There will be a global variable ``matrixcs``
+``<script>`` to your page. There will be a global variable ``matrixcsc``
 attached to ``window`` through which you can access the SDK. See below for how to
 include libolm to enable end-to-end-encryption.
 
@@ -125,7 +125,7 @@ events for incoming data and state changes. Aside from wrapping the HTTP API, it
  - Handles WebRTC calling.
 
 Later versions of the SDK will:
- - Expose a `RoomSummary` which would be suitable for a recents page.
+ - Expose a `RoomSummary` which would be suitable for a recent page.
  - Provide different pluggable storage layers (e.g. local storage, database-backed)
 
 Usage
