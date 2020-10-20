@@ -94,6 +94,9 @@ if [ $# -ne 1 ]; then
     exit 1
 fi
 
+# Ensure all dependencies are updated
+yarn install --ignore-scripts
+
 if [ -z "$skip_changelog" ]; then
     # update_changelog doesn't have a --version flag
     update_changelog -h > /dev/null || (echo "github-changelog-generator is required: please install it"; exit)
