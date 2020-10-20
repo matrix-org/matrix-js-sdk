@@ -5143,7 +5143,12 @@ MatrixClient.prototype.getVersions = function() {
         {
             prefix: '',
         },
-    );
+    ).catch((e) => {
+        // Need to unset this if it fails, otherwise we'll never retry
+        this._serverVersionsPromise = null;
+        // but rethrow the exception to anything that was waiting
+        throw e;
+    });
 
     return this._serverVersionsPromise;
 };
