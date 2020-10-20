@@ -340,7 +340,7 @@ fi
 echo "updating master branch"
 git checkout master
 git pull
-git merge "$rel_branch"
+git merge "$rel_branch" --no-edit
 
 # push master to github
 git push origin master
@@ -349,6 +349,6 @@ git push origin master
 if [ $(git branch -lr | grep origin/develop -c) -ge 1 ]; then
     git checkout develop
     git pull
-    git merge master
+    git merge master --no-edit
     git push origin develop
 fi
