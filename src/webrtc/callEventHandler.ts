@@ -213,7 +213,7 @@ export class CallEventHandler {
                     call.onAnsweredElsewhere(content);
                 }
             } else {
-                call.receivedAnswer(content);
+                call.onAnswerReceived(event);
             }
         } else if (event.getType() === EventType.CallCandidates) {
             if (event.getSender() === this.client.credentials.userId) {
@@ -251,6 +251,13 @@ export class CallEventHandler {
                     this.calls.delete(content.call_id);
                 }
             }
+        } else if (event.getType() === EventType.CallSelectAnswer) {
+            if (event.getContent().party_id === call.ourPartyId) {
+                // Ignore remote echo
+                return;
+            }
+
+            call.onSelectAnswerReceived(event);
         }
     }
 }

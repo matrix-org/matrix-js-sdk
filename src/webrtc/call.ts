@@ -22,9 +22,10 @@ limitations under the License.
  */
 
 import {logger} from '../logger';
-import {EventEmitter} from "events";
-import * as utils from "../utils";
-import MatrixEvent from "../models/event"
+import {EventEmitter} from 'events';
+import * as utils from '../utils';
+import MatrixEvent from '../models/event';
+import {EventType} from '../@types/event';
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
@@ -208,6 +209,7 @@ export class MatrixCall extends EventEmitter {
     hangupParty: CallParty;
     hangupReason: string;
     direction: CallDirection;
+    ourPartyId: string;
 
     private client: any; // Fix when client is TSified
     private forceTURN: boolean;
@@ -231,7 +233,6 @@ export class MatrixCall extends EventEmitter {
     private config: MediaStreamConstraints;
     private successor: MatrixCall;
     private opponentVersion: number;
-    private ourPartyId: string;
     // The party ID of the other side: undefined if we haven't chosen a partner
     // yet, null if we have but they didn't send a party ID.
     private opponentPartyId: string;
@@ -555,7 +556,7 @@ export class MatrixCall extends EventEmitter {
         // Continue to send no reason for user hangups temporarily, until
         // clients understand the user_hangup reason (voip v1)
         if (reason !== CallErrorCode.UserHangup) content['reason'] = reason;
-        this.sendVoipEvent('m.call.hangup', {});
+        this.sendVoipEvent(EventType.CallHangup, {});
     }
 
     /**
@@ -578,7 +579,7 @@ export class MatrixCall extends EventEmitter {
 
         logger.debug("Rejecting call: " + this.callId);
         this.terminate(CallParty.Local, CallErrorCode.UserHangup, true);
-        this.sendVoipEvent('m.call.reject', {});
+        this.sendVoipEvent(EventType.CallReject, {});
     }
 
     /**
@@ -691,7 +692,7 @@ export class MatrixCall extends EventEmitter {
 
     private sendAnswer() {
         this.setState(CallState.Connecting);
-        this.sendVoipEvent('m.call.answer', this.answerContent).then(() => {
+        this.sendVoipEvent(EventType.CallAnswer, this.answerContent).then(() => {
             // If this isn't the first time we've tried to send the answer,
             // we may have candidates queued up, so send them now.
             this.sendCandidateQueue();
@@ -842,24 +843,37 @@ export class MatrixCall extends EventEmitter {
      * Used by MatrixClient.
      * @param {Object} msg
      */
-    async receivedAnswer(msg: MatrixEvent) {
+    async onAnswerReceived(event: MatrixEvent) {
         if (this.state === CallState.Ended) {
             return;
         }
 
         if (this.opponentPartyId !== undefined) {
             logger.info(
-                `Ignoring answer from party ID ${msg.party_id}: ` +
+                `Ignoring answer from party ID ${event.getContent().party_id}: ` +
                 `we already have an answer/reject from ${this.opponentPartyId}`,
             );
             return;
         }
 
-        this.opponentVersion = msg.version;
-        this.opponentPartyId = msg.party_id || null;
+        this.opponentVersion = event.getContent().version;
+        this.opponentPartyId = event.getContent().party_id || null;
+
+        // If the answer we selected has a party_id, send a select_answer event
+        if (this.opponentPartyId !== null) {
+            try {
+                await this.sendVoipEvent(EventType.CallSelectAnswer, {
+                    selected_party_id: this.opponentPartyId,
+                });
+            } catch (err) {
+                // This isn't fatal, and will just mean that if another party has raced to answer
+                // the call, they won't know they got rejected, so we carry on & don't retry.
+                logger.warn("Failed to send select_answer event", err);
+            }
+        }
 
         try {
-            await this.peerConn.setRemoteDescription(msg.answer);
+            await this.peerConn.setRemoteDescription(event.getContent().answer);
         } catch (e) {
             logger.debug("Failed to set remote description", e);
             this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
@@ -867,6 +881,26 @@ export class MatrixCall extends EventEmitter {
         }
 
         this.setState(CallState.Connecting);
+    }
+
+    async onSelectAnswerReceived(event: MatrixEvent) {
+        if (this.direction !== CallDirection.Inbound) {
+            logger.warn("Got select_answer for an outbound call: ignoring");
+            return;
+        }
+
+        const selectedPartyId = event.getContent().selected_party_id;
+
+        if (selectedPartyId === undefined || selectedPartyId === null) {
+            logger.warn("Got nonsensical select_answer with null/undefined selected_party_id: ignoring");
+            return;
+        }
+
+        if (selectedPartyId !== this.ourPartyId) {
+            logger.info(`Got select_answer for party ID ${selectedPartyId}: we are party ID ${this.ourPartyId}.`);
+            // The other party has picked somebody else's answer
+            this.terminate(CallParty.Remote, CallErrorCode.AnsweredElsewhere, true);
+        }
     }
 
     private gotLocalOffer = async (description: RTCSessionDescriptionInit) => {
@@ -905,7 +939,7 @@ export class MatrixCall extends EventEmitter {
             lifetime: CALL_TIMEOUT_MS,
         };
         try {
-            await this.sendVoipEvent('m.call.invite', content);
+            await this.sendVoipEvent(EventType.CallInvite, content);
             this.setState(CallState.InviteSent);
             setTimeout(() => {
                 if (this.state === CallState.InviteSent) {
@@ -1212,7 +1246,7 @@ export class MatrixCall extends EventEmitter {
             candidates: cands,
         };
         logger.debug("Attempting to send " + cands.length + " candidates");
-        this.sendVoipEvent('m.call.candidates', content).then(() => {
+        this.sendVoipEvent(EventType.CallCandidates, content).then(() => {
             this.candidateSendTries = 0;
             this.sendCandidateQueue();
         }, (error) => {
