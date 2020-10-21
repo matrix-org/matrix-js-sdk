@@ -236,6 +236,7 @@ export class MatrixCall extends EventEmitter {
     // The party ID of the other side: undefined if we haven't chosen a partner
     // yet, null if we have but they didn't send a party ID.
     private opponentPartyId: string;
+    private inviteTimeout;
 
     constructor(opts: CallOpts) {
         super();
@@ -941,7 +942,8 @@ export class MatrixCall extends EventEmitter {
         try {
             await this.sendVoipEvent(EventType.CallInvite, content);
             this.setState(CallState.InviteSent);
-            setTimeout(() => {
+            this.inviteTimeout = setTimeout(() => {
+                this.inviteTimeout = null;
                 if (this.state === CallState.InviteSent) {
                     this.hangup(CallErrorCode.InviteTimeout, false);
                 }
@@ -1164,6 +1166,11 @@ export class MatrixCall extends EventEmitter {
 
     private terminate(hangupParty: CallParty, hangupReason: CallErrorCode, shouldEmit: boolean) {
         if (this.state === CallState.Ended) return;
+
+        if (this.inviteTimeout) {
+            clearTimeout(this.inviteTimeout);
+            this.inviteTimeout = null;
+        }
 
         const remoteVid = this.getRemoteVideoElement();
         const remoteAud = this.getRemoteAudioElement();
