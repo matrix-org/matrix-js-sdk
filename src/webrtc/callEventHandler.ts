@@ -252,6 +252,8 @@ export class CallEventHandler {
                 }
             }
         } else if (event.getType() === EventType.CallSelectAnswer) {
+            if (!call) return;
+
             if (event.getContent().party_id === call.ourPartyId) {
                 // Ignore remote echo
                 return;
