@@ -942,6 +942,10 @@ export class MatrixCall extends EventEmitter {
             setTimeout(resolve, 200);
         });
 
+        // @ts-ignore: Typescript thinks this is impossible because of the
+        // check above: it has not heard of async functions
+        if (this.state === CallState.Ended) return;
+
         const content = {
             // OpenWebRTC appears to add extra stuff (like the DTLS fingerprint)
             // to the description when setting it on the peerconnection.
@@ -1244,7 +1248,7 @@ export class MatrixCall extends EventEmitter {
             this.peerConn.close();
         }
         if (shouldEmit) {
-            this.emit(CallEvent.Hangup, self);
+            this.emit(CallEvent.Hangup, this);
         }
     }
 
