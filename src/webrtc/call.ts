@@ -551,7 +551,7 @@ export class MatrixCall extends EventEmitter {
      * @param {boolean} suppressEvent True to suppress emitting an event.
      */
     hangup(reason: CallErrorCode, suppressEvent: boolean) {
-        if (this.state === CallState.Ended) return;
+        if (this.callHasEnded()) return;
 
         logger.debug("Ending call " + this.callId);
         this.terminate(CallParty.Local, reason, !suppressEvent);
@@ -648,7 +648,7 @@ export class MatrixCall extends EventEmitter {
             this.successor.gotUserMediaForAnswer(stream);
             return;
         }
-        if (this.state === CallState.Ended) {
+        if (this.callHasEnded()) {
             return;
         }
         logger.debug("gotUserMediaForInvite -> " + this.type);
@@ -730,7 +730,7 @@ export class MatrixCall extends EventEmitter {
     }
 
     private gotUserMediaForAnswer = async (stream: MediaStream) => {
-        if (this.state === CallState.Ended) {
+        if (this.callHasEnded()) {
             return;
         }
 
@@ -791,7 +791,7 @@ export class MatrixCall extends EventEmitter {
                 event.candidate.candidate,
             );
 
-            if (this.state == CallState.Ended) return;
+            if (this.callHasEnded()) return;
 
             // As with the offer, note we need to make a copy of this object, not
             // pass the original: that broke in Chrome ~m43.
@@ -822,7 +822,7 @@ export class MatrixCall extends EventEmitter {
     };
 
     onRemoteIceCandidatesReceived(ev: MatrixEvent) {
-        if (this.state == CallState.Ended) {
+        if (this.callHasEnded()) {
             //debuglog("Ignoring remote ICE candidate because call has ended");
             return;
         }
@@ -859,7 +859,7 @@ export class MatrixCall extends EventEmitter {
      * @param {Object} msg
      */
     async onAnswerReceived(event: MatrixEvent) {
-        if (this.state === CallState.Ended) {
+        if (this.callHasEnded()) {
             return;
         }
 
@@ -920,10 +920,17 @@ export class MatrixCall extends EventEmitter {
         }
     }
 
+    private callHasEnded() : boolean {
+        // This exists as workaround to typescript trying to be clever and erroring
+        // when putting if (this.state === CallState.Ended) return; twice in the same
+        // function, even though that function is async.
+        return this.state === CallState.Ended;
+    }
+
     private gotLocalOffer = async (description: RTCSessionDescriptionInit) => {
         logger.debug("Created offer: ", description);
 
-        if (this.state === CallState.Ended) {
+        if (this.callHasEnded()) {
             logger.debug("Ignoring newly created offer on call ID " + this.callId +
                 " because the call has ended");
             return;
@@ -942,9 +949,7 @@ export class MatrixCall extends EventEmitter {
             setTimeout(resolve, 200);
         });
 
-        // @ts-ignore: Typescript thinks this is impossible because of the
-        // check above: it has not heard of async functions
-        if (this.state === CallState.Ended) return;
+        if (this.callHasEnded()) return;
 
         const content = {
             // OpenWebRTC appears to add extra stuff (like the DTLS fingerprint)
@@ -1026,7 +1031,7 @@ export class MatrixCall extends EventEmitter {
     };
 
     onIceConnectionStateChanged = () => {
-        if (this.state === CallState.Ended) {
+        if (this.callHasEnded()) {
             return; // because ICE can still complete as we're ending the call
         }
         logger.debug(
@@ -1204,7 +1209,7 @@ export class MatrixCall extends EventEmitter {
     }
 
     private terminate(hangupParty: CallParty, hangupReason: CallErrorCode, shouldEmit: boolean) {
-        if (this.state === CallState.Ended) return;
+        if (this.callHasEnded()) return;
 
         if (this.inviteTimeout) {
             clearTimeout(this.inviteTimeout);
