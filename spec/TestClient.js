@@ -69,6 +69,9 @@ export function TestClient(
 
     this.deviceKeys = null;
     this.oneTimeKeys = {};
+    this._callEventHandler = {
+        calls: new Map(),
+    };
 }
 
 TestClient.prototype.toString = function() {
@@ -229,4 +232,8 @@ TestClient.prototype.flushSync = function() {
     ]).then(() => {
         logger.log(`${this}: flushSync completed`);
     });
+};
+
+TestClient.prototype.isFallbackICEServerAllowed = function() {
+    return true;
 };

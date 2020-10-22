@@ -475,9 +475,9 @@ SyncApi.prototype.sync = function() {
 
     this._running = true;
 
-    if (global.document) {
+    if (global.window) {
         this._onOnlineBound = this._onOnline.bind(this);
-        global.document.addEventListener("online", this._onOnlineBound, false);
+        global.window.addEventListener("online", this._onOnlineBound, false);
     }
 
     let savedSyncPromise = Promise.resolve();
@@ -643,8 +643,8 @@ SyncApi.prototype.sync = function() {
  */
 SyncApi.prototype.stop = function() {
     debuglog("SyncApi.stop");
-    if (global.document) {
-        global.document.removeEventListener("online", this._onOnlineBound, false);
+    if (global.window) {
+        global.window.removeEventListener("online", this._onOnlineBound, false);
         this._onOnlineBound = undefined;
     }
     this._running = false;

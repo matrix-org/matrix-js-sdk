@@ -45,6 +45,8 @@ export enum EventType {
     CallCandidates = "m.call.candidates",
     CallAnswer = "m.call.answer",
     CallHangup = "m.call.hangup",
+    CallReject = "m.call.reject",
+    CallSelectAnswer = "m.call.select_answer",
     KeyVerificationRequest = "m.key.verification.request",
     KeyVerificationStart = "m.key.verification.start",
     KeyVerificationCancel = "m.key.verification.cancel",
