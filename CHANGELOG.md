@@ -1,3 +1,10 @@
+Changes in [9.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.0.0) (2020-10-26)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.0.0-rc.1...v9.0.0)
+
+ * Fix logger typo
+   [\#1528](https://github.com/matrix-org/matrix-js-sdk/pull/1528)
+
 Changes in [9.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.0.0-rc.1) (2020-10-21)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.5.0...v9.0.0-rc.1)
