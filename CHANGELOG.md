@@ -1,3 +1,60 @@
+Changes in [9.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.0.0) (2020-10-26)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.0.0-rc.1...v9.0.0)
+
+ * Fix logger typo
+   [\#1528](https://github.com/matrix-org/matrix-js-sdk/pull/1528)
+
+Changes in [9.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.0.0-rc.1) (2020-10-21)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.5.0...v9.0.0-rc.1)
+
+BREAKING CHANGES
+---
+
+ * `hasPendingEvent` now returns false instead of throwing when pending ordering mode is not `detached`
+
+All changes
+---
+
+ * Don't cache failures when fetching /versions
+   [\#1521](https://github.com/matrix-org/matrix-js-sdk/pull/1521)
+ * Install deps first as part of release
+   [\#1518](https://github.com/matrix-org/matrix-js-sdk/pull/1518)
+ * [Breaking] Change hasPendingEvent to return false if pending ordering
+   !detached
+   [\#1517](https://github.com/matrix-org/matrix-js-sdk/pull/1517)
+ * Skip editor prompts for merges
+   [\#1519](https://github.com/matrix-org/matrix-js-sdk/pull/1519)
+ * Convert call test to TypeScript
+   [\#1516](https://github.com/matrix-org/matrix-js-sdk/pull/1516)
+ * Support party_id
+   [\#1512](https://github.com/matrix-org/matrix-js-sdk/pull/1512)
+ * Support m.call.reject
+   [\#1510](https://github.com/matrix-org/matrix-js-sdk/pull/1510)
+ * Remove specbuild from .gitignore
+   [\#1515](https://github.com/matrix-org/matrix-js-sdk/pull/1515)
+ * Log the error when we failed to send candidates
+   [\#1514](https://github.com/matrix-org/matrix-js-sdk/pull/1514)
+ * Fixes for call state machine
+   [\#1503](https://github.com/matrix-org/matrix-js-sdk/pull/1503)
+ * Fix call event handler listener removing
+   [\#1506](https://github.com/matrix-org/matrix-js-sdk/pull/1506)
+ * Set the type of the call based on the tracks
+   [\#1501](https://github.com/matrix-org/matrix-js-sdk/pull/1501)
+ * Use new local timestamp for calls
+   [\#1499](https://github.com/matrix-org/matrix-js-sdk/pull/1499)
+ * Adjust types and APIs to match React SDK
+   [\#1502](https://github.com/matrix-org/matrix-js-sdk/pull/1502)
+ * Make an accurate version of 'age' for events
+   [\#1495](https://github.com/matrix-org/matrix-js-sdk/pull/1495)
+ * Make 'options' parameter optional
+   [\#1498](https://github.com/matrix-org/matrix-js-sdk/pull/1498)
+ * Create a giant event type enum
+   [\#1497](https://github.com/matrix-org/matrix-js-sdk/pull/1497)
+ * Convert call.js to Typescript & update WebRTC APIs (re-apply)
+   [\#1494](https://github.com/matrix-org/matrix-js-sdk/pull/1494)
+
 Changes in [8.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v8.5.0) (2020-10-12)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v8.5.0-rc.1...v8.5.0)
