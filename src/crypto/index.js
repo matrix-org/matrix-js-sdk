@@ -763,12 +763,16 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         // be trusted via cross-signing.
         if (
             this._crossSigningInfo.getId() &&
-            this._crossSigningInfo.isStoredInKeyCache("master")
+            await this._crossSigningInfo.isStoredInKeyCache("master")
         ) {
-            logger.log("Adding cross-signing signature to key backup");
-            await this._crossSigningInfo.signObject(
-                keyBackupInfo.auth_data, "master",
-            );
+            try {
+                logger.log("Adding cross-signing signature to key backup");
+                await this._crossSigningInfo.signObject(
+                    keyBackupInfo.auth_data, "master",
+                );
+            } catch (e) {
+                logger.error("Signing key backup with cross-signing keys failed", e);
+            }
         } else {
             logger.warn(
                 "Cross-signing keys not available, skipping signature on key backup",
@@ -826,11 +830,17 @@ Crypto.prototype.bootstrapSecretStorage = async function({
 
         if (
             this._crossSigningInfo.getId() &&
-            this._crossSigningInfo.isStoredInKeyCache("master")
+            await this._crossSigningInfo.isStoredInKeyCache("master")
         ) {
-            // sign with cross-sign master key
-            logger.log("Adding cross-signing signature to key backup");
-            await this._crossSigningInfo.signObject(data.auth_data, "master");
+            try {
+                // sign with cross-sign master key
+                logger.log("Adding cross-signing signature to key backup");
+                await this._crossSigningInfo.signObject(data.auth_data, "master");
+            } catch (e) {
+                // This step is not critical (just helpful), so we catch here
+                // and continue if it fails.
+                logger.error("Signing key backup with cross-signing keys failed", e);
+            }
         } else {
             logger.warn(
                 "Cross-signing keys not available, skipping signature on key backup",
