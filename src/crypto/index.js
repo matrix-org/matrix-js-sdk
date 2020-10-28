@@ -2640,7 +2640,10 @@ Crypto.prototype.trackRoomDevices = function(roomId) {
     let promise = this._roomDeviceTrackingState[roomId];
     if (!promise) {
         promise = trackMembers();
-        this._roomDeviceTrackingState[roomId] = promise;
+        this._roomDeviceTrackingState[roomId] = promise.catch(err => {
+            this._roomDeviceTrackingState[roomId] = null;
+            throw err;
+        });
     }
     return promise;
 };
