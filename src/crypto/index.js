@@ -695,6 +695,26 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         }
     };
 
+    const signKeyBackupWithCrossSigning = async (keyBackupAuthData) => {
+        if (
+            this._crossSigningInfo.getId() &&
+            await this._crossSigningInfo.isStoredInKeyCache("master")
+        ) {
+            try {
+                logger.log("Adding cross-signing signature to key backup");
+                await this._crossSigningInfo.signObject(keyBackupAuthData, "master");
+            } catch (e) {
+                // This step is not critical (just helpful), so we catch here
+                // and continue if it fails.
+                logger.error("Signing key backup with cross-signing keys failed", e);
+            }
+        } else {
+            logger.warn(
+                "Cross-signing keys not available, skipping signature on key backup",
+            );
+        }
+    };
+
     const oldSSSSKey = await this.getSecretStorageKey();
     const [oldKeyId, oldKeyInfo] = oldSSSSKey || [null, null];
     const storageExists = (
@@ -761,19 +781,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         // The backup is trusted because the user provided the private key.
         // Sign the backup with the cross-signing key so the key backup can
         // be trusted via cross-signing.
-        if (
-            this._crossSigningInfo.getId() &&
-            this._crossSigningInfo.isStoredInKeyCache("master")
-        ) {
-            logger.log("Adding cross-signing signature to key backup");
-            await this._crossSigningInfo.signObject(
-                keyBackupInfo.auth_data, "master",
-            );
-        } else {
-            logger.warn(
-                "Cross-signing keys not available, skipping signature on key backup",
-            );
-        }
+        await signKeyBackupWithCrossSigning(keyBackupInfo.auth_data);
 
         builder.addSessionBackup(keyBackupInfo);
     } else {
@@ -824,18 +832,8 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             auth_data: info.auth_data,
         };
 
-        if (
-            this._crossSigningInfo.getId() &&
-            this._crossSigningInfo.isStoredInKeyCache("master")
-        ) {
-            // sign with cross-sign master key
-            logger.log("Adding cross-signing signature to key backup");
-            await this._crossSigningInfo.signObject(data.auth_data, "master");
-        } else {
-            logger.warn(
-                "Cross-signing keys not available, skipping signature on key backup",
-            );
-        }
+        // Sign with cross-signing master key
+        await signKeyBackupWithCrossSigning(data.auth_data);
 
         // sign with the device fingerprint
         await this._signObject(data.auth_data);
