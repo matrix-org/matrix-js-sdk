@@ -91,6 +91,9 @@ export enum CallEvent {
     State = 'state',
     Error = 'error',
     Replaced = 'replaced',
+
+    // The value of isLocalOnHold() has changed
+    HoldUnhold = 'hold_unhold',
 }
 
 enum MediaQueueId {
@@ -163,6 +166,11 @@ export enum CallErrorCode {
      * The call was replaced by another call
      */
     Replaced = 'replaced',
+
+    /**
+     * Signalling for the call could not be sent (other than the initial invite)
+     */
+    SignallingFailed = 'signalling_timeout',
 }
 
 /**
@@ -236,7 +244,17 @@ export class MatrixCall extends EventEmitter {
     // The party ID of the other side: undefined if we haven't chosen a partner
     // yet, null if we have but they didn't send a party ID.
     private opponentPartyId: string;
-    private inviteTimeout;
+    private inviteTimeout: NodeJS.Timeout;
+
+    // The logic of when & if a call is on hold is nontrivial and explained in is*OnHold
+    // This flag represents whether we want the other party to be on hold
+    private remoteOnHold;
+    private micMuted;
+    private vidMuted;
+
+    // Perfect negotiation state: https://www.w3.org/TR/webrtc/#perfect-negotiation-example
+    private makingOffer: boolean;
+    private ignoreOffer: boolean;
 
     constructor(opts: CallOpts) {
         super();
@@ -273,6 +291,11 @@ export class MatrixCall extends EventEmitter {
 
         this.sentEndOfCandidates = false;
         this.inviteOrAnswerSent = false;
+        this.makingOffer = false;
+
+        this.remoteOnHold = false;
+        this.micMuted = false;
+        this.vidMuted = false;
     }
 
     /**
@@ -421,7 +444,7 @@ export class MatrixCall extends EventEmitter {
     async setRemoteAudioElement(element: HTMLAudioElement) {
         if (element === this.remoteAudioElement) return;
 
-        this.remoteVideoElement.muted = true;
+        if (this.remoteVideoElement) this.remoteVideoElement.muted = true;
         this.remoteAudioElement = element;
         this.remoteAudioElement.muted = false;
 
@@ -586,14 +609,12 @@ export class MatrixCall extends EventEmitter {
     }
 
     /**
-     * Set whether the local video preview should be muted or not.
-     * @param {boolean} muted True to mute the local video.
+     * Set whether our outbound video should be muted or not.
+     * @param {boolean} muted True to mute the outbound video.
      */
     setLocalVideoMuted(muted: boolean) {
-        if (!this.localAVStream) {
-            return;
-        }
-        setTracksEnabled(this.localAVStream.getVideoTracks(), !muted);
+        this.vidMuted = muted;
+        this.updateMuteStatus();
     }
 
     /**
@@ -606,10 +627,7 @@ export class MatrixCall extends EventEmitter {
      * (including if the call is not set up yet).
      */
     isLocalVideoMuted(): boolean {
-        if (!this.localAVStream) {
-            return false;
-        }
-        return !isTracksEnabled(this.localAVStream.getVideoTracks());
+        return this.vidMuted;
     }
 
     /**
@@ -617,10 +635,8 @@ export class MatrixCall extends EventEmitter {
      * @param {boolean} muted True to mute the mic.
      */
     setMicrophoneMuted(muted: boolean) {
-        if (!this.localAVStream) {
-            return;
-        }
-        setTracksEnabled(this.localAVStream.getAudioTracks(), !muted);
+        this.micMuted = muted;
+        this.updateMuteStatus();
     }
 
     /**
@@ -633,10 +649,63 @@ export class MatrixCall extends EventEmitter {
      * is not set up yet).
      */
     isMicrophoneMuted(): boolean {
-        if (!this.localAVStream) {
-            return false;
+        return this.micMuted;
+    }
+
+    /**
+     * @returns true if we have put the party on the other side of the call on hold
+     * (that is, we are signalling to them that we are not listening)
+     */
+    isRemoteOnHold(): boolean {
+        return this.remoteOnHold;
+    }
+
+    setRemoteOnHold(onHold: boolean) {
+        if (this.isRemoteOnHold() === onHold) return;
+        this.remoteOnHold = onHold;
+
+        for (const tranceiver of this.peerConn.getTransceivers()) {
+            // We set 'inactive' rather than 'sendonly' because we're not planning on
+            // playing music etc. to the other side.
+            tranceiver.direction = onHold ? 'inactive' : 'sendrecv';
         }
-        return !isTracksEnabled(this.localAVStream.getAudioTracks());
+        this.updateMuteStatus();
+    }
+
+    /**
+     * Indicates whether we are 'on hold' to the remote party (ie. if true,
+     * they cannot hear us). Note that this will return true when we put the
+     * remote on hold too due to the way hold is implemented (since we don't
+     * wish to play hold music when we put a call on hold, we use 'inactive'
+     * rather than 'sendonly')
+     * @returns true if the other party has put us on hold
+     */
+    isLocalOnHold(): boolean {
+        if (this.state !== CallState.Connected) return false;
+
+        let callOnHold = true;
+
+        // We consider a call to be on hold only if *all* the tracks are on hold
+        // (is this the right thing to do?)
+        for (const tranceiver of this.peerConn.getTransceivers()) {
+            const trackOnHold = ['inactive', 'recvonly'].includes(tranceiver.currentDirection);
+
+            if (!trackOnHold) callOnHold = false;
+        }
+
+        return callOnHold;
+    }
+
+    private updateMuteStatus() {
+        if (!this.localAVStream) {
+            return;
+        }
+
+        const micShouldBeMuted = this.micMuted || this.remoteOnHold;
+        setTracksEnabled(this.localAVStream.getAudioTracks(), !micShouldBeMuted);
+
+        const vidShouldBeMuted = this.vidMuted || this.remoteOnHold;
+        setTracksEnabled(this.localAVStream.getVideoTracks(), !vidShouldBeMuted);
     }
 
     /**
@@ -651,6 +720,9 @@ export class MatrixCall extends EventEmitter {
         if (this.callHasEnded()) {
             return;
         }
+
+        this.setState(CallState.CreateOffer);
+
         logger.debug("gotUserMediaForInvite -> " + this.type);
 
         const videoEl = this.getLocalVideoElement();
@@ -672,25 +744,21 @@ export class MatrixCall extends EventEmitter {
         }
 
         this.localAVStream = stream;
+        logger.info("Got local AV stream with id " + this.localAVStream.id);
         // why do we enable audio (and only audio) tracks here? -- matthew
         setTracksEnabled(stream.getAudioTracks(), true);
         this.peerConn = this.createPeerConnection();
 
         for (const audioTrack of stream.getAudioTracks()) {
+            logger.info("Adding audio track with id " + audioTrack.id);
             this.peerConn.addTrack(audioTrack, stream);
         }
         for (const videoTrack of (this.screenSharingStream || stream).getVideoTracks()) {
+            logger.info("Adding audio track with id " + videoTrack.id);
             this.peerConn.addTrack(videoTrack, stream);
         }
 
-        try {
-            const myOffer = await this.peerConn.createOffer();
-            this.gotLocalOffer(myOffer);
-        } catch (e) {
-            this.getLocalOfferFailed(e);
-            return;
-        }
-        this.setState(CallState.CreateOffer);
+        // Now we wait for the negotiationneeded event
     };
 
     private sendAnswer() {
@@ -747,6 +815,7 @@ export class MatrixCall extends EventEmitter {
         }
 
         this.localAVStream = stream;
+        logger.info("Got local AV stream with id " + this.localAVStream.id);
         setTracksEnabled(stream.getAudioTracks(), true);
         for (const track of stream.getTracks()) {
             this.peerConn.addTrack(track, stream);
@@ -850,7 +919,13 @@ export class MatrixCall extends EventEmitter {
                 return;
             }
             logger.debug("Got remote ICE " + cand.sdpMid + " candidate: " + cand.candidate);
-            this.peerConn.addIceCandidate(cand);
+            try {
+                this.peerConn.addIceCandidate(cand);
+            } catch (err) {
+                if (!this.ignoreOffer) {
+                    logger.info("Failed to add remore ICE candidate", err);
+                }
+            }
         }
     }
 
@@ -920,6 +995,53 @@ export class MatrixCall extends EventEmitter {
         }
     }
 
+    async onNegotiateReceived(event: MatrixEvent) {
+        const description = event.getContent().description;
+        if (!description || !description.sdp || !description.type) {
+            logger.info("Ignoring invalid m.call.negotiate event");
+            return;
+        }
+        // Politeness always follows the direction of the call: in a glare situation,
+        // we pick either the inbound or outbound call, so one side will always be
+        // inbound and one outbound
+        const polite = this.direction === CallDirection.Inbound;
+
+        // Here we follow the perfect negotiation logic from
+        // https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation
+        const offerCollision = (
+            (description.type == 'offer') &&
+            (this.makingOffer || this.peerConn.signalingState != 'stable')
+        );
+
+        this.ignoreOffer = !polite && offerCollision;
+        if (this.ignoreOffer) {
+            logger.info("Ignoring colliding negotiate event because we're impolite");
+            return;
+        }
+
+        const prevOnHold = this.isLocalOnHold();
+
+        try {
+            await this.peerConn.setRemoteDescription(description);
+
+            if (description.type === 'offer') {
+                const localDescription = await this.peerConn.createAnswer();
+                await this.peerConn.setLocalDescription(localDescription);
+
+                this.sendVoipEvent(EventType.CallNegotiate, {
+                    description: this.peerConn.localDescription,
+                });
+            }
+        } catch (err) {
+            logger.warn("Failed to complete negotiation", err);
+        }
+
+        const nowOnHold = this.isLocalOnHold();
+        if (prevOnHold !== nowOnHold) {
+            this.emit(CallEvent.HoldUnhold, nowOnHold);
+        }
+    }
+
     private callHasEnded() : boolean {
         // This exists as workaround to typescript trying to be clever and erroring
         // when putting if (this.state === CallState.Ended) return; twice in the same
@@ -944,29 +1066,20 @@ export class MatrixCall extends EventEmitter {
             return
         }
 
-        // Allow a short time for initial candidates to be gathered
-        await new Promise(resolve => {
-            setTimeout(resolve, 200);
-        });
+        if (this.peerConn.iceGatheringState === 'gathering') {
+            // Allow a short time for initial candidates to be gathered
+            await new Promise(resolve => {
+                setTimeout(resolve, 200);
+            });
+        }
 
         if (this.callHasEnded()) return;
 
+        const keyName = this.state === CallState.CreateOffer ? 'offer' : 'description';
+        const eventType = this.state === CallState.CreateOffer ? EventType.CallInvite : EventType.CallNegotiate;
+
         const content = {
-            // OpenWebRTC appears to add extra stuff (like the DTLS fingerprint)
-            // to the description when setting it on the peerconnection.
-            // According to the spec it should only add ICE
-            // candidates. Any ICE candidates that have already been generated
-            // at this point will probably be sent both in the offer and separately.
-            // Also, note that we have to make a new object here, copying the
-            // type and sdp properties.
-            // Passing the RTCSessionDescription object as-is doesn't work in
-            // Chrome (as of about m43).
-            offer: {
-                sdp: this.peerConn.localDescription.sdp,
-                // type now deprecated in Matrix VoIP v1, but
-                // required to still be sent for backwards compat
-                type: this.peerConn.localDescription.type,
-            },
+            [keyName]: this.peerConn.localDescription,
             lifetime: CALL_TIMEOUT_MS,
         };
 
@@ -976,34 +1089,40 @@ export class MatrixCall extends EventEmitter {
         this.candidateSendQueue = [];
 
         try {
-            await this.sendVoipEvent(EventType.CallInvite, content);
+            await this.sendVoipEvent(eventType, content);
             this.sendCandidateQueue();
-            this.inviteOrAnswerSent = true;
-            this.setState(CallState.InviteSent);
-            this.inviteTimeout = setTimeout(() => {
-                this.inviteTimeout = null;
-                if (this.state === CallState.InviteSent) {
-                    this.hangup(CallErrorCode.InviteTimeout, false);
-                }
-            }, CALL_TIMEOUT_MS);
+            if (this.state === CallState.CreateOffer) {
+                this.inviteOrAnswerSent = true;
+                this.setState(CallState.InviteSent);
+                this.inviteTimeout = setTimeout(() => {
+                    this.inviteTimeout = null;
+                    if (this.state === CallState.InviteSent) {
+                        this.hangup(CallErrorCode.InviteTimeout, false);
+                    }
+                }, CALL_TIMEOUT_MS);
+            }
         } catch (error) {
-            let code = CallErrorCode.SendInvite;
-            let message = "Failed to send invite";
+            this.client.cancelPendingEvent(error.event);
+
+            let code = CallErrorCode.SignallingFailed;
+            let message = "Signalling failed";
+            if (this.state === CallState.CreateOffer) {
+                code = CallErrorCode.SendInvite;
+                message = "Failed to send invite";
+            }
             if (error.name == 'UnknownDeviceError') {
                 code = CallErrorCode.UnknownDevices;
                 message = "Unknown devices present in the room";
             }
 
-            this.client.cancelPendingEvent(error.event);
-            this.terminate(CallParty.Local, code, false);
             this.emit(CallEvent.Error, new CallError(code, message, error));
+            this.terminate(CallParty.Local, code, false);
         }
     };
 
     private getLocalOfferFailed = (err: Error) => {
         logger.error("Failed to get local offer", err);
 
-        this.terminate(CallParty.Local, CallErrorCode.LocalOfferFailed, false);
         this.emit(
             CallEvent.Error,
             new CallError(
@@ -1011,6 +1130,7 @@ export class MatrixCall extends EventEmitter {
                 "Failed to get local offer!", err,
             ),
         );
+        this.terminate(CallParty.Local, CallErrorCode.LocalOfferFailed, false);
     };
 
     private getUserMediaFailed = (err: Error) => {
@@ -1019,7 +1139,8 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        this.terminate(CallParty.Local, CallErrorCode.NoUserMedia, false);
+        logger.warn("Failed to get user media - ending call", err);
+
         this.emit(
             CallEvent.Error,
             new CallError(
@@ -1028,6 +1149,7 @@ export class MatrixCall extends EventEmitter {
                 "does this app have permission?", err,
             ),
         );
+        this.terminate(CallParty.Local, CallErrorCode.NoUserMedia, false);
     };
 
     onIceConnectionStateChanged = () => {
@@ -1054,41 +1176,30 @@ export class MatrixCall extends EventEmitter {
     };
 
     private onTrack = (ev: RTCTrackEvent) => {
-        logger.debug(`Track id ${ev.track.id} of kind ${ev.track.kind} added`);
-
-        // This is relatively complex as we may get any number of tracks that may
-        // be in any number of streams, or not in streams at all, etc.
-        // I'm not entirely sure how this API is supposed to be used: it would
-        // be nice to know when the browser is finished telling us about a bunch
-        // of tracks so we could go & figure out which ones to use in which streams,
-        // but it doesn't. There was an 'addstream' event, but that is now deprecated.
-
-        // The base case is that there will be one stream with one audio track, or in
-        // the case of a video call, and audio and video track.
-
-        // This algorithm is not perfect and will fail in edge cases such as a streamless
-        // track being added first, followed by a normal audio + video stream.
-
-        const haveStream = this.remoteStream !== undefined;
-        if (!haveStream) {
-            // If we don't currently have a stream, use one this track is already in
-            if (ev.streams.length > 0) {
-                this.remoteStream = ev.streams[0];
-            } else {
-                // ...unless it's a streamless track, in which case we'll need to make
-                // our own stream.
-                this.remoteStream = new MediaStream();
-            }
+        if (ev.streams.length === 0) {
+            logger.warn(`Streamless ${ev.track.kind} found: ignoring.`);
+            return;
+        }
+        // If we already have a stream, check this track is from the same one
+        if (this.remoteStream && ev.streams[0].id !== this.remoteStream.id) {
+            logger.warn(
+                `Ignoring new stream ID ${ev.streams[0].id}: we already have stream ID ${this.remoteStream.id}`,
+            );
+            return;
         }
 
-        // if this track isn't in a stream, add it to the one we have.
-        // This basically assumes all the tracks are streamless, otherwise it
-        // will end up adding the track to a stream provided by the RTCPeerConnection,
-        // which would be weird.
-        if (ev.streams.length === 0) this.remoteStream.addTrack(ev.track);
+        if (!this.remoteStream) {
+            logger.info("Got remote stream with id " + ev.streams[0].id);
+        }
 
-        // If we've just gained our stream, wire it up to the media object
-        if (!haveStream) {
+        // Note that we check by ID above and always set the remote stream: Chrome appears
+        // to make new stream objects when tranciever directionality is changed and the 'active'
+        // status of streams change
+        this.remoteStream = ev.streams[0];
+
+        logger.debug(`Track id ${ev.track.id} of kind ${ev.track.kind} added`);
+
+        if (ev.track.kind === 'video') {
             if (this.remoteVideoElement) {
                 this.queueMediaOperation(MediaQueueId.RemoteVideo, async () => {
                     this.remoteVideoElement.srcObject = this.remoteStream;
@@ -1099,10 +1210,28 @@ export class MatrixCall extends EventEmitter {
                     }
                 });
             }
+        } else {
+            if (this.remoteAudioElement) this.playRemoteAudio();
+        }
+    };
 
-            if (this.remoteAudioElement) {
-                this.playRemoteAudio();
-            }
+    onNegotiationNeeded = async () => {
+        logger.info("Negotation is needed!");
+
+        if (this.state !== CallState.CreateOffer && this.opponentVersion === 0) {
+            logger.info("Opponent does not support renegotiation: ignoring negotiationneeded event");
+            return;
+        }
+
+        this.makingOffer = true;
+        try {
+            const myOffer = await this.peerConn.createOffer();
+            await this.gotLocalOffer(myOffer);
+        } catch (e) {
+            this.getLocalOfferFailed(e);
+            return;
+        } finally {
+            this.makingOffer = false;
         }
     };
 
@@ -1356,6 +1485,7 @@ export class MatrixCall extends EventEmitter {
         pc.addEventListener('icecandidate', this.gotLocalIceCandidate);
         pc.addEventListener('icegatheringstatechange', this.onIceGatheringStateChange);
         pc.addEventListener('track', this.onTrack);
+        pc.addEventListener('negotiationneeded', this.onNegotiationNeeded);
 
         return pc;
     }
@@ -1371,15 +1501,6 @@ function setTracksEnabled(tracks: Array<MediaStreamTrack>, enabled: boolean) {
     for (let i = 0; i < tracks.length; i++) {
         tracks[i].enabled = enabled;
     }
-}
-
-function isTracksEnabled(tracks: Array<MediaStreamTrack>) {
-    for (let i = 0; i < tracks.length; i++) {
-        if (tracks[i].enabled) {
-            return true; // at least one track is enabled
-        }
-    }
-    return false;
 }
 
 function getUserMediaVideoContraints(callType: CallType) {
