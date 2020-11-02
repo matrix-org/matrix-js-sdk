@@ -3702,10 +3702,16 @@ MatrixClient.prototype.setProfileInfo = function(info, data, callback) {
  * @return {Promise} Resolves: TODO
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype.setDisplayName = function(name, callback) {
-    return this.setProfileInfo(
+MatrixClient.prototype.setDisplayName = async function(name, callback) {
+    const prom = await this.setProfileInfo(
         "displayname", { displayname: name }, callback,
     );
+    const user = this.getUser(this.getUserId());
+    if (user) {
+        user.displayName = name;
+        user.emit("User.displayName");
+    }
+    return prom;
 };
 
 /**
@@ -3714,10 +3720,16 @@ MatrixClient.prototype.setDisplayName = function(name, callback) {
  * @return {Promise} Resolves: TODO
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype.setAvatarUrl = function(url, callback) {
-    return this.setProfileInfo(
+MatrixClient.prototype.setAvatarUrl = async function(url, callback) {
+    const prom = await this.setProfileInfo(
         "avatar_url", { avatar_url: url }, callback,
     );
+    const user = this.getUser(this.getUserId());
+    if (user) {
+        user.avatarUrl = url;
+        user.emit("User.avatarUrl");
+    }
+    return prom;
 };
 
 /**
