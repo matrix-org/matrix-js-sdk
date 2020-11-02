@@ -3709,7 +3709,7 @@ MatrixClient.prototype.setDisplayName = async function(name, callback) {
     const user = this.getUser(this.getUserId());
     if (user) {
         user.displayName = name;
-        user.emit("User.displayName");
+        user.emit("User.displayName", null, user);
     }
     return prom;
 };
@@ -3727,7 +3727,7 @@ MatrixClient.prototype.setAvatarUrl = async function(url, callback) {
     const user = this.getUser(this.getUserId());
     if (user) {
         user.avatarUrl = url;
-        user.emit("User.avatarUrl");
+        user.emit("User.avatarUrl", null, user);
     }
     return prom;
 };
