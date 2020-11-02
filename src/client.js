@@ -3699,13 +3699,14 @@ MatrixClient.prototype.setProfileInfo = function(info, data, callback) {
 /**
  * @param {string} name
  * @param {module:client.callback} callback Optional.
- * @return {Promise} Resolves: TODO
+ * @return {Promise} Resolves: {} an empty object.
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.setDisplayName = async function(name, callback) {
     const prom = await this.setProfileInfo(
         "displayname", { displayname: name }, callback,
     );
+    // XXX: synthesise a profile update for ourselves because Synapse is broken and won't
     const user = this.getUser(this.getUserId());
     if (user) {
         user.displayName = name;
@@ -3717,13 +3718,14 @@ MatrixClient.prototype.setDisplayName = async function(name, callback) {
 /**
  * @param {string} url
  * @param {module:client.callback} callback Optional.
- * @return {Promise} Resolves: TODO
+ * @return {Promise} Resolves: {} an empty object.
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.setAvatarUrl = async function(url, callback) {
     const prom = await this.setProfileInfo(
         "avatar_url", { avatar_url: url }, callback,
     );
+    // XXX: synthesise a profile update for ourselves because Synapse is broken and won't
     const user = this.getUser(this.getUserId());
     if (user) {
         user.avatarUrl = url;
