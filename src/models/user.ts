@@ -91,12 +91,14 @@ interface IUserEvents {
     on(event: "User.avatarUrl", listener: (event: MatrixEvent, user: User) => void): this;
 }
 
-// https://matrix-org.github.io/matrix-js-sdk/9.0.1/module-models_user.User.html
+/**
+ * Construct a new User. A User must have an ID and can optionally have extra
+ * information associated with it.
+ *
+ * @param userId The ID of this user.
+ * */
 export class User extends EventEmitter implements IUserEvents {
-    constructor(
-        /** The ID of this user. */
-        public userId: string
-    ) {
+    constructor(public userId: string) {
         super();
     }
 
