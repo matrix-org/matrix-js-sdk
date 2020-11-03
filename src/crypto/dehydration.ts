@@ -262,4 +262,11 @@ export class DehydrationManager {
             this.inProgress = false;
         }
     }
+
+    private stop() {
+        if (this.timeoutId) {
+            global.clearTimeout(this.timeoutId);
+            this.timeoutId = undefined;
+        }
+    }
 }

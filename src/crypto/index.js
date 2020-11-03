@@ -1752,6 +1752,7 @@ Crypto.prototype.start = function() {
 Crypto.prototype.stop = function() {
     this._outgoingRoomKeyRequestManager.stop();
     this._deviceList.stop();
+    this._dehydrationManager.stop();
 };
 
 /**
