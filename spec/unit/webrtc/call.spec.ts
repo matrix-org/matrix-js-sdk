@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import {TestClient} from '../../TestClient';
-import {MatrixCall} from '../../../src/webrtc/call';
+import {MatrixCall, CallErrorCode} from '../../../src/webrtc/call';
 
 const DUMMY_SDP = (
     "v=0\r\n" +
@@ -78,6 +78,7 @@ class MockRTCPeerConnection {
     setLocalDescription() {
         return Promise.resolve();
     }
+    close() {}
 }
 
 describe('Call', function() {
@@ -118,6 +119,9 @@ describe('Call', function() {
         global.document = {};
 
         client = new TestClient("@alice:foo", "somedevice", "token", undefined, {});
+        // We just stub out sendEvent: we're not interested in testing the client's
+        // event sending code here
+        client.client.sendEvent = () => {};
         call = new MatrixCall({
             client: client.client,
             roomId: '!foo:bar',
@@ -135,12 +139,16 @@ describe('Call', function() {
 
     it('should ignore candidate events from non-matching party ID', async function() {
         await call.placeVoiceCall();
-        await call.receivedAnswer({
-            version: 0,
-            call_id: call.callId,
-            party_id: 'the_correct_party_id',
-            answer: {
-                sdp: DUMMY_SDP,
+        await call.onAnswerReceived({
+            getContent: () => {
+                return {
+                    version: 0,
+                    call_id: call.callId,
+                    party_id: 'the_correct_party_id',
+                    answer: {
+                        sdp: DUMMY_SDP,
+                    },
+                };
             },
         });
 
@@ -178,5 +186,8 @@ describe('Call', function() {
             },
         });
         expect(call.peerConn.addIceCandidate.mock.calls.length).toBe(1);
+
+        // Hangup to stop timers
+        call.hangup(CallErrorCode.UserHangup, true);
     });
 });

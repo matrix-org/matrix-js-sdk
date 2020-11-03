@@ -51,7 +51,7 @@ export class DehydrationManager {
         this.getDehydrationKeyFromCache();
     }
     async getDehydrationKeyFromCache(): Promise<void> {
-        return this.crypto._cryptoStore.doTxn(
+        return await this.crypto._cryptoStore.doTxn(
             'readonly',
             [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
@@ -88,7 +88,7 @@ export class DehydrationManager {
                 this.timeoutId = undefined;
             }
             // clear storage
-            this.crypto._cryptoStore.doTxn(
+            await this.crypto._cryptoStore.doTxn(
                 'readwrite',
                 [IndexedDBCryptoStore.STORE_ACCOUNT],
                 (txn) => {
@@ -135,7 +135,7 @@ export class DehydrationManager {
 
             // update the crypto store with the timestamp
             const key = await encryptAES(encodeBase64(this.key), pickleKey, DEHYDRATION_ALGORITHM);
-            this.crypto._cryptoStore.doTxn(
+            await this.crypto._cryptoStore.doTxn(
                 'readwrite',
                 [IndexedDBCryptoStore.STORE_ACCOUNT],
                 (txn) => {

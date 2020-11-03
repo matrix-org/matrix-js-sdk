@@ -29,7 +29,7 @@ export enum EventType {
     RoomEncryption = "m.room.encryption",
     RoomHistoryVisibility = "m.room.history_visibility",
     RoomGuestAccess = "m.room.guest_access",
-    RoomServerAcl = "m.room_server_acl",
+    RoomServerAcl = "m.room.server_acl",
     RoomTombstone = "m.room.tombstone",
     /**
      * @deprecated Should not be used.
@@ -46,6 +46,7 @@ export enum EventType {
     CallAnswer = "m.call.answer",
     CallHangup = "m.call.hangup",
     CallReject = "m.call.reject",
+    CallSelectAnswer = "m.call.select_answer",
     KeyVerificationRequest = "m.key.verification.request",
     KeyVerificationStart = "m.key.verification.start",
     KeyVerificationCancel = "m.key.verification.cancel",
