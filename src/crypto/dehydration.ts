@@ -132,7 +132,9 @@ export class DehydrationManager {
         }
         return matches;
     }
-    private async dehydrateDevice(): Promise<void> {
+
+    /** returns the device id of the newly created dehydrated device */
+    async dehydrateDevice(): Promise<string> {
         if (this.inProgress) {
             logger.log("Dehydration already in progress -- not starting new dehydration");
             return;
@@ -270,6 +272,8 @@ export class DehydrationManager {
             this.timeoutId = global.setTimeout(
                 this.dehydrateDevice.bind(this), oneweek,
             );
+
+            return deviceId;
         } finally {
             this.inProgress = false;
         }
