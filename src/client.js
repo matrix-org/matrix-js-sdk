@@ -3699,25 +3699,39 @@ MatrixClient.prototype.setProfileInfo = function(info, data, callback) {
 /**
  * @param {string} name
  * @param {module:client.callback} callback Optional.
- * @return {Promise} Resolves: TODO
+ * @return {Promise} Resolves: {} an empty object.
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype.setDisplayName = function(name, callback) {
-    return this.setProfileInfo(
+MatrixClient.prototype.setDisplayName = async function(name, callback) {
+    const prom = await this.setProfileInfo(
         "displayname", { displayname: name }, callback,
     );
+    // XXX: synthesise a profile update for ourselves because Synapse is broken and won't
+    const user = this.getUser(this.getUserId());
+    if (user) {
+        user.displayName = name;
+        user.emit("User.displayName", user.events.presence, user);
+    }
+    return prom;
 };
 
 /**
  * @param {string} url
  * @param {module:client.callback} callback Optional.
- * @return {Promise} Resolves: TODO
+ * @return {Promise} Resolves: {} an empty object.
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype.setAvatarUrl = function(url, callback) {
-    return this.setProfileInfo(
+MatrixClient.prototype.setAvatarUrl = async function(url, callback) {
+    const prom = await this.setProfileInfo(
         "avatar_url", { avatar_url: url }, callback,
     );
+    // XXX: synthesise a profile update for ourselves because Synapse is broken and won't
+    const user = this.getUser(this.getUserId());
+    if (user) {
+        user.avatarUrl = url;
+        user.emit("User.avatarUrl", user.events.presence, user);
+    }
+    return prom;
 };
 
 /**
