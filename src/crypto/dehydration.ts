@@ -77,10 +77,23 @@ export class DehydrationManager {
             },
         );
     }
-    async setDehydrationKey(
+
+    /** set the key, and queue periodic dehydration to the server in the background */
+    async setKeyAndQueueDehydration(
         key: Uint8Array, keyInfo: {[props: string]: any} = {},
         deviceDisplayName: string = undefined,
     ): Promise<void> {
+        const matches = await this.setKey(key, keyInfo, deviceDisplayName);
+        if (!matches) {
+            // start dehydration in the background
+            this.dehydrateDevice();
+        }
+    }
+
+    async setKey(
+        key: Uint8Array, keyInfo: {[props: string]: any} = {},
+        deviceDisplayName: string = undefined,
+    ): Promise<boolean> {
         if (!key) {
             // unsetting the key -- cancel any pending dehydration task
             if (this.timeoutId) {
@@ -116,9 +129,8 @@ export class DehydrationManager {
             this.key = key;
             this.keyInfo = keyInfo;
             this.deviceDisplayName = deviceDisplayName;
-            // start dehydration in the background
-            this.dehydrateDevice();
         }
+        return matches;
     }
     private async dehydrateDevice(): Promise<void> {
         if (this.inProgress) {
