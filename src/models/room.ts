@@ -20,16 +20,17 @@ limitations under the License.
  * @module models/room
  */
 
-import {EventEmitter} from "events";
-import {EventTimelineSet} from "./event-timeline-set";
-import {EventTimeline} from "./event-timeline";
-import {getHttpUriForMxc} from "../content-repo";
+import { EventEmitter } from "events";
+import { EventTimelineSet } from "./event-timeline-set";
+import { EventTimeline } from "./event-timeline";
+import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
-import {EventStatus, MatrixEvent} from "./event";
-import {RoomMember} from "./room-member";
-import {RoomSummary} from "./room-summary";
-import {logger} from '../logger';
-import {ReEmitter} from '../ReEmitter';
+import { EventStatus, MatrixEvent } from "./event";
+import { RoomMember } from "./room-member";
+import { RoomSummary } from "./room-summary";
+import { logger } from '../logger';
+import { ReEmitter } from '../ReEmitter';
+import { UNKNOWN_TYPE_FILL_ME_IN_LATER } from "./user";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -55,6 +56,178 @@ function synthesizeReceipt(userId, event, receiptType) {
         ts: event.getTs(),
     };
     return new MatrixEvent(fakeReceipt);
+}
+
+export interface IRoomOptions {
+    /**
+     * Controls where pending messages
+     * appear in a room's timeline. If "<b>chronological</b>", messages will appear
+     * in the timeline when the call to <code>sendEvent</code> was made. If
+     * "<b>detached</b>", pending messages will appear in a separate list,
+     */
+    pendingEventOrdering?: string;
+
+    /** The token which a data store can use to remember the state of the room.
+     * What this means is dependent on the store implementation. */
+    storageToken?: string;
+
+    /**
+     * Set to true to enable improved timeline support.
+     *
+     * @default false
+     */
+    timelineSupport?: boolean;
+
+    /**
+     * Set to true to enable client-side aggregation of event relations
+     * via `EventTimelineSet#getRelationsForEvent`.
+     *
+     * @default false
+     */
+    unstableClientRelationAggregation?: boolean;
+}
+
+/**
+ * Construct a new Room.
+ *
+ * <p>For a room, we store an ordered sequence of timelines, which may or may not
+ * be continuous. Each timeline lists a series of events, as well as tracking
+ * the room state at the start and the end of the timeline. It also tracks
+ * forward and backward pagination tokens, as well as containing links to the
+ * next timeline in the sequence.
+ *
+ * <p>There is one special timeline - the 'live' timeline, which represents the
+ * timeline to which events are being added in real-time as they are received
+ * from the /sync API. Note that you should not retain references to this
+ * timeline - even if it is the current timeline right now, it may not remain
+ * so if the server gives us a timeline gap in /sync.
+ *
+ * <p>In order that we can find events from their ids later, we also maintain a
+ * map from event_id to timeline and index.
+ *
+ * @constructor
+ * @alias module:models/room
+ * @param roomId Required. The ID of this room.
+ * @param client Required. The client, used to lazy load members.
+ * @param myUserId Required. The ID of the syncing user.
+ * @param opts Configuration options
+ *
+ * @prop roomId The ID of this room.
+ * @prop name The human-readable display name for this room.
+ * @prop timeline The live event timeline for this room,
+ * with the oldest event at index 0. Present for backwards compatibility -
+ * prefer getLiveTimeline().getEvents().
+ * @prop tags Dict of room tags; the keys are the tag name and the values
+ * are any metadata associated with the tag - e.g. { "fav" : { order: 1 } }
+ * @prop accountData Dict of per-room account_data events; the keys are the
+ * event type and the values are the events.
+ * @prop oldState The state of the room at the time of the oldest
+ * event in the live timeline. Present for backwards compatibility -
+ * prefer getLiveTimeline().getState(EventTimeline.BACKWARDS).
+ * @prop currentState The state of the room at the time of the
+ * newest event in the timeline. Present for backwards compatibility -
+ * prefer getLiveTimeline().getState(EventTimeline.FORWARDS).
+ * @prop summary The room summary.
+ * @prop storageToken A token which a data store can use to remember
+ * the state of the room.
+ */
+export class Room extends EventEmitter {
+    name = this.roomId;
+    summary = null;
+    reEmitter = new ReEmitter(this);
+    storageToken = this._opts.storageToken;
+
+    tags: Record<string, UNKNOWN_TYPE_FILL_ME_IN_LATER> = {
+        // $tagName: { $metadata: $value },
+        // $tagName: { $metadata: $value },
+    };
+
+    accountData: Record<string, UNKNOWN_TYPE_FILL_ME_IN_LATER> = {
+        // $eventType: $event
+    };
+
+    constructor(public roomId: string, client: MatrixClient, public myUserId: string, public _opts: IRoomOptions) {
+        super();
+
+        _opts = _opts || {};
+        _opts.pendingEventOrdering = _opts.pendingEventOrdering || "chronological";
+
+        // In some cases, we add listeners for every displayed Matrix event, so it's
+        // common to have quite a few more than the default limit.
+        this.setMaxListeners(100);
+
+        if (["chronological", "detached"].indexOf(_opts.pendingEventOrdering) === -1) {
+            throw new Error(
+                "opts.pendingEventOrdering MUST be either 'chronological' or " +
+                "'detached'. Got: '" + _opts.pendingEventOrdering + "'",
+            );
+        }
+
+        this.name = roomId;
+        this.tags = {
+            // $tagName: { $metadata: $value },
+            // $tagName: { $metadata: $value },
+        };
+        this.accountData = {
+            // $eventType: $event
+        };
+        this.storageToken = _opts.storageToken;
+        this._txnToEvent = {}; // Pending in-flight requests { string: MatrixEvent }
+        // receipts should clobber based on receipt_type and user_id pairs hence
+        // the form of this structure. This is sub-optimal for the exposed APIs
+        // which pass in an event ID and get back some receipts, so we also store
+        // a pre-cached list for this purpose.
+        this._receipts = {
+            // receipt_type: {
+            //   user_id: {
+            //     eventId: <event_id>,
+            //     data: <receipt_data>
+            //   }
+            // }
+        };
+        this._receiptCacheByEventId = {
+            // $event_id: [{
+            //   type: $type,
+            //   userId: $user_id,
+            //   data: <receipt data>
+            // }]
+        };
+        // only receipts that came from the server, not synthesized ones
+        this._realReceipts = {};
+
+        this._notificationCounts = {};
+
+        // all our per-room timeline sets. the first one is the unfiltered ones;
+        // the subsequent ones are the filtered ones in no particular order.
+        this._timelineSets = [new EventTimelineSet(this, _opts)];
+        this.reEmitter.reEmit(this.getUnfilteredTimelineSet(),
+            ["Room.timeline", "Room.timelineReset"]);
+
+        this._fixUpLegacyTimelineFields();
+
+        // any filtered timeline sets we're maintaining for this room
+        this._filteredTimelineSets = {
+            // filter_id: timelineSet
+        };
+
+        if (this._opts.pendingEventOrdering == "detached") {
+            this._pendingEventList = [];
+        }
+
+        // read by megolm; boolean value - null indicates "use global value"
+        this._blacklistUnverifiedDevices = null;
+        this._selfMembership = null;
+        this._summaryHeroes = null;
+        // awaited by getEncryptionTargetMembers while room members are loading
+
+        this._client = client;
+        if (!this._opts.lazyLoadMembers) {
+            this._membersPromise = Promise.resolve();
+        } else {
+            this._membersPromise = null;
+        }
+    }
+
 }
 
 
@@ -118,7 +291,7 @@ function synthesizeReceipt(userId, event, receiptType) {
  * @prop {*} storageToken A token which a data store can use to remember
  * the state of the room.
  */
-export function Room(roomId, client, myUserId, opts) {
+export function Roossm(roomId, client, myUserId, opts) {
     opts = opts || {};
     opts.pendingEventOrdering = opts.pendingEventOrdering || "chronological";
 
@@ -177,7 +350,7 @@ export function Room(roomId, client, myUserId, opts) {
     // the subsequent ones are the filtered ones in no particular order.
     this._timelineSets = [new EventTimelineSet(this, opts)];
     this.reEmitter.reEmit(this.getUnfilteredTimelineSet(),
-           ["Room.timeline", "Room.timelineReset"]);
+        ["Room.timeline", "Room.timelineReset"]);
 
     this._fixUpLegacyTimelineFields();
 
@@ -210,7 +383,7 @@ utils.inherits(Room, EventEmitter);
  * Gets the version of the room
  * @returns {string} The version of the room, or null if it could not be determined
  */
-Room.prototype.getVersion = function() {
+Room.prototype.getVersion = function () {
     const createEvent = this.currentState.getStateEvents("m.room.create", "");
     if (!createEvent) {
         logger.warn("Room " + this.roomId + " does not have an m.room.create event");
@@ -227,7 +400,7 @@ Room.prototype.getVersion = function() {
  *     the room does not require upgrading at this time.
  * @deprecated Use #getRecommendedVersion() instead
  */
-Room.prototype.shouldUpgradeToVersion = function() {
+Room.prototype.shouldUpgradeToVersion = function () {
     // TODO: Remove this function.
     // This makes assumptions about which versions are safe, and can easily
     // be wrong. Instead, people are encouraged to use getRecommendedVersion
@@ -253,7 +426,7 @@ Room.prototype.shouldUpgradeToVersion = function() {
  * @returns {Promise<{version: string, needsUpgrade: bool, urgent: bool}>}
  * Resolves to the version the room should be upgraded to.
  */
-Room.prototype.getRecommendedVersion = async function() {
+Room.prototype.getRecommendedVersion = async function () {
     const capabilities = await this._client.getCapabilities();
     let versionCap = capabilities["m.room_versions"];
     if (!versionCap) {
@@ -292,7 +465,7 @@ Room.prototype.getRecommendedVersion = async function() {
     return result;
 };
 
-Room.prototype._checkVersionAgainstCapability = function(versionCap) {
+Room.prototype._checkVersionAgainstCapability = function (versionCap) {
     const currentVersion = this.getVersion();
     logger.log(`[${this.roomId}] Current version: ${currentVersion}`);
     logger.log(`[${this.roomId}] Version capability: `, versionCap);
@@ -334,7 +507,7 @@ Room.prototype._checkVersionAgainstCapability = function(versionCap) {
  * @param {String} userId The ID of the user to test against
  * @returns {bool} True if the given user is permitted to upgrade the room
  */
-Room.prototype.userMayUpgradeRoom = function(userId) {
+Room.prototype.userMayUpgradeRoom = function (userId) {
     return this.currentState.maySendStateEvent("m.room.tombstone", userId);
 };
 
@@ -346,11 +519,11 @@ Room.prototype.userMayUpgradeRoom = function(userId) {
  *
  * @throws If <code>opts.pendingEventOrdering</code> was not 'detached'
  */
-Room.prototype.getPendingEvents = function() {
+Room.prototype.getPendingEvents = function () {
     if (this._opts.pendingEventOrdering !== "detached") {
         throw new Error(
             "Cannot call getPendingEvents with pendingEventOrdering == " +
-                this._opts.pendingEventOrdering);
+            this._opts.pendingEventOrdering);
     }
 
     return this._pendingEventList;
@@ -363,7 +536,7 @@ Room.prototype.getPendingEvents = function() {
  * @param {string} eventId The event ID to check for.
  * @return {boolean}
  */
-Room.prototype.hasPendingEvent = function(eventId) {
+Room.prototype.hasPendingEvent = function (eventId) {
     if (this._opts.pendingEventOrdering !== "detached") {
         return false;
     }
@@ -377,7 +550,7 @@ Room.prototype.hasPendingEvent = function(eventId) {
  * @param {string} eventId The event ID to check for.
  * @return {MatrixEvent}
  */
-Room.prototype.getPendingEvent = function(eventId) {
+Room.prototype.getPendingEvent = function (eventId) {
     if (this._opts.pendingEventOrdering !== "detached") {
         return null;
     }
@@ -390,7 +563,7 @@ Room.prototype.getPendingEvent = function(eventId) {
  *
  * @return {module:models/event-timeline~EventTimeline} live timeline
  */
-Room.prototype.getLiveTimeline = function() {
+Room.prototype.getLiveTimeline = function () {
     return this.getUnfilteredTimelineSet().getLiveTimeline();
 };
 
@@ -400,7 +573,7 @@ Room.prototype.getLiveTimeline = function() {
  *
  * @return {number} the timestamp of the last message in the room
  */
-Room.prototype.getLastActiveTimestamp = function() {
+Room.prototype.getLastActiveTimestamp = function () {
     const timeline = this.getLiveTimeline();
     const events = timeline.getEvents();
     if (events.length) {
@@ -415,7 +588,7 @@ Room.prototype.getLastActiveTimestamp = function() {
  * @param {string} myUserId the user id for the logged in member
  * @return {string} the membership type (join | leave | invite) for the logged in user
  */
-Room.prototype.getMyMembership = function() {
+Room.prototype.getMyMembership = function () {
     return this._selfMembership;
 };
 
@@ -424,7 +597,7 @@ Room.prototype.getMyMembership = function() {
  * try to find out who invited us
  * @return {string} user id of the inviter
  */
-Room.prototype.getDMInviter = function() {
+Room.prototype.getDMInviter = function () {
     if (this.myUserId) {
         const me = this.getMember(this.myUserId);
         if (me) {
@@ -444,7 +617,7 @@ Room.prototype.getDMInviter = function() {
  * Assuming this room is a DM room, tries to guess with which user.
  * @return {string} user id of the other member (could be syncing user)
  */
-Room.prototype.guessDMUserId = function() {
+Room.prototype.guessDMUserId = function () {
     const me = this.getMember(this.myUserId);
     if (me) {
         const inviterId = me.getDMInviter();
@@ -470,7 +643,7 @@ Room.prototype.guessDMUserId = function() {
     return this.myUserId;
 };
 
-Room.prototype.getAvatarFallbackMember = function() {
+Room.prototype.getAvatarFallbackMember = function () {
     const memberCount = this.getInvitedAndJoinedMemberCount();
     if (memberCount > 2) {
         return;
@@ -515,7 +688,7 @@ Room.prototype.getAvatarFallbackMember = function() {
  * Sets the membership this room was received as during sync
  * @param {string} membership join | leave | invite
  */
-Room.prototype.updateMyMembership = function(membership) {
+Room.prototype.updateMyMembership = function (membership) {
     const prevMembership = this._selfMembership;
     this._selfMembership = membership;
     if (prevMembership !== membership) {
@@ -526,21 +699,21 @@ Room.prototype.updateMyMembership = function(membership) {
     }
 };
 
-Room.prototype._loadMembersFromServer = async function() {
+Room.prototype._loadMembersFromServer = async function () {
     const lastSyncToken = this._client.store.getSyncToken();
     const queryString = utils.encodeParams({
         not_membership: "leave",
         at: lastSyncToken,
     });
     const path = utils.encodeUri("/rooms/$roomId/members?" + queryString,
-        {$roomId: this.roomId});
+        { $roomId: this.roomId });
     const http = this._client._http;
     const response = await http.authedRequest(undefined, "GET", path);
     return response.chunk;
 };
 
 
-Room.prototype._loadMembers = async function() {
+Room.prototype._loadMembers = async function () {
     // were the members loaded from the server?
     let fromServer = false;
     let rawMembersEvents =
@@ -552,7 +725,7 @@ Room.prototype._loadMembers = async function() {
             `members from server for room ${this.roomId}`);
     }
     const memberEvents = rawMembersEvents.map(this._client.getEventMapper());
-    return {memberEvents, fromServer};
+    return { memberEvents, fromServer };
 };
 
 /**
@@ -563,7 +736,7 @@ Room.prototype._loadMembers = async function() {
  * accessing the members on the room will take
  * all members in the room into account
  */
-Room.prototype.loadMembersIfNeeded = function() {
+Room.prototype.loadMembersIfNeeded = function () {
     if (this._membersPromise) {
         return this._membersPromise;
     }
@@ -617,7 +790,7 @@ Room.prototype.loadMembersIfNeeded = function() {
 /**
  * Removes the lazily loaded members from storage if needed
  */
-Room.prototype.clearLoadedMembersIfNeeded = async function() {
+Room.prototype.clearLoadedMembersIfNeeded = async function () {
     if (this._opts.lazyLoadMembers && this._membersPromise) {
         await this.loadMembersIfNeeded();
         await this._client.store.clearOutOfBandMembers(this.roomId);
@@ -630,7 +803,7 @@ Room.prototype.clearLoadedMembersIfNeeded = async function() {
  * called when sync receives this room in the leave section
  * to do cleanup after leaving a room. Possibly called multiple times.
  */
-Room.prototype._cleanupAfterLeaving = function() {
+Room.prototype._cleanupAfterLeaving = function () {
     this.clearLoadedMembersIfNeeded().catch((err) => {
         logger.error(`error after clearing loaded members from ` +
             `room ${this.roomId} after leaving`);
@@ -649,7 +822,7 @@ Room.prototype._cleanupAfterLeaving = function() {
  * timeline which would otherwise be unable to paginate forwards without this token).
  * Removing just the old live timeline whilst preserving previous ones is not supported.
  */
-Room.prototype.resetLiveTimeline = function(backPaginationToken, forwardPaginationToken) {
+Room.prototype.resetLiveTimeline = function (backPaginationToken, forwardPaginationToken) {
     for (let i = 0; i < this._timelineSets.length; i++) {
         this._timelineSets[i].resetLiveTimeline(
             backPaginationToken, forwardPaginationToken,
@@ -664,16 +837,16 @@ Room.prototype.resetLiveTimeline = function(backPaginationToken, forwardPaginati
  *
  * @private
  */
-Room.prototype._fixUpLegacyTimelineFields = function() {
+Room.prototype._fixUpLegacyTimelineFields = function () {
     // maintain this.timeline as a reference to the live timeline,
     // and this.oldState and this.currentState as references to the
     // state at the start and end of that timeline. These are more
     // for backwards-compatibility than anything else.
     this.timeline = this.getLiveTimeline().getEvents();
     this.oldState = this.getLiveTimeline()
-                        .getState(EventTimeline.BACKWARDS);
+        .getState(EventTimeline.BACKWARDS);
     this.currentState = this.getLiveTimeline()
-                            .getState(EventTimeline.FORWARDS);
+        .getState(EventTimeline.FORWARDS);
 };
 
 /**
@@ -685,7 +858,7 @@ Room.prototype._fixUpLegacyTimelineFields = function() {
  *
  * @return {bool} the result
  */
-Room.prototype.hasUnverifiedDevices = async function() {
+Room.prototype.hasUnverifiedDevices = async function () {
     if (!this._client.isRoomEncrypted(this.roomId)) {
         return false;
     }
@@ -703,7 +876,7 @@ Room.prototype.hasUnverifiedDevices = async function() {
  * Return the timeline sets for this room.
  * @return {EventTimelineSet[]} array of timeline sets for this room
  */
-Room.prototype.getTimelineSets = function() {
+Room.prototype.getTimelineSets = function () {
     return this._timelineSets;
 };
 
@@ -711,7 +884,7 @@ Room.prototype.getTimelineSets = function() {
  * Helper to return the main unfiltered timeline set for this room
  * @return {EventTimelineSet} room's unfiltered timeline set
  */
-Room.prototype.getUnfilteredTimelineSet = function() {
+Room.prototype.getUnfilteredTimelineSet = function () {
     return this._timelineSets[0];
 };
 
@@ -722,7 +895,7 @@ Room.prototype.getUnfilteredTimelineSet = function() {
  * @return {?module:models/event-timeline~EventTimeline} timeline containing
  * the given event, or null if unknown
  */
-Room.prototype.getTimelineForEvent = function(eventId) {
+Room.prototype.getTimelineForEvent = function (eventId) {
     return this.getUnfilteredTimelineSet().getTimelineForEvent(eventId);
 };
 
@@ -731,7 +904,7 @@ Room.prototype.getTimelineForEvent = function(eventId) {
  *
  * @return {module:models/event-timeline~EventTimeline} newly-created timeline
  */
-Room.prototype.addTimeline = function() {
+Room.prototype.addTimeline = function () {
     return this.getUnfilteredTimelineSet().addTimeline();
 };
 
@@ -741,7 +914,7 @@ Room.prototype.addTimeline = function() {
  * @param {string} eventId  event ID to look for
  * @return {?module:models/event.MatrixEvent} the given event, or undefined if unknown
  */
-Room.prototype.findEventById = function(eventId) {
+Room.prototype.findEventById = function (eventId) {
     return this.getUnfilteredTimelineSet().findEventById(eventId);
 };
 
@@ -751,7 +924,7 @@ Room.prototype.findEventById = function(eventId) {
  * @return {Number} The notification count, or undefined if there is no count
  *                  for this type.
  */
-Room.prototype.getUnreadNotificationCount = function(type) {
+Room.prototype.getUnreadNotificationCount = function (type) {
     type = type || 'total';
     return this._notificationCounts[type];
 };
@@ -761,11 +934,11 @@ Room.prototype.getUnreadNotificationCount = function(type) {
  * @param {String} type The type of notification count to set.
  * @param {Number} count The new count
  */
-Room.prototype.setUnreadNotificationCount = function(type, count) {
+Room.prototype.setUnreadNotificationCount = function (type, count) {
     this._notificationCounts[type] = count;
 };
 
-Room.prototype.setSummary = function(summary) {
+Room.prototype.setSummary = function (summary) {
     const heroes = summary["m.heroes"];
     const joinedCount = summary["m.joined_member_count"];
     const invitedCount = summary["m.invited_member_count"];
@@ -790,7 +963,7 @@ Room.prototype.setSummary = function(summary) {
  * @param {Boolean} value true to blacklist unverified devices, null
  * to use the global value for this room.
  */
-Room.prototype.setBlacklistUnverifiedDevices = function(value) {
+Room.prototype.setBlacklistUnverifiedDevices = function (value) {
     this._blacklistUnverifiedDevices = value;
 };
 
@@ -799,7 +972,7 @@ Room.prototype.setBlacklistUnverifiedDevices = function(value) {
  * @return {Boolean} true if blacklisting unverified devices, null
  * if the global value should be used for this room.
  */
-Room.prototype.getBlacklistUnverifiedDevices = function() {
+Room.prototype.getBlacklistUnverifiedDevices = function () {
     return this._blacklistUnverifiedDevices;
 };
 
@@ -815,8 +988,8 @@ Room.prototype.getBlacklistUnverifiedDevices = function() {
  * avatar URL wasn't explicitly set. Default: true. (Deprecated)
  * @return {?string} the avatar URL or null.
  */
-Room.prototype.getAvatarUrl = function(baseUrl, width, height, resizeMethod,
-                                       allowDefault) {
+Room.prototype.getAvatarUrl = function (baseUrl, width, height, resizeMethod,
+    allowDefault) {
     const roomAvatarEvent = this.currentState.getStateEvents("m.room.avatar", "");
     if (allowDefault === undefined) {
         allowDefault = true;
@@ -841,7 +1014,7 @@ Room.prototype.getAvatarUrl = function(baseUrl, width, height, resizeMethod,
  * still point to this room.
  * @return {array} The room's alias as an array of strings
  */
-Room.prototype.getAliases = function() {
+Room.prototype.getAliases = function () {
     const aliasStrings = [];
 
     const aliasEvents = this.currentState.getStateEvents("m.room.aliases");
@@ -850,7 +1023,7 @@ Room.prototype.getAliases = function() {
             const aliasEvent = aliasEvents[i];
             if (utils.isArray(aliasEvent.getContent().aliases)) {
                 const filteredAliases = aliasEvent.getContent().aliases.filter(a => {
-                    if (typeof(a) !== "string") return false;
+                    if (typeof (a) !== "string") return false;
                     if (a[0] !== '#') return false;
                     if (!a.endsWith(`:${aliasEvent.getStateKey()}`)) return false;
 
@@ -870,7 +1043,7 @@ Room.prototype.getAliases = function() {
  * still point to this room.
  * @return {?string} The room's canonical alias, or null if there is none
  */
-Room.prototype.getCanonicalAlias = function() {
+Room.prototype.getCanonicalAlias = function () {
     const canonicalAlias = this.currentState.getStateEvents("m.room.canonical_alias", "");
     if (canonicalAlias) {
         return canonicalAlias.getContent().alias || null;
@@ -882,7 +1055,7 @@ Room.prototype.getCanonicalAlias = function() {
  * Get this room's alternative aliases
  * @return {array} The room's alternative aliases, or an empty array
  */
-Room.prototype.getAltAliases = function() {
+Room.prototype.getAltAliases = function () {
     const canonicalAlias = this.currentState.getStateEvents("m.room.canonical_alias", "");
     if (canonicalAlias) {
         return canonicalAlias.getContent().alt_aliases || [];
@@ -909,8 +1082,8 @@ Room.prototype.getAltAliases = function() {
  * @fires module:client~MatrixClient#event:"Room.timeline"
  *
  */
-Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
-                                              timeline, paginationToken) {
+Room.prototype.addEventsToTimeline = function (events, toStartOfTimeline,
+    timeline, paginationToken) {
     timeline.getTimelineSet().addEventsToTimeline(
         events, toStartOfTimeline,
         timeline, paginationToken,
@@ -922,17 +1095,17 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
  * @param {string} userId The user ID of the member.
  * @return {RoomMember} The member or <code>null</code>.
  */
- Room.prototype.getMember = function(userId) {
-     return this.currentState.getMember(userId);
- };
+Room.prototype.getMember = function (userId) {
+    return this.currentState.getMember(userId);
+};
 
 /**
  * Get a list of members whose membership state is "join".
  * @return {RoomMember[]} A list of currently joined members.
  */
- Room.prototype.getJoinedMembers = function() {
-     return this.getMembersWithMembership("join");
- };
+Room.prototype.getJoinedMembers = function () {
+    return this.getMembersWithMembership("join");
+};
 
 /**
  * Returns the number of joined members in this room
@@ -941,7 +1114,7 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
  * its result for the room's current state.
  * @return {integer} The number of members in this room whose membership is 'join'
  */
-Room.prototype.getJoinedMemberCount = function() {
+Room.prototype.getJoinedMemberCount = function () {
     return this.currentState.getJoinedMemberCount();
 };
 
@@ -949,7 +1122,7 @@ Room.prototype.getJoinedMemberCount = function() {
  * Returns the number of invited members in this room
  * @return {integer} The number of members in this room whose membership is 'invite'
  */
-Room.prototype.getInvitedMemberCount = function() {
+Room.prototype.getInvitedMemberCount = function () {
     return this.currentState.getInvitedMemberCount();
 };
 
@@ -957,7 +1130,7 @@ Room.prototype.getInvitedMemberCount = function() {
  * Returns the number of invited + joined members in this room
  * @return {integer} The number of members in this room whose membership is 'invite' or 'join'
  */
-Room.prototype.getInvitedAndJoinedMemberCount = function() {
+Room.prototype.getInvitedAndJoinedMemberCount = function () {
     return this.getInvitedMemberCount() + this.getJoinedMemberCount();
 };
 
@@ -966,67 +1139,67 @@ Room.prototype.getInvitedAndJoinedMemberCount = function() {
  * @param {string} membership The membership state.
  * @return {RoomMember[]} A list of members with the given membership state.
  */
- Room.prototype.getMembersWithMembership = function(membership) {
-    return utils.filter(this.currentState.getMembers(), function(m) {
+Room.prototype.getMembersWithMembership = function (membership) {
+    return utils.filter(this.currentState.getMembers(), function (m) {
         return m.membership === membership;
     });
- };
+};
 
- /**
-  * Get a list of members we should be encrypting for in this room
-  * @return {Promise<RoomMember[]>} A list of members who
-  * we should encrypt messages for in this room.
-  */
- Room.prototype.getEncryptionTargetMembers = async function() {
+/**
+ * Get a list of members we should be encrypting for in this room
+ * @return {Promise<RoomMember[]>} A list of members who
+ * we should encrypt messages for in this room.
+ */
+Room.prototype.getEncryptionTargetMembers = async function () {
     await this.loadMembersIfNeeded();
     let members = this.getMembersWithMembership("join");
     if (this.shouldEncryptForInvitedMembers()) {
         members = members.concat(this.getMembersWithMembership("invite"));
     }
     return members;
- };
+};
 
- /**
-  * Determine whether we should encrypt messages for invited users in this room
-  * @return {boolean} if we should encrypt messages for invited users
-  */
- Room.prototype.shouldEncryptForInvitedMembers = function() {
+/**
+ * Determine whether we should encrypt messages for invited users in this room
+ * @return {boolean} if we should encrypt messages for invited users
+ */
+Room.prototype.shouldEncryptForInvitedMembers = function () {
     const ev = this.currentState.getStateEvents("m.room.history_visibility", "");
     return (ev && ev.getContent() && ev.getContent().history_visibility !== "joined");
- };
+};
 
- /**
-  * Get the default room name (i.e. what a given user would see if the
-  * room had no m.room.name)
-  * @param {string} userId The userId from whose perspective we want
-  * to calculate the default name
-  * @return {string} The default room name
-  */
- Room.prototype.getDefaultRoomName = function(userId) {
-    return calculateRoomName(this, userId, true);
- };
-
-
- /**
- * Check if the given user_id has the given membership state.
- * @param {string} userId The user ID to check.
- * @param {string} membership The membership e.g. <code>'join'</code>
- * @return {boolean} True if this user_id has the given membership state.
+/**
+ * Get the default room name (i.e. what a given user would see if the
+ * room had no m.room.name)
+ * @param {string} userId The userId from whose perspective we want
+ * to calculate the default name
+ * @return {string} The default room name
  */
- Room.prototype.hasMembershipState = function(userId, membership) {
+Room.prototype.getDefaultRoomName = function (userId) {
+    return calculateRoomName(this, userId, true);
+};
+
+
+/**
+* Check if the given user_id has the given membership state.
+* @param {string} userId The user ID to check.
+* @param {string} membership The membership e.g. <code>'join'</code>
+* @return {boolean} True if this user_id has the given membership state.
+*/
+Room.prototype.hasMembershipState = function (userId, membership) {
     const member = this.getMember(userId);
     if (!member) {
         return false;
     }
     return member.membership === membership;
- };
+};
 
 /**
  * Add a timelineSet for this room with the given filter
  * @param {Filter} filter  The filter to be applied to this timelineSet
  * @return {EventTimelineSet}  The timelineSet
  */
-Room.prototype.getOrCreateFilteredTimelineSet = function(filter) {
+Room.prototype.getOrCreateFilteredTimelineSet = function (filter) {
     if (this._filteredTimelineSets[filter.filterId]) {
         return this._filteredTimelineSets[filter.filterId];
     }
@@ -1045,7 +1218,7 @@ Room.prototype.getOrCreateFilteredTimelineSet = function(filter) {
 
     const unfilteredLiveTimeline = this.getLiveTimeline();
 
-    unfilteredLiveTimeline.getEvents().forEach(function(event) {
+    unfilteredLiveTimeline.getEvents().forEach(function (event) {
         timelineSet.addLiveEvent(event);
     });
 
@@ -1076,7 +1249,7 @@ Room.prototype.getOrCreateFilteredTimelineSet = function(filter) {
  *
  * @param {Filter} filter  the filter whose timelineSet is to be forgotten
  */
-Room.prototype.removeFilteredTimelineSet = function(filter) {
+Room.prototype.removeFilteredTimelineSet = function (filter) {
     const timelineSet = this._filteredTimelineSets[filter.filterId];
     delete this._filteredTimelineSets[filter.filterId];
     const i = this._timelineSets.indexOf(timelineSet);
@@ -1095,7 +1268,7 @@ Room.prototype.removeFilteredTimelineSet = function(filter) {
  * @fires module:client~MatrixClient#event:"Room.timeline"
  * @private
  */
-Room.prototype._addLiveEvent = function(event, duplicateStrategy, fromCache) {
+Room.prototype._addLiveEvent = function (event, duplicateStrategy, fromCache) {
     if (event.isRedaction()) {
         const redactId = event.event.redacts;
 
@@ -1181,15 +1354,15 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy, fromCache) {
  * @throws if the event doesn't have status SENDING, or we aren't given a
  * unique transaction id.
  */
-Room.prototype.addPendingEvent = function(event, txnId) {
+Room.prototype.addPendingEvent = function (event, txnId) {
     if (event.status !== EventStatus.SENDING) {
         throw new Error("addPendingEvent called on an event with status " +
-                        event.status);
+            event.status);
     }
 
     if (this._txnToEvent[txnId]) {
         throw new Error("addPendingEvent called on an event with known txnId " +
-                        txnId);
+            txnId);
     }
 
     // call setEventMetadata to set up event.sender etc
@@ -1256,7 +1429,7 @@ Room.prototype.addPendingEvent = function(event, txnId) {
  * Also note that live events are aggregated in the live EventTimelineSet.
  * @param {module:models/event.MatrixEvent} event the relation event that needs to be aggregated.
  */
-Room.prototype._aggregateNonLiveRelation = function(event) {
+Room.prototype._aggregateNonLiveRelation = function (event) {
     // TODO: We should consider whether this means it would be a better
     // design to lift the relations handling up to the room instead.
     for (let i = 0; i < this._timelineSets.length; i++) {
@@ -1285,7 +1458,7 @@ Room.prototype._aggregateNonLiveRelation = function(event) {
  * @fires module:client~MatrixClient#event:"Room.localEchoUpdated"
  * @private
  */
-Room.prototype._handleRemoteEcho = function(remoteEvent, localEvent) {
+Room.prototype._handleRemoteEcho = function (remoteEvent, localEvent) {
     const oldEventId = localEvent.getId();
     const newEventId = remoteEvent.getId();
     const oldStatus = localEvent.status;
@@ -1302,7 +1475,7 @@ Room.prototype._handleRemoteEcho = function(remoteEvent, localEvent) {
     if (this._pendingEventList) {
         utils.removeElement(
             this._pendingEventList,
-            function(ev) {
+            function (ev) {
                 return ev.getId() == oldEventId;
             }, false,
         );
@@ -1320,7 +1493,7 @@ Room.prototype._handleRemoteEcho = function(remoteEvent, localEvent) {
     }
 
     this.emit("Room.localEchoUpdated", localEvent, this,
-              oldEventId, oldStatus);
+        oldEventId, oldStatus);
 };
 
 /* a map from current event status to a list of allowed next statuses
@@ -1363,7 +1536,7 @@ ALLOWED_TRANSITIONS[EventStatus.CANCELLED] =
  *    newStatus == EventStatus.SENT.
  * @fires module:client~MatrixClient#event:"Room.localEchoUpdated"
  */
-Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
+Room.prototype.updatePendingEvent = function (event, newStatus, newEventId) {
     logger.log(
         `setting pendingEvent status to ${newStatus} in ${event.getRoomId()} ` +
         `event ID ${event.getId()} -> ${newEventId}`,
@@ -1372,7 +1545,7 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
     // if the message was sent, we expect an event id
     if (newStatus == EventStatus.SENT && !newEventId) {
         throw new Error("updatePendingEvent called with status=SENT, " +
-                        "but no new event id");
+            "but no new event id");
     }
 
     // SENT races against /sync, so we have to special-case it.
@@ -1390,13 +1563,13 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
 
     if (!oldStatus) {
         throw new Error("updatePendingEventStatus called on an event which is " +
-                        "not a local echo.");
+            "not a local echo.");
     }
 
     const allowed = ALLOWED_TRANSITIONS[oldStatus];
     if (!allowed || allowed.indexOf(newStatus) < 0) {
         throw new Error("Invalid EventStatus transition " + oldStatus + "->" +
-                        newStatus);
+            newStatus);
     }
 
     event.setStatus(newStatus);
@@ -1428,7 +1601,7 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
     this.emit("Room.localEchoUpdated", event, this, oldEventId, oldStatus);
 };
 
-Room.prototype._revertRedactionLocalEcho = function(redactionEvent) {
+Room.prototype._revertRedactionLocalEcho = function (redactionEvent) {
     const redactId = redactionEvent.event.redacts;
     if (!redactId) {
         return;
@@ -1463,7 +1636,7 @@ Room.prototype._revertRedactionLocalEcho = function(redactionEvent) {
  * @param {boolean} fromCache whether the sync response came from cache
  * @throws If <code>duplicateStrategy</code> is not falsey, 'replace' or 'ignore'.
  */
-Room.prototype.addLiveEvents = function(events, duplicateStrategy, fromCache) {
+Room.prototype.addLiveEvents = function (events, duplicateStrategy, fromCache) {
     let i;
     if (duplicateStrategy && ["replace", "ignore"].indexOf(duplicateStrategy) === -1) {
         throw new Error("duplicateStrategy MUST be either 'replace' or 'ignore'");
@@ -1497,7 +1670,7 @@ Room.prototype.addLiveEvents = function(events, duplicateStrategy, fromCache) {
  * Adds/handles ephemeral events such as typing notifications and read receipts.
  * @param {MatrixEvent[]} events A list of events to process
  */
-Room.prototype.addEphemeralEvents = function(events) {
+Room.prototype.addEphemeralEvents = function (events) {
     for (const event of events) {
         if (event.getType() === 'm.typing') {
             this.currentState.setTypingEvent(event);
@@ -1511,7 +1684,7 @@ Room.prototype.addEphemeralEvents = function(events) {
  * Removes events from this room.
  * @param {String[]} eventIds A list of eventIds to remove.
  */
-Room.prototype.removeEvents = function(eventIds) {
+Room.prototype.removeEvents = function (eventIds) {
     for (let i = 0; i < eventIds.length; ++i) {
         this.removeEvent(eventIds[i]);
     }
@@ -1524,7 +1697,7 @@ Room.prototype.removeEvents = function(eventIds) {
  *
  * @return {bool} true if the event was removed from any of the room's timeline sets
  */
-Room.prototype.removeEvent = function(eventId) {
+Room.prototype.removeEvent = function (eventId) {
     let removedAny = false;
     for (let i = 0; i < this._timelineSets.length; i++) {
         const removed = this._timelineSets[i].removeEvent(eventId);
@@ -1545,7 +1718,7 @@ Room.prototype.removeEvent = function(eventId) {
  * May fire "Room.name" if the room name is updated.
  * @fires module:client~MatrixClient#event:"Room.name"
  */
-Room.prototype.recalculate = function() {
+Room.prototype.recalculate = function () {
     // set fake stripped state events if this is an invite room so logic remains
     // consistent elsewhere.
     const self = this;
@@ -1554,7 +1727,7 @@ Room.prototype.recalculate = function() {
     );
     if (membershipEvent && membershipEvent.getContent().membership === "invite") {
         const strippedStateEvents = membershipEvent.event.invite_room_state || [];
-        utils.forEach(strippedStateEvents, function(strippedEvent) {
+        utils.forEach(strippedStateEvents, function (strippedEvent) {
             const existingEvent = self.currentState.getStateEvents(
                 strippedEvent.type, strippedEvent.state_key,
             );
@@ -1588,10 +1761,10 @@ Room.prototype.recalculate = function() {
  * @param {MatrixEvent} event the event to get read receipts for.
  * @return {String[]} A list of user IDs.
  */
-Room.prototype.getUsersReadUpTo = function(event) {
-    return this.getReceiptsForEvent(event).filter(function(receipt) {
+Room.prototype.getUsersReadUpTo = function (event) {
+    return this.getReceiptsForEvent(event).filter(function (receipt) {
         return receipt.type === "m.read";
-    }).map(function(receipt) {
+    }).map(function (receipt) {
         return receipt.userId;
     });
 };
@@ -1605,7 +1778,7 @@ Room.prototype.getUsersReadUpTo = function(event) {
  *                                    by the JS SDK.
  * @return {String} ID of the latest event that the given user has read, or null.
  */
-Room.prototype.getEventReadUpTo = function(userId, ignoreSynthesized) {
+Room.prototype.getEventReadUpTo = function (userId, ignoreSynthesized) {
     let receipts = this._receipts;
     if (ignoreSynthesized) {
         receipts = this._realReceipts;
@@ -1629,7 +1802,7 @@ Room.prototype.getEventReadUpTo = function(userId, ignoreSynthesized) {
  * @param {String} eventId The event ID to check if the user read.
  * @returns {Boolean} True if the user has read the event, false otherwise.
  */
-Room.prototype.hasUserReadEvent = function(userId, eventId) {
+Room.prototype.hasUserReadEvent = function (userId, eventId) {
     const readUpToId = this.getEventReadUpTo(userId, false);
     if (readUpToId === eventId) return true;
 
@@ -1661,7 +1834,7 @@ Room.prototype.hasUserReadEvent = function(userId, eventId) {
  * @return {Object[]} A list of receipts with a userId, type and data keys or
  * an empty list.
  */
-Room.prototype.getReceiptsForEvent = function(event) {
+Room.prototype.getReceiptsForEvent = function (event) {
     return this._receiptCacheByEventId[event.getId()] || [];
 };
 
@@ -1670,7 +1843,7 @@ Room.prototype.getReceiptsForEvent = function(event) {
  * @param {MatrixEvent} event The m.receipt event.
  * @param {Boolean} fake True if this event is implicit
  */
-Room.prototype.addReceipt = function(event, fake) {
+Room.prototype.addReceipt = function (event, fake) {
     // event content looks like:
     // content: {
     //   $event_id: {
@@ -1702,39 +1875,39 @@ Room.prototype.addReceipt = function(event, fake) {
  * @param {MatrixEvent} event The m.receipt event.
  * @param {Object} receipts The object to add receipts to
  */
-Room.prototype._addReceiptsToStructure = function(event, receipts) {
+Room.prototype._addReceiptsToStructure = function (event, receipts) {
     const self = this;
-    utils.keys(event.getContent()).forEach(function(eventId) {
-        utils.keys(event.getContent()[eventId]).forEach(function(receiptType) {
+    utils.keys(event.getContent()).forEach(function (eventId) {
+        utils.keys(event.getContent()[eventId]).forEach(function (receiptType) {
             utils.keys(event.getContent()[eventId][receiptType]).forEach(
-            function(userId) {
-                const receipt = event.getContent()[eventId][receiptType][userId];
+                function (userId) {
+                    const receipt = event.getContent()[eventId][receiptType][userId];
 
-                if (!receipts[receiptType]) {
-                    receipts[receiptType] = {};
-                }
-
-                const existingReceipt = receipts[receiptType][userId];
-
-                if (!existingReceipt) {
-                    receipts[receiptType][userId] = {};
-                } else {
-                    // we only want to add this receipt if we think it is later
-                    // than the one we already have. (This is managed
-                    // server-side, but because we synthesize RRs locally we
-                    // have to do it here too.)
-                    const ordering = self.getUnfilteredTimelineSet().compareEventOrdering(
-                        existingReceipt.eventId, eventId);
-                    if (ordering !== null && ordering >= 0) {
-                        return;
+                    if (!receipts[receiptType]) {
+                        receipts[receiptType] = {};
                     }
-                }
 
-                receipts[receiptType][userId] = {
-                    eventId: eventId,
-                    data: receipt,
-                };
-            });
+                    const existingReceipt = receipts[receiptType][userId];
+
+                    if (!existingReceipt) {
+                        receipts[receiptType][userId] = {};
+                    } else {
+                        // we only want to add this receipt if we think it is later
+                        // than the one we already have. (This is managed
+                        // server-side, but because we synthesize RRs locally we
+                        // have to do it here too.)
+                        const ordering = self.getUnfilteredTimelineSet().compareEventOrdering(
+                            existingReceipt.eventId, eventId);
+                        if (ordering !== null && ordering >= 0) {
+                            return;
+                        }
+                    }
+
+                    receipts[receiptType][userId] = {
+                        eventId: eventId,
+                        data: receipt,
+                    };
+                });
         });
     });
 };
@@ -1744,10 +1917,10 @@ Room.prototype._addReceiptsToStructure = function(event, receipts) {
  * @param {Object} receipts A map of receipts
  * @return {Object} Map of receipts by event ID
  */
-Room.prototype._buildReceiptCache = function(receipts) {
+Room.prototype._buildReceiptCache = function (receipts) {
     const receiptCacheByEventId = {};
-    utils.keys(receipts).forEach(function(receiptType) {
-        utils.keys(receipts[receiptType]).forEach(function(userId) {
+    utils.keys(receipts).forEach(function (receiptType) {
+        utils.keys(receipts[receiptType]).forEach(function (userId) {
             const receipt = receipts[receiptType][userId];
             if (!receiptCacheByEventId[receipt.eventId]) {
                 receiptCacheByEventId[receipt.eventId] = [];
@@ -1770,7 +1943,7 @@ Room.prototype._buildReceiptCache = function(receipts) {
  * @param {MatrixEvent} e The event that is to be acknowledged
  * @param {string} receiptType The type of receipt
  */
-Room.prototype._addLocalEchoReceipt = function(userId, e, receiptType) {
+Room.prototype._addLocalEchoReceipt = function (userId, e, receiptType) {
     this.addReceipt(synthesizeReceipt(userId, e, receiptType), true);
 };
 
@@ -1778,7 +1951,7 @@ Room.prototype._addLocalEchoReceipt = function(userId, e, receiptType) {
  * Update the room-tag event for the room.  The previous one is overwritten.
  * @param {MatrixEvent} event the m.tag event
  */
-Room.prototype.addTags = function(event) {
+Room.prototype.addTags = function (event) {
     // event content looks like:
     // content: {
     //    tags: {
@@ -1799,7 +1972,7 @@ Room.prototype.addTags = function(event) {
  * Update the account_data events for this room, overwriting events of the same type.
  * @param {Array<MatrixEvent>} events an array of account_data events to add
  */
-Room.prototype.addAccountData = function(events) {
+Room.prototype.addAccountData = function (events) {
     for (let i = 0; i < events.length; i++) {
         const event = events[i];
         if (event.getType() === "m.tag") {
@@ -1816,7 +1989,7 @@ Room.prototype.addAccountData = function(events) {
  * @param {string} type the type of account_data event to be accessed
  * @return {?MatrixEvent} the account_data event in question
  */
-Room.prototype.getAccountData = function(type) {
+Room.prototype.getAccountData = function (type) {
     return this.accountData[type];
 };
 
@@ -1826,7 +1999,7 @@ Room.prototype.getAccountData = function(type) {
  * @return {boolean} true if the user should be permitted to send
  *                   message events into the room.
  */
-Room.prototype.maySendMessage = function() {
+Room.prototype.maySendMessage = function () {
     return this.getMyMembership() === 'join' &&
         this.currentState.maySendEvent('m.room.message', this.myUserId);
 };
@@ -1929,7 +2102,7 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
 function memberNamesToRoomName(names, count = (names.length + 1)) {
     const countWithoutMe = count - 1;
     if (!names.length) {
-       return "Empty room";
+        return "Empty room";
     } else if (names.length === 1 && countWithoutMe <= 1) {
         return names[0];
     } else if (names.length === 2 && countWithoutMe <= 2) {
