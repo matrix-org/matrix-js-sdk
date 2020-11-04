@@ -104,7 +104,7 @@ export class DehydrationManager {
 
         // Check to see if it's the same key as before.  If it's different,
         // dehydrate a new device.  If it's the same, we can keep the same
-        // device.  (Assume that keyInfo and deviceDisplayNamme will be the
+        // device.  (Assume that keyInfo and deviceDisplayName will be the
         // same if the key is the same.)
         let matches: boolean = this.key && key.length == this.key.length;
         for (let i = 0; matches && i < key.length; i++) {
