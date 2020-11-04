@@ -577,9 +577,31 @@ MatrixClient.prototype.setDehydrationKey = async function(
         logger.warn('not dehydrating device if crypto is not enabled');
         return;
     }
-    return await this._crypto._dehydrationManager.setDehydrationKey(
+    return await this._crypto._dehydrationManager.setKeyAndQueue(
         key, keyInfo, deviceDisplayName,
     );
+};
+
+/**
+ * Creates a new dehydrated device (without queuing periodic dehydration)
+ * @param {Uint8Array} key the dehydration key
+ * @param {object} [keyInfo] Information about the key.  Primarily for
+ *     information about how to generate the key from a passphrase.
+ * @param {string} [deviceDisplayName] The device display name for the
+ *     dehydrated device.
+ * @return {Promise<String>} the device id of the newly created dehydrated device
+ */
+MatrixClient.prototype.createDehydratedDevice = async function(
+    key, keyInfo = {}, deviceDisplayName = undefined,
+) {
+    if (!(this._crypto)) {
+        logger.warn('not dehydrating device if crypto is not enabled');
+        return;
+    }
+    await this._crypto._dehydrationManager.setKey(
+        key, keyInfo, deviceDisplayName,
+    );
+    return await this._crypto._dehydrationManager.dehydrateDevice();
 };
 
 MatrixClient.prototype.exportDevice = async function() {

@@ -77,10 +77,23 @@ export class DehydrationManager {
             },
         );
     }
-    async setDehydrationKey(
+
+    /** set the key, and queue periodic dehydration to the server in the background */
+    async setKeyAndQueueDehydration(
         key: Uint8Array, keyInfo: {[props: string]: any} = {},
         deviceDisplayName: string = undefined,
     ): Promise<void> {
+        const matches = await this.setKey(key, keyInfo, deviceDisplayName);
+        if (!matches) {
+            // start dehydration in the background
+            this.dehydrateDevice();
+        }
+    }
+
+    async setKey(
+        key: Uint8Array, keyInfo: {[props: string]: any} = {},
+        deviceDisplayName: string = undefined,
+    ): Promise<boolean> {
         if (!key) {
             // unsetting the key -- cancel any pending dehydration task
             if (this.timeoutId) {
@@ -104,7 +117,7 @@ export class DehydrationManager {
 
         // Check to see if it's the same key as before.  If it's different,
         // dehydrate a new device.  If it's the same, we can keep the same
-        // device.  (Assume that keyInfo and deviceDisplayNamme will be the
+        // device.  (Assume that keyInfo and deviceDisplayName will be the
         // same if the key is the same.)
         let matches: boolean = this.key && key.length == this.key.length;
         for (let i = 0; matches && i < key.length; i++) {
@@ -116,11 +129,12 @@ export class DehydrationManager {
             this.key = key;
             this.keyInfo = keyInfo;
             this.deviceDisplayName = deviceDisplayName;
-            // start dehydration in the background
-            this.dehydrateDevice();
         }
+        return matches;
     }
-    private async dehydrateDevice(): Promise<void> {
+
+    /** returns the device id of the newly created dehydrated device */
+    async dehydrateDevice(): Promise<string> {
         if (this.inProgress) {
             logger.log("Dehydration already in progress -- not starting new dehydration");
             return;
@@ -258,8 +272,17 @@ export class DehydrationManager {
             this.timeoutId = global.setTimeout(
                 this.dehydrateDevice.bind(this), oneweek,
             );
+
+            return deviceId;
         } finally {
             this.inProgress = false;
+        }
+    }
+
+    private stop() {
+        if (this.timeoutId) {
+            global.clearTimeout(this.timeoutId);
+            this.timeoutId = undefined;
         }
     }
 }
