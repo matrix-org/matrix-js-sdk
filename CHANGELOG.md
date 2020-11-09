@@ -1,3 +1,32 @@
+Changes in [9.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.1.0) (2020-11-09)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.1.0-rc.1...v9.1.0)
+
+* No changes since rc.1
+
+Changes in [9.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.1.0-rc.1) (2020-11-04)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.0.1...v9.1.0-rc.1)
+
+ * Fix spelling error in the server ACL event type
+   [\#1535](https://github.com/matrix-org/matrix-js-sdk/pull/1535)
+ * await idb operations from crypto store for dehydration
+   [\#1533](https://github.com/matrix-org/matrix-js-sdk/pull/1533)
+ * Fix stuck never-sending messages
+   [\#1531](https://github.com/matrix-org/matrix-js-sdk/pull/1531)
+ * Await key cache check to avoid prompts
+   [\#1529](https://github.com/matrix-org/matrix-js-sdk/pull/1529)
+ * Improve ICE candidate batching
+   [\#1524](https://github.com/matrix-org/matrix-js-sdk/pull/1524)
+ * Convert logger to typescript
+   [\#1527](https://github.com/matrix-org/matrix-js-sdk/pull/1527)
+ * Fix logger typo
+   [\#1525](https://github.com/matrix-org/matrix-js-sdk/pull/1525)
+ * bind online listener to window instead of document
+   [\#1523](https://github.com/matrix-org/matrix-js-sdk/pull/1523)
+ * Support m.call.select_answer
+   [\#1522](https://github.com/matrix-org/matrix-js-sdk/pull/1522)
+
 Changes in [9.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.0.1) (2020-10-28)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.0.0...v9.0.1)
