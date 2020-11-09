@@ -244,7 +244,7 @@ export class MatrixCall extends EventEmitter {
     // The party ID of the other side: undefined if we haven't chosen a partner
     // yet, null if we have but they didn't send a party ID.
     private opponentPartyId: string;
-    private inviteTimeout: NodeJS.Timeout;
+    private inviteTimeout: NodeJS.Timeout; // in the browser it's 'number'
 
     // The logic of when & if a call is on hold is nontrivial and explained in is*OnHold
     // This flag represents whether we want the other party to be on hold
