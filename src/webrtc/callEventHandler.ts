@@ -260,6 +260,15 @@ export class CallEventHandler {
             }
 
             call.onSelectAnswerReceived(event);
+        } else if (event.getType() === EventType.CallNegotiate) {
+            if (!call) return;
+
+            if (event.getContent().party_id === call.ourPartyId) {
+                // Ignore remote echo
+                return;
+            }
+
+            call.onNegotiateReceived(event);
         }
     }
 }
