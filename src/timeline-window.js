@@ -19,6 +19,9 @@ limitations under the License.
 
 import {EventTimeline} from './models/event-timeline';
 import {logger} from './logger';
+import {MatrixEvent} from './models/event';
+import {MatrixClient} from './client';
+import {EventTimelineSet} from './models/event-timeline-set';
 
 /**
  * @private

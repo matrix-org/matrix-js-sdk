@@ -25,6 +25,7 @@ import {EventStatus} from "./event";
 import * as utils from "../utils";
 import {logger} from '../logger';
 import {Relations} from './relations';
+import {Filter} from '../filter';
 
 // var DEBUG = false;
 const DEBUG = true;

@@ -22,6 +22,7 @@ limitations under the License.
  */
 import * as utils from "./utils";
 import {logger} from './logger';
+import {MatrixEvent} from "./models/event";
 
 const DEBUG = false;  // set true to enable console logging.
 

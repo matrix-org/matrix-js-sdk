@@ -8,8 +8,10 @@
     "target": "es2016",
     "noImplicitAny": false,
     "sourceMap": true,
-    "outDir": "./lib",
+    "outDir": "allow_js_off_lib",
     "declaration": true,
+    "allowJs": true,
+    "checkJs": true,
     "types": [
       "node"
     ]
