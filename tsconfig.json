@@ -17,6 +17,6 @@
     ]
   },
   "include": [
-    "./src/**/*.ts"
+    "./src/**/*.ts", "src/models/user.ignoredts"
   ]
 }

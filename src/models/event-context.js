@@ -18,6 +18,7 @@ limitations under the License.
 /**
  * @module models/event-context
  */
+import {MatrixEvent} from './event';
 
 /**
  * Construct a new EventContext
@@ -33,23 +34,24 @@ limitations under the License.
  *
  * @constructor
  */
-export function EventContext(ourEvent) {
-    this._timeline = [ourEvent];
-    this._ourEventIndex = 0;
-    this._paginateTokens = {b: null, f: null};
+export class EventContext {
+    constructor (ourEvent) {
+        this._timeline = [ourEvent];
+        this._ourEventIndex = 0;
+        this._paginateTokens = {b: null, f: null};
 
-    // this is used by MatrixClient to keep track of active requests
-    this._paginateRequests = {b: null, f: null};
-}
+        // this is used by MatrixClient to keep track of active requests
+        this._paginateRequests = {b: null, f: null};
+    }
 
-/**
+    /**
  * Get the main event of interest
  *
  * This is a convenience function for getTimeline()[getOurEventIndex()].
  *
  * @return {MatrixEvent} The event at the centre of this context.
  */
-EventContext.prototype.getEvent = function() {
+getEvent() {
     return this._timeline[this._ourEventIndex];
 };
 
@@ -58,7 +60,7 @@ EventContext.prototype.getEvent = function() {
  *
  * @return {Array} An array of MatrixEvents
  */
-EventContext.prototype.getTimeline = function() {
+getTimeline() {
     return this._timeline;
 };
 
@@ -67,7 +69,7 @@ EventContext.prototype.getTimeline = function() {
  *
  * @return {Number}
  */
-EventContext.prototype.getOurEventIndex = function() {
+getOurEventIndex() {
     return this._ourEventIndex;
 };
 
@@ -78,7 +80,7 @@ EventContext.prototype.getOurEventIndex = function() {
  *                                  backwards in time
  * @return {string}
  */
-EventContext.prototype.getPaginateToken = function(backwards) {
+getPaginateToken(backwards) {
     return this._paginateTokens[backwards ? 'b' : 'f'];
 };
 
@@ -91,7 +93,7 @@ EventContext.prototype.getPaginateToken = function(backwards) {
  * @param {boolean} backwards   true to set the pagination token for going
  *                                   backwards in time
  */
-EventContext.prototype.setPaginateToken = function(token, backwards) {
+setPaginateToken(token, backwards) {
     this._paginateTokens[backwards ? 'b' : 'f'] = token;
 };
 
@@ -101,7 +103,7 @@ EventContext.prototype.setPaginateToken = function(token, backwards) {
  * @param {Array} events      new events, in timeline order
  * @param {boolean} atStart   true to insert new events at the start
  */
-EventContext.prototype.addEvents = function(events, atStart) {
+addEvents(events, atStart) {
     // TODO: should we share logic with Room.addEventsToTimeline?
     // Should Room even use EventContext?
 
@@ -113,3 +115,12 @@ EventContext.prototype.addEvents = function(events, atStart) {
     }
 };
 
+}
+export function EventContext(ourEvent) {
+    this._timeline = [ourEvent];
+    this._ourEventIndex = 0;
+    this._paginateTokens = {b: null, f: null};
+
+    // this is used by MatrixClient to keep track of active requests
+    this._paginateRequests = {b: null, f: null};
+}
