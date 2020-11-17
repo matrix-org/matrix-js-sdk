@@ -371,7 +371,6 @@ MatrixBaseApis.prototype.getSsoLoginUrl = function(redirectUrl, loginType, idpId
         prefix = "/_matrix/client/unstable/org.matrix.msc2858";
     }
 
-
     return this._http.getUrl(url, { redirectUrl }, prefix);
 };
 
