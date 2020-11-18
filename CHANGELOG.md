@@ -1,3 +1,14 @@
+Changes in [9.2.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.2.0-rc.1) (2020-11-18)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.1.0...v9.2.0-rc.1)
+
+ * Implement call holding functionality
+   [\#1532](https://github.com/matrix-org/matrix-js-sdk/pull/1532)
+ * Support awaitable one-time dehydration
+   [\#1537](https://github.com/matrix-org/matrix-js-sdk/pull/1537)
+ * Client set profile methods update own user
+   [\#1534](https://github.com/matrix-org/matrix-js-sdk/pull/1534)
+
 Changes in [9.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.1.0) (2020-11-09)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.1.0-rc.1...v9.1.0)
