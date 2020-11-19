@@ -577,7 +577,7 @@ MatrixClient.prototype.setDehydrationKey = async function(
         logger.warn('not dehydrating device if crypto is not enabled');
         return;
     }
-    return await this._crypto._dehydrationManager.setKeyAndQueue(
+    return await this._crypto._dehydrationManager.setKeyAndQueueDehydration(
         key, keyInfo, deviceDisplayName,
     );
 };
