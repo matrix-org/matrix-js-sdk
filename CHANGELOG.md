@@ -1,3 +1,10 @@
+Changes in [9.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.2.0) (2020-11-23)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.2.0-rc.1...v9.2.0)
+
+ * [Release] Fix dehydration method name
+   [\#1545](https://github.com/matrix-org/matrix-js-sdk/pull/1545)
+
 Changes in [9.2.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.2.0-rc.1) (2020-11-18)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.1.0...v9.2.0-rc.1)
