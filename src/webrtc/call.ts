@@ -26,6 +26,7 @@ import {EventEmitter} from 'events';
 import * as utils from '../utils';
 import MatrixEvent from '../models/event';
 import {EventType} from '../@types/event';
+import { RoomMember } from '../models/room-member';
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
@@ -93,6 +94,10 @@ export enum CallEvent {
     Replaced = 'replaced',
 
     // The value of isLocalOnHold() has changed
+    LocalHoldUnhold = 'local_hold_unhold',
+    // The value of isRemoteOnHold() has changed
+    RemoteHoldUnhold = 'remote_hold_unhold',
+    // backwards compat alias for LocalHoldUnhold: remove in a major version bump
     HoldUnhold = 'hold_unhold',
 }
 
@@ -179,7 +184,7 @@ export enum CallErrorCode {
  * bumped to 1. While we partially speak v1 VoIP, it remains
  * as 0.
  */
-const VOIP_PROTO_VERSION = 0;
+const VOIP_PROTO_VERSION = 1;
 
 /** The fallback ICE server to use for STUN or TURN protocols. */
 const FALLBACK_ICE_SERVER = 'stun:turn.matrix.org';
@@ -240,6 +245,7 @@ export class MatrixCall extends EventEmitter {
     // XXX: I don't know why this is called 'config'.
     private config: MediaStreamConstraints;
     private successor: MatrixCall;
+    private opponentMember: RoomMember;
     private opponentVersion: number;
     // The party ID of the other side: undefined if we haven't chosen a partner
     // yet, null if we have but they didn't send a party ID.
@@ -249,6 +255,11 @@ export class MatrixCall extends EventEmitter {
     // The logic of when & if a call is on hold is nontrivial and explained in is*OnHold
     // This flag represents whether we want the other party to be on hold
     private remoteOnHold;
+
+    // and this one we set when we're transitioning out of the hold state because we
+    // can't tell the difference between that and the other party holding us
+    private unholdingRemote;
+
     private micMuted;
     private vidMuted;
 
@@ -294,6 +305,7 @@ export class MatrixCall extends EventEmitter {
         this.makingOffer = false;
 
         this.remoteOnHold = false;
+        this.unholdingRemote = false;
         this.micMuted = false;
         this.vidMuted = false;
     }
@@ -356,6 +368,10 @@ export class MatrixCall extends EventEmitter {
         }
 
         this.type = CallType.Video;
+    }
+
+    getOpponentMember() {
+        return this.opponentMember;
     }
 
     private queueMediaOperation(queueId: MediaQueueId, operation: () => any) {
@@ -481,6 +497,7 @@ export class MatrixCall extends EventEmitter {
         this.direction = CallDirection.Inbound;
         this.opponentVersion = this.msg.version;
         this.opponentPartyId = this.msg.party_id || null;
+        this.opponentMember = event.sender;
 
         if (event.getLocalAge()) {
             setTimeout(() => {
@@ -663,6 +680,7 @@ export class MatrixCall extends EventEmitter {
     setRemoteOnHold(onHold: boolean) {
         if (this.isRemoteOnHold() === onHold) return;
         this.remoteOnHold = onHold;
+        if (!onHold) this.unholdingRemote = true;
 
         for (const tranceiver of this.peerConn.getTransceivers()) {
             // We set 'inactive' rather than 'sendonly' because we're not planning on
@@ -670,6 +688,8 @@ export class MatrixCall extends EventEmitter {
             tranceiver.direction = onHold ? 'inactive' : 'sendrecv';
         }
         this.updateMuteStatus();
+
+        this.emit(CallEvent.RemoteHoldUnhold, this.remoteOnHold);
     }
 
     /**
@@ -682,6 +702,7 @@ export class MatrixCall extends EventEmitter {
      */
     isLocalOnHold(): boolean {
         if (this.state !== CallState.Connected) return false;
+        if (this.unholdingRemote) return false;
 
         let callOnHold = true;
 
@@ -948,6 +969,7 @@ export class MatrixCall extends EventEmitter {
 
         this.opponentVersion = event.getContent().version;
         this.opponentPartyId = event.getContent().party_id || null;
+        this.opponentMember = event.sender;
 
         this.setState(CallState.Connecting);
 
@@ -1009,7 +1031,7 @@ export class MatrixCall extends EventEmitter {
         // Here we follow the perfect negotiation logic from
         // https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation
         const offerCollision = (
-            (description.type == 'offer') &&
+            (description.type === 'offer') &&
             (this.makingOffer || this.peerConn.signalingState != 'stable')
         );
 
@@ -1019,7 +1041,14 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        const prevOnHold = this.isLocalOnHold();
+        const prevLocalOnHold = this.isLocalOnHold();
+
+        if (description.type === 'answer') {
+            // whenever we get an answer back, clear the flag we set whilst trying to un-hold
+            // the other party: the state of the channels now reflects reality
+            //nope, this doesnt work either
+            this.unholdingRemote = false;
+        }
 
         try {
             await this.peerConn.setRemoteDescription(description);
@@ -1036,9 +1065,11 @@ export class MatrixCall extends EventEmitter {
             logger.warn("Failed to complete negotiation", err);
         }
 
-        const nowOnHold = this.isLocalOnHold();
-        if (prevOnHold !== nowOnHold) {
-            this.emit(CallEvent.HoldUnhold, nowOnHold);
+        const newLocalOnHold = this.isLocalOnHold();
+        if (prevLocalOnHold !== newLocalOnHold) {
+            this.emit(CallEvent.LocalHoldUnhold, newLocalOnHold);
+            // also this one for backwards compat
+            this.emit(CallEvent.HoldUnhold, newLocalOnHold);
         }
     }
 
