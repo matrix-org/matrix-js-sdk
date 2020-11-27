@@ -180,9 +180,6 @@ export enum CallErrorCode {
 
 /**
  * The version field that we set in m.call.* events
- * Once we are able to speak v1 VoIP sufficiently, this
- * bumped to 1. While we partially speak v1 VoIP, it remains
- * as 0.
  */
 const VOIP_PROTO_VERSION = 1;
 
