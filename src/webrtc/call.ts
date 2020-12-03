@@ -457,9 +457,7 @@ export class MatrixCall extends EventEmitter {
     async setRemoteAudioElement(element: HTMLAudioElement) {
         if (element === this.remoteAudioElement) return;
 
-        if (this.remoteVideoElement) this.remoteVideoElement.muted = true;
         this.remoteAudioElement = element;
-        this.remoteAudioElement.muted = false;
 
         if (this.remoteStream) this.playRemoteAudio();
     }
@@ -685,6 +683,10 @@ export class MatrixCall extends EventEmitter {
             tranceiver.direction = onHold ? 'inactive' : 'sendrecv';
         }
         this.updateMuteStatus();
+
+        if (!onHold) {
+            this.playRemoteAudio();
+        }
 
         this.emit(CallEvent.RemoteHoldUnhold, this.remoteOnHold);
     }
@@ -1265,6 +1267,9 @@ export class MatrixCall extends EventEmitter {
 
     playRemoteAudio() {
         this.queueMediaOperation(MediaQueueId.RemoteAudio, async () => {
+            if (this.remoteVideoElement) this.remoteVideoElement.muted = true;
+            this.remoteAudioElement.muted = false;
+
             this.remoteAudioElement.srcObject = this.remoteStream;
 
             // if audioOutput is non-default:
@@ -1284,7 +1289,7 @@ export class MatrixCall extends EventEmitter {
             try {
                 await this.remoteAudioElement.play();
             } catch (e) {
-                logger.error("Failed to play remote video element", e);
+                logger.error("Failed to play remote audio element", e);
             }
         });
     }
@@ -1628,5 +1633,9 @@ export function createNewMatrixCall(client: any, roomId: string, options?: CallO
         // call level options
         forceTURN: client._forceTURN || optionsForceTURN,
     };
-    return new MatrixCall(opts);
+    const call = new MatrixCall(opts);
+
+    client.reEmitter.reEmit(call, Object.values(CallEvent));
+
+    return call;
 }
