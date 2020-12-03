@@ -356,15 +356,22 @@ MatrixBaseApis.prototype.getCasLoginUrl = function(redirectUrl) {
  *     authenticates with the SSO.
  * @param {string} loginType The type of SSO login we are doing (sso or cas).
  *     Defaults to 'sso'.
+ * @param {string} idpId The ID of the Identity Provider being targeted, optional.
  * @return {string} The HS URL to hit to begin the SSO login process.
  */
-MatrixBaseApis.prototype.getSsoLoginUrl = function(redirectUrl, loginType) {
+MatrixBaseApis.prototype.getSsoLoginUrl = function(redirectUrl, loginType, idpId) {
     if (loginType === undefined) {
         loginType = "sso";
     }
-    return this._http.getUrl("/login/"+loginType+"/redirect", {
-        "redirectUrl": redirectUrl,
-    }, PREFIX_R0);
+
+    let prefix = PREFIX_R0;
+    let url = "/login/" + loginType + "/redirect";
+    if (idpId) {
+        url += "/" + idpId;
+        prefix = "/_matrix/client/unstable/org.matrix.msc2858";
+    }
+
+    return this._http.getUrl(url, { redirectUrl }, prefix);
 };
 
 /**
