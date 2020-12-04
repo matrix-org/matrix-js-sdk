@@ -1267,6 +1267,25 @@ export class MatrixCall extends EventEmitter {
         }
     }
 
+    private async playRemoteVideo() {
+        // A note on calling methods on media elements:
+        // We used to have queues per media element to serialise all calls on those elements.
+        // The reason given for this was that load() and play() were racing. However, we now
+        // never call load() explicitly so this seems unnecessary. However, serialising every
+        // operation was causing bugs where video would not resume because some play command
+        // had got stuck and all media operations were queued up behind it. If necessary, we
+        // should serialise the ones that need to be serialised but then be able to interrupt
+        // them with another load() which will cancel the pending one, but since we don't call
+        // load() explicitly, it shouldn't be a problem.
+        this.remoteVideoElement.srcObject = this.remoteStream;
+        logger.info("playing remote video. stream active? " + this.remoteStream.active);
+        try {
+            await this.remoteVideoElement.play();
+        } catch (e) {
+            logger.info("Failed to play remote video element", e);
+        }
+    }
+
     onHangupReceived = (msg) => {
         logger.debug("Hangup received");
 
@@ -1494,25 +1513,6 @@ export class MatrixCall extends EventEmitter {
         // They must either match or both be absent (in which case opponentPartyId will be null)
         const msgPartyId = msg.party_id || null;
         return msgPartyId === this.opponentPartyId;
-    }
-
-    private async playRemoteVideo() {
-        // A note on calling methods on media elements:
-        // We used to have queues per media element to serialise all calls on those elements.
-        // The reason given for this was that load() and play() were racing. However, we now
-        // never call load() explicitly so this seems unnecessary. However, serialising every
-        // operation was causing bugs where video would not resume because some play command
-        // had got stuck and all media operations were queued up behind it. If necessary, we
-        // should serialise the ones that need to be serialised but then be able to interrupt
-        // them with another load() which will cancel the pending one, but since we don't call
-        // load() explicitly, it shouldn't be a problem.
-        this.remoteVideoElement.srcObject = this.remoteStream;
-        logger.info("playing remote video. stream active? " + this.remoteStream.active);
-        try {
-            await this.remoteVideoElement.play();
-        } catch (e) {
-            logger.info("Failed to play remote video element", e);
-        }
     }
 }
 
