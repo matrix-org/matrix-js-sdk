@@ -27,6 +27,7 @@ import {LocalIndexedDBStoreBackend} from "./store/indexeddb-local-backend";
 import {RemoteIndexedDBStoreBackend} from "./store/indexeddb-remote-backend";
 import {MatrixScheduler} from "./scheduler";
 import {MatrixClient} from "./client";
+import { Filter } from "./filter";
 
 export * from "./client";
 export * from "./http-api";
@@ -263,3 +264,76 @@ export function createClient(opts: ICreateClientOpts | string) {
   * <code>{statusCode: {Number}, headers: {Object}}</code>
   * @param {Object} body The parsed HTTP response body.
   */
+
+export interface Relations {
+    events: MatrixEvent[];
+    nextBatch?: UNKNOWN_TYPE_FILL_ME_IN_LATER;
+}
+
+export interface IClientStartOpts {
+    /**
+     * The event <code>limit=</code> to apply
+     * to initial sync. Default: 8.
+     */
+    initialSyncLimit?: number;
+
+    /**
+     * True to put <code>archived=true</code>
+     * on the <code>/initialSync</code> request. Default: false.
+     */
+    includeArchivedRooms?: boolean;
+
+    /**
+     * True to do /profile requests
+     * on every invite event if the displayname/avatar_url is not known for this user ID.
+     * Default: false.
+     */
+    resolveInvitesToProfiles?: boolean;
+
+    /**
+     * Controls where pending messages
+     * appear in a room's timeline. If "<b>chronological</b>", messages will appear
+     * in the timeline when the call to <code>sendEvent</code> was made. If
+     * "<b>detached</b>", pending messages will appear in a separate list,
+     * accessbile via {@link module:models/room#getPendingEvents}. Default:
+     * "chronological".
+     */
+    pendingEventOrdering?: string;
+
+    /**
+     * The number of milliseconds to wait on /sync.
+     * Default: 30000 (30 seconds).
+     */
+    pollTimeout?: number;
+
+    /**
+     * The filter to apply to /sync calls. This will override
+     * the opts.initialSyncLimit, which would normally result in a timeline limit filter.
+     */
+    filter?: Filter;
+
+    /** True to perform syncing without automatically updating presence. */
+    disablePresence?: boolean;
+
+    /**
+     * True to not load all membership events during
+     * initial sync but fetch them when needed by calling `loadOutOfBandMembers`
+     * This will override the filter option at this moment.
+     */
+    lazyLoadMembers?: boolean;
+
+    /**
+     * The number of seconds between polls
+     * to /.well-known/matrix/client, undefined to disable. This should be in the order of hours.
+     * Default: undefined.
+     */
+    clientWellKnownPollPeriod?: number;
+}
+
+/**
+ * The standard MatrixClient callback interface. Functions which accept this will
+ * specify 2 return arguments. These arguments map to the 2 parameters specified in this callback.
+ */
+export type Callback<TData = unknown, TError = unknown> =
+    (err: TError, data: TData) => void;
+
