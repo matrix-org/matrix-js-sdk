@@ -18,7 +18,7 @@
     "lint": "yarn lint:types && yarn lint:js",
     "lint:js": "eslint --max-warnings 73 src spec",
     "lint:types": "tsc --noEmit",
-    "test": "echo 'Temporarily builds as well, will revert after updating pipelines' && yarn build && jest spec/ --coverage --testEnvironment node",
+    "test": "jest spec/ --coverage --testEnvironment node",
     "test:watch": "jest spec/ --coverage --testEnvironment node --watch"
   },
   "repository": {
