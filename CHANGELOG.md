@@ -1,3 +1,22 @@
+Changes in [9.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.3.0) (2020-12-07)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.3.0-rc.1...v9.3.0)
+
+* No changes since rc.1
+
+Changes in [9.3.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.3.0-rc.1) (2020-12-02)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.2.0...v9.3.0-rc.1)
+
+ * Export CallError
+   [\#1551](https://github.com/matrix-org/matrix-js-sdk/pull/1551)
+ * Upgrade dependencies
+   [\#1550](https://github.com/matrix-org/matrix-js-sdk/pull/1550)
+ * Don't log error when environment does not support WebRTC
+   [\#1547](https://github.com/matrix-org/matrix-js-sdk/pull/1547)
+ * Fix dehydration method name
+   [\#1544](https://github.com/matrix-org/matrix-js-sdk/pull/1544)
+
 Changes in [9.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.2.0) (2020-11-23)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.2.0-rc.1...v9.2.0)
