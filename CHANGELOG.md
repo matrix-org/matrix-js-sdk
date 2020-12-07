@@ -1,3 +1,9 @@
+Changes in [9.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.3.0) (2020-12-07)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.3.0-rc.1...v9.3.0)
+
+* No changes since rc.1
+
 Changes in [9.3.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.3.0-rc.1) (2020-12-02)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.2.0...v9.3.0-rc.1)
