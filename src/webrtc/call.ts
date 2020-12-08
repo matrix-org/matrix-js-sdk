@@ -704,6 +704,16 @@ export class MatrixCall extends EventEmitter {
 
         const vidShouldBeMuted = this.vidMuted || this.remoteOnHold;
         setTracksEnabled(this.localAVStream.getVideoTracks(), !vidShouldBeMuted);
+
+        if (this.remoteOnHold) {
+            if (this.remoteAudioElement && this.remoteAudioElement.srcObject === this.remoteStream) {
+                this.remoteAudioElement.muted = true;
+            } else if (this.remoteVideoElement && this.remoteVideoElement.srcObject === this.remoteStream) {
+                this.remoteVideoElement.muted = true;
+            }
+        } else {
+            this.playRemoteAudio();
+        }
     }
 
     /**
