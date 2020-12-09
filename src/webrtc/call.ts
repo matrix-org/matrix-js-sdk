@@ -1037,7 +1037,6 @@ export class MatrixCall extends EventEmitter {
         if (description.type === 'answer') {
             // whenever we get an answer back, clear the flag we set whilst trying to un-hold
             // the other party: the state of the channels now reflects reality
-            //nope, this doesnt work either
             this.unholdingRemote = false;
         }
 
