@@ -1300,13 +1300,12 @@ export class MatrixCall extends EventEmitter {
 
         // party ID must match (our chosen partner hanging up the call) or be undefined (we haven't chosen
         // a partner yet but we're treating the hangup as a reject as per VoIP v0)
-        if (!this.partyIdMatches(msg) && this.opponentPartyId !== undefined) {
+        if (this.partyIdMatches(msg) || this.opponentPartyId === undefined || this.state === CallState.Ringing) {
+            // default reason is user_hangup
+            this.terminate(CallParty.Remote, msg.reason || CallErrorCode.UserHangup, true);
+        } else {
             logger.info(`Ignoring message from party ID ${msg.party_id}: our partner is ${this.opponentPartyId}`);
-            return;
         }
-
-        // default reason is user_hangup
-        this.terminate(CallParty.Remote, msg.reason || CallErrorCode.UserHangup, true);
     };
 
     onRejectReceived = (msg) => {
