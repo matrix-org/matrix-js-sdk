@@ -27,6 +27,7 @@ import * as utils from '../utils';
 import MatrixEvent from '../models/event';
 import {EventType} from '../@types/event';
 import { RoomMember } from '../models/room-member';
+import { randomString } from '../randomstring';
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
@@ -58,6 +59,10 @@ interface TurnServer {
     username?: string,
     password?: string,
     ttl?: number,
+}
+
+interface CallCapabilities {
+    'm.call.transferee': boolean,
 }
 
 export enum CallState {
@@ -194,6 +199,10 @@ export class CallError extends Error {
     }
 }
 
+function genCallID() {
+    return Date.now() + randomString(16);
+}
+
 /**
  * Construct a new Matrix Call.
  * @constructor
@@ -240,6 +249,7 @@ export class MatrixCall extends EventEmitter {
     // The party ID of the other side: undefined if we haven't chosen a partner
     // yet, null if we have but they didn't send a party ID.
     private opponentPartyId: string;
+    private opponentCaps: CallCapabilities;
     private inviteTimeout: NodeJS.Timeout; // in the browser it's 'number'
 
     // The logic of when & if a call is on hold is nontrivial and explained in is*OnHold
@@ -275,7 +285,7 @@ export class MatrixCall extends EventEmitter {
             utils.checkObjectHasKeys(server, ["urls"]);
         }
 
-        this.callId = "c" + new Date().getTime() + Math.random();
+        this.callId = genCallID();
         this.state = CallState.Fledgling;
 
         // A queue for candidates waiting to go out.
@@ -356,6 +366,10 @@ export class MatrixCall extends EventEmitter {
 
     getOpponentMember() {
         return this.opponentMember;
+    }
+
+    opponentCanBeTransferred() {
+        return Boolean(this.opponentCaps && this.opponentCaps["m.call.transferee"]);
     }
 
     /**
@@ -470,6 +484,7 @@ export class MatrixCall extends EventEmitter {
         this.direction = CallDirection.Inbound;
         this.opponentVersion = this.msg.version;
         this.opponentPartyId = this.msg.party_id || null;
+        this.opponentCaps = this.msg.capabilities || {};
         this.opponentMember = event.sender;
 
         if (event.getLocalAge()) {
@@ -779,7 +794,14 @@ export class MatrixCall extends EventEmitter {
                 // required to still be sent for backwards compat
                 type: this.peerConn.localDescription.type,
             },
-        };
+        } as any;
+
+        if (this.client._supportsTransfer) {
+            answerContent.capabilities = {
+                'm.call.transferee': true,
+            }
+        }
+
         // We have just taken the local description from the peerconnection which will
         // contain all the local candidates added so far, so we can discard any candidates
         // we had queued up because they'll be in the answer.
@@ -960,6 +982,7 @@ export class MatrixCall extends EventEmitter {
 
         this.opponentVersion = event.getContent().version;
         this.opponentPartyId = event.getContent().party_id || null;
+        this.opponentCaps = event.getContent().capabilities || {};
         this.opponentMember = event.sender;
 
         this.setState(CallState.Connecting);
@@ -1102,7 +1125,13 @@ export class MatrixCall extends EventEmitter {
         const content = {
             [keyName]: this.peerConn.localDescription,
             lifetime: CALL_TIMEOUT_MS,
-        };
+        } as any;
+
+        if (this.client._supportsTransfer) {
+            content.capabilities = {
+                'm.call.transferee': true,
+            }
+        }
 
         // Get rid of any candidates waiting to be sent: they'll be included in the local
         // description we just got and will send in the offer.
@@ -1368,6 +1397,28 @@ export class MatrixCall extends EventEmitter {
                 this.sendCandidateQueue();
             }, delay);
         }
+    }
+
+    async transfer(targetUserId: string, targetRoomId?: string) {
+        // Fetch the target user's global profile info: their room avatar / displayname
+        // could be different in whatever room we shae with them.
+        const profileInfo = await this.client.getProfileInfo(targetUserId);
+
+        const replacementId = genCallID();
+
+        const body = {
+            replacement_id: genCallID(),
+            target_user: {
+                id: targetUserId,
+                display_name: profileInfo.display_name,
+                avatar_url: profileInfo.avatar_url,
+            },
+            create_call: replacementId,
+        } as any;
+
+        if (targetRoomId) body.target_room = targetRoomId;
+
+        return this.sendVoipEvent(EventType.CallReplaces, body);
     }
 
     private async terminate(hangupParty: CallParty, hangupReason: CallErrorCode, shouldEmit: boolean) {
