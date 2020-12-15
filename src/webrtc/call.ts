@@ -1000,7 +1000,9 @@ export class MatrixCall extends EventEmitter {
         }
 
         this.opponentVersion = event.getContent().version;
-        this.opponentPartyId = event.getContent().party_id || null;
+        if (this.opponentVersion !== 0) {
+            this.opponentPartyId = event.getContent().party_id || null;
+        }
         this.opponentCaps = event.getContent().capabilities || {};
         this.opponentMember = event.sender;
 
