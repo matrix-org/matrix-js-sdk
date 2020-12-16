@@ -1,0 +1,1517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    
+    <meta charset="utf-8">
+    <title>crypto/OlmDevice.js - Documentation</title>
+    
+    
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc.css">
+    <script src="scripts/nav.js" defer></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav >
+    
+    <input type="text" id="nav-search" placeholder="Search" />
+    
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="AccountDataClientAdapter.html">AccountDataClientAdapter</a><ul class='methods'><li data-type='method' style='display: none;'><a href="AccountDataClientAdapter.html#getAccountData">getAccountData</a></li><li data-type='method' style='display: none;'><a href="AccountDataClientAdapter.html#getAccountDataFromServer">getAccountDataFromServer</a></li><li data-type='method' style='display: none;'><a href="AccountDataClientAdapter.html#setAccountData">setAccountData</a></li></ul></li><li><a href="Backend.html">Backend</a><ul class='methods'><li data-type='method' style='display: none;'><a href="Backend.html#deleteOutgoingRoomKeyRequest">deleteOutgoingRoomKeyRequest</a></li><li data-type='method' style='display: none;'><a href="Backend.html#getAllOutgoingRoomKeyRequestsByState">getAllOutgoingRoomKeyRequestsByState</a></li><li data-type='method' style='display: none;'><a href="Backend.html#getOrAddOutgoingRoomKeyRequest">getOrAddOutgoingRoomKeyRequest</a></li><li data-type='method' style='display: none;'><a href="Backend.html#getOutgoingRoomKeyRequest">getOutgoingRoomKeyRequest</a></li><li data-type='method' style='display: none;'><a href="Backend.html#getOutgoingRoomKeyRequestByState">getOutgoingRoomKeyRequestByState</a></li><li data-type='method' style='display: none;'><a href="Backend.html#updateOutgoingRoomKeyRequest">updateOutgoingRoomKeyRequest</a></li></ul></li><li><a href="CrossSigningCallbacks.html">CrossSigningCallbacks</a></li><li><a href="crypto_DeviceList%250A%250AManages%2520the%2520list%2520of%2520other%2520users_%2520devicesmodule_-DeviceListUpdateSerialiser.html">DeviceListUpdateSerialiser</a><ul class='methods'><li data-type='method' style='display: none;'><a href="crypto_DeviceList%25250A%25250AManages%252520the%252520list%252520of%252520other%252520users_%252520devicesmodule_-DeviceListUpdateSerialiser.html#updateDevicesForUsers">updateDevicesForUsers</a></li></ul></li><li><a href="EncryptionSetupBuilder.html">EncryptionSetupBuilder</a><ul class='methods'><li data-type='method' style='display: none;'><a href="EncryptionSetupBuilder.html#addCrossSigningKeys">addCrossSigningKeys</a></li><li data-type='method' style='display: none;'><a href="EncryptionSetupBuilder.html#addKeySignature">addKeySignature</a></li><li data-type='method' style='display: none;'><a href="EncryptionSetupBuilder.html#addSessionBackup">addSessionBackup</a></li><li data-type='method' style='display: none;'><a href="EncryptionSetupBuilder.html#addSessionBackupPrivateKeyToCache">addSessionBackupPrivateKeyToCache</a></li><li data-type='method' style='display: none;'><a href="EncryptionSetupBuilder.html#buildOperation">buildOperation</a></li><li data-type='method' style='display: none;'><a href="EncryptionSetupBuilder.html#persist">persist</a></li><li data-type='method' style='display: none;'><a href="EncryptionSetupBuilder.html#setAccountData">setAccountData</a></li></ul></li><li><a href="EncryptionSetupOperation.html">EncryptionSetupOperation</a><ul class='methods'><li data-type='method' style='display: none;'><a href="EncryptionSetupOperation.html#apply">apply</a></li></ul></li><li><a href="IndexedDBStoreWorker.html">IndexedDBStoreWorker</a><ul class='methods'><li data-type='method' style='display: none;'><a href="IndexedDBStoreWorker.html#onMessage">onMessage</a></li></ul></li><li><a href="InRoomChannel.html">InRoomChannel</a><ul class='methods'><li data-type='method' style='display: none;'><a href="InRoomChannel.html#.canCreateRequest">canCreateRequest</a></li><li data-type='method' style='display: none;'><a href="InRoomChannel.html#.getEventType">getEventType</a></li><li data-type='method' style='display: none;'><a href="InRoomChannel.html#.getTransactionId">getTransactionId</a></li><li data-type='method' style='display: none;'><a href="InRoomChannel.html#.validateEvent">validateEvent</a></li><li data-type='method' style='display: none;'><a href="InRoomChannel.html#completeContent">completeContent</a></li><li data-type='method' style='display: none;'><a href="InRoomChannel.html#completedContentFromEvent">completedContentFromEvent</a></li><li data-type='method' style='display: none;'><a href="InRoomChannel.html#getTimestamp">getTimestamp</a></li><li data-type='method' style='display: none;'><a href="InRoomChannel.html#handleEvent">handleEvent</a></li><li data-type='method' style='display: none;'><a href="InRoomChannel.html#send">send</a></li><li data-type='method' style='display: none;'><a href="InRoomChannel.html#sendCompleted">sendCompleted</a></li></ul></li><li><a href="LocalIndexedDBStoreBackend.html">LocalIndexedDBStoreBackend</a><ul class='methods'><li data-type='method' style='display: none;'><a href="LocalIndexedDBStoreBackend.html#_init">_init</a></li><li data-type='method' style='display: none;'><a href="LocalIndexedDBStoreBackend.html#_loadAccountData">_loadAccountData</a></li><li data-type='method' style='display: none;'><a href="LocalIndexedDBStoreBackend.html#_loadSyncData">_loadSyncData</a></li><li data-type='method' style='display: none;'><a href="LocalIndexedDBStoreBackend.html#_persistAccountData">_persistAccountData</a></li><li data-type='method' style='display: none;'><a href="LocalIndexedDBStoreBackend.html#_persistSyncData">_persistSyncData</a></li><li data-type='method' style='display: none;'><a href="LocalIndexedDBStoreBackend.html#_persistUserPresenceEvents">_persistUserPresenceEvents</a></li><li data-type='method' style='display: none;'><a href="LocalIndexedDBStoreBackend.html#clearDatabase">clearDatabase</a></li><li data-type='method' style='display: none;'><a href="LocalIndexedDBStoreBackend.html#connect">connect</a></li><li data-type='method' style='display: none;'><a href="LocalIndexedDBStoreBackend.html#getOutOfBandMembers">getOutOfBandMembers</a></li><li data-type='method' style='display: none;'><a href="LocalIndexedDBStoreBackend.html#getSavedSync">getSavedSync</a></li><li data-type='method' style='display: none;'><a href="LocalIndexedDBStoreBackend.html#getUserPresenceEvents">getUserPresenceEvents</a></li><li data-type='method' style='display: none;'><a href="LocalIndexedDBStoreBackend.html#isNewlyCreated">isNewlyCreated</a></li><li data-type='method' style='display: none;'><a href="LocalIndexedDBStoreBackend.html#setOutOfBandMembers">setOutOfBandMembers</a></li></ul></li><li><a href="module-auto-discovery.AutoDiscovery.html">AutoDiscovery</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-auto-discovery.AutoDiscovery.html#.findClientConfig">findClientConfig</a></li><li data-type='method' style='display: none;'><a href="module-auto-discovery.AutoDiscovery.html#.fromDiscoveryConfig">fromDiscoveryConfig</a></li><li data-type='method' style='display: none;'><a href="module-auto-discovery.AutoDiscovery.html#.getRawClientConfig">getRawClientConfig</a></li></ul></li><li><a href="module-auto-discovery.AutoDiscovery.FAIL_ERROR.html">FAIL_ERROR</a></li><li><a href="module-auto-discovery.AutoDiscovery.FAIL_PROMPT.html">FAIL_PROMPT</a></li><li><a href="module-auto-discovery.AutoDiscovery.PROMPT.html">PROMPT</a></li><li><a href="module-auto-discovery.AutoDiscovery.SUCCESS.html">SUCCESS</a></li><li><a href="module-auto-discovery-DiscoveredClientConfig.html">DiscoveredClientConfig</a></li><li><a href="module-base-apis.MatrixBaseApis.html">MatrixBaseApis</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#acceptGroupInvite">acceptGroupInvite</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#addPushRule">addPushRule</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#addRoomToGroup">addRoomToGroup</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#addRoomToGroupSummary">addRoomToGroupSummary</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#addThreePid">addThreePid</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#addThreePidOnly">addThreePidOnly</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#addUserToGroupSummary">addUserToGroupSummary</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#bindThreePid">bindThreePid</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#bulkLookupThreePids">bulkLookupThreePids</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#cancelUpload">cancelUpload</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#claimOneTimeKeys">claimOneTimeKeys</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#createAlias">createAlias</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#createGroup">createGroup</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#createRoom">createRoom</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#deactivateAccount">deactivateAccount</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#deleteAlias">deleteAlias</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#deleteDevice">deleteDevice</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#deleteMultipleDevices">deleteMultipleDevices</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#deletePushRule">deletePushRule</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#deleteThreePid">deleteThreePid</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#downloadKeysForUsers">downloadKeysForUsers</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#fetchRelations">fetchRelations</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#fetchRoomEvent">fetchRoomEvent</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getAccessToken">getAccessToken</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getCasLoginUrl">getCasLoginUrl</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getCurrentUploads">getCurrentUploads</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getDevices">getDevices</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getFallbackAuthUrl">getFallbackAuthUrl</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getGroupInvitedUsers">getGroupInvitedUsers</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getGroupProfile">getGroupProfile</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getGroupRooms">getGroupRooms</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getGroupSummary">getGroupSummary</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getGroupUsers">getGroupUsers</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getHomeserverUrl">getHomeserverUrl</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getIdentityAccount">getIdentityAccount</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getIdentityHashDetails">getIdentityHashDetails</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getIdentityServerUrl">getIdentityServerUrl</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getJoinedGroups">getJoinedGroups</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getJoinedRoomMembers">getJoinedRoomMembers</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getJoinedRooms">getJoinedRooms</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getKeyChanges">getKeyChanges</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getProfileInfo">getProfileInfo</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getPublicisedGroups">getPublicisedGroups</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getPushers">getPushers</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getPushRules">getPushRules</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getRoomDirectoryVisibility">getRoomDirectoryVisibility</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getRoomIdForAlias">getRoomIdForAlias</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getSsoLoginUrl">getSsoLoginUrl</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getStateEvent">getStateEvent</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getThirdpartyLocation">getThirdpartyLocation</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getThirdpartyProtocols">getThirdpartyProtocols</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getThirdpartyUser">getThirdpartyUser</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#getThreePids">getThreePids</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#identityHashedLookup">identityHashedLookup</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#inviteUserToGroup">inviteUserToGroup</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#isLoggedIn">isLoggedIn</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#isUsernameAvailable">isUsernameAvailable</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#joinGroup">joinGroup</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#leaveGroup">leaveGroup</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#login">login</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#loginFlows">loginFlows</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#loginWithPassword">loginWithPassword</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#loginWithSAML2">loginWithSAML2</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#loginWithToken">loginWithToken</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#logout">logout</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#lookupThreePid">lookupThreePid</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#makeTxnId">makeTxnId</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#members">members</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#publicRooms">publicRooms</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#register">register</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#registerGuest">registerGuest</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#registerRequest">registerRequest</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#registerWithIdentityServer">registerWithIdentityServer</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#removeRoomFromGroup">removeRoomFromGroup</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#removeRoomFromGroupSummary">removeRoomFromGroupSummary</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#removeUserFromGroup">removeUserFromGroup</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#removeUserFromGroupSummary">removeUserFromGroupSummary</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#reportEvent">reportEvent</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#requestEmailToken">requestEmailToken</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#requestMsisdnToken">requestMsisdnToken</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#resolveRoomAlias">resolveRoomAlias</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#roomInitialSync">roomInitialSync</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#roomState">roomState</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#search">search</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#searchUserDirectory">searchUserDirectory</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#sendStateEvent">sendStateEvent</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#sendToDevice">sendToDevice</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#setDeviceDetails">setDeviceDetails</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#setGroupJoinPolicy">setGroupJoinPolicy</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#setGroupProfile">setGroupProfile</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#setGroupPublicity">setGroupPublicity</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#setIdentityServerUrl">setIdentityServerUrl</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#setPassword">setPassword</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#setPusher">setPusher</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#setPushRuleActions">setPushRuleActions</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#setPushRuleEnabled">setPushRuleEnabled</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#setRoomDirectoryVisibility">setRoomDirectoryVisibility</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#setRoomDirectoryVisibilityAppService">setRoomDirectoryVisibilityAppService</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#setRoomReadMarkersHttpRequest">setRoomReadMarkersHttpRequest</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#submitMsisdnToken">submitMsisdnToken</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#submitMsisdnTokenOtherUrl">submitMsisdnTokenOtherUrl</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#unbindThreePid">unbindThreePid</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#unstableGetLocalAliases">unstableGetLocalAliases</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#updateGroupRoomVisibility">updateGroupRoomVisibility</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#upgradeRoom">upgradeRoom</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#uploadContent">uploadContent</a></li><li data-type='method' style='display: none;'><a href="module-base-apis.MatrixBaseApis.html#uploadKeysRequest">uploadKeysRequest</a></li></ul></li><li><a href="module-client.MatrixClient.html">MatrixClient</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#_createMessagesRequest">_createMessagesRequest</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#_requestTokenFromEndpoint">_requestTokenFromEndpoint</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#_sendCompleteEvent">_sendCompleteEvent</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#_storeClientOptions">_storeClientOptions</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#_unstable_setStatusMessage">_unstable_setStatusMessage</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#addListener">addListener</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#backPaginateRoomEventsSearch">backPaginateRoomEventsSearch</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#ban">ban</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#beginKeyVerification">beginKeyVerification</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#cancelAndResendEventRoomKeyRequest">cancelAndResendEventRoomKeyRequest</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#cancelPendingEvent">cancelPendingEvent</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#checkKeyBackup">checkKeyBackup</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#clearStores">clearStores</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#createDehydratedDevice">createDehydratedDevice</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#createFilter">createFilter</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#createKeyBackupVersion">createKeyBackupVersion</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#deactivateSynapseUser">deactivateSynapseUser</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#deleteRoomTag">deleteRoomTag</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#disableKeyBackup">disableKeyBackup</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#doesServerAcceptIdentityAccessToken">doesServerAcceptIdentityAccessToken</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#doesServerForceEncryptionForPreset">doesServerForceEncryptionForPreset</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#doesServerRequireIdServerParam">doesServerRequireIdServerParam</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#doesServerSupportLazyLoading">doesServerSupportLazyLoading</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#doesServerSupportSeparateAddAndBind">doesServerSupportSeparateAddAndBind</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#doesServerSupportUnstableFeature">doesServerSupportUnstableFeature</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#downloadKeys">downloadKeys</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#emit">emit</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#enableKeyBackup">enableKeyBackup</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#exportRoomKeys">exportRoomKeys</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#findVerificationRequestDMInProgress">findVerificationRequestDMInProgress</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#flagAllGroupSessionsForBackup">flagAllGroupSessionsForBackup</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#forceDiscardSession">forceDiscardSession</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#forget">forget</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#generateClientSecret">generateClientSecret</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getAccountData">getAccountData</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getAccountDataFromServer">getAccountDataFromServer</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getCanResetTimelineCallback">getCanResetTimelineCallback</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getCapabilities">getCapabilities</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getCrossSigningCacheCallbacks">getCrossSigningCacheCallbacks</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getDeviceCurve25519Key">getDeviceCurve25519Key</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getDeviceEd25519Key">getDeviceEd25519Key</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getDeviceId">getDeviceId</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getDomain">getDomain</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getEventMapper">getEventMapper</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getEventSenderDeviceInfo">getEventSenderDeviceInfo</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getEventTimeline">getEventTimeline</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getFilter">getFilter</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getGlobalBlacklistUnverifiedDevices">getGlobalBlacklistUnverifiedDevices</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getGlobalErrorOnUnknownDevices">getGlobalErrorOnUnknownDevices</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getGroup">getGroup</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getGroups">getGroups</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getIgnoredUsers">getIgnoredUsers</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getKeyBackupEnabled">getKeyBackupEnabled</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getKeyBackupVersion">getKeyBackupVersion</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getMediaConfig">getMediaConfig</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getNotifTimelineSet">getNotifTimelineSet</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getOpenIdToken">getOpenIdToken</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getOrCreateFilter">getOrCreateFilter</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getPushActionsForEvent">getPushActionsForEvent</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getRoom">getRoom</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getRoomPushRule">getRoomPushRule</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getRooms">getRooms</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getRoomTags">getRoomTags</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getRoomUpgradeHistory">getRoomUpgradeHistory</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getScheduler">getScheduler</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getStoredDevice">getStoredDevice</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getStoredDevicesForUser">getStoredDevicesForUser</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getSyncState">getSyncState</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getSyncStateData">getSyncStateData</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getTurnServers">getTurnServers</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getUrlPreview">getUrlPreview</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getUser">getUser</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getUserId">getUserId</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getUserIdLocalpart">getUserIdLocalpart</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getUsers">getUsers</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getVerificationRequestsToDeviceInProgress">getVerificationRequestsToDeviceInProgress</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getVersions">getVersions</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#getVisibleRooms">getVisibleRooms</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#hasLazyLoadMembersEnabled">hasLazyLoadMembersEnabled</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#importRoomKeys">importRoomKeys</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#initCrypto">initCrypto</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#invite">invite</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#inviteByEmail">inviteByEmail</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#inviteByThreePid">inviteByThreePid</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#isCryptoEnabled">isCryptoEnabled</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#isEventSenderVerified">isEventSenderVerified</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#isFallbackICEServerAllowed">isFallbackICEServerAllowed</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#isGuest">isGuest</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#isInitialSyncComplete">isInitialSyncComplete</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#isKeyBackupKeyStored">isKeyBackupKeyStored</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#isKeyBackupTrusted">isKeyBackupTrusted</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#isRoomEncrypted">isRoomEncrypted</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#isSynapseAdministrator">isSynapseAdministrator</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#isUserIgnored">isUserIgnored</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#isVersionSupported">isVersionSupported</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#joinRoom">joinRoom</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#keyBackupKeyFromPassword">keyBackupKeyFromPassword</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#keyBackupKeyFromRecoveryKey">keyBackupKeyFromRecoveryKey</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#kick">kick</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#leave">leave</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#leaveRoomChain">leaveRoomChain</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#mxcUrlToHttp">mxcUrlToHttp</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#on">on</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#once">once</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#paginateEventTimeline">paginateEventTimeline</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#peekInRoom">peekInRoom</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#prepareKeyBackupVersion">prepareKeyBackupVersion</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#redactEvent">redactEvent</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#rehydrateDevice">rehydrateDevice</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#relations">relations</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#removeAllListeners">removeAllListeners</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#removeListener">removeListener</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#requestAdd3pidEmailToken">requestAdd3pidEmailToken</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#requestAdd3pidMsisdnToken">requestAdd3pidMsisdnToken</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#requestPasswordEmailToken">requestPasswordEmailToken</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#requestPasswordMsisdnToken">requestPasswordMsisdnToken</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#requestRegisterEmailToken">requestRegisterEmailToken</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#requestRegisterMsisdnToken">requestRegisterMsisdnToken</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#requestVerification">requestVerification</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#requestVerificationDM">requestVerificationDM</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#resendEvent">resendEvent</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#resetNotifTimelineSet">resetNotifTimelineSet</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#restoreKeyBackupWithCache">restoreKeyBackupWithCache</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#restoreKeyBackupWithPassword">restoreKeyBackupWithPassword</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#restoreKeyBackupWithRecoveryKey">restoreKeyBackupWithRecoveryKey</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#restoreKeyBackupWithSecretStorage">restoreKeyBackupWithSecretStorage</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#retryImmediately">retryImmediately</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#scheduleAllGroupSessionsForBackup">scheduleAllGroupSessionsForBackup</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#scrollback">scrollback</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#searchMessageText">searchMessageText</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#searchRoomEvents">searchRoomEvents</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#sendEmoteMessage">sendEmoteMessage</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#sendEvent">sendEvent</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#sendHtmlEmote">sendHtmlEmote</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#sendHtmlMessage">sendHtmlMessage</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#sendHtmlNotice">sendHtmlNotice</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#sendImageMessage">sendImageMessage</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#sendKeyBackup">sendKeyBackup</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#sendMessage">sendMessage</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#sendNotice">sendNotice</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#sendReadReceipt">sendReadReceipt</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#sendReceipt">sendReceipt</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#sendStickerMessage">sendStickerMessage</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#sendTextMessage">sendTextMessage</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#sendTyping">sendTyping</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setAccountData">setAccountData</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setAvatarUrl">setAvatarUrl</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setCanResetTimelineCallback">setCanResetTimelineCallback</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setDehydrationKey">setDehydrationKey</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setDeviceBlocked">setDeviceBlocked</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setDeviceKnown">setDeviceKnown</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setDeviceVerified">setDeviceVerified</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setDisplayName">setDisplayName</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setFallbackICEServerAllowed">setFallbackICEServerAllowed</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setForceTURN">setForceTURN</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setGlobalBlacklistUnverifiedDevices">setGlobalBlacklistUnverifiedDevices</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setGlobalErrorOnUnknownDevices">setGlobalErrorOnUnknownDevices</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setGuest">setGuest</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setGuestAccess">setGuestAccess</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setIgnoredUsers">setIgnoredUsers</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setMaxListeners">setMaxListeners</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setNotifTimelineSet">setNotifTimelineSet</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setPowerLevel">setPowerLevel</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setPresence">setPresence</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setProfileInfo">setProfileInfo</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setRoomAccountData">setRoomAccountData</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setRoomEncryption">setRoomEncryption</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setRoomMutePushRule">setRoomMutePushRule</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setRoomName">setRoomName</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setRoomReadMarkers">setRoomReadMarkers</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setRoomTag">setRoomTag</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#setRoomTopic">setRoomTopic</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#startClient">startClient</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#stopClient">stopClient</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#stopPeeking">stopPeeking</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#supportsVoip">supportsVoip</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#syncLeftRooms">syncLeftRooms</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#turnServer">turnServer</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#unban">unban</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#uploadKeys">uploadKeys</a></li><li data-type='method' style='display: none;'><a href="module-client.MatrixClient.html#whoisSynapseUser">whoisSynapseUser</a></li></ul></li><li><a href="module-crypto.html">crypto</a><ul class='members'><li data-type='member' style='display: none;'><a href="module-crypto.html#.verificationMethods">verificationMethods</a></li></ul><ul class='methods'><li data-type='method' style='display: none;'><a href="module-crypto.html#.fixBackupKey">fixBackupKey</a></li></ul></li><li><a href="module-crypto_algorithms_base.DecryptionAlgorithm.html">DecryptionAlgorithm</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_base.DecryptionAlgorithm.html#decryptEvent">decryptEvent</a></li><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_base.DecryptionAlgorithm.html#hasKeysForKeyRequest">hasKeysForKeyRequest</a></li><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_base.DecryptionAlgorithm.html#importRoomKey">importRoomKey</a></li><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_base.DecryptionAlgorithm.html#onRoomKeyEvent">onRoomKeyEvent</a></li><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_base.DecryptionAlgorithm.html#retryDecryptionFromSender">retryDecryptionFromSender</a></li><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_base.DecryptionAlgorithm.html#shareKeysWithDevice">shareKeysWithDevice</a></li></ul></li><li><a href="module-crypto_algorithms_base.DecryptionError.html">DecryptionError</a></li><li><a href="module-crypto_algorithms_base.EncryptionAlgorithm.html">EncryptionAlgorithm</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_base.EncryptionAlgorithm.html#.encryptMessage">encryptMessage</a></li><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_base.EncryptionAlgorithm.html#onRoomMembership">onRoomMembership</a></li><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_base.EncryptionAlgorithm.html#prepareToEncrypt">prepareToEncrypt</a></li></ul></li><li><a href="module-crypto_algorithms_base.UnknownDeviceError.html">UnknownDeviceError</a></li><li><a href="module-crypto_algorithms_megolm-MegolmDecryption.html">MegolmDecryption</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_megolm-MegolmDecryption.html#decryptEvent">decryptEvent</a></li><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_megolm-MegolmDecryption.html#hasKeysForKeyRequest">hasKeysForKeyRequest</a></li><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_megolm-MegolmDecryption.html#importRoomKey">importRoomKey</a></li><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_megolm-MegolmDecryption.html#onRoomKeyEvent">onRoomKeyEvent</a></li><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_megolm-MegolmDecryption.html#onRoomKeyWithheldEvent">onRoomKeyWithheldEvent</a></li><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_megolm-MegolmDecryption.html#shareKeysWithDevice">shareKeysWithDevice</a></li></ul></li><li><a href="module-crypto_algorithms_megolm-MegolmEncryption.html">MegolmEncryption</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_megolm-MegolmEncryption.html#_checkForUnknownDevices">_checkForUnknownDevices</a></li><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_megolm-MegolmEncryption.html#_getDevicesInRoom">_getDevicesInRoom</a></li><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_megolm-MegolmEncryption.html#_notifyBlockedDevices">_notifyBlockedDevices</a></li><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_megolm-MegolmEncryption.html#_notifyFailedOlmDevices">_notifyFailedOlmDevices</a></li><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_megolm-MegolmEncryption.html#_removeUnknownDevices">_removeUnknownDevices</a></li><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_megolm-MegolmEncryption.html#encryptMessage">encryptMessage</a></li><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_megolm-MegolmEncryption.html#forceDiscardSession">forceDiscardSession</a></li><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_megolm-MegolmEncryption.html#prepareToEncrypt">prepareToEncrypt</a></li><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_megolm-MegolmEncryption.html#reshareKeyWithDevice">reshareKeyWithDevice</a></li></ul></li><li><a href="module-crypto_algorithms_olm-OlmDecryption.html">OlmDecryption</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_olm-OlmDecryption.html#_decryptMessage">_decryptMessage</a></li><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_olm-OlmDecryption.html#decryptEvent">decryptEvent</a></li></ul></li><li><a href="module-crypto_algorithms_olm-OlmEncryption.html">OlmEncryption</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_olm-OlmEncryption.html#encryptMessage">encryptMessage</a></li></ul></li><li><a href="module-crypto_CrossSigning.CrossSigningInfo.html">CrossSigningInfo</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-crypto_CrossSigning.CrossSigningInfo.html#.getFromSecretStorage">getFromSecretStorage</a></li><li data-type='method' style='display: none;'><a href="module-crypto_CrossSigning.CrossSigningInfo.html#.storeInSecretStorage">storeInSecretStorage</a></li><li data-type='method' style='display: none;'><a href="module-crypto_CrossSigning.CrossSigningInfo.html#checkDeviceTrust">checkDeviceTrust</a></li><li data-type='method' style='display: none;'><a href="module-crypto_CrossSigning.CrossSigningInfo.html#checkUserTrust">checkUserTrust</a></li><li data-type='method' style='display: none;'><a href="module-crypto_CrossSigning.CrossSigningInfo.html#clearKeys">clearKeys</a></li><li data-type='method' style='display: none;'><a href="module-crypto_CrossSigning.CrossSigningInfo.html#getCacheCallbacks">getCacheCallbacks</a></li><li data-type='method' style='display: none;'><a href="module-crypto_CrossSigning.CrossSigningInfo.html#getCrossSigningKey">getCrossSigningKey</a></li><li data-type='method' style='display: none;'><a href="module-crypto_CrossSigning.CrossSigningInfo.html#getCrossSigningKeysFromCache">getCrossSigningKeysFromCache</a></li><li data-type='method' style='display: none;'><a href="module-crypto_CrossSigning.CrossSigningInfo.html#getId">getId</a></li><li data-type='method' style='display: none;'><a href="module-crypto_CrossSigning.CrossSigningInfo.html#isStoredInKeyCache">isStoredInKeyCache</a></li><li data-type='method' style='display: none;'><a href="module-crypto_CrossSigning.CrossSigningInfo.html#isStoredInSecretStorage">isStoredInSecretStorage</a></li><li data-type='method' style='display: none;'><a href="module-crypto_CrossSigning.CrossSigningInfo.html#resetKeys">resetKeys</a></li></ul></li><li><a href="module-crypto_CrossSigning.DeviceTrustLevel.html">DeviceTrustLevel</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-crypto_CrossSigning.DeviceTrustLevel.html#isCrossSigningVerified">isCrossSigningVerified</a></li><li data-type='method' style='display: none;'><a href="module-crypto_CrossSigning.DeviceTrustLevel.html#isLocallyVerified">isLocallyVerified</a></li><li data-type='method' style='display: none;'><a href="module-crypto_CrossSigning.DeviceTrustLevel.html#isTofu">isTofu</a></li><li data-type='method' style='display: none;'><a href="module-crypto_CrossSigning.DeviceTrustLevel.html#isVerified">isVerified</a></li></ul></li><li><a href="module-crypto_CrossSigning.UserTrustLevel.html">UserTrustLevel</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-crypto_CrossSigning.UserTrustLevel.html#isCrossSigningVerified">isCrossSigningVerified</a></li><li data-type='method' style='display: none;'><a href="module-crypto_CrossSigning.UserTrustLevel.html#isTofu">isTofu</a></li><li data-type='method' style='display: none;'><a href="module-crypto_CrossSigning.UserTrustLevel.html#isVerified">isVerified</a></li><li data-type='method' style='display: none;'><a href="module-crypto_CrossSigning.UserTrustLevel.html#wasCrossSigningVerified">wasCrossSigningVerified</a></li></ul></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_DeviceList.html">crypto/DeviceList</a></li><li><a href="module-crypto_OlmDevice.html">crypto/OlmDevice</a></li><li><a href="module-crypto_RoomList.html">crypto/RoomList</a></li><li><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html">IndexedDBCryptoStore</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#addEndToEndInboundGroupSession">addEndToEndInboundGroupSession</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#countEndToEndSessions">countEndToEndSessions</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#countSessionsNeedingBackup">countSessionsNeedingBackup</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#deleteAllData">deleteAllData</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#deleteOutgoingRoomKeyRequest">deleteOutgoingRoomKeyRequest</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#doTxn">doTxn</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#getAllEndToEndInboundGroupSessions">getAllEndToEndInboundGroupSessions</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#getAllEndToEndSessions">getAllEndToEndSessions</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#getAllOutgoingRoomKeyRequestsByState">getAllOutgoingRoomKeyRequestsByState</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#getCrossSigningKeys">getCrossSigningKeys</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#getEndToEndDeviceData">getEndToEndDeviceData</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#getEndToEndInboundGroupSession">getEndToEndInboundGroupSession</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#getEndToEndRooms">getEndToEndRooms</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#getEndToEndSession">getEndToEndSession</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#getEndToEndSessions">getEndToEndSessions</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#getOrAddOutgoingRoomKeyRequest">getOrAddOutgoingRoomKeyRequest</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#getOutgoingRoomKeyRequest">getOutgoingRoomKeyRequest</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#getOutgoingRoomKeyRequestByState">getOutgoingRoomKeyRequestByState</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#getOutgoingRoomKeyRequestsByTarget">getOutgoingRoomKeyRequestsByTarget</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#getSecretStorePrivateKey">getSecretStorePrivateKey</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#getSessionsNeedingBackup">getSessionsNeedingBackup</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#markSessionsNeedingBackup">markSessionsNeedingBackup</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#startup">startup</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#storeAccount">storeAccount</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#storeCrossSigningKeys">storeCrossSigningKeys</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#storeEndToEndDeviceData">storeEndToEndDeviceData</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#storeEndToEndInboundGroupSession">storeEndToEndInboundGroupSession</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#storeEndToEndRoom">storeEndToEndRoom</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#storeEndToEndSession">storeEndToEndSession</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#storeSecretStorePrivateKey">storeSecretStorePrivateKey</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#unmarkSessionsNeedingBackup">unmarkSessionsNeedingBackup</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html#updateOutgoingRoomKeyRequest">updateOutgoingRoomKeyRequest</a></li></ul></li><li><a href="module-crypto_store_localStorage-crypto-store.LocalStorageCryptoStore.html">LocalStorageCryptoStore</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-crypto_store_localStorage-crypto-store.LocalStorageCryptoStore.html#deleteAllData">deleteAllData</a></li></ul></li><li><a href="module-crypto_store_memory-crypto-store.MemoryCryptoStore.html">MemoryCryptoStore</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-crypto_store_memory-crypto-store.MemoryCryptoStore.html#_getOutgoingRoomKeyRequest">_getOutgoingRoomKeyRequest</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_memory-crypto-store.MemoryCryptoStore.html#deleteAllData">deleteAllData</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_memory-crypto-store.MemoryCryptoStore.html#deleteOutgoingRoomKeyRequest">deleteOutgoingRoomKeyRequest</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_memory-crypto-store.MemoryCryptoStore.html#getAllOutgoingRoomKeyRequestsByState">getAllOutgoingRoomKeyRequestsByState</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_memory-crypto-store.MemoryCryptoStore.html#getOrAddOutgoingRoomKeyRequest">getOrAddOutgoingRoomKeyRequest</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_memory-crypto-store.MemoryCryptoStore.html#getOutgoingRoomKeyRequest">getOutgoingRoomKeyRequest</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_memory-crypto-store.MemoryCryptoStore.html#getOutgoingRoomKeyRequestByState">getOutgoingRoomKeyRequestByState</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_memory-crypto-store.MemoryCryptoStore.html#startup">startup</a></li><li data-type='method' style='display: none;'><a href="module-crypto_store_memory-crypto-store.MemoryCryptoStore.html#updateOutgoingRoomKeyRequest">updateOutgoingRoomKeyRequest</a></li></ul></li><li><a href="module-crypto_verification_Base.VerificationBase.html">VerificationBase</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-crypto_verification_Base.VerificationBase.html#verify">verify</a></li></ul></li><li><a href="module-crypto_verification_IllegalMethod-crypto_verification_IllegalMethod_IllegalMethod.html">crypto/verification/IllegalMethod/IllegalMethod</a></li><li><a href="module-crypto_verification_QRCode-crypto_verification_QRCode_ReciprocateQRCode.html">crypto/verification/QRCode/ReciprocateQRCode</a></li><li><a href="module-crypto_verification_SAS.html">crypto/verification/SAS</a></li><li><a href="module-crypto-IncomingRoomKeyRequest.html">IncomingRoomKeyRequest</a></li><li><a href="module-crypto-IncomingRoomKeyRequestCancellation.html">IncomingRoomKeyRequestCancellation</a></li><li><a href="module-filter.Filter.html">Filter</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-filter.Filter.html#.fromJson">fromJson</a></li><li data-type='method' style='display: none;'><a href="module-filter.Filter.html#filterRoomTimeline">filterRoomTimeline</a></li><li data-type='method' style='display: none;'><a href="module-filter.Filter.html#getDefinition">getDefinition</a></li><li data-type='method' style='display: none;'><a href="module-filter.Filter.html#getFilterId">getFilterId</a></li><li data-type='method' style='display: none;'><a href="module-filter.Filter.html#getRoomTimelineFilterComponent">getRoomTimelineFilterComponent</a></li><li data-type='method' style='display: none;'><a href="module-filter.Filter.html#setDefinition">setDefinition</a></li><li data-type='method' style='display: none;'><a href="module-filter.Filter.html#setIncludeLeaveRooms">setIncludeLeaveRooms</a></li><li data-type='method' style='display: none;'><a href="module-filter.Filter.html#setTimelineLimit">setTimelineLimit</a></li></ul></li><li><a href="module-filter-component.FilterComponent.html">FilterComponent</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-filter-component.FilterComponent.html#_checkFields">_checkFields</a></li><li data-type='method' style='display: none;'><a href="module-filter-component.FilterComponent.html#check">check</a></li><li data-type='method' style='display: none;'><a href="module-filter-component.FilterComponent.html#filter">filter</a></li><li data-type='method' style='display: none;'><a href="module-filter-component.FilterComponent.html#limit">limit</a></li></ul></li><li><a href="module-http-api.ConnectionError.html">ConnectionError</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-http-api.MatrixHttpApi.html#authedRequest">authedRequest</a></li><li data-type='method' style='display: none;'><a href="module-http-api.MatrixHttpApi.html#getContentUri">getContentUri</a></li><li data-type='method' style='display: none;'><a href="module-http-api.MatrixHttpApi.html#getUrl">getUrl</a></li><li data-type='method' style='display: none;'><a href="module-http-api.MatrixHttpApi.html#request">request</a></li><li data-type='method' style='display: none;'><a href="module-http-api.MatrixHttpApi.html#requestOtherUrl">requestOtherUrl</a></li><li data-type='method' style='display: none;'><a href="module-http-api.MatrixHttpApi.html#setIdBaseUrl">setIdBaseUrl</a></li><li data-type='method' style='display: none;'><a href="module-http-api.MatrixHttpApi.html#uploadContent">uploadContent</a></li></ul></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_event-context.EventContext.html">EventContext</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-models_event-context.EventContext.html#addEvents">addEvents</a></li><li data-type='method' style='display: none;'><a href="module-models_event-context.EventContext.html#getEvent">getEvent</a></li><li data-type='method' style='display: none;'><a href="module-models_event-context.EventContext.html#getOurEventIndex">getOurEventIndex</a></li><li data-type='method' style='display: none;'><a href="module-models_event-context.EventContext.html#getPaginateToken">getPaginateToken</a></li><li data-type='method' style='display: none;'><a href="module-models_event-context.EventContext.html#getTimeline">getTimeline</a></li><li data-type='method' style='display: none;'><a href="module-models_event-context.EventContext.html#setPaginateToken">setPaginateToken</a></li></ul></li><li><a href="module-models_event-timeline.EventTimeline.html">EventTimeline</a><ul class='members'><li data-type='member' style='display: none;'><a href="module-models_event-timeline.EventTimeline.html#.BACKWARDS">BACKWARDS</a></li><li data-type='member' style='display: none;'><a href="module-models_event-timeline.EventTimeline.html#.FORWARDS">FORWARDS</a></li></ul><ul class='methods'><li data-type='method' style='display: none;'><a href="module-models_event-timeline.EventTimeline.html#.setEventMetadata">setEventMetadata</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline.EventTimeline.html#addEvent">addEvent</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline.EventTimeline.html#fork">fork</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline.EventTimeline.html#forkLive">forkLive</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline.EventTimeline.html#getBaseIndex">getBaseIndex</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline.EventTimeline.html#getEvents">getEvents</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline.EventTimeline.html#getFilter">getFilter</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline.EventTimeline.html#getNeighbouringTimeline">getNeighbouringTimeline</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline.EventTimeline.html#getPaginationToken">getPaginationToken</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline.EventTimeline.html#getRoomId">getRoomId</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline.EventTimeline.html#getState">getState</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline.EventTimeline.html#getTimelineSet">getTimelineSet</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline.EventTimeline.html#initialiseState">initialiseState</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline.EventTimeline.html#removeEvent">removeEvent</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline.EventTimeline.html#setNeighbouringTimeline">setNeighbouringTimeline</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline.EventTimeline.html#setPaginationToken">setPaginationToken</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline.EventTimeline.html#toString">toString</a></li></ul></li><li><a href="module-models_event-timeline-set.EventTimelineSet.html">EventTimelineSet</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-models_event-timeline-set.EventTimelineSet.html#addEventsToTimeline">addEventsToTimeline</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline-set.EventTimelineSet.html#addEventToTimeline">addEventToTimeline</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline-set.EventTimelineSet.html#addLiveEvent">addLiveEvent</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline-set.EventTimelineSet.html#addTimeline">addTimeline</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline-set.EventTimelineSet.html#aggregateRelations">aggregateRelations</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline-set.EventTimelineSet.html#compareEventOrdering">compareEventOrdering</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline-set.EventTimelineSet.html#eventIdToTimeline">eventIdToTimeline</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline-set.EventTimelineSet.html#findEventById">findEventById</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline-set.EventTimelineSet.html#getFilter">getFilter</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline-set.EventTimelineSet.html#getLiveTimeline">getLiveTimeline</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline-set.EventTimelineSet.html#getPendingEvents">getPendingEvents</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline-set.EventTimelineSet.html#getRelationsForEvent">getRelationsForEvent</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline-set.EventTimelineSet.html#getTimelineForEvent">getTimelineForEvent</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline-set.EventTimelineSet.html#getTimelines">getTimelines</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline-set.EventTimelineSet.html#handleRemoteEcho">handleRemoteEcho</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline-set.EventTimelineSet.html#removeEvent">removeEvent</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline-set.EventTimelineSet.html#replaceEventId">replaceEventId</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline-set.EventTimelineSet.html#resetLiveTimeline">resetLiveTimeline</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline-set.EventTimelineSet.html#setFilter">setFilter</a></li><li data-type='method' style='display: none;'><a href="module-models_event-timeline-set.EventTimelineSet.html#setRelationsTarget">setRelationsTarget</a></li></ul></li><li><a href="module-models_room.html">models/room</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-models_room.html#~calculateRoomName">calculateRoomName</a></li></ul></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.RoomState.html">RoomState</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#_getOrCreateMember">_getOrCreateMember</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#_hasSufficientPowerLevelFor">_hasSufficientPowerLevelFor</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#_maySendEventOfType">_maySendEventOfType</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#_setOutOfBandMember">_setOutOfBandMember</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#_updateModifiedTime">_updateModifiedTime</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#clearOutOfBandMembers">clearOutOfBandMembers</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#clone">clone</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#getInvitedMemberCount">getInvitedMemberCount</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#getInviteForThreePidToken">getInviteForThreePidToken</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#getJoinedMemberCount">getJoinedMemberCount</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#getLastModifiedTime">getLastModifiedTime</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#getMember">getMember</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#getMembers">getMembers</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#getMembersExcept">getMembersExcept</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#getSentinelMember">getSentinelMember</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#getStateEvents">getStateEvents</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#getUserIdsWithDisplayName">getUserIdsWithDisplayName</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#markOutOfBandMembersFailed">markOutOfBandMembersFailed</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#markOutOfBandMembersStarted">markOutOfBandMembersStarted</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#mayClientSendStateEvent">mayClientSendStateEvent</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#maySendEvent">maySendEvent</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#maySendMessage">maySendMessage</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#maySendRedactionForEvent">maySendRedactionForEvent</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#maySendStateEvent">maySendStateEvent</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#mayTriggerNotifOfType">mayTriggerNotifOfType</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#needsOutOfBandMembers">needsOutOfBandMembers</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#setInvitedMemberCount">setInvitedMemberCount</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#setJoinedMemberCount">setJoinedMemberCount</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#setOutOfBandMembers">setOutOfBandMembers</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#setStateEvents">setStateEvents</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#setTypingEvent">setTypingEvent</a></li><li data-type='method' style='display: none;'><a href="module-models_room-state.RoomState.html#setUnknownStateEvents">setUnknownStateEvents</a></li></ul></li><li><a href="module-models_room-summary.RoomSummary.html">RoomSummary</a></li><li><a href="module-models_search-result.SearchResult.html">SearchResult</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-models_search-result.SearchResult.html#.fromJson">fromJson</a></li></ul></li><li><a href="module-models_user.User.html">User</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-models_user.User.html#_unstable_updateStatusMessage">_unstable_updateStatusMessage</a></li><li data-type='method' style='display: none;'><a href="module-models_user.User.html#_updateModifiedTime">_updateModifiedTime</a></li><li data-type='method' style='display: none;'><a href="module-models_user.User.html#getLastActiveTs">getLastActiveTs</a></li><li data-type='method' style='display: none;'><a href="module-models_user.User.html#getLastModifiedTime">getLastModifiedTime</a></li><li data-type='method' style='display: none;'><a href="module-models_user.User.html#setAvatarUrl">setAvatarUrl</a></li><li data-type='method' style='display: none;'><a href="module-models_user.User.html#setDisplayName">setDisplayName</a></li><li data-type='method' style='display: none;'><a href="module-models_user.User.html#setPresenceEvent">setPresenceEvent</a></li><li data-type='method' style='display: none;'><a href="module-models_user.User.html#setRawDisplayName">setRawDisplayName</a></li></ul></li><li><a href="module-pushprocessor.PushProcessor.html">PushProcessor</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-pushprocessor.PushProcessor.html#.actionListToActionsObject">actionListToActionsObject</a></li><li data-type='method' style='display: none;'><a href="module-pushprocessor.PushProcessor.html#.rewriteDefaultRules">rewriteDefaultRules</a></li><li data-type='method' style='display: none;'><a href="module-pushprocessor.PushProcessor.html#actionsForEvent">actionsForEvent</a></li><li data-type='method' style='display: none;'><a href="module-pushprocessor.PushProcessor.html#getPushRuleById">getPushRuleById</a></li></ul></li><li><a href="module-scheduler.MatrixScheduler.html">MatrixScheduler</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-scheduler.MatrixScheduler.html#.QUEUE_MESSAGES">QUEUE_MESSAGES</a></li><li data-type='method' style='display: none;'><a href="module-scheduler.MatrixScheduler.html#.RETRY_BACKOFF_RATELIMIT">RETRY_BACKOFF_RATELIMIT</a></li><li data-type='method' style='display: none;'><a href="module-scheduler.MatrixScheduler.html#getQueueForEvent">getQueueForEvent</a></li><li data-type='method' style='display: none;'><a href="module-scheduler.MatrixScheduler.html#queueEvent">queueEvent</a></li><li data-type='method' style='display: none;'><a href="module-scheduler.MatrixScheduler.html#removeEventFromQueue">removeEventFromQueue</a></li><li data-type='method' style='display: none;'><a href="module-scheduler.MatrixScheduler.html#setProcessFunction">setProcessFunction</a></li></ul></li><li><a href="module-store_indexeddb.IndexedDBStore.html">IndexedDBStore</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-store_indexeddb.IndexedDBStore.html#save">save</a></li><li data-type='method' style='display: none;'><a href="module-store_indexeddb.IndexedDBStore.html#startup">startup</a></li><li data-type='method' style='display: none;'><a href="module-store_indexeddb.IndexedDBStore.html#wantsSave">wantsSave</a></li></ul></li><li><a href="module-store_memory.MemoryStore.html">MemoryStore</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#_onRoomMember">_onRoomMember</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#deleteAllData">deleteAllData</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#getAccountData">getAccountData</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#getFilter">getFilter</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#getFilterIdByName">getFilterIdByName</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#getGroup">getGroup</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#getGroups">getGroups</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#getOutOfBandMembers">getOutOfBandMembers</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#getRoom">getRoom</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#getRooms">getRooms</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#getRoomSummaries">getRoomSummaries</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#getSavedSync">getSavedSync</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#getSavedSyncToken">getSavedSyncToken</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#getSyncToken">getSyncToken</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#getUser">getUser</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#getUsers">getUsers</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#isNewlyCreated">isNewlyCreated</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#removeRoom">removeRoom</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#save">save</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#scrollback">scrollback</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#setFilterIdByName">setFilterIdByName</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#setOutOfBandMembers">setOutOfBandMembers</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#setSyncData">setSyncData</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#setSyncToken">setSyncToken</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#startup">startup</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#storeAccountDataEvents">storeAccountDataEvents</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#storeEvents">storeEvents</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#storeFilter">storeFilter</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#storeGroup">storeGroup</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#storeRoom">storeRoom</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#storeUser">storeUser</a></li><li data-type='method' style='display: none;'><a href="module-store_memory.MemoryStore.html#wantsSave">wantsSave</a></li></ul></li><li><a href="module-store_session_webstorage.WebStorageSessionStore.html">WebStorageSessionStore</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-store_session_webstorage.WebStorageSessionStore.html#getAllEndToEndDevices">getAllEndToEndDevices</a></li><li data-type='method' style='display: none;'><a href="module-store_session_webstorage.WebStorageSessionStore.html#getAllEndToEndInboundGroupSessionKeys">getAllEndToEndInboundGroupSessionKeys</a></li><li data-type='method' style='display: none;'><a href="module-store_session_webstorage.WebStorageSessionStore.html#getAllEndToEndRooms">getAllEndToEndRooms</a></li><li data-type='method' style='display: none;'><a href="module-store_session_webstorage.WebStorageSessionStore.html#getAllEndToEndSessions">getAllEndToEndSessions</a></li><li data-type='method' style='display: none;'><a href="module-store_session_webstorage.WebStorageSessionStore.html#getEndToEndAccount">getEndToEndAccount</a></li><li data-type='method' style='display: none;'><a href="module-store_session_webstorage.WebStorageSessionStore.html#getEndToEndDeviceSyncToken">getEndToEndDeviceSyncToken</a></li><li data-type='method' style='display: none;'><a href="module-store_session_webstorage.WebStorageSessionStore.html#getEndToEndSessions">getEndToEndSessions</a></li><li data-type='method' style='display: none;'><a href="module-store_session_webstorage.WebStorageSessionStore.html#removeAllEndToEndSessions">removeAllEndToEndSessions</a></li><li data-type='method' style='display: none;'><a href="module-store_session_webstorage.WebStorageSessionStore.html#removeEndToEndAccount">removeEndToEndAccount</a></li><li data-type='method' style='display: none;'><a href="module-store_session_webstorage.WebStorageSessionStore.html#removeEndToEndDeviceData">removeEndToEndDeviceData</a></li></ul></li><li><a href="module-store_stub.StubStore.html">StubStore</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#deleteAllData">deleteAllData</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#getAccountData">getAccountData</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#getFilter">getFilter</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#getFilterIdByName">getFilterIdByName</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#getGroup">getGroup</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#getGroups">getGroups</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#getRoom">getRoom</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#getRooms">getRooms</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#getRoomSummaries">getRoomSummaries</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#getSavedSync">getSavedSync</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#getSavedSyncToken">getSavedSyncToken</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#getSyncToken">getSyncToken</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#getUser">getUser</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#getUsers">getUsers</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#isNewlyCreated">isNewlyCreated</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#removeRoom">removeRoom</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#save">save</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#scrollback">scrollback</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#setFilterIdByName">setFilterIdByName</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#setSyncData">setSyncData</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#setSyncToken">setSyncToken</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#startup">startup</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#storeAccountDataEvents">storeAccountDataEvents</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#storeEvents">storeEvents</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#storeFilter">storeFilter</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#storeGroup">storeGroup</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#storeRoom">storeRoom</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#storeUser">storeUser</a></li><li data-type='method' style='display: none;'><a href="module-store_stub.StubStore.html#wantsSave">wantsSave</a></li></ul></li><li><a href="module-sync-accumulator.SyncAccumulator.html">SyncAccumulator</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-sync-accumulator.SyncAccumulator.html#_accumulateGroups">_accumulateGroups</a></li><li data-type='method' style='display: none;'><a href="module-sync-accumulator.SyncAccumulator.html#_accumulateRooms">_accumulateRooms</a></li><li data-type='method' style='display: none;'><a href="module-sync-accumulator.SyncAccumulator.html#getJSON">getJSON</a></li></ul></li><li><a href="module-timeline-window.TimelineWindow.html">TimelineWindow</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-timeline-window.TimelineWindow.html#canPaginate">canPaginate</a></li><li data-type='method' style='display: none;'><a href="module-timeline-window.TimelineWindow.html#extend">extend</a></li><li data-type='method' style='display: none;'><a href="module-timeline-window.TimelineWindow.html#getEvents">getEvents</a></li><li data-type='method' style='display: none;'><a href="module-timeline-window.TimelineWindow.html#getTimelineIndex">getTimelineIndex</a></li><li data-type='method' style='display: none;'><a href="module-timeline-window.TimelineWindow.html#load">load</a></li><li data-type='method' style='display: none;'><a href="module-timeline-window.TimelineWindow.html#paginate">paginate</a></li><li data-type='method' style='display: none;'><a href="module-timeline-window.TimelineWindow.html#unpaginate">unpaginate</a></li></ul></li><li><a href="module-webrtc_call.MatrixCall.html">MatrixCall</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#answer">answer</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#getLocalVideoElement">getLocalVideoElement</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#getRemoteAudioElement">getRemoteAudioElement</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#getRemoteVideoElement">getRemoteVideoElement</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#gotLocalIceCandidate">gotLocalIceCandidate</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#gotUserMediaForInvite">gotUserMediaForInvite</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#hangup">hangup</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#initWithHangup">initWithHangup</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#initWithInvite">initWithInvite</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#isLocalOnHold">isLocalOnHold</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#isLocalVideoMuted">isLocalVideoMuted</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#isMicrophoneMuted">isMicrophoneMuted</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#isRemoteOnHold">isRemoteOnHold</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#onAnswerReceived">onAnswerReceived</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#placeScreenSharingCall">placeScreenSharingCall</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#placeVideoCall">placeVideoCall</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#placeVoiceCall">placeVoiceCall</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#reject">reject</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#replacedBy">replacedBy</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#sendVoipEvent">sendVoipEvent</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#setLocalVideoElement">setLocalVideoElement</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#setLocalVideoMuted">setLocalVideoMuted</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#setMicrophoneMuted">setMicrophoneMuted</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#setRemoteAudioElement">setRemoteAudioElement</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.MatrixCall.html#setRemoteVideoElement">setRemoteVideoElement</a></li></ul></li><li><a href="Relations.html">Relations</a><ul class='methods'><li data-type='method' style='display: none;'><a href="Relations.html#_removeEvent">_removeEvent</a></li><li data-type='method' style='display: none;'><a href="Relations.html#addEvent">addEvent</a></li><li data-type='method' style='display: none;'><a href="Relations.html#getAnnotationsBySender">getAnnotationsBySender</a></li><li data-type='method' style='display: none;'><a href="Relations.html#getLastReplacement">getLastReplacement</a></li><li data-type='method' style='display: none;'><a href="Relations.html#getRelations">getRelations</a></li><li data-type='method' style='display: none;'><a href="Relations.html#getSortedAnnotationsByKey">getSortedAnnotationsByKey</a></li></ul></li><li><a href="RemoteIndexedDBStoreBackend.html">RemoteIndexedDBStoreBackend</a><ul class='methods'><li data-type='method' style='display: none;'><a href="RemoteIndexedDBStoreBackend.html#clearDatabase">clearDatabase</a></li><li data-type='method' style='display: none;'><a href="RemoteIndexedDBStoreBackend.html#connect">connect</a></li><li data-type='method' style='display: none;'><a href="RemoteIndexedDBStoreBackend.html#getOutOfBandMembers">getOutOfBandMembers</a></li><li data-type='method' style='display: none;'><a href="RemoteIndexedDBStoreBackend.html#getSavedSync">getSavedSync</a></li><li data-type='method' style='display: none;'><a href="RemoteIndexedDBStoreBackend.html#getUserPresenceEvents">getUserPresenceEvents</a></li><li data-type='method' style='display: none;'><a href="RemoteIndexedDBStoreBackend.html#isNewlyCreated">isNewlyCreated</a></li><li data-type='method' style='display: none;'><a href="RemoteIndexedDBStoreBackend.html#setOutOfBandMembers">setOutOfBandMembers</a></li></ul></li><li><a href="SSSSCryptoCallbacks.html">SSSSCryptoCallbacks</a></li><li><a href="SyncApi.html">SyncApi</a><ul class='methods'><li data-type='method' style='display: none;'><a href="SyncApi.html#_getGuestFilter">_getGuestFilter</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#_mapSyncEventsFormat">_mapSyncEventsFormat</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#_mapSyncResponseToRoomArray">_mapSyncResponseToRoomArray</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#_onOnline">_onOnline</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#_peekPoll">_peekPoll</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#_pokeKeepAlive">_pokeKeepAlive</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#_processEventsForNotifs">_processEventsForNotifs</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#_processGroupSyncEntry">_processGroupSyncEntry</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#_processRoomEvents">_processRoomEvents</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#_processSyncResponse">_processSyncResponse</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#_resolveInvites">_resolveInvites</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#_startKeepAlives">_startKeepAlives</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#_sync">_sync</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#_syncFromCache">_syncFromCache</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#_updateSyncState">_updateSyncState</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#_wasLazyLoadingToggled">_wasLazyLoadingToggled</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#createGroup">createGroup</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#createRoom">createRoom</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#getSyncState">getSyncState</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#getSyncStateData">getSyncStateData</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#peek">peek</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#retryImmediately">retryImmediately</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#stop">stop</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#stopPeeking">stopPeeking</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#sync">sync</a></li><li data-type='method' style='display: none;'><a href="SyncApi.html#syncLeftRooms">syncLeftRooms</a></li></ul></li><li><a href="ToDeviceChannel.html">ToDeviceChannel</a><ul class='methods'><li data-type='method' style='display: none;'><a href="ToDeviceChannel.html#.canCreateRequest">canCreateRequest</a></li><li data-type='method' style='display: none;'><a href="ToDeviceChannel.html#.getTransactionId">getTransactionId</a></li><li data-type='method' style='display: none;'><a href="ToDeviceChannel.html#.makeTransactionId">makeTransactionId</a></li><li data-type='method' style='display: none;'><a href="ToDeviceChannel.html#.validateEvent">validateEvent</a></li><li data-type='method' style='display: none;'><a href="ToDeviceChannel.html#completeContent">completeContent</a></li><li data-type='method' style='display: none;'><a href="ToDeviceChannel.html#completedContentFromEvent">completedContentFromEvent</a></li><li data-type='method' style='display: none;'><a href="ToDeviceChannel.html#getTimestamp">getTimestamp</a></li><li data-type='method' style='display: none;'><a href="ToDeviceChannel.html#handleEvent">handleEvent</a></li><li data-type='method' style='display: none;'><a href="ToDeviceChannel.html#send">send</a></li><li data-type='method' style='display: none;'><a href="ToDeviceChannel.html#sendCompleted">sendCompleted</a></li></ul></li></ul><h3>Modules</h3><ul><li><a href="crypto_DeviceList%250A%250AManages%2520the%2520list%2520of%2520other%2520users_%2520devicesmodule_.html">crypto/DeviceList
+
+Manages the list of other users' devices</a></li><li><a href="crypto_RoomList%250A%250AManages%2520the%2520list%2520of%2520encrypted%2520roomsmodule_.html">crypto/RoomList
+
+Manages the list of encrypted rooms</a></li><li><a href="module-auto-discovery.html">auto-discovery</a></li><li><a href="module-base-apis.html">base-apis</a></li><li><a href="module-client.html">client</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-client.html#~_encryptEventIfNeeded">_encryptEventIfNeeded</a></li><li data-type='method' style='display: none;'><a href="module-client.html#~_getEncryptedIfNeededEventType">_getEncryptedIfNeededEventType</a></li><li data-type='method' style='display: none;'><a href="module-client.html#~_membershipChange">_membershipChange</a></li><li data-type='method' style='display: none;'><a href="module-client.html#~_setMembershipState">_setMembershipState</a></li><li data-type='method' style='display: none;'><a href="module-client.html#~wrapCryptoFuncs">wrapCryptoFuncs</a></li></ul></li><li><a href="module-content-repo.html">content-repo</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-content-repo.html#.getHttpUriForMxc">getHttpUriForMxc</a></li></ul></li><li><a href="module-ContentHelpers.html">ContentHelpers</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-ContentHelpers.html#.makeEmoteMessage">makeEmoteMessage</a></li><li data-type='method' style='display: none;'><a href="module-ContentHelpers.html#.makeHtmlEmote">makeHtmlEmote</a></li><li data-type='method' style='display: none;'><a href="module-ContentHelpers.html#.makeHtmlMessage">makeHtmlMessage</a></li><li data-type='method' style='display: none;'><a href="module-ContentHelpers.html#.makeHtmlNotice">makeHtmlNotice</a></li><li data-type='method' style='display: none;'><a href="module-ContentHelpers.html#.makeNotice">makeNotice</a></li><li data-type='method' style='display: none;'><a href="module-ContentHelpers.html#.makeTextMessage">makeTextMessage</a></li></ul></li><li><a href="module-crypto.html">crypto</a><ul class='members'><li data-type='member' style='display: none;'><a href="module-crypto.html#.verificationMethods">verificationMethods</a></li></ul><ul class='methods'><li data-type='method' style='display: none;'><a href="module-crypto.html#.fixBackupKey">fixBackupKey</a></li></ul></li><li><a href="module-crypto_algorithms.html">crypto/algorithms</a></li><li><a href="module-crypto_algorithms_base.html">crypto/algorithms/base</a><ul class='members'><li data-type='member' style='display: none;'><a href="module-crypto_algorithms_base.html#.DECRYPTION_CLASSES">DECRYPTION_CLASSES</a></li><li data-type='member' style='display: none;'><a href="module-crypto_algorithms_base.html#.ENCRYPTION_CLASSES">ENCRYPTION_CLASSES</a></li></ul><ul class='methods'><li data-type='method' style='display: none;'><a href="module-crypto_algorithms_base.html#.registerAlgorithm">registerAlgorithm</a></li></ul></li><li><a href="module-crypto_algorithms_megolm.html">crypto/algorithms/megolm</a></li><li><a href="module-crypto_algorithms_olm.html">crypto/algorithms/olm</a></li><li><a href="module-crypto_CrossSigning.html">crypto/CrossSigning</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-crypto_CrossSigning.html#.requestKeysDuringVerification">requestKeysDuringVerification</a></li></ul></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_OutgoingRoomKeyRequestManager.html">crypto/OutgoingRoomKeyRequestManager</a><ul class='members'><li data-type='member' style='display: none;'><a href="module-crypto_OutgoingRoomKeyRequestManager.html#.ROOM_KEY_REQUEST_STATES">ROOM_KEY_REQUEST_STATES</a></li></ul></li><li><a href="module-crypto_SecretStorage.html">crypto/SecretStorage</a></li><li><a href="module-crypto_store_base.html">crypto/store/base</a></li><li><a href="module-crypto_store_indexeddb-crypto-store.html">crypto/store/indexeddb-crypto-store</a></li><li><a href="module-crypto_store_localStorage-crypto-store.html">crypto/store/localStorage-crypto-store</a></li><li><a href="module-crypto_store_memory-crypto-store.html">crypto/store/memory-crypto-store</a></li><li><a href="module-crypto_verification_Base.html">crypto/verification/Base</a></li><li><a href="module-crypto_verification_Error.html">crypto/verification/Error</a><ul class='members'><li data-type='member' style='display: none;'><a href="module-crypto_verification_Error.html#.newInvalidMessageError">newInvalidMessageError</a></li><li data-type='member' style='display: none;'><a href="module-crypto_verification_Error.html#.newKeyMismatchError">newKeyMismatchError</a></li><li data-type='member' style='display: none;'><a href="module-crypto_verification_Error.html#.newTimeoutError">newTimeoutError</a></li><li data-type='member' style='display: none;'><a href="module-crypto_verification_Error.html#.newUnexpectedMessageError">newUnexpectedMessageError</a></li><li data-type='member' style='display: none;'><a href="module-crypto_verification_Error.html#.newUnknownMethodError">newUnknownMethodError</a></li><li data-type='member' style='display: none;'><a href="module-crypto_verification_Error.html#.newUnknownTransactionError">newUnknownTransactionError</a></li><li data-type='member' style='display: none;'><a href="module-crypto_verification_Error.html#.newUserCancelledError">newUserCancelledError</a></li><li data-type='member' style='display: none;'><a href="module-crypto_verification_Error.html#.newUserMismatchError">newUserMismatchError</a></li></ul></li><li><a href="module-crypto_verification_IllegalMethod.html">crypto/verification/IllegalMethod</a></li><li><a href="module-crypto_verification_QRCode.html">crypto/verification/QRCode</a></li><li><a href="module-crypto_verification_SAS.html">crypto/verification/SAS</a></li><li><a href="module-filter.html">filter</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-filter.html#~setProp">setProp</a></li></ul></li><li><a href="module-filter-component.html">filter-component</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-filter-component.html#~_matches_wildcard">_matches_wildcard</a></li></ul></li><li><a href="module-http-api.html">http-api</a><ul class='members'><li data-type='member' style='display: none;'><a href="module-http-api.html#.PREFIX_IDENTITY_V1">PREFIX_IDENTITY_V1</a></li><li data-type='member' style='display: none;'><a href="module-http-api.html#.PREFIX_IDENTITY_V2">PREFIX_IDENTITY_V2</a></li><li data-type='member' style='display: none;'><a href="module-http-api.html#.PREFIX_MEDIA_R0">PREFIX_MEDIA_R0</a></li><li data-type='member' style='display: none;'><a href="module-http-api.html#.PREFIX_R0">PREFIX_R0</a></li><li data-type='member' style='display: none;'><a href="module-http-api.html#.PREFIX_UNSTABLE">PREFIX_UNSTABLE</a></li></ul><ul class='methods'><li data-type='method' style='display: none;'><a href="module-http-api.html#.retryNetworkOperation">retryNetworkOperation</a></li><li data-type='method' style='display: none;'><a href="module-http-api.html#~getResponseContentType">getResponseContentType</a></li><li data-type='method' style='display: none;'><a href="module-http-api.html#~parseErrorResponse">parseErrorResponse</a></li></ul></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-logger.html">logger</a><ul class='members'><li data-type='member' style='display: none;'><a href="module-logger.html#.logger">logger</a></li></ul></li><li><a href="module-models_event.html">models/event</a><ul class='members'><li data-type='member' style='display: none;'><a href="module-models_event.html#.EventStatus">EventStatus</a></li></ul><ul class='methods'><li data-type='method' style='display: none;'><a href="module-models_event.html#~_setClearData">_setClearData</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~attemptDecryption">attemptDecryption</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~cancelAndResendKeyRequest">cancelAndResendKeyRequest</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~flagCancelled">flagCancelled</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getAge">getAge</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getAssociatedId">getAssociatedId</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getAssociatedStatus">getAssociatedStatus</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getClaimedEd25519Key">getClaimedEd25519Key</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getClearContent">getClearContent</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getContent">getContent</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getDate">getDate</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getDirectionalContent">getDirectionalContent</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getForwardingCurve25519KeyChain">getForwardingCurve25519KeyChain</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getId">getId</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getKeyRequestRecipients">getKeyRequestRecipients</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getKeysClaimed">getKeysClaimed</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getLocalAge">getLocalAge</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getOriginalContent">getOriginalContent</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getPrevContent">getPrevContent</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getPushActions">getPushActions</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getRelation">getRelation</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getRoomId">getRoomId</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getSender">getSender</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getSenderKey">getSenderKey</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getStateKey">getStateKey</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getTs">getTs</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getType">getType</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getWireContent">getWireContent</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~getWireType">getWireType</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~handleRemoteEcho">handleRemoteEcho</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~hasAssocation">hasAssocation</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~isBeingDecrypted">isBeingDecrypted</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~isCancelled">isCancelled</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~isDecryptionFailure">isDecryptionFailure</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~isEncrypted">isEncrypted</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~isKeySourceUntrusted">isKeySourceUntrusted</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~isRedacted">isRedacted</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~isRedaction">isRedaction</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~isRelation">isRelation</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~isSending">isSending</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~isState">isState</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~localRedactionEvent">localRedactionEvent</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~makeEncrypted">makeEncrypted</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~makeRedacted">makeRedacted</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~makeReplaced">makeReplaced</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~replacingEvent">replacingEvent</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~replacingEventDate">replacingEventDate</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~replacingEventId">replacingEventId</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~setPushActions">setPushActions</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~setStatus">setStatus</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~toJSON">toJSON</a></li><li data-type='method' style='display: none;'><a href="module-models_event.html#~updateAssociatedId">updateAssociatedId</a></li></ul></li><li><a href="module-models_event-context.html">models/event-context</a></li><li><a href="module-models_event-timeline.html">models/event-timeline</a></li><li><a href="module-models_event-timeline-set.html">models/event-timeline-set</a></li><li><a href="module-models_group.html">models/group</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-models_group.html#.Group">Group</a></li></ul></li><li><a href="module-models_room.html">models/room</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-models_room.html#~calculateRoomName">calculateRoomName</a></li></ul></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_search-result.html">models/search-result</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-pushprocessor.html">pushprocessor</a></li><li><a href="module-ReEmitter.html">ReEmitter</a></li><li><a href="module-scheduler.html">scheduler</a></li><li><a href="module-store_indexeddb.html">store/indexeddb</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-store_indexeddb.html#~degradable">degradable</a></li></ul></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-store_session_webstorage.html">store/session/webstorage</a></li><li><a href="module-store_stub.html">store/stub</a></li><li><a href="module-sync-accumulator.html">sync-accumulator</a></li><li><a href="module-timeline-window.html">timeline-window</a></li><li><a href="module-utils.html">utils</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-utils.html#.checkObjectHasKeys">checkObjectHasKeys</a></li><li data-type='method' style='display: none;'><a href="module-utils.html#.checkObjectHasNoAdditionalKeys">checkObjectHasNoAdditionalKeys</a></li><li data-type='method' style='display: none;'><a href="module-utils.html#.deepCompare">deepCompare</a></li><li data-type='method' style='display: none;'><a href="module-utils.html#.deepCopy">deepCopy</a></li><li data-type='method' style='display: none;'><a href="module-utils.html#.encodeParams">encodeParams</a></li><li data-type='method' style='display: none;'><a href="module-utils.html#.encodeUri">encodeUri</a></li><li data-type='method' style='display: none;'><a href="module-utils.html#.extend">extend</a></li><li data-type='method' style='display: none;'><a href="module-utils.html#.filter">filter</a></li><li data-type='method' style='display: none;'><a href="module-utils.html#.findElement">findElement</a></li><li data-type='method' style='display: none;'><a href="module-utils.html#.forEach">forEach</a></li><li data-type='method' style='display: none;'><a href="module-utils.html#.inherits">inherits</a></li><li data-type='method' style='display: none;'><a href="module-utils.html#.isArray">isArray</a></li><li data-type='method' style='display: none;'><a href="module-utils.html#.isFunction">isFunction</a></li><li data-type='method' style='display: none;'><a href="module-utils.html#.isNumber">isNumber</a></li><li data-type='method' style='display: none;'><a href="module-utils.html#.keys">keys</a></li><li data-type='method' style='display: none;'><a href="module-utils.html#.map">map</a></li><li data-type='method' style='display: none;'><a href="module-utils.html#.polyfillSuper">polyfillSuper</a></li><li data-type='method' style='display: none;'><a href="module-utils.html#.removeElement">removeElement</a></li><li data-type='method' style='display: none;'><a href="module-utils.html#.removeHiddenChars">removeHiddenChars</a></li><li data-type='method' style='display: none;'><a href="module-utils.html#.runPolyfills">runPolyfills</a></li><li data-type='method' style='display: none;'><a href="module-utils.html#.values">values</a></li></ul></li><li><a href="module-webrtc_call.html">webrtc/call</a><ul class='methods'><li data-type='method' style='display: none;'><a href="module-webrtc_call.html#.createNewMatrixCall">createNewMatrixCall</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.html#.setAudioInput">setAudioInput</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.html#.setAudioOutput">setAudioOutput</a></li><li data-type='method' style='display: none;'><a href="module-webrtc_call.html#.setVideoInput">setVideoInput</a></li></ul></li><li><a href="olmlib%250A%250AUtilities%2520common%2520to%2520olm%2520encryption%2520algorithmsmodule_.html">olmlib
+
+Utilities common to olm encryption algorithms</a><ul class='methods'><li data-type='method' style='display: none;'><a href="olmlib%25250A%25250AUtilities%252520common%252520to%252520olm%252520encryption%252520algorithmsmodule_.html">olmlib
+
+Utilities common to olm encryption algorithmsmodule:.decodeBase64</a></li><li data-type='method' style='display: none;'><a href="olmlib%25250A%25250AUtilities%252520common%252520to%252520olm%252520encryption%252520algorithmsmodule_.html">olmlib
+
+Utilities common to olm encryption algorithmsmodule:.encodeBase64</a></li><li data-type='method' style='display: none;'><a href="olmlib%25250A%25250AUtilities%252520common%252520to%252520olm%252520encryption%252520algorithmsmodule_.html">olmlib
+
+Utilities common to olm encryption algorithmsmodule:.encodeUnpaddedBase64</a></li><li data-type='method' style='display: none;'><a href="olmlib%25250A%25250AUtilities%252520common%252520to%252520olm%252520encryption%252520algorithmsmodule_.html">olmlib
+
+Utilities common to olm encryption algorithmsmodule:.encryptMessageForDevice</a></li><li data-type='method' style='display: none;'><a href="olmlib%25250A%25250AUtilities%252520common%252520to%252520olm%252520encryption%252520algorithmsmodule_.html">olmlib
+
+Utilities common to olm encryption algorithmsmodule:.ensureOlmSessionsForDevices</a></li><li data-type='method' style='display: none;'><a href="olmlib%25250A%25250AUtilities%252520common%252520to%252520olm%252520encryption%252520algorithmsmodule_.html">olmlib
+
+Utilities common to olm encryption algorithmsmodule:.getExistingOlmSessions</a></li><li data-type='method' style='display: none;'><a href="olmlib%25250A%25250AUtilities%252520common%252520to%252520olm%252520encryption%252520algorithmsmodule_.html">olmlib
+
+Utilities common to olm encryption algorithmsmodule:.pkSign</a></li><li data-type='method' style='display: none;'><a href="olmlib%25250A%25250AUtilities%252520common%252520to%252520olm%252520encryption%252520algorithmsmodule_.html">olmlib
+
+Utilities common to olm encryption algorithmsmodule:.pkVerify</a></li><li data-type='method' style='display: none;'><a href="olmlib%25250A%25250AUtilities%252520common%252520to%252520olm%252520encryption%252520algorithmsmodule_.html">olmlib
+
+Utilities common to olm encryption algorithmsmodule:.verifySignature</a></li></ul></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a><ul class='methods'><li data-type='method' style='display: none;'><a href="external-EventEmitter.html#addListener">addListener</a></li><li data-type='method' style='display: none;'><a href="external-EventEmitter.html#emit">emit</a></li><li data-type='method' style='display: none;'><a href="external-EventEmitter.html#on">on</a></li><li data-type='method' style='display: none;'><a href="external-EventEmitter.html#once">once</a></li><li data-type='method' style='display: none;'><a href="external-EventEmitter.html#removeAllListeners">removeAllListeners</a></li><li data-type='method' style='display: none;'><a href="external-EventEmitter.html#removeListener">removeListener</a></li><li data-type='method' style='display: none;'><a href="external-EventEmitter.html#setMaxListeners">setMaxListeners</a></li></ul></li></ul><h3>Events</h3><ul><li><a href="global.html#event:%2522change%2522wheneverthestateoftherequestobjecthaschanged.">"change" whenever the state of the request object has changed.</a></li><li><a href="module-client.html#~event:MatrixClient%2522accountData%2522">MatrixClient"accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Call.incoming%2522">MatrixClient"Call.incoming"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crossSigning.keysChanged%2522">MatrixClient"crossSigning.keysChanged"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.devicesUpdated%2522">MatrixClient"crypto.devicesUpdated"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.keyBackupStatus%2522">MatrixClient"crypto.keyBackupStatus"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.roomKeyRequest%2522">MatrixClient"crypto.roomKeyRequest"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.roomKeyRequestCancellation%2522">MatrixClient"crypto.roomKeyRequestCancellation"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.secrets.requestCancelled%2522">MatrixClient"crypto.secrets.requestCancelled"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.suggestKeyRestore%2522">MatrixClient"crypto.suggestKeyRestore"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.verification.request.unknown%2522">MatrixClient"crypto.verification.request.unknown"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.verification.request%2522">MatrixClient"crypto.verification.request"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.warning%2522">MatrixClient"crypto.warning"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.willUpdateDevices%2522">MatrixClient"crypto.willUpdateDevices"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deleteRoom%2522">MatrixClient"deleteRoom"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deviceVerificationChanged%2522">MatrixClient"deviceVerificationChanged"</a></li><li><a href="module-client.html#~event:MatrixClient%2522event%2522">MatrixClient"event"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group.myMembership%2522">MatrixClient"Group.myMembership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group.profile%2522">MatrixClient"Group.profile"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group%2522">MatrixClient"Group"</a></li><li><a href="module-client.html#~event:MatrixClient%2522no_consent%2522">MatrixClient"no_consent"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.accountData%2522">MatrixClient"Room.accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.localEchoUpdated%2522">MatrixClient"Room.localEchoUpdated"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.name%2522">MatrixClient"Room.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.receipt%2522">MatrixClient"Room.receipt"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.redaction%2522">MatrixClient"Room.redaction"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.redactionCancelled%2522">MatrixClient"Room.redactionCancelled"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.tags%2522">MatrixClient"Room.tags"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timeline%2522">MatrixClient"Room.timeline"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timelineReset%2522">MatrixClient"Room.timelineReset"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room%2522">MatrixClient"Room"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.membership%2522">MatrixClient"RoomMember.membership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.name%2522">MatrixClient"RoomMember.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.powerLevel%2522">MatrixClient"RoomMember.powerLevel"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.typing%2522">MatrixClient"RoomMember.typing"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.events%2522">MatrixClient"RoomState.events"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.members%2522">MatrixClient"RoomState.members"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.newMember%2522">MatrixClient"RoomState.newMember"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Session.logged_out%2522">MatrixClient"Session.logged_out"</a></li><li><a href="module-client.html#~event:MatrixClient%2522sync%2522">MatrixClient"sync"</a></li><li><a href="module-client.html#~event:MatrixClient%2522toDeviceEvent%2522">MatrixClient"toDeviceEvent"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.avatarUrl%2522">MatrixClient"User.avatarUrl"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.currentlyActive%2522">MatrixClient"User.currentlyActive"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.displayName%2522">MatrixClient"User.displayName"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.lastPresenceTs%2522">MatrixClient"User.lastPresenceTs"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.presence%2522">MatrixClient"User.presence"</a></li><li><a href="module-client.html#~event:MatrixClient%2522userTrustStatusChanged%2522">MatrixClient"userTrustStatusChanged"</a></li><li><a href="module-client.html#~event:MatrixClient%2522WellKnown.client%2522">MatrixClient"WellKnown.client"</a></li><li><a href="module-models_event.html#.event:MatrixEvent%2522Event.decrypted%2522">MatrixEvent"Event.decrypted"</a></li></ul><h3>Interfaces</h3><ul><li><a href="module-crypto_store_base-CryptoStore.html">CryptoStore</a></li><li><a href="module-webrtc_call-CallOpts.html">CallOpts</a></li></ul><h3>Global</h3><ul><li><a href="global.html#_initialiseFromExportedDevice">_initialiseFromExportedDevice</a></li><li><a href="global.html#clearTimeout">clearTimeout</a></li><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#decryptBrowser">decryptBrowser</a></li><li><a href="global.html#decryptNode">decryptNode</a></li><li><a href="global.html#encryptBrowser">encryptBrowser</a></li><li><a href="global.html#encryptNode">encryptNode</a></li><li><a href="global.html#EventDecryptionResult">EventDecryptionResult</a></li><li><a href="global.html#exists">exists</a></li><li><a href="global.html#getRequest">getRequest</a></li><li><a href="global.html#InboundGroupSessionData">InboundGroupSessionData</a></li><li><a href="global.html#processFn">processFn</a></li><li><a href="global.html#PushAction">PushAction</a></li><li><a href="global.html#queueAlgorithm">queueAlgorithm</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#requestCallback">requestCallback</a></li><li><a href="global.html#requestFunction">requestFunction</a></li><li><a href="global.html#requestWrapperFunction">requestWrapperFunction</a></li><li><a href="global.html#retryAlgorithm">retryAlgorithm</a></li><li><a href="global.html#selectQuery">selectQuery</a></li><li><a href="global.html#setCryptoStoreFactory">setCryptoStoreFactory</a></li><li><a href="global.html#setNow">setNow</a></li><li><a href="global.html#setTimeout">setTimeout</a></li><li><a href="global.html#wrapRequest">wrapRequest</a></li></ul>
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">crypto/OlmDevice.js</h1>
+    
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/*
+Copyright 2016 OpenMarket Ltd
+Copyright 2017, 2019 New Vector Ltd
+Copyright 2019, 2020 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+import {logger} from '../logger';
+import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
+import * as algorithms from './algorithms';
+
+// The maximum size of an event is 65K, and we base64 the content, so this is a
+// reasonable approximation to the biggest plaintext we can encrypt.
+const MAX_PLAINTEXT_LENGTH = 65536 * 3 / 4;
+
+function checkPayloadLength(payloadString) {
+    if (payloadString === undefined) {
+        throw new Error("payloadString undefined");
+    }
+
+    if (payloadString.length > MAX_PLAINTEXT_LENGTH) {
+        // might as well fail early here rather than letting the olm library throw
+        // a cryptic memory allocation error.
+        //
+        // Note that even if we manage to do the encryption, the message send may fail,
+        // because by the time we've wrapped the ciphertext in the event object, it may
+        // exceed 65K. But at least we won't just fail with "abort()" in that case.
+        const err = new Error("Message too long (" + payloadString.length + " bytes). " +
+                        "The maximum for an encrypted message is " +
+                        MAX_PLAINTEXT_LENGTH + " bytes.");
+        // TODO: [TypeScript] We should have our own error types
+        err.data = {
+            errcode: "M_TOO_LARGE",
+            error: "Payload too large for encrypted message",
+        };
+        throw err;
+    }
+}
+
+
+/**
+ * The type of object we use for importing and exporting megolm session data.
+ *
+ * @typedef {Object} module:crypto/OlmDevice.MegolmSessionData
+ * @property {String} sender_key  Sender's Curve25519 device key
+ * @property {String[]} forwarding_curve25519_key_chain Devices which forwarded
+ *     this session to us (normally empty).
+ * @property {Object&lt;string, string>} sender_claimed_keys Other keys the sender claims.
+ * @property {String} room_id     Room this session is used in
+ * @property {String} session_id  Unique id for the session
+ * @property {String} session_key Base64'ed key data
+ */
+
+
+/**
+ * Manages the olm cryptography functions. Each OlmDevice has a single
+ * OlmAccount and a number of OlmSessions.
+ *
+ * Accounts and sessions are kept pickled in the cryptoStore.
+ *
+ * @constructor
+ * @alias module:crypto/OlmDevice
+ *
+ * @param {Object} cryptoStore A store for crypto data
+ *
+ * @property {string} deviceCurve25519Key   Curve25519 key for the account
+ * @property {string} deviceEd25519Key      Ed25519 key for the account
+ */
+export function OlmDevice(cryptoStore) {
+    this._cryptoStore = cryptoStore;
+    this._pickleKey = "DEFAULT_KEY";
+
+    // don't know these until we load the account from storage in init()
+    this.deviceCurve25519Key = null;
+    this.deviceEd25519Key = null;
+    this._maxOneTimeKeys = null;
+
+    // we don't bother stashing outboundgroupsessions in the cryptoStore -
+    // instead we keep them here.
+    this._outboundGroupSessionStore = {};
+
+    // Store a set of decrypted message indexes for each group session.
+    // This partially mitigates a replay attack where a MITM resends a group
+    // message into the room.
+    //
+    // When we decrypt a message and the message index matches a previously
+    // decrypted message, one possible cause of that is that we are decrypting
+    // the same event, and may not indicate an actual replay attack.  For
+    // example, this could happen if we receive events, forget about them, and
+    // then re-fetch them when we backfill.  So we store the event ID and
+    // timestamp corresponding to each message index when we first decrypt it,
+    // and compare these against the event ID and timestamp every time we use
+    // that same index.  If they match, then we're probably decrypting the same
+    // event and we don't consider it a replay attack.
+    //
+    // Keys are strings of form "&lt;senderKey>|&lt;session_id>|&lt;message_index>"
+    // Values are objects of the form "{id: &lt;event id>, timestamp: &lt;ts>}"
+    this._inboundGroupSessionMessageIndexes = {};
+
+    // Keep track of sessions that we're starting, so that we don't start
+    // multiple sessions for the same device at the same time.
+    this._sessionsInProgress = {};
+
+    // Used by olm to serialise prekey message decryptions
+    this._olmPrekeyPromise = Promise.resolve();
+}
+
+/**
+ * Initialise the OlmAccount. This must be called before any other operations
+ * on the OlmDevice.
+ *
+ * Data from an exported Olm device can be provided
+ * in order to re-create this device.
+ *
+ * Attempts to load the OlmAccount from the crypto store, or creates one if none is
+ * found.
+ *
+ * Reads the device keys from the OlmAccount object.
+ *
+ * @param {object} opts
+ * @param {object} opts.fromExportedDevice (Optional) data from exported device
+ *     that must be re-created.
+ *     If present, opts.pickleKey is ignored
+ *     (exported data already provides a pickle key)
+ * @param {object} opts.pickleKey (Optional) pickle key to set instead of default one
+ */
+OlmDevice.prototype.init = async function(opts = {}) {
+    let e2eKeys;
+    const account = new global.Olm.Account();
+
+    const { pickleKey, fromExportedDevice } = opts;
+
+    try {
+        if (fromExportedDevice) {
+            if (pickleKey) {
+                logger.warn(
+                    'ignoring opts.pickleKey'
+                    + ' because opts.fromExportedDevice is present.',
+                );
+            }
+            this._pickleKey = fromExportedDevice.pickleKey;
+            await _initialiseFromExportedDevice(
+                fromExportedDevice,
+                this._cryptoStore,
+                this._pickleKey,
+                account,
+            );
+        } else {
+            if (pickleKey) {
+                this._pickleKey = pickleKey;
+            }
+            await _initialiseAccount(
+                this._cryptoStore,
+                this._pickleKey,
+                account,
+            );
+        }
+        e2eKeys = JSON.parse(account.identity_keys());
+
+        this._maxOneTimeKeys = account.max_number_of_one_time_keys();
+    } finally {
+        account.free();
+    }
+
+    this.deviceCurve25519Key = e2eKeys.curve25519;
+    this.deviceEd25519Key = e2eKeys.ed25519;
+};
+
+/**
+ * Populates the crypto store using data that was exported from an existing device.
+ * Note that for now only the “account” and “sessions” stores are populated;
+ * Other stores will be as with a new device.
+ *
+ * @param {Object} exportedData Data exported from another device
+ *     through the “export” method.
+ * @param {module:crypto/store/base~CryptoStore} cryptoStore storage for the crypto layer
+ * @param {string} pickleKey the key that was used to pickle the exported data
+ * @param {Olm.Account} account an olm account to initialize
+ */
+async function _initialiseFromExportedDevice(
+    exportedData,
+    cryptoStore,
+    pickleKey,
+    account,
+) {
+    await cryptoStore.doTxn(
+        'readwrite',
+        [
+            IndexedDBCryptoStore.STORE_ACCOUNT,
+            IndexedDBCryptoStore.STORE_SESSIONS,
+        ],
+        (txn) => {
+            cryptoStore.storeAccount(txn, exportedData.pickledAccount);
+            exportedData.sessions.forEach((session) => {
+                const {
+                    deviceKey,
+                    sessionId,
+                } = session;
+                const sessionInfo = {
+                    session: session.session,
+                    lastReceivedMessageTs: session.lastReceivedMessageTs,
+                };
+                cryptoStore.storeEndToEndSession(
+                    deviceKey,
+                    sessionId,
+                    sessionInfo,
+                    txn,
+                );
+            });
+    });
+    account.unpickle(pickleKey, exportedData.pickledAccount);
+}
+
+async function _initialiseAccount(cryptoStore, pickleKey, account) {
+    await cryptoStore.doTxn(
+        'readwrite',
+        [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            cryptoStore.getAccount(txn, (pickledAccount) => {
+                if (pickledAccount !== null) {
+                    account.unpickle(pickleKey, pickledAccount);
+                } else {
+                    account.create();
+                    pickledAccount = account.pickle(pickleKey);
+                    cryptoStore.storeAccount(txn, pickledAccount);
+                }
+            });
+        },
+    );
+}
+
+/**
+ * @return {array} The version of Olm.
+ */
+OlmDevice.getOlmVersion = function() {
+    return global.Olm.get_library_version();
+};
+
+/**
+ * extract our OlmAccount from the crypto store and call the given function
+ * with the account object
+ * The `account` object is useable only within the callback passed to this
+ * function and will be freed as soon the callback returns. It is *not*
+ * useable for the rest of the lifetime of the transaction.
+ * This function requires a live transaction object from cryptoStore.doTxn()
+ * and therefore may only be called in a doTxn() callback.
+ *
+ * @param {*} txn Opaque transaction object from cryptoStore.doTxn()
+ * @param {function} func
+ * @private
+ */
+OlmDevice.prototype._getAccount = function(txn, func) {
+    this._cryptoStore.getAccount(txn, (pickledAccount) => {
+        const account = new global.Olm.Account();
+        try {
+            account.unpickle(this._pickleKey, pickledAccount);
+            func(account);
+        } finally {
+            account.free();
+        }
+    });
+};
+
+/*
+ * Saves an account to the crypto store.
+ * This function requires a live transaction object from cryptoStore.doTxn()
+ * and therefore may only be called in a doTxn() callback.
+ *
+ * @param {*} txn Opaque transaction object from cryptoStore.doTxn()
+ * @param {object} Olm.Account object
+ * @private
+ */
+OlmDevice.prototype._storeAccount = function(txn, account) {
+    this._cryptoStore.storeAccount(txn, account.pickle(this._pickleKey));
+};
+
+/**
+ * Export data for re-creating the Olm device later.
+ * TODO export data other than just account and (P2P) sessions.
+ *
+ * @return {Promise&lt;object>} The exported data
+*/
+OlmDevice.prototype.export = async function() {
+    const result = {
+        pickleKey: this._pickleKey,
+    };
+    await this._cryptoStore.doTxn(
+        'readonly',
+        [
+            IndexedDBCryptoStore.STORE_ACCOUNT,
+            IndexedDBCryptoStore.STORE_SESSIONS,
+        ],
+        (txn) => {
+            this._cryptoStore.getAccount(txn, (pickledAccount) => {
+                result.pickledAccount = pickledAccount;
+            });
+            result.sessions = [];
+            // Note that the pickledSession object we get in the callback
+            // is not exactly the same thing you get in method _getSession
+            // see documentation of IndexedDBCryptoStore.getAllEndToEndSessions
+            this._cryptoStore.getAllEndToEndSessions(txn, (pickledSession) => {
+                result.sessions.push(pickledSession);
+            });
+        },
+    );
+    return result;
+};
+
+/**
+ * extract an OlmSession from the session store and call the given function
+ * The session is useable only within the callback passed to this
+ * function and will be freed as soon the callback returns. It is *not*
+ * useable for the rest of the lifetime of the transaction.
+ *
+ * @param {string} deviceKey
+ * @param {string} sessionId
+ * @param {*} txn Opaque transaction object from cryptoStore.doTxn()
+ * @param {function} func
+ * @private
+ */
+OlmDevice.prototype._getSession = function(deviceKey, sessionId, txn, func) {
+    this._cryptoStore.getEndToEndSession(
+        deviceKey, sessionId, txn, (sessionInfo) => {
+            this._unpickleSession(sessionInfo, func);
+        },
+    );
+};
+
+/**
+ * Creates a session object from a session pickle and executes the given
+ * function with it. The session object is destroyed once the function
+ * returns.
+ *
+ * @param {object} sessionInfo
+ * @param {function} func
+ * @private
+ */
+OlmDevice.prototype._unpickleSession = function(sessionInfo, func) {
+    const session = new global.Olm.Session();
+    try {
+        session.unpickle(this._pickleKey, sessionInfo.session);
+        const unpickledSessInfo = Object.assign({}, sessionInfo, {session});
+
+        func(unpickledSessInfo);
+    } finally {
+        session.free();
+    }
+};
+
+/**
+ * store our OlmSession in the session store
+ *
+ * @param {string} deviceKey
+ * @param {object} sessionInfo {session: OlmSession, lastReceivedMessageTs: int}
+ * @param {*} txn Opaque transaction object from cryptoStore.doTxn()
+ * @private
+ */
+OlmDevice.prototype._saveSession = function(deviceKey, sessionInfo, txn) {
+    const sessionId = sessionInfo.session.session_id();
+    const pickledSessionInfo = Object.assign(sessionInfo, {
+        session: sessionInfo.session.pickle(this._pickleKey),
+    });
+    this._cryptoStore.storeEndToEndSession(
+        deviceKey, sessionId, pickledSessionInfo, txn,
+    );
+};
+
+
+/**
+ * get an OlmUtility and call the given function
+ *
+ * @param {function} func
+ * @return {object} result of func
+ * @private
+ */
+OlmDevice.prototype._getUtility = function(func) {
+    const utility = new global.Olm.Utility();
+    try {
+        return func(utility);
+    } finally {
+        utility.free();
+    }
+};
+
+
+/**
+ * Signs a message with the ed25519 key for this account.
+ *
+ * @param {string} message  message to be signed
+ * @return {Promise&lt;string>} base64-encoded signature
+ */
+OlmDevice.prototype.sign = async function(message) {
+    let result;
+    await this._cryptoStore.doTxn(
+        'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._getAccount(txn, (account) => {
+                result = account.sign(message);
+            },
+        );
+    });
+    return result;
+};
+
+/**
+ * Get the current (unused, unpublished) one-time keys for this account.
+ *
+ * @return {object} one time keys; an object with the single property
+ * &lt;tt>curve25519&lt;/tt>, which is itself an object mapping key id to Curve25519
+ * key.
+ */
+OlmDevice.prototype.getOneTimeKeys = async function() {
+    let result;
+    await this._cryptoStore.doTxn(
+        'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._getAccount(txn, (account) => {
+                result = JSON.parse(account.one_time_keys());
+            });
+        },
+    );
+
+    return result;
+};
+
+
+/**
+ * Get the maximum number of one-time keys we can store.
+ *
+ * @return {number} number of keys
+ */
+OlmDevice.prototype.maxNumberOfOneTimeKeys = function() {
+    return this._maxOneTimeKeys;
+};
+
+/**
+ * Marks all of the one-time keys as published.
+ */
+OlmDevice.prototype.markKeysAsPublished = async function() {
+    await this._cryptoStore.doTxn(
+        'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._getAccount(txn, (account) => {
+                account.mark_keys_as_published();
+                this._storeAccount(txn, account);
+            });
+        },
+    );
+};
+
+/**
+ * Generate some new one-time keys
+ *
+ * @param {number} numKeys number of keys to generate
+ * @return {Promise} Resolved once the account is saved back having generated the keys
+ */
+OlmDevice.prototype.generateOneTimeKeys = function(numKeys) {
+    return this._cryptoStore.doTxn(
+        'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._getAccount(txn, (account) => {
+                account.generate_one_time_keys(numKeys);
+                this._storeAccount(txn, account);
+            });
+        },
+    );
+};
+
+/**
+ * Generate a new fallback keys
+ *
+ * @return {Promise} Resolved once the account is saved back having generated the key
+ */
+OlmDevice.prototype.generateFallbackKey = async function() {
+    await this._cryptoStore.doTxn(
+        'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._getAccount(txn, (account) => {
+                account.generate_fallback_key();
+                this._storeAccount(txn, account);
+            });
+        },
+    );
+};
+
+OlmDevice.prototype.getFallbackKey = async function() {
+    let result;
+    await this._cryptoStore.doTxn(
+        'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._getAccount(txn, (account) => {
+                result = JSON.parse(account.fallback_key());
+            });
+        },
+    );
+    return result;
+};
+
+/**
+ * Generate a new outbound session
+ *
+ * The new session will be stored in the cryptoStore.
+ *
+ * @param {string} theirIdentityKey remote user's Curve25519 identity key
+ * @param {string} theirOneTimeKey  remote user's one-time Curve25519 key
+ * @return {string} sessionId for the outbound session.
+ */
+OlmDevice.prototype.createOutboundSession = async function(
+    theirIdentityKey, theirOneTimeKey,
+) {
+    let newSessionId;
+    await this._cryptoStore.doTxn(
+        'readwrite', [
+            IndexedDBCryptoStore.STORE_ACCOUNT,
+            IndexedDBCryptoStore.STORE_SESSIONS,
+        ],
+        (txn) => {
+            this._getAccount(txn, (account) => {
+                const session = new global.Olm.Session();
+                try {
+                    session.create_outbound(account, theirIdentityKey, theirOneTimeKey);
+                    newSessionId = session.session_id();
+                    this._storeAccount(txn, account);
+                    const sessionInfo = {
+                        session,
+                        // Pretend we've received a message at this point, otherwise
+                        // if we try to send a message to the device, it won't use
+                        // this session
+                        lastReceivedMessageTs: Date.now(),
+                    };
+                    this._saveSession(theirIdentityKey, sessionInfo, txn);
+                } finally {
+                    session.free();
+                }
+            });
+        },
+    );
+    return newSessionId;
+};
+
+
+/**
+ * Generate a new inbound session, given an incoming message
+ *
+ * @param {string} theirDeviceIdentityKey remote user's Curve25519 identity key
+ * @param {number} messageType  messageType field from the received message (must be 0)
+ * @param {string} ciphertext base64-encoded body from the received message
+ *
+ * @return {{payload: string, session_id: string}} decrypted payload, and
+ *     session id of new session
+ *
+ * @raises {Error} if the received message was not valid (for instance, it
+ *     didn't use a valid one-time key).
+ */
+OlmDevice.prototype.createInboundSession = async function(
+    theirDeviceIdentityKey, messageType, ciphertext,
+) {
+    if (messageType !== 0) {
+        throw new Error("Need messageType == 0 to create inbound session");
+    }
+
+    let result;
+    await this._cryptoStore.doTxn(
+        'readwrite', [
+            IndexedDBCryptoStore.STORE_ACCOUNT,
+            IndexedDBCryptoStore.STORE_SESSIONS,
+        ],
+        (txn) => {
+            this._getAccount(txn, (account) => {
+                const session = new global.Olm.Session();
+                try {
+                    session.create_inbound_from(
+                        account, theirDeviceIdentityKey, ciphertext,
+                    );
+                    account.remove_one_time_keys(session);
+                    this._storeAccount(txn, account);
+
+                    const payloadString = session.decrypt(messageType, ciphertext);
+
+                    const sessionInfo = {
+                        session,
+                        // this counts as a received message: set last received message time
+                        // to now
+                        lastReceivedMessageTs: Date.now(),
+                    };
+                    this._saveSession(theirDeviceIdentityKey, sessionInfo, txn);
+
+                    result = {
+                        payload: payloadString,
+                        session_id: session.session_id(),
+                    };
+                } finally {
+                    session.free();
+                }
+            });
+        },
+    );
+
+    return result;
+};
+
+
+/**
+ * Get a list of known session IDs for the given device
+ *
+ * @param {string} theirDeviceIdentityKey Curve25519 identity key for the
+ *     remote device
+ * @return {Promise&lt;string[]>}  a list of known session ids for the device
+ */
+OlmDevice.prototype.getSessionIdsForDevice = async function(theirDeviceIdentityKey) {
+    if (this._sessionsInProgress[theirDeviceIdentityKey]) {
+        logger.log("waiting for olm session to be created");
+        try {
+            await this._sessionsInProgress[theirDeviceIdentityKey];
+        } catch (e) {
+            // if the session failed to be created, just fall through and
+            // return an empty result
+        }
+    }
+    let sessionIds;
+    await this._cryptoStore.doTxn(
+        'readonly', [IndexedDBCryptoStore.STORE_SESSIONS],
+        (txn) => {
+            this._cryptoStore.getEndToEndSessions(
+                theirDeviceIdentityKey, txn, (sessions) => {
+                    sessionIds = Object.keys(sessions);
+                },
+            );
+        },
+    );
+
+    return sessionIds;
+};
+
+/**
+ * Get the right olm session id for encrypting messages to the given identity key
+ *
+ * @param {string} theirDeviceIdentityKey Curve25519 identity key for the
+ *     remote device
+ * @param {boolean} nowait Don't wait for an in-progress session to complete.
+ *     This should only be set to true of the calling function is the function
+ *     that marked the session as being in-progress.
+ * @return {Promise&lt;?string>}  session id, or null if no established session
+ */
+OlmDevice.prototype.getSessionIdForDevice = async function(
+    theirDeviceIdentityKey, nowait,
+) {
+    const sessionInfos = await this.getSessionInfoForDevice(
+        theirDeviceIdentityKey, nowait,
+    );
+
+    if (sessionInfos.length === 0) {
+        return null;
+    }
+    // Use the session that has most recently received a message
+    let idxOfBest = 0;
+    for (let i = 1; i &lt; sessionInfos.length; i++) {
+        const thisSessInfo = sessionInfos[i];
+        const thisLastReceived = thisSessInfo.lastReceivedMessageTs === undefined ?
+            0 : thisSessInfo.lastReceivedMessageTs;
+
+        const bestSessInfo = sessionInfos[idxOfBest];
+        const bestLastReceived = bestSessInfo.lastReceivedMessageTs === undefined ?
+            0 : bestSessInfo.lastReceivedMessageTs;
+        if (
+            thisLastReceived > bestLastReceived || (
+                thisLastReceived === bestLastReceived &amp;&amp;
+                thisSessInfo.sessionId &lt; bestSessInfo.sessionId
+            )
+        ) {
+            idxOfBest = i;
+        }
+    }
+    return sessionInfos[idxOfBest].sessionId;
+};
+
+/**
+ * Get information on the active Olm sessions for a device.
+ * &lt;p>
+ * Returns an array, with an entry for each active session. The first entry in
+ * the result will be the one used for outgoing messages. Each entry contains
+ * the keys 'hasReceivedMessage' (true if the session has received an incoming
+ * message and is therefore past the pre-key stage), and 'sessionId'.
+ *
+ * @param {string} deviceIdentityKey Curve25519 identity key for the device
+ * @param {boolean} nowait Don't wait for an in-progress session to complete.
+ *     This should only be set to true of the calling function is the function
+ *     that marked the session as being in-progress.
+ * @return {Array.&lt;{sessionId: string, hasReceivedMessage: Boolean}>}
+ */
+OlmDevice.prototype.getSessionInfoForDevice = async function(deviceIdentityKey, nowait) {
+    if (this._sessionsInProgress[deviceIdentityKey] &amp;&amp; !nowait) {
+        logger.log("waiting for olm session to be created");
+        try {
+            await this._sessionsInProgress[deviceIdentityKey];
+        } catch (e) {
+            // if the session failed to be created, then just fall through and
+            // return an empty result
+        }
+    }
+    const info = [];
+
+    await this._cryptoStore.doTxn(
+        'readonly', [IndexedDBCryptoStore.STORE_SESSIONS],
+        (txn) => {
+            this._cryptoStore.getEndToEndSessions(deviceIdentityKey, txn, (sessions) => {
+                const sessionIds = Object.keys(sessions).sort();
+                for (const sessionId of sessionIds) {
+                    this._unpickleSession(sessions[sessionId], (sessInfo) => {
+                        info.push({
+                            lastReceivedMessageTs: sessInfo.lastReceivedMessageTs,
+                            hasReceivedMessage: sessInfo.session.has_received_message(),
+                            sessionId: sessionId,
+                        });
+                    });
+                }
+            });
+        },
+    );
+
+    return info;
+};
+
+/**
+ * Encrypt an outgoing message using an existing session
+ *
+ * @param {string} theirDeviceIdentityKey Curve25519 identity key for the
+ *     remote device
+ * @param {string} sessionId  the id of the active session
+ * @param {string} payloadString  payload to be encrypted and sent
+ *
+ * @return {Promise&lt;string>} ciphertext
+ */
+OlmDevice.prototype.encryptMessage = async function(
+    theirDeviceIdentityKey, sessionId, payloadString,
+) {
+    checkPayloadLength(payloadString);
+
+    let res;
+    await this._cryptoStore.doTxn(
+        'readwrite', [IndexedDBCryptoStore.STORE_SESSIONS],
+        (txn) => {
+            this._getSession(theirDeviceIdentityKey, sessionId, txn, (sessionInfo) => {
+                const sessionDesc = sessionInfo.session.describe();
+                logger.log(
+                    "encryptMessage: Olm Session ID " + sessionId + " to " +
+                    theirDeviceIdentityKey + ": " + sessionDesc,
+                );
+                res = sessionInfo.session.encrypt(payloadString);
+                this._saveSession(theirDeviceIdentityKey, sessionInfo, txn);
+            });
+        },
+    );
+    return res;
+};
+
+/**
+ * Decrypt an incoming message using an existing session
+ *
+ * @param {string} theirDeviceIdentityKey Curve25519 identity key for the
+ *     remote device
+ * @param {string} sessionId  the id of the active session
+ * @param {number} messageType  messageType field from the received message
+ * @param {string} ciphertext base64-encoded body from the received message
+ *
+ * @return {Promise&lt;string>} decrypted payload.
+ */
+OlmDevice.prototype.decryptMessage = async function(
+    theirDeviceIdentityKey, sessionId, messageType, ciphertext,
+) {
+    let payloadString;
+    await this._cryptoStore.doTxn(
+        'readwrite', [IndexedDBCryptoStore.STORE_SESSIONS],
+        (txn) => {
+            this._getSession(theirDeviceIdentityKey, sessionId, txn, (sessionInfo) => {
+                const sessionDesc = sessionInfo.session.describe();
+                logger.log(
+                    "decryptMessage: Olm Session ID " + sessionId + " from " +
+                    theirDeviceIdentityKey + ": " + sessionDesc,
+                );
+                payloadString = sessionInfo.session.decrypt(messageType, ciphertext);
+                sessionInfo.lastReceivedMessageTs = Date.now();
+                this._saveSession(theirDeviceIdentityKey, sessionInfo, txn);
+            });
+        },
+    );
+    return payloadString;
+};
+
+/**
+ * Determine if an incoming messages is a prekey message matching an existing session
+ *
+ * @param {string} theirDeviceIdentityKey Curve25519 identity key for the
+ *     remote device
+ * @param {string} sessionId  the id of the active session
+ * @param {number} messageType  messageType field from the received message
+ * @param {string} ciphertext base64-encoded body from the received message
+ *
+ * @return {Promise&lt;boolean>} true if the received message is a prekey message which matches
+ *    the given session.
+ */
+OlmDevice.prototype.matchesSession = async function(
+    theirDeviceIdentityKey, sessionId, messageType, ciphertext,
+) {
+    if (messageType !== 0) {
+        return false;
+    }
+
+    let matches;
+    await this._cryptoStore.doTxn(
+        'readonly', [IndexedDBCryptoStore.STORE_SESSIONS],
+        (txn) => {
+            this._getSession(theirDeviceIdentityKey, sessionId, txn, (sessionInfo) => {
+                matches = sessionInfo.session.matches_inbound(ciphertext);
+            });
+        },
+    );
+    return matches;
+};
+
+OlmDevice.prototype.recordSessionProblem = async function(deviceKey, type, fixed) {
+    await this._cryptoStore.storeEndToEndSessionProblem(deviceKey, type, fixed);
+};
+
+OlmDevice.prototype.sessionMayHaveProblems = async function(deviceKey, timestamp) {
+    return await this._cryptoStore.getEndToEndSessionProblem(deviceKey, timestamp);
+};
+
+OlmDevice.prototype.filterOutNotifiedErrorDevices = async function(devices) {
+    return await this._cryptoStore.filterOutNotifiedErrorDevices(devices);
+};
+
+
+// Outbound group session
+// ======================
+
+/**
+ * store an OutboundGroupSession in _outboundGroupSessionStore
+ *
+ * @param {Olm.OutboundGroupSession} session
+ * @private
+ */
+OlmDevice.prototype._saveOutboundGroupSession = function(session) {
+    const pickledSession = session.pickle(this._pickleKey);
+    this._outboundGroupSessionStore[session.session_id()] = pickledSession;
+};
+
+
+/**
+ * extract an OutboundGroupSession from _outboundGroupSessionStore and call the
+ * given function
+ *
+ * @param {string} sessionId
+ * @param {function} func
+ * @return {object} result of func
+ * @private
+ */
+OlmDevice.prototype._getOutboundGroupSession = function(sessionId, func) {
+    const pickled = this._outboundGroupSessionStore[sessionId];
+    if (pickled === undefined) {
+        throw new Error("Unknown outbound group session " + sessionId);
+    }
+
+    const session = new global.Olm.OutboundGroupSession();
+    try {
+        session.unpickle(this._pickleKey, pickled);
+        return func(session);
+    } finally {
+        session.free();
+    }
+};
+
+
+/**
+ * Generate a new outbound group session
+ *
+ * @return {string} sessionId for the outbound session.
+ */
+OlmDevice.prototype.createOutboundGroupSession = function() {
+    const session = new global.Olm.OutboundGroupSession();
+    try {
+        session.create();
+        this._saveOutboundGroupSession(session);
+        return session.session_id();
+    } finally {
+        session.free();
+    }
+};
+
+
+/**
+ * Encrypt an outgoing message with an outbound group session
+ *
+ * @param {string} sessionId  the id of the outboundgroupsession
+ * @param {string} payloadString  payload to be encrypted and sent
+ *
+ * @return {string} ciphertext
+ */
+OlmDevice.prototype.encryptGroupMessage = function(sessionId, payloadString) {
+    const self = this;
+
+    logger.log(`encrypting msg with megolm session ${sessionId}`);
+
+    checkPayloadLength(payloadString);
+
+    return this._getOutboundGroupSession(sessionId, function(session) {
+        const res = session.encrypt(payloadString);
+        self._saveOutboundGroupSession(session);
+        return res;
+    });
+};
+
+/**
+ * Get the session keys for an outbound group session
+ *
+ * @param {string} sessionId  the id of the outbound group session
+ *
+ * @return {{chain_index: number, key: string}} current chain index, and
+ *     base64-encoded secret key.
+ */
+OlmDevice.prototype.getOutboundGroupSessionKey = function(sessionId) {
+    return this._getOutboundGroupSession(sessionId, function(session) {
+        return {
+            chain_index: session.message_index(),
+            key: session.session_key(),
+        };
+    });
+};
+
+
+// Inbound group session
+// =====================
+
+/**
+ * data stored in the session store about an inbound group session
+ *
+ * @typedef {Object} InboundGroupSessionData
+ * @property {string} room_Id
+ * @property {string} session   pickled Olm.InboundGroupSession
+ * @property {Object&lt;string, string>} keysClaimed
+ * @property {Array&lt;string>} forwardingCurve25519KeyChain  Devices involved in forwarding
+ *     this session to us (normally empty).
+ */
+
+/**
+ * Unpickle a session from a sessionData object and invoke the given function.
+ * The session is valid only until func returns.
+ *
+ * @param {Object} sessionData Object describing the session.
+ * @param {function(Olm.InboundGroupSession)} func Invoked with the unpickled session
+ * @return {*} result of func
+ */
+OlmDevice.prototype._unpickleInboundGroupSession = function(sessionData, func) {
+    const session = new global.Olm.InboundGroupSession();
+    try {
+        session.unpickle(this._pickleKey, sessionData.session);
+        return func(session);
+    } finally {
+        session.free();
+    }
+};
+
+/**
+ * extract an InboundGroupSession from the crypto store and call the given function
+ *
+ * @param {string} roomId The room ID to extract the session for, or null to fetch
+ *     sessions for any room.
+ * @param {string} senderKey
+ * @param {string} sessionId
+ * @param {*} txn Opaque transaction object from cryptoStore.doTxn()
+ * @param {function(Olm.InboundGroupSession, InboundGroupSessionData)} func
+ *   function to call.
+ *
+ * @private
+ */
+OlmDevice.prototype._getInboundGroupSession = function(
+    roomId, senderKey, sessionId, txn, func,
+) {
+    this._cryptoStore.getEndToEndInboundGroupSession(
+        senderKey, sessionId, txn, (sessionData, withheld) => {
+            if (sessionData === null) {
+                func(null, null, withheld);
+                return;
+            }
+
+            // if we were given a room ID, check that the it matches the original one for the session. This stops
+            // the HS pretending a message was targeting a different room.
+            if (roomId !== null &amp;&amp; roomId !== sessionData.room_id) {
+                throw new Error(
+                    "Mismatched room_id for inbound group session (expected " +
+                    sessionData.room_id + ", was " + roomId + ")",
+                );
+            }
+
+            this._unpickleInboundGroupSession(sessionData, (session) => {
+                func(session, sessionData, withheld);
+            });
+        },
+    );
+};
+
+/**
+ * Add an inbound group session to the session store
+ *
+ * @param {string} roomId     room in which this session will be used
+ * @param {string} senderKey  base64-encoded curve25519 key of the sender
+ * @param {Array&lt;string>} forwardingCurve25519KeyChain  Devices involved in forwarding
+ *     this session to us.
+ * @param {string} sessionId  session identifier
+ * @param {string} sessionKey base64-encoded secret key
+ * @param {Object&lt;string, string>} keysClaimed Other keys the sender claims.
+ * @param {boolean} exportFormat true if the megolm keys are in export format
+ *    (ie, they lack an ed25519 signature)
+ * @param {Object} [extraSessionData={}] any other data to be include with the session
+ */
+OlmDevice.prototype.addInboundGroupSession = async function(
+    roomId, senderKey, forwardingCurve25519KeyChain,
+    sessionId, sessionKey, keysClaimed,
+    exportFormat, extraSessionData = {},
+) {
+    await this._cryptoStore.doTxn(
+        'readwrite', [
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
+        ], (txn) => {
+            /* if we already have this session, consider updating it */
+            this._getInboundGroupSession(
+                roomId, senderKey, sessionId, txn,
+                (existingSession, existingSessionData) => {
+                    // new session.
+                    const session = new global.Olm.InboundGroupSession();
+                    try {
+                        if (exportFormat) {
+                            session.import_session(sessionKey);
+                        } else {
+                            session.create(sessionKey);
+                        }
+                        if (sessionId != session.session_id()) {
+                            throw new Error(
+                                "Mismatched group session ID from senderKey: " +
+                                senderKey,
+                            );
+                        }
+
+                        if (existingSession) {
+                            logger.log(
+                                "Update for megolm session "
+                                    + senderKey + "/" + sessionId,
+                            );
+                            if (existingSession.first_known_index()
+                                &lt;= session.first_known_index()) {
+                                // existing session has lower index (i.e. can
+                                // decrypt more), so keep it
+                                logger.log(
+                                    `Keeping existing megolm session ${sessionId}`,
+                                );
+                                return;
+                            }
+                        }
+
+                        logger.info(
+                            "Storing megolm session " + senderKey + "/" + sessionId +
+                            " with first index " + session.first_known_index(),
+                        );
+
+                        const sessionData = Object.assign({}, extraSessionData, {
+                            room_id: roomId,
+                            session: session.pickle(this._pickleKey),
+                            keysClaimed: keysClaimed,
+                            forwardingCurve25519KeyChain: forwardingCurve25519KeyChain,
+                        });
+
+                        this._cryptoStore.storeEndToEndInboundGroupSession(
+                            senderKey, sessionId, sessionData, txn,
+                        );
+                    } finally {
+                        session.free();
+                    }
+                },
+            );
+        },
+    );
+};
+
+/**
+ * Record in the data store why an inbound group session was withheld.
+ *
+ * @param {string} roomId     room that the session belongs to
+ * @param {string} senderKey  base64-encoded curve25519 key of the sender
+ * @param {string} sessionId  session identifier
+ * @param {string} code       reason code
+ * @param {string} reason     human-readable version of `code`
+ */
+OlmDevice.prototype.addInboundGroupSessionWithheld = async function(
+    roomId, senderKey, sessionId, code, reason,
+) {
+    await this._cryptoStore.doTxn(
+        'readwrite', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD],
+        (txn) => {
+            this._cryptoStore.storeEndToEndInboundGroupSessionWithheld(
+                senderKey, sessionId,
+                {
+                    room_id: roomId,
+                    code: code,
+                    reason: reason,
+                },
+                txn,
+            );
+        },
+    );
+};
+
+export const WITHHELD_MESSAGES = {
+    "m.unverified": "The sender has disabled encrypting to unverified devices.",
+    "m.blacklisted": "The sender has blocked you.",
+    "m.unauthorised": "You are not authorised to read the message.",
+    "m.no_olm": "Unable to establish a secure channel.",
+};
+
+/**
+ * Calculate the message to use for the exception when a session key is withheld.
+ *
+ * @param {object} withheld  An object that describes why the key was withheld.
+ *
+ * @return {string} the message
+ *
+ * @private
+ */
+function _calculateWithheldMessage(withheld) {
+    if (withheld.code &amp;&amp; withheld.code in WITHHELD_MESSAGES) {
+        return WITHHELD_MESSAGES[withheld.code];
+    } else if (withheld.reason) {
+        return withheld.reason;
+    } else {
+        return "decryption key withheld";
+    }
+}
+
+/**
+ * Decrypt a received message with an inbound group session
+ *
+ * @param {string} roomId    room in which the message was received
+ * @param {string} senderKey base64-encoded curve25519 key of the sender
+ * @param {string} sessionId session identifier
+ * @param {string} body      base64-encoded body of the encrypted message
+ * @param {string} eventId   ID of the event being decrypted
+ * @param {Number} timestamp timestamp of the event being decrypted
+ *
+ * @return {null} the sessionId is unknown
+ *
+ * @return {Promise&lt;{result: string, senderKey: string,
+ *    forwardingCurve25519KeyChain: Array&lt;string>,
+ *    keysClaimed: Object&lt;string, string>}>}
+ */
+OlmDevice.prototype.decryptGroupMessage = async function(
+    roomId, senderKey, sessionId, body, eventId, timestamp,
+) {
+    let result;
+    // when the localstorage crypto store is used as an indexeddb backend,
+    // exceptions thrown from within the inner function are not passed through
+    // to the top level, so we store exceptions in a variable and raise them at
+    // the end
+    let error;
+
+    await this._cryptoStore.doTxn(
+        'readwrite', [
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
+        ], (txn) => {
+            this._getInboundGroupSession(
+                roomId, senderKey, sessionId, txn, (session, sessionData, withheld) => {
+                    if (session === null) {
+                        if (withheld) {
+                            error = new algorithms.DecryptionError(
+                                "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
+                                _calculateWithheldMessage(withheld),
+                                {
+                                    session: senderKey + '|' + sessionId,
+                                },
+                            );
+                        }
+                        result = null;
+                        return;
+                    }
+                    let res;
+                    try {
+                        res = session.decrypt(body);
+                    } catch (e) {
+                        if (e &amp;&amp; e.message === 'OLM.UNKNOWN_MESSAGE_INDEX' &amp;&amp; withheld) {
+                            error = new algorithms.DecryptionError(
+                                "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
+                                _calculateWithheldMessage(withheld),
+                                {
+                                    session: senderKey + '|' + sessionId,
+                                },
+                            );
+                        } else {
+                            error = e;
+                        }
+                        return;
+                    }
+
+                    let plaintext = res.plaintext;
+                    if (plaintext === undefined) {
+                        // Compatibility for older olm versions.
+                        plaintext = res;
+                    } else {
+                        // Check if we have seen this message index before to detect replay attacks.
+                        // If the event ID and timestamp are specified, and the match the event ID
+                        // and timestamp from the last time we used this message index, then we
+                        // don't consider it a replay attack.
+                        const messageIndexKey = (
+                            senderKey + "|" + sessionId + "|" + res.message_index
+                        );
+                        if (messageIndexKey in this._inboundGroupSessionMessageIndexes) {
+                            const msgInfo = (
+                                this._inboundGroupSessionMessageIndexes[messageIndexKey]
+                            );
+                            if (
+                                msgInfo.id !== eventId ||
+                                msgInfo.timestamp !== timestamp
+                            ) {
+                                error = new Error(
+                                    "Duplicate message index, possible replay attack: " +
+                                    messageIndexKey,
+                                );
+                                return;
+                            }
+                        }
+                        this._inboundGroupSessionMessageIndexes[messageIndexKey] = {
+                            id: eventId,
+                            timestamp: timestamp,
+                        };
+                    }
+
+                    sessionData.session = session.pickle(this._pickleKey);
+                    this._cryptoStore.storeEndToEndInboundGroupSession(
+                        senderKey, sessionId, sessionData, txn,
+                    );
+                    result = {
+                        result: plaintext,
+                        keysClaimed: sessionData.keysClaimed || {},
+                        senderKey: senderKey,
+                        forwardingCurve25519KeyChain: (
+                            sessionData.forwardingCurve25519KeyChain || []
+                        ),
+                        untrusted: sessionData.untrusted,
+                    };
+                },
+            );
+        },
+    );
+
+    if (error) {
+        throw error;
+    }
+    return result;
+};
+
+/**
+ * Determine if we have the keys for a given megolm session
+ *
+ * @param {string} roomId    room in which the message was received
+ * @param {string} senderKey base64-encoded curve25519 key of the sender
+ * @param {string} sessionId session identifier
+ *
+ * @returns {Promise&lt;boolean>} true if we have the keys to this session
+ */
+OlmDevice.prototype.hasInboundSessionKeys = async function(roomId, senderKey, sessionId) {
+    let result;
+    await this._cryptoStore.doTxn(
+        'readonly', [
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
+        ], (txn) => {
+            this._cryptoStore.getEndToEndInboundGroupSession(
+                senderKey, sessionId, txn, (sessionData) => {
+                    if (sessionData === null) {
+                        result = false;
+                        return;
+                    }
+
+                    if (roomId !== sessionData.room_id) {
+                        logger.warn(
+                            `requested keys for inbound group session ${senderKey}|` +
+                            `${sessionId}, with incorrect room_id ` +
+                            `(expected ${sessionData.room_id}, ` +
+                            `was ${roomId})`,
+                        );
+                        result = false;
+                    } else {
+                        result = true;
+                    }
+                },
+            );
+        },
+    );
+
+    return result;
+};
+
+/**
+ * Extract the keys to a given megolm session, for sharing
+ *
+ * @param {string} roomId    room in which the message was received
+ * @param {string} senderKey base64-encoded curve25519 key of the sender
+ * @param {string} sessionId session identifier
+ * @param {integer} chainIndex The chain index at which to export the session.
+ *     If omitted, export at the first index we know about.
+ *
+ * @returns {Promise&lt;{chain_index: number, key: string,
+ *        forwarding_curve25519_key_chain: Array&lt;string>,
+ *        sender_claimed_ed25519_key: string
+ *    }>}
+ *    details of the session key. The key is a base64-encoded megolm key in
+ *    export format.
+ *
+ * @throws Error If the given chain index could not be obtained from the known
+ *     index (ie. the given chain index is before the first we have).
+ */
+OlmDevice.prototype.getInboundGroupSessionKey = async function(
+    roomId, senderKey, sessionId, chainIndex,
+) {
+    let result;
+    await this._cryptoStore.doTxn(
+        'readonly', [
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
+        ], (txn) => {
+            this._getInboundGroupSession(
+                roomId, senderKey, sessionId, txn, (session, sessionData) => {
+                    if (session === null) {
+                        result = null;
+                        return;
+                    }
+
+                    if (chainIndex === undefined) {
+                        chainIndex = session.first_known_index();
+                    }
+
+                    const exportedSession = session.export_session(chainIndex);
+
+                    const claimedKeys = sessionData.keysClaimed || {};
+                    const senderEd25519Key = claimedKeys.ed25519 || null;
+
+                    result = {
+                        "chain_index": chainIndex,
+                        "key": exportedSession,
+                        "forwarding_curve25519_key_chain":
+                            sessionData.forwardingCurve25519KeyChain || [],
+                        "sender_claimed_ed25519_key": senderEd25519Key,
+                    };
+                },
+            );
+        },
+    );
+
+    return result;
+};
+
+/**
+ * Export an inbound group session
+ *
+ * @param {string} senderKey base64-encoded curve25519 key of the sender
+ * @param {string} sessionId session identifier
+ * @param {string} sessionData The session object from the store
+ * @return {module:crypto/OlmDevice.MegolmSessionData} exported session data
+ */
+OlmDevice.prototype.exportInboundGroupSession = function(
+    senderKey, sessionId, sessionData,
+) {
+    return this._unpickleInboundGroupSession(sessionData, (session) => {
+        const messageIndex = session.first_known_index();
+
+        return {
+            "sender_key": senderKey,
+            "sender_claimed_keys": sessionData.keysClaimed,
+            "room_id": sessionData.room_id,
+            "session_id": sessionId,
+            "session_key": session.export_session(messageIndex),
+            "forwarding_curve25519_key_chain": session.forwardingCurve25519KeyChain || [],
+            "first_known_index": session.first_known_index(),
+        };
+    });
+};
+
+// Utilities
+// =========
+
+/**
+ * Verify an ed25519 signature.
+ *
+ * @param {string} key ed25519 key
+ * @param {string} message message which was signed
+ * @param {string} signature base64-encoded signature to be checked
+ *
+ * @raises {Error} if there is a problem with the verification. If the key was
+ * too small then the message will be "OLM.INVALID_BASE64". If the signature
+ * was invalid then the message will be "OLM.BAD_MESSAGE_MAC".
+ */
+OlmDevice.prototype.verifySignature = function(
+    key, message, signature,
+) {
+    this._getUtility(function(util) {
+        util.ed25519_verify(key, message, signature);
+    });
+};
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+    
+    
+</div>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.6</a> on Wed Dec 16 2020 15:54:58 GMT+0000 (Greenwich Mean Time) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/polyfill.js"></script>
+<script src="scripts/linenumber.js"></script>
+
+<script src="scripts/search.js" defer></script>
+
+
+<script src="scripts/collapse.js" defer></script>
+
+
+</body>
+</html>
