@@ -1,3 +1,10 @@
+Changes in [9.4.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.4.0-rc.2) (2020-12-16)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.4.0-rc.1...v9.4.0-rc.2)
+
+ * Remove `postinstall` script which also runs as a dependency
+   [\#1560](https://github.com/matrix-org/matrix-js-sdk/pull/1560)
+
 Changes in [9.4.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.4.0-rc.1) (2020-12-16)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.3.0...v9.4.0-rc.1)
