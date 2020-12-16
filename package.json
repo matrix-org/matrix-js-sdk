@@ -4,7 +4,6 @@
   "description": "Matrix Client-Server SDK for Javascript",
   "scripts": {
     "prepublishOnly": "yarn build",
-    "postinstall": "yarn build:dev",
     "start": "echo THIS IS FOR LEGACY PURPOSES ONLY. && babel src -w -s -d lib --verbose --extensions \".ts,.js\"",
     "dist": "echo 'This is for the release script so it can make assets (browser bundle).' && yarn build",
     "clean": "rimraf lib dist",
