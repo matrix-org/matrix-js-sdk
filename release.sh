@@ -6,6 +6,7 @@
 #   github-changelog-generator; install via:
 #     pip install git+https://github.com/matrix-org/github-changelog-generator.git
 #   jq; install from your distribution's package manager (https://stedolan.github.io/jq/)
+#   dot-json; install via Yarn (`yarn global add dot-json`)
 #   hub; install via brew (macOS) or source/pre-compiled binaries (debian) (https://github.com/github/hub) - Tested on v2.2.9
 #   npm; typically installed by Node.js
 #   yarn; install via brew (macOS) or similar (https://yarnpkg.com/docs/install/)
@@ -15,6 +16,7 @@
 set -e
 
 jq --version > /dev/null || (echo "jq is required: please install it"; kill $$)
+dot-json --version > /dev/null || (echo "dot-json is required: please install it"; kill $$)
 if [[ `command -v hub` ]] && [[ `hub --version` =~ hub[[:space:]]version[[:space:]]([0-9]*).([0-9]*) ]]; then
     HUB_VERSION_MAJOR=${BASH_REMATCH[1]}
     HUB_VERSION_MINOR=${BASH_REMATCH[2]}
@@ -177,6 +179,19 @@ echo "yarn version"
 # only turn off both of these behaviours, so we have to
 # manually commit the result.
 yarn version --no-git-tag-version --new-version "$release"
+
+# For the published and dist versions of the package, we copy the
+# `matrix_lib_main` and `matrix_lib_typings` fields to `main` and `typings` (if
+# they exist). This small bit of gymnastics allows us to use the TypeScript
+# source directly for development without needing to build before linting or
+# testing.
+for i in main typings
+do
+    lib_value=`dot-json package.json matrix_lib_$i`
+    if [ -n "$lib_value" ]; then
+        dot-json package.json $i $lib_value
+    fi
+done
 
 # commit yarn.lock if it exists, is versioned, and is modified
 if [[ -f yarn.lock && `git status --porcelain yarn.lock | grep '^ M'` ]];
@@ -353,5 +368,30 @@ if [ $(git branch -lr | grep origin/develop -c) -ge 1 ]; then
     git checkout develop
     git pull
     git merge master --no-edit
+
+    # When merging to develop, we need revert the `main` and `typings` fields if
+    # we adjusted them previously.
+    for i in main typings
+    do
+        # If a `lib` prefixed value is present, it means we adjusted the field
+        # earlier at publish time, so we should revert it now.
+        if [ -n "$(dot-json package.json matrix_lib_$i)" ]; then
+            # If there's a `src` prefixed value, use that, otherwise delete.
+            # This is used to delete the `typings` field and reset `main` back
+            # to the TypeScript source.
+            src_value=`dot-json package.json matrix_src_$i`
+            if [ -n "$src_value" ]; then
+                dot-json package.json $i $src_value
+            else
+                dot-json package.json $i --delete
+            fi
+        fi
+    done
+
+    if [ -n "$(git ls-files --modified package.json)" ]; then
+        echo "Committing develop package.json"
+        git commit package.json -m "Resetting package fields for development"
+    fi
+
     git push origin develop
 fi
