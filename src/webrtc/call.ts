@@ -446,6 +446,7 @@ export class MatrixCall extends EventEmitter {
      */
     async initWithInvite(event: MatrixEvent) {
         this.msg = event.getContent();
+        this.direction = CallDirection.Inbound;
         this.peerConn = this.createPeerConnection();
         try {
             await this.peerConn.setRemoteDescription(this.msg.offer);
@@ -467,7 +468,6 @@ export class MatrixCall extends EventEmitter {
         this.type = this.remoteStream.getTracks().some(t => t.kind === 'video') ? CallType.Video : CallType.Voice;
 
         this.setState(CallState.Ringing);
-        this.direction = CallDirection.Inbound;
         this.opponentVersion = this.msg.version;
         this.opponentPartyId = this.msg.party_id || null;
         this.opponentMember = event.sender;
@@ -1314,7 +1314,16 @@ export class MatrixCall extends EventEmitter {
         // No need to check party_id for reject because if we'd received either
         // an answer or reject, we wouldn't be in state InviteSent
 
-        if (this.state === CallState.InviteSent) {
+        const shouldTerminate = (
+            // reject events also end the call if it's ringing: it's another of
+            // our devices rejecting the call.
+            ([CallState.InviteSent, CallState.Ringing].includes(this.state)) ||
+            // also if we're in the init state and it's an inbound call, since
+            // this means we just haven't entered the ringing state yet
+            this.state === CallState.Fledgling && this.direction === CallDirection.Inbound
+        );
+
+        if (shouldTerminate) {
             this.terminate(CallParty.Remote, CallErrorCode.UserHangup, true);
         } else {
             logger.debug(`Call is in state: ${this.state}: ignoring reject`);
