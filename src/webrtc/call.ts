@@ -65,6 +65,22 @@ interface CallCapabilities {
     'm.call.transferee': boolean,
 }
 
+// allow camelcase as these are events type that go onto the wire
+/* eslint-disable camelcase */
+interface MCallReplacesTarget {
+    id: string;
+    display_name: string,
+    avatar_url: string,
+}
+
+interface MCallReplacesEvent {
+    replacement_id: string;
+    target_user: MCallReplacesTarget;
+    create_call: string;
+    target_room: string;
+}
+/* eslint-enable camelcase */
+
 export enum CallState {
     Fledgling = 'fledgling',
     InviteSent = 'invite_sent',
@@ -1423,7 +1439,7 @@ export class MatrixCall extends EventEmitter {
                 avatar_url: profileInfo.avatar_url,
             },
             create_call: replacementId,
-        } as any;
+        } as MCallReplacesEvent;
 
         if (targetRoomId) body.target_room = targetRoomId;
 
