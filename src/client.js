@@ -701,7 +701,7 @@ MatrixClient.prototype.setForceTURN = function(forceTURN) {
 };
 
 /**
- * Set whether to advertise trabsfer support to other parties on Matrix calls.
+ * Set whether to advertise transfer support to other parties on Matrix calls.
  * @param {bool} supportsCallTransfer True to advertise the 'm.call.transeree' capability
  */
 MatrixClient.prototype.setSupportsCallTransfer = function(supportsCallTransfer) {
