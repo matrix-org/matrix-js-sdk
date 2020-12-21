@@ -1,6 +1,6 @@
 {
   "name": "matrix-js-sdk",
-  "version": "9.4.0-rc.2",
+  "version": "9.4.0",
   "description": "Matrix Client-Server SDK for Javascript",
   "scripts": {
     "prepublishOnly": "yarn build",
