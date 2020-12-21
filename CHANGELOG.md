@@ -1,3 +1,9 @@
+Changes in [9.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.4.0) (2020-12-21)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.4.0-rc.2...v9.4.0)
+
+ * Revert `postinstall` script change, causes issues for other layers
+
 Changes in [9.4.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.4.0-rc.2) (2020-12-16)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.4.0-rc.1...v9.4.0-rc.2)
