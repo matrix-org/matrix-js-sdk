@@ -1,3 +1,33 @@
+Changes in [9.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.4.0) (2020-12-21)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.4.0-rc.2...v9.4.0)
+
+ * Revert `postinstall` script change, causes issues for other layers
+
+Changes in [9.4.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.4.0-rc.2) (2020-12-16)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.4.0-rc.1...v9.4.0-rc.2)
+
+ * Remove `postinstall` script which also runs as a dependency
+   [\#1560](https://github.com/matrix-org/matrix-js-sdk/pull/1560)
+
+Changes in [9.4.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.4.0-rc.1) (2020-12-16)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.3.0...v9.4.0-rc.1)
+
+ * Fixes to support line 1 / 2
+   [\#1553](https://github.com/matrix-org/matrix-js-sdk/pull/1553)
+ * Add API for listening to remote hold status, advertise VoIP V1
+   [\#1549](https://github.com/matrix-org/matrix-js-sdk/pull/1549)
+ * A hangup from another client is still valid
+   [\#1555](https://github.com/matrix-org/matrix-js-sdk/pull/1555)
+ * Remove temporary build step for tests
+   [\#1554](https://github.com/matrix-org/matrix-js-sdk/pull/1554)
+ * Move browser build steps to prepublish only
+   [\#1552](https://github.com/matrix-org/matrix-js-sdk/pull/1552)
+ * Extend getSsoLoginUrl for MSC2858
+   [\#1541](https://github.com/matrix-org/matrix-js-sdk/pull/1541)
+
 Changes in [9.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.3.0) (2020-12-07)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.3.0-rc.1...v9.3.0)
