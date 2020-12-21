@@ -180,6 +180,9 @@ function keyFromRecoverySession(session, decryptionKey) {
  * @param {boolean} [opts.forceTURN]
  * Optional. Whether relaying calls through a TURN server should be forced.
  *
+ * @param {boolean} [opts.supportsTransfer]
+ * Optional. True to advertise support for call transfers to other parties on Matrix calls.
+ *
  * @param {boolean} [opts.fallbackICEServerAllowed]
  * Optional. Whether to allow a fallback ICE server should be used for negotiating a
  * WebRTC connection if the homeserver doesn't provide any servers. Defaults to false.
@@ -364,6 +367,7 @@ export function MatrixClient(opts) {
     this._cryptoCallbacks = opts.cryptoCallbacks || {};
 
     this._forceTURN = opts.forceTURN || false;
+    this._supportsTransfer = opts.supportsTransfer || false;
     this._fallbackICEServerAllowed = opts.fallbackICEServerAllowed || false;
 
     // List of which rooms have encryption enabled: separate from crypto because
@@ -694,6 +698,14 @@ MatrixClient.prototype.supportsVoip = function() {
  */
 MatrixClient.prototype.setForceTURN = function(forceTURN) {
     this._forceTURN = forceTURN;
+};
+
+/**
+ * Set whether to advertise trabsfer support to other parties on Matrix calls.
+ * @param {bool} supportsTransfer True to advertise the 'm.call.transeree' capability
+ */
+MatrixClient.prototype.setSupportsTransfer = function(supportsTransfer) {
+    this._supportsTransfer = supportsTransfer;
 };
 
 /**
