@@ -178,6 +178,19 @@ echo "yarn version"
 # manually commit the result.
 yarn version --no-git-tag-version --new-version "$release"
 
+# For the published and dist versions of the package, we copy the
+# `matrix_lib_main` and `matrix_lib_typings` fields to `main` and `typings` (if
+# they exist). This small bit of gymnastics allows us to use the TypeScript
+# source directly for development without needing to build before linting or
+# testing.
+for i in main typings
+do
+    lib_value=$(jq -r ".matrix_lib_$i" package.json)
+    if [ "$lib_value" != "null" ]; then
+        jq ".$i = .matrix_lib_$i" package.json > package.json.new && mv package.json.new package.json
+    fi
+done
+
 # commit yarn.lock if it exists, is versioned, and is modified
 if [[ -f yarn.lock && `git status --porcelain yarn.lock | grep '^ M'` ]];
 then
@@ -353,5 +366,30 @@ if [ $(git branch -lr | grep origin/develop -c) -ge 1 ]; then
     git checkout develop
     git pull
     git merge master --no-edit
+
+    # When merging to develop, we need revert the `main` and `typings` fields if
+    # we adjusted them previously.
+    for i in main typings
+    do
+        # If a `lib` prefixed value is present, it means we adjusted the field
+        # earlier at publish time, so we should revert it now.
+        if [ "$(jq -r ".matrix_lib_$i" package.json)" != "null" ]; then
+            # If there's a `src` prefixed value, use that, otherwise delete.
+            # This is used to delete the `typings` field and reset `main` back
+            # to the TypeScript source.
+            src_value=$(jq -r ".matrix_src_$i" package.json)
+            if [ "$src_value" != "null" ]; then
+                jq ".$i = .matrix_src_$i" package.json > package.json.new && mv package.json.new package.json
+            else
+                jq "del(.$i)" package.json > package.json.new && mv package.json.new package.json
+            fi
+        fi
+    done
+
+    if [ -n "$(git ls-files --modified package.json)" ]; then
+        echo "Committing develop package.json"
+        git commit package.json -m "Resetting package fields for development"
+    fi
+
     git push origin develop
 fi

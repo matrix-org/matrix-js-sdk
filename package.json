@@ -3,7 +3,6 @@
   "version": "9.4.1",
   "description": "Matrix Client-Server SDK for Javascript",
   "scripts": {
-    "prepare": "yarn build:dev",
     "prepublishOnly": "yarn build",
     "start": "echo THIS IS FOR LEGACY PURPOSES ONLY. && babel src -w -s -d lib --verbose --extensions \".ts,.js\"",
     "dist": "echo 'This is for the release script so it can make assets (browser bundle).' && yarn build",
@@ -28,11 +27,12 @@
   "keywords": [
     "matrix-org"
   ],
-  "main": "./lib/index.js",
-  "typings": "./lib/index.d.ts",
+  "main": "./src/index.ts",
   "browser": "./lib/browser-index.js",
   "matrix_src_main": "./src/index.ts",
   "matrix_src_browser": "./src/browser-index.js",
+  "matrix_lib_main": "./lib/index.js",
+  "matrix_lib_typings": "./lib/index.d.ts",
   "author": "matrix.org",
   "license": "Apache-2.0",
   "files": [
