@@ -28,6 +28,7 @@ import MatrixEvent from '../models/event';
 import {EventType} from '../@types/event';
 import { RoomMember } from '../models/room-member';
 import { randomString } from '../randomstring';
+import { MCallReplacesEvent, MCallAnswer, MCallOfferNegotiate, CallCapabilities } from './callEventTypes';
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
@@ -60,26 +61,6 @@ interface TurnServer {
     password?: string,
     ttl?: number,
 }
-
-interface CallCapabilities {
-    'm.call.transferee': boolean,
-}
-
-// allow camelcase as these are events type that go onto the wire
-/* eslint-disable camelcase */
-interface MCallReplacesTarget {
-    id: string;
-    display_name: string,
-    avatar_url: string,
-}
-
-interface MCallReplacesEvent {
-    replacement_id: string;
-    target_user: MCallReplacesTarget;
-    create_call: string;
-    target_room: string;
-}
-/* eslint-enable camelcase */
 
 export enum CallState {
     Fledgling = 'fledgling',
@@ -810,7 +791,7 @@ export class MatrixCall extends EventEmitter {
                 // required to still be sent for backwards compat
                 type: this.peerConn.localDescription.type,
             },
-        } as any;
+        } as MCallAnswer;
 
         if (this.client._supportsTransfer) {
             answerContent.capabilities = {
@@ -1135,13 +1116,18 @@ export class MatrixCall extends EventEmitter {
 
         if (this.callHasEnded()) return;
 
-        const keyName = this.state === CallState.CreateOffer ? 'offer' : 'description';
         const eventType = this.state === CallState.CreateOffer ? EventType.CallInvite : EventType.CallNegotiate;
 
         const content = {
-            [keyName]: this.peerConn.localDescription,
             lifetime: CALL_TIMEOUT_MS,
-        } as any;
+        } as MCallOfferNegotiate;
+
+        // clunky because TypeScript can't folow the types through if we use an expression as the key
+        if (this.state === CallState.CreateOffer) {
+            content.offer = this.peerConn.localDescription;
+        } else {
+            content.description = this.peerConn.localDescription;
+        }
 
         if (this.client._supportsTransfer) {
             content.capabilities = {
