@@ -6,7 +6,6 @@
 #   github-changelog-generator; install via:
 #     pip install git+https://github.com/matrix-org/github-changelog-generator.git
 #   jq; install from your distribution's package manager (https://stedolan.github.io/jq/)
-#   dot-json; install via Yarn (`yarn global add dot-json`)
 #   hub; install via brew (macOS) or source/pre-compiled binaries (debian) (https://github.com/github/hub) - Tested on v2.2.9
 #   npm; typically installed by Node.js
 #   yarn; install via brew (macOS) or similar (https://yarnpkg.com/docs/install/)
@@ -16,7 +15,6 @@
 set -e
 
 jq --version > /dev/null || (echo "jq is required: please install it"; kill $$)
-dot-json --version > /dev/null || (echo "dot-json is required: please install it"; kill $$)
 if [[ `command -v hub` ]] && [[ `hub --version` =~ hub[[:space:]]version[[:space:]]([0-9]*).([0-9]*) ]]; then
     HUB_VERSION_MAJOR=${BASH_REMATCH[1]}
     HUB_VERSION_MINOR=${BASH_REMATCH[2]}
@@ -187,9 +185,9 @@ yarn version --no-git-tag-version --new-version "$release"
 # testing.
 for i in main typings
 do
-    lib_value=`dot-json package.json matrix_lib_$i`
-    if [ -n "$lib_value" ]; then
-        dot-json package.json $i $lib_value
+    lib_value=$(jq -r ".matrix_lib_$i" package.json)
+    if [ "$lib_value" != "null" ]; then
+        jq ".$i = .matrix_lib_$i" package.json > package.json.new && mv package.json.new package.json
     fi
 done
 
@@ -375,15 +373,15 @@ if [ $(git branch -lr | grep origin/develop -c) -ge 1 ]; then
     do
         # If a `lib` prefixed value is present, it means we adjusted the field
         # earlier at publish time, so we should revert it now.
-        if [ -n "$(dot-json package.json matrix_lib_$i)" ]; then
+        if [ "$(jq -r ".matrix_lib_$i" package.json)" != "null" ]; then
             # If there's a `src` prefixed value, use that, otherwise delete.
             # This is used to delete the `typings` field and reset `main` back
             # to the TypeScript source.
-            src_value=`dot-json package.json matrix_src_$i`
-            if [ -n "$src_value" ]; then
-                dot-json package.json $i $src_value
+            src_value=$(jq -r ".matrix_src_$i" package.json)
+            if [ "$src_value" != "null" ]; then
+                jq ".$i = .matrix_src_$i" package.json > package.json.new && mv package.json.new package.json
             else
-                dot-json package.json $i --delete
+                jq "del(.$i)" package.json > package.json.new && mv package.json.new package.json
             fi
         fi
     done
