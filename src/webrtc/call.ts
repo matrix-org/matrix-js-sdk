@@ -46,31 +46,6 @@ import { RoomMember } from '../models/room-member';
  * });
  */
 
-
-export interface ElectronDesktopCapturerSource {
-    display_id: string;
-    id: string;
-    name: string;
-}
-
-interface ElectronGetSourcesOptions {
-    fetchWindowIcons?: boolean;
-    thumbnailSize?: {
-        height: number;
-        width: number;
-    };
-    types: string[];
-}
-
-declare global {
-    interface Window {
-        desktopCapturer?: {
-            getSources(options: ElectronGetSourcesOptions): Promise<Array<ElectronDesktopCapturerSource>>;
-        };
-    }
-}
-
-
 interface CallOpts {
     roomId?: string,
     client?: any, // Fix when client is TSified
@@ -361,8 +336,8 @@ export class MatrixCall extends EventEmitter {
         remoteVideoElement: HTMLVideoElement,
         localVideoElement: HTMLVideoElement,
         selectDesktopCapturerSource: (
-            sources: Array<ElectronDesktopCapturerSource>,
-        ) => Promise<ElectronDesktopCapturerSource>,
+            sources: Array<DesktopCapturerSource>,
+        ) => Promise<DesktopCapturerSource>,
     ) {
         logger.debug("placeScreenSharingCall");
         this.checkForErrorListener();
@@ -373,7 +348,7 @@ export class MatrixCall extends EventEmitter {
             // We have access to the Electron desktop capturer
             logger.debug("Electron desktopCapturer is available...");
             try {
-                const options: ElectronGetSourcesOptions = {
+                const getSourcesOptions: GetSourcesOptions = {
                     thumbnailSize: {
                         height: 176,
                         width: 312,
@@ -383,10 +358,9 @@ export class MatrixCall extends EventEmitter {
                         "window",
                     ],
                 };
-
-                const sources = await window.desktopCapturer.getSources(options);
+                const sources = await window.desktopCapturer.getSources(getSourcesOptions);
                 const selectedSource = await selectDesktopCapturerSource(sources);
-                this.screenSharingStream = await window.navigator.mediaDevices.getUserMedia({
+                const getUserMediaOptions: MediaStreamConstraints | DesktopCapturerConstraints = {
                     audio: false,
                     video: {
                         mandatory: {
@@ -394,7 +368,9 @@ export class MatrixCall extends EventEmitter {
                             chromeMediaSourceId: selectedSource.id,
                         },
                     },
-                });
+                }
+                this.screenSharingStream = await window.navigator.mediaDevices.getUserMedia(getUserMediaOptions);
+
                 logger.debug("Got screen stream, requesting audio stream...");
                 const audioConstraints = getUserMediaVideoContraints(CallType.Voice);
                 this.placeCallWithConstraints(audioConstraints);

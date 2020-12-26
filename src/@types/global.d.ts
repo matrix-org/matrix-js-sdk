@@ -26,10 +26,50 @@ declare global {
         }
     }
 
+    interface Window {
+        desktopCapturer?: {
+            getSources(options: GetSourcesOptions): Promise<Array<DesktopCapturerSource>>;
+        };
+    }
+
     interface MediaDevices {
         // This is experimental and types don't know about it yet
         // https://github.com/microsoft/TypeScript/issues/33232
-        getDisplayMedia(constraints: MediaStreamConstraints): Promise<MediaStream>;
+        getDisplayMedia(constraints: MediaStreamConstraints | DesktopCapturerConstraints): Promise<MediaStream>;
+        getUserMedia(constraints: MediaStreamConstraints | DesktopCapturerConstraints): Promise<MediaStream>;
+    }
+
+    export interface DesktopCapturerConstraints {
+        audio: boolean | {
+            mandatory: {
+                chromeMediaSource: string;
+                chromeMediaSourceId: string;
+            };
+        };
+        video: boolean | {
+            mandatory: {
+                chromeMediaSource: string;
+                chromeMediaSourceId: string;
+            };
+        };
+    }
+
+    export interface DesktopCapturerSource {
+        id: string;
+        name: string;
+        thumbnail;
+        // This property is not camelcase and isn't used, therefore it is commented
+        //display_id: string;
+        appIcon;
+    }
+
+    interface GetSourcesOptions {
+        types: Array<string>;
+        thumbnailSize?: {
+            height: number;
+            width: number;
+        };
+        fetchWindowIcons?: boolean;
     }
 
     interface HTMLAudioElement {
