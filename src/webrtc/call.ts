@@ -371,7 +371,7 @@ export class MatrixCall extends EventEmitter {
 
         if (window.desktopCapturer) {
             // We have access to the Electron desktop capturer
-            logger.debug("Electron desktopCapturer is available");
+            logger.debug("Electron desktopCapturer is available...");
             try {
                 const options: ElectronGetSourcesOptions = {
                     thumbnailSize: {
@@ -384,32 +384,20 @@ export class MatrixCall extends EventEmitter {
                     ],
                 };
 
-                window.desktopCapturer.getSources(options).then((sources: Array<ElectronDesktopCapturerSource>) => {
-                    console.log("Sources:", sources);
-                    selectDesktopCapturerSource(sources).then((selectedSource)=> {
-                        console.log("Source:", selectedSource);
-                        window.navigator.mediaDevices.getUserMedia({
-                            audio: false,
-                            video: {
-                                mandatory: {
-                                    chromeMediaSource: "desktop",
-                                    chromeMediaSourceId: selectedSource.id,
-                                },
-                            },
-                        }).then((stream)=> {
-                            this.screenSharingStream = stream;
-                            console.log("Stream", this.screenSharingStream);
-                            logger.debug("Got screen stream, requesting audio stream...");
-
-                            const audioConstraints = getUserMediaVideoContraints(CallType.Voice);
-                            this.placeCallWithConstraints(audioConstraints);
-                        }).catch( (error) => {
-                            this.emit(error);
-                        });
-                    });
-                }).catch((error) => {
-                    this.emit(error);
+                const sources = await window.desktopCapturer.getSources(options);
+                const selectedSource = await selectDesktopCapturerSource(sources);
+                this.screenSharingStream = await window.navigator.mediaDevices.getUserMedia({
+                    audio: false,
+                    video: {
+                        mandatory: {
+                            chromeMediaSource: "desktop",
+                            chromeMediaSourceId: selectedSource.id,
+                        },
+                    },
                 });
+                logger.debug("Got screen stream, requesting audio stream...");
+                const audioConstraints = getUserMediaVideoContraints(CallType.Voice);
+                this.placeCallWithConstraints(audioConstraints);
             } catch (err) {
                 this.emit(CallEvent.Error,
                     new CallError(
@@ -421,7 +409,7 @@ export class MatrixCall extends EventEmitter {
         } else {
             /* We do not have access to the Electron desktop capturer,
              * therefore we can assume we are on the web */
-            logger.debug("Electron desktopCapturer is not available");
+            logger.debug("Electron desktopCapturer is not available...");
             try {
                 this.screenSharingStream = await navigator.mediaDevices.getDisplayMedia({'audio': false});
                 logger.debug("Got screen stream, requesting audio stream...");
