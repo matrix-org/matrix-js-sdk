@@ -65,7 +65,7 @@ interface ElectronGetSourcesOptions {
 declare global {
     interface Window {
         desktopCapturer?: {
-            getSources(options: ElectronGetSourcesOptions): Promise<ElectronDesktopCapturerSource[]>;
+            getSources(options: ElectronGetSourcesOptions): Promise<Array<ElectronDesktopCapturerSource>>;
         };
     }
 }
