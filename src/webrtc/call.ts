@@ -46,6 +46,31 @@ import { RoomMember } from '../models/room-member';
  * });
  */
 
+
+export interface ElectronDesktopCapturerSource {
+    display_id: string;
+    id: string;
+    name: string;
+}
+
+interface ElectronGetSourcesOptions {
+    fetchWindowIcons?: boolean;
+    thumbnailSize?: {
+        height: number;
+        width: number;
+    };
+    types: string[];
+}
+
+declare global {
+    interface Window {
+        desktopCapturer?: {
+            getSources(options: ElectronGetSourcesOptions): Promise<ElectronDesktopCapturerSource[]>;
+        };
+    }
+}
+
+
 interface CallOpts {
     roomId?: string,
     client?: any, // Fix when client is TSified
@@ -332,23 +357,84 @@ export class MatrixCall extends EventEmitter {
      * to render the local camera preview.
      * @throws If you have not specified a listener for 'error' events.
      */
-    async placeScreenSharingCall(remoteVideoElement: HTMLVideoElement, localVideoElement: HTMLVideoElement) {
+    async placeScreenSharingCall(
+        remoteVideoElement: HTMLVideoElement,
+        localVideoElement: HTMLVideoElement,
+        selectDesktopCapturerSource: (
+            sources: Array<ElectronDesktopCapturerSource>,
+        ) => Promise<ElectronDesktopCapturerSource>,
+    ) {
         logger.debug("placeScreenSharingCall");
         this.checkForErrorListener();
         this.localVideoElement = localVideoElement;
         this.remoteVideoElement = remoteVideoElement;
-        try {
-            this.screenSharingStream = await navigator.mediaDevices.getDisplayMedia({'audio': false});
-            logger.debug("Got screen stream, requesting audio stream...");
-            const audioConstraints = getUserMediaVideoContraints(CallType.Voice);
-            this.placeCallWithConstraints(audioConstraints);
-        } catch (err) {
-            this.emit(CallEvent.Error,
-                new CallError(
-                    CallErrorCode.NoUserMedia,
-                    "Failed to get screen-sharing stream: ", err,
-                ),
-            );
+
+        if (window.desktopCapturer) {
+            // We have access to the Electron desktop capturer
+            logger.debug("Electron desktopCapturer is available");
+            try {
+                const options: ElectronGetSourcesOptions = {
+                    thumbnailSize: {
+                        height: 176,
+                        width: 312,
+                    },
+                    types: [
+                        "screen",
+                        "window",
+                    ],
+                };
+
+                window.desktopCapturer.getSources(options).then((sources: Array<ElectronDesktopCapturerSource>) => {
+                    console.log("Sources:", sources);
+                    selectDesktopCapturerSource(sources).then((selectedSource)=> {
+                        console.log("Source:", selectedSource);
+                        window.navigator.mediaDevices.getUserMedia({
+                            audio: false,
+                            video: {
+                                mandatory: {
+                                    chromeMediaSource: "desktop",
+                                    chromeMediaSourceId: selectedSource.id,
+                                },
+                            },
+                        }).then((stream)=> {
+                            this.screenSharingStream = stream;
+                            console.log("Stream", this.screenSharingStream);
+                            logger.debug("Got screen stream, requesting audio stream...");
+
+                            const audioConstraints = getUserMediaVideoContraints(CallType.Voice);
+                            this.placeCallWithConstraints(audioConstraints);
+                        }).catch( (error) => {
+                            this.emit(error);
+                        });
+                    });
+                }).catch((error) => {
+                    this.emit(error);
+                });
+            } catch (err) {
+                this.emit(CallEvent.Error,
+                    new CallError(
+                        CallErrorCode.NoUserMedia,
+                        "Failed to get screen-sharing stream: ", err,
+                    ),
+                );
+            }
+        } else {
+            /* We do not have access to the Electron desktop capturer,
+             * therefore we can assume we are on the web */
+            logger.debug("Electron desktopCapturer is not available");
+            try {
+                this.screenSharingStream = await navigator.mediaDevices.getDisplayMedia({'audio': false});
+                logger.debug("Got screen stream, requesting audio stream...");
+                const audioConstraints = getUserMediaVideoContraints(CallType.Voice);
+                this.placeCallWithConstraints(audioConstraints);
+            } catch (err) {
+                this.emit(CallEvent.Error,
+                    new CallError(
+                        CallErrorCode.NoUserMedia,
+                        "Failed to get screen-sharing stream: ", err,
+                    ),
+                );
+            }
         }
 
         this.type = CallType.Video;
