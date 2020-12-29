@@ -1059,9 +1059,14 @@ OlmDevice.prototype.addInboundGroupSession = async function(
                                     + senderKey + "/" + sessionId,
                             );
                             if (existingSession.first_known_index()
-                                <= session.first_known_index()) {
+                                <= session.first_known_index()
+                                && !(existingSession.first_known_index() == session.first_known_index()
+                                    && !extraSessionData.untrusted
+                                    && existingSessionData.untrusted)) {
                                 // existing session has lower index (i.e. can
-                                // decrypt more), so keep it
+                                // decrypt more), or they have the same index and
+                                // the new sessions trust does not win over the old
+                                // sessions trust, so keep it
                                 logger.log(
                                     `Keeping existing megolm session ${sessionId}`,
                                 );

@@ -971,4 +971,60 @@ describe("megolm", function() {
             expect(event.getContent().body).toEqual('42');
         });
     });
+
+    it("Alice receives an untrusted megolm key, only to receive the trusted one shortly after", function() {
+        const testClient = new TestClient(
+            "@alice:localhost", "device2", "access_token2",
+        );
+        const groupSession = new Olm.OutboundGroupSession();
+        groupSession.create();
+        const inboundGroupSession = new Olm.InboundGroupSession();
+        inboundGroupSession.create(groupSession.session_key());
+        const rawEvent = encryptMegolmEvent({
+            senderKey: testSenderKey,
+            groupSession: groupSession,
+            room_id: ROOM_ID,
+        });
+        return testClient.client.initCrypto().then(() => {
+            const keys = [{
+                room_id: ROOM_ID,
+                algorithm: 'm.megolm.v1.aes-sha2',
+                session_id: groupSession.session_id(),
+                session_key: inboundGroupSession.export_session(0),
+                sender_key: testSenderKey,
+            }];
+            return testClient.client.importRoomKeys(keys, { untrusted: true });
+        }).then(() => {
+            const event = testUtils.mkEvent({
+                event: true,
+                ...rawEvent,
+                room: ROOM_ID,
+            });
+            return event.attemptDecryption(testClient.client._crypto, true).then(() => {
+                expect(event.isKeySourceUntrusted()).toBeTruthy();
+            });
+        }).then(() => {
+            const event = testUtils.mkEvent({
+                type: 'm.room_key',
+                content: {
+                    room_id: ROOM_ID,
+                    algorithm: 'm.megolm.v1.aes-sha2',
+                    session_id: groupSession.session_id(),
+                    session_key: groupSession.session_key(),
+                },
+                event: true,
+            });
+            event._senderCurve25519Key = testSenderKey;
+            return testClient.client._crypto._onRoomKeyEvent(event);
+        }).then(() => {
+            const event = testUtils.mkEvent({
+                event: true,
+                ...rawEvent,
+                room: ROOM_ID,
+            });
+            return event.attemptDecryption(testClient.client._crypto, true).then(() => {
+                expect(event.isKeySourceUntrusted()).toBeFalsy();
+            });
+        });
+    });
 });
