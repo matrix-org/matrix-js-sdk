@@ -480,7 +480,10 @@ export class MatrixCall extends EventEmitter {
 
         this.setState(CallState.Ringing);
         this.opponentVersion = this.msg.version;
-        this.opponentPartyId = this.msg.party_id || null;
+        if (this.opponentVersion !== 0) {
+            // ignore party ID in v0 calls: party ID isn't a thing until v1
+            this.opponentPartyId = this.msg.party_id || null;
+        }
         this.opponentCaps = this.msg.capabilities || {};
         this.opponentMember = event.sender;
 
@@ -978,7 +981,9 @@ export class MatrixCall extends EventEmitter {
         }
 
         this.opponentVersion = event.getContent().version;
-        this.opponentPartyId = event.getContent().party_id || null;
+        if (this.opponentVersion !== 0) {
+            this.opponentPartyId = event.getContent().party_id || null;
+        }
         this.opponentCaps = event.getContent().capabilities || {};
         this.opponentMember = event.sender;
 

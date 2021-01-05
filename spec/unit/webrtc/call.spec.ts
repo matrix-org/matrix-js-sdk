@@ -142,7 +142,7 @@ describe('Call', function() {
         await call.onAnswerReceived({
             getContent: () => {
                 return {
-                    version: 0,
+                    version: 1,
                     call_id: call.callId,
                     party_id: 'the_correct_party_id',
                     answer: {
@@ -156,7 +156,7 @@ describe('Call', function() {
         call.onRemoteIceCandidatesReceived({
             getContent: () => {
                 return {
-                    version: 0,
+                    version: 1,
                     call_id: call.callId,
                     party_id: 'the_correct_party_id',
                     candidates: [
@@ -173,7 +173,7 @@ describe('Call', function() {
         call.onRemoteIceCandidatesReceived({
             getContent: () => {
                 return {
-                    version: 0,
+                    version: 1,
                     call_id: call.callId,
                     party_id: 'some_other_party_id',
                     candidates: [
