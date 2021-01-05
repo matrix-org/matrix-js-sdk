@@ -793,7 +793,7 @@ export class MatrixCall extends EventEmitter {
             },
         } as MCallAnswer;
 
-        if (this.client._supportsTransfer) {
+        if (this.client._supportsCallTransfer) {
             answerContent.capabilities = {
                 'm.call.transferee': true,
             }
@@ -1129,7 +1129,7 @@ export class MatrixCall extends EventEmitter {
             content.description = this.peerConn.localDescription;
         }
 
-        if (this.client._supportsTransfer) {
+        if (this.client._supportsCallTransfer) {
             content.capabilities = {
                 'm.call.transferee': true,
             }
