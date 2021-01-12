@@ -1663,7 +1663,8 @@ export function setVideoInput(deviceId: string) { videoInput = deviceId; }
 export function createNewMatrixCall(client: any, roomId: string, options?: CallOpts) {
     // typeof prevents Node from erroring on an undefined reference
     if (typeof(window) === 'undefined' || typeof(document) === 'undefined') {
-        logger.info("No window or document object: WebRTC is not supported in this environment");
+        // NB. We don't log here as apps try to create a call object as a test for
+        // whether calls are supported, so we shouldn't fill the logs up.
         return null;
     }
 
