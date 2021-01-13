@@ -709,6 +709,21 @@ export class MatrixCall extends EventEmitter {
         return callOnHold;
     }
 
+    /**
+     * Sends a DTMF digit to the other party
+     * @param digit The digit (nb. string - '#' and '*' are dtmf too)
+     */
+    sendDtmfDigit(digit: string) {
+        for (const sender of this.peerConn.getSenders()) {
+            if (sender.track.kind === 'audio' && sender.dtmf) {
+                sender.dtmf.insertDTMF(digit);
+                return;
+            }
+        }
+
+        throw new Error("Unable to find a track to send DTMF on");
+    }
+
     private updateMuteStatus() {
         if (!this.localAVStream) {
             return;
