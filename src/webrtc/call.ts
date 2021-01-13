@@ -706,7 +706,7 @@ export class MatrixCall extends EventEmitter {
             }
         }
 
-        throw new Error("Unable to kind a track to send DTMF on");
+        throw new Error("Unable to find a track to send DTMF on");
     }
 
     private updateMuteStatus() {
