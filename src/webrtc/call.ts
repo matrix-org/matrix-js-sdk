@@ -185,6 +185,21 @@ const FALLBACK_ICE_SERVER = 'stun:turn.matrix.org';
 /** The length of time a call can be ringing for. */
 const CALL_TIMEOUT_MS = 60000;
 
+/** Retrieves sources from desktopCapturer */
+export function getDesktopCapturerSources(): Promise<Array<DesktopCapturerSource>> {
+    const options: GetSourcesOptions = {
+        thumbnailSize: {
+            height: 176,
+            width: 312,
+        },
+        types: [
+            "screen",
+            "window",
+        ],
+    };
+    return window.electron.getDesktopCapturerSources(options);
+}
+
 export class CallError extends Error {
     code : string;
 
@@ -342,9 +357,7 @@ export class MatrixCall extends EventEmitter {
     async placeScreenSharingCall(
         remoteVideoElement: HTMLVideoElement,
         localVideoElement: HTMLVideoElement,
-        selectDesktopCapturerSource: (
-            sources: Array<DesktopCapturerSource>,
-        ) => Promise<DesktopCapturerSource>,
+        selectDesktopCapturerSource: () => Promise<DesktopCapturerSource>,
     ) {
         logger.debug("placeScreenSharingCall");
         this.checkForErrorListener();
@@ -355,18 +368,7 @@ export class MatrixCall extends EventEmitter {
             // We have access to getDesktopCapturerSources()
             logger.debug("Electron getDesktopCapturerSources() is available...");
             try {
-                const getSourcesOptions: GetSourcesOptions = {
-                    thumbnailSize: {
-                        height: 176,
-                        width: 312,
-                    },
-                    types: [
-                        "screen",
-                        "window",
-                    ],
-                };
-                const sources = await window.electron.getDesktopCapturerSources(getSourcesOptions);
-                const selectedSource = await selectDesktopCapturerSource(sources);
+                const selectedSource = await selectDesktopCapturerSource();
                 const getUserMediaOptions: MediaStreamConstraints | DesktopCapturerConstraints = {
                     audio: false,
                     video: {
