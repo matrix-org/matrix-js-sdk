@@ -351,9 +351,9 @@ export class MatrixCall extends EventEmitter {
         this.localVideoElement = localVideoElement;
         this.remoteVideoElement = remoteVideoElement;
 
-        if (window.desktopCapturer) {
-            // We have access to the Electron desktop capturer
-            logger.debug("Electron desktopCapturer is available...");
+        if (window.electron.getDesktopCapturerSources) {
+            // We have access to getDesktopCapturerSources()
+            logger.debug("Electron getDesktopCapturerSources() is available...");
             try {
                 const getSourcesOptions: GetSourcesOptions = {
                     thumbnailSize: {
@@ -365,7 +365,7 @@ export class MatrixCall extends EventEmitter {
                         "window",
                     ],
                 };
-                const sources = await window.desktopCapturer.getSources(getSourcesOptions);
+                const sources = await window.electron.getDesktopCapturerSources(getSourcesOptions);
                 const selectedSource = await selectDesktopCapturerSource(sources);
                 const getUserMediaOptions: MediaStreamConstraints | DesktopCapturerConstraints = {
                     audio: false,

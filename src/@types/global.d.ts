@@ -27,9 +27,9 @@ declare global {
     }
 
     interface Window {
-        desktopCapturer?: {
-            getSources(options: GetSourcesOptions): Promise<Array<DesktopCapturerSource>>;
-        };
+        electron?: {
+            getDesktopCapturerSources(options: GetSourcesOptions): Promise<Array<DesktopCapturerSource>>;
+        }
     }
 
     interface MediaDevices {
@@ -57,10 +57,7 @@ declare global {
     export interface DesktopCapturerSource {
         id: string;
         name: string;
-        thumbnail;
-        // This property is not camelcase and isn't used, therefore it is commented
-        //display_id: string;
-        appIcon;
+        thumbnailURL: string;
     }
 
     interface GetSourcesOptions {
