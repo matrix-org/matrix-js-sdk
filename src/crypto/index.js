@@ -2884,18 +2884,18 @@ Crypto.prototype.backupGroupSession = async function(
     sessionId, sessionKey, keysClaimed,
     exportFormat,
 ) {
-    if (!this.backupInfo) {
-        throw new Error("Key backups are not enabled");
-    }
-
     await this._cryptoStore.markSessionsNeedingBackup([{
         senderKey: senderKey,
         sessionId: sessionId,
     }]);
 
-    // don't wait for this to complete: it will delay so
-    // happens in the background
-    this.scheduleKeyBackupSend();
+    if (this.backupInfo) {
+        // don't wait for this to complete: it will delay so
+        // happens in the background
+        this.scheduleKeyBackupSend();
+    }
+    // if this.backupInfo is not set, then the keys will be backed up when
+    // client.enableKeyBackup is called
 };
 
 /**
