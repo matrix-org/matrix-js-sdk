@@ -5425,6 +5425,11 @@ function checkTurnServers(client) {
         }
     }, function(err) {
         logger.error("Failed to get TURN URIs");
+        // If we get a 403, there's no point in looping forever.
+        if (err.httpStatus === 403) {
+            logger.info("TURN access unavailable for this account");
+            return;
+        }
         client._checkTurnServersTimeoutID = setTimeout(function() {
             checkTurnServers(client);
         }, 60000);
