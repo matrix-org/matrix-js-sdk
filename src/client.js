@@ -3841,6 +3841,19 @@ MatrixClient.prototype.setPresence = function(opts, callback) {
     );
 };
 
+/**
+ * @param {string} userId The user to get presence for
+ * @param {module:client.callback} callback Optional.
+ * @return {Promise} Resolves: The presence state for this user.
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixClient.prototype.getPresence = function(userId, callback) {
+    const path = utils.encodeUri("/presence/$userId/status", {
+        $userId: userId,
+    });
+
+    return this._http.authedRequest(callback, "GET", path, undefined, undefined);
+};
 
 /**
  * Retrieve older messages from the given room and put them in the timeline.

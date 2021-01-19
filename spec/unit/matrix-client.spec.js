@@ -521,4 +521,19 @@ describe("MatrixClient", function() {
         xit("should be able to peek into a room using peekInRoom", function(done) {
         });
     });
+
+    describe("getPresence", function() {
+        it("should send a presence HTTP GET", function() {
+            httpLookups = [{
+                method: "GET",
+                path: `/presence/${encodeURIComponent(userId)}/status`,
+                data: {
+                    "presence": "unavailable",
+                    "last_active_ago": 420845,
+                },
+            }];
+            client.getPresence(userId);
+            expect(httpLookups.length).toEqual(0);
+        });
+    });
 });
