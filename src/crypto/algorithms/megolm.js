@@ -851,7 +851,7 @@ MegolmEncryption.prototype.prepareToEncrypt = function(room) {
         // We're already preparing something, so don't do anything else.
         // FIXME: check if we need to restart
         // (https://github.com/matrix-org/matrix-js-sdk/issues/1255)
-        const elapsedTime = Date.now() - this.encryptionPreparationMetadata.startTime
+        const elapsedTime = Date.now() - this.encryptionPreparationMetadata.startTime;
         logger.debug(
             `Already started preparing to encrypt for ${this._roomId} ` +
             `${elapsedTime} ms ago, skipping`,
