@@ -35,6 +35,8 @@ module.exports = {
         "files": ["src/**/*.ts"],
         "extends": ["matrix-org/ts"],
         "rules": {
+            // We're okay being explicit at the moment
+            "@typescript-eslint/no-empty-interface": "off",
             // While we're converting to ts we make heavy use of this
             "@typescript-eslint/no-explicit-any": "off",
             "quotes": "off",
