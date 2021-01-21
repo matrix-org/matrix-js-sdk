@@ -1,3 +1,38 @@
+Changes in [9.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.5.0) (2021-01-18)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.5.0-rc.1...v9.5.0)
+
+ * No changes since rc.1
+
+Changes in [9.5.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.5.0-rc.1) (2021-01-13)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.4.1...v9.5.0-rc.1)
+
+ * Don't log if no WebRTC
+   [\#1574](https://github.com/matrix-org/matrix-js-sdk/pull/1574)
+ * Add _unstable_getSharedRooms
+   [\#1417](https://github.com/matrix-org/matrix-js-sdk/pull/1417)
+ * Bump node-notifier from 8.0.0 to 8.0.1
+   [\#1568](https://github.com/matrix-org/matrix-js-sdk/pull/1568)
+ * Ignore party ID if opponent is v0
+   [\#1567](https://github.com/matrix-org/matrix-js-sdk/pull/1567)
+ * Basic call transfer initiation support
+   [\#1566](https://github.com/matrix-org/matrix-js-sdk/pull/1566)
+ * Room version 6 is now a thing
+   [\#1572](https://github.com/matrix-org/matrix-js-sdk/pull/1572)
+ * Store keys with same index but better trust level
+   [\#1571](https://github.com/matrix-org/matrix-js-sdk/pull/1571)
+ * Use TypeScript source for development, swap to build during release
+   [\#1561](https://github.com/matrix-org/matrix-js-sdk/pull/1561)
+ * Revert "Ignore party ID if opponent is v0"
+   [\#1565](https://github.com/matrix-org/matrix-js-sdk/pull/1565)
+ * Basic call transfer initiation support
+   [\#1558](https://github.com/matrix-org/matrix-js-sdk/pull/1558)
+ * Ignore party ID if opponent is v0
+   [\#1559](https://github.com/matrix-org/matrix-js-sdk/pull/1559)
+ * Honour a call reject event from another of our own devices
+   [\#1562](https://github.com/matrix-org/matrix-js-sdk/pull/1562)
+
 Changes in [9.4.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.4.1) (2020-12-21)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.4.0...v9.4.1)

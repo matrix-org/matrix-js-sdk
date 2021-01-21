@@ -1136,8 +1136,21 @@ export class MatrixCall extends EventEmitter {
             await this.peerConn.setRemoteDescription(description);
 
             if (description.type === 'offer') {
+                // First we sent the direction of the tranciever to what we'd like it to be,
+                // irresepective of whether the other side has us on hold - so just whether we
+                // want the call to be on hold or not. This is necessary because in a few lines,
+                // we'll adjust the direction and unless we do this too, we'll never come off hold.
+                for (const tranceiver of this.peerConn.getTransceivers()) {
+                    tranceiver.direction = this.isRemoteOnHold() ? 'inactive' : 'sendrecv';
+                }
                 const localDescription = await this.peerConn.createAnswer();
                 await this.peerConn.setLocalDescription(localDescription);
+                // Now we've got our answer, set the direction to the outcome of the negotiation.
+                // We need to do this otherwise Firefox will notice that the direction is not the
+                // currentDirection and try to negotiate itself off hold again.
+                for (const tranceiver of this.peerConn.getTransceivers()) {
+                    tranceiver.direction = tranceiver.currentDirection;
+                }
 
                 this.sendVoipEvent(EventType.CallNegotiate, {
                     description: this.peerConn.localDescription,
@@ -1281,7 +1294,7 @@ export class MatrixCall extends EventEmitter {
             return; // because ICE can still complete as we're ending the call
         }
         logger.debug(
-            "ICE connection state changed to: " + this.peerConn.iceConnectionState,
+            "Call ID " + this.callId + ": ICE connection state changed to: " + this.peerConn.iceConnectionState,
         );
         // ideally we'd consider the call to be connected when we get media but
         // chrome doesn't implement any of the 'onstarted' events yet
@@ -1399,7 +1412,7 @@ export class MatrixCall extends EventEmitter {
     }
 
     onHangupReceived = (msg) => {
-        logger.debug("Hangup received");
+        logger.debug("Hangup received for call ID " + + this.callId);
 
         // party ID must match (our chosen partner hanging up the call) or be undefined (we haven't chosen
         // a partner yet but we're treating the hangup as a reject as per VoIP v0)
@@ -1412,7 +1425,7 @@ export class MatrixCall extends EventEmitter {
     };
 
     onRejectReceived = (msg) => {
-        logger.debug("Reject received");
+        logger.debug("Reject received for call ID " + this.callId);
 
         // No need to check party_id for reject because if we'd received either
         // an answer or reject, we wouldn't be in state InviteSent
@@ -1434,7 +1447,7 @@ export class MatrixCall extends EventEmitter {
     };
 
     onAnsweredElsewhere = (msg) => {
-        logger.debug("Answered elsewhere");
+        logger.debug("Call ID " + this.callId + " answered elsewhere");
         this.terminate(CallParty.Remote, CallErrorCode.AnsweredElsewhere, true);
     };
 

@@ -3841,6 +3841,19 @@ MatrixClient.prototype.setPresence = function(opts, callback) {
     );
 };
 
+/**
+ * @param {string} userId The user to get presence for
+ * @param {module:client.callback} callback Optional.
+ * @return {Promise} Resolves: The presence state for this user.
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixClient.prototype.getPresence = function(userId, callback) {
+    const path = utils.encodeUri("/presence/$userId/status", {
+        $userId: userId,
+    });
+
+    return this._http.authedRequest(callback, "GET", path, undefined, undefined);
+};
 
 /**
  * Retrieve older messages from the given room and put them in the timeline.
@@ -5425,6 +5438,11 @@ function checkTurnServers(client) {
         }
     }, function(err) {
         logger.error("Failed to get TURN URIs");
+        // If we get a 403, there's no point in looping forever.
+        if (err.httpStatus === 403) {
+            logger.info("TURN access unavailable for this account");
+            return;
+        }
         client._checkTurnServersTimeoutID = setTimeout(function() {
             checkTurnServers(client);
         }, 60000);

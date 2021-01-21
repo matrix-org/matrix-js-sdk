@@ -264,11 +264,14 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
         await Promise.all([
             (async () => {
                 // share keys with devices that we already have a session for
+                logger.debug(`Sharing keys with existing Olm sessions in ${this._roomId}`);
                 await this._shareKeyWithOlmSessions(
                     session, key, payload, olmSessions,
                 );
+                logger.debug(`Shared keys with existing Olm sessions in ${this._roomId}`);
             })(),
             (async () => {
+                logger.debug(`Sharing keys with new Olm sessions in ${this._roomId}`);
                 const errorDevices = [];
 
                 // meanwhile, establish olm sessions for devices that we don't
@@ -319,8 +322,10 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
                 } else {
                     await this._notifyFailedOlmDevices(session, key, errorDevices);
                 }
+                logger.debug(`Shared keys with new Olm sessions in ${this._roomId}`);
             })(),
             (async () => {
+                logger.debug(`Notifying blocked devices in ${this._roomId}`);
                 // also, notify blocked devices that they're blocked
                 const blockedMap = {};
                 for (const [userId, userBlockedDevices] of Object.entries(blocked)) {
@@ -336,6 +341,7 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
                 }
 
                 await this._notifyBlockedDevices(session, blockedMap);
+                logger.debug(`Notified blocked devices in ${this._roomId}`);
             })(),
         ]);
     };
@@ -347,6 +353,11 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
 
     // first wait for the previous share to complete
     const prom = this._setupPromise.then(prepareSession);
+
+    // Ensure any failures are logged for debugging
+    prom.catch(e => {
+        logger.error(`Failed to ensure outbound session in ${this._roomId}`, e);
+    });
 
     // _setupPromise resolves to `session` whether or not the share succeeds
     this._setupPromise = prom.then(returnSession, returnSession);
@@ -369,17 +380,11 @@ MegolmEncryption.prototype._prepareNewSession = async function() {
         key.key, {ed25519: this._olmDevice.deviceEd25519Key},
     );
 
-    if (this._crypto.backupInfo) {
-        // don't wait for it to complete
-        this._crypto.backupGroupSession(
-            this._roomId, this._olmDevice.deviceCurve25519Key, [],
-            sessionId, key.key,
-        ).catch((e) => {
-            // This throws if the upload failed, but this is fine
-            // since it will have written it to the db and will retry.
-            logger.log("Failed to back up megolm session", e);
-        });
-    }
+    // don't wait for it to complete
+    this._crypto.backupGroupSession(
+        this._roomId, this._olmDevice.deviceCurve25519Key, [],
+        sessionId, key.key,
+    );
 
     return new OutboundSessionInfo(sessionId);
 };
@@ -846,24 +851,41 @@ MegolmEncryption.prototype.prepareToEncrypt = function(room) {
         // We're already preparing something, so don't do anything else.
         // FIXME: check if we need to restart
         // (https://github.com/matrix-org/matrix-js-sdk/issues/1255)
+        const elapsedTime = Date.now() - this.encryptionPreparationMetadata.startTime;
+        logger.debug(
+            `Already started preparing to encrypt for ${this._roomId} ` +
+            `${elapsedTime} ms ago, skipping`,
+        );
         return;
     }
 
     logger.debug(`Preparing to encrypt events for ${this._roomId}`);
 
+    this.encryptionPreparationMetadata = {
+        startTime: Date.now(),
+    };
     this.encryptionPreparation = (async () => {
-        const [devicesInRoom, blocked] = await this._getDevicesInRoom(room);
+        try {
+            logger.debug(`Getting devices in ${this._roomId}`);
+            const [devicesInRoom, blocked] = await this._getDevicesInRoom(room);
 
-        if (this._crypto.getGlobalErrorOnUnknownDevices()) {
-            // Drop unknown devices for now.  When the message gets sent, we'll
-            // throw an error, but we'll still be prepared to send to the known
-            // devices.
-            this._removeUnknownDevices(devicesInRoom);
+            if (this._crypto.getGlobalErrorOnUnknownDevices()) {
+                // Drop unknown devices for now.  When the message gets sent, we'll
+                // throw an error, but we'll still be prepared to send to the known
+                // devices.
+                this._removeUnknownDevices(devicesInRoom);
+            }
+
+            logger.debug(`Ensuring outbound session in ${this._roomId}`);
+            await this._ensureOutboundSession(devicesInRoom, blocked, true);
+
+            logger.debug(`Ready to encrypt events for ${this._roomId}`);
+        } catch (e) {
+            logger.error(`Failed to prepare to encrypt events for ${this._roomId}`, e);
+        } finally {
+            delete this.encryptionPreparationMetadata;
+            delete this.encryptionPreparation;
         }
-
-        await this._ensureOutboundSession(devicesInRoom, blocked, true);
-
-        delete this.encryptionPreparation;
     })();
 };
 
@@ -1347,18 +1369,12 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
                 }
             });
     }).then(() => {
-        if (this._crypto.backupInfo) {
-            // don't wait for the keys to be backed up for the server
-            this._crypto.backupGroupSession(
-                content.room_id, senderKey, forwardingKeyChain,
-                content.session_id, content.session_key, keysClaimed,
-                exportFormat,
-            ).catch((e) => {
-                // This throws if the upload failed, but this is fine
-                // since it will have written it to the db and will retry.
-                logger.log("Failed to back up megolm session", e);
-            });
-        }
+        // don't wait for the keys to be backed up for the server
+        this._crypto.backupGroupSession(
+            content.room_id, senderKey, forwardingKeyChain,
+            content.session_id, content.session_key, keysClaimed,
+            exportFormat,
+        );
     }).catch((e) => {
         logger.error(`Error handling m.room_key_event: ${e}`);
     });
@@ -1564,7 +1580,7 @@ MegolmDecryption.prototype.importRoomKey = function(session, opts = {}) {
         true,
         opts.untrusted ? { untrusted: opts.untrusted } : {},
     ).then(() => {
-        if (this._crypto.backupInfo && opts.source !== "backup") {
+        if (opts.source !== "backup") {
             // don't wait for it to complete
             this._crypto.backupGroupSession(
                 session.room_id,
