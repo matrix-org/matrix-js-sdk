@@ -1242,7 +1242,7 @@ export class MatrixCall extends EventEmitter {
             return; // because ICE can still complete as we're ending the call
         }
         logger.debug(
-            "ICE connection state changed to: " + this.peerConn.iceConnectionState,
+            "Call ID " + this.callId + ": ICE connection state changed to: " + this.peerConn.iceConnectionState,
         );
         // ideally we'd consider the call to be connected when we get media but
         // chrome doesn't implement any of the 'onstarted' events yet
@@ -1360,7 +1360,7 @@ export class MatrixCall extends EventEmitter {
     }
 
     onHangupReceived = (msg) => {
-        logger.debug("Hangup received");
+        logger.debug("Hangup received for call ID " + + this.callId);
 
         // party ID must match (our chosen partner hanging up the call) or be undefined (we haven't chosen
         // a partner yet but we're treating the hangup as a reject as per VoIP v0)
@@ -1373,7 +1373,7 @@ export class MatrixCall extends EventEmitter {
     };
 
     onRejectReceived = (msg) => {
-        logger.debug("Reject received");
+        logger.debug("Reject received for call ID " + this.callId);
 
         // No need to check party_id for reject because if we'd received either
         // an answer or reject, we wouldn't be in state InviteSent
@@ -1395,7 +1395,7 @@ export class MatrixCall extends EventEmitter {
     };
 
     onAnsweredElsewhere = (msg) => {
-        logger.debug("Answered elsewhere");
+        logger.debug("Call ID " + this.callId + " answered elsewhere");
         this.terminate(CallParty.Remote, CallErrorCode.AnsweredElsewhere, true);
     };
 
