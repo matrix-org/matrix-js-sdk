@@ -975,7 +975,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        if (this.opponentPartyId !== undefined) {
+        if (this.opponentPartyId !== null) {
             logger.info(
                 `Ignoring answer from party ID ${event.getContent().party_id}: ` +
                 `we already have an answer/reject from ${this.opponentPartyId}`,
