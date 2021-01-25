@@ -1471,11 +1471,6 @@ export class MatrixCall extends EventEmitter {
     private async terminate(hangupParty: CallParty, hangupReason: CallErrorCode, shouldEmit: boolean) {
         if (this.callHasEnded()) return;
 
-        const stats = await this.peerConn.getStats();
-        for (const s of stats.keys()) {
-            console.log(stats.get(s));
-        }
-
         if (this.inviteTimeout) {
             clearTimeout(this.inviteTimeout);
             this.inviteTimeout = null;
