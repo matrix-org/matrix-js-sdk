@@ -271,6 +271,9 @@ export class MatrixCall extends EventEmitter {
         this.type = null;
         this.forceTURN = opts.forceTURN;
         this.ourPartyId = this.client.deviceId;
+        // We compare this to null to checks the presence of a party ID:
+        // make sure it's null, not undefined
+        this.opponentPartyId = null;
         // Array of Objects with urls, username, credential keys
         this.turnServers = opts.turnServers || [];
         if (this.turnServers.length === 0 && this.client.isFallbackICEServerAllowed()) {
@@ -972,7 +975,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        if (this.opponentPartyId !== undefined) {
+        if (this.opponentPartyId !== null) {
             logger.info(
                 `Ignoring answer from party ID ${event.getContent().party_id}: ` +
                 `we already have an answer/reject from ${this.opponentPartyId}`,
@@ -1336,7 +1339,7 @@ export class MatrixCall extends EventEmitter {
 
         // party ID must match (our chosen partner hanging up the call) or be undefined (we haven't chosen
         // a partner yet but we're treating the hangup as a reject as per VoIP v0)
-        if (this.partyIdMatches(msg) || this.opponentPartyId === undefined || this.state === CallState.Ringing) {
+        if (this.partyIdMatches(msg) || this.state === CallState.Ringing) {
             // default reason is user_hangup
             this.terminate(CallParty.Remote, msg.reason || CallErrorCode.UserHangup, true);
         } else {
