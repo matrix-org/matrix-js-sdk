@@ -1,3 +1,10 @@
+Changes in [9.5.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.5.1) (2021-01-26)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.5.0...v9.5.1)
+
+ * [Release] Fix compatibility with v0 calls
+   [\#1585](https://github.com/matrix-org/matrix-js-sdk/pull/1585)
+
 Changes in [9.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.5.0) (2021-01-18)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.5.0-rc.1...v9.5.0)
