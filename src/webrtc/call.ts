@@ -260,6 +260,11 @@ export class MatrixCall extends EventEmitter {
     private micMuted;
     private vidMuted;
 
+    // the stats for the call at the point it ended. We can't get these after we
+    // tear the call down, so we just grab a snapshot before we stop the call.
+    // The typescript definitions have this type as 'any' :(
+    private callStatsAtEnd: any[];
+
     // Perfect negotiation state: https://www.w3.org/TR/webrtc/#perfect-negotiation-example
     private makingOffer: boolean;
     private ignoreOffer: boolean;
@@ -364,11 +369,11 @@ export class MatrixCall extends EventEmitter {
         this.type = CallType.Video;
     }
 
-    getOpponentMember() {
+    public getOpponentMember() {
         return this.opponentMember;
     }
 
-    opponentCanBeTransferred() {
+    public opponentCanBeTransferred() {
         return Boolean(this.opponentCaps && this.opponentCaps["m.call.transferee"]);
     }
 
@@ -376,7 +381,7 @@ export class MatrixCall extends EventEmitter {
      * Retrieve the local <code>&lt;video&gt;</code> DOM element.
      * @return {Element} The dom element
      */
-    getLocalVideoElement(): HTMLVideoElement {
+    public getLocalVideoElement(): HTMLVideoElement {
         return this.localVideoElement;
     }
 
@@ -385,7 +390,7 @@ export class MatrixCall extends EventEmitter {
      * used for playing back video capable streams.
      * @return {Element} The dom element
      */
-    getRemoteVideoElement(): HTMLVideoElement {
+    public getRemoteVideoElement(): HTMLVideoElement {
         return this.remoteVideoElement;
     }
 
@@ -394,7 +399,7 @@ export class MatrixCall extends EventEmitter {
      * used for playing back audio only streams.
      * @return {Element} The dom element
      */
-    getRemoteAudioElement(): HTMLAudioElement {
+    public getRemoteAudioElement(): HTMLAudioElement {
         return this.remoteAudioElement;
     }
 
@@ -403,7 +408,7 @@ export class MatrixCall extends EventEmitter {
      * video will be rendered to it immediately.
      * @param {Element} element The <code>&lt;video&gt;</code> DOM element.
      */
-    async setLocalVideoElement(element : HTMLVideoElement) {
+    public async setLocalVideoElement(element : HTMLVideoElement) {
         this.localVideoElement = element;
 
         if (element && this.localAVStream && this.type === CallType.Video) {
@@ -424,7 +429,7 @@ export class MatrixCall extends EventEmitter {
      * the first received video-capable stream will be rendered to it immediately.
      * @param {Element} element The <code>&lt;video&gt;</code> DOM element.
      */
-    setRemoteVideoElement(element : HTMLVideoElement) {
+    public setRemoteVideoElement(element : HTMLVideoElement) {
         if (element === this.remoteVideoElement) return;
 
         element.autoplay = true;
@@ -446,12 +451,31 @@ export class MatrixCall extends EventEmitter {
      * The audio will *not* be rendered from the remoteVideoElement.
      * @param {Element} element The <code>&lt;video&gt;</code> DOM element.
      */
-    async setRemoteAudioElement(element: HTMLAudioElement) {
+    public async setRemoteAudioElement(element: HTMLAudioElement) {
         if (element === this.remoteAudioElement) return;
 
         this.remoteAudioElement = element;
 
         if (this.remoteStream) this.playRemoteAudio();
+    }
+
+    // The typescript definitions have this type as 'any' :(
+    public async getCurrentCallStats(): Promise<any[]> {
+        if (this.callHasEnded()) {
+            return this.callStatsAtEnd;
+        }
+
+        return this.collectCallStats();
+    }
+
+    private async collectCallStats(): Promise<any[]> {
+        const statsReport = await this.peerConn.getStats();
+        const stats = [];
+        for (const item of statsReport) {
+            stats.push(item[1]);
+        }
+
+        return stats;
     }
 
     /**
@@ -1470,6 +1494,8 @@ export class MatrixCall extends EventEmitter {
 
     private async terminate(hangupParty: CallParty, hangupReason: CallErrorCode, shouldEmit: boolean) {
         if (this.callHasEnded()) return;
+
+        this.callStatsAtEnd = await this.collectCallStats();
 
         if (this.inviteTimeout) {
             clearTimeout(this.inviteTimeout);
