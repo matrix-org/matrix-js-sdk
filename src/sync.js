@@ -93,7 +93,7 @@ export function SyncApi(client, opts) {
         };
     }
     this.opts = opts;
-    this._peekRoomId = null;
+    this._peekRoom = null;
     this._currentSyncRequest = null;
     this._syncState = null;
     this._syncStateData = null; // additional data (eg. error object for failed sync)
@@ -264,16 +264,17 @@ SyncApi.prototype.syncLeftRooms = function() {
  * store.
  */
 SyncApi.prototype.peek = function(roomId) {
-    const self = this;
+    if (this._peekRoom && this._peekRoom.roomId === roomId) {
+        return Promise.resolve(this._peekRoom);
+    }
+
     const client = this.client;
-    this._peekRoomId = roomId;
-    return this.client.roomInitialSync(roomId, 20).then(function(response) {
+    this._peekRoom = this.createRoom(roomId);
+    return this.client.roomInitialSync(roomId, 20).then((response) => {
         // make sure things are init'd
         response.messages = response.messages || {};
         response.messages.chunk = response.messages.chunk || [];
         response.state = response.state || [];
-
-        const peekRoom = self.createRoom(roomId);
 
         // FIXME: Mostly duplicated from _processRoomEvents but not entirely
         // because "state" in this API is at the BEGINNING of the chunk
@@ -309,28 +310,28 @@ SyncApi.prototype.peek = function(roomId) {
         // fire off pagination requests in response to the Room.timeline
         // events.
         if (response.messages.start) {
-            peekRoom.oldState.paginationToken = response.messages.start;
+            this._peekRoom.oldState.paginationToken = response.messages.start;
         }
 
         // set the state of the room to as it was after the timeline executes
-        peekRoom.oldState.setStateEvents(oldStateEvents);
-        peekRoom.currentState.setStateEvents(stateEvents);
+        this._peekRoom.oldState.setStateEvents(oldStateEvents);
+        this._peekRoom.currentState.setStateEvents(stateEvents);
 
-        self._resolveInvites(peekRoom);
-        peekRoom.recalculate();
+        this._resolveInvites(this._peekRoom);
+        this._peekRoom.recalculate();
 
         // roll backwards to diverge old state. addEventsToTimeline
         // will overwrite the pagination token, so make sure it overwrites
         // it with the right thing.
-        peekRoom.addEventsToTimeline(messages.reverse(), true,
-                                     peekRoom.getLiveTimeline(),
+        this._peekRoom.addEventsToTimeline(messages.reverse(), true,
+                                     this._peekRoom.getLiveTimeline(),
                                      response.messages.start);
 
-        client.store.storeRoom(peekRoom);
-        client.emit("Room", peekRoom);
+        client.store.storeRoom(this._peekRoom);
+        client.emit("Room", this._peekRoom);
 
-        self._peekPoll(peekRoom);
-        return peekRoom;
+        this._peekPoll(this._peekRoom);
+        return this._peekRoom;
     });
 };
 
@@ -339,16 +340,16 @@ SyncApi.prototype.peek = function(roomId) {
  * peeked.
  */
 SyncApi.prototype.stopPeeking = function() {
-    this._peekRoomId = null;
+    this._peekRoom = null;
 };
 
 /**
  * Do a peek room poll.
  * @param {Room} peekRoom
- * @param {string} token from= token
+ * @param {string?} token from= token
  */
 SyncApi.prototype._peekPoll = function(peekRoom, token) {
-    if (this._peekRoomId !== peekRoom.roomId) {
+    if (this._peekRoom !== peekRoom) {
         debuglog("Stopped peeking in room %s", peekRoom.roomId);
         return;
     }
@@ -360,7 +361,7 @@ SyncApi.prototype._peekPoll = function(peekRoom, token) {
         timeout: 30 * 1000,
         from: token,
     }, undefined, 50 * 1000).then(function(res) {
-        if (self._peekRoomId !== peekRoom.roomId) {
+        if (self._peekRoom !== peekRoom) {
             debuglog("Stopped peeking in room %s", peekRoom.roomId);
             return;
         }
