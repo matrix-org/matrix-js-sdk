@@ -1,3 +1,35 @@
+Changes in [9.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.6.0) (2021-02-03)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.6.0-rc.1...v9.6.0)
+
+ * [Release] Fix edge cases with peeking where a room is re-peeked
+   [\#1588](https://github.com/matrix-org/matrix-js-sdk/pull/1588)
+
+Changes in [9.6.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.6.0-rc.1) (2021-01-29)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.5.1...v9.6.0-rc.1)
+
+ * Add support for getting call stats
+   [\#1584](https://github.com/matrix-org/matrix-js-sdk/pull/1584)
+ * Fix compatibility with v0 calls
+   [\#1583](https://github.com/matrix-org/matrix-js-sdk/pull/1583)
+ * Upgrade deps 2021-01
+   [\#1582](https://github.com/matrix-org/matrix-js-sdk/pull/1582)
+ * Log the call ID when logging that we've received VoIP events
+   [\#1581](https://github.com/matrix-org/matrix-js-sdk/pull/1581)
+ * Fix extra negotiate message in Firefox
+   [\#1579](https://github.com/matrix-org/matrix-js-sdk/pull/1579)
+ * Add debug logs to encryption prep
+   [\#1580](https://github.com/matrix-org/matrix-js-sdk/pull/1580)
+ * Expose getPresence endpoint
+   [\#1578](https://github.com/matrix-org/matrix-js-sdk/pull/1578)
+ * Queue keys for backup even if backup isn't enabled yet
+   [\#1577](https://github.com/matrix-org/matrix-js-sdk/pull/1577)
+ * Stop retrying TURN access when forbidden
+   [\#1576](https://github.com/matrix-org/matrix-js-sdk/pull/1576)
+ * Add DTMF sending support
+   [\#1573](https://github.com/matrix-org/matrix-js-sdk/pull/1573)
+
 Changes in [9.5.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.5.1) (2021-01-26)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.5.0...v9.5.1)
