@@ -1,3 +1,10 @@
+Changes in [9.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.6.0) (2021-02-03)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.6.0-rc.1...v9.6.0)
+
+ * [Release] Fix edge cases with peeking where a room is re-peeked
+   [\#1588](https://github.com/matrix-org/matrix-js-sdk/pull/1588)
+
 Changes in [9.6.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.6.0-rc.1) (2021-01-29)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.5.1...v9.6.0-rc.1)
