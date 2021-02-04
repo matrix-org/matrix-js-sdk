@@ -812,6 +812,24 @@ utils.extend(MatrixEvent.prototype, {
     },
 
     /**
+     * Get the (decrypted, if necessary) redaction event JSON
+     * if event was redacted
+     *
+     * @returns {object} The redaction event JSON, or an empty object
+     */
+    getRedactionEvent: function() {
+        if (!this.isRedacted()) return null;
+
+        if (this._clearEvent.unsigned) {
+            return this._clearEvent.unsigned.redacted_because;
+        } else if (this.event.unsigned.redacted_because) {
+            return this.event.unsigned.redacted_because;
+        } else {
+            return {};
+        }
+    },
+
+    /**
      * Get the push actions, if known, for this event
      *
      * @return {?Object} push actions

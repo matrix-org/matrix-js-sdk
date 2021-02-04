@@ -57,6 +57,7 @@ import {IllegalMethod} from "./verification/IllegalMethod";
 import {KeySignatureUploadError} from "../errors";
 import {decryptAES, encryptAES} from './aes';
 import {DehydrationManager} from './dehydration';
+import { MatrixEvent } from "../models/event";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -3028,19 +3029,26 @@ Crypto.prototype.encryptEvent = async function(event, room) {
  *  finished decrypting. Rejects with an `algorithms.DecryptionError` if there
  *  is a problem decrypting the event.
  */
-Crypto.prototype.decryptEvent = function(event) {
+Crypto.prototype.decryptEvent = async function(event) {
     if (event.isRedacted()) {
-        return Promise.resolve({
+        const redactionEvent = new MatrixEvent(event.getUnsigned().redacted_because);
+        const decryptedEvent = await this.decryptEvent(redactionEvent);
+
+        return {
             clearEvent: {
                 room_id: event.getRoomId(),
                 type: "m.room.message",
                 content: {},
+                unsigned: {
+                    redacted_because: decryptedEvent.clearEvent,
+                },
             },
-        });
+        };
+    } else {
+        const content = event.getWireContent();
+        const alg = this._getRoomDecryptor(event.getRoomId(), content.algorithm);
+        return await alg.decryptEvent(event);
     }
-    const content = event.getWireContent();
-    const alg = this._getRoomDecryptor(event.getRoomId(), content.algorithm);
-    return alg.decryptEvent(event);
 };
 
 /**
