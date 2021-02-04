@@ -3032,9 +3032,7 @@ Crypto.prototype.encryptEvent = async function(event, room) {
 Crypto.prototype.decryptEvent = async function(event) {
     if (event.isRedacted()) {
         const redactionEvent = new MatrixEvent(event.getUnsigned().redacted_because);
-        const content = redactionEvent.getWireContent();
-        const alg = this._getRoomDecryptor(event.getRoomId(), content.algorithm);
-        const decryptedEvent = await alg.decryptEvent(redactionEvent);
+        const decryptedEvent = await this.decryptEvent(redactionEvent);
 
         return {
             clearEvent: {
