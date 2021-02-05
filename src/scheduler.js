@@ -164,7 +164,7 @@ MatrixScheduler.RETRY_BACKOFF_RATELIMIT = function(event, attempts, err) {
 
     if (err.name === "M_LIMIT_EXCEEDED") {
         const waitTime = err.data.retry_after_ms;
-        if (waitTime) {
+        if (waitTime > 0) {
             return waitTime;
         }
     }
