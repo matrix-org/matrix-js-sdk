@@ -27,9 +27,11 @@ declare global {
     }
 
     interface Window {
-        electron?: {
-            getDesktopCapturerSources(options: GetSourcesOptions): Promise<Array<DesktopCapturerSource>>;
-        }
+        electron?: Electron;
+    }
+
+    interface Electron {
+        getDesktopCapturerSources(options: GetSourcesOptions): Promise<Array<DesktopCapturerSource>>;
     }
 
     interface MediaDevices {
