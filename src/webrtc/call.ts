@@ -211,8 +211,8 @@ export class CallError extends Error {
     }
 }
 
-function genCallID() {
-    return Date.now() + randomString(16);
+function genCallID(): string {
+    return Date.now().toString() + randomString(16);
 }
 
 /**
