@@ -372,7 +372,7 @@ export class MatrixCall extends EventEmitter {
         this.localVideoElement = localVideoElement;
         this.remoteVideoElement = remoteVideoElement;
 
-        if (window.electron.getDesktopCapturerSources) {
+        if (window.electron?.getDesktopCapturerSources) {
             // We have access to getDesktopCapturerSources()
             logger.debug("Electron getDesktopCapturerSources() is available...");
             try {
