@@ -185,6 +185,21 @@ const FALLBACK_ICE_SERVER = 'stun:turn.matrix.org';
 /** The length of time a call can be ringing for. */
 const CALL_TIMEOUT_MS = 60000;
 
+/** Retrieves sources from desktopCapturer */
+export function getDesktopCapturerSources(): Promise<Array<DesktopCapturerSource>> {
+    const options: GetSourcesOptions = {
+        thumbnailSize: {
+            height: 176,
+            width: 312,
+        },
+        types: [
+            "screen",
+            "window",
+        ],
+    };
+    return window.electron.getDesktopCapturerSources(options);
+}
+
 export class CallError extends Error {
     code : string;
 
@@ -347,23 +362,60 @@ export class MatrixCall extends EventEmitter {
      * to render the local camera preview.
      * @throws If you have not specified a listener for 'error' events.
      */
-    async placeScreenSharingCall(remoteVideoElement: HTMLVideoElement, localVideoElement: HTMLVideoElement) {
+    async placeScreenSharingCall(
+        remoteVideoElement: HTMLVideoElement,
+        localVideoElement: HTMLVideoElement,
+        selectDesktopCapturerSource: () => Promise<DesktopCapturerSource>,
+    ) {
         logger.debug("placeScreenSharingCall");
         this.checkForErrorListener();
         this.localVideoElement = localVideoElement;
         this.remoteVideoElement = remoteVideoElement;
-        try {
-            this.screenSharingStream = await navigator.mediaDevices.getDisplayMedia({'audio': false});
-            logger.debug("Got screen stream, requesting audio stream...");
-            const audioConstraints = getUserMediaVideoContraints(CallType.Voice);
-            this.placeCallWithConstraints(audioConstraints);
-        } catch (err) {
-            this.emit(CallEvent.Error,
-                new CallError(
-                    CallErrorCode.NoUserMedia,
-                    "Failed to get screen-sharing stream: ", err,
-                ),
-            );
+
+        if (window.electron.getDesktopCapturerSources) {
+            // We have access to getDesktopCapturerSources()
+            logger.debug("Electron getDesktopCapturerSources() is available...");
+            try {
+                const selectedSource = await selectDesktopCapturerSource();
+                const getUserMediaOptions: MediaStreamConstraints | DesktopCapturerConstraints = {
+                    audio: false,
+                    video: {
+                        mandatory: {
+                            chromeMediaSource: "desktop",
+                            chromeMediaSourceId: selectedSource.id,
+                        },
+                    },
+                }
+                this.screenSharingStream = await window.navigator.mediaDevices.getUserMedia(getUserMediaOptions);
+
+                logger.debug("Got screen stream, requesting audio stream...");
+                const audioConstraints = getUserMediaVideoContraints(CallType.Voice);
+                this.placeCallWithConstraints(audioConstraints);
+            } catch (err) {
+                this.emit(CallEvent.Error,
+                    new CallError(
+                        CallErrorCode.NoUserMedia,
+                        "Failed to get screen-sharing stream: ", err,
+                    ),
+                );
+            }
+        } else {
+            /* We do not have access to the Electron desktop capturer,
+             * therefore we can assume we are on the web */
+            logger.debug("Electron desktopCapturer is not available...");
+            try {
+                this.screenSharingStream = await navigator.mediaDevices.getDisplayMedia({'audio': false});
+                logger.debug("Got screen stream, requesting audio stream...");
+                const audioConstraints = getUserMediaVideoContraints(CallType.Voice);
+                this.placeCallWithConstraints(audioConstraints);
+            } catch (err) {
+                this.emit(CallEvent.Error,
+                    new CallError(
+                        CallErrorCode.NoUserMedia,
+                        "Failed to get screen-sharing stream: ", err,
+                    ),
+                );
+            }
         }
 
         this.type = CallType.Video;
