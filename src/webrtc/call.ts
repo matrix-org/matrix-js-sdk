@@ -521,6 +521,10 @@ export class MatrixCall extends EventEmitter {
     }
 
     private async collectCallStats(): Promise<any[]> {
+        // This happens when the call fails before it starts.
+        // For example when we fail to get capture sources
+        if (!this.peerConn) return;
+
         const statsReport = await this.peerConn.getStats();
         const stats = [];
         for (const item of statsReport) {
