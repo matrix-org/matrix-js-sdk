@@ -377,6 +377,8 @@ export class MatrixCall extends EventEmitter {
             logger.debug("Electron getDesktopCapturerSources() is available...");
             try {
                 const selectedSource = await selectDesktopCapturerSource();
+                // If no source was selected cancel call
+                if (!selectedSource) return;
                 const getUserMediaOptions: MediaStreamConstraints | DesktopCapturerConstraints = {
                     audio: false,
                     video: {
