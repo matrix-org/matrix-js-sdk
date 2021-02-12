@@ -696,7 +696,7 @@ describe("Room", function() {
                 });
 
                 room.recalculate();
-                expect(room.name).toEqual(`${userB} and 2 others`);
+                expect(room.name).toEqual(`${userB}, ${userC} and ${userD}`);
             });
 
             it("missing hero member state reverts to mxid", function() {
@@ -722,7 +722,8 @@ describe("Room", function() {
             });
 
             it("uses counts from summary", function() {
-                const name = "Mr B";
+                const firstName = "Bean";
+                const name = `${firstName} Mr`;
                 addMember(userB, "join", {name});
                 room.setSummary({
                     "m.heroes": [userB],
@@ -730,19 +731,21 @@ describe("Room", function() {
                     "m.invited_member_count": 50,
                 });
                 room.recalculate();
-                expect(room.name).toEqual(`${name} and 98 others`);
+                expect(room.name).toEqual(`${firstName} and 98 others`);
             });
 
             it("relies on heroes in case of absent counts", function() {
-                const nameB = "Mr Bean";
-                const nameC = "Mel C";
+                const firstNameB = "Bean";
+                const nameB = `${firstNameB} Mr`;
+                const firstNameC = "Mel";
+                const nameC = `${firstNameC} C`;
                 addMember(userB, "join", {name: nameB});
                 addMember(userC, "join", {name: nameC});
                 room.setSummary({
                     "m.heroes": [userB, userC],
                 });
                 room.recalculate();
-                expect(room.name).toEqual(`${nameB} and ${nameC}`);
+                expect(room.name).toEqual(`${firstNameB} and ${firstNameC}`);
             });
 
             it("uses only heroes", function() {

@@ -1866,8 +1866,7 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
 
     const joinedMemberCount = room.currentState.getJoinedMemberCount();
     const invitedMemberCount = room.currentState.getInvitedMemberCount();
-    // -1 because these numbers include the syncing user
-    const inviteJoinCount = joinedMemberCount + invitedMemberCount - 1;
+    const inviteJoinCount = joinedMemberCount + invitedMemberCount;
 
     // get members that are NOT ourselves and are actually in the room.
     let otherNames = null;
@@ -1890,7 +1889,7 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
         otherNames = otherMembers.map((m) => m.name);
     }
 
-    if (inviteJoinCount) {
+    if (inviteJoinCount > 1) {
         return memberNamesToRoomName(otherNames, inviteJoinCount);
     }
 
@@ -1948,7 +1947,7 @@ function memberNamesToRoomName(names, count = (names.length + 1)) {
         return `${shortName(names[0])}, ${shortName(names[1])} and ${shortName(names[2])}`;
     } else if (names.length >= 2) {
         const restCount = countWithoutMe - 2;
-        const plural = restCount > 0;
+        const plural = restCount > 1;
         if (plural) {
             return `${shortName(names[0])}, ${shortName(names[1])} and ${restCount} others`;
         } else {
@@ -1956,7 +1955,7 @@ function memberNamesToRoomName(names, count = (names.length + 1)) {
         }
     } else { // Implicit name.length === 1
         const restCount = countWithoutMe - 1;
-        const plural = restCount > 0;
+        const plural = restCount > 1;
         if (plural) {
             return `${shortName(names[0])} and ${restCount} others`;
         } else {
