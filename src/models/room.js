@@ -1926,6 +1926,16 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
     }
 }
 
+/**
+ * Simplifies a full name to a single word.
+ *
+ * @param {string} name The full name of a room member
+ * @return {string} A single word of the name
+ */
+function shortName(name) {
+    return name.split(" ")[0];
+}
+
 function memberNamesToRoomName(names, count = (names.length + 1)) {
     const countWithoutMe = count - 1;
     if (!names.length) {
@@ -1933,13 +1943,24 @@ function memberNamesToRoomName(names, count = (names.length + 1)) {
     } else if (names.length === 1 && countWithoutMe <= 1) {
         return names[0];
     } else if (names.length === 2 && countWithoutMe <= 2) {
-        return `${names[0]} and ${names[1]}`;
-    } else {
-        const plural = countWithoutMe > 1;
+        return `${shortName(names[0])} and ${shortName(names[1])}`;
+    } else if (names.length === 3 && countWithoutMe <= 3) {
+        return `${shortName(names[0])}, ${shortName(names[1])} and ${shortName(names[2])}`;
+    } else if (names.length >= 2) {
+        const restCount = countWithoutMe - 2;
+        const plural = restCount > 0;
         if (plural) {
-            return `${names[0]} and ${countWithoutMe} others`;
+            return `${shortName(names[0])}, ${shortName(names[1])} and ${restCount} others`;
         } else {
-            return `${names[0]} and 1 other`;
+            return `${shortName(names[0])}, ${shortName(names[1])} and 1 other`;
+        }
+    } else { // Implicit name.length === 1
+        const restCount = countWithoutMe - 1;
+        const plural = restCount > 0;
+        if (plural) {
+            return `${shortName(names[0])} and ${restCount} others`;
+        } else {
+            return `${shortName(names[0])} and 1 other`;
         }
     }
 }
