@@ -1686,6 +1686,7 @@ export class MatrixCall extends EventEmitter {
         const pc = new window.RTCPeerConnection({
             iceTransportPolicy: this.forceTURN ? 'relay' : undefined,
             iceServers: this.turnServers,
+            iceCandidatePoolSize: this.client._iceCandidatePoolSize,
         });
 
         // 'connectionstatechange' would be better, but firefox doesn't implement that.
