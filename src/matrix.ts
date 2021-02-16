@@ -142,7 +142,7 @@ export interface ICreateClientOpts {
     unstableClientRelationAggregation?: boolean;
     verificationMethods?: Array<any>;
     forceTURN?: boolean;
-    iceCandidatePoolSize: number,
+    iceCandidatePoolSize?: number,
     supportsCallTransfer?: boolean,
     fallbackICEServerAllowed?: boolean;
     cryptoCallbacks?: ICryptoCallbacks;
