@@ -1,3 +1,38 @@
+Changes in [9.7.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.7.0) (2021-02-16)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.7.0-rc.1...v9.7.0)
+
+ * No changes since rc.1
+
+Changes in [9.7.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.7.0-rc.1) (2021-02-10)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.6.0...v9.7.0-rc.1)
+
+ * Handle undefined peerconn
+   [\#1600](https://github.com/matrix-org/matrix-js-sdk/pull/1600)
+ * ReEmitter: Don't throw if no error handler is attached
+   [\#1599](https://github.com/matrix-org/matrix-js-sdk/pull/1599)
+ * Convert ReEmitter to TS
+   [\#1598](https://github.com/matrix-org/matrix-js-sdk/pull/1598)
+ * Fix typo in main readme
+   [\#1597](https://github.com/matrix-org/matrix-js-sdk/pull/1597)
+ * Remove rogue plus character
+   [\#1596](https://github.com/matrix-org/matrix-js-sdk/pull/1596)
+ * Fix call ID NaN
+   [\#1595](https://github.com/matrix-org/matrix-js-sdk/pull/1595)
+ * Fix Electron type merging
+   [\#1594](https://github.com/matrix-org/matrix-js-sdk/pull/1594)
+ * Fix browser screen share
+   [\#1593](https://github.com/matrix-org/matrix-js-sdk/pull/1593)
+ * Fix desktop Matrix screen sharing
+   [\#1570](https://github.com/matrix-org/matrix-js-sdk/pull/1570)
+ * Guard against confused server retry times
+   [\#1591](https://github.com/matrix-org/matrix-js-sdk/pull/1591)
+ * Decrypt redaction events
+   [\#1589](https://github.com/matrix-org/matrix-js-sdk/pull/1589)
+ * Fix edge cases with peeking where a room is re-peeked
+   [\#1587](https://github.com/matrix-org/matrix-js-sdk/pull/1587)
+
 Changes in [9.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.6.0) (2021-02-03)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.6.0-rc.1...v9.6.0)
