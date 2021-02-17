@@ -873,7 +873,7 @@ export class MatrixCall extends EventEmitter {
             this.peerConn.addTrack(audioTrack, stream);
         }
         for (const videoTrack of (this.screenSharingStream || stream).getVideoTracks()) {
-            logger.info("Adding audio track with id " + videoTrack.id);
+            logger.info("Adding video track with id " + videoTrack.id);
             this.peerConn.addTrack(videoTrack, stream);
         }
 
