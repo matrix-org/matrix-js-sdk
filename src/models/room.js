@@ -1823,7 +1823,7 @@ Room.prototype.getAccountData = function(type) {
 
 
 /**
- * Returns wheter the syncing user has permission to send a message in the room
+ * Returns whether the syncing user has permission to send a message in the room
  * @return {boolean} true if the user should be permitted to send
  *                   message events into the room.
  */
@@ -2072,4 +2072,13 @@ function memberNamesToRoomName(names, count = (names.length + 1)) {
  *    except when updating a successfully-sent event when its echo arrives)
  *
  * @param {EventStatus} oldStatus The previous event status.
+ */
+
+/**
+ * Fires when the logged in user's membership in the room is updated.
+ *
+ * @event module:models/room~Room#"Room.myMembership"
+ * @param {Room} room The room in which the membership has been updated
+ * @param {string} membership The new membership value
+ * @param {string} prevMembership The previous membership value
  */
