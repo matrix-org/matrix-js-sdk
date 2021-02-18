@@ -30,6 +30,7 @@ import {RoomMember} from "./room-member";
 import {RoomSummary} from "./room-summary";
 import {logger} from '../logger';
 import {ReEmitter} from '../ReEmitter';
+import {EventType} from "../@types/event";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -1822,13 +1823,37 @@ Room.prototype.getAccountData = function(type) {
 
 
 /**
- * Returns wheter the syncing user has permission to send a message in the room
+ * Returns whether the syncing user has permission to send a message in the room
  * @return {boolean} true if the user should be permitted to send
  *                   message events into the room.
  */
 Room.prototype.maySendMessage = function() {
     return this.getMyMembership() === 'join' &&
         this.currentState.maySendEvent('m.room.message', this.myUserId);
+};
+
+/**
+ * Returns whether the given user has permissions to issue an invite for this room.
+ * @param {string} userId the ID of the Matrix user to check permissions for
+ * @returns {boolean} true if the user should be permitted to issue invites for this room.
+ */
+Room.prototype.canInvite = function(userId) {
+    let canInvite = this.getMyMembership() === "join";
+    const powerLevelsEvent = this.currentState.getStateEvents(EventType.RoomPowerLevels, "");
+    const powerLevels = powerLevelsEvent && powerLevelsEvent.getContent();
+    const me = this.getMember(userId);
+    if (powerLevels && me && powerLevels.invite > me.powerLevel) {
+        canInvite = false;
+    }
+    return canInvite;
+};
+
+/**
+ * Returns the join rule based on the m.room.join_rule state event, defaulting to `invite`.
+ * @returns {string} the join_rule applied to this room
+ */
+Room.prototype.getJoinRule = function() {
+    return this.currentState.getJoinRule();
 };
 
 /**
@@ -2047,4 +2072,13 @@ function memberNamesToRoomName(names, count = (names.length + 1)) {
  *    except when updating a successfully-sent event when its echo arrives)
  *
  * @param {EventStatus} oldStatus The previous event status.
+ */
+
+/**
+ * Fires when the logged in user's membership in the room is updated.
+ *
+ * @event module:models/room~Room#"Room.myMembership"
+ * @param {Room} room The room in which the membership has been updated
+ * @param {string} membership The new membership value
+ * @param {string} prevMembership The previous membership value
  */
