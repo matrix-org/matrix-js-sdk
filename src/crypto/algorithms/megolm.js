@@ -743,16 +743,17 @@ MegolmEncryption.prototype._shareKeyWithOlmSessions = async function(
     const userDeviceMaps = this._splitDevices(devicemap);
 
     for (let i = 0; i < userDeviceMaps.length; i++) {
+        const taskDetail =
+            `megolm keys for ${session.sessionId} ` +
+            `in ${this._roomId} (slice ${i + 1}/${userDeviceMaps.length})`;
         try {
+            logger.debug(`Sharing ${taskDetail}`);
             await this._encryptAndSendKeysToDevices(
                 session, key.chain_index, userDeviceMaps[i], payload,
             );
-            logger.log(`Completed megolm keyshare for ${session.sessionId} `
-                + `in ${this._roomId} (slice ${i + 1}/${userDeviceMaps.length})`);
+            logger.debug(`Shared ${taskDetail}`);
         } catch (e) {
-            logger.log(`megolm keyshare for ${session.sessionId} in ${this._roomId} `
-                + `(slice ${i + 1}/${userDeviceMaps.length}) failed`);
-
+            logger.error(`Failed to share ${taskDetail}`);
             throw e;
         }
     }

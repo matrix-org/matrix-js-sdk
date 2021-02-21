@@ -185,6 +185,21 @@ const FALLBACK_ICE_SERVER = 'stun:turn.matrix.org';
 /** The length of time a call can be ringing for. */
 const CALL_TIMEOUT_MS = 60000;
 
+/** Retrieves sources from desktopCapturer */
+export function getDesktopCapturerSources(): Promise<Array<DesktopCapturerSource>> {
+    const options: GetSourcesOptions = {
+        thumbnailSize: {
+            height: 176,
+            width: 312,
+        },
+        types: [
+            "screen",
+            "window",
+        ],
+    };
+    return window.electron.getDesktopCapturerSources(options);
+}
+
 export class CallError extends Error {
     code : string;
 
@@ -196,8 +211,8 @@ export class CallError extends Error {
     }
 }
 
-function genCallID() {
-    return Date.now() + randomString(16);
+function genCallID(): string {
+    return Date.now().toString() + randomString(16);
 }
 
 /**
@@ -347,23 +362,62 @@ export class MatrixCall extends EventEmitter {
      * to render the local camera preview.
      * @throws If you have not specified a listener for 'error' events.
      */
-    async placeScreenSharingCall(remoteVideoElement: HTMLVideoElement, localVideoElement: HTMLVideoElement) {
+    async placeScreenSharingCall(
+        remoteVideoElement: HTMLVideoElement,
+        localVideoElement: HTMLVideoElement,
+        selectDesktopCapturerSource: () => Promise<DesktopCapturerSource>,
+    ) {
         logger.debug("placeScreenSharingCall");
         this.checkForErrorListener();
         this.localVideoElement = localVideoElement;
         this.remoteVideoElement = remoteVideoElement;
-        try {
-            this.screenSharingStream = await navigator.mediaDevices.getDisplayMedia({'audio': false});
-            logger.debug("Got screen stream, requesting audio stream...");
-            const audioConstraints = getUserMediaVideoContraints(CallType.Voice);
-            this.placeCallWithConstraints(audioConstraints);
-        } catch (err) {
-            this.emit(CallEvent.Error,
-                new CallError(
-                    CallErrorCode.NoUserMedia,
-                    "Failed to get screen-sharing stream: ", err,
-                ),
-            );
+
+        if (window.electron?.getDesktopCapturerSources) {
+            // We have access to getDesktopCapturerSources()
+            logger.debug("Electron getDesktopCapturerSources() is available...");
+            try {
+                const selectedSource = await selectDesktopCapturerSource();
+                // If no source was selected cancel call
+                if (!selectedSource) return;
+                const getUserMediaOptions: MediaStreamConstraints | DesktopCapturerConstraints = {
+                    audio: false,
+                    video: {
+                        mandatory: {
+                            chromeMediaSource: "desktop",
+                            chromeMediaSourceId: selectedSource.id,
+                        },
+                    },
+                }
+                this.screenSharingStream = await window.navigator.mediaDevices.getUserMedia(getUserMediaOptions);
+
+                logger.debug("Got screen stream, requesting audio stream...");
+                const audioConstraints = getUserMediaVideoContraints(CallType.Voice);
+                this.placeCallWithConstraints(audioConstraints);
+            } catch (err) {
+                this.emit(CallEvent.Error,
+                    new CallError(
+                        CallErrorCode.NoUserMedia,
+                        "Failed to get screen-sharing stream: ", err,
+                    ),
+                );
+            }
+        } else {
+            /* We do not have access to the Electron desktop capturer,
+             * therefore we can assume we are on the web */
+            logger.debug("Electron desktopCapturer is not available...");
+            try {
+                this.screenSharingStream = await navigator.mediaDevices.getDisplayMedia({'audio': false});
+                logger.debug("Got screen stream, requesting audio stream...");
+                const audioConstraints = getUserMediaVideoContraints(CallType.Voice);
+                this.placeCallWithConstraints(audioConstraints);
+            } catch (err) {
+                this.emit(CallEvent.Error,
+                    new CallError(
+                        CallErrorCode.NoUserMedia,
+                        "Failed to get screen-sharing stream: ", err,
+                    ),
+                );
+            }
         }
 
         this.type = CallType.Video;
@@ -469,6 +523,10 @@ export class MatrixCall extends EventEmitter {
     }
 
     private async collectCallStats(): Promise<any[]> {
+        // This happens when the call fails before it starts.
+        // For example when we fail to get capture sources
+        if (!this.peerConn) return;
+
         const statsReport = await this.peerConn.getStats();
         const stats = [];
         for (const item of statsReport) {
@@ -821,7 +879,7 @@ export class MatrixCall extends EventEmitter {
             this.peerConn.addTrack(audioTrack, stream);
         }
         for (const videoTrack of (this.screenSharingStream || stream).getVideoTracks()) {
-            logger.info("Adding audio track with id " + videoTrack.id);
+            logger.info("Adding video track with id " + videoTrack.id);
             this.peerConn.addTrack(videoTrack, stream);
         }
 
@@ -1387,7 +1445,7 @@ export class MatrixCall extends EventEmitter {
     }
 
     onHangupReceived = (msg) => {
-        logger.debug("Hangup received for call ID " + + this.callId);
+        logger.debug("Hangup received for call ID " + this.callId);
 
         // party ID must match (our chosen partner hanging up the call) or be undefined (we haven't chosen
         // a partner yet but we're treating the hangup as a reject as per VoIP v0)
@@ -1628,6 +1686,7 @@ export class MatrixCall extends EventEmitter {
         const pc = new window.RTCPeerConnection({
             iceTransportPolicy: this.forceTURN ? 'relay' : undefined,
             iceServers: this.turnServers,
+            iceCandidatePoolSize: this.client._iceCandidatePoolSize,
         });
 
         // 'connectionstatechange' would be better, but firefox doesn't implement that.

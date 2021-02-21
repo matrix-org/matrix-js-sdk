@@ -180,6 +180,11 @@ function keyFromRecoverySession(session, decryptionKey) {
  * @param {boolean} [opts.forceTURN]
  * Optional. Whether relaying calls through a TURN server should be forced.
  *
+ * * @param {boolean} [opts.iceCandidatePoolSize]
+ * Optional. Up to this many ICE candidates will be gathered when an incoming call arrives.
+ * Gathering does not send data to the caller, but will communicate with the configured TURN
+ * server. Default 0.
+ *
  * @param {boolean} [opts.supportsCallTransfer]
  * Optional. True to advertise support for call transfers to other parties on Matrix calls.
  *
@@ -369,6 +374,7 @@ export function MatrixClient(opts) {
     this._cryptoCallbacks = opts.cryptoCallbacks || {};
 
     this._forceTURN = opts.forceTURN || false;
+    this._iceCandidatePoolSize = opts.iceCandidatePoolSize === undefined ? 0 : opts.iceCandidatePoolSize;
     this._supportsCallTransfer = opts.supportsCallTransfer || false;
     this._fallbackICEServerAllowed = opts.fallbackICEServerAllowed || false;
 

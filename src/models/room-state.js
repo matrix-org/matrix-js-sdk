@@ -23,6 +23,7 @@ import {EventEmitter} from "events";
 import {RoomMember} from "./room-member";
 import {logger} from '../logger';
 import * as utils from "../utils";
+import {EventType} from "../@types/event";
 
 // possible statuses for out-of-band member loading
 const OOB_STATUS_NOTSTARTED = 1;
@@ -716,6 +717,16 @@ RoomState.prototype.mayTriggerNotifOfType = function(notifLevelKey, userId) {
     }
 
     return member.powerLevel >= notifLevel;
+};
+
+/**
+ * Returns the join rule based on the m.room.join_rule state event, defaulting to `invite`.
+ * @returns {string} the join_rule applied to this room
+ */
+RoomState.prototype.getJoinRule = function() {
+    const joinRuleEvent = this.getStateEvents(EventType.RoomJoinRules, "");
+    const joinRuleContent = joinRuleEvent ? joinRuleEvent.getContent() : {};
+    return joinRuleContent["join_rule"] || "invite";
 };
 
 
