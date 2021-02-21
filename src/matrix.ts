@@ -206,6 +206,8 @@ export interface IDeviceTrustLevel {
  *    {@link setCryptoStoreFactory} if unspecified; or if no factory has been
  *    specified, uses a default implementation (indexeddb in the browser,
  *    in-memory otherwise).
+ * @param {String=} opts.debugLogType How the client debuglog output is handled, can be one of
+ * 'stdout' | 'event' | 'off', defaults to stdout
  *
  * @return {MatrixClient} A new matrix client.
  * @see {@link module:client.MatrixClient} for the full list of options for
