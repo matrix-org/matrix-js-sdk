@@ -22,7 +22,7 @@ limitations under the License.
  * @module crypto/algorithms/megolm
  */
 
-import {logger} from '../../logger';
+import {getPrefixedLogger, logger} from '../../logger';
 import * as utils from "../../utils";
 import {polyfillSuper} from "../../utils";
 import * as olmlib from "../olmlib";
@@ -271,7 +271,7 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
                 logger.debug(`Shared keys with existing Olm sessions in ${this._roomId}`);
             })(),
             (async () => {
-                logger.debug(`Sharing keys with new Olm sessions in ${this._roomId}`);
+                logger.debug(`Sharing keys (start phase 1) with new Olm sessions in ${this._roomId}`);
                 const errorDevices = [];
 
                 // meanwhile, establish olm sessions for devices that we don't
@@ -285,6 +285,7 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
                     session, key, payload, devicesWithoutSession, errorDevices,
                     singleOlmCreationPhase ? 10000 : 2000, failedServers,
                 );
+                logger.debug(`Shared keys (end phase 1) with new Olm sessions in ${this._roomId}`);
 
                 if (!singleOlmCreationPhase && (Date.now() - start < 10000)) {
                     // perform the second phase of olm session creation if requested,
@@ -313,21 +314,24 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
                             }
                         }
 
+                        logger.debug(`Sharing keys (start phase 2) with new Olm sessions in ${this._roomId}`);
                         await this._shareKeyWithDevices(
                             session, key, payload, retryDevices, failedDevices, 30000,
                         );
+                        logger.debug(`Shared keys (end phase 2) with new Olm sessions in ${this._roomId}`);
 
                         await this._notifyFailedOlmDevices(session, key, failedDevices);
                     })();
                 } else {
                     await this._notifyFailedOlmDevices(session, key, errorDevices);
                 }
-                logger.debug(`Shared keys with new Olm sessions in ${this._roomId}`);
+                logger.debug(`Shared keys (all phases done) with new Olm sessions in ${this._roomId}`);
             })(),
             (async () => {
                 logger.debug(`Notifying blocked devices in ${this._roomId}`);
                 // also, notify blocked devices that they're blocked
                 const blockedMap = {};
+                let blockedCount = 0;
                 for (const [userId, userBlockedDevices] of Object.entries(blocked)) {
                     for (const [deviceId, device] of Object.entries(userBlockedDevices)) {
                         if (
@@ -335,13 +339,14 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
                             session.blockedDevicesNotified[userId][deviceId] === undefined
                         ) {
                             blockedMap[userId] = blockedMap[userId] || {};
-                            blockedMap[userId][deviceId] = {device};
+                            blockedMap[userId][deviceId] = { device };
+                            blockedCount++;
                         }
                     }
                 }
 
                 await this._notifyBlockedDevices(session, blockedMap);
-                logger.debug(`Notified blocked devices in ${this._roomId}`);
+                logger.debug(`Notified ${blockedCount} blocked devices in ${this._roomId}`);
             })(),
         ]);
     };
@@ -728,13 +733,18 @@ MegolmEncryption.prototype.reshareKeyWithDevice = async function(
 MegolmEncryption.prototype._shareKeyWithDevices = async function(
     session, key, payload, devicesByUser, errorDevices, otkTimeout, failedServers,
 ) {
+    logger.debug(`Ensuring Olm sessions for devices in ${this._roomId}`);
     const devicemap = await olmlib.ensureOlmSessionsForDevices(
         this._olmDevice, this._baseApis, devicesByUser, otkTimeout, failedServers,
+        getPrefixedLogger(`[${this._roomId}]`),
     );
+    logger.debug(`Ensured Olm sessions for devices in ${this._roomId}`);
 
     this._getDevicesWithoutSessions(devicemap, devicesByUser, errorDevices);
 
+    logger.debug(`Sharing keys with Olm sessions in ${this._roomId}`);
     await this._shareKeyWithOlmSessions(session, key, payload, devicemap);
+    logger.debug(`Shared keys with Olm sessions in ${this._roomId}`);
 };
 
 MegolmEncryption.prototype._shareKeyWithOlmSessions = async function(
@@ -772,6 +782,11 @@ MegolmEncryption.prototype._shareKeyWithOlmSessions = async function(
 MegolmEncryption.prototype._notifyFailedOlmDevices = async function(
     session, key, failedDevices,
 ) {
+    logger.debug(
+        `Notifying ${failedDevices.length} devices we failed to ` +
+        `create Olm sessions in ${this._roomId}`,
+    );
+
     // mark the devices that failed as "handled" because we don't want to try
     // to claim a one-time-key for dead devices on every message.
     for (const {userId, deviceInfo} of failedDevices) {
@@ -786,6 +801,10 @@ MegolmEncryption.prototype._notifyFailedOlmDevices = async function(
           await this._olmDevice.filterOutNotifiedErrorDevices(
               failedDevices,
           );
+    logger.debug(
+        `Filtered down to ${filteredFailedDevices.length} error devices ` +
+        `in ${this._roomId}`,
+    );
     const blockedMap = {};
     for (const {userId, deviceInfo} of filteredFailedDevices) {
         blockedMap[userId] = blockedMap[userId] || {};
@@ -803,6 +822,10 @@ MegolmEncryption.prototype._notifyFailedOlmDevices = async function(
 
     // send the notifications
     await this._notifyBlockedDevices(session, blockedMap);
+    logger.debug(
+        `Notified ${filteredFailedDevices.length} devices we failed to ` +
+        `create Olm sessions in ${this._roomId}`,
+    );
 };
 
 /**

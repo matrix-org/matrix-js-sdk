@@ -1,6 +1,6 @@
 /*
 Copyright 2018 André Jaenisch
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2019, 2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ limitations under the License.
  * @module logger
  */
 
-import log from "loglevel";
+import log, { Logger } from "loglevel";
 
 // This is to demonstrate, that you can use any namespace you want.
 // Namespaces allow you to turn on/off the logging for specific parts of the
@@ -36,6 +36,11 @@ const DEFAULT_NAMESPACE = "matrix";
 // when logging so we always get the current value of console methods.
 log.methodFactory = function(methodName, logLevel, loggerName) {
     return function(...args) {
+        /* eslint-disable babel/no-invalid-this */
+        if (this.prefix) {
+            args.unshift(this.prefix);
+        }
+        /* eslint-enable babel/no-invalid-this */
         const supportedByConsole = methodName === "error" ||
             methodName === "warn" ||
             methodName === "trace" ||
@@ -57,3 +62,13 @@ log.methodFactory = function(methodName, logLevel, loggerName) {
 export const logger = log.getLogger(DEFAULT_NAMESPACE);
 logger.setLevel(log.levels.DEBUG);
 
+interface PrefixedLogger extends Logger {
+    prefix?: any;
+}
+
+export function getPrefixedLogger(prefix): PrefixedLogger {
+    const prefixLogger: PrefixedLogger = log.getLogger(`${DEFAULT_NAMESPACE}-${prefix}`);
+    prefixLogger.prefix = prefix;
+    prefixLogger.setLevel(log.levels.DEBUG);
+    return prefixLogger;
+}

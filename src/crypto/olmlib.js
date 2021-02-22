@@ -183,17 +183,23 @@ export async function getExistingOlmSessions(
  * @param {Array} [failedServers] An array to fill with remote servers that
  *     failed to respond to one-time-key requests.
  *
+ * @param {Object} [log] A possibly customised log
+ *
  * @return {Promise} resolves once the sessions are complete, to
  *    an Object mapping from userId to deviceId to
  *    {@link module:crypto~OlmSessionResult}
  */
 export async function ensureOlmSessionsForDevices(
-    olmDevice, baseApis, devicesByUser, force, otkTimeout, failedServers,
+    olmDevice, baseApis, devicesByUser, force, otkTimeout, failedServers, log,
 ) {
     if (typeof force === "number") {
+        log = failedServers;
         failedServers = otkTimeout;
         otkTimeout = force;
         force = false;
+    }
+    if (!log) {
+        log = logger;
     }
 
     const devicesWithoutSession = [
@@ -216,7 +222,7 @@ export async function ensureOlmSessionsForDevices(
                 // new chain when this side has an active sender chain.
                 // If you see this message being logged in the wild, we should find
                 // the thing that is trying to send Olm messages to itself and fix it.
-                logger.info("Attempted to start session with ourself! Ignoring");
+                log.info("Attempted to start session with ourself! Ignoring");
                 // We must fill in the section in the return value though, as callers
                 // expect it to be there.
                 result[userId][deviceId] = {
@@ -258,9 +264,9 @@ export async function ensureOlmSessionsForDevices(
             }
             if (sessionId === null || force) {
                 if (force) {
-                    logger.info("Forcing new Olm session for " + userId + ":" + deviceId);
+                    log.info(`Forcing new Olm session for ${userId}:${deviceId}`);
                 } else {
-                    logger.info("Making new Olm session for " + userId + ":" + deviceId);
+                    log.info(`Making new Olm session for ${userId}:${deviceId}`);
                 }
                 devicesWithoutSession.push([userId, deviceId]);
             }
@@ -284,19 +290,19 @@ export async function ensureOlmSessionsForDevices(
     // cause we're seeing in practice.
     // See also https://github.com/vector-im/element-web/issues/16194
     const otkTimeoutLogger = setTimeout(() => {
-        logger.error(`Homeserver never replied while claiming ${taskDetail}`);
+        log.error(`Homeserver never replied while claiming ${taskDetail}`);
     }, otkTimeout);
     try {
-        logger.debug(`Claiming ${taskDetail}`);
+        log.debug(`Claiming ${taskDetail}`);
         res = await baseApis.claimOneTimeKeys(
             devicesWithoutSession, oneTimeKeyAlgorithm, otkTimeout,
         );
-        logger.debug(`Claimed ${taskDetail}`);
+        log.debug(`Claimed ${taskDetail}`);
     } catch (e) {
         for (const resolver of Object.values(resolveSession)) {
             resolver.resolve();
         }
-        logger.log(`Failed to claim ${taskDetail}`, e, devicesWithoutSession);
+        log.log(`Failed to claim ${taskDetail}`, e, devicesWithoutSession);
         throw e;
     } finally {
         clearTimeout(otkTimeoutLogger);
@@ -336,9 +342,10 @@ export async function ensureOlmSessionsForDevices(
             }
 
             if (!oneTimeKey) {
-                const msg = "No one-time keys (alg=" + oneTimeKeyAlgorithm +
-                      ") for device " + userId + ":" + deviceId;
-                logger.warn(msg);
+                log.warn(
+                    `No one-time keys (alg=${oneTimeKeyAlgorithm}) ` +
+                    `for device ${userId}:${deviceId}`,
+                );
                 if (resolveSession[key]) {
                     resolveSession[key].resolve();
                 }
@@ -364,9 +371,9 @@ export async function ensureOlmSessionsForDevices(
     }
 
     taskDetail = `Olm sessions for ${promises.length} devices`;
-    logger.debug(`Starting ${taskDetail}`);
+    log.debug(`Starting ${taskDetail}`);
     await Promise.all(promises);
-    logger.debug(`Started ${taskDetail}`);
+    log.debug(`Started ${taskDetail}`);
     return result;
 }
 
