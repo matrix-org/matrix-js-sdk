@@ -177,6 +177,7 @@ export enum CallErrorCode {
 enum ConstraintsType {
     Audio = "audio",
     Video = "video",
+    AudioVideo = "audiovideo",
     Screenshare = "screenshare",
 }
 
@@ -355,7 +356,7 @@ export class MatrixCall extends EventEmitter {
         this.checkForErrorListener();
         this.localVideoElement = localVideoElement;
         this.remoteVideoElement = remoteVideoElement;
-        const constraints = await getUserMediaContraints(ConstraintsType.Video);
+        const constraints = await getUserMediaContraints(ConstraintsType.AudioVideo);
         this.placeCallWithConstraints(constraints);
         this.type = CallType.Video;
     }
@@ -599,7 +600,7 @@ export class MatrixCall extends EventEmitter {
         if (!this.localAVStream && !this.waitForLocalAVStream) {
             const constraints = await getUserMediaContraints(
                 this.type == CallType.Video ?
-                    ConstraintsType.Video:
+                    ConstraintsType.AudioVideo:
                     ConstraintsType.Audio,
             );
             logger.log("Getting user media with constraints", constraints);
@@ -1714,10 +1715,26 @@ async function getUserMediaContraints(
             return {
                 audio: {
                     deviceId: audioInput ? {ideal: audioInput} : undefined,
-                }, video: false,
+                },
+                video: false,
             };
         }
         case ConstraintsType.Video: {
+            return {
+                audio: false,
+                video: {
+                    deviceId: videoInput ? {ideal: videoInput} : undefined,
+                    /* We want 640x360.  Chrome will give it only if we ask exactly,
+                       FF refuses entirely if we ask exactly, so have to ask for ideal
+                       instead
+                       XXX: Is this still true?
+                     */
+                    width: isWebkit ? { exact: 640 } : { ideal: 640 },
+                    height: isWebkit ? { exact: 360 } : { ideal: 360 },
+                },
+            };
+        }
+        case ConstraintsType.AudioVideo: {
             return {
                 audio: {
                     deviceId: audioInput ? {ideal: audioInput} : undefined,
