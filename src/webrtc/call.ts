@@ -1754,11 +1754,7 @@ async function getUserMediaContraints(
                 logger.debug("Electron desktopCapturer is not available...");
                 return {
                     audio: false,
-                    video: {
-                        mandatory: {
-                            chromeMediaSource: "desktop",
-                        },
-                    },
+                    video: true,
                 };
             }
         }
