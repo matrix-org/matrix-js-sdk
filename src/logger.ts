@@ -68,7 +68,10 @@ interface PrefixedLogger extends Logger {
 
 export function getPrefixedLogger(prefix): PrefixedLogger {
     const prefixLogger: PrefixedLogger = log.getLogger(`${DEFAULT_NAMESPACE}-${prefix}`);
-    prefixLogger.prefix = prefix;
-    prefixLogger.setLevel(log.levels.DEBUG);
+    if (prefixLogger.prefix !== prefix) {
+        // Only do this setup work the first time through, as loggers are saved by name.
+        prefixLogger.prefix = prefix;
+        prefixLogger.setLevel(log.levels.DEBUG);
+    }
     return prefixLogger;
 }
