@@ -174,6 +174,12 @@ export enum CallErrorCode {
     SignallingFailed = 'signalling_timeout',
 }
 
+enum ConstraintsType {
+    Audio = "audio",
+    Video = "video",
+    Screenshare = "screenshare",
+}
+
 /**
  * The version field that we set in m.call.* events
  */
@@ -328,10 +334,11 @@ export class MatrixCall extends EventEmitter {
      * Place a voice call to this room.
      * @throws If you have not specified a listener for 'error' events.
      */
-    placeVoiceCall() {
+    async placeVoiceCall() {
         logger.debug("placeVoiceCall");
         this.checkForErrorListener();
-        this.placeCallWithConstraints(getUserMediaVideoContraints(CallType.Voice));
+        const constraints = await getUserMediaContraints(ConstraintsType.Audio);
+        this.placeCallWithConstraints(constraints);
         this.type = CallType.Voice;
     }
 
@@ -343,12 +350,13 @@ export class MatrixCall extends EventEmitter {
      * to render the local camera preview.
      * @throws If you have not specified a listener for 'error' events.
      */
-    placeVideoCall(remoteVideoElement: HTMLVideoElement, localVideoElement: HTMLVideoElement) {
+    async placeVideoCall(remoteVideoElement: HTMLVideoElement, localVideoElement: HTMLVideoElement) {
         logger.debug("placeVideoCall");
         this.checkForErrorListener();
         this.localVideoElement = localVideoElement;
         this.remoteVideoElement = remoteVideoElement;
-        this.placeCallWithConstraints(getUserMediaVideoContraints(CallType.Video));
+        const constraints = await getUserMediaContraints(ConstraintsType.Video);
+        this.placeCallWithConstraints(constraints);
         this.type = CallType.Video;
     }
 
@@ -376,22 +384,14 @@ export class MatrixCall extends EventEmitter {
             // We have access to getDesktopCapturerSources()
             logger.debug("Electron getDesktopCapturerSources() is available...");
             try {
-                const selectedSource = await selectDesktopCapturerSource();
-                // If no source was selected cancel call
-                if (!selectedSource) return;
-                const getUserMediaOptions: MediaStreamConstraints | DesktopCapturerConstraints = {
-                    audio: false,
-                    video: {
-                        mandatory: {
-                            chromeMediaSource: "desktop",
-                            chromeMediaSourceId: selectedSource.id,
-                        },
-                    },
-                }
-                this.screenSharingStream = await window.navigator.mediaDevices.getUserMedia(getUserMediaOptions);
+                const screenshareConstraints = await getUserMediaContraints(
+                    ConstraintsType.Screenshare,
+                    selectDesktopCapturerSource,
+                );
+                this.screenSharingStream = await window.navigator.mediaDevices.getUserMedia(screenshareConstraints);
 
                 logger.debug("Got screen stream, requesting audio stream...");
-                const audioConstraints = getUserMediaVideoContraints(CallType.Voice);
+                const audioConstraints = await getUserMediaContraints(ConstraintsType.Audio);
                 this.placeCallWithConstraints(audioConstraints);
             } catch (err) {
                 this.emit(CallEvent.Error,
@@ -408,7 +408,7 @@ export class MatrixCall extends EventEmitter {
             try {
                 this.screenSharingStream = await navigator.mediaDevices.getDisplayMedia({'audio': false});
                 logger.debug("Got screen stream, requesting audio stream...");
-                const audioConstraints = getUserMediaVideoContraints(CallType.Voice);
+                const audioConstraints = await getUserMediaContraints(ConstraintsType.Audio);
                 this.placeCallWithConstraints(audioConstraints);
             } catch (err) {
                 this.emit(CallEvent.Error,
@@ -611,7 +611,11 @@ export class MatrixCall extends EventEmitter {
         logger.debug(`Answering call ${this.callId} of type ${this.type}`);
 
         if (!this.localAVStream && !this.waitForLocalAVStream) {
-            const constraints = getUserMediaVideoContraints(this.type);
+            const constraints = await getUserMediaContraints(
+                this.type == CallType.Video ?
+                    ConstraintsType.Video:
+                    ConstraintsType.Audio,
+            );
             logger.log("Getting user media with constraints", constraints);
             this.setState(CallState.WaitLocalMedia);
             this.waitForLocalAVStream = true;
@@ -1713,17 +1717,21 @@ function setTracksEnabled(tracks: Array<MediaStreamTrack>, enabled: boolean) {
     }
 }
 
-function getUserMediaVideoContraints(callType: CallType) {
+async function getUserMediaContraints(
+    type: ConstraintsType,
+    selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>,
+) {
     const isWebkit = !!navigator.webkitGetUserMedia;
 
-    switch (callType) {
-        case CallType.Voice:
+    switch (type) {
+        case ConstraintsType.Audio: {
             return {
                 audio: {
                     deviceId: audioInput ? {ideal: audioInput} : undefined,
                 }, video: false,
             };
-        case CallType.Video:
+        }
+        case ConstraintsType.Video: {
             return {
                 audio: {
                     deviceId: audioInput ? {ideal: audioInput} : undefined,
@@ -1738,6 +1746,36 @@ function getUserMediaVideoContraints(callType: CallType) {
                     height: isWebkit ? { exact: 360 } : { ideal: 360 },
                 },
             };
+        }
+        case ConstraintsType.Screenshare: {
+            if (window.electron?.getDesktopCapturerSources && selectDesktopCapturerSource) {
+                // We have access to getDesktopCapturerSources()
+                logger.debug("Electron getDesktopCapturerSources() is available...");
+                const selectedSource = await selectDesktopCapturerSource();
+                if (!selectedSource) return null;
+                return {
+                    audio: false,
+                    video: {
+                        mandatory: {
+                            chromeMediaSource: "desktop",
+                            chromeMediaSourceId: selectedSource.id,
+                        },
+                    },
+                };
+            } else {
+                // We do not have access to the Electron desktop capturer,
+                // therefore we can assume we are on the web
+                logger.debug("Electron desktopCapturer is not available...");
+                return {
+                    audio: false,
+                    video: {
+                        mandatory: {
+                            chromeMediaSource: "desktop",
+                        },
+                    },
+                };
+            }
+        }
     }
 }
 
