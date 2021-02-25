@@ -87,3 +87,9 @@ export enum MsgType {
     Location = "m.location",
     Video = "m.video",
 }
+
+export const RoomCreateTypeField = "org.matrix.msc1772.type"; // Spaces MSC1772
+
+export enum RoomType {
+    Space = "org.matrix.msc1772.space", // Spaces MSC1772
+}
