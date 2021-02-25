@@ -2374,3 +2374,26 @@ MatrixBaseApis.prototype.reportEvent = function(roomId, eventId, score, reason) 
     return this._http.authedRequest(undefined, "POST", path, null, {score, reason});
 };
 
+/**
+ * Fetches or paginates a summary of a space as defined by MSC2946
+ * @param {string} roomId The ID of the space-room to use as the root of the summary.
+ * @param {number?} maxRoomsPerSpace The maximum number of rooms to return per subspace.
+ * @param {boolean?} autoJoinOnly Whether to only return rooms with auto_join=true.
+ * @param {number?} limit The maximum number of rooms to return in total.
+ * @param {string?} batch The opaque token to paginate a previous summary request.
+ * @returns {Promise} the response, with next_batch, rooms, events fields.
+ */
+MatrixBaseApis.prototype.getSpaceSummary = function(roomId, maxRoomsPerSpace, autoJoinOnly, limit, batch) {
+    const path = utils.encodeUri("/rooms/$roomId/spaces", {
+        $roomId: roomId,
+    });
+
+    return this._http.authedRequest(undefined, "POST", path, null, {
+        max_rooms_per_space: maxRoomsPerSpace,
+        auto_join_only: autoJoinOnly,
+        limit,
+        batch,
+    }, {
+        prefix: PREFIX_UNSTABLE,
+    });
+};
