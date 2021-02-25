@@ -667,15 +667,16 @@ export function removeHiddenChars(str: string): string {
     return "";
 }
 
-// Regex matching bunch of unicode control characters and otherwise misleading/invisible characters.
+// Regex matching bunch of unicode control characters, punctuation, and otherwise
+// misleading/invisible characters.
 // Includes:
-// various width spaces U+2000 - U+200D
-// LTR and RTL marks U+200E and U+200F
-// LTR/RTL and other directional formatting marks U+202A - U+202F
+// ASCII punctuation
+// General punctuation (including whitespace and LTR/RTL marks) U+2000 - U+206F
+// Supplemental punctuation U+2E00 - U+2E7F
 // Combining characters U+0300 - U+036F
 // Zero width no-break space (BOM) U+FEFF
 // eslint-disable-next-line no-misleading-character-class
-const removeHiddenCharsRegex = /[\u2000-\u200F\u202A-\u202F\u0300-\u036f\uFEFF\s]/g;
+const removeHiddenCharsRegex = /[\\'!"#$%&()*+,\-./:;<=>?@[\]^_`{|}~\u2000-\u206f\u2e00-\u2e7f\u0300-\u036f\uFEFF\s]/g;
 
 export function escapeRegExp(string: string): string {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
