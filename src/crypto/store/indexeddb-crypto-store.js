@@ -596,6 +596,7 @@ export class IndexedDBCryptoStore {
      * @param {function(*)} func Function called with the
      *     transaction object: an opaque object that should be passed
      *     to store functions.
+     * @param {object} [log] A possibly customised log
      * @return {Promise} Promise that resolves with the result of the `func`
      *     when the transaction is complete. If the backend is
      *     async (ie. the indexeddb backend) any of the callback
@@ -603,8 +604,8 @@ export class IndexedDBCryptoStore {
      *     reject with that exception. On synchronous backends, the
      *     exception will propagate to the caller of the getFoo method.
      */
-    doTxn(mode, stores, func) {
-        return this._backend.doTxn(mode, stores, func);
+    doTxn(mode, stores, func, log) {
+        return this._backend.doTxn(mode, stores, func, log);
     }
 }
 

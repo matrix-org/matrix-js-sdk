@@ -34,6 +34,7 @@ export class Backend {
      */
     constructor(db) {
         this._db = db;
+        this._nextTxnId = 0;
 
         // make sure we close the db on `onversionchange` - otherwise
         // attempts to delete the database will block (and subsequent
@@ -757,10 +758,21 @@ export class Backend {
         }));
     }
 
-    doTxn(mode, stores, func) {
+    doTxn(mode, stores, func, log = logger) {
+        const txnId = this._nextTxnId++;
+        const startTime = Date.now();
+        const description = `${mode} crypto store transaction ${txnId} in ${stores}`;
+        log.debug(`Starting ${description}`);
         const txn = this._db.transaction(stores, mode);
         const promise = promiseifyTxn(txn);
         const result = func(txn);
+        promise.then(() => {
+            const elapsedTime = Date.now() - startTime;
+            log.debug(`Finished ${description}, took ${elapsedTime} ms`);
+        }, () => {
+            const elapsedTime = Date.now() - startTime;
+            log.error(`Failed ${description}, took ${elapsedTime} ms`);
+        });
         return promise.then(() => {
             return result;
         });

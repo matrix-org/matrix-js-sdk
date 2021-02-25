@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {logger} from '../logger';
+import {getPrefixedLogger, logger} from '../logger';
 import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
 import * as algorithms from './algorithms';
 
@@ -545,6 +545,7 @@ OlmDevice.prototype.createOutboundSession = async function(
                 }
             });
         },
+        getPrefixedLogger("[createOutboundSession]"),
     );
     return newSessionId;
 };
@@ -605,6 +606,7 @@ OlmDevice.prototype.createInboundSession = async function(
                 }
             });
         },
+        getPrefixedLogger("[createInboundSession]"),
     );
 
     return result;
@@ -638,6 +640,7 @@ OlmDevice.prototype.getSessionIdsForDevice = async function(theirDeviceIdentityK
                 },
             );
         },
+        getPrefixedLogger("[getSessionIdsForDevice]"),
     );
 
     return sessionIds;
@@ -727,6 +730,7 @@ OlmDevice.prototype.getSessionInfoForDevice = async function(deviceIdentityKey, 
                 }
             });
         },
+        getPrefixedLogger("[getSessionInfoForDevice]"),
     );
 
     return info;
@@ -761,6 +765,7 @@ OlmDevice.prototype.encryptMessage = async function(
                 this._saveSession(theirDeviceIdentityKey, sessionInfo, txn);
             });
         },
+        getPrefixedLogger("[encryptMessage]"),
     );
     return res;
 };
@@ -794,6 +799,7 @@ OlmDevice.prototype.decryptMessage = async function(
                 this._saveSession(theirDeviceIdentityKey, sessionInfo, txn);
             });
         },
+        getPrefixedLogger("[decryptMessage]"),
     );
     return payloadString;
 };
@@ -825,6 +831,7 @@ OlmDevice.prototype.matchesSession = async function(
                 matches = sessionInfo.session.matches_inbound(ciphertext);
             });
         },
+        getPrefixedLogger("[matchesSession]"),
     );
     return matches;
 };
@@ -1095,6 +1102,7 @@ OlmDevice.prototype.addInboundGroupSession = async function(
                 },
             );
         },
+        getPrefixedLogger("[addInboundGroupSession]"),
     );
 };
 
@@ -1265,6 +1273,7 @@ OlmDevice.prototype.decryptGroupMessage = async function(
                 },
             );
         },
+        getPrefixedLogger("[decryptGroupMessage]"),
     );
 
     if (error) {
@@ -1310,6 +1319,7 @@ OlmDevice.prototype.hasInboundSessionKeys = async function(roomId, senderKey, se
                 },
             );
         },
+        getPrefixedLogger("[hasInboundSessionKeys]"),
     );
 
     return result;
@@ -1369,6 +1379,7 @@ OlmDevice.prototype.getInboundGroupSessionKey = async function(
                 },
             );
         },
+        getPrefixedLogger("[getInboundGroupSessionKey]"),
     );
 
     return result;
