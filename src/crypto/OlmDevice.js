@@ -621,8 +621,10 @@ OlmDevice.prototype.createInboundSession = async function(
  * @return {Promise<string[]>}  a list of known session ids for the device
  */
 OlmDevice.prototype.getSessionIdsForDevice = async function(theirDeviceIdentityKey) {
+    const log = getPrefixedLogger("[getSessionIdsForDevice]");
+
     if (this._sessionsInProgress[theirDeviceIdentityKey]) {
-        logger.log("waiting for olm session to be created");
+        log.debug(`Waiting for Olm session for ${theirDeviceIdentityKey} to be created`);
         try {
             await this._sessionsInProgress[theirDeviceIdentityKey];
         } catch (e) {
@@ -640,7 +642,7 @@ OlmDevice.prototype.getSessionIdsForDevice = async function(theirDeviceIdentityK
                 },
             );
         },
-        getPrefixedLogger("[getSessionIdsForDevice]"),
+        log,
     );
 
     return sessionIds;
@@ -703,8 +705,10 @@ OlmDevice.prototype.getSessionIdForDevice = async function(
  * @return {Array.<{sessionId: string, hasReceivedMessage: Boolean}>}
  */
 OlmDevice.prototype.getSessionInfoForDevice = async function(deviceIdentityKey, nowait) {
+    const log = getPrefixedLogger("[getSessionInfoForDevice]");
+
     if (this._sessionsInProgress[deviceIdentityKey] && !nowait) {
-        logger.log("waiting for olm session to be created");
+        log.debug(`Waiting for Olm session for ${deviceIdentityKey} to be created`);
         try {
             await this._sessionsInProgress[deviceIdentityKey];
         } catch (e) {
@@ -730,7 +734,7 @@ OlmDevice.prototype.getSessionInfoForDevice = async function(deviceIdentityKey, 
                 }
             });
         },
-        getPrefixedLogger("[getSessionInfoForDevice]"),
+        log,
     );
 
     return info;
