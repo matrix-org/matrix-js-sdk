@@ -2394,6 +2394,6 @@ MatrixBaseApis.prototype.getSpaceSummary = function(roomId, maxRoomsPerSpace, au
         limit,
         batch,
     }, {
-        prefix: PREFIX_UNSTABLE,
+        prefix: "/_matrix/client/unstable/org.matrix.msc2946",
     });
 };
