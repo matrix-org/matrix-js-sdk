@@ -183,7 +183,7 @@ export async function getExistingOlmSessions(
  * @param {Array} [failedServers] An array to fill with remote servers that
  *     failed to respond to one-time-key requests.
  *
- * @param {Object} [log] A possibly customised log
+ * @param {Logger} [log] A possibly customised log
  *
  * @return {Promise} resolves once the sessions are complete, to
  *    an Object mapping from userId to deviceId to
@@ -257,7 +257,7 @@ export async function ensureOlmSessionsForDevices(
                 );
             }
             const sessionId = await olmDevice.getSessionIdForDevice(
-                key, resolveSession[key],
+                key, resolveSession[key], log,
             );
             log.debug(`Got Olm session ${sessionId} ${forWhom}`);
             if (sessionId !== null && resolveSession[key]) {

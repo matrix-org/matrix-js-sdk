@@ -68,8 +68,9 @@ interface PrefixedLogger extends Logger {
 }
 
 function extendLogger(logger: PrefixedLogger) {
-    logger.withPrefix = function(prefix: string) {
-        return getPrefixedLogger(this.prefix + prefix);
+    logger.withPrefix = function(prefix: string): PrefixedLogger {
+        const existingPrefix = this.prefix || "";
+        return getPrefixedLogger(existingPrefix + prefix);
     };
 }
 

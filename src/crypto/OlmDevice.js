@@ -656,13 +656,14 @@ OlmDevice.prototype.getSessionIdsForDevice = async function(theirDeviceIdentityK
  * @param {boolean} nowait Don't wait for an in-progress session to complete.
  *     This should only be set to true of the calling function is the function
  *     that marked the session as being in-progress.
+ * @param {Logger} [log] A possibly customised log
  * @return {Promise<?string>}  session id, or null if no established session
  */
 OlmDevice.prototype.getSessionIdForDevice = async function(
-    theirDeviceIdentityKey, nowait,
+    theirDeviceIdentityKey, nowait, log,
 ) {
     const sessionInfos = await this.getSessionInfoForDevice(
-        theirDeviceIdentityKey, nowait,
+        theirDeviceIdentityKey, nowait, log,
     );
 
     if (sessionInfos.length === 0) {
@@ -702,10 +703,13 @@ OlmDevice.prototype.getSessionIdForDevice = async function(
  * @param {boolean} nowait Don't wait for an in-progress session to complete.
  *     This should only be set to true of the calling function is the function
  *     that marked the session as being in-progress.
+ * @param {Logger} [log] A possibly customised log
  * @return {Array.<{sessionId: string, hasReceivedMessage: Boolean}>}
  */
-OlmDevice.prototype.getSessionInfoForDevice = async function(deviceIdentityKey, nowait) {
-    const log = logger.withPrefix("[getSessionInfoForDevice]");
+OlmDevice.prototype.getSessionInfoForDevice = async function(
+    deviceIdentityKey, nowait, log = logger,
+) {
+    log = log.withPrefix("[getSessionInfoForDevice]");
 
     if (this._sessionsInProgress[deviceIdentityKey] && !nowait) {
         log.debug(`Waiting for Olm session for ${deviceIdentityKey} to be created`);
