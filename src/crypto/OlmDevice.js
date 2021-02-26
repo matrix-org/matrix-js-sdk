@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {getPrefixedLogger, logger} from '../logger';
+import {logger} from '../logger';
 import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
 import * as algorithms from './algorithms';
 
@@ -545,7 +545,7 @@ OlmDevice.prototype.createOutboundSession = async function(
                 }
             });
         },
-        getPrefixedLogger("[createOutboundSession]"),
+        logger.withPrefix("[createOutboundSession]"),
     );
     return newSessionId;
 };
@@ -606,7 +606,7 @@ OlmDevice.prototype.createInboundSession = async function(
                 }
             });
         },
-        getPrefixedLogger("[createInboundSession]"),
+        logger.withPrefix("[createInboundSession]"),
     );
 
     return result;
@@ -621,7 +621,7 @@ OlmDevice.prototype.createInboundSession = async function(
  * @return {Promise<string[]>}  a list of known session ids for the device
  */
 OlmDevice.prototype.getSessionIdsForDevice = async function(theirDeviceIdentityKey) {
-    const log = getPrefixedLogger("[getSessionIdsForDevice]");
+    const log = logger.withPrefix("[getSessionIdsForDevice]");
 
     if (this._sessionsInProgress[theirDeviceIdentityKey]) {
         log.debug(`Waiting for Olm session for ${theirDeviceIdentityKey} to be created`);
@@ -705,7 +705,7 @@ OlmDevice.prototype.getSessionIdForDevice = async function(
  * @return {Array.<{sessionId: string, hasReceivedMessage: Boolean}>}
  */
 OlmDevice.prototype.getSessionInfoForDevice = async function(deviceIdentityKey, nowait) {
-    const log = getPrefixedLogger("[getSessionInfoForDevice]");
+    const log = logger.withPrefix("[getSessionInfoForDevice]");
 
     if (this._sessionsInProgress[deviceIdentityKey] && !nowait) {
         log.debug(`Waiting for Olm session for ${deviceIdentityKey} to be created`);
@@ -769,7 +769,7 @@ OlmDevice.prototype.encryptMessage = async function(
                 this._saveSession(theirDeviceIdentityKey, sessionInfo, txn);
             });
         },
-        getPrefixedLogger("[encryptMessage]"),
+        logger.withPrefix("[encryptMessage]"),
     );
     return res;
 };
@@ -803,7 +803,7 @@ OlmDevice.prototype.decryptMessage = async function(
                 this._saveSession(theirDeviceIdentityKey, sessionInfo, txn);
             });
         },
-        getPrefixedLogger("[decryptMessage]"),
+        logger.withPrefix("[decryptMessage]"),
     );
     return payloadString;
 };
@@ -835,7 +835,7 @@ OlmDevice.prototype.matchesSession = async function(
                 matches = sessionInfo.session.matches_inbound(ciphertext);
             });
         },
-        getPrefixedLogger("[matchesSession]"),
+        logger.withPrefix("[matchesSession]"),
     );
     return matches;
 };
@@ -1106,7 +1106,7 @@ OlmDevice.prototype.addInboundGroupSession = async function(
                 },
             );
         },
-        getPrefixedLogger("[addInboundGroupSession]"),
+        logger.withPrefix("[addInboundGroupSession]"),
     );
 };
 
@@ -1277,7 +1277,7 @@ OlmDevice.prototype.decryptGroupMessage = async function(
                 },
             );
         },
-        getPrefixedLogger("[decryptGroupMessage]"),
+        logger.withPrefix("[decryptGroupMessage]"),
     );
 
     if (error) {
@@ -1323,7 +1323,7 @@ OlmDevice.prototype.hasInboundSessionKeys = async function(roomId, senderKey, se
                 },
             );
         },
-        getPrefixedLogger("[hasInboundSessionKeys]"),
+        logger.withPrefix("[hasInboundSessionKeys]"),
     );
 
     return result;
@@ -1383,7 +1383,7 @@ OlmDevice.prototype.getInboundGroupSessionKey = async function(
                 },
             );
         },
-        getPrefixedLogger("[getInboundGroupSessionKey]"),
+        logger.withPrefix("[getInboundGroupSessionKey]"),
     );
 
     return result;
