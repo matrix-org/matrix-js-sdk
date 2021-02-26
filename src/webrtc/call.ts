@@ -886,7 +886,7 @@ export class MatrixCall extends EventEmitter {
         // Now we wait for the negotiationneeded event
     };
 
-    private sendAnswer() {
+    private async sendAnswer() {
         const answerContent = {
             answer: {
                 sdp: this.peerConn.localDescription.sdp,
@@ -908,12 +908,12 @@ export class MatrixCall extends EventEmitter {
         logger.info(`Discarding ${this.candidateSendQueue.length} candidates that will be sent in answer`);
         this.candidateSendQueue = [];
 
-        this.sendVoipEvent(EventType.CallAnswer, answerContent).then(() => {
+        try {
+            await this.sendVoipEvent(EventType.CallAnswer, answerContent);
             // If this isn't the first time we've tried to send the answer,
             // we may have candidates queued up, so send them now.
             this.inviteOrAnswerSent = true;
-            this.sendCandidateQueue();
-        }).catch((error) => {
+        } catch (error) {
             // We've failed to answer: back to the ringing state
             this.setState(CallState.Ringing);
             this.client.cancelPendingEvent(error.event);
@@ -926,7 +926,11 @@ export class MatrixCall extends EventEmitter {
             }
             this.emit(CallEvent.Error, new CallError(code, message, error));
             throw error;
-        });
+        }
+
+        // error handler re-throws so this won't happen on error, but
+        // we don't want the same error handling on the candidate queue
+        this.sendCandidateQueue();
     }
 
     private gotUserMediaForAnswer = async (stream: MediaStream) => {
@@ -1260,19 +1264,9 @@ export class MatrixCall extends EventEmitter {
 
         try {
             await this.sendVoipEvent(eventType, content);
-            this.sendCandidateQueue();
-            if (this.state === CallState.CreateOffer) {
-                this.inviteOrAnswerSent = true;
-                this.setState(CallState.InviteSent);
-                this.inviteTimeout = setTimeout(() => {
-                    this.inviteTimeout = null;
-                    if (this.state === CallState.InviteSent) {
-                        this.hangup(CallErrorCode.InviteTimeout, false);
-                    }
-                }, CALL_TIMEOUT_MS);
-            }
         } catch (error) {
-            this.client.cancelPendingEvent(error.event);
+            logger.error("Failed to send invite", error);
+            if (error.event) this.client.cancelPendingEvent(error.event);
 
             let code = CallErrorCode.SignallingFailed;
             let message = "Signalling failed";
@@ -1287,6 +1281,22 @@ export class MatrixCall extends EventEmitter {
 
             this.emit(CallEvent.Error, new CallError(code, message, error));
             this.terminate(CallParty.Local, code, false);
+
+            // no need to carry on & send the candidate queue, but we also
+            // don't want to rethrow the error
+            return;
+        }
+
+        this.sendCandidateQueue();
+        if (this.state === CallState.CreateOffer) {
+            this.inviteOrAnswerSent = true;
+            this.setState(CallState.InviteSent);
+            this.inviteTimeout = setTimeout(() => {
+                this.inviteTimeout = null;
+                if (this.state === CallState.InviteSent) {
+                    this.hangup(CallErrorCode.InviteTimeout, false);
+                }
+            }, CALL_TIMEOUT_MS);
         }
     };
 
@@ -1623,7 +1633,7 @@ export class MatrixCall extends EventEmitter {
         }
     }
 
-    private sendCandidateQueue() {
+    private async sendCandidateQueue() {
         if (this.candidateSendQueue.length === 0) {
             return;
         }
@@ -1635,20 +1645,28 @@ export class MatrixCall extends EventEmitter {
             candidates: cands,
         };
         logger.debug("Attempting to send " + cands.length + " candidates");
-        this.sendVoipEvent(EventType.CallCandidates, content).then(() => {
-            this.candidateSendTries = 0;
-            this.sendCandidateQueue();
-        }, (error) => {
-            for (let i = 0; i < cands.length; i++) {
-                this.candidateSendQueue.push(cands[i]);
-            }
+        try {
+            await this.sendVoipEvent(EventType.CallCandidates, content);
+        } catch (error) {
+            // don't retry this event: we'll send another one later as we might
+            // have more candidates by then.
+            if (error.event) this.client.cancelPendingEvent(error.event);
+
+            // put all the candidates we failed to send back in the queue
+            this.candidateSendQueue.push(...cands);
 
             if (this.candidateSendTries > 5) {
                 logger.debug(
                     "Failed to send candidates on attempt " + this.candidateSendTries +
-                    ". Giving up for now.", error,
+                    ". Giving up on this call.", error,
                 );
-                this.candidateSendTries = 0;
+
+                const code = CallErrorCode.SignallingFailed;
+                const message = "Signalling failed";
+
+                this.emit(CallEvent.Error, new CallError(code, message, error));
+                this.hangup(code, false);
+
                 return;
             }
 
@@ -1658,7 +1676,7 @@ export class MatrixCall extends EventEmitter {
             setTimeout(() => {
                 this.sendCandidateQueue();
             }, delayMs);
-        });
+        }
     }
 
     private async placeCallWithConstraints(constraints: MediaStreamConstraints) {
