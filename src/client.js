@@ -3447,11 +3447,12 @@ MatrixClient.prototype.getRoomUpgradeHistory = function(roomId, verifyLinks=fals
  * @param {string} roomId
  * @param {string} userId
  * @param {module:client.callback} callback Optional.
+ * @param {string} reason Optional.
  * @return {Promise} Resolves: TODO
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype.invite = function(roomId, userId, callback) {
-    return _membershipChange(this, roomId, userId, "invite", undefined,
+MatrixClient.prototype.invite = function(roomId, userId, callback, reason) {
+    return _membershipChange(this, roomId, userId, "invite", reason,
         callback);
 };
 
