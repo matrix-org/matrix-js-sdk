@@ -36,6 +36,10 @@ export enum EventType {
      */
     RoomAliases = "m.room.aliases", // deprecated https://matrix.org/docs/spec/client_server/r0.6.1#historical-events
 
+    // Spaces MSC1772
+    SpaceChild = "org.matrix.msc1772.space.child",
+    SpaceParent = "org.matrix.msc1772.space.parent",
+
     // Room timeline events
     RoomRedaction = "m.room.redaction",
     RoomMessage = "m.room.message",
