@@ -251,8 +251,6 @@ export class MatrixCall extends EventEmitter {
     private localAVStream: MediaStream;
     private inviteOrAnswerSent: boolean;
     private waitForLocalAVStream: boolean;
-    // XXX: This is either the invite or answer from remote...
-    private msg: any;
     // XXX: I don't know why this is called 'config'.
     private config: MediaStreamConstraints;
     private successor: MatrixCall;
@@ -284,6 +282,11 @@ export class MatrixCall extends EventEmitter {
     private makingOffer: boolean;
     private ignoreOffer: boolean;
 
+    // If candidates arrive before we've picked an opponent (which, in particular,
+    // will happen if the opponent sends candidates eagerly before the user answers
+    // the call) we buffer them up here so we can then add the ones from the party we pick
+    private remoteCandidateBuffer = new Map<string, RTCIceCandidate[]>();
+
     constructor(opts: CallOpts) {
         super();
         this.roomId = opts.roomId;
@@ -291,9 +294,6 @@ export class MatrixCall extends EventEmitter {
         this.type = null;
         this.forceTURN = opts.forceTURN;
         this.ourPartyId = this.client.deviceId;
-        // We compare this to null to checks the presence of a party ID:
-        // make sure it's null, not undefined
-        this.opponentPartyId = null;
         // Array of Objects with urls, username, credential keys
         this.turnServers = opts.turnServers || [];
         if (this.turnServers.length === 0 && this.client.isFallbackICEServerAllowed()) {
@@ -541,11 +541,16 @@ export class MatrixCall extends EventEmitter {
      * @param {MatrixEvent} event The m.call.invite event
      */
     async initWithInvite(event: MatrixEvent) {
-        this.msg = event.getContent();
+        const invite = event.getContent();
         this.direction = CallDirection.Inbound;
+
         this.peerConn = this.createPeerConnection();
+        // we must set the party ID before await-ing on anything: the call event
+        // handler will start giving us more call events (eg. candidates) so if
+        // we haven't set the party ID, we'll ignore them.
+        this.chooseOpponent(event);
         try {
-            await this.peerConn.setRemoteDescription(this.msg.offer);
+            await this.peerConn.setRemoteDescription(invite.offer);
         } catch (e) {
             logger.debug("Failed to set remote description", e);
             this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
@@ -564,13 +569,6 @@ export class MatrixCall extends EventEmitter {
         this.type = this.remoteStream.getTracks().some(t => t.kind === 'video') ? CallType.Video : CallType.Voice;
 
         this.setState(CallState.Ringing);
-        this.opponentVersion = this.msg.version;
-        if (this.opponentVersion !== 0) {
-            // ignore party ID in v0 calls: party ID isn't a thing until v1
-            this.opponentPartyId = this.msg.party_id || null;
-        }
-        this.opponentCaps = this.msg.capabilities || {};
-        this.opponentMember = event.sender;
 
         if (event.getLocalAge()) {
             setTimeout(() => {
@@ -584,7 +582,7 @@ export class MatrixCall extends EventEmitter {
                     }
                     this.emit(CallEvent.Hangup);
                 }
-            }, this.msg.lifetime - event.getLocalAge());
+            }, invite.lifetime - event.getLocalAge());
         }
     }
 
@@ -596,7 +594,6 @@ export class MatrixCall extends EventEmitter {
         // perverse as it may seem, sometimes we want to instantiate a call with a
         // hangup message (because when getting the state of the room on load, events
         // come in reverse order and we want to remember that a call has been hung up)
-        this.msg = event.getContent();
         this.setState(CallState.Ended);
     }
 
@@ -1034,37 +1031,33 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        if (!this.partyIdMatches(ev.getContent())) {
-            logger.info(
-                `Ignoring candidates from party ID ${ev.getContent().party_id}: ` +
-                `we have chosen party ID ${this.opponentPartyId}`,
-            );
-            return;
-        }
-
         const cands = ev.getContent().candidates;
         if (!cands) {
             logger.info("Ignoring candidates event with no candidates!");
             return;
         }
 
-        for (const cand of cands) {
-            if (
-                (cand.sdpMid === null || cand.sdpMid === undefined) &&
-                (cand.sdpMLineIndex === null || cand.sdpMLineIndex === undefined)
-            ) {
-                logger.debug("Ignoring remote ICE candidate with no sdpMid or sdpMLineIndex");
-                return;
-            }
-            logger.debug("Got remote ICE " + cand.sdpMid + " candidate: " + cand.candidate);
-            try {
-                this.peerConn.addIceCandidate(cand);
-            } catch (err) {
-                if (!this.ignoreOffer) {
-                    logger.info("Failed to add remore ICE candidate", err);
-                }
-            }
+        const fromPartyId = ev.getContent().version === 0 ? null : ev.getContent().party_id || null;
+
+        if (this.opponentPartyId === undefined) {
+            // we haven't picked an opponent yet so save the candidates
+            logger.info(`Bufferring ${cands.length} candidates until we pick an opponent`);
+            const bufferedCands = this.remoteCandidateBuffer.get(fromPartyId) || [];
+            bufferedCands.push(...cands);
+            this.remoteCandidateBuffer.set(fromPartyId, bufferedCands);
+            return;
         }
+
+        if (!this.partyIdMatches(ev.getContent())) {
+            logger.info(
+                `Ignoring candidates from party ID ${ev.getContent().party_id}: ` +
+                `we have chosen party ID ${this.opponentPartyId}`,
+            );
+
+            return;
+        }
+
+        this.addIceCandidates(cands);
     }
 
     /**
@@ -1076,7 +1069,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        if (this.opponentPartyId !== null) {
+        if (this.opponentPartyId !== undefined) {
             logger.info(
                 `Ignoring answer from party ID ${event.getContent().party_id}: ` +
                 `we already have an answer/reject from ${this.opponentPartyId}`,
@@ -1084,12 +1077,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        this.opponentVersion = event.getContent().version;
-        if (this.opponentVersion !== 0) {
-            this.opponentPartyId = event.getContent().party_id || null;
-        }
-        this.opponentCaps = event.getContent().capabilities || {};
-        this.opponentMember = event.sender;
+        this.chooseOpponent(event);
 
         this.setState(CallState.Connecting);
 
@@ -1720,8 +1708,59 @@ export class MatrixCall extends EventEmitter {
 
     private partyIdMatches(msg): boolean {
         // They must either match or both be absent (in which case opponentPartyId will be null)
-        const msgPartyId = msg.party_id || null;
+        // Also we ignore party IDs on the invite/offer if the version is 0, so we must do the same
+        // here and use null if the version is 0 (woe betide any opponent sending messages in the
+        // same call with different versions)
+        const msgPartyId = msg.version === 0 ? null : msg.party_id || null;
         return msgPartyId === this.opponentPartyId;
+    }
+
+    // Commits to an opponent for the call
+    // ev: An invite or answer event
+    private chooseOpponent(ev: MatrixEvent) {
+        // I choo-choo-choose you
+        const msg = ev.getContent();
+
+        this.opponentVersion = msg.version;
+        if (this.opponentVersion === 0) {
+            // set to null to indicate that we've chosen an opponent, but because
+            // they're v0 they have no party ID (even if they sent one, we're ignoring it)
+            this.opponentPartyId = null;
+        } else {
+            // set to their party ID, or if they're naughty and didn't send one despite
+            // not being v0, set it to null to indicate we picked an opponent with no
+            // party ID
+            this.opponentPartyId = msg.party_id || null;
+        }
+        this.opponentCaps = msg.capabilities || {};
+        this.opponentMember = ev.sender;
+
+        const bufferedCands = this.remoteCandidateBuffer.get(this.opponentPartyId);
+        if (bufferedCands) {
+            logger.info(`Adding ${bufferedCands.length} buffered candidates for opponent ${this.opponentPartyId}`);
+            this.addIceCandidates(bufferedCands);
+        }
+        this.remoteCandidateBuffer = null;
+    }
+
+    private addIceCandidates(cands: RTCIceCandidate[]) {
+        for (const cand of cands) {
+            if (
+                (cand.sdpMid === null || cand.sdpMid === undefined) &&
+                (cand.sdpMLineIndex === null || cand.sdpMLineIndex === undefined)
+            ) {
+                logger.debug("Ignoring remote ICE candidate with no sdpMid or sdpMLineIndex");
+                return;
+            }
+            logger.debug("Got remote ICE " + cand.sdpMid + " candidate: " + cand.candidate);
+            try {
+                this.peerConn.addIceCandidate(cand);
+            } catch (err) {
+                if (!this.ignoreOffer) {
+                    logger.info("Failed to add remore ICE candidate", err);
+                }
+            }
+        }
     }
 }
 

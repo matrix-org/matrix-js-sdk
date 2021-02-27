@@ -190,4 +190,62 @@ describe('Call', function() {
         // Hangup to stop timers
         call.hangup(CallErrorCode.UserHangup, true);
     });
+
+    it('should add candidates received before answer if party ID is correct', async function() {
+        await call.placeVoiceCall();
+        call.peerConn.addIceCandidate = jest.fn();
+
+        call.onRemoteIceCandidatesReceived({
+            getContent: () => {
+                return {
+                    version: 1,
+                    call_id: call.callId,
+                    party_id: 'the_correct_party_id',
+                    candidates: [
+                        {
+                            candidate: 'the_correct_candidate',
+                            sdpMid: '',
+                        },
+                    ],
+                };
+            },
+        });
+
+        call.onRemoteIceCandidatesReceived({
+            getContent: () => {
+                return {
+                    version: 1,
+                    call_id: call.callId,
+                    party_id: 'some_other_party_id',
+                    candidates: [
+                        {
+                            candidate: 'the_wrong_candidate',
+                            sdpMid: '',
+                        },
+                    ],
+                };
+            },
+        });
+
+        expect(call.peerConn.addIceCandidate.mock.calls.length).toBe(0);
+
+        await call.onAnswerReceived({
+            getContent: () => {
+                return {
+                    version: 1,
+                    call_id: call.callId,
+                    party_id: 'the_correct_party_id',
+                    answer: {
+                        sdp: DUMMY_SDP,
+                    },
+                };
+            },
+        });
+
+        expect(call.peerConn.addIceCandidate.mock.calls.length).toBe(1);
+        expect(call.peerConn.addIceCandidate).toHaveBeenCalledWith({
+            candidate: 'the_correct_candidate',
+            sdpMid: '',
+        });
+    });
 });
