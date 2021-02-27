@@ -36,8 +36,6 @@ import {PushProcessor} from "./pushprocessor";
 import {logger} from './logger';
 import {InvalidStoreError} from './errors';
 
-const DEBUG = true;
-
 // /sync requests allow you to set a timeout= but the request may continue
 // beyond that and wedge forever, so we need to track how long we are willing
 // to keep open the connection. This constant is *ADDED* to the timeout= value
@@ -55,11 +53,20 @@ function getFilterName(userId, suffix) {
     return "FILTER_SYNC_" + userId + (suffix ? "_" + suffix : "");
 }
 
-function debuglog(...params) {
-    if (!DEBUG) {
-        return;
+function debuglog(client, debugLogType, ...params) {
+    switch (debugLogType) {
+        case 'event':
+            client.emit("debuglog", ...params);
+
+            break;
+        case 'off':
+            return;
+        case 'stdout':
+        default:
+            logger.log(...params);
+
+            break;
     }
-    logger.log(...params);
 }
 
 
@@ -77,6 +84,8 @@ function debuglog(...params) {
  * Default: returns false.
  * @param {Boolean=} opts.disablePresence True to perform syncing without automatically
  * updating presence.
+ * @param {String=} opts.debugLogType How the client debuglog output is handled, can be one of
+ * 'stdout' | 'event' | 'off', defaults to stdout
  */
 export function SyncApi(client, opts) {
     this.client = client;
@@ -104,6 +113,7 @@ export function SyncApi(client, opts) {
     this._notifEvents = []; // accumulator of sync events in the current sync response
     this._failedSyncCount = 0; // Number of consecutive failed /sync requests
     this._storeIsInvalid = false; // flag set if the store needs to be cleared before we can start
+    this._debugLogType = opts.debugLogType || 'stdout';  // stdout | event | off, stdout is "classic" behaviour, and default
 
     if (client.getNotifTimelineSet()) {
         client.reEmitter.reEmit(client.getNotifTimelineSet(),
@@ -350,7 +360,7 @@ SyncApi.prototype.stopPeeking = function() {
  */
 SyncApi.prototype._peekPoll = function(peekRoom, token) {
     if (this._peekRoom !== peekRoom) {
-        debuglog("Stopped peeking in room %s", peekRoom.roomId);
+        debuglog(self.client, this._debugLogType, "Stopped peeking in room %s", peekRoom.roomId);
         return;
     }
 
@@ -362,7 +372,7 @@ SyncApi.prototype._peekPoll = function(peekRoom, token) {
         from: token,
     }, undefined, 50 * 1000).then(function(res) {
         if (self._peekRoom !== peekRoom) {
-            debuglog("Stopped peeking in room %s", peekRoom.roomId);
+            debuglog(self.client, self._debugLogType, "Stopped peeking in room %s", peekRoom.roomId);
             return;
         }
         // We have a problem that we get presence both from /events and /sync
@@ -494,9 +504,9 @@ SyncApi.prototype.sync = function() {
 
     async function getPushRules() {
         try {
-            debuglog("Getting push rules...");
+            debuglog(client, self._debugLogType, "Getting push rules...");
             const result = await client.getPushRules();
-            debuglog("Got push rules");
+            debuglog(client, self._debugLogType, "Got push rules");
 
             client.pushRules = result;
         } catch (err) {
@@ -504,7 +514,7 @@ SyncApi.prototype.sync = function() {
             if (self._shouldAbortSync(err)) return;
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
-            debuglog("Waiting for saved sync before retrying push rules...");
+            debuglog(client, self._debugLogType, "Waiting for saved sync before retrying push rules...");
             await self.recoverFromSyncStartupError(savedSyncPromise, err);
             getPushRules();
             return;
@@ -519,27 +529,27 @@ SyncApi.prototype.sync = function() {
     }
 
     const checkLazyLoadStatus = async () => {
-        debuglog("Checking lazy load status...");
+        debuglog(client, self._debugLogType, "Checking lazy load status...");
         if (this.opts.lazyLoadMembers && client.isGuest()) {
             this.opts.lazyLoadMembers = false;
         }
         if (this.opts.lazyLoadMembers) {
-            debuglog("Checking server lazy load support...");
+            debuglog(client, self._debugLogType, "Checking server lazy load support...");
             const supported = await client.doesServerSupportLazyLoading();
             if (supported) {
-                debuglog("Enabling lazy load on sync filter...");
+                debuglog(client, self._debugLogType, "Enabling lazy load on sync filter...");
                 if (!this.opts.filter) {
                     this.opts.filter = buildDefaultFilter();
                 }
                 this.opts.filter.setLazyLoadMembers(true);
             } else {
-                debuglog("LL: lazy loading requested but not supported " +
+                debuglog(client, self._debugLogType, "LL: lazy loading requested but not supported " +
                     "by server, so disabling");
                 this.opts.lazyLoadMembers = false;
             }
         }
         // need to vape the store when enabling LL and wasn't enabled before
-        debuglog("Checking whether lazy loading has changed in store...");
+        debuglog(client, self._debugLogType, "Checking whether lazy loading has changed in store...");
         const shouldClear = await this._wasLazyLoadingToggled(this.opts.lazyLoadMembers);
         if (shouldClear) {
             this._storeIsInvalid = true;
@@ -557,9 +567,9 @@ SyncApi.prototype.sync = function() {
             this.opts.crypto.enableLazyLoading();
         }
         try {
-            debuglog("Storing client options...");
+            debuglog(client, self._debugLogType, "Storing client options...");
             await this.client._storeClientOptions();
-            debuglog("Stored client options");
+            debuglog(client, self._debugLogType, "Stored client options");
         } catch (err) {
             logger.error("Storing client options failed", err);
             throw err;
@@ -569,7 +579,7 @@ SyncApi.prototype.sync = function() {
     };
 
     async function getFilter() {
-        debuglog("Getting filter...");
+        debuglog(client, self._debugLogType, "Getting filter...");
         let filter;
         if (self.opts.filter) {
             filter = self.opts.filter;
@@ -587,7 +597,7 @@ SyncApi.prototype.sync = function() {
             if (self._shouldAbortSync(err)) return;
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
-            debuglog("Waiting for saved sync before retrying filter...");
+            debuglog(client, self._debugLogType, "Waiting for saved sync before retrying filter...");
             await self.recoverFromSyncStartupError(savedSyncPromise, err);
             getFilter();
             return;
@@ -601,12 +611,12 @@ SyncApi.prototype.sync = function() {
         if (self._currentSyncRequest === null) {
             // Send this first sync request here so we can then wait for the saved
             // sync data to finish processing before we process the results of this one.
-            debuglog("Sending first sync request...");
+            debuglog(client, self._debugLogType, "Sending first sync request...");
             self._currentSyncRequest = self._doSyncRequest({ filterId }, savedSyncToken);
         }
 
         // Now wait for the saved sync to finish...
-        debuglog("Waiting for saved sync before starting sync processing...");
+        debuglog(client, self._debugLogType, "Waiting for saved sync before starting sync processing...");
         await savedSyncPromise;
         self._sync({ filterId });
     }
@@ -618,14 +628,14 @@ SyncApi.prototype.sync = function() {
         // Pull the saved sync token out first, before the worker starts sending
         // all the sync data which could take a while. This will let us send our
         // first incremental sync request before we've processed our saved data.
-        debuglog("Getting saved sync token...");
+        debuglog(client, self._debugLogType, "Getting saved sync token...");
         savedSyncPromise = client.store.getSavedSyncToken().then((tok) => {
-            debuglog("Got saved sync token");
+            debuglog(client, self._debugLogType, "Got saved sync token");
             savedSyncToken = tok;
-            debuglog("Getting saved sync...");
+            debuglog(client, self._debugLogType, "Getting saved sync...");
             return client.store.getSavedSync();
         }).then((savedSync) => {
-            debuglog(`Got reply from saved sync, exists? ${!!savedSync}`);
+            debuglog(client, self._debugLogType, `Got reply from saved sync, exists? ${!!savedSync}`);
             if (savedSync) {
                 return self._syncFromCache(savedSync);
             }
@@ -643,7 +653,7 @@ SyncApi.prototype.sync = function() {
  * Stops the sync object from syncing.
  */
 SyncApi.prototype.stop = function() {
-    debuglog("SyncApi.stop");
+    debuglog(this.client, this._debugLogType, "SyncApi.stop");
     if (global.window) {
         global.window.removeEventListener("online", this._onOnlineBound, false);
         this._onOnlineBound = undefined;
@@ -676,7 +686,7 @@ SyncApi.prototype.retryImmediately = function() {
  * should have been acquired via client.store.getSavedSync().
  */
 SyncApi.prototype._syncFromCache = async function(savedSync) {
-    debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
+    debuglog(this.client, this._debugLogType, "sync(): not doing HTTP hit, instead returning stored /sync data");
 
     const nextSyncToken = savedSync.nextBatch;
 
@@ -724,7 +734,7 @@ SyncApi.prototype._sync = async function(syncOptions) {
     const client = this.client;
 
     if (!this._running) {
-        debuglog("Sync no longer running: exiting.");
+        debuglog(client, this._debugLogType, "Sync no longer running: exiting.");
         if (this._connectionReturnedDefer) {
             this._connectionReturnedDefer.reject();
             this._connectionReturnedDefer = null;
@@ -883,7 +893,7 @@ SyncApi.prototype._getSyncParams = function(syncOptions, syncToken) {
 
 SyncApi.prototype._onSyncError = function(err, syncOptions) {
     if (!this._running) {
-        debuglog("Sync no longer running: exiting");
+        debuglog(this.client, this._debugLogType, "Sync no longer running: exiting");
         if (this._connectionReturnedDefer) {
             this._connectionReturnedDefer.reject();
             this._connectionReturnedDefer = null;
@@ -902,7 +912,7 @@ SyncApi.prototype._onSyncError = function(err, syncOptions) {
     this._failedSyncCount++;
     logger.log('Number of consecutive failed sync requests:', this._failedSyncCount);
 
-    debuglog("Starting keep-alive");
+    debuglog(this.client, this._debugLogType, "Starting keep-alive");
     // Note that we do *not* mark the sync connection as
     // lost yet: we only do this if a keepalive poke
     // fails, since long lived HTTP connections will
@@ -1206,7 +1216,7 @@ SyncApi.prototype._processSyncResponse = async function(
             for (let i = timelineEvents.length - 1; i >= 0; i--) {
                 const eventId = timelineEvents[i].getId();
                 if (room.getTimelineForEvent(eventId)) {
-                    debuglog("Already have event " + eventId + " in limited " +
+                    debuglog(client, self._debugLogType, "Already have event " + eventId + " in limited " +
                              "sync - not resetting");
                     limited = false;
 
@@ -1702,7 +1712,7 @@ SyncApi.prototype._updateSyncState = function(newState, data) {
  * but this might help us reconnect a little faster.
  */
 SyncApi.prototype._onOnline = function() {
-    debuglog("Browser thinks we are back online");
+    debuglog(this.client, this._debugLogType, "Browser thinks we are back online");
     this._startKeepAlives(0);
 };
 

@@ -278,6 +278,8 @@ function keyFromRecoverySession(session, decryptionKey) {
  *     unique per sender, device pair.
  *   {DeviceTrustLevel} deviceTrust: The trust status of the device requesting
  *     the secret as returned by {@link module:client~MatrixClient#checkDeviceTrust}.
+ * @param {String=} opts.debugLogType How the client debuglog output is handled, can be one of
+ * 'stdout' | 'event' | 'off', defaults to stdout
  */
 export function MatrixClient(opts) {
     opts.baseUrl = utils.ensureNoTrailingSlash(opts.baseUrl);
@@ -392,6 +394,9 @@ export function MatrixClient(opts) {
 
     this._clientWellKnown = undefined;
     this._clientWellKnownPromise = undefined;
+
+    // Debuglog type
+    this._debugLogType = opts.debugLogType || 'stdout';
 
     // The SDK doesn't really provide a clean way for events to recalculate the push
     // actions for themselves, so we have to kinda help them out when they are encrypted.
@@ -5067,6 +5072,8 @@ MatrixClient.prototype.deactivateSynapseUser = function(userId) {
  * @param {Number=} opts.clientWellKnownPollPeriod The number of seconds between polls
  * to /.well-known/matrix/client, undefined to disable. This should be in the order of hours.
  * Default: undefined.
+ * @param {String=} opts.debugLogType How the client debuglog output is handled, can be one of
+ * 'stdout' | 'event' | 'off', defaults to stdout
  */
 MatrixClient.prototype.startClient = async function(opts) {
     if (this.clientRunning) {
@@ -5112,6 +5119,10 @@ MatrixClient.prototype.startClient = async function(opts) {
         }
         return this._canResetTimelineCallback(roomId);
     };
+
+    // Transfer debuglog setting
+    opts.debugLogType = this._debugLogType;
+
     this._clientOpts = opts;
     this._syncApi = new SyncApi(this, opts);
     this._syncApi.sync();
