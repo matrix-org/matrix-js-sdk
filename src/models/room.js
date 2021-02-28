@@ -1585,6 +1585,44 @@ Room.prototype.recalculate = function() {
 };
 
 /**
+ * Get a list of user IDs who have read up to and including the given
+ * event. This will look at the most recent maxEvents to identify the
+ * given event, and any users who have read events leading up to that
+ * event. If the function exceeds the given limit, an empty array will
+ * be returned. Otherwise, an array with at least the event sender will
+ * be returned.
+ * @param {MatrixEvent} event The event to search for.
+ * @param {number} maxEvents The maximum number of events to search within.
+ * @returns {string[]} A list of user IDs who have read the event.
+ */
+Room.prototype.getUsersWhoHaveRead = function(event, maxEvents) {
+    // First, determine if the event is a pending event. If yes, don't bother searching
+    if (this.getPendingEvents().some(e => e.getId() === event.getId())) {
+        return [event.getSender()];
+    }
+
+    // Now try to find where the event is in the timeline. We look behind for a maximum
+    // of 100 events just to avoid runaway loops
+    const events = this.getLiveTimeline().getEvents(); // timelines are most recent last
+    let foundEvent = false;
+    const receiptIds = new Set();
+    for (let i = events.length - 1; i >= Math.max(0, events.length - maxEvents); i--) {
+        const ev = events[i];
+        this.getUsersReadUpTo(ev).forEach(u => receiptIds.add(u));
+        if (ev.getId() === event.getId()) {
+            foundEvent = true;
+            break; // we don't need to search any further
+        }
+    }
+    if (!foundEvent) {
+        return []; // per our contract, return nothing
+    } else {
+        receiptIds.add(event.getSender()); // also per the contract, return with the sender
+    }
+    return Array.from(receiptIds);
+};
+
+/**
  * Get a list of user IDs who have <b>read up to</b> the given event.
  * @param {MatrixEvent} event the event to get read receipts for.
  * @return {String[]} A list of user IDs.
