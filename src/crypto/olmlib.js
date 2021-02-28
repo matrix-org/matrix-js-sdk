@@ -183,7 +183,7 @@ export async function getExistingOlmSessions(
  * @param {Array} [failedServers] An array to fill with remote servers that
  *     failed to respond to one-time-key requests.
  *
- * @param {Object} [log] A possibly customised log
+ * @param {Logger} [log] A possibly customised log
  *
  * @return {Promise} resolves once the sessions are complete, to
  *    an Object mapping from userId to deviceId to
@@ -232,18 +232,23 @@ export async function ensureOlmSessionsForDevices(
                 continue;
             }
 
+            const forWhom = `for ${key} (${userId}:${deviceId})`;
+            log.debug(`Ensuring Olm session ${forWhom}`);
             if (!olmDevice._sessionsInProgress[key]) {
                 // pre-emptively mark the session as in-progress to avoid race
                 // conditions.  If we find that we already have a session, then
                 // we'll resolve
+                log.debug(`Marking Olm session in progress ${forWhom}`);
                 olmDevice._sessionsInProgress[key] = new Promise(
                     (resolve, reject) => {
                         resolveSession[key] = {
                             resolve: (...args) => {
+                                log.debug(`Resolved Olm session in progress ${forWhom}`);
                                 delete olmDevice._sessionsInProgress[key];
                                 resolve(...args);
                             },
                             reject: (...args) => {
+                                log.debug(`Rejected Olm session in progress ${forWhom}`);
                                 delete olmDevice._sessionsInProgress[key];
                                 reject(...args);
                             },
@@ -252,8 +257,9 @@ export async function ensureOlmSessionsForDevices(
                 );
             }
             const sessionId = await olmDevice.getSessionIdForDevice(
-                key, resolveSession[key],
+                key, resolveSession[key], log,
             );
+            log.debug(`Got Olm session ${sessionId} ${forWhom}`);
             if (sessionId !== null && resolveSession[key]) {
                 // we found a session, but we had marked the session as
                 // in-progress, so unmark it and unblock anything that was
@@ -264,9 +270,9 @@ export async function ensureOlmSessionsForDevices(
             }
             if (sessionId === null || force) {
                 if (force) {
-                    log.info(`Forcing new Olm session for ${userId}:${deviceId}`);
+                    log.info(`Forcing new Olm session ${forWhom}`);
                 } else {
-                    log.info(`Making new Olm session for ${userId}:${deviceId}`);
+                    log.info(`Making new Olm session ${forWhom}`);
                 }
                 devicesWithoutSession.push([userId, deviceId]);
             }

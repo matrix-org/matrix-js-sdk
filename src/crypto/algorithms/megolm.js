@@ -22,7 +22,7 @@ limitations under the License.
  * @module crypto/algorithms/megolm
  */
 
-import {getPrefixedLogger, logger} from '../../logger';
+import {logger} from '../../logger';
 import * as utils from "../../utils";
 import {polyfillSuper} from "../../utils";
 import * as olmlib from "../olmlib";
@@ -736,7 +736,7 @@ MegolmEncryption.prototype._shareKeyWithDevices = async function(
     logger.debug(`Ensuring Olm sessions for devices in ${this._roomId}`);
     const devicemap = await olmlib.ensureOlmSessionsForDevices(
         this._olmDevice, this._baseApis, devicesByUser, otkTimeout, failedServers,
-        getPrefixedLogger(`[${this._roomId}]`),
+        logger.withPrefix(`[${this._roomId}]`),
     );
     logger.debug(`Ensured Olm sessions for devices in ${this._roomId}`);
 
