@@ -295,9 +295,13 @@ export async function ensureOlmSessionsForDevices(
     // timeout on this request, let's first log whether that's the root
     // cause we're seeing in practice.
     // See also https://github.com/vector-im/element-web/issues/16194
-    const otkTimeoutLogger = setTimeout(() => {
-        log.error(`Homeserver never replied while claiming ${taskDetail}`);
-    }, otkTimeout);
+    let otkTimeoutLogger;
+    // XXX: Perhaps there should be a default timeout?
+    if (otkTimeout) {
+        otkTimeoutLogger = setTimeout(() => {
+            log.error(`Homeserver never replied while claiming ${taskDetail}`);
+        }, otkTimeout);
+    }
     try {
         log.debug(`Claiming ${taskDetail}`);
         res = await baseApis.claimOneTimeKeys(
