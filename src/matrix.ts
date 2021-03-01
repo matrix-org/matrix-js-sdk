@@ -52,7 +52,7 @@ export * from "./store/session/webstorage";
 export * from "./crypto/store/memory-crypto-store";
 export * from "./crypto/store/indexeddb-crypto-store";
 export * from "./content-repo";
-export const ContentHelpers = import("./content-helpers");
+export * as ContentHelpers from "./content-helpers";
 export {
     createNewMatrixCall,
     setAudioOutput as setMatrixCallAudioOutput,
