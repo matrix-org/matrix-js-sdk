@@ -1601,8 +1601,7 @@ Room.prototype.getUsersWhoHaveRead = function(event, maxEvents) {
         return [event.getSender()];
     }
 
-    // Now try to find where the event is in the timeline. We look behind for a maximum
-    // of 100 events just to avoid runaway loops
+    // Now try to find where the event is in the timeline
     const events = this.getLiveTimeline().getEvents(); // timelines are most recent last
     let foundEvent = false;
     const receiptIds = new Set();
