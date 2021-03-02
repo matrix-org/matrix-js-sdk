@@ -331,10 +331,10 @@ export async function ensureOlmSessionsForDevices(
         failedServers.push(...Object.keys(res.failures));
     }
 
-    const otk_res = res.one_time_keys || {};
+    const otkResult = res.one_time_keys || {};
     const promises = [];
     for (const [userId, devices] of Object.entries(devicesByUser)) {
-        const userRes = otk_res[userId] || {};
+        const userRes = otkResult[userId] || {};
         for (let j = 0; j < devices.length; j++) {
             const deviceInfo = devices[j];
             const deviceId = deviceInfo.deviceId;
