@@ -208,6 +208,48 @@ export async function ensureOlmSessionsForDevices(
     const result = {};
     const resolveSession = {};
 
+    // Mark all sessions this task intends to update as in progress. It is
+    // important to do this for all devices this task cares about in a single
+    // synchronous operation, as otherwise it is possible to have deadlocks
+    // where multiple tasks wait indefinitely on another task to update some set
+    // of common devices.
+    for (const [userId, devices] of Object.entries(devicesByUser)) {
+        for (const deviceInfo of devices) {
+            const deviceId = deviceInfo.deviceId;
+            const key = deviceInfo.getIdentityKey();
+
+            if (key === olmDevice.deviceCurve25519Key) {
+                // We don't start sessions with ourself, so there's no need to
+                // mark it in progress.
+                continue;
+            }
+
+            const forWhom = `for ${key} (${userId}:${deviceId})`;
+            if (!olmDevice._sessionsInProgress[key]) {
+                // pre-emptively mark the session as in-progress to avoid race
+                // conditions.  If we find that we already have a session, then
+                // we'll resolve
+                log.debug(`Marking Olm session in progress ${forWhom}`);
+                olmDevice._sessionsInProgress[key] = new Promise(
+                    (resolve, reject) => {
+                        resolveSession[key] = {
+                            resolve: (...args) => {
+                                log.debug(`Resolved Olm session in progress ${forWhom}`);
+                                delete olmDevice._sessionsInProgress[key];
+                                resolve(...args);
+                            },
+                            reject: (...args) => {
+                                log.debug(`Rejected Olm session in progress ${forWhom}`);
+                                delete olmDevice._sessionsInProgress[key];
+                                reject(...args);
+                            },
+                        };
+                    },
+                );
+            }
+        }
+    }
+
     for (const [userId, devices] of Object.entries(devicesByUser)) {
         result[userId] = {};
         for (const deviceInfo of devices) {
@@ -234,28 +276,6 @@ export async function ensureOlmSessionsForDevices(
 
             const forWhom = `for ${key} (${userId}:${deviceId})`;
             log.debug(`Ensuring Olm session ${forWhom}`);
-            if (!olmDevice._sessionsInProgress[key]) {
-                // pre-emptively mark the session as in-progress to avoid race
-                // conditions.  If we find that we already have a session, then
-                // we'll resolve
-                log.debug(`Marking Olm session in progress ${forWhom}`);
-                olmDevice._sessionsInProgress[key] = new Promise(
-                    (resolve, reject) => {
-                        resolveSession[key] = {
-                            resolve: (...args) => {
-                                log.debug(`Resolved Olm session in progress ${forWhom}`);
-                                delete olmDevice._sessionsInProgress[key];
-                                resolve(...args);
-                            },
-                            reject: (...args) => {
-                                log.debug(`Rejected Olm session in progress ${forWhom}`);
-                                delete olmDevice._sessionsInProgress[key];
-                                reject(...args);
-                            },
-                        };
-                    },
-                );
-            }
             const sessionId = await olmDevice.getSessionIdForDevice(
                 key, resolveSession[key], log,
             );
