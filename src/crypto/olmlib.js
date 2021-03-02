@@ -230,22 +230,13 @@ export async function ensureOlmSessionsForDevices(
                 // conditions.  If we find that we already have a session, then
                 // we'll resolve
                 log.debug(`Marking Olm session in progress ${forWhom}`);
-                olmDevice._sessionsInProgress[key] = new Promise(
-                    (resolve, reject) => {
-                        resolveSession[key] = {
-                            resolve: (...args) => {
-                                log.debug(`Resolved Olm session in progress ${forWhom}`);
-                                delete olmDevice._sessionsInProgress[key];
-                                resolve(...args);
-                            },
-                            reject: (...args) => {
-                                log.debug(`Rejected Olm session in progress ${forWhom}`);
-                                delete olmDevice._sessionsInProgress[key];
-                                reject(...args);
-                            },
-                        };
-                    },
-                );
+                olmDevice._sessionsInProgress[key] = new Promise(resolve => {
+                    resolveSession[key] = (...args) => {
+                        log.debug(`Resolved Olm session in progress ${forWhom}`);
+                        delete olmDevice._sessionsInProgress[key];
+                        resolve(...args);
+                    };
+                });
             }
         }
     }
@@ -285,7 +276,7 @@ export async function ensureOlmSessionsForDevices(
                 // in-progress, so unmark it and unblock anything that was
                 // waiting
                 delete olmDevice._sessionsInProgress[key];
-                resolveSession[key].resolve();
+                resolveSession[key]();
                 delete resolveSession[key];
             }
             if (sessionId === null || force) {
@@ -330,7 +321,7 @@ export async function ensureOlmSessionsForDevices(
         log.debug(`Claimed ${taskDetail}`);
     } catch (e) {
         for (const resolver of Object.values(resolveSession)) {
-            resolver.resolve();
+            resolver();
         }
         log.log(`Failed to claim ${taskDetail}`, e, devicesWithoutSession);
         throw e;
@@ -377,7 +368,7 @@ export async function ensureOlmSessionsForDevices(
                     `for device ${userId}:${deviceId}`,
                 );
                 if (resolveSession[key]) {
-                    resolveSession[key].resolve();
+                    resolveSession[key]();
                 }
                 continue;
             }
@@ -387,12 +378,12 @@ export async function ensureOlmSessionsForDevices(
                     olmDevice, oneTimeKey, userId, deviceInfo,
                 ).then((sid) => {
                     if (resolveSession[key]) {
-                        resolveSession[key].resolve(sid);
+                        resolveSession[key](sid);
                     }
                     result[userId][deviceId].sessionId = sid;
                 }, (e) => {
                     if (resolveSession[key]) {
-                        resolveSession[key].resolve();
+                        resolveSession[key]();
                     }
                     throw e;
                 }),
