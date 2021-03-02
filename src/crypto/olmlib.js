@@ -273,11 +273,9 @@ export async function ensureOlmSessionsForDevices(
             log.debug(`Got Olm session ${sessionId} ${forWhom}`);
             if (sessionId !== null && resolveSession[key]) {
                 // we found a session, but we had marked the session as
-                // in-progress, so unmark it and unblock anything that was
-                // waiting
-                delete olmDevice._sessionsInProgress[key];
+                // in-progress, so resolve it now, which will unmark it and
+                // unblock anything that was waiting
                 resolveSession[key]();
-                delete resolveSession[key];
             }
             if (sessionId === null || force) {
                 if (force) {
