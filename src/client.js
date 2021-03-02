@@ -5425,6 +5425,9 @@ async function(roomId, eventId, relationType, eventType, opts = {}) {
         }));
         events = events.filter(e => e.getType() === eventType);
     }
+    if (originalEvent && relationType === "m.replace") {
+        events = events.filter(e => e.getSender() === originalEvent.getSender());
+    }
     return {
         originalEvent,
         events,
