@@ -381,6 +381,7 @@ export class MatrixCall extends EventEmitter {
 
         try {
             const screenshareConstraints = await getScreenshareContraints(selectDesktopCapturerSource);
+            if (!screenshareConstraints) return;
             if (window.electron?.getDesktopCapturerSources) {
                 // We are using Electron
                 logger.debug("Getting screen stream using getUserMedia()...");
