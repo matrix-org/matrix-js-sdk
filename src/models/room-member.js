@@ -290,6 +290,9 @@ RoomMember.prototype.getMxcAvatarUrl = function() {
     return null;
 };
 
+const MXID_PATTERN = /@.+:.+/;
+const LTR_RTL_PATTERN = /[\u200E\u200F\u202A-\u202F]/;
+
 function calculateDisplayName(selfUserId, displayName, roomState) {
     if (!displayName || displayName === selfUserId) {
         return selfUserId;
@@ -308,13 +311,13 @@ function calculateDisplayName(selfUserId, displayName, roomState) {
     // Next check if the name contains something that look like a mxid
     // If it does, it may be someone trying to impersonate someone else
     // Show full mxid in this case
-    let disambiguate = /@.+:.+/.test(displayName);
+    let disambiguate = MXID_PATTERN.test(displayName);
 
     if (!disambiguate) {
         // Also show mxid if the display name contains any LTR/RTL characters as these
         // make it very difficult for us to find similar *looking* display names
         // E.g "Mark" could be cloned by writing "kraM" but in RTL.
-        disambiguate = /[\u200E\u200F\u202A-\u202F]/.test(displayName);
+        disambiguate = LTR_RTL_PATTERN.test(displayName);
     }
 
     if (!disambiguate) {

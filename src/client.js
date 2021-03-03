@@ -393,6 +393,9 @@ export function MatrixClient(opts) {
     this._clientWellKnown = undefined;
     this._clientWellKnownPromise = undefined;
 
+    this._turnServers = [];
+    this._turnServersExpiry = null;
+
     // The SDK doesn't really provide a clean way for events to recalculate the push
     // actions for themselves, so we have to kinda help them out when they are encrypted.
     // We do this so that push rules are correctly executed on events in their decrypted
@@ -4943,6 +4946,15 @@ MatrixClient.prototype.getTurnServers = function() {
 };
 
 /**
+ * Get the unix timestamp (in seconds) at which the current
+ * TURN credentials (from getTurnServers) expire
+ * @return {number} The expiry timestamp, in seconds, or null if no credentials
+ */
+MatrixClient.prototype.getTurnServersExpiry = function() {
+    return this._turnServersExpiry;
+};
+
+/**
  * Set whether to allow a fallback ICE server should be used for negotiating a
  * WebRTC connection if the homeserver doesn't provide any servers. Defaults to
  * false.
@@ -5413,6 +5425,9 @@ async function(roomId, eventId, relationType, eventType, opts = {}) {
         }));
         events = events.filter(e => e.getType() === eventType);
     }
+    if (originalEvent && relationType === "m.replace") {
+        events = events.filter(e => e.getSender() === originalEvent.getSender());
+    }
     return {
         originalEvent,
         events,
@@ -5437,6 +5452,7 @@ function checkTurnServers(client) {
                 credential: res.password,
             };
             client._turnServers = [servers];
+            client._turnServersExpiry = Date.now() + res.ttl;
             // re-fetch when we're about to reach the TTL
             client._checkTurnServersTimeoutID = setTimeout(() => {
                 checkTurnServers(client);

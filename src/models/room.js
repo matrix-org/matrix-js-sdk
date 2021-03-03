@@ -30,7 +30,7 @@ import {RoomMember} from "./room-member";
 import {RoomSummary} from "./room-summary";
 import {logger} from '../logger';
 import {ReEmitter} from '../ReEmitter';
-import {EventType} from "../@types/event";
+import {EventType, RoomCreateTypeField, RoomType} from "../@types/event";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -1854,6 +1854,27 @@ Room.prototype.canInvite = function(userId) {
  */
 Room.prototype.getJoinRule = function() {
     return this.currentState.getJoinRule();
+};
+
+/**
+ * Returns the type of the room from the `m.room.create` event content or undefined if none is set
+ * @returns {?string} the type of the room. Currently only RoomType.Space is known.
+ */
+Room.prototype.getType = function() {
+    const createEvent = this.currentState.getStateEvents("m.room.create", "");
+    if (!createEvent) {
+        logger.warn("Room " + this.roomId + " does not have an m.room.create event");
+        return undefined;
+    }
+    return createEvent.getContent()[RoomCreateTypeField];
+};
+
+/**
+ * Returns whether the room is a space-room as defined by MSC1772.
+ * @returns {boolean} true if the room's type is RoomType.Space
+ */
+Room.prototype.isSpaceRoom = function() {
+    return this.getType() === RoomType.Space;
 };
 
 /**

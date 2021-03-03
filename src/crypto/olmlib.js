@@ -183,17 +183,23 @@ export async function getExistingOlmSessions(
  * @param {Array} [failedServers] An array to fill with remote servers that
  *     failed to respond to one-time-key requests.
  *
+ * @param {Logger} [log] A possibly customised log
+ *
  * @return {Promise} resolves once the sessions are complete, to
  *    an Object mapping from userId to deviceId to
  *    {@link module:crypto~OlmSessionResult}
  */
 export async function ensureOlmSessionsForDevices(
-    olmDevice, baseApis, devicesByUser, force, otkTimeout, failedServers,
+    olmDevice, baseApis, devicesByUser, force, otkTimeout, failedServers, log,
 ) {
     if (typeof force === "number") {
+        log = failedServers;
         failedServers = otkTimeout;
         otkTimeout = force;
         force = false;
+    }
+    if (!log) {
+        log = logger;
     }
 
     const devicesWithoutSession = [
@@ -201,6 +207,39 @@ export async function ensureOlmSessionsForDevices(
     ];
     const result = {};
     const resolveSession = {};
+
+    // Mark all sessions this task intends to update as in progress. It is
+    // important to do this for all devices this task cares about in a single
+    // synchronous operation, as otherwise it is possible to have deadlocks
+    // where multiple tasks wait indefinitely on another task to update some set
+    // of common devices.
+    for (const [userId, devices] of Object.entries(devicesByUser)) {
+        for (const deviceInfo of devices) {
+            const deviceId = deviceInfo.deviceId;
+            const key = deviceInfo.getIdentityKey();
+
+            if (key === olmDevice.deviceCurve25519Key) {
+                // We don't start sessions with ourself, so there's no need to
+                // mark it in progress.
+                continue;
+            }
+
+            const forWhom = `for ${key} (${userId}:${deviceId})`;
+            if (!olmDevice._sessionsInProgress[key]) {
+                // pre-emptively mark the session as in-progress to avoid race
+                // conditions.  If we find that we already have a session, then
+                // we'll resolve
+                log.debug(`Marking Olm session in progress ${forWhom}`);
+                olmDevice._sessionsInProgress[key] = new Promise(resolve => {
+                    resolveSession[key] = (...args) => {
+                        log.debug(`Resolved Olm session in progress ${forWhom}`);
+                        delete olmDevice._sessionsInProgress[key];
+                        resolve(...args);
+                    };
+                });
+            }
+        }
+    }
 
     for (const [userId, devices] of Object.entries(devicesByUser)) {
         result[userId] = {};
@@ -216,7 +255,7 @@ export async function ensureOlmSessionsForDevices(
                 // new chain when this side has an active sender chain.
                 // If you see this message being logged in the wild, we should find
                 // the thing that is trying to send Olm messages to itself and fix it.
-                logger.info("Attempted to start session with ourself! Ignoring");
+                log.info("Attempted to start session with ourself! Ignoring");
                 // We must fill in the section in the return value though, as callers
                 // expect it to be there.
                 result[userId][deviceId] = {
@@ -226,41 +265,23 @@ export async function ensureOlmSessionsForDevices(
                 continue;
             }
 
-            if (!olmDevice._sessionsInProgress[key]) {
-                // pre-emptively mark the session as in-progress to avoid race
-                // conditions.  If we find that we already have a session, then
-                // we'll resolve
-                olmDevice._sessionsInProgress[key] = new Promise(
-                    (resolve, reject) => {
-                        resolveSession[key] = {
-                            resolve: (...args) => {
-                                delete olmDevice._sessionsInProgress[key];
-                                resolve(...args);
-                            },
-                            reject: (...args) => {
-                                delete olmDevice._sessionsInProgress[key];
-                                reject(...args);
-                            },
-                        };
-                    },
-                );
-            }
+            const forWhom = `for ${key} (${userId}:${deviceId})`;
+            log.debug(`Ensuring Olm session ${forWhom}`);
             const sessionId = await olmDevice.getSessionIdForDevice(
-                key, resolveSession[key],
+                key, resolveSession[key], log,
             );
+            log.debug(`Got Olm session ${sessionId} ${forWhom}`);
             if (sessionId !== null && resolveSession[key]) {
                 // we found a session, but we had marked the session as
-                // in-progress, so unmark it and unblock anything that was
-                // waiting
-                delete olmDevice._sessionsInProgress[key];
-                resolveSession[key].resolve();
-                delete resolveSession[key];
+                // in-progress, so resolve it now, which will unmark it and
+                // unblock anything that was waiting
+                resolveSession[key]();
             }
             if (sessionId === null || force) {
                 if (force) {
-                    logger.info("Forcing new Olm session for " + userId + ":" + deviceId);
+                    log.info(`Forcing new Olm session ${forWhom}`);
                 } else {
-                    logger.info("Making new Olm session for " + userId + ":" + deviceId);
+                    log.info(`Making new Olm session ${forWhom}`);
                 }
                 devicesWithoutSession.push([userId, deviceId]);
             }
@@ -283,20 +304,24 @@ export async function ensureOlmSessionsForDevices(
     // timeout on this request, let's first log whether that's the root
     // cause we're seeing in practice.
     // See also https://github.com/vector-im/element-web/issues/16194
-    const otkTimeoutLogger = setTimeout(() => {
-        logger.error(`Homeserver never replied while claiming ${taskDetail}`);
-    }, otkTimeout);
+    let otkTimeoutLogger;
+    // XXX: Perhaps there should be a default timeout?
+    if (otkTimeout) {
+        otkTimeoutLogger = setTimeout(() => {
+            log.error(`Homeserver never replied while claiming ${taskDetail}`);
+        }, otkTimeout);
+    }
     try {
-        logger.debug(`Claiming ${taskDetail}`);
+        log.debug(`Claiming ${taskDetail}`);
         res = await baseApis.claimOneTimeKeys(
             devicesWithoutSession, oneTimeKeyAlgorithm, otkTimeout,
         );
-        logger.debug(`Claimed ${taskDetail}`);
+        log.debug(`Claimed ${taskDetail}`);
     } catch (e) {
         for (const resolver of Object.values(resolveSession)) {
-            resolver.resolve();
+            resolver();
         }
-        logger.log(`Failed to claim ${taskDetail}`, e, devicesWithoutSession);
+        log.log(`Failed to claim ${taskDetail}`, e, devicesWithoutSession);
         throw e;
     } finally {
         clearTimeout(otkTimeoutLogger);
@@ -306,10 +331,10 @@ export async function ensureOlmSessionsForDevices(
         failedServers.push(...Object.keys(res.failures));
     }
 
-    const otk_res = res.one_time_keys || {};
+    const otkResult = res.one_time_keys || {};
     const promises = [];
     for (const [userId, devices] of Object.entries(devicesByUser)) {
-        const userRes = otk_res[userId] || {};
+        const userRes = otkResult[userId] || {};
         for (let j = 0; j < devices.length; j++) {
             const deviceInfo = devices[j];
             const deviceId = deviceInfo.deviceId;
@@ -336,11 +361,12 @@ export async function ensureOlmSessionsForDevices(
             }
 
             if (!oneTimeKey) {
-                const msg = "No one-time keys (alg=" + oneTimeKeyAlgorithm +
-                      ") for device " + userId + ":" + deviceId;
-                logger.warn(msg);
+                log.warn(
+                    `No one-time keys (alg=${oneTimeKeyAlgorithm}) ` +
+                    `for device ${userId}:${deviceId}`,
+                );
                 if (resolveSession[key]) {
-                    resolveSession[key].resolve();
+                    resolveSession[key]();
                 }
                 continue;
             }
@@ -350,12 +376,12 @@ export async function ensureOlmSessionsForDevices(
                     olmDevice, oneTimeKey, userId, deviceInfo,
                 ).then((sid) => {
                     if (resolveSession[key]) {
-                        resolveSession[key].resolve(sid);
+                        resolveSession[key](sid);
                     }
                     result[userId][deviceId].sessionId = sid;
                 }, (e) => {
                     if (resolveSession[key]) {
-                        resolveSession[key].resolve();
+                        resolveSession[key]();
                     }
                     throw e;
                 }),
@@ -364,9 +390,9 @@ export async function ensureOlmSessionsForDevices(
     }
 
     taskDetail = `Olm sessions for ${promises.length} devices`;
-    logger.debug(`Starting ${taskDetail}`);
+    log.debug(`Starting ${taskDetail}`);
     await Promise.all(promises);
-    logger.debug(`Started ${taskDetail}`);
+    log.debug(`Started ${taskDetail}`);
     return result;
 }
 
