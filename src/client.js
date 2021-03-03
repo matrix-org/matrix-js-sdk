@@ -2291,6 +2291,32 @@ MatrixClient.prototype.deleteKeysFromBackup = function(roomId, sessionId, versio
     );
 };
 
+MatrixClient.prototype.shareKeysForMessages = async function(roomId, userIds, messages) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    const roomEncryption = this._roomList.getRoomEncryption(roomId);
+    if (!roomEncryption) {
+        // unknown room, or unencrypted room
+        logger.error("Unknown room.  Not sharing decryption keys");
+        return;
+    }
+
+    const deviceInfos = await this._crypto.downloadKeys(userIds);
+    const devicesByUser = {};
+    for (const [userId, devices] of Object.entries(deviceInfos)) {
+        devicesByUser[userId] = Object.values(devices);
+    }
+
+    const alg = this._crypto._getRoomDecryptor(roomId, roomEncryption.algorithm);
+    if (alg.shareKeysForMessages) {
+        await alg.shareKeysForMessages(devicesByUser, messages);
+    } else {
+        logger.info("Algorithm does not support sharing previous keys", alg, roomEncryption);
+    }
+};
+
 // Group ops
 // =========
 // Operations on groups that come down the sync stream (ie. ones the

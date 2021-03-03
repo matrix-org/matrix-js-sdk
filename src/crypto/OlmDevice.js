@@ -1271,6 +1271,7 @@ OlmDevice.prototype.decryptGroupMessage = async function(
                     );
                     result = {
                         result: plaintext,
+                        message_index: res.message_index,
                         keysClaimed: sessionData.keysClaimed || {},
                         senderKey: senderKey,
                         forwardingCurve25519KeyChain: (

@@ -1681,6 +1681,143 @@ MegolmDecryption.prototype.retryDecryptionFromSender = async function(senderKey)
     return !this._pendingEvents[senderKey];
 };
 
+/**
+ * Share the keys with the given users for the given messages.
+ *
+ * @param {object} devicesByUser a map of user to array of module:crypto/deviceinfo.
+ * @param {object} messages an iterator giving the Matrix messages to share.
+ */
+MegolmDecryption.prototype.shareKeysForMessages = async function(devicesByUser, messages) {
+    await olmlib.ensureOlmSessionsForDevices(
+        this._olmDevice, this._baseApis, devicesByUser,
+    );
+
+    const shareSession = async (senderKey, sessionId, index) => {
+        logger.log("Sharing session", senderKey, sessionId, index);
+        const key = await this._olmDevice.getInboundGroupSessionKey(
+            this._roomId, senderKey, sessionId, index,
+        );
+
+        const payload = {
+            type: "m.forwarded_room_key",
+            content: {
+                algorithm: olmlib.MEGOLM_ALGORITHM,
+                room_id: this._roomId,
+                session_id: sessionId,
+                session_key: key.key,
+                chain_index: key.chain_index,
+                sender_key: senderKey,
+                sender_claimed_ed25519_key: key.sender_claimed_ed25519_key,
+                forwarding_curve25519_key_chain: key.forwarding_curve25519_key_chain,
+            },
+        };
+
+        const promises = [];
+        const contentMap = {};
+        for (const [userId, devices] of Object.entries(devicesByUser)) {
+            contentMap[userId] = {};
+            for (const deviceInfo of devices) {
+                const encryptedContent = {
+                    algorithm: olmlib.OLM_ALGORITHM,
+                    sender_key: this._olmDevice.deviceCurve25519Key,
+                    ciphertext: {},
+                };
+                contentMap[userId][deviceInfo.deviceId] = encryptedContent;
+                promises.push(
+                    olmlib.encryptMessageForDevice(
+                        encryptedContent.ciphertext,
+                        this._userId,
+                        this._deviceId,
+                        this._olmDevice,
+                        userId,
+                        deviceInfo,
+                        payload,
+                    ),
+                );
+            }
+        }
+        await Promise.all(promises);
+
+        // prune out any devices that encryptMessageForDevice could not encrypt for,
+        // in which case it will have just not added anything to the ciphertext object.
+        // There's no point sending messages to devices if we couldn't encrypt to them,
+        // since that's effectively a blank message.
+        for (const userId of Object.keys(contentMap)) {
+            for (const deviceId of Object.keys(contentMap[userId])) {
+                if (Object.keys(contentMap[userId][deviceId].ciphertext).length === 0) {
+                    logger.log(
+                        "No ciphertext for device " +
+                            userId + ":" + deviceId + ": pruning",
+                    );
+                    delete contentMap[userId][deviceId];
+                }
+            }
+            // No devices left for that user? Strip that too.
+            if (Object.keys(contentMap[userId]).length === 0) {
+                logger.log("Pruned all devices for user " + userId);
+                delete contentMap[userId];
+            }
+        }
+
+        // Is there anything left?
+        if (Object.keys(contentMap).length === 0) {
+            logger.log("No users left to send to: aborting");
+            return;
+        }
+
+        await this._baseApis.sendToDevice("m.room.encrypted", contentMap);
+    };
+
+    const sessionBySenderKey = {};
+    for (let message = await messages.next(); message !== undefined; message = await messages.next()) {
+        if (!message.isEncrypted() ||
+            message.getWireContent().algorithm !== olmlib.MEGOLM_ALGORITHM) {
+            logger.info(message.isEncrypted(), message.getWireContent());
+            continue;
+        }
+        const content = message.getWireContent();
+        const senderKey = content.sender_key;
+        const sessionId = content.session_id;
+        let res;
+        try {
+            res = await this._olmDevice.decryptGroupMessage(
+                message.getRoomId(), content.sender_key, content.session_id, content.ciphertext,
+                message.getId(), message.getTs(),
+            );
+        } catch (e) {
+            logger.error("Error", e);
+            continue;
+        }
+        const index = res.message_index;
+        if (!Number.isFinite(index)) {
+            logger.error("Not a number", res);
+            continue;
+        }
+        logger.info("session", sessionId, index);
+        if (senderKey in sessionBySenderKey) {
+            const [oldSessionId, oldIndex] = sessionBySenderKey[senderKey];
+            logger.info("session ID", oldSessionId, sessionId, oldIndex, index);
+            if (oldSessionId === sessionId) {
+                if (oldIndex >= index) {
+                    sessionBySenderKey[senderKey] = [sessionId, index];
+                }
+            } else {
+                sessionBySenderKey[senderKey] = [sessionId, index];
+
+                await shareSession(senderKey, oldSessionId, oldIndex);
+            }
+        } else {
+            sessionBySenderKey[senderKey] = [sessionId, index];
+        }
+    }
+
+    logger.log("Done iterating", sessionBySenderKey);
+
+    for (const [senderKey, [sessionId, index]] of Object.entries(sessionBySenderKey)) {
+        await shareSession(senderKey, sessionId, index);
+    }
+};
+
 registerAlgorithm(
     olmlib.MEGOLM_ALGORITHM, MegolmEncryption, MegolmDecryption,
 );
