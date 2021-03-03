@@ -177,7 +177,6 @@ export enum CallErrorCode {
 enum ConstraintsType {
     Audio = "audio",
     Video = "video",
-    AudioVideo = "audiovideo",
 }
 
 /**
@@ -355,7 +354,7 @@ export class MatrixCall extends EventEmitter {
         this.checkForErrorListener();
         this.localVideoElement = localVideoElement;
         this.remoteVideoElement = remoteVideoElement;
-        const constraints = getUserMediaContraints(ConstraintsType.AudioVideo);
+        const constraints = getUserMediaContraints(ConstraintsType.Video);
         this.placeCallWithConstraints(constraints);
         this.type = CallType.Video;
     }
@@ -593,7 +592,7 @@ export class MatrixCall extends EventEmitter {
         if (!this.localAVStream && !this.waitForLocalAVStream) {
             const constraints = getUserMediaContraints(
                 this.type == CallType.Video ?
-                    ConstraintsType.AudioVideo:
+                    ConstraintsType.Video:
                     ConstraintsType.Audio,
             );
             logger.log("Getting user media with constraints", constraints);
@@ -1770,21 +1769,6 @@ function getUserMediaContraints(type: ConstraintsType) {
             };
         }
         case ConstraintsType.Video: {
-            return {
-                audio: false,
-                video: {
-                    deviceId: videoInput ? {ideal: videoInput} : undefined,
-                    /* We want 640x360.  Chrome will give it only if we ask exactly,
-                       FF refuses entirely if we ask exactly, so have to ask for ideal
-                       instead
-                       XXX: Is this still true?
-                     */
-                    width: isWebkit ? { exact: 640 } : { ideal: 640 },
-                    height: isWebkit ? { exact: 360 } : { ideal: 360 },
-                },
-            };
-        }
-        case ConstraintsType.AudioVideo: {
             return {
                 audio: {
                     deviceId: audioInput ? {ideal: audioInput} : undefined,
