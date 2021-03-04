@@ -1685,9 +1685,11 @@ MegolmDecryption.prototype.retryDecryptionFromSender = async function(senderKey)
  * Share the keys with the given users for the given messages.
  *
  * @param {object} devicesByUser a map of user to array of module:crypto/deviceinfo.
- * @param {object} messages an iterator giving the Matrix messages to share.
+ * @param {function} nextMessage a function that returns the next Matrix message to
+ *     to share keys for each time it is called.  The function should return a
+ *     {module:models/event.MatrixEvent}.
  */
-MegolmDecryption.prototype.shareKeysForMessages = async function(devicesByUser, messages) {
+MegolmDecryption.prototype.shareKeysForMessages = async function(devicesByUser, nextMessage) {
     await olmlib.ensureOlmSessionsForDevices(
         this._olmDevice, this._baseApis, devicesByUser,
     );
@@ -1771,10 +1773,9 @@ MegolmDecryption.prototype.shareKeysForMessages = async function(devicesByUser, 
     };
 
     const sessionBySenderKey = {};
-    for (let message = await messages.next(); message !== undefined; message = await messages.next()) {
+    for (let message = await nextMessage(); message !== undefined; message = await nextMessage()) {
         if (!message.isEncrypted() ||
             message.getWireContent().algorithm !== olmlib.MEGOLM_ALGORITHM) {
-            logger.info(message.isEncrypted(), message.getWireContent());
             continue;
         }
         const content = message.getWireContent();

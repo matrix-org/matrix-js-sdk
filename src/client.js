@@ -2291,7 +2291,17 @@ MatrixClient.prototype.deleteKeysFromBackup = function(roomId, sessionId, versio
     );
 };
 
-MatrixClient.prototype.shareKeysForMessages = async function(roomId, userIds, messages) {
+/**
+ * Share the decryption keys with the given users for the given messages.
+ *
+ * @param {string} roomId the room for which keys should be shared.
+ * @param {array} userIds a list of users to share with.  The keys will be sent to
+ *     all of the user's current devices.
+ * @param {function} nextMessage a function that returns the next Matrix message to
+ *     to share keys for each time it is called.  The function should return a
+ *     {module:models/event.MatrixEvent}.
+ */
+MatrixClient.prototype.shareKeysForMessages = async function(roomId, userIds, nextMessage) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
@@ -2311,9 +2321,9 @@ MatrixClient.prototype.shareKeysForMessages = async function(roomId, userIds, me
 
     const alg = this._crypto._getRoomDecryptor(roomId, roomEncryption.algorithm);
     if (alg.shareKeysForMessages) {
-        await alg.shareKeysForMessages(devicesByUser, messages);
+        await alg.shareKeysForMessages(devicesByUser, nextMessage);
     } else {
-        logger.info("Algorithm does not support sharing previous keys", alg, roomEncryption);
+        logger.warning("Algorithm does not support sharing previous keys", roomEncryption.algorithm);
     }
 };
 
