@@ -1692,6 +1692,8 @@ MegolmDecryption.prototype.shareKeysForMessages = async function(devicesByUser, 
         this._olmDevice, this._baseApis, devicesByUser,
     );
 
+    logger.log("shareKeysForMessages to users", Object.keys(devicesByUser));
+
     const shareSession = async (senderKey, sessionId, index) => {
         logger.log("Sharing session", senderKey, sessionId, index);
         const key = await this._olmDevice.getInboundGroupSessionKey(
@@ -1785,18 +1787,14 @@ MegolmDecryption.prototype.shareKeysForMessages = async function(devicesByUser, 
                 message.getId(), message.getTs(),
             );
         } catch (e) {
-            logger.error("Error", e);
             continue;
         }
         const index = res.message_index;
         if (!Number.isFinite(index)) {
-            logger.error("Not a number", res);
             continue;
         }
-        logger.info("session", sessionId, index);
         if (senderKey in sessionBySenderKey) {
             const [oldSessionId, oldIndex] = sessionBySenderKey[senderKey];
-            logger.info("session ID", oldSessionId, sessionId, oldIndex, index);
             if (oldSessionId === sessionId) {
                 if (oldIndex >= index) {
                     sessionBySenderKey[senderKey] = [sessionId, index];
@@ -1810,8 +1808,6 @@ MegolmDecryption.prototype.shareKeysForMessages = async function(devicesByUser, 
             sessionBySenderKey[senderKey] = [sessionId, index];
         }
     }
-
-    logger.log("Done iterating", sessionBySenderKey);
 
     for (const [senderKey, [sessionId, index]] of Object.entries(sessionBySenderKey)) {
         await shareSession(senderKey, sessionId, index);
