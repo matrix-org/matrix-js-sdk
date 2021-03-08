@@ -825,8 +825,11 @@ export class MatrixCall extends EventEmitter {
             return;
         }
         if (this.callHasEnded()) {
+            this.stopAllMedia();
             return;
         }
+        this.localAVStream = stream;
+        logger.info("Got local AV stream with id " + this.localAVStream.id);
 
         this.setState(CallState.CreateOffer);
 
@@ -852,8 +855,6 @@ export class MatrixCall extends EventEmitter {
             }
         }
 
-        this.localAVStream = stream;
-        logger.info("Got local AV stream with id " + this.localAVStream.id);
         // why do we enable audio (and only audio) tracks here? -- matthew
         setTracksEnabled(stream.getAudioTracks(), true);
         this.peerConn = this.createPeerConnection();
