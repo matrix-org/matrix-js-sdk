@@ -183,7 +183,7 @@ export async function getExistingOlmSessions(
  * @param {Array} [failedServers] An array to fill with remote servers that
  *     failed to respond to one-time-key requests.
  *
- * @param {Object} [log] A possibly customised log
+ * @param {Logger} [log] A possibly customised log
  *
  * @return {Promise} resolves once the sessions are complete, to
  *    an Object mapping from userId to deviceId to
@@ -207,6 +207,39 @@ export async function ensureOlmSessionsForDevices(
     ];
     const result = {};
     const resolveSession = {};
+
+    // Mark all sessions this task intends to update as in progress. It is
+    // important to do this for all devices this task cares about in a single
+    // synchronous operation, as otherwise it is possible to have deadlocks
+    // where multiple tasks wait indefinitely on another task to update some set
+    // of common devices.
+    for (const [userId, devices] of Object.entries(devicesByUser)) {
+        for (const deviceInfo of devices) {
+            const deviceId = deviceInfo.deviceId;
+            const key = deviceInfo.getIdentityKey();
+
+            if (key === olmDevice.deviceCurve25519Key) {
+                // We don't start sessions with ourself, so there's no need to
+                // mark it in progress.
+                continue;
+            }
+
+            const forWhom = `for ${key} (${userId}:${deviceId})`;
+            if (!olmDevice._sessionsInProgress[key]) {
+                // pre-emptively mark the session as in-progress to avoid race
+                // conditions.  If we find that we already have a session, then
+                // we'll resolve
+                log.debug(`Marking Olm session in progress ${forWhom}`);
+                olmDevice._sessionsInProgress[key] = new Promise(resolve => {
+                    resolveSession[key] = (...args) => {
+                        log.debug(`Resolved Olm session in progress ${forWhom}`);
+                        delete olmDevice._sessionsInProgress[key];
+                        resolve(...args);
+                    };
+                });
+            }
+        }
+    }
 
     for (const [userId, devices] of Object.entries(devicesByUser)) {
         result[userId] = {};
@@ -232,41 +265,23 @@ export async function ensureOlmSessionsForDevices(
                 continue;
             }
 
-            if (!olmDevice._sessionsInProgress[key]) {
-                // pre-emptively mark the session as in-progress to avoid race
-                // conditions.  If we find that we already have a session, then
-                // we'll resolve
-                olmDevice._sessionsInProgress[key] = new Promise(
-                    (resolve, reject) => {
-                        resolveSession[key] = {
-                            resolve: (...args) => {
-                                delete olmDevice._sessionsInProgress[key];
-                                resolve(...args);
-                            },
-                            reject: (...args) => {
-                                delete olmDevice._sessionsInProgress[key];
-                                reject(...args);
-                            },
-                        };
-                    },
-                );
-            }
+            const forWhom = `for ${key} (${userId}:${deviceId})`;
+            log.debug(`Ensuring Olm session ${forWhom}`);
             const sessionId = await olmDevice.getSessionIdForDevice(
-                key, resolveSession[key],
+                key, resolveSession[key], log,
             );
+            log.debug(`Got Olm session ${sessionId} ${forWhom}`);
             if (sessionId !== null && resolveSession[key]) {
                 // we found a session, but we had marked the session as
-                // in-progress, so unmark it and unblock anything that was
-                // waiting
-                delete olmDevice._sessionsInProgress[key];
-                resolveSession[key].resolve();
-                delete resolveSession[key];
+                // in-progress, so resolve it now, which will unmark it and
+                // unblock anything that was waiting
+                resolveSession[key]();
             }
             if (sessionId === null || force) {
                 if (force) {
-                    log.info(`Forcing new Olm session for ${userId}:${deviceId}`);
+                    log.info(`Forcing new Olm session ${forWhom}`);
                 } else {
-                    log.info(`Making new Olm session for ${userId}:${deviceId}`);
+                    log.info(`Making new Olm session ${forWhom}`);
                 }
                 devicesWithoutSession.push([userId, deviceId]);
             }
@@ -289,9 +304,13 @@ export async function ensureOlmSessionsForDevices(
     // timeout on this request, let's first log whether that's the root
     // cause we're seeing in practice.
     // See also https://github.com/vector-im/element-web/issues/16194
-    const otkTimeoutLogger = setTimeout(() => {
-        log.error(`Homeserver never replied while claiming ${taskDetail}`);
-    }, otkTimeout);
+    let otkTimeoutLogger;
+    // XXX: Perhaps there should be a default timeout?
+    if (otkTimeout) {
+        otkTimeoutLogger = setTimeout(() => {
+            log.error(`Homeserver never replied while claiming ${taskDetail}`);
+        }, otkTimeout);
+    }
     try {
         log.debug(`Claiming ${taskDetail}`);
         res = await baseApis.claimOneTimeKeys(
@@ -300,7 +319,7 @@ export async function ensureOlmSessionsForDevices(
         log.debug(`Claimed ${taskDetail}`);
     } catch (e) {
         for (const resolver of Object.values(resolveSession)) {
-            resolver.resolve();
+            resolver();
         }
         log.log(`Failed to claim ${taskDetail}`, e, devicesWithoutSession);
         throw e;
@@ -312,10 +331,10 @@ export async function ensureOlmSessionsForDevices(
         failedServers.push(...Object.keys(res.failures));
     }
 
-    const otk_res = res.one_time_keys || {};
+    const otkResult = res.one_time_keys || {};
     const promises = [];
     for (const [userId, devices] of Object.entries(devicesByUser)) {
-        const userRes = otk_res[userId] || {};
+        const userRes = otkResult[userId] || {};
         for (let j = 0; j < devices.length; j++) {
             const deviceInfo = devices[j];
             const deviceId = deviceInfo.deviceId;
@@ -347,7 +366,7 @@ export async function ensureOlmSessionsForDevices(
                     `for device ${userId}:${deviceId}`,
                 );
                 if (resolveSession[key]) {
-                    resolveSession[key].resolve();
+                    resolveSession[key]();
                 }
                 continue;
             }
@@ -357,12 +376,12 @@ export async function ensureOlmSessionsForDevices(
                     olmDevice, oneTimeKey, userId, deviceInfo,
                 ).then((sid) => {
                     if (resolveSession[key]) {
-                        resolveSession[key].resolve(sid);
+                        resolveSession[key](sid);
                     }
                     result[userId][deviceId].sessionId = sid;
                 }, (e) => {
                     if (resolveSession[key]) {
-                        resolveSession[key].resolve();
+                        resolveSession[key]();
                     }
                     throw e;
                 }),

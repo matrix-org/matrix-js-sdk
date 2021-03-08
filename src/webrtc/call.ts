@@ -174,6 +174,11 @@ export enum CallErrorCode {
     SignallingFailed = 'signalling_timeout',
 }
 
+enum ConstraintsType {
+    Audio = "audio",
+    Video = "video",
+}
+
 /**
  * The version field that we set in m.call.* events
  */
@@ -251,8 +256,6 @@ export class MatrixCall extends EventEmitter {
     private localAVStream: MediaStream;
     private inviteOrAnswerSent: boolean;
     private waitForLocalAVStream: boolean;
-    // XXX: This is either the invite or answer from remote...
-    private msg: any;
     // XXX: I don't know why this is called 'config'.
     private config: MediaStreamConstraints;
     private successor: MatrixCall;
@@ -284,6 +287,11 @@ export class MatrixCall extends EventEmitter {
     private makingOffer: boolean;
     private ignoreOffer: boolean;
 
+    // If candidates arrive before we've picked an opponent (which, in particular,
+    // will happen if the opponent sends candidates eagerly before the user answers
+    // the call) we buffer them up here so we can then add the ones from the party we pick
+    private remoteCandidateBuffer = new Map<string, RTCIceCandidate[]>();
+
     constructor(opts: CallOpts) {
         super();
         this.roomId = opts.roomId;
@@ -291,9 +299,6 @@ export class MatrixCall extends EventEmitter {
         this.type = null;
         this.forceTURN = opts.forceTURN;
         this.ourPartyId = this.client.deviceId;
-        // We compare this to null to checks the presence of a party ID:
-        // make sure it's null, not undefined
-        this.opponentPartyId = null;
         // Array of Objects with urls, username, credential keys
         this.turnServers = opts.turnServers || [];
         if (this.turnServers.length === 0 && this.client.isFallbackICEServerAllowed()) {
@@ -331,7 +336,8 @@ export class MatrixCall extends EventEmitter {
     placeVoiceCall() {
         logger.debug("placeVoiceCall");
         this.checkForErrorListener();
-        this.placeCallWithConstraints(getUserMediaVideoContraints(CallType.Voice));
+        const constraints = getUserMediaContraints(ConstraintsType.Audio);
+        this.placeCallWithConstraints(constraints);
         this.type = CallType.Voice;
     }
 
@@ -348,7 +354,8 @@ export class MatrixCall extends EventEmitter {
         this.checkForErrorListener();
         this.localVideoElement = localVideoElement;
         this.remoteVideoElement = remoteVideoElement;
-        this.placeCallWithConstraints(getUserMediaVideoContraints(CallType.Video));
+        const constraints = getUserMediaContraints(ConstraintsType.Video);
+        this.placeCallWithConstraints(constraints);
         this.type = CallType.Video;
     }
 
@@ -372,54 +379,30 @@ export class MatrixCall extends EventEmitter {
         this.localVideoElement = localVideoElement;
         this.remoteVideoElement = remoteVideoElement;
 
-        if (window.electron?.getDesktopCapturerSources) {
-            // We have access to getDesktopCapturerSources()
-            logger.debug("Electron getDesktopCapturerSources() is available...");
-            try {
-                const selectedSource = await selectDesktopCapturerSource();
-                // If no source was selected cancel call
-                if (!selectedSource) return;
-                const getUserMediaOptions: MediaStreamConstraints | DesktopCapturerConstraints = {
-                    audio: false,
-                    video: {
-                        mandatory: {
-                            chromeMediaSource: "desktop",
-                            chromeMediaSourceId: selectedSource.id,
-                        },
-                    },
-                }
-                this.screenSharingStream = await window.navigator.mediaDevices.getUserMedia(getUserMediaOptions);
+        try {
+            const screenshareConstraints = await getScreenshareContraints(selectDesktopCapturerSource);
+            if (!screenshareConstraints) return;
+            if (window.electron?.getDesktopCapturerSources) {
+                // We are using Electron
+                logger.debug("Getting screen stream using getUserMedia()...");
+                this.screenSharingStream = await navigator.mediaDevices.getUserMedia(screenshareConstraints);
+            } else {
+                // We are not using Electron
+                logger.debug("Getting screen stream using getDisplayMedia()...");
+                this.screenSharingStream = await navigator.mediaDevices.getDisplayMedia(screenshareConstraints);
+            }
 
-                logger.debug("Got screen stream, requesting audio stream...");
-                const audioConstraints = getUserMediaVideoContraints(CallType.Voice);
-                this.placeCallWithConstraints(audioConstraints);
-            } catch (err) {
-                this.emit(CallEvent.Error,
-                    new CallError(
-                        CallErrorCode.NoUserMedia,
-                        "Failed to get screen-sharing stream: ", err,
-                    ),
-                );
-            }
-        } else {
-            /* We do not have access to the Electron desktop capturer,
-             * therefore we can assume we are on the web */
-            logger.debug("Electron desktopCapturer is not available...");
-            try {
-                this.screenSharingStream = await navigator.mediaDevices.getDisplayMedia({'audio': false});
-                logger.debug("Got screen stream, requesting audio stream...");
-                const audioConstraints = getUserMediaVideoContraints(CallType.Voice);
-                this.placeCallWithConstraints(audioConstraints);
-            } catch (err) {
-                this.emit(CallEvent.Error,
-                    new CallError(
-                        CallErrorCode.NoUserMedia,
-                        "Failed to get screen-sharing stream: ", err,
-                    ),
-                );
-            }
+            logger.debug("Got screen stream, requesting audio stream...");
+            const audioConstraints = getUserMediaContraints(ConstraintsType.Audio);
+            this.placeCallWithConstraints(audioConstraints);
+        } catch (err) {
+            this.emit(CallEvent.Error,
+                new CallError(
+                    CallErrorCode.NoUserMedia,
+                    "Failed to get screen-sharing stream: ", err,
+                ),
+            );
         }
-
         this.type = CallType.Video;
     }
 
@@ -541,11 +524,16 @@ export class MatrixCall extends EventEmitter {
      * @param {MatrixEvent} event The m.call.invite event
      */
     async initWithInvite(event: MatrixEvent) {
-        this.msg = event.getContent();
+        const invite = event.getContent();
         this.direction = CallDirection.Inbound;
+
         this.peerConn = this.createPeerConnection();
+        // we must set the party ID before await-ing on anything: the call event
+        // handler will start giving us more call events (eg. candidates) so if
+        // we haven't set the party ID, we'll ignore them.
+        this.chooseOpponent(event);
         try {
-            await this.peerConn.setRemoteDescription(this.msg.offer);
+            await this.peerConn.setRemoteDescription(invite.offer);
         } catch (e) {
             logger.debug("Failed to set remote description", e);
             this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
@@ -564,13 +552,6 @@ export class MatrixCall extends EventEmitter {
         this.type = this.remoteStream.getTracks().some(t => t.kind === 'video') ? CallType.Video : CallType.Voice;
 
         this.setState(CallState.Ringing);
-        this.opponentVersion = this.msg.version;
-        if (this.opponentVersion !== 0) {
-            // ignore party ID in v0 calls: party ID isn't a thing until v1
-            this.opponentPartyId = this.msg.party_id || null;
-        }
-        this.opponentCaps = this.msg.capabilities || {};
-        this.opponentMember = event.sender;
 
         if (event.getLocalAge()) {
             setTimeout(() => {
@@ -584,7 +565,7 @@ export class MatrixCall extends EventEmitter {
                     }
                     this.emit(CallEvent.Hangup);
                 }
-            }, this.msg.lifetime - event.getLocalAge());
+            }, invite.lifetime - event.getLocalAge());
         }
     }
 
@@ -596,7 +577,6 @@ export class MatrixCall extends EventEmitter {
         // perverse as it may seem, sometimes we want to instantiate a call with a
         // hangup message (because when getting the state of the room on load, events
         // come in reverse order and we want to remember that a call has been hung up)
-        this.msg = event.getContent();
         this.setState(CallState.Ended);
     }
 
@@ -611,7 +591,11 @@ export class MatrixCall extends EventEmitter {
         logger.debug(`Answering call ${this.callId} of type ${this.type}`);
 
         if (!this.localAVStream && !this.waitForLocalAVStream) {
-            const constraints = getUserMediaVideoContraints(this.type);
+            const constraints = getUserMediaContraints(
+                this.type == CallType.Video ?
+                    ConstraintsType.Video:
+                    ConstraintsType.Audio,
+            );
             logger.log("Getting user media with constraints", constraints);
             this.setState(CallState.WaitLocalMedia);
             this.waitForLocalAVStream = true;
@@ -886,7 +870,7 @@ export class MatrixCall extends EventEmitter {
         // Now we wait for the negotiationneeded event
     };
 
-    private sendAnswer() {
+    private async sendAnswer() {
         const answerContent = {
             answer: {
                 sdp: this.peerConn.localDescription.sdp,
@@ -908,12 +892,12 @@ export class MatrixCall extends EventEmitter {
         logger.info(`Discarding ${this.candidateSendQueue.length} candidates that will be sent in answer`);
         this.candidateSendQueue = [];
 
-        this.sendVoipEvent(EventType.CallAnswer, answerContent).then(() => {
+        try {
+            await this.sendVoipEvent(EventType.CallAnswer, answerContent);
             // If this isn't the first time we've tried to send the answer,
             // we may have candidates queued up, so send them now.
             this.inviteOrAnswerSent = true;
-            this.sendCandidateQueue();
-        }).catch((error) => {
+        } catch (error) {
             // We've failed to answer: back to the ringing state
             this.setState(CallState.Ringing);
             this.client.cancelPendingEvent(error.event);
@@ -926,7 +910,11 @@ export class MatrixCall extends EventEmitter {
             }
             this.emit(CallEvent.Error, new CallError(code, message, error));
             throw error;
-        });
+        }
+
+        // error handler re-throws so this won't happen on error, but
+        // we don't want the same error handling on the candidate queue
+        this.sendCandidateQueue();
     }
 
     private gotUserMediaForAnswer = async (stream: MediaStream) => {
@@ -1030,37 +1018,33 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        if (!this.partyIdMatches(ev.getContent())) {
-            logger.info(
-                `Ignoring candidates from party ID ${ev.getContent().party_id}: ` +
-                `we have chosen party ID ${this.opponentPartyId}`,
-            );
-            return;
-        }
-
         const cands = ev.getContent().candidates;
         if (!cands) {
             logger.info("Ignoring candidates event with no candidates!");
             return;
         }
 
-        for (const cand of cands) {
-            if (
-                (cand.sdpMid === null || cand.sdpMid === undefined) &&
-                (cand.sdpMLineIndex === null || cand.sdpMLineIndex === undefined)
-            ) {
-                logger.debug("Ignoring remote ICE candidate with no sdpMid or sdpMLineIndex");
-                return;
-            }
-            logger.debug("Got remote ICE " + cand.sdpMid + " candidate: " + cand.candidate);
-            try {
-                this.peerConn.addIceCandidate(cand);
-            } catch (err) {
-                if (!this.ignoreOffer) {
-                    logger.info("Failed to add remore ICE candidate", err);
-                }
-            }
+        const fromPartyId = ev.getContent().version === 0 ? null : ev.getContent().party_id || null;
+
+        if (this.opponentPartyId === undefined) {
+            // we haven't picked an opponent yet so save the candidates
+            logger.info(`Bufferring ${cands.length} candidates until we pick an opponent`);
+            const bufferedCands = this.remoteCandidateBuffer.get(fromPartyId) || [];
+            bufferedCands.push(...cands);
+            this.remoteCandidateBuffer.set(fromPartyId, bufferedCands);
+            return;
         }
+
+        if (!this.partyIdMatches(ev.getContent())) {
+            logger.info(
+                `Ignoring candidates from party ID ${ev.getContent().party_id}: ` +
+                `we have chosen party ID ${this.opponentPartyId}`,
+            );
+
+            return;
+        }
+
+        this.addIceCandidates(cands);
     }
 
     /**
@@ -1072,7 +1056,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        if (this.opponentPartyId !== null) {
+        if (this.opponentPartyId !== undefined) {
             logger.info(
                 `Ignoring answer from party ID ${event.getContent().party_id}: ` +
                 `we already have an answer/reject from ${this.opponentPartyId}`,
@@ -1080,12 +1064,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        this.opponentVersion = event.getContent().version;
-        if (this.opponentVersion !== 0) {
-            this.opponentPartyId = event.getContent().party_id || null;
-        }
-        this.opponentCaps = event.getContent().capabilities || {};
-        this.opponentMember = event.sender;
+        this.chooseOpponent(event);
 
         this.setState(CallState.Connecting);
 
@@ -1260,19 +1239,9 @@ export class MatrixCall extends EventEmitter {
 
         try {
             await this.sendVoipEvent(eventType, content);
-            this.sendCandidateQueue();
-            if (this.state === CallState.CreateOffer) {
-                this.inviteOrAnswerSent = true;
-                this.setState(CallState.InviteSent);
-                this.inviteTimeout = setTimeout(() => {
-                    this.inviteTimeout = null;
-                    if (this.state === CallState.InviteSent) {
-                        this.hangup(CallErrorCode.InviteTimeout, false);
-                    }
-                }, CALL_TIMEOUT_MS);
-            }
         } catch (error) {
-            this.client.cancelPendingEvent(error.event);
+            logger.error("Failed to send invite", error);
+            if (error.event) this.client.cancelPendingEvent(error.event);
 
             let code = CallErrorCode.SignallingFailed;
             let message = "Signalling failed";
@@ -1287,6 +1256,22 @@ export class MatrixCall extends EventEmitter {
 
             this.emit(CallEvent.Error, new CallError(code, message, error));
             this.terminate(CallParty.Local, code, false);
+
+            // no need to carry on & send the candidate queue, but we also
+            // don't want to rethrow the error
+            return;
+        }
+
+        this.sendCandidateQueue();
+        if (this.state === CallState.CreateOffer) {
+            this.inviteOrAnswerSent = true;
+            this.setState(CallState.InviteSent);
+            this.inviteTimeout = setTimeout(() => {
+                this.inviteTimeout = null;
+                if (this.state === CallState.InviteSent) {
+                    this.hangup(CallErrorCode.InviteTimeout, false);
+                }
+            }, CALL_TIMEOUT_MS);
         }
     };
 
@@ -1623,7 +1608,7 @@ export class MatrixCall extends EventEmitter {
         }
     }
 
-    private sendCandidateQueue() {
+    private async sendCandidateQueue() {
         if (this.candidateSendQueue.length === 0) {
             return;
         }
@@ -1635,20 +1620,28 @@ export class MatrixCall extends EventEmitter {
             candidates: cands,
         };
         logger.debug("Attempting to send " + cands.length + " candidates");
-        this.sendVoipEvent(EventType.CallCandidates, content).then(() => {
-            this.candidateSendTries = 0;
-            this.sendCandidateQueue();
-        }, (error) => {
-            for (let i = 0; i < cands.length; i++) {
-                this.candidateSendQueue.push(cands[i]);
-            }
+        try {
+            await this.sendVoipEvent(EventType.CallCandidates, content);
+        } catch (error) {
+            // don't retry this event: we'll send another one later as we might
+            // have more candidates by then.
+            if (error.event) this.client.cancelPendingEvent(error.event);
+
+            // put all the candidates we failed to send back in the queue
+            this.candidateSendQueue.push(...cands);
 
             if (this.candidateSendTries > 5) {
                 logger.debug(
                     "Failed to send candidates on attempt " + this.candidateSendTries +
-                    ". Giving up for now.", error,
+                    ". Giving up on this call.", error,
                 );
-                this.candidateSendTries = 0;
+
+                const code = CallErrorCode.SignallingFailed;
+                const message = "Signalling failed";
+
+                this.emit(CallEvent.Error, new CallError(code, message, error));
+                this.hangup(code, false);
+
                 return;
             }
 
@@ -1658,7 +1651,7 @@ export class MatrixCall extends EventEmitter {
             setTimeout(() => {
                 this.sendCandidateQueue();
             }, delayMs);
-        });
+        }
     }
 
     private async placeCallWithConstraints(constraints: MediaStreamConstraints) {
@@ -1702,8 +1695,59 @@ export class MatrixCall extends EventEmitter {
 
     private partyIdMatches(msg): boolean {
         // They must either match or both be absent (in which case opponentPartyId will be null)
-        const msgPartyId = msg.party_id || null;
+        // Also we ignore party IDs on the invite/offer if the version is 0, so we must do the same
+        // here and use null if the version is 0 (woe betide any opponent sending messages in the
+        // same call with different versions)
+        const msgPartyId = msg.version === 0 ? null : msg.party_id || null;
         return msgPartyId === this.opponentPartyId;
+    }
+
+    // Commits to an opponent for the call
+    // ev: An invite or answer event
+    private chooseOpponent(ev: MatrixEvent) {
+        // I choo-choo-choose you
+        const msg = ev.getContent();
+
+        this.opponentVersion = msg.version;
+        if (this.opponentVersion === 0) {
+            // set to null to indicate that we've chosen an opponent, but because
+            // they're v0 they have no party ID (even if they sent one, we're ignoring it)
+            this.opponentPartyId = null;
+        } else {
+            // set to their party ID, or if they're naughty and didn't send one despite
+            // not being v0, set it to null to indicate we picked an opponent with no
+            // party ID
+            this.opponentPartyId = msg.party_id || null;
+        }
+        this.opponentCaps = msg.capabilities || {};
+        this.opponentMember = ev.sender;
+
+        const bufferedCands = this.remoteCandidateBuffer.get(this.opponentPartyId);
+        if (bufferedCands) {
+            logger.info(`Adding ${bufferedCands.length} buffered candidates for opponent ${this.opponentPartyId}`);
+            this.addIceCandidates(bufferedCands);
+        }
+        this.remoteCandidateBuffer = null;
+    }
+
+    private addIceCandidates(cands: RTCIceCandidate[]) {
+        for (const cand of cands) {
+            if (
+                (cand.sdpMid === null || cand.sdpMid === undefined) &&
+                (cand.sdpMLineIndex === null || cand.sdpMLineIndex === undefined)
+            ) {
+                logger.debug("Ignoring remote ICE candidate with no sdpMid or sdpMLineIndex");
+                return;
+            }
+            logger.debug("Got remote ICE " + cand.sdpMid + " candidate: " + cand.candidate);
+            try {
+                this.peerConn.addIceCandidate(cand);
+            } catch (err) {
+                if (!this.ignoreOffer) {
+                    logger.info("Failed to add remore ICE candidate", err);
+                }
+            }
+        }
     }
 }
 
@@ -1713,17 +1757,19 @@ function setTracksEnabled(tracks: Array<MediaStreamTrack>, enabled: boolean) {
     }
 }
 
-function getUserMediaVideoContraints(callType: CallType) {
+function getUserMediaContraints(type: ConstraintsType) {
     const isWebkit = !!navigator.webkitGetUserMedia;
 
-    switch (callType) {
-        case CallType.Voice:
+    switch (type) {
+        case ConstraintsType.Audio: {
             return {
                 audio: {
                     deviceId: audioInput ? {ideal: audioInput} : undefined,
-                }, video: false,
+                },
+                video: false,
             };
-        case CallType.Video:
+        }
+        case ConstraintsType.Video: {
             return {
                 audio: {
                     deviceId: audioInput ? {ideal: audioInput} : undefined,
@@ -1738,6 +1784,33 @@ function getUserMediaVideoContraints(callType: CallType) {
                     height: isWebkit ? { exact: 360 } : { ideal: 360 },
                 },
             };
+        }
+    }
+}
+
+async function getScreenshareContraints(selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>) {
+    if (window.electron?.getDesktopCapturerSources && selectDesktopCapturerSource) {
+        // We have access to getDesktopCapturerSources()
+        logger.debug("Electron getDesktopCapturerSources() is available...");
+        const selectedSource = await selectDesktopCapturerSource();
+        if (!selectedSource) return null;
+        return {
+            audio: false,
+            video: {
+                mandatory: {
+                    chromeMediaSource: "desktop",
+                    chromeMediaSourceId: selectedSource.id,
+                },
+            },
+        };
+    } else {
+        // We do not have access to the Electron desktop capturer,
+        // therefore we can assume we are on the web
+        logger.debug("Electron desktopCapturer is not available...");
+        return {
+            audio: false,
+            video: true,
+        };
     }
 }
 

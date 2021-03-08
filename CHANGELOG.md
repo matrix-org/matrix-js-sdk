@@ -1,3 +1,30 @@
+Changes in [9.8.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.8.0) (2021-03-01)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.8.0-rc.1...v9.8.0)
+
+ * No changes since rc.1
+
+Changes in [9.8.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.8.0-rc.1) (2021-02-24)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.7.0...v9.8.0-rc.1)
+
+ * Optimise prefixed logger
+   [\#1615](https://github.com/matrix-org/matrix-js-sdk/pull/1615)
+ * Add debug logs to encryption prep, take 3
+   [\#1614](https://github.com/matrix-org/matrix-js-sdk/pull/1614)
+ * Add functions for upper & lowercase random strings
+   [\#1612](https://github.com/matrix-org/matrix-js-sdk/pull/1612)
+ * Room helpers for invite permissions and join rules
+   [\#1609](https://github.com/matrix-org/matrix-js-sdk/pull/1609)
+ * Fixed wording in "Adding video track with id" log
+   [\#1606](https://github.com/matrix-org/matrix-js-sdk/pull/1606)
+ * Add more debug logs to encryption prep
+   [\#1605](https://github.com/matrix-org/matrix-js-sdk/pull/1605)
+ * Add option to set ice candidate pool size
+   [\#1604](https://github.com/matrix-org/matrix-js-sdk/pull/1604)
+ * Cancel call if no source was selected
+   [\#1601](https://github.com/matrix-org/matrix-js-sdk/pull/1601)
+
 Changes in [9.7.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.7.0) (2021-02-16)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.7.0-rc.1...v9.7.0)
