@@ -41,7 +41,7 @@ declare global {
         getUserMedia(constraints: MediaStreamConstraints | DesktopCapturerConstraints): Promise<MediaStream>;
     }
 
-    export interface DesktopCapturerConstraints {
+    interface DesktopCapturerConstraints {
         audio: boolean | {
             mandatory: {
                 chromeMediaSource: string;
@@ -56,7 +56,7 @@ declare global {
         };
     }
 
-    export interface DesktopCapturerSource {
+    interface DesktopCapturerSource {
         id: string;
         name: string;
         thumbnailURL: string;
