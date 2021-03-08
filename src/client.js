@@ -570,6 +570,27 @@ MatrixClient.prototype.rehydrateDevice = async function() {
 };
 
 /**
+ * Get the current dehydrated device, if any
+ * @return {Promise} A promise of an object containing the dehydrated device
+ */
+MatrixClient.prototype.getDehydratedDevice = async function() {
+    try {
+        return await this._http.authedRequest(
+            undefined,
+            "GET",
+            "/dehydrated_device",
+            undefined, undefined,
+            {
+                prefix: "/_matrix/client/unstable/org.matrix.msc2697.v2",
+            },
+        );
+    } catch (e) {
+        logger.info("could not get dehydrated device", e.toString());
+        return;
+    }
+};
+
+/**
  * Set the dehydration key.  This will also periodically dehydrate devices to
  * the server.
  *
