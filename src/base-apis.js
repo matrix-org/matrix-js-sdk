@@ -1519,6 +1519,21 @@ MatrixBaseApis.prototype.getDevices = function() {
 };
 
 /**
+ * Gets specific device details for the logged-in user
+ * @param {string} device_id  device to query
+ * @return {Promise} Resolves: result object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getDevice = function(device_id) {
+    const path = utils.encodeUri("/devices/$device_id", {
+        $device_id: device_id,
+    });
+    return this._http.authedRequest(
+        undefined, 'GET', path, undefined, undefined,
+    );
+};
+
+/**
  * Update the given device
  *
  * @param {string} device_id  device to update
