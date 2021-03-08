@@ -527,6 +527,13 @@ export class MatrixCall extends EventEmitter {
         const invite = event.getContent();
         this.direction = CallDirection.Inbound;
 
+        // make sure we have valid turn creds. Unless something's gone wrong, it should
+        // poll and keep the credentials valid so this should be instant.
+        const haveTurnCreds = await this.client._checkTurnServers();
+        if (!haveTurnCreds) {
+            logger.warn("Failed to get TURN credentials! Proceeding with call anyway...");
+        }
+
         this.peerConn = this.createPeerConnection();
         // we must set the party ID before await-ing on anything: the call event
         // handler will start giving us more call events (eg. candidates) so if
@@ -1662,6 +1669,14 @@ export class MatrixCall extends EventEmitter {
         this.setState(CallState.WaitLocalMedia);
         this.direction = CallDirection.Outbound;
         this.config = constraints;
+
+        // make sure we have valid turn creds. Unless something's gone wrong, it should
+        // poll and keep the credentials valid so this should be instant.
+        const haveTurnCreds = await this.client._checkTurnServers();
+        if (!haveTurnCreds) {
+            logger.warn("Failed to get TURN credentials! Proceeding with call anyway...");
+        }
+
         // It would be really nice if we could start gathering candidates at this point
         // so the ICE agent could be gathering while we open our media devices: we already
         // know the type of the call and therefore what tracks we want to send.
