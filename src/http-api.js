@@ -274,7 +274,7 @@ MatrixHttpApi.prototype = {
                 switch (xhr.readyState) {
                     case global.XMLHttpRequest.DONE:
                         callbacks.clearTimeout(xhr.timeout_timer);
-                        var resp;
+                        let resp;
                         try {
                             if (xhr.status === 0) {
                                 throw new AbortError();
