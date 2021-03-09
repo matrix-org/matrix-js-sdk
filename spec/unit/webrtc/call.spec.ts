@@ -79,6 +79,7 @@ class MockRTCPeerConnection {
         return Promise.resolve();
     }
     close() {}
+    getStats() { return []; }
 }
 
 describe('Call', function() {
@@ -122,6 +123,7 @@ describe('Call', function() {
         // We just stub out sendEvent: we're not interested in testing the client's
         // event sending code here
         client.client.sendEvent = () => {};
+        client.httpBackend.when("GET", "/voip/turnServer").respond(200, {});
         call = new MatrixCall({
             client: client.client,
             roomId: '!foo:bar',
@@ -138,7 +140,9 @@ describe('Call', function() {
     });
 
     it('should ignore candidate events from non-matching party ID', async function() {
-        await call.placeVoiceCall();
+        const callPromise = call.placeVoiceCall();
+        await client.httpBackend.flush();
+        await callPromise;
         await call.onAnswerReceived({
             getContent: () => {
                 return {
@@ -192,7 +196,9 @@ describe('Call', function() {
     });
 
     it('should add candidates received before answer if party ID is correct', async function() {
-        await call.placeVoiceCall();
+        const callPromise = call.placeVoiceCall();
+        await client.httpBackend.flush();
+        await callPromise;
         call.peerConn.addIceCandidate = jest.fn();
 
         call.onRemoteIceCandidatesReceived({
