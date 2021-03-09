@@ -55,7 +55,6 @@ export * from "./content-repo";
 export * as ContentHelpers from "./content-helpers";
 export {
     createNewMatrixCall,
-    setAudioOutput as setMatrixCallAudioOutput,
     setAudioInput as setMatrixCallAudioInput,
     setVideoInput as setMatrixCallVideoInput,
 } from "./webrtc/call";

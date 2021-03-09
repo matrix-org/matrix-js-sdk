@@ -252,7 +252,6 @@ export class MatrixCall extends EventEmitter {
     private sentEndOfCandidates: boolean;
     private peerConn: RTCPeerConnection;
     private feeds: Array<CallFeed>;
-    private remoteAudioElement: HTMLAudioElement;
     private screenSharingStream: MediaStream;
     private remoteStream: MediaStream;
     private localAVStream: MediaStream;
@@ -435,29 +434,6 @@ export class MatrixCall extends EventEmitter {
         this.emit(CallEvent.FeedsChanged, this.feeds);
     }
 
-    /**
-     * Retrieve the remote <code>&lt;audio&gt;</code> DOM element
-     * used for playing back audio only streams.
-     * @return {Element} The dom element
-     */
-    public getRemoteAudioElement(): HTMLAudioElement {
-        return this.remoteAudioElement;
-    }
-
-    /**
-     * Set the remote <code>&lt;audio&gt;</code> DOM element. If this call is active,
-     * the first received audio-only stream will be rendered to it immediately.
-     * The audio will *not* be rendered from the remoteVideoElement.
-     * @param {Element} element The <code>&lt;video&gt;</code> DOM element.
-     */
-    public async setRemoteAudioElement(element: HTMLAudioElement) {
-        if (element === this.remoteAudioElement) return;
-
-        this.remoteAudioElement = element;
-
-        if (this.remoteStream) this.playRemoteAudio();
-    }
-
     // The typescript definitions have this type as 'any' :(
     public async getCurrentCallStats(): Promise<any[]> {
         if (this.callHasEnded()) {
@@ -603,7 +579,6 @@ export class MatrixCall extends EventEmitter {
             newCall.gotUserMediaForAnswer(this.localAVStream);
             delete(this.localAVStream);
         }
-        newCall.remoteAudioElement = this.remoteAudioElement;
         this.successor = newCall;
         this.emit(CallEvent.Replaced, newCall);
         this.hangup(CallErrorCode.Replaced, true);
@@ -713,10 +688,6 @@ export class MatrixCall extends EventEmitter {
         }
         this.updateMuteStatus();
 
-        if (!onHold) {
-            this.playRemoteAudio();
-        }
-
         this.emit(CallEvent.RemoteHoldUnhold, this.remoteOnHold);
     }
 
@@ -770,14 +741,6 @@ export class MatrixCall extends EventEmitter {
 
         const vidShouldBeMuted = this.vidMuted || this.remoteOnHold;
         setTracksEnabled(this.localAVStream.getVideoTracks(), !vidShouldBeMuted);
-
-        if (this.remoteOnHold) {
-            if (this.remoteAudioElement && this.remoteAudioElement.srcObject === this.remoteStream) {
-                this.remoteAudioElement.muted = true;
-            }
-        } else {
-            this.playRemoteAudio();
-        }
     }
 
     /**
@@ -1297,7 +1260,6 @@ export class MatrixCall extends EventEmitter {
         logger.debug(`Track id ${ev.track.id} of kind ${ev.track.kind} added`);
 
         this.pushNewFeed(this.remoteStream, this.getOpponentMember().userId, CallFeedType.Webcam)
-        if (this.remoteAudioElement) this.playRemoteAudio();
 
         logger.info("playing remote. stream active? " + this.remoteStream.active);
     };
@@ -1321,31 +1283,6 @@ export class MatrixCall extends EventEmitter {
             this.makingOffer = false;
         }
     };
-
-    async playRemoteAudio() {
-        this.remoteAudioElement.muted = false;
-        this.remoteAudioElement.srcObject = this.remoteStream;
-
-        // if audioOutput is non-default:
-        try {
-            if (audioOutput) {
-                // This seems quite unreliable in Chrome, although I haven't yet managed to make a jsfiddle where
-                // it fails.
-                // It seems reliable if you set the sink ID after setting the srcObject and then set the sink ID
-                // back to the default after the call is over
-                logger.info("Setting audio sink to " + audioOutput + ", was " + this.remoteAudioElement.sinkId);
-                await this.remoteAudioElement.setSinkId(audioOutput);
-            }
-        } catch (e) {
-            logger.warn("Couldn't set requested audio output device: using default", e);
-        }
-
-        try {
-            await this.remoteAudioElement.play();
-        } catch (e) {
-            logger.error("Failed to play remote audio element", e);
-        }
-    }
 
     onHangupReceived = (msg) => {
         logger.debug("Hangup received for call ID " + this.callId);
@@ -1463,18 +1400,6 @@ export class MatrixCall extends EventEmitter {
             this.inviteTimeout = null;
         }
 
-        const remoteAud = this.getRemoteAudioElement();
-        if (remoteAud) {
-            remoteAud.pause();
-            remoteAud.srcObject = null;
-            try {
-                // As per comment in playRemoteAudio, setting the sink ID back to the default
-                // once the call is over makes setSinkId work reliably.
-                await this.remoteAudioElement.setSinkId('')
-            } catch (e) {
-                logger.warn("Failed to set sink ID back to default");
-            }
-        }
         this.deleteAllFeeds();
 
         this.hangupParty = hangupParty;
@@ -1730,16 +1655,8 @@ async function getScreenshareContraints(selectDesktopCapturerSource?: () => Prom
     }
 }
 
-let audioOutput: string;
 let audioInput: string;
 let videoInput: string;
-/**
- * Set an audio output device to use for MatrixCalls
- * @function
- * @param {string=} deviceId the identifier for the device
- * undefined treated as unset
- */
-export function setAudioOutput(deviceId: string) { audioOutput = deviceId; }
 /**
  * Set an audio input device to use for MatrixCalls
  * @function
