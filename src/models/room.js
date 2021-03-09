@@ -818,7 +818,7 @@ Room.prototype.getBlacklistUnverifiedDevices = function() {
  */
 Room.prototype.getAvatarUrl = function(baseUrl, width, height, resizeMethod,
                                        allowDefault) {
-    const roomAvatarEvent = this.currentState.getStateEvents("m.room.avatar", "");
+    const roomAvatarEvent = this.currentState.getStateEvents(EventType.RoomAvatar, "");
     if (allowDefault === undefined) {
         allowDefault = true;
     }
@@ -841,9 +841,9 @@ Room.prototype.getAvatarUrl = function(baseUrl, width, height, resizeMethod,
  * @return {string} the mxc avatar url or falsy
  */
 Room.prototype.getMxcAvatarUrl = function() {
-    const roomAvatarEvent = this.currentState.getStateEvents("m.room.avatar", "");
+    const roomAvatarEvent = this.currentState.getStateEvents(EventType.RoomAvatar, "");
     return roomAvatarEvent ? roomAvatarEvent.getContent().url : null;
-}
+};
 
 /**
  * Get the aliases this room has according to the room's state
