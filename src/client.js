@@ -61,6 +61,7 @@ import {DEHYDRATION_ALGORITHM} from "./crypto/dehydration";
 const SCROLLBACK_DELAY_MS = 3000;
 export const CRYPTO_ENABLED = isCryptoAvailable();
 const CAPABILITIES_CACHE_MS = 21600000; // 6 hours - an arbitrary value
+const TURN_CHECK_INTERVAL = 10 * 60 * 1000; // poll for turn credentials every 10 minutes
 
 function keysFromRecoverySession(sessions, decryptionKey, roomId) {
     const keys = [];
@@ -394,7 +395,8 @@ export function MatrixClient(opts) {
     this._clientWellKnownPromise = undefined;
 
     this._turnServers = [];
-    this._turnServersExpiry = null;
+    this._turnServersExpiry = 0;
+    this._checkTurnServersIntervalID = null;
 
     // The SDK doesn't really provide a clean way for events to recalculate the push
     // actions for themselves, so we have to kinda help them out when they are encrypted.
@@ -4955,6 +4957,48 @@ MatrixClient.prototype.getTurnServersExpiry = function() {
     return this._turnServersExpiry;
 };
 
+MatrixClient.prototype._checkTurnServers = async function() {
+    if (!this._supportsVoip) {
+        return;
+    }
+
+    let credentialsGood = false;
+    const remainingTime = this._turnServersExpiry - Date.now();
+    if (remainingTime > TURN_CHECK_INTERVAL) {
+        logger.debug("TURN creds are valid for another " + remainingTime + " ms: not fetching new ones.");
+        credentialsGood = true;
+    } else {
+        logger.debug("Fetching new TURN credentials");
+        try {
+            const res = await this.turnServer();
+            if (res.uris) {
+                logger.log("Got TURN URIs: " + res.uris + " refresh in " + res.ttl + " secs");
+                // map the response to a format that can be fed to RTCPeerConnection
+                const servers = {
+                    urls: res.uris,
+                    username: res.username,
+                    credential: res.password,
+                };
+                this._turnServers = [servers];
+                // The TTL is in seconds but we work in ms
+                this._turnServersExpiry = Date.now() + (res.ttl * 1000);
+                credentialsGood = true;
+            }
+        } catch (err) {
+            logger.error("Failed to get TURN URIs", err);
+            // If we get a 403, there's no point in looping forever.
+            if (err.httpStatus === 403) {
+                logger.info("TURN access unavailable for this account: stopping credentials checks");
+                if (this._checkTurnServersIntervalID !== null) global.clearInterval(this._checkTurnServersIntervalID);
+                this._checkTurnServersIntervalID = null;
+            }
+        }
+        // otherwise, if we failed for whatever reason, try again the next time we're called.
+    }
+
+    return credentialsGood;
+};
+
 /**
  * Set whether to allow a fallback ICE server should be used for negotiating a
  * WebRTC connection if the homeserver doesn't provide any servers. Defaults to
@@ -5107,7 +5151,12 @@ MatrixClient.prototype.startClient = async function(opts) {
     }
 
     // periodically poll for turn servers if we support voip
-    checkTurnServers(this);
+    if (this._supportsVoip) {
+        this._checkTurnServersIntervalID = setInterval(() => {
+            this._checkTurnServers();
+        }, TURN_CHECK_INTERVAL);
+        this._checkTurnServers();
+    }
 
     if (this._syncApi) {
         // This shouldn't happen since we thought the client was not running
@@ -5219,7 +5268,7 @@ MatrixClient.prototype.stopClient = function() {
         this._callEventHandler = null;
     }
 
-    global.clearTimeout(this._checkTurnServersTimeoutID);
+    global.clearInterval(this._checkTurnServersIntervalID);
     if (this._clientWellKnownIntervalID !== undefined) {
         global.clearInterval(this._clientWellKnownIntervalID);
     }
@@ -5435,42 +5484,6 @@ async function(roomId, eventId, relationType, eventType, opts = {}) {
         nextBatch: result.next_batch,
     };
 };
-
-function checkTurnServers(client) {
-    if (!client._supportsVoip) {
-        return;
-    }
-
-    client.turnServer().then(function(res) {
-        if (res.uris) {
-            logger.log("Got TURN URIs: " + res.uris + " refresh in " +
-                res.ttl + " secs");
-            // map the response to a format that can be fed to
-            // RTCPeerConnection
-            const servers = {
-                urls: res.uris,
-                username: res.username,
-                credential: res.password,
-            };
-            client._turnServers = [servers];
-            client._turnServersExpiry = Date.now() + res.ttl;
-            // re-fetch when we're about to reach the TTL
-            client._checkTurnServersTimeoutID = setTimeout(() => {
-                checkTurnServers(client);
-            }, (res.ttl || (60 * 60)) * 1000 * 0.9);
-        }
-    }, function(err) {
-        logger.error("Failed to get TURN URIs");
-        // If we get a 403, there's no point in looping forever.
-        if (err.httpStatus === 403) {
-            logger.info("TURN access unavailable for this account");
-            return;
-        }
-        client._checkTurnServersTimeoutID = setTimeout(function() {
-            checkTurnServers(client);
-        }, 60000);
-    });
-}
 
 function _reject(callback, reject, err) {
     if (callback) {
