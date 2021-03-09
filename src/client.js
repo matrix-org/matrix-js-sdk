@@ -5150,10 +5150,12 @@ MatrixClient.prototype.startClient = async function(opts) {
     }
 
     // periodically poll for turn servers if we support voip
-    this._checkTurnServersIntervalID = setInterval(() => {
+    if (this._supportsVoip) {
+        this._checkTurnServersIntervalID = setInterval(() => {
+            this._checkTurnServers();
+        }, TURN_CHECK_INTERVAL);
         this._checkTurnServers();
-    }, TURN_CHECK_INTERVAL);
-    this._checkTurnServers();
+    }
 
     if (this._syncApi) {
         // This shouldn't happen since we thought the client was not running
