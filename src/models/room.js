@@ -837,6 +837,15 @@ Room.prototype.getAvatarUrl = function(baseUrl, width, height, resizeMethod,
 };
 
 /**
+ * Get the mxc avatar url for the room, if one was set.
+ * @return {string} the mxc avatar url or falsy
+ */
+Room.prototype.getMxcAvatarUrl = function() {
+    const roomAvatarEvent = this.currentState.getStateEvents("m.room.avatar", "");
+    return roomAvatarEvent ? roomAvatarEvent.getContent().url : null;
+}
+
+/**
  * Get the aliases this room has according to the room's state
  * The aliases returned by this function may not necessarily
  * still point to this room.
