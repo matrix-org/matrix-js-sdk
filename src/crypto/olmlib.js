@@ -293,18 +293,6 @@ export async function ensureOlmSessionsForDevices(
     const oneTimeKeyAlgorithm = "signed_curve25519";
     let res;
     let taskDetail = `one-time keys for ${devicesWithoutSession.length} devices`;
-    // If your homeserver takes a nap here and never replies, this process
-    // would hang indefinitely. While that's easily fixed by setting a
-    // timeout on this request, let's first log whether that's the root
-    // cause we're seeing in practice.
-    // See also https://github.com/vector-im/element-web/issues/16194
-    let otkTimeoutLogger;
-    // XXX: Perhaps there should be a default timeout?
-    if (otkTimeout) {
-        otkTimeoutLogger = setTimeout(() => {
-            log.error(`Homeserver never replied while claiming ${taskDetail}`);
-        }, otkTimeout);
-    }
     try {
         log.debug(`Claiming ${taskDetail}`);
         res = await baseApis.claimOneTimeKeys(
@@ -317,8 +305,6 @@ export async function ensureOlmSessionsForDevices(
         }
         log.log(`Failed to claim ${taskDetail}`, e, devicesWithoutSession);
         throw e;
-    } finally {
-        clearTimeout(otkTimeoutLogger);
     }
 
     if (failedServers && "failures" in res) {
