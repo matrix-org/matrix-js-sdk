@@ -401,10 +401,19 @@ export class MatrixCall extends EventEmitter {
         return Boolean(this.opponentCaps && this.opponentCaps["m.call.transferee"]);
     }
 
+    /**
+     * Returns an array of all CallFeeds
+     * @returns {Array<CallFeed>} CallFeeds
+     */
     public getFeeds(): Array<CallFeed> {
         return this.feeds;
     }
 
+    /**
+     * Returns true if there are no incoming feeds,
+     * otherwise returns false
+     * @returns {boolean} no incoming feeds
+     */
     public noIncomingFeeds(): boolean {
         return !this.feeds.some((feed) => !feed.isLocal());
     }

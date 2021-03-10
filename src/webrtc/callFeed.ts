@@ -35,17 +35,30 @@ export class CallFeed extends EventEmitter {
         super()
     }
 
+    /**
+     * Returns true if CallFeed is local, otherwise returns false
+     * @returns {boolean} is local?
+     */
     public isLocal() {
         return this.userId === this.client.getUserId();
     }
 
     // TODO: This should be later replaced by a method
     // that will also check if the remote is muted.
+    /**
+     * Returns true if there are no video tracks, otherwise returns false
+     * @returns {boolean} is audio only?
+     */
     public isAudioOnly(): boolean {
         // We assume only one video track
         return !this.stream.getTracks().some((track) => track.kind === "video");
     }
 
+    /**
+     * Replaces the current MediaStream with a new one.
+     * This method should be only used by MatrixCall.
+     * @param newStream new stream with which to replace the current one
+     */
     public setNewStream(newStream: MediaStream) {
         this.stream = newStream;
         this.emit(CallFeedEvent.NewStream, this.stream);
