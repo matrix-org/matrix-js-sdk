@@ -20,6 +20,7 @@ import {logger} from '../../logger';
 import * as utils from "../../utils";
 
 export const VERSION = 9;
+const PROFILE_TRANSACTIONS = false;
 
 /**
  * Implementation of a CryptoStore which is backed by an existing
@@ -759,20 +760,26 @@ export class Backend {
     }
 
     doTxn(mode, stores, func, log = logger) {
-        const txnId = this._nextTxnId++;
-        const startTime = Date.now();
-        const description = `${mode} crypto store transaction ${txnId} in ${stores}`;
-        log.debug(`Starting ${description}`);
+        let startTime;
+        let description;
+        if (PROFILE_TRANSACTIONS) {
+            const txnId = this._nextTxnId++;
+            startTime = Date.now();
+            description = `${mode} crypto store transaction ${txnId} in ${stores}`;
+            log.debug(`Starting ${description}`);
+        }
         const txn = this._db.transaction(stores, mode);
         const promise = promiseifyTxn(txn);
         const result = func(txn);
-        promise.then(() => {
-            const elapsedTime = Date.now() - startTime;
-            log.debug(`Finished ${description}, took ${elapsedTime} ms`);
-        }, () => {
-            const elapsedTime = Date.now() - startTime;
-            log.error(`Failed ${description}, took ${elapsedTime} ms`);
-        });
+        if (PROFILE_TRANSACTIONS) {
+            promise.then(() => {
+                const elapsedTime = Date.now() - startTime;
+                log.debug(`Finished ${description}, took ${elapsedTime} ms`);
+            }, () => {
+                const elapsedTime = Date.now() - startTime;
+                log.error(`Failed ${description}, took ${elapsedTime} ms`);
+            });
+        }
         return promise.then(() => {
             return result;
         });
