@@ -582,6 +582,18 @@ export class IndexedDBCryptoStore {
         return this._backend.markSessionsNeedingBackup(sessions, txn);
     }
 
+    /* FIXME: jsdoc
+     */
+    addShareableInboundGroupSession(roomId, senderKey, sessionId, txn) {
+        return this._backend.addShareableInboundGroupSession(
+            roomId, senderKey, sessionId, txn,
+        );
+    }
+
+    getShareableInboundGroupSessions(roomId, txn) {
+        return this._backend.getShareableInboundGroupSessions(roomId, txn);
+    }
+
     /**
      * Perform a transaction on the crypto store. Any store methods
      * that require a transaction (txn) object to be passed in may
@@ -614,6 +626,8 @@ IndexedDBCryptoStore.STORE_SESSIONS = 'sessions';
 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS = 'inbound_group_sessions';
 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD
     = 'inbound_group_sessions_withheld';
+IndexedDBCryptoStore.STORE_SHAREABLE_INBOUND_GROUP_SESSIONS
+    = 'shareable_inbound_group_sessions';
 IndexedDBCryptoStore.STORE_DEVICE_DATA = 'device_data';
 IndexedDBCryptoStore.STORE_ROOMS = 'rooms';
 IndexedDBCryptoStore.STORE_BACKUP = 'sessions_needing_backup';

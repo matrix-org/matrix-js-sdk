@@ -1048,6 +1048,7 @@ OlmDevice.prototype.addInboundGroupSession = async function(
         'readwrite', [
             IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
             IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
+            IndexedDBCryptoStore.STORE_SHAREABLE_INBOUND_GROUP_SESSIONS,
         ], (txn) => {
             /* if we already have this session, consider updating it */
             this._getInboundGroupSession(
@@ -1104,6 +1105,12 @@ OlmDevice.prototype.addInboundGroupSession = async function(
                         this._cryptoStore.storeEndToEndInboundGroupSession(
                             senderKey, sessionId, sessionData, txn,
                         );
+
+                        if (!existingSession && extraSessionData.shareable) {
+                            this._cryptoStore.addShareableInboundGroupSession(
+                                roomId, senderKey, sessionId, txn,
+                            );
+                        }
                     } finally {
                         session.free();
                     }
@@ -1383,6 +1390,7 @@ OlmDevice.prototype.getInboundGroupSessionKey = async function(
                         "forwarding_curve25519_key_chain":
                             sessionData.forwardingCurve25519KeyChain || [],
                         "sender_claimed_ed25519_key": senderEd25519Key,
+                        "shareable": sessionData.shareable || false,
                     };
                 },
             );
@@ -1415,8 +1423,22 @@ OlmDevice.prototype.exportInboundGroupSession = function(
             "session_key": session.export_session(messageIndex),
             "forwarding_curve25519_key_chain": session.forwardingCurve25519KeyChain || [],
             "first_known_index": session.first_known_index(),
+            "io.element.unstable.shareable": sessionData.shareable || false,
         };
     });
+};
+
+OlmDevice.prototype.getShareableInboundGroupSessions = async function(roomId) {
+    let result;
+    await this._cryptoStore.doTxn(
+        'readonly', [
+            IndexedDBCryptoStore.STORE_SHAREABLE_INBOUND_GROUP_SESSIONS,
+        ], (txn) => {
+            result = this._cryptoStore.getShareableInboundGroupSessions(roomId, txn);
+        },
+        logger.withPrefix("[getShareableInboundGroupSessionsForRoom]"),
+    );
+    return result;
 };
 
 // Utilities
