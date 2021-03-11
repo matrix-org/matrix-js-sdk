@@ -255,6 +255,7 @@ MatrixBaseApis.prototype.register = function(
 MatrixBaseApis.prototype.registerGuest = function(opts, callback) {
     opts = opts || {};
     opts.body = opts.body || {};
+    this.setGuest(true);
     return this.registerRequest(opts.body, "guest", callback);
 };
 
