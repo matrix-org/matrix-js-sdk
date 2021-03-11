@@ -38,8 +38,8 @@ import {WITHHELD_MESSAGES} from '../OlmDevice';
 
 // determine whether the key can be shared with invitees
 function isRoomKeyShareable(room) {
-    const visibilityEvent = room.currentState
-          .getStateEvents("m.room.history_visibility", "");
+    const visibilityEvent = room.currentState &&
+          room.currentState.getStateEvents("m.room.history_visibility", "");
     // NOTE: if the room visibility is unset, it would normally default to
     // "world_readable".
     // (https://spec.matrix.org/unstable/client-server-api/#server-behaviour-5)
@@ -55,6 +55,8 @@ function isRoomKeyShareable(room) {
  * @constructor
  *
  * @param {string} sessionId
+ * @param {boolean} shareable whether the session can be freely shared with other
+ *    group members, according to the room history visibility settings
  *
  * @property {string} sessionId
  * @property {Number} useCount     number of times this session has been used
@@ -698,14 +700,14 @@ MegolmEncryption.prototype.reshareKeyWithDevice = async function(
     const payload = {
         type: "m.forwarded_room_key",
         content: {
-            algorithm: olmlib.MEGOLM_ALGORITHM,
-            room_id: this._roomId,
-            session_id: sessionId,
-            session_key: key.key,
-            chain_index: key.chain_index,
-            sender_key: senderKey,
-            sender_claimed_ed25519_key: key.sender_claimed_ed25519_key,
-            forwarding_curve25519_key_chain: key.forwarding_curve25519_key_chain,
+            "algorithm": olmlib.MEGOLM_ALGORITHM,
+            "room_id": this._roomId,
+            "session_id": sessionId,
+            "session_key": key.key,
+            "chain_index": key.chain_index,
+            "sender_key": senderKey,
+            "sender_claimed_ed25519_key": key.sender_claimed_ed25519_key,
+            "forwarding_curve25519_key_chain": key.forwarding_curve25519_key_chain,
             "io.element.unstable.shareable": key.shareable || false,
         },
     };
