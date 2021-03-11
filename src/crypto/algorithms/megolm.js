@@ -275,11 +275,12 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
         const payload = {
             type: "m.room_key",
             content: {
-                algorithm: olmlib.MEGOLM_ALGORITHM,
-                room_id: this._roomId,
-                session_id: session.sessionId,
-                session_key: key.key,
-                chain_index: key.chain_index,
+                "algorithm": olmlib.MEGOLM_ALGORITHM,
+                "room_id": this._roomId,
+                "session_id": session.sessionId,
+                "session_key": key.key,
+                "chain_index": key.chain_index,
+                "io.element.unstable.shareable": shareable,
             },
         };
         const [devicesWithoutSession, olmSessions] = await olmlib.getExistingOlmSessions(
@@ -1399,10 +1400,14 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
         keysClaimed = event.getKeysClaimed();
     }
 
+    const extraSessionData = {};
+    if (content["io.element.unstable.shareable"]) {
+        extraSessionData.shareable = true;
+    }
     return this._olmDevice.addInboundGroupSession(
         content.room_id, senderKey, forwardingKeyChain, sessionId,
         content.session_key, keysClaimed,
-        exportFormat,
+        exportFormat, extraSessionData,
     ).then(() => {
         // have another go at decrypting events sent with this session.
         this._retryDecryption(senderKey, sessionId)
@@ -1624,6 +1629,13 @@ MegolmDecryption.prototype._buildKeyForwardingMessage = async function(
  * @param {string} [opts.source] where the key came from
  */
 MegolmDecryption.prototype.importRoomKey = function(session, opts = {}) {
+    const extraSessionData = {};
+    if (opts.untrusted) {
+        extraSessionData.untrusted = true;
+    }
+    if (session["io.element.unstable.shareable"]) {
+        extraSessionData.shareable = true;
+    }
     return this._olmDevice.addInboundGroupSession(
         session.room_id,
         session.sender_key,
@@ -1632,7 +1644,7 @@ MegolmDecryption.prototype.importRoomKey = function(session, opts = {}) {
         session.session_key,
         session.sender_claimed_keys,
         true,
-        opts.untrusted ? { untrusted: opts.untrusted } : {},
+        extraSessionData,
     ).then(() => {
         if (opts.source !== "backup") {
             // don't wait for it to complete
@@ -1723,7 +1735,7 @@ MegolmDecryption.prototype.sendShareableInboundSessions = async function(devices
     );
     logger.log("shareable sessions", shareableSessions);
     for (const [senderKey, sessionId] of shareableSessions) {
-        const payload = this._buildKeyForwardingMessage(
+        const payload = await this._buildKeyForwardingMessage(
             this._roomId, senderKey, sessionId,
         );
 
