@@ -1528,7 +1528,7 @@ export class MatrixCall extends EventEmitter {
     /*
      * Transfers this call to another user
      */
-    async transfer(targetUserId: string) {
+    async transfer(targetUserId: string, targetRoomId?: string) {
         // Fetch the target user's global profile info: their room avatar / displayname
         // could be different in whatever room we shae with them.
         const profileInfo = await this.client.getProfileInfo(targetUserId);
@@ -1545,14 +1545,9 @@ export class MatrixCall extends EventEmitter {
             create_call: replacementId,
         } as MCallReplacesEvent;
 
-        return this.sendVoipEvent(EventType.CallReplaces, body);
-    }
+        if (targetRoomId) body.target_room = targetRoomId;
 
-    /*
-     * Transfers this call to the target call, effectively 'joining' the
-     * two calls (so the remote parties on each call are connected together).
-     */
-    async transferToCall(transferTargetCall?: MatrixCall) {
+        return this.sendVoipEvent(EventType.CallReplaces, body);
     }
 
     private async terminate(hangupParty: CallParty, hangupReason: CallErrorCode, shouldEmit: boolean) {
