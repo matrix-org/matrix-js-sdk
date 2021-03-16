@@ -1525,9 +1525,6 @@ export class MatrixCall extends EventEmitter {
         }
     }
 
-    /*
-     * Transfers this call to another user
-     */
     async transfer(targetUserId: string, targetRoomId?: string) {
         // Fetch the target user's global profile info: their room avatar / displayname
         // could be different in whatever room we shae with them.
