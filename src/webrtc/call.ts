@@ -372,7 +372,7 @@ export class MatrixCall extends EventEmitter {
     async placeScreenSharingCall(
         remoteVideoElement: HTMLVideoElement,
         localVideoElement: HTMLVideoElement,
-        selectDesktopCapturerSource: () => Promise<DesktopCapturerSource>,
+        selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>,
     ) {
         logger.debug("placeScreenSharingCall");
         this.checkForErrorListener();
