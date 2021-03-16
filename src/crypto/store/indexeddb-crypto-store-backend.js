@@ -758,11 +758,13 @@ export class Backend {
         }));
     }
 
-    addShareableInboundGroupSession(roomId, senderKey, sessionId, txn) {
+    addSharedHistoryInboundGroupSession(roomId, senderKey, sessionId, txn) {
         if (!txn) {
-            txn = this._db.transaction("shareable_inbound_group_sessions", "readwrite");
+            txn = this._db.transaction(
+                "shared_history_inbound_group_sessions", "readwrite",
+            );
         }
-        const objectStore = txn.objectStore("shareable_inbound_group_sessions");
+        const objectStore = txn.objectStore("shared_history_inbound_group_sessions");
         const req = objectStore.get([roomId]);
         req.onsuccess = () => {
             const {sessions} = req.result || {sessions: []};
@@ -771,11 +773,13 @@ export class Backend {
         };
     }
 
-    getShareableInboundGroupSessions(roomId, txn) {
+    getSharedHistoryInboundGroupSessions(roomId, txn) {
         if (!txn) {
-            txn = this._db.transaction("shareable_inbound_group_sessions", "readonly");
+            txn = this._db.transaction(
+                "shared_history_inbound_group_sessions", "readonly",
+            );
         }
-        const objectStore = txn.objectStore("shareable_inbound_group_sessions");
+        const objectStore = txn.objectStore("shared_history_inbound_group_sessions");
         const req = objectStore.get([roomId]);
         return new Promise((resolve, reject) => {
             req.onsuccess = () => {
@@ -856,7 +860,7 @@ export function upgradeDatabase(db, oldVersion) {
         });
     }
     if (oldVersion < 10) {
-        db.createObjectStore("shareable_inbound_group_sessions", {
+        db.createObjectStore("shared_history_inbound_group_sessions", {
             keyPath: ["roomId"],
         });
     }

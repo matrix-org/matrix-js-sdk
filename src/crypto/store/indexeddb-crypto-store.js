@@ -584,14 +584,14 @@ export class IndexedDBCryptoStore {
 
     /* FIXME: jsdoc
      */
-    addShareableInboundGroupSession(roomId, senderKey, sessionId, txn) {
-        return this._backend.addShareableInboundGroupSession(
+    addSharedHistoryInboundGroupSession(roomId, senderKey, sessionId, txn) {
+        return this._backend.addSharedHistoryInboundGroupSession(
             roomId, senderKey, sessionId, txn,
         );
     }
 
-    getShareableInboundGroupSessions(roomId, txn) {
-        return this._backend.getShareableInboundGroupSessions(roomId, txn);
+    getSharedHistoryInboundGroupSessions(roomId, txn) {
+        return this._backend.getSharedHistoryInboundGroupSessions(roomId, txn);
     }
 
     /**
@@ -626,8 +626,8 @@ IndexedDBCryptoStore.STORE_SESSIONS = 'sessions';
 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS = 'inbound_group_sessions';
 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD
     = 'inbound_group_sessions_withheld';
-IndexedDBCryptoStore.STORE_SHAREABLE_INBOUND_GROUP_SESSIONS
-    = 'shareable_inbound_group_sessions';
+IndexedDBCryptoStore.STORE_SHARED_HISTORY_INBOUND_GROUP_SESSIONS
+    = 'shared_history_inbound_group_sessions';
 IndexedDBCryptoStore.STORE_DEVICE_DATA = 'device_data';
 IndexedDBCryptoStore.STORE_ROOMS = 'rooms';
 IndexedDBCryptoStore.STORE_BACKUP = 'sessions_needing_backup';

@@ -37,14 +37,14 @@ import {
 import {WITHHELD_MESSAGES} from '../OlmDevice';
 
 // determine whether the key can be shared with invitees
-function isRoomKeyShareable(room) {
+function isRoomSharedHistory(room) {
     const visibilityEvent = room.currentState &&
           room.currentState.getStateEvents("m.room.history_visibility", "");
     // NOTE: if the room visibility is unset, it would normally default to
     // "world_readable".
     // (https://spec.matrix.org/unstable/client-server-api/#server-behaviour-5)
-    // But we will be paranoid here, and treat it as a situation where the key
-    // should not be shareable
+    // But we will be paranoid here, and treat it as a situation where the room
+    // is not shared-history
     const visibility = visibilityEvent && visibilityEvent.getContent() &&
           visibilityEvent.getContent().history_visibility;
     return ["world_readable", "shared"].includes(visibility);
@@ -55,8 +55,8 @@ function isRoomKeyShareable(room) {
  * @constructor
  *
  * @param {string} sessionId
- * @param {boolean} shareable whether the session can be freely shared with other
- *    group members, according to the room history visibility settings
+ * @param {boolean} sharedHistory whether the session can be freely shared with
+ *    other group members, according to the room history visibility settings
  *
  * @property {string} sessionId
  * @property {Number} useCount     number of times this session has been used
@@ -66,13 +66,13 @@ function isRoomKeyShareable(room) {
  *    devices with which we have shared the session key
  *        userId -> {deviceId -> msgindex}
  */
-function OutboundSessionInfo(sessionId, shareable = false) {
+function OutboundSessionInfo(sessionId, sharedHistory = false) {
     this.sessionId = sessionId;
     this.useCount = 0;
     this.creationTime = new Date().getTime();
     this.sharedWithDevices = {};
     this.blockedDevicesNotified = {};
-    this.shareable = shareable;
+    this.sharedHistory = sharedHistory;
 }
 
 
@@ -222,10 +222,10 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
     const prepareSession = async (oldSession) => {
         session = oldSession;
 
-        const shareable = isRoomKeyShareable(room);
+        const sharedHistory = isRoomSharedHistory(room);
 
         // history visibility changed
-        if (session && shareable !== session.shareable) {
+        if (session && sharedHistory !== session.sharedHistory) {
             session = null;
         }
 
@@ -244,7 +244,7 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
 
         if (!session) {
             logger.log(`Starting new megolm session for room ${this._roomId}`);
-            session = await this._prepareNewSession(shareable);
+            session = await this._prepareNewSession(sharedHistory);
             logger.log(`Started new megolm session ${session.sessionId} ` +
                        `for room ${this._roomId}`);
             this._outboundSessions[session.sessionId] = session;
@@ -280,7 +280,7 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
                 "session_id": session.sessionId,
                 "session_key": key.key,
                 "chain_index": key.chain_index,
-                "io.element.unstable.shareable": shareable,
+                "org.matrix.msc3061.shared_history": sharedHistory,
             },
         };
         const [devicesWithoutSession, olmSessions] = await olmlib.getExistingOlmSessions(
@@ -400,18 +400,18 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
 /**
  * @private
  *
- * @param {boolean} shareable
+ * @param {boolean} sharedHistory
  *
  * @return {module:crypto/algorithms/megolm.OutboundSessionInfo} session
  */
-MegolmEncryption.prototype._prepareNewSession = async function(shareable) {
+MegolmEncryption.prototype._prepareNewSession = async function(sharedHistory) {
     const sessionId = this._olmDevice.createOutboundGroupSession();
     const key = this._olmDevice.getOutboundGroupSessionKey(sessionId);
 
     await this._olmDevice.addInboundGroupSession(
         this._roomId, this._olmDevice.deviceCurve25519Key, [], sessionId,
         key.key, {ed25519: this._olmDevice.deviceEd25519Key}, false,
-        {shareable: shareable},
+        {sharedHistory: sharedHistory},
     );
 
     // don't wait for it to complete
@@ -420,7 +420,7 @@ MegolmEncryption.prototype._prepareNewSession = async function(shareable) {
         sessionId, key.key,
     );
 
-    return new OutboundSessionInfo(sessionId, shareable);
+    return new OutboundSessionInfo(sessionId, sharedHistory);
 };
 
 /**
@@ -709,7 +709,7 @@ MegolmEncryption.prototype.reshareKeyWithDevice = async function(
             "sender_key": senderKey,
             "sender_claimed_ed25519_key": key.sender_claimed_ed25519_key,
             "forwarding_curve25519_key_chain": key.forwarding_curve25519_key_chain,
-            "io.element.unstable.shareable": key.shareable || false,
+            "org.matrix.msc3061.shared_history": key.shared_history || false,
         },
     };
 
@@ -1401,8 +1401,8 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
     }
 
     const extraSessionData = {};
-    if (content["io.element.unstable.shareable"]) {
-        extraSessionData.shareable = true;
+    if (content["org.matrix.msc3061.shared_history"]) {
+        extraSessionData.sharedHistory = true;
     }
     return this._olmDevice.addInboundGroupSession(
         content.room_id, senderKey, forwardingKeyChain, sessionId,
@@ -1615,7 +1615,7 @@ MegolmDecryption.prototype._buildKeyForwardingMessage = async function(
             "session_key": key.key,
             "chain_index": key.chain_index,
             "forwarding_curve25519_key_chain": key.forwarding_curve25519_key_chain,
-            "io.element.unstable.shareable": key.shareable || false,
+            "org.matrix.msc3061.shared_history": key.shared_history || false,
         },
     };
 };
@@ -1633,8 +1633,8 @@ MegolmDecryption.prototype.importRoomKey = function(session, opts = {}) {
     if (opts.untrusted) {
         extraSessionData.untrusted = true;
     }
-    if (session["io.element.unstable.shareable"]) {
-        extraSessionData.shareable = true;
+    if (session["org.matrix.msc3061.shared_history"]) {
+        extraSessionData.sharedHistory = true;
     }
     return this._olmDevice.addInboundGroupSession(
         session.room_id,
@@ -1723,18 +1723,19 @@ MegolmDecryption.prototype.retryDecryptionFromSender = async function(senderKey)
     return !this._pendingEvents[senderKey];
 };
 
-MegolmDecryption.prototype.sendShareableInboundSessions = async function(devicesByUser) {
+MegolmDecryption.prototype.sendSharedHistoryInboundSessions = async function(devicesByUser) {
     await olmlib.ensureOlmSessionsForDevices(
         this._olmDevice, this._baseApis, devicesByUser,
     );
 
-    logger.log("sendShareableInboundSessions to users", Object.keys(devicesByUser));
+    logger.log("sendSharedHistoryInboundSessions to users", Object.keys(devicesByUser));
 
-    const shareableSessions = await this._olmDevice.getShareableInboundGroupSessions(
-        this._roomId,
-    );
-    logger.log("shareable sessions", shareableSessions);
-    for (const [senderKey, sessionId] of shareableSessions) {
+    const sharedHistorySessions =
+          await this._olmDevice.getSharedHistoryInboundGroupSessions(
+              this._roomId,
+          );
+    logger.log("shared-history sessions", sharedHistorySessions);
+    for (const [senderKey, sessionId] of sharedHistorySessions) {
         const payload = await this._buildKeyForwardingMessage(
             this._roomId, senderKey, sessionId,
         );

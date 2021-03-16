@@ -1048,7 +1048,7 @@ OlmDevice.prototype.addInboundGroupSession = async function(
         'readwrite', [
             IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
             IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
-            IndexedDBCryptoStore.STORE_SHAREABLE_INBOUND_GROUP_SESSIONS,
+            IndexedDBCryptoStore.STORE_SHARED_HISTORY_INBOUND_GROUP_SESSIONS,
         ], (txn) => {
             /* if we already have this session, consider updating it */
             this._getInboundGroupSession(
@@ -1106,8 +1106,8 @@ OlmDevice.prototype.addInboundGroupSession = async function(
                             senderKey, sessionId, sessionData, txn,
                         );
 
-                        if (!existingSession && extraSessionData.shareable) {
-                            this._cryptoStore.addShareableInboundGroupSession(
+                        if (!existingSession && extraSessionData.sharedHistory) {
+                            this._cryptoStore.addSharedHistoryInboundGroupSession(
                                 roomId, senderKey, sessionId, txn,
                             );
                         }
@@ -1390,7 +1390,7 @@ OlmDevice.prototype.getInboundGroupSessionKey = async function(
                         "forwarding_curve25519_key_chain":
                             sessionData.forwardingCurve25519KeyChain || [],
                         "sender_claimed_ed25519_key": senderEd25519Key,
-                        "shareable": sessionData.shareable || false,
+                        "shared_history": sessionData.sharedHistory || false,
                     };
                 },
             );
@@ -1423,20 +1423,20 @@ OlmDevice.prototype.exportInboundGroupSession = function(
             "session_key": session.export_session(messageIndex),
             "forwarding_curve25519_key_chain": session.forwardingCurve25519KeyChain || [],
             "first_known_index": session.first_known_index(),
-            "io.element.unstable.shareable": sessionData.shareable || false,
+            "org.matrix.msc3061.shared_history": sessionData.sharedHistory || false,
         };
     });
 };
 
-OlmDevice.prototype.getShareableInboundGroupSessions = async function(roomId) {
+OlmDevice.prototype.getSharedHistoryInboundGroupSessions = async function(roomId) {
     let result;
     await this._cryptoStore.doTxn(
         'readonly', [
-            IndexedDBCryptoStore.STORE_SHAREABLE_INBOUND_GROUP_SESSIONS,
+            IndexedDBCryptoStore.STORE_SHARED_HISTORY_INBOUND_GROUP_SESSIONS,
         ], (txn) => {
-            result = this._cryptoStore.getShareableInboundGroupSessions(roomId, txn);
+            result = this._cryptoStore.getSharedHistoryInboundGroupSessions(roomId, txn);
         },
-        logger.withPrefix("[getShareableInboundGroupSessionsForRoom]"),
+        logger.withPrefix("[getSharedHistoryInboundGroupSessionsForRoom]"),
     );
     return result;
 };
