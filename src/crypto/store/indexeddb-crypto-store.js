@@ -582,14 +582,25 @@ export class IndexedDBCryptoStore {
         return this._backend.markSessionsNeedingBackup(sessions, txn);
     }
 
-    /* FIXME: jsdoc
+    /**
+     * Add a shared-history group session for a room.
+     * @param {string} roomId The room that the key belongs to
+     * @param {string} senderKey The sender's curve 25519 key
+     * @param {string} sessionId The ID of the session
+     * @param {*} txn An active transaction. See doTxn(). (optional)
      */
     addSharedHistoryInboundGroupSession(roomId, senderKey, sessionId, txn) {
-        return this._backend.addSharedHistoryInboundGroupSession(
+        this._backend.addSharedHistoryInboundGroupSession(
             roomId, senderKey, sessionId, txn,
         );
     }
 
+    /**
+     * Get the shared-history group session for a room.
+     * @param {string} roomId The room that the key belongs to
+     * @param {*} txn An active transaction. See doTxn(). (optional)
+     * @returns {Promise} Resolves to an array of [senderKey, sessionId]
+     */
     getSharedHistoryInboundGroupSessions(roomId, txn) {
         return this._backend.getSharedHistoryInboundGroupSessions(roomId, txn);
     }
