@@ -1,3 +1,58 @@
+Changes in [9.9.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.9.0) (2021-03-15)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.9.0-rc.1...v9.9.0)
+
+ * No changes since rc.1
+
+Changes in [9.9.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.9.0-rc.1) (2021-03-10)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.8.0...v9.9.0-rc.1)
+
+ * Remove detailed Olm session logging
+   [\#1638](https://github.com/matrix-org/matrix-js-sdk/pull/1638)
+ * Add space summary suggested only param
+   [\#1637](https://github.com/matrix-org/matrix-js-sdk/pull/1637)
+ * Check TURN servers periodically, and at start of calls
+   [\#1634](https://github.com/matrix-org/matrix-js-sdk/pull/1634)
+ * Support sending invite reasons
+   [\#1624](https://github.com/matrix-org/matrix-js-sdk/pull/1624)
+ * Bump elliptic from 6.5.3 to 6.5.4
+   [\#1636](https://github.com/matrix-org/matrix-js-sdk/pull/1636)
+ * Add a function to get a room's MXC URI
+   [\#1635](https://github.com/matrix-org/matrix-js-sdk/pull/1635)
+ * Stop streams if the call has ended
+   [\#1633](https://github.com/matrix-org/matrix-js-sdk/pull/1633)
+ * Remove export keyword from global.d.ts
+   [\#1631](https://github.com/matrix-org/matrix-js-sdk/pull/1631)
+ * Fix IndexedDB store creation example
+   [\#1445](https://github.com/matrix-org/matrix-js-sdk/pull/1445)
+ * An attempt to  cleanup how constraints are handled in calls
+   [\#1613](https://github.com/matrix-org/matrix-js-sdk/pull/1613)
+ * Extract display name patterns to constants
+   [\#1628](https://github.com/matrix-org/matrix-js-sdk/pull/1628)
+ * Bump pug-code-gen from 2.0.2 to 2.0.3
+   [\#1630](https://github.com/matrix-org/matrix-js-sdk/pull/1630)
+ * Avoid deadlocks when ensuring Olm sessions for devices
+   [\#1627](https://github.com/matrix-org/matrix-js-sdk/pull/1627)
+ * Filter out edits from other senders in history
+   [\#1626](https://github.com/matrix-org/matrix-js-sdk/pull/1626)
+ * Fix ContentHelpers export
+   [\#1618](https://github.com/matrix-org/matrix-js-sdk/pull/1618)
+ * Add logging to in progress Olm sessions
+   [\#1621](https://github.com/matrix-org/matrix-js-sdk/pull/1621)
+ * Don't ignore ICE candidates received before offer/answer
+   [\#1623](https://github.com/matrix-org/matrix-js-sdk/pull/1623)
+ * Better handling of send failures on VoIP events
+   [\#1622](https://github.com/matrix-org/matrix-js-sdk/pull/1622)
+ * Log when turn creds expire
+   [\#1620](https://github.com/matrix-org/matrix-js-sdk/pull/1620)
+ * Initial Spaces [MSC1772] support
+   [\#1563](https://github.com/matrix-org/matrix-js-sdk/pull/1563)
+ * Add logging to crypto store transactions
+   [\#1617](https://github.com/matrix-org/matrix-js-sdk/pull/1617)
+ * Room helper for getting type and checking if it is a space room
+   [\#1610](https://github.com/matrix-org/matrix-js-sdk/pull/1610)
+
 Changes in [9.8.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.8.0) (2021-03-01)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.8.0-rc.1...v9.8.0)
