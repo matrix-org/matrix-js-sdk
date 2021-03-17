@@ -503,6 +503,7 @@ export class MatrixCall extends EventEmitter {
         this.chooseOpponent(event);
         try {
             await this.peerConn.setRemoteDescription(invite.offer);
+            await this.addBufferedIceCandidates();
         } catch (e) {
             logger.debug("Failed to set remote description", e);
             this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
@@ -920,7 +921,7 @@ export class MatrixCall extends EventEmitter {
     private gotLocalIceCandidate = (event: RTCPeerConnectionIceEvent) => {
         if (event.candidate) {
             logger.debug(
-                "Got local ICE " + event.candidate.sdpMid + " candidate: " +
+                "Call " + this.callId + " got local ICE " + event.candidate.sdpMid + " candidate: " +
                 event.candidate.candidate,
             );
 
@@ -954,7 +955,7 @@ export class MatrixCall extends EventEmitter {
         }
     };
 
-    onRemoteIceCandidatesReceived(ev: MatrixEvent) {
+    async onRemoteIceCandidatesReceived(ev: MatrixEvent) {
         if (this.callHasEnded()) {
             //debuglog("Ignoring remote ICE candidate because call has ended");
             return;
@@ -986,7 +987,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        this.addIceCandidates(cands);
+        await this.addIceCandidates(cands);
     }
 
     /**
@@ -994,7 +995,10 @@ export class MatrixCall extends EventEmitter {
      * @param {Object} msg
      */
     async onAnswerReceived(event: MatrixEvent) {
+        logger.debug(`Got answer for call ID ${this.callId} from party ID ${event.getContent().party_id}`);
+
         if (this.callHasEnded()) {
+            logger.debug(`Ignoring answer because call ID ${this.callId} has ended`);
             return;
         }
 
@@ -1007,6 +1011,7 @@ export class MatrixCall extends EventEmitter {
         }
 
         this.chooseOpponent(event);
+        await this.addBufferedIceCandidates();
 
         this.setState(CallState.Connecting);
 
@@ -1624,6 +1629,8 @@ export class MatrixCall extends EventEmitter {
         // I choo-choo-choose you
         const msg = ev.getContent();
 
+        logger.debug(`Choosing party ID ${msg.party_id} for call ID ${this.callId}`);
+
         this.opponentVersion = msg.version;
         if (this.opponentVersion === 0) {
             // set to null to indicate that we've chosen an opponent, but because
@@ -1637,30 +1644,32 @@ export class MatrixCall extends EventEmitter {
         }
         this.opponentCaps = msg.capabilities || {};
         this.opponentMember = ev.sender;
+    }
 
+    private async addBufferedIceCandidates() {
         const bufferedCands = this.remoteCandidateBuffer.get(this.opponentPartyId);
         if (bufferedCands) {
             logger.info(`Adding ${bufferedCands.length} buffered candidates for opponent ${this.opponentPartyId}`);
-            this.addIceCandidates(bufferedCands);
+            await this.addIceCandidates(bufferedCands);
         }
         this.remoteCandidateBuffer = null;
     }
 
-    private addIceCandidates(cands: RTCIceCandidate[]) {
+    private async addIceCandidates(cands: RTCIceCandidate[]) {
         for (const cand of cands) {
             if (
                 (cand.sdpMid === null || cand.sdpMid === undefined) &&
                 (cand.sdpMLineIndex === null || cand.sdpMLineIndex === undefined)
             ) {
                 logger.debug("Ignoring remote ICE candidate with no sdpMid or sdpMLineIndex");
-                return;
+                continue;
             }
-            logger.debug("Got remote ICE " + cand.sdpMid + " candidate: " + cand.candidate);
+            logger.debug("Call " + this.callId + " got remote ICE " + cand.sdpMid + " candidate: " + cand.candidate);
             try {
-                this.peerConn.addIceCandidate(cand);
+                await this.peerConn.addIceCandidate(cand);
             } catch (err) {
                 if (!this.ignoreOffer) {
-                    logger.info("Failed to add remore ICE candidate", err);
+                    logger.info("Failed to add remote ICE candidate", err);
                 }
             }
         }

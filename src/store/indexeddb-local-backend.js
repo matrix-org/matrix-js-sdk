@@ -435,7 +435,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if the data was persisted.
      */
     _persistSyncData: function(nextBatch, roomsData, groupsData) {
-        logger.log("Persisting sync data up to ", nextBatch);
+        logger.log("Persisting sync data up to", nextBatch);
         return utils.promiseTry(() => {
             const txn = this.db.transaction(["sync"], "readwrite");
             const store = txn.objectStore("sync");

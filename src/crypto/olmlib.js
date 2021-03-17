@@ -213,9 +213,8 @@ export async function ensureOlmSessionsForDevices(
     // synchronous operation, as otherwise it is possible to have deadlocks
     // where multiple tasks wait indefinitely on another task to update some set
     // of common devices.
-    for (const [userId, devices] of Object.entries(devicesByUser)) {
+    for (const [, devices] of Object.entries(devicesByUser)) {
         for (const deviceInfo of devices) {
-            const deviceId = deviceInfo.deviceId;
             const key = deviceInfo.getIdentityKey();
 
             if (key === olmDevice.deviceCurve25519Key) {
@@ -224,15 +223,12 @@ export async function ensureOlmSessionsForDevices(
                 continue;
             }
 
-            const forWhom = `for ${key} (${userId}:${deviceId})`;
             if (!olmDevice._sessionsInProgress[key]) {
                 // pre-emptively mark the session as in-progress to avoid race
                 // conditions.  If we find that we already have a session, then
                 // we'll resolve
-                log.debug(`Marking Olm session in progress ${forWhom}`);
                 olmDevice._sessionsInProgress[key] = new Promise(resolve => {
                     resolveSession[key] = (...args) => {
-                        log.debug(`Resolved Olm session in progress ${forWhom}`);
                         delete olmDevice._sessionsInProgress[key];
                         resolve(...args);
                     };
@@ -266,11 +262,9 @@ export async function ensureOlmSessionsForDevices(
             }
 
             const forWhom = `for ${key} (${userId}:${deviceId})`;
-            log.debug(`Ensuring Olm session ${forWhom}`);
             const sessionId = await olmDevice.getSessionIdForDevice(
                 key, resolveSession[key], log,
             );
-            log.debug(`Got Olm session ${sessionId} ${forWhom}`);
             if (sessionId !== null && resolveSession[key]) {
                 // we found a session, but we had marked the session as
                 // in-progress, so resolve it now, which will unmark it and
@@ -299,18 +293,6 @@ export async function ensureOlmSessionsForDevices(
     const oneTimeKeyAlgorithm = "signed_curve25519";
     let res;
     let taskDetail = `one-time keys for ${devicesWithoutSession.length} devices`;
-    // If your homeserver takes a nap here and never replies, this process
-    // would hang indefinitely. While that's easily fixed by setting a
-    // timeout on this request, let's first log whether that's the root
-    // cause we're seeing in practice.
-    // See also https://github.com/vector-im/element-web/issues/16194
-    let otkTimeoutLogger;
-    // XXX: Perhaps there should be a default timeout?
-    if (otkTimeout) {
-        otkTimeoutLogger = setTimeout(() => {
-            log.error(`Homeserver never replied while claiming ${taskDetail}`);
-        }, otkTimeout);
-    }
     try {
         log.debug(`Claiming ${taskDetail}`);
         res = await baseApis.claimOneTimeKeys(
@@ -323,8 +305,6 @@ export async function ensureOlmSessionsForDevices(
         }
         log.log(`Failed to claim ${taskDetail}`, e, devicesWithoutSession);
         throw e;
-    } finally {
-        clearTimeout(otkTimeoutLogger);
     }
 
     if (failedServers && "failures" in res) {

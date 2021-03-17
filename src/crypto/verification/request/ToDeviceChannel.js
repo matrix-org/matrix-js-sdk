@@ -179,7 +179,9 @@ export class ToDeviceChannel {
         const isAcceptingEvent = type === START_TYPE || type === READY_TYPE;
         // the request has picked a ready or start event, tell the other devices about it
         if (isAcceptingEvent && !wasStarted && isStarted && this._deviceId) {
-            const nonChosenDevices = this._devices.filter(d => d !== this._deviceId);
+            const nonChosenDevices = this._devices.filter(
+                d => d !== this._deviceId && d !== this._client.getDeviceId(),
+            );
             if (nonChosenDevices.length) {
                 const message = this.completeContent({
                     code: "m.accepted",
