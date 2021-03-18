@@ -28,7 +28,7 @@ import {DeviceInfo} from './deviceinfo';
 import {CrossSigningInfo} from './CrossSigning';
 import * as olmlib from './olmlib';
 import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
-import {defer, sleep} from '../utils';
+import {chunkPromises, defer, sleep} from '../utils';
 
 
 /* State transition diagram for DeviceList._deviceTrackingStatus
@@ -62,7 +62,7 @@ const TRACKING_STATUS_UP_TO_DATE = 3;
  * @alias module:crypto/DeviceList
  */
 export class DeviceList extends EventEmitter {
-    constructor(baseApis, cryptoStore, olmDevice) {
+    constructor(baseApis, cryptoStore, olmDevice, keyDownloadChunkSize = 250) {
         super();
 
         this._cryptoStore = cryptoStore;
@@ -97,6 +97,9 @@ export class DeviceList extends EventEmitter {
 
         // userId -> promise
         this._keyDownloadsInProgressByUser = {};
+
+        // Maximum number of user IDs per request to prevent server overload (#1619)
+        this._keyDownloadChunkSize = keyDownloadChunkSize;
 
         // Set whenever changes are made other than setting the sync token
         this._dirty = false;
@@ -780,13 +783,17 @@ class DeviceListUpdateSerialiser {
             opts.token = this._syncToken;
         }
 
-        this._baseApis.downloadKeysForUsers(
-            downloadUsers, opts,
-        ).then(async (res) => {
-            const dk = res.device_keys || {};
-            const masterKeys = res.master_keys || {};
-            const ssks = res.self_signing_keys || {};
-            const usks = res.user_signing_keys || {};
+        const factories = [];
+        for (let i = 0; i < downloadUsers.length; i += this._deviceList._keyDownloadChunkSize) {
+            const userSlice = downloadUsers.slice(i, i + this._deviceList._keyDownloadChunkSize);
+            factories.push(() => this._baseApis.downloadKeysForUsers(userSlice, opts));
+        }
+
+        chunkPromises(factories, 3).then(async (responses) => {
+            const dk = Object.assign({}, ...(responses.map(res => res.device_keys || {})));
+            const masterKeys = Object.assign({}, ...(responses.map(res => res.master_keys || {})));
+            const ssks = Object.assign({}, ...(responses.map(res => res.self_signing_keys || {})));
+            const usks = Object.assign({}, ...(responses.map(res => res.user_signing_keys || {})));
 
             // yield to other things that want to execute in between users, to
             // avoid wedging the CPU
