@@ -660,6 +660,8 @@ export class MatrixCall extends EventEmitter {
 
         logger.debug("Ending call " + this.callId);
         this.terminate(CallParty.Local, reason, !suppressEvent);
+        // We don't want to send hangup here if we didn't even get to sending an invite
+        if (this.state === CallState.WaitLocalMedia) return;
         const content = {};
         // Continue to send no reason for user hangups temporarily, until
         // clients understand the user_hangup reason (voip v1)
