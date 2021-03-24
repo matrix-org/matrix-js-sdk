@@ -568,7 +568,9 @@ Crypto.prototype.bootstrapCrossSigning = async function({
             "Cross-signing private keys not found locally, but they are available " +
             "in secret storage, reading storage and caching locally",
         );
-        await this.checkOwnCrossSigningTrust();
+        await this.checkOwnCrossSigningTrust({
+            allowPrivateKeyRequests: true,
+        });
     }
 
     // Assuming no app-supplied callback, default to storing new private keys in
@@ -1300,12 +1302,18 @@ Crypto.prototype._onDeviceListUserCrossSigningUpdated = async function(userId) {
  * Check the copy of our cross-signing key that we have in the device list and
  * see if we can get the private key. If so, mark it as trusted.
  */
-Crypto.prototype.checkOwnCrossSigningTrust = async function() {
+Crypto.prototype.checkOwnCrossSigningTrust = async function({
+    allowPrivateKeyRequests = false,
+} = {}) {
     const userId = this._userId;
 
     // Before proceeding, ensure our cross-signing public keys have been
     // downloaded via the device list.
     await this.downloadKeys([this._userId]);
+
+    // Also check which private keys are locally cached.
+    const crossSigningPrivateKeys =
+        await this._crossSigningInfo.getCrossSigningKeysFromCache();
 
     // If we see an update to our own master key, check it against the master
     // key we have and, if it matches, mark it as verified
@@ -1324,6 +1332,11 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     const masterChanged = this._crossSigningInfo.getId() !== seenPubkey;
     if (masterChanged) {
         logger.info("Got new master public key", seenPubkey);
+    }
+    if (
+        allowPrivateKeyRequests &&
+        (masterChanged || !crossSigningPrivateKeys.has("master"))
+    ) {
         logger.info("Attempting to retrieve cross-signing master private key");
         let signing = null;
         try {
@@ -1352,6 +1365,11 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
 
     if (selfSigningChanged) {
         logger.info("Got new self-signing key", newCrossSigning.getId("self_signing"));
+    }
+    if (
+        allowPrivateKeyRequests &&
+        (selfSigningChanged || !crossSigningPrivateKeys.has("self_signing"))
+    ) {
         logger.info("Attempting to retrieve cross-signing self-signing private key");
         let signing = null;
         try {
@@ -1374,6 +1392,11 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     }
     if (userSigningChanged) {
         logger.info("Got new user-signing key", newCrossSigning.getId("user_signing"));
+    }
+    if (
+        allowPrivateKeyRequests &&
+        (userSigningChanged || !crossSigningPrivateKeys.has("user_signing"))
+    ) {
         logger.info("Attempting to retrieve cross-signing user-signing private key");
         let signing = null;
         try {
