@@ -583,6 +583,29 @@ export class IndexedDBCryptoStore {
     }
 
     /**
+     * Add a shared-history group session for a room.
+     * @param {string} roomId The room that the key belongs to
+     * @param {string} senderKey The sender's curve 25519 key
+     * @param {string} sessionId The ID of the session
+     * @param {*} txn An active transaction. See doTxn(). (optional)
+     */
+    addSharedHistoryInboundGroupSession(roomId, senderKey, sessionId, txn) {
+        this._backend.addSharedHistoryInboundGroupSession(
+            roomId, senderKey, sessionId, txn,
+        );
+    }
+
+    /**
+     * Get the shared-history group session for a room.
+     * @param {string} roomId The room that the key belongs to
+     * @param {*} txn An active transaction. See doTxn(). (optional)
+     * @returns {Promise} Resolves to an array of [senderKey, sessionId]
+     */
+    getSharedHistoryInboundGroupSessions(roomId, txn) {
+        return this._backend.getSharedHistoryInboundGroupSessions(roomId, txn);
+    }
+
+    /**
      * Perform a transaction on the crypto store. Any store methods
      * that require a transaction (txn) object to be passed in may
      * only be called within a callback of either this function or
@@ -614,6 +637,8 @@ IndexedDBCryptoStore.STORE_SESSIONS = 'sessions';
 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS = 'inbound_group_sessions';
 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD
     = 'inbound_group_sessions_withheld';
+IndexedDBCryptoStore.STORE_SHARED_HISTORY_INBOUND_GROUP_SESSIONS
+    = 'shared_history_inbound_group_sessions';
 IndexedDBCryptoStore.STORE_DEVICE_DATA = 'device_data';
 IndexedDBCryptoStore.STORE_ROOMS = 'rooms';
 IndexedDBCryptoStore.STORE_BACKUP = 'sessions_needing_backup';

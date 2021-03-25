@@ -51,6 +51,8 @@ export class MemoryCryptoStore {
         this._rooms = {};
         // Set of {senderCurve25519Key+'/'+sessionId}
         this._sessionsNeedingBackup = {};
+        // roomId -> array of [senderKey, sessionId]
+        this._sharedHistoryInboundGroupSessions = {};
     }
 
     /**
@@ -465,6 +467,16 @@ export class MemoryCryptoStore {
             this._sessionsNeedingBackup[sessionKey] = true;
         }
         return Promise.resolve();
+    }
+
+    addSharedHistoryInboundGroupSession(roomId, senderKey, sessionId) {
+        const sessions = this._sharedHistoryInboundGroupSessions[roomId] || [];
+        sessions.push([senderKey, sessionId]);
+        this._sharedHistoryInboundGroupSessions[roomId] = sessions;
+    }
+
+    getSharedHistoryInboundGroupSessions(roomId) {
+        return Promise.resolve(this._sharedHistoryInboundGroupSessions[roomId] || []);
     }
 
     // Session key backups
