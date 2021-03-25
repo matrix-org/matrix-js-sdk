@@ -1527,7 +1527,10 @@ export class MatrixCall extends EventEmitter {
         }
     }
 
-    async transfer(targetUserId: string, targetRoomId?: string) {
+    /*
+     * Transfers this call to another user
+     */
+    async transfer(targetUserId: string) {
         // Fetch the target user's global profile info: their room avatar / displayname
         // could be different in whatever room we shae with them.
         const profileInfo = await this.client.getProfileInfo(targetUserId);
@@ -1544,9 +1547,44 @@ export class MatrixCall extends EventEmitter {
             create_call: replacementId,
         } as MCallReplacesEvent;
 
-        if (targetRoomId) body.target_room = targetRoomId;
-
         return this.sendVoipEvent(EventType.CallReplaces, body);
+    }
+
+    /*
+     * Transfers this call to the target call, effectively 'joining' the
+     * two calls (so the remote parties on each call are connected together).
+     */
+    async transferToCall(transferTargetCall?: MatrixCall) {
+        const targetProfileInfo = await this.client.getProfileInfo(transferTargetCall.getOpponentMember().userId);
+        const transfereeProfileInfo = await this.client.getProfileInfo(this.getOpponentMember().userId);
+
+        const newCallId = genCallID();
+
+        const bodyToTransferTarget = {
+            // the replacements on each side have their own ID, and it's distinct from the
+            // ID of the new call (but we can use the same function to generate it)
+            replacement_id: genCallID(),
+            target_user: {
+                id: this.getOpponentMember().userId,
+                display_name: transfereeProfileInfo.display_name,
+                avatar_url: transfereeProfileInfo.avatar_url,
+            },
+            await_call: newCallId,
+        } as MCallReplacesEvent;
+
+        await transferTargetCall.sendVoipEvent(EventType.CallReplaces, bodyToTransferTarget);
+
+        const bodyToTransferee = {
+            replacement_id: genCallID(),
+            target_user: {
+                id: transferTargetCall.getOpponentMember().userId,
+                display_name: targetProfileInfo.display_name,
+                avatar_url: targetProfileInfo.avatar_url,
+            },
+            create_call: newCallId,
+        } as MCallReplacesEvent;
+
+        await this.sendVoipEvent(EventType.CallReplaces, bodyToTransferee);
     }
 
     private async terminate(hangupParty: CallParty, hangupReason: CallErrorCode, shouldEmit: boolean) {
