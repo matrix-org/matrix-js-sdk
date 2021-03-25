@@ -174,6 +174,11 @@ export enum CallErrorCode {
     SignallingFailed = 'signalling_timeout',
 }
 
+enum ConstraintsType {
+    Audio = "audio",
+    Video = "video",
+}
+
 /**
  * The version field that we set in m.call.* events
  */
@@ -328,10 +333,11 @@ export class MatrixCall extends EventEmitter {
      * Place a voice call to this room.
      * @throws If you have not specified a listener for 'error' events.
      */
-    placeVoiceCall() {
+    async placeVoiceCall() {
         logger.debug("placeVoiceCall");
         this.checkForErrorListener();
-        this.placeCallWithConstraints(getUserMediaVideoContraints(CallType.Voice));
+        const constraints = getUserMediaContraints(ConstraintsType.Audio);
+        await this.placeCallWithConstraints(constraints);
         this.type = CallType.Voice;
     }
 
@@ -343,12 +349,13 @@ export class MatrixCall extends EventEmitter {
      * to render the local camera preview.
      * @throws If you have not specified a listener for 'error' events.
      */
-    placeVideoCall(remoteVideoElement: HTMLVideoElement, localVideoElement: HTMLVideoElement) {
+    async placeVideoCall(remoteVideoElement: HTMLVideoElement, localVideoElement: HTMLVideoElement) {
         logger.debug("placeVideoCall");
         this.checkForErrorListener();
         this.localVideoElement = localVideoElement;
         this.remoteVideoElement = remoteVideoElement;
-        this.placeCallWithConstraints(getUserMediaVideoContraints(CallType.Video));
+        const constraints = getUserMediaContraints(ConstraintsType.Video);
+        await this.placeCallWithConstraints(constraints);
         this.type = CallType.Video;
     }
 
@@ -365,61 +372,37 @@ export class MatrixCall extends EventEmitter {
     async placeScreenSharingCall(
         remoteVideoElement: HTMLVideoElement,
         localVideoElement: HTMLVideoElement,
-        selectDesktopCapturerSource: () => Promise<DesktopCapturerSource>,
+        selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>,
     ) {
         logger.debug("placeScreenSharingCall");
         this.checkForErrorListener();
         this.localVideoElement = localVideoElement;
         this.remoteVideoElement = remoteVideoElement;
 
-        if (window.electron?.getDesktopCapturerSources) {
-            // We have access to getDesktopCapturerSources()
-            logger.debug("Electron getDesktopCapturerSources() is available...");
-            try {
-                const selectedSource = await selectDesktopCapturerSource();
-                // If no source was selected cancel call
-                if (!selectedSource) return;
-                const getUserMediaOptions: MediaStreamConstraints | DesktopCapturerConstraints = {
-                    audio: false,
-                    video: {
-                        mandatory: {
-                            chromeMediaSource: "desktop",
-                            chromeMediaSourceId: selectedSource.id,
-                        },
-                    },
-                }
-                this.screenSharingStream = await window.navigator.mediaDevices.getUserMedia(getUserMediaOptions);
+        try {
+            const screenshareConstraints = await getScreenshareContraints(selectDesktopCapturerSource);
+            if (!screenshareConstraints) return;
+            if (window.electron?.getDesktopCapturerSources) {
+                // We are using Electron
+                logger.debug("Getting screen stream using getUserMedia()...");
+                this.screenSharingStream = await navigator.mediaDevices.getUserMedia(screenshareConstraints);
+            } else {
+                // We are not using Electron
+                logger.debug("Getting screen stream using getDisplayMedia()...");
+                this.screenSharingStream = await navigator.mediaDevices.getDisplayMedia(screenshareConstraints);
+            }
 
-                logger.debug("Got screen stream, requesting audio stream...");
-                const audioConstraints = getUserMediaVideoContraints(CallType.Voice);
-                this.placeCallWithConstraints(audioConstraints);
-            } catch (err) {
-                this.emit(CallEvent.Error,
-                    new CallError(
-                        CallErrorCode.NoUserMedia,
-                        "Failed to get screen-sharing stream: ", err,
-                    ),
-                );
-            }
-        } else {
-            /* We do not have access to the Electron desktop capturer,
-             * therefore we can assume we are on the web */
-            logger.debug("Electron desktopCapturer is not available...");
-            try {
-                this.screenSharingStream = await navigator.mediaDevices.getDisplayMedia({'audio': false});
-                logger.debug("Got screen stream, requesting audio stream...");
-                const audioConstraints = getUserMediaVideoContraints(CallType.Voice);
-                this.placeCallWithConstraints(audioConstraints);
-            } catch (err) {
-                this.emit(CallEvent.Error,
-                    new CallError(
-                        CallErrorCode.NoUserMedia,
-                        "Failed to get screen-sharing stream: ", err,
-                    ),
-                );
-            }
+            logger.debug("Got screen stream, requesting audio stream...");
+            const audioConstraints = getUserMediaContraints(ConstraintsType.Audio);
+            this.placeCallWithConstraints(audioConstraints);
+        } catch (err) {
+            this.emit(CallEvent.Error,
+                new CallError(
+                    CallErrorCode.NoUserMedia,
+                    "Failed to get screen-sharing stream: ", err,
+                ),
+            );
         }
-
         this.type = CallType.Video;
     }
 
@@ -544,6 +527,13 @@ export class MatrixCall extends EventEmitter {
         const invite = event.getContent();
         this.direction = CallDirection.Inbound;
 
+        // make sure we have valid turn creds. Unless something's gone wrong, it should
+        // poll and keep the credentials valid so this should be instant.
+        const haveTurnCreds = await this.client._checkTurnServers();
+        if (!haveTurnCreds) {
+            logger.warn("Failed to get TURN credentials! Proceeding with call anyway...");
+        }
+
         this.peerConn = this.createPeerConnection();
         // we must set the party ID before await-ing on anything: the call event
         // handler will start giving us more call events (eg. candidates) so if
@@ -551,6 +541,7 @@ export class MatrixCall extends EventEmitter {
         this.chooseOpponent(event);
         try {
             await this.peerConn.setRemoteDescription(invite.offer);
+            await this.addBufferedIceCandidates();
         } catch (e) {
             logger.debug("Failed to set remote description", e);
             this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
@@ -608,7 +599,11 @@ export class MatrixCall extends EventEmitter {
         logger.debug(`Answering call ${this.callId} of type ${this.type}`);
 
         if (!this.localAVStream && !this.waitForLocalAVStream) {
-            const constraints = getUserMediaVideoContraints(this.type);
+            const constraints = getUserMediaContraints(
+                this.type == CallType.Video ?
+                    ConstraintsType.Video:
+                    ConstraintsType.Audio,
+            );
             logger.log("Getting user media with constraints", constraints);
             this.setState(CallState.WaitLocalMedia);
             this.waitForLocalAVStream = true;
@@ -665,6 +660,8 @@ export class MatrixCall extends EventEmitter {
 
         logger.debug("Ending call " + this.callId);
         this.terminate(CallParty.Local, reason, !suppressEvent);
+        // We don't want to send hangup here if we didn't even get to sending an invite
+        if (this.state === CallState.WaitLocalMedia) return;
         const content = {};
         // Continue to send no reason for user hangups temporarily, until
         // clients understand the user_hangup reason (voip v1)
@@ -838,8 +835,11 @@ export class MatrixCall extends EventEmitter {
             return;
         }
         if (this.callHasEnded()) {
+            this.stopAllMedia();
             return;
         }
+        this.localAVStream = stream;
+        logger.info("Got local AV stream with id " + this.localAVStream.id);
 
         this.setState(CallState.CreateOffer);
 
@@ -865,11 +865,8 @@ export class MatrixCall extends EventEmitter {
             }
         }
 
-        this.localAVStream = stream;
-        logger.info("Got local AV stream with id " + this.localAVStream.id);
         // why do we enable audio (and only audio) tracks here? -- matthew
         setTracksEnabled(stream.getAudioTracks(), true);
-        this.peerConn = this.createPeerConnection();
 
         for (const audioTrack of stream.getAudioTracks()) {
             logger.info("Adding audio track with id " + audioTrack.id);
@@ -991,7 +988,7 @@ export class MatrixCall extends EventEmitter {
     private gotLocalIceCandidate = (event: RTCPeerConnectionIceEvent) => {
         if (event.candidate) {
             logger.debug(
-                "Got local ICE " + event.candidate.sdpMid + " candidate: " +
+                "Call " + this.callId + " got local ICE " + event.candidate.sdpMid + " candidate: " +
                 event.candidate.candidate,
             );
 
@@ -1025,7 +1022,7 @@ export class MatrixCall extends EventEmitter {
         }
     };
 
-    onRemoteIceCandidatesReceived(ev: MatrixEvent) {
+    async onRemoteIceCandidatesReceived(ev: MatrixEvent) {
         if (this.callHasEnded()) {
             //debuglog("Ignoring remote ICE candidate because call has ended");
             return;
@@ -1057,7 +1054,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        this.addIceCandidates(cands);
+        await this.addIceCandidates(cands);
     }
 
     /**
@@ -1065,7 +1062,10 @@ export class MatrixCall extends EventEmitter {
      * @param {Object} msg
      */
     async onAnswerReceived(event: MatrixEvent) {
+        logger.debug(`Got answer for call ID ${this.callId} from party ID ${event.getContent().party_id}`);
+
         if (this.callHasEnded()) {
+            logger.debug(`Ignoring answer because call ID ${this.callId} has ended`);
             return;
         }
 
@@ -1078,6 +1078,7 @@ export class MatrixCall extends EventEmitter {
         }
 
         this.chooseOpponent(event);
+        await this.addBufferedIceCandidates();
 
         this.setState(CallState.Connecting);
 
@@ -1674,11 +1675,18 @@ export class MatrixCall extends EventEmitter {
         this.setState(CallState.WaitLocalMedia);
         this.direction = CallDirection.Outbound;
         this.config = constraints;
-        // It would be really nice if we could start gathering candidates at this point
-        // so the ICE agent could be gathering while we open our media devices: we already
-        // know the type of the call and therefore what tracks we want to send.
-        // Perhaps we could do this by making fake tracks now and then using replaceTrack()
-        // once we have the actual tracks? (Can we make fake tracks?)
+
+        // make sure we have valid turn creds. Unless something's gone wrong, it should
+        // poll and keep the credentials valid so this should be instant.
+        const haveTurnCreds = await this.client._checkTurnServers();
+        if (!haveTurnCreds) {
+            logger.warn("Failed to get TURN credentials! Proceeding with call anyway...");
+        }
+
+        // create the peer connection now so it can be gathering candidates while we get user
+        // media (assuming a candidate pool size is configured)
+        this.peerConn = this.createPeerConnection();
+
         try {
             const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
             this.gotUserMediaForInvite(mediaStream);
@@ -1721,6 +1729,8 @@ export class MatrixCall extends EventEmitter {
         // I choo-choo-choose you
         const msg = ev.getContent();
 
+        logger.debug(`Choosing party ID ${msg.party_id} for call ID ${this.callId}`);
+
         this.opponentVersion = msg.version;
         if (this.opponentVersion === 0) {
             // set to null to indicate that we've chosen an opponent, but because
@@ -1734,30 +1744,32 @@ export class MatrixCall extends EventEmitter {
         }
         this.opponentCaps = msg.capabilities || {};
         this.opponentMember = ev.sender;
+    }
 
+    private async addBufferedIceCandidates() {
         const bufferedCands = this.remoteCandidateBuffer.get(this.opponentPartyId);
         if (bufferedCands) {
             logger.info(`Adding ${bufferedCands.length} buffered candidates for opponent ${this.opponentPartyId}`);
-            this.addIceCandidates(bufferedCands);
+            await this.addIceCandidates(bufferedCands);
         }
         this.remoteCandidateBuffer = null;
     }
 
-    private addIceCandidates(cands: RTCIceCandidate[]) {
+    private async addIceCandidates(cands: RTCIceCandidate[]) {
         for (const cand of cands) {
             if (
                 (cand.sdpMid === null || cand.sdpMid === undefined) &&
                 (cand.sdpMLineIndex === null || cand.sdpMLineIndex === undefined)
             ) {
                 logger.debug("Ignoring remote ICE candidate with no sdpMid or sdpMLineIndex");
-                return;
+                continue;
             }
-            logger.debug("Got remote ICE " + cand.sdpMid + " candidate: " + cand.candidate);
+            logger.debug("Call " + this.callId + " got remote ICE " + cand.sdpMid + " candidate: " + cand.candidate);
             try {
-                this.peerConn.addIceCandidate(cand);
+                await this.peerConn.addIceCandidate(cand);
             } catch (err) {
                 if (!this.ignoreOffer) {
-                    logger.info("Failed to add remore ICE candidate", err);
+                    logger.info("Failed to add remote ICE candidate", err);
                 }
             }
         }
@@ -1770,17 +1782,19 @@ function setTracksEnabled(tracks: Array<MediaStreamTrack>, enabled: boolean) {
     }
 }
 
-function getUserMediaVideoContraints(callType: CallType) {
+function getUserMediaContraints(type: ConstraintsType) {
     const isWebkit = !!navigator.webkitGetUserMedia;
 
-    switch (callType) {
-        case CallType.Voice:
+    switch (type) {
+        case ConstraintsType.Audio: {
             return {
                 audio: {
                     deviceId: audioInput ? {ideal: audioInput} : undefined,
-                }, video: false,
+                },
+                video: false,
             };
-        case CallType.Video:
+        }
+        case ConstraintsType.Video: {
             return {
                 audio: {
                     deviceId: audioInput ? {ideal: audioInput} : undefined,
@@ -1795,6 +1809,33 @@ function getUserMediaVideoContraints(callType: CallType) {
                     height: isWebkit ? { exact: 360 } : { ideal: 360 },
                 },
             };
+        }
+    }
+}
+
+async function getScreenshareContraints(selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>) {
+    if (window.electron?.getDesktopCapturerSources && selectDesktopCapturerSource) {
+        // We have access to getDesktopCapturerSources()
+        logger.debug("Electron getDesktopCapturerSources() is available...");
+        const selectedSource = await selectDesktopCapturerSource();
+        if (!selectedSource) return null;
+        return {
+            audio: false,
+            video: {
+                mandatory: {
+                    chromeMediaSource: "desktop",
+                    chromeMediaSourceId: selectedSource.id,
+                },
+            },
+        };
+    } else {
+        // We do not have access to the Electron desktop capturer,
+        // therefore we can assume we are on the web
+        logger.debug("Electron desktopCapturer is not available...");
+        return {
+            audio: false,
+            video: true,
+        };
     }
 }
 

@@ -139,7 +139,7 @@ export class CallEventHandler {
             }
 
             const timeUntilTurnCresExpire = this.client.getTurnServersExpiry() - Date.now();
-            logger.info("Current turn creds expire in " + timeUntilTurnCresExpire + " seconds");
+            logger.info("Current turn creds expire in " + timeUntilTurnCresExpire + " ms");
             call = createNewMatrixCall(this.client, event.getRoomId(), {
                 forceTURN: this.client._forceTURN,
             });

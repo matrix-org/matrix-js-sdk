@@ -271,10 +271,10 @@ MatrixHttpApi.prototype = {
             xhr.timeout_timer = callbacks.setTimeout(timeout_fn, 30000);
 
             xhr.onreadystatechange = function() {
+                let resp;
                 switch (xhr.readyState) {
                     case global.XMLHttpRequest.DONE:
                         callbacks.clearTimeout(xhr.timeout_timer);
-                        var resp;
                         try {
                             if (xhr.status === 0) {
                                 throw new AbortError();

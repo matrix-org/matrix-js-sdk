@@ -190,5 +190,91 @@ describe("OlmDevice", function() {
             // new session and will have called claimOneTimeKeys
             expect(count).toBe(2);
         });
+
+        it("avoids deadlocks when two tasks are ensuring the same devices", async function() {
+            // This test checks whether `ensureOlmSessionsForDevices` properly
+            // handles multiple tasks in flight ensuring some set of devices in
+            // common without deadlocks.
+
+            let claimRequestCount = 0;
+            const baseApis = {
+                claimOneTimeKeys: () => {
+                    // simulate a very slow server (.5 seconds to respond)
+                    claimRequestCount++;
+                    return new Promise((resolve, reject) => {
+                        setTimeout(reject, 500);
+                    });
+                },
+            };
+
+            const deviceBobA = DeviceInfo.fromStorage({
+                keys: {
+                    "curve25519:BOB-A": "akey",
+                },
+            }, "BOB-A");
+            const deviceBobB = DeviceInfo.fromStorage({
+                keys: {
+                    "curve25519:BOB-B": "bkey",
+                },
+            }, "BOB-B");
+
+            // There's no required ordering of devices per user, so here we
+            // create two different orderings so that each task reserves a
+            // device the other task needs before continuing.
+            const devicesByUserAB = {
+                "@bob:example.com": [
+                    deviceBobA,
+                    deviceBobB,
+                ],
+            };
+            const devicesByUserBA = {
+                "@bob:example.com": [
+                    deviceBobB,
+                    deviceBobA,
+                ],
+            };
+
+            function alwaysSucceed(promise) {
+                // swallow any exception thrown by a promise, so that
+                // Promise.all doesn't abort
+                return promise.catch(() => {});
+            }
+
+            const task1 = alwaysSucceed(olmlib.ensureOlmSessionsForDevices(
+                aliceOlmDevice, baseApis, devicesByUserAB,
+            ));
+
+            // After a single tick through the first task, it should have
+            // claimed ownership of all devices to avoid deadlocking others.
+            expect(Object.keys(aliceOlmDevice._sessionsInProgress).length).toBe(2);
+
+            const task2 = alwaysSucceed(olmlib.ensureOlmSessionsForDevices(
+                aliceOlmDevice, baseApis, devicesByUserBA,
+            ));
+
+            // The second task should not have changed the ownership count, as
+            // it's waiting on the first task.
+            expect(Object.keys(aliceOlmDevice._sessionsInProgress).length).toBe(2);
+
+            // Track the tasks, but don't await them yet.
+            const promises = Promise.all([
+                task1,
+                task2,
+            ]);
+
+            await new Promise((resolve) => {
+                setTimeout(resolve, 200);
+            });
+
+            // After .2s, the first task should have made an initial claim request.
+            expect(claimRequestCount).toBe(1);
+
+            await promises;
+
+            // After waiting for both tasks to complete, the first task should
+            // have failed, so the second task should have tried to create a
+            // new session and will have called claimOneTimeKeys
+            expect(claimRequestCount).toBe(2);
+        });
     });
 });

@@ -745,6 +745,15 @@ export function promiseTry<T>(fn: () => T): Promise<T> {
     return new Promise((resolve) => resolve(fn()));
 }
 
+// Creates and awaits all promises, running no more than `chunkSize` at the same time
+export async function chunkPromises<T>(fns: (() => Promise<T>)[], chunkSize: number): Promise<T[]> {
+    const results: T[] = [];
+    for (let i = 0; i < fns.length; i += chunkSize) {
+        results.push(...(await Promise.all(fns.slice(i, i + chunkSize).map(fn => fn()))));
+    }
+    return results;
+}
+
 // We need to be able to access the Node.js crypto library from within the
 // Matrix SDK without needing to `require("crypto")`, which will fail in
 // browsers.  So `index.ts` will call `setCrypto` to store it, and when we need
