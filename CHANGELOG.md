@@ -1,3 +1,20 @@
+Changes in [9.10.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.10.0-rc.1) (2021-03-25)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.9.0...v9.10.0-rc.1)
+
+ * Don't send m.call.hangup if m.call.invite wasn't sent either
+   [\#1647](https://github.com/matrix-org/matrix-js-sdk/pull/1647)
+ * docs: registerGuest()
+   [\#1641](https://github.com/matrix-org/matrix-js-sdk/pull/1641)
+ * Download device keys in chunks of 250
+   [\#1639](https://github.com/matrix-org/matrix-js-sdk/pull/1639)
+ * More VoIP connectivity fixes
+   [\#1646](https://github.com/matrix-org/matrix-js-sdk/pull/1646)
+ * Make selectDesktopCapturerSource param optional
+   [\#1644](https://github.com/matrix-org/matrix-js-sdk/pull/1644)
+ * Expose APIs needed for reworked cross-signing login flow
+   [\#1632](https://github.com/matrix-org/matrix-js-sdk/pull/1632)
+
 Changes in [9.9.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.9.0) (2021-03-15)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.9.0-rc.1...v9.9.0)
