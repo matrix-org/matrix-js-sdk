@@ -1,6 +1,6 @@
 {
   "name": "matrix-js-sdk",
-  "version": "9.9.0",
+  "version": "9.10.0-rc.1",
   "description": "Matrix Client-Server SDK for Javascript",
   "scripts": {
     "prepublishOnly": "yarn build",
@@ -27,7 +27,7 @@
   "keywords": [
     "matrix-org"
   ],
-  "main": "./src/index.ts",
+  "main": "./lib/index.js",
   "browser": "./lib/browser-index.js",
   "matrix_src_main": "./src/index.ts",
   "matrix_src_browser": "./src/browser-index.js",
@@ -95,5 +95,6 @@
   },
   "jest": {
     "testEnvironment": "node"
-  }
+  },
+  "typings": "./lib/index.d.ts"
 }
