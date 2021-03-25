@@ -396,7 +396,6 @@ export class MatrixCall extends EventEmitter {
 
             logger.debug("Got screen stream, requesting audio stream...");
             const audioConstraints = getUserMediaContraints(ConstraintsType.Audio);
-            this.type = CallType.Video;
             this.placeCallWithConstraints(audioConstraints);
         } catch (err) {
             this.emit(CallEvent.Error,
@@ -406,7 +405,7 @@ export class MatrixCall extends EventEmitter {
                 ),
             );
         }
-        
+        this.type = CallType.Video;
     }
 
     public getOpponentMember() {
