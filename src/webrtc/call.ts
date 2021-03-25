@@ -339,7 +339,6 @@ export class MatrixCall extends EventEmitter {
         const constraints = getUserMediaContraints(ConstraintsType.Audio);
         this.type = CallType.Voice;
         await this.placeCallWithConstraints(constraints);
-        
     }
 
     /**
@@ -358,7 +357,6 @@ export class MatrixCall extends EventEmitter {
         const constraints = getUserMediaContraints(ConstraintsType.Video);
         this.type = CallType.Video;
         await this.placeCallWithConstraints(constraints);
-        
     }
 
     /**
