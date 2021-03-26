@@ -1547,7 +1547,9 @@ export class MatrixCall extends EventEmitter {
             create_call: replacementId,
         } as MCallReplacesEvent;
 
-        return this.sendVoipEvent(EventType.CallReplaces, body);
+        await this.sendVoipEvent(EventType.CallReplaces, body);
+
+        await this.terminate(CallParty.Local, CallErrorCode.Replaced, true);
     }
 
     /*
@@ -1585,6 +1587,8 @@ export class MatrixCall extends EventEmitter {
         } as MCallReplacesEvent;
 
         await this.sendVoipEvent(EventType.CallReplaces, bodyToTransferee);
+
+        await this.terminate(CallParty.Local, CallErrorCode.Replaced, true);
     }
 
     private async terminate(hangupParty: CallParty, hangupReason: CallErrorCode, shouldEmit: boolean) {
