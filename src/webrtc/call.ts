@@ -381,7 +381,11 @@ export class MatrixCall extends EventEmitter {
 
         try {
             const screenshareConstraints = await getScreenshareContraints(selectDesktopCapturerSource);
-            if (!screenshareConstraints) return;
+            if (!screenshareConstraints) {
+                this.terminate(CallParty.Local, CallErrorCode.NoUserMedia, false);
+                return;
+            }
+
             if (window.electron?.getDesktopCapturerSources) {
                 // We are using Electron
                 logger.debug("Getting screen stream using getUserMedia()...");
@@ -402,6 +406,7 @@ export class MatrixCall extends EventEmitter {
                     "Failed to get screen-sharing stream: ", err,
                 ),
             );
+            this.terminate(CallParty.Local, CallErrorCode.NoUserMedia, false);
         }
         this.type = CallType.Video;
     }
