@@ -1339,14 +1339,15 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function({
     ) {
         logger.info("Attempting to retrieve cross-signing master private key");
         let signing = null;
+        // It's important for control flow that we leave any errors alone for
+        // higher levels to handle so that e.g. cancelling access properly
+        // aborts any larger operation as well.
         try {
             const ret = await this._crossSigningInfo.getCrossSigningKey(
                 'master', seenPubkey,
             );
             signing = ret[1];
             logger.info("Got cross-signing master private key");
-        } catch (e) {
-            logger.error("Cross-signing master private key not available", e);
         } finally {
             if (signing) signing.free();
         }
@@ -1378,8 +1379,6 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function({
             );
             signing = ret[1];
             logger.info("Got cross-signing self-signing private key");
-        } catch (e) {
-            logger.error("Cross-signing self-signing private key not available", e);
         } finally {
             if (signing) signing.free();
         }
@@ -1405,8 +1404,6 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function({
             );
             signing = ret[1];
             logger.info("Got cross-signing user-signing private key");
-        } catch (e) {
-            logger.error("Cross-signing user-signing private key not available", e);
         } finally {
             if (signing) signing.free();
         }
