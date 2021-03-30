@@ -1589,6 +1589,7 @@ export class MatrixCall extends EventEmitter {
         await this.sendVoipEvent(EventType.CallReplaces, bodyToTransferee);
 
         await this.terminate(CallParty.Local, CallErrorCode.Replaced, true);
+        await transferTargetCall.terminate(CallParty.Local, CallErrorCode.Replaced, true);
     }
 
     private async terminate(hangupParty: CallParty, hangupReason: CallErrorCode, shouldEmit: boolean) {
