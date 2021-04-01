@@ -32,6 +32,7 @@ export interface MCallReplacesEvent {
     replacement_id: string;
     target_user: MCallReplacesTarget;
     create_call: string;
+    await_call: string;
     target_room: string;
 }
 /* eslint-enable camelcase */
