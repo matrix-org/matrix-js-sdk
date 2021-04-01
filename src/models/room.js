@@ -189,6 +189,17 @@ export function Room(roomId, client, myUserId, opts) {
 
     if (this._opts.pendingEventOrdering == "detached") {
         this._pendingEventList = [];
+        const serializedPendingEventList = client._sessionStore.store.getItem(pendingEventsKey(this.roomId));
+        if (serializedPendingEventList) {
+            const self = this;
+            JSON.parse(serializedPendingEventList)
+                .forEach(serializedEvent => {
+                    const event = new MatrixEvent(serializedEvent);
+                    event.setStatus(EventStatus.NOT_SENT);
+                    const txnId = client.makeTxnId();
+                    self.addPendingEvent(event, txnId);
+                });
+        }
     }
 
     // read by megolm; boolean value - null indicates "use global value"
@@ -203,6 +214,14 @@ export function Room(roomId, client, myUserId, opts) {
     } else {
         this._membersPromise = null;
     }
+}
+
+/**
+ * @param {string} roomId ID of the current room
+ * @returns {string} Storage key to retrieve pending events
+ */
+function pendingEventsKey(roomId) {
+    return `mx_pending_events_${roomId}`;
 }
 
 utils.inherits(Room, EventEmitter);
@@ -355,6 +374,39 @@ Room.prototype.getPendingEvents = function() {
     }
 
     return this._pendingEventList;
+};
+
+/**
+ * Removes a pending event for this room
+ *
+ * @param {string} eventId
+ * @return {boolean} True if an element was removed.
+ */
+Room.prototype.removePendingEvent = function(eventId) {
+    if (this._opts.pendingEventOrdering !== "detached") {
+        throw new Error(
+            "Cannot call removePendingEvent with pendingEventOrdering == " +
+                this._opts.pendingEventOrdering);
+    }
+
+    const removed = utils.removeElement(
+        this._pendingEventList,
+        function(ev) {
+            return ev.getId() == eventId;
+        }, false,
+    );
+
+    const { store } = this._client._sessionStore;
+    if (this._pendingEventList.length > 0) {
+        store.setItem(
+            pendingEventsKey(this.roomId),
+            JSON.stringify(this._pendingEventList),
+        );
+    } else {
+        store.removeItem(pendingEventsKey(this.roomId));
+    }
+
+    return removed;
 };
 
 /**
@@ -1192,7 +1244,7 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy, fromCache) {
  * unique transaction id.
  */
 Room.prototype.addPendingEvent = function(event, txnId) {
-    if (event.status !== EventStatus.SENDING) {
+    if (event.status !== EventStatus.SENDING && event.status !== EventStatus.NOT_SENT) {
         throw new Error("addPendingEvent called on an event with status " +
                         event.status);
     }
@@ -1219,7 +1271,11 @@ Room.prototype.addPendingEvent = function(event, txnId) {
             event.setStatus(EventStatus.NOT_SENT);
         }
         this._pendingEventList.push(event);
-
+        const { store } = this._client._sessionStore;
+        store.setItem(
+            pendingEventsKey(this.roomId),
+            JSON.stringify(this._pendingEventList),
+        );
         if (event.isRelation()) {
             // For pending events, add them to the relations collection immediately.
             // (The alternate case below already covers this as part of adding to
@@ -1310,12 +1366,7 @@ Room.prototype._handleRemoteEcho = function(remoteEvent, localEvent) {
 
     // if it's in the pending list, remove it
     if (this._pendingEventList) {
-        utils.removeElement(
-            this._pendingEventList,
-            function(ev) {
-                return ev.getId() == oldEventId;
-            }, false,
-        );
+        this.removePendingEvent(oldEventId);
     }
 
     // replace the event source (this will preserve the plaintext payload if
@@ -1421,6 +1472,7 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
         for (let i = 0; i < this._timelineSets.length; i++) {
             this._timelineSets[i].replaceEventId(oldEventId, newEventId);
         }
+        this.removePendingEvent(event.event.event_id);
     } else if (newStatus == EventStatus.CANCELLED) {
         // remove it from the pending event list, or the timeline.
         if (this._pendingEventList) {
