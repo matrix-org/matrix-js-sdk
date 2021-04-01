@@ -193,13 +193,12 @@ export function Room(roomId, client, myUserId, opts) {
         this._pendingEventList = [];
         const serializedPendingEventList = client._sessionStore.store.getItem(pendingEventsKey(this.roomId));
         if (serializedPendingEventList) {
-            const self = this;
             JSON.parse(serializedPendingEventList)
                 .forEach(serializedEvent => {
                     const event = new MatrixEvent(serializedEvent);
                     event.setStatus(EventStatus.NOT_SENT);
                     const txnId = client.makeTxnId();
-                    self.addPendingEvent(event, txnId);
+                    this.addPendingEvent(event, txnId);
                 });
         }
     }
