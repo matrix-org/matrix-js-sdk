@@ -123,6 +123,8 @@ export function Room(roomId, client, myUserId, opts) {
     opts = opts || {};
     opts.pendingEventOrdering = opts.pendingEventOrdering || "chronological";
 
+    this._client = client;
+
     // In some cases, we add listeners for every displayed Matrix event, so it's
     // common to have quite a few more than the default limit.
     this.setMaxListeners(100);
@@ -208,7 +210,6 @@ export function Room(roomId, client, myUserId, opts) {
     this._summaryHeroes = null;
     // awaited by getEncryptionTargetMembers while room members are loading
 
-    this._client = client;
     if (!this._opts.lazyLoadMembers) {
         this._membersPromise = Promise.resolve();
     } else {
@@ -1472,7 +1473,9 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
         for (let i = 0; i < this._timelineSets.length; i++) {
             this._timelineSets[i].replaceEventId(oldEventId, newEventId);
         }
-        this.removePendingEvent(event.event.event_id);
+        if (this._opts.pendingEventOrdering === "detached") {
+            this.removePendingEvent(event.event.event_id);
+        }
     } else if (newStatus == EventStatus.CANCELLED) {
         // remove it from the pending event list, or the timeline.
         if (this._pendingEventList) {
