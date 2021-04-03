@@ -19,7 +19,7 @@ limitations under the License.
 import {logger} from '../../logger';
 import * as utils from "../../utils";
 
-export const VERSION = 9;
+export const VERSION = 10;
 const PROFILE_TRANSACTIONS = false;
 
 /**
@@ -759,6 +759,38 @@ export class Backend {
         }));
     }
 
+    addSharedHistoryInboundGroupSession(roomId, senderKey, sessionId, txn) {
+        if (!txn) {
+            txn = this._db.transaction(
+                "shared_history_inbound_group_sessions", "readwrite",
+            );
+        }
+        const objectStore = txn.objectStore("shared_history_inbound_group_sessions");
+        const req = objectStore.get([roomId]);
+        req.onsuccess = () => {
+            const {sessions} = req.result || {sessions: []};
+            sessions.push([senderKey, sessionId]);
+            objectStore.put({roomId, sessions});
+        };
+    }
+
+    getSharedHistoryInboundGroupSessions(roomId, txn) {
+        if (!txn) {
+            txn = this._db.transaction(
+                "shared_history_inbound_group_sessions", "readonly",
+            );
+        }
+        const objectStore = txn.objectStore("shared_history_inbound_group_sessions");
+        const req = objectStore.get([roomId]);
+        return new Promise((resolve, reject) => {
+            req.onsuccess = () => {
+                const {sessions} = req.result || {sessions: []};
+                resolve(sessions);
+            };
+            req.onerror = reject;
+        });
+    }
+
     doTxn(mode, stores, func, log = logger) {
         let startTime;
         let description;
@@ -832,6 +864,11 @@ export function upgradeDatabase(db, oldVersion) {
 
         db.createObjectStore("notified_error_devices", {
             keyPath: ["userId", "deviceId"],
+        });
+    }
+    if (oldVersion < 10) {
+        db.createObjectStore("shared_history_inbound_group_sessions", {
+            keyPath: ["roomId"],
         });
     }
     // Expand as needed.

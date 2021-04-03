@@ -282,4 +282,30 @@ describe("utils", function() {
             expect(target.nonenumerableProp).toBe(undefined);
         });
     });
+
+    describe("chunkPromises", function() {
+        it("should execute promises in chunks", async function() {
+            let promiseCount = 0;
+
+            function fn1() {
+                return new Promise(async function(resolve, reject) {
+                    await utils.sleep(1);
+                    expect(promiseCount).toEqual(0);
+                    ++promiseCount;
+                    resolve();
+                });
+            }
+
+            function fn2() {
+                return new Promise(function(resolve, reject) {
+                    expect(promiseCount).toEqual(1);
+                    ++promiseCount;
+                    resolve();
+                });
+            }
+
+            await utils.chunkPromises([fn1, fn2], 1);
+            expect(promiseCount).toEqual(2);
+        });
+    });
 });
