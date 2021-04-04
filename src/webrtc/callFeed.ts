@@ -53,13 +53,23 @@ export class CallFeed extends EventEmitter {
         return this.userId === this.client.getUserId();
     }
 
-    // TODO: This should be later replaced by a method
-    // that will also check if the remote is muted.
+    // TODO: The two following methods should be later replaced
+    // by something that will also check if the remote is muted
     /**
-     * Returns true if there are no video tracks, otherwise returns false
-     * @returns {boolean} is audio only?
+     * Returns true if audio is muted or if there are no audio
+     * tracks, otherwise returns false
+     * @returns {boolean} is audio muted?
      */
-    public isAudioOnly(): boolean {
+    public isAudioMuted(): boolean {
+        return !this.stream.getTracks().some((track) => track.kind === "audio");
+    }
+
+    /**
+     * Returns true video is muted or if there are no video
+     * tracks, otherwise returns false
+     * @returns {boolean} is video muted?
+     */
+    public isVideoMuted(): boolean {
         // We assume only one video track
         return !this.stream.getTracks().some((track) => track.kind === "video");
     }
