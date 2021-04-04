@@ -31,8 +31,18 @@ export class CallFeed extends EventEmitter {
         public userId: string,
         public type: CallFeedType,
         private client: any, // Fix when client is TSified
+        private roomId: string,
     ) {
         super()
+    }
+
+    /**
+     * Returns callRoom member
+     * @returns member of the callRoom
+     */
+    public getMember() {
+        const callRoom = this.client.getRoom(this.roomId);
+        return callRoom.getMember(this.userId);
     }
 
     /**

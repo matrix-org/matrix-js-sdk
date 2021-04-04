@@ -424,7 +424,7 @@ export class MatrixCall extends EventEmitter {
         if (feed) {
             feed.setNewStream(stream);
         } else {
-            this.feeds.push(new CallFeed(stream, userId, type, this.client));
+            this.feeds.push(new CallFeed(stream, userId, type, this.client, this.roomId));
             this.emit(CallEvent.FeedsChanged, this.feeds);
         }
     }
