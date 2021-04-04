@@ -16,8 +16,8 @@ limitations under the License.
 
 import EventEmitter from "events";
 
-export enum CallFeedType {
-    Webcam = "webcam",
+export enum CallFeedPurpose {
+    Usermedia = "usermedia",
     Screenshare = "screenshare",
 }
 
@@ -29,7 +29,7 @@ export class CallFeed extends EventEmitter {
     constructor(
         public stream: MediaStream,
         public userId: string,
-        public type: CallFeedType,
+        public purpose: CallFeedPurpose,
         private client: any, // Fix when client is TSified
         private roomId: string,
     ) {

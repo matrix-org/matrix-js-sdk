@@ -29,7 +29,7 @@ import {EventType} from '../@types/event';
 import { RoomMember } from '../models/room-member';
 import { randomString } from '../randomstring';
 import { MCallReplacesEvent, MCallAnswer, MCallOfferNegotiate, CallCapabilities } from './callEventTypes';
-import { CallFeed, CallFeedType } from './callFeed';
+import { CallFeed, CallFeedPurpose } from './callFeed';
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
@@ -417,14 +417,14 @@ export class MatrixCall extends EventEmitter {
         return !this.feeds.some((feed) => !feed.isLocal());
     }
 
-    private pushNewFeed(stream: MediaStream, userId: string, type: CallFeedType) {
+    private pushNewFeed(stream: MediaStream, userId: string, purpose: CallFeedPurpose) {
         // Try to find a feed with the same stream id as the new stream,
         // if we find it replace the old stream with the new one
         const feed = this.feeds.find((feed) => feed.stream.id === stream.id);
         if (feed) {
             feed.setNewStream(stream);
         } else {
-            this.feeds.push(new CallFeed(stream, userId, type, this.client, this.roomId));
+            this.feeds.push(new CallFeed(stream, userId, purpose, this.client, this.roomId));
             this.emit(CallEvent.FeedsChanged, this.feeds);
         }
     }
@@ -770,9 +770,9 @@ export class MatrixCall extends EventEmitter {
             logger.debug(
                 "Setting screen sharing stream to the local video element",
             );
-            this.pushNewFeed(this.screenSharingStream, this.client.getUserId(), CallFeedType.Screenshare);
+            this.pushNewFeed(this.screenSharingStream, this.client.getUserId(), CallFeedPurpose.Screenshare);
         } else {
-            this.pushNewFeed(stream, this.client.getUserId(), CallFeedType.Webcam);
+            this.pushNewFeed(stream, this.client.getUserId(), CallFeedPurpose.Usermedia);
         }
 
         // why do we enable audio (and only audio) tracks here? -- matthew
@@ -842,7 +842,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        this.pushNewFeed(stream, this.client.getUserId(), CallFeedType.Webcam);
+        this.pushNewFeed(stream, this.client.getUserId(), CallFeedPurpose.Usermedia);
 
         this.localAVStream = stream;
         logger.info("Got local AV stream with id " + this.localAVStream.id);
@@ -1266,7 +1266,7 @@ export class MatrixCall extends EventEmitter {
 
         logger.debug(`Track id ${ev.track.id} of kind ${ev.track.kind} added`);
 
-        this.pushNewFeed(this.remoteStream, this.getOpponentMember().userId, CallFeedType.Webcam)
+        this.pushNewFeed(this.remoteStream, this.getOpponentMember().userId, CallFeedPurpose.Usermedia)
 
         logger.info("playing remote. stream active? " + this.remoteStream.active);
     };
