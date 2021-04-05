@@ -61,7 +61,7 @@ export class CallFeed extends EventEmitter {
      * @returns {boolean} is audio muted?
      */
     public isAudioMuted(): boolean {
-        return !this.stream.getTracks().some((track) => track.kind === "audio");
+        return this.stream.getAudioTracks().length === 0;
     }
 
     /**
@@ -71,7 +71,7 @@ export class CallFeed extends EventEmitter {
      */
     public isVideoMuted(): boolean {
         // We assume only one video track
-        return !this.stream.getTracks().some((track) => track.kind === "video");
+        return this.stream.getVideoTracks().length === 0;
     }
 
     /**
