@@ -1330,12 +1330,14 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function({
 
     const seenPubkey = newCrossSigning.getId();
     const masterChanged = this._crossSigningInfo.getId() !== seenPubkey;
+    const masterExistsNotLocallyCached =
+        newCrossSigning.getId() && !crossSigningPrivateKeys.has("master");
     if (masterChanged) {
         logger.info("Got new master public key", seenPubkey);
     }
     if (
         allowPrivateKeyRequests &&
-        (masterChanged || !crossSigningPrivateKeys.has("master"))
+        (masterChanged || masterExistsNotLocallyCached)
     ) {
         logger.info("Attempting to retrieve cross-signing master private key");
         let signing = null;
@@ -1362,6 +1364,15 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function({
     const selfSigningChanged = oldSelfSigningId !== newCrossSigning.getId("self_signing");
     const userSigningChanged = oldUserSigningId !== newCrossSigning.getId("user_signing");
 
+    const selfSigningExistsNotLocallyCached = (
+        newCrossSigning.getId("self_signing") &&
+        !crossSigningPrivateKeys.has("self_signing")
+    );
+    const userSigningExistsNotLocallyCached = (
+        newCrossSigning.getId("user_signing") &&
+        !crossSigningPrivateKeys.has("user_signing")
+    );
+
     const keySignatures = {};
 
     if (selfSigningChanged) {
@@ -1369,7 +1380,7 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function({
     }
     if (
         allowPrivateKeyRequests &&
-        (selfSigningChanged || !crossSigningPrivateKeys.has("self_signing"))
+        (selfSigningChanged || selfSigningExistsNotLocallyCached)
     ) {
         logger.info("Attempting to retrieve cross-signing self-signing private key");
         let signing = null;
@@ -1394,7 +1405,7 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function({
     }
     if (
         allowPrivateKeyRequests &&
-        (userSigningChanged || !crossSigningPrivateKeys.has("user_signing"))
+        (userSigningChanged || userSigningExistsNotLocallyCached)
     ) {
         logger.info("Attempting to retrieve cross-signing user-signing private key");
         let signing = null;
