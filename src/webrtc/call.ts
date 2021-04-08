@@ -362,7 +362,7 @@ export class MatrixCall extends EventEmitter {
      * only works in Google Chrome and Firefox >= 44.</b>
      * @throws If you have not specified a listener for 'error' events.
      */
-    async placeScreenSharingCall(selectDesktopCapturerSource: () => Promise<DesktopCapturerSource>) {
+    async placeScreenSharingCall(selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>) {
         logger.debug("placeScreenSharingCall");
         this.checkForErrorListener();
         try {
