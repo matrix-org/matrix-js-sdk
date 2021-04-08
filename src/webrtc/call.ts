@@ -28,8 +28,15 @@ import MatrixEvent from '../models/event';
 import {EventType} from '../@types/event';
 import { RoomMember } from '../models/room-member';
 import { randomString } from '../randomstring';
-import { MCallReplacesEvent, MCallAnswer, MCallOfferNegotiate, CallCapabilities } from './callEventTypes';
-import { CallFeed, SDPStreamMetadataPurpose } from './callFeed';
+import {
+    MCallReplacesEvent,
+    MCallAnswer,
+    MCallOfferNegotiate,
+    CallCapabilities,
+    SDPStreamMetadataPurpose,
+} from './callEventTypes';
+import { CallFeed } from './callFeed';
+
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
