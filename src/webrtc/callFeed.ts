@@ -16,7 +16,7 @@ limitations under the License.
 
 import EventEmitter from "events";
 
-export enum CallFeedPurpose {
+export enum SDPStreamMetadataPurpose {
     Usermedia = "usermedia",
     Screenshare = "screenshare",
 }
@@ -29,7 +29,7 @@ export class CallFeed extends EventEmitter {
     constructor(
         public stream: MediaStream,
         public userId: string,
-        public purpose: CallFeedPurpose,
+        public purpose: SDPStreamMetadataPurpose,
         private client: any, // Fix when client is TSified
         private roomId: string,
     ) {
