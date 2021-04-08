@@ -17,8 +17,8 @@ limitations under the License.
 import EventEmitter from "events";
 
 export enum SDPStreamMetadataPurpose {
-    Usermedia = "usermedia",
-    Screenshare = "screenshare",
+    Usermedia = "m.usermedia",
+    Screenshare = "m.screenshare",
 }
 
 export enum CallFeedEvent {
