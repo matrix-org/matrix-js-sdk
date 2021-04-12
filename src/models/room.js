@@ -1311,10 +1311,9 @@ Room.prototype._savePendingEvents = function() {
         };
     }).filter(event => {
         // Filter out the unencrypted messages if the room is encrypted
-        const isEventEncrypted = event.getType !== "m.room.encrypted";
+        const isEventEncrypted = event.getType() === "m.room.encrypted";
         const isRoomEncrypted = this._client.isRoomEncrypted(this.roomId);
-
-        return !isRoomEncrypted || (isRoomEncrypted && isEventEncrypted);
+        return isEventEncrypted || !isRoomEncrypted;
     });
 
     const { store } = this._client._sessionStore;
