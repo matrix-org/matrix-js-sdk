@@ -1303,6 +1303,19 @@ Room.prototype.addPendingEvent = function(event, txnId) {
     this.emit("Room.localEchoUpdated", event, this, null, null);
 };
 
+/**
+ * Persists all pending events to local storage
+ *
+ * If the current room is encrypted only encrypted events will be persisted
+ * all messages that are not yet encrypted will be discarded
+ *
+ * This is because the flow of EVENT_STATUS transition is
+ * queued => sending => encrypting => sending => sent
+ *
+ * Steps 3 and 4 are skipped for unencrypted room.
+ * It is better to discard an unencrypted message rather than persisting
+ * it locally for everyone to read
+ */
 Room.prototype._savePendingEvents = function() {
     const pendingEvents = this._pendingEventList.map(event => {
         return {
