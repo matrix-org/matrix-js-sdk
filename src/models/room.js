@@ -195,9 +195,10 @@ export function Room(roomId, client, myUserId, opts) {
         if (serializedPendingEventList) {
             JSON.parse(serializedPendingEventList)
                 .forEach(serializedEvent => {
+                    const txnId = client.makeTxnId();
                     const event = new MatrixEvent(serializedEvent);
                     event.setStatus(EventStatus.NOT_SENT);
-                    const txnId = client.makeTxnId();
+                    event.setTxnId(txnId);
                     this.addPendingEvent(event, txnId);
                 });
         }
@@ -1471,9 +1472,6 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
         // timeline map.
         for (let i = 0; i < this._timelineSets.length; i++) {
             this._timelineSets[i].replaceEventId(oldEventId, newEventId);
-        }
-        if (this._opts.pendingEventOrdering === "detached") {
-            this.removePendingEvent(event.event.event_id);
         }
     } else if (newStatus == EventStatus.CANCELLED) {
         // remove it from the pending event list, or the timeline.
