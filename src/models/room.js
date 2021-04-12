@@ -1317,26 +1317,28 @@ Room.prototype.addPendingEvent = function(event, txnId) {
  * it locally for everyone to read
  */
 Room.prototype._savePendingEvents = function() {
-    const pendingEvents = this._pendingEventList.map(event => {
-        return {
-            ...event.event,
-            txn_id: event.getTxnId(),
-        };
-    }).filter(event => {
-        // Filter out the unencrypted messages if the room is encrypted
-        const isEventEncrypted = event.type === "m.room.encrypted";
-        const isRoomEncrypted = this._client.isRoomEncrypted(this.roomId);
-        return isEventEncrypted || !isRoomEncrypted;
-    });
+    if (this._pendingEventList) {
+        const pendingEvents = this._pendingEventList.map(event => {
+            return {
+                ...event.event,
+                txn_id: event.getTxnId(),
+            };
+        }).filter(event => {
+            // Filter out the unencrypted messages if the room is encrypted
+            const isEventEncrypted = event.type === "m.room.encrypted";
+            const isRoomEncrypted = this._client.isRoomEncrypted(this.roomId);
+            return isEventEncrypted || !isRoomEncrypted;
+        });
 
-    const { store } = this._client._sessionStore;
-    if (this._pendingEventList.length > 0) {
-        store.setItem(
-            pendingEventsKey(this.roomId),
-            JSON.stringify(pendingEvents),
-        );
-    } else {
-        store.removeItem(pendingEventsKey(this.roomId));
+        const { store } = this._client._sessionStore;
+        if (this._pendingEventList.length > 0) {
+            store.setItem(
+                pendingEventsKey(this.roomId),
+                JSON.stringify(pendingEvents),
+            );
+        } else {
+            store.removeItem(pendingEventsKey(this.roomId));
+        }
     }
 };
 
