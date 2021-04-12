@@ -195,11 +195,9 @@ export function Room(roomId, client, myUserId, opts) {
         if (serializedPendingEventList) {
             JSON.parse(serializedPendingEventList)
                 .forEach(serializedEvent => {
-                    const txnId = client.makeTxnId();
                     const event = new MatrixEvent(serializedEvent);
                     event.setStatus(EventStatus.NOT_SENT);
-                    event.setTxnId(txnId);
-                    this.addPendingEvent(event, txnId);
+                    this.addPendingEvent(event, event.getTxnId());
                 });
         }
     }
