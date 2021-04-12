@@ -194,11 +194,13 @@ export function Room(roomId, client, myUserId, opts) {
         const serializedPendingEventList = client._sessionStore.store.getItem(pendingEventsKey(this.roomId));
         if (serializedPendingEventList) {
             JSON.parse(serializedPendingEventList)
-                .forEach(serializedEvent => {
+                .forEach(async serializedEvent => {
                     const event = new MatrixEvent(serializedEvent);
+                    if (event.getType() === "m.room.encrypted") {
+                        await event.attemptDecryption(this._client._crypto);
+                    }
                     event.setStatus(EventStatus.NOT_SENT);
-                    const txnId = client.makeTxnId();
-                    this.addPendingEvent(event, txnId);
+                    this.addPendingEvent(event, event.getTxnId());
                 });
         }
     }
@@ -396,15 +398,7 @@ Room.prototype.removePendingEvent = function(eventId) {
         }, false,
     );
 
-    const { store } = this._client._sessionStore;
-    if (this._pendingEventList.length > 0) {
-        store.setItem(
-            pendingEventsKey(this.roomId),
-            JSON.stringify(this._pendingEventList),
-        );
-    } else {
-        store.removeItem(pendingEventsKey(this.roomId));
-    }
+    this._savePendingEvents();
 
     return removed;
 };
@@ -1271,11 +1265,7 @@ Room.prototype.addPendingEvent = function(event, txnId) {
             event.setStatus(EventStatus.NOT_SENT);
         }
         this._pendingEventList.push(event);
-        const { store } = this._client._sessionStore;
-        store.setItem(
-            pendingEventsKey(this.roomId),
-            JSON.stringify(this._pendingEventList),
-        );
+        this._savePendingEvents();
         if (event.isRelation()) {
             // For pending events, add them to the relations collection immediately.
             // (The alternate case below already covers this as part of adding to
@@ -1312,6 +1302,46 @@ Room.prototype.addPendingEvent = function(event, txnId) {
 
     this.emit("Room.localEchoUpdated", event, this, null, null);
 };
+
+/**
+ * Persists all pending events to local storage
+ *
+ * If the current room is encrypted only encrypted events will be persisted
+ * all messages that are not yet encrypted will be discarded
+ *
+ * This is because the flow of EVENT_STATUS transition is
+ * queued => sending => encrypting => sending => sent
+ *
+ * Steps 3 and 4 are skipped for unencrypted room.
+ * It is better to discard an unencrypted message rather than persisting
+ * it locally for everyone to read
+ */
+Room.prototype._savePendingEvents = function() {
+    if (this._pendingEventList) {
+        const pendingEvents = this._pendingEventList.map(event => {
+            return {
+                ...event.event,
+                txn_id: event.getTxnId(),
+            };
+        }).filter(event => {
+            // Filter out the unencrypted messages if the room is encrypted
+            const isEventEncrypted = event.type === "m.room.encrypted";
+            const isRoomEncrypted = this._client.isRoomEncrypted(this.roomId);
+            return isEventEncrypted || !isRoomEncrypted;
+        });
+
+        const { store } = this._client._sessionStore;
+        if (this._pendingEventList.length > 0) {
+            store.setItem(
+                pendingEventsKey(this.roomId),
+                JSON.stringify(pendingEvents),
+            );
+        } else {
+            store.removeItem(pendingEventsKey(this.roomId));
+        }
+    }
+};
+
 /**
  * Used to aggregate the local echo for a relation, and also
  * for re-applying a relation after it's redaction has been cancelled,
@@ -1472,9 +1502,6 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
         for (let i = 0; i < this._timelineSets.length; i++) {
             this._timelineSets[i].replaceEventId(oldEventId, newEventId);
         }
-        if (this._opts.pendingEventOrdering === "detached") {
-            this.removePendingEvent(event.event.event_id);
-        }
     } else if (newStatus == EventStatus.CANCELLED) {
         // remove it from the pending event list, or the timeline.
         if (this._pendingEventList) {
@@ -1488,6 +1515,7 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
         }
         this.removeEvent(oldEventId);
     }
+    this._savePendingEvents();
 
     this.emit("Room.localEchoUpdated", event, this, oldEventId, oldStatus);
 };
