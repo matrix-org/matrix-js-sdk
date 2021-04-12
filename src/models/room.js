@@ -1303,15 +1303,19 @@ Room.prototype.addPendingEvent = function(event, txnId) {
     this.emit("Room.localEchoUpdated", event, this, null, null);
 };
 
-Room.prototype._savePendingEvents = async function() {
-    const pendingEvents = await Promise.all(
-        this._pendingEventList.map(async (event) => {
-            return {
-                ...event.event,
-                txn_id: event.getTxnId(),
-            };
-        }),
-    );
+Room.prototype._savePendingEvents = function() {
+    const pendingEvents = this._pendingEventList.map(event => {
+        return {
+            ...event.event,
+            txn_id: event.getTxnId(),
+        };
+    }).filter(event => {
+        // Filter out the unencrypted messages if the room is encrypted
+        const isEventEncrypted = event.getType !== "m.room.encrypted";
+        const isRoomEncrypted = this._client.isRoomEncrypted(this.roomId);
+
+        return !isRoomEncrypted || (isRoomEncrypted && isEventEncrypted);
+    });
 
     const { store } = this._client._sessionStore;
     if (this._pendingEventList.length > 0) {
