@@ -1098,7 +1098,6 @@ utils.extend(MatrixEvent.prototype, {
             origin_server_ts: this.getTs(),
             unsigned: this.getUnsigned(),
             room_id: this.getRoomId(),
-            txn_id: this.getTxnId(),
         };
 
         // if this is a redaction then attach the redacts key

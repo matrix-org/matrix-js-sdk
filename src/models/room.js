@@ -194,8 +194,11 @@ export function Room(roomId, client, myUserId, opts) {
         const serializedPendingEventList = client._sessionStore.store.getItem(pendingEventsKey(this.roomId));
         if (serializedPendingEventList) {
             JSON.parse(serializedPendingEventList)
-                .forEach(serializedEvent => {
+                .forEach(async serializedEvent => {
                     const event = new MatrixEvent(serializedEvent);
+                    if (event.getType() === "m.room.encrypted") {
+                        await event.attemptDecryption(this._client._crypto);
+                    }
                     event.setStatus(EventStatus.NOT_SENT);
                     this.addPendingEvent(event, event.getTxnId());
                 });
@@ -395,15 +398,7 @@ Room.prototype.removePendingEvent = function(eventId) {
         }, false,
     );
 
-    const { store } = this._client._sessionStore;
-    if (this._pendingEventList.length > 0) {
-        store.setItem(
-            pendingEventsKey(this.roomId),
-            JSON.stringify(this._pendingEventList),
-        );
-    } else {
-        store.removeItem(pendingEventsKey(this.roomId));
-    }
+    this._savePendingEvents();
 
     return removed;
 };
@@ -1270,11 +1265,7 @@ Room.prototype.addPendingEvent = function(event, txnId) {
             event.setStatus(EventStatus.NOT_SENT);
         }
         this._pendingEventList.push(event);
-        const { store } = this._client._sessionStore;
-        store.setItem(
-            pendingEventsKey(this.roomId),
-            JSON.stringify(this._pendingEventList),
-        );
+        this._savePendingEvents();
         if (event.isRelation()) {
             // For pending events, add them to the relations collection immediately.
             // (The alternate case below already covers this as part of adding to
@@ -1311,6 +1302,28 @@ Room.prototype.addPendingEvent = function(event, txnId) {
 
     this.emit("Room.localEchoUpdated", event, this, null, null);
 };
+
+Room.prototype._savePendingEvents = async function() {
+    const pendingEvents = await Promise.all(
+        this._pendingEventList.map(async (event) => {
+            return {
+                ...event.event,
+                txn_id: event.getTxnId(),
+            };
+        }),
+    );
+
+    const { store } = this._client._sessionStore;
+    if (this._pendingEventList.length > 0) {
+        store.setItem(
+            pendingEventsKey(this.roomId),
+            JSON.stringify(pendingEvents),
+        );
+    } else {
+        store.removeItem(pendingEventsKey(this.roomId));
+    }
+};
+
 /**
  * Used to aggregate the local echo for a relation, and also
  * for re-applying a relation after it's redaction has been cancelled,
@@ -1484,6 +1497,7 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
         }
         this.removeEvent(oldEventId);
     }
+    this._savePendingEvents();
 
     this.emit("Room.localEchoUpdated", event, this, oldEventId, oldStatus);
 };
