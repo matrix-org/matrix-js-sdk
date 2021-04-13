@@ -1,13 +1,12 @@
 module.exports = {
-    extends: ["matrix-org"],
     plugins: [
-        "babel",
+        "matrix-org",
     ],
+    extends: ["plugin:matrix-org/javascript"],
     env: {
         browser: true,
         node: true,
     },
-
     rules: {
         "no-var": ["warn"],
         "prefer-rest-params": ["warn"],
@@ -33,7 +32,7 @@ module.exports = {
     },
     overrides: [{
         "files": ["src/**/*.ts"],
-        "extends": ["matrix-org/ts"],
+        "extends": ["plugin:matrix-org/typescript"],
         "rules": {
             // We're okay being explicit at the moment
             "@typescript-eslint/no-empty-interface": "off",

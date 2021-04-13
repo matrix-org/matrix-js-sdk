@@ -30,7 +30,7 @@ export async function makeTestClients(userInfos, options) {
                 for (const [deviceId, msg] of Object.entries(devMap)) {
                     if (deviceId in clientMap[userId]) {
                         const event = new MatrixEvent({
-                            sender: this.getUserId(), // eslint-disable-line babel/no-invalid-this
+                            sender: this.getUserId(), // eslint-disable-line @babel/no-invalid-this
                             type: type,
                             content: msg,
                         });
@@ -49,9 +49,9 @@ export async function makeTestClients(userInfos, options) {
     };
     const sendEvent = function(room, type, content) {
         // make up a unique ID as the event ID
-        const eventId = "$" + this.makeTxnId(); // eslint-disable-line babel/no-invalid-this
+        const eventId = "$" + this.makeTxnId(); // eslint-disable-line @babel/no-invalid-this
         const rawEvent = {
-            sender: this.getUserId(), // eslint-disable-line babel/no-invalid-this
+            sender: this.getUserId(), // eslint-disable-line @babel/no-invalid-this
             type: type,
             content: content,
             room_id: room,
@@ -61,13 +61,13 @@ export async function makeTestClients(userInfos, options) {
         const event = new MatrixEvent(rawEvent);
         const remoteEcho = new MatrixEvent(Object.assign({}, rawEvent, {
             unsigned: {
-                transaction_id: this.makeTxnId(), // eslint-disable-line babel/no-invalid-this
+                transaction_id: this.makeTxnId(), // eslint-disable-line @babel/no-invalid-this
             },
         }));
 
         setImmediate(() => {
             for (const tc of clients) {
-                if (tc.client === this) { // eslint-disable-line babel/no-invalid-this
+                if (tc.client === this) { // eslint-disable-line @babel/no-invalid-this
                     logger.log("sending remote echo!!");
                     tc.client.emit("Room.timeline", remoteEcho);
                 } else {
