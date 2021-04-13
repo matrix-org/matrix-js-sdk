@@ -168,7 +168,7 @@ export const MatrixEvent = function(
     /* The txnId with which this event was sent if it was during this session,
        allows for a unique ID which does not change when the event comes back down sync.
      */
-    this._txnId = null;
+    this._txnId = event.txn_id || null;
 
     /* Set an approximate timestamp for the event relative the local clock.
      * This will inherently be approximate because it doesn't take into account
