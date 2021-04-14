@@ -500,7 +500,7 @@ MatrixClient.prototype.rehydrateDevice = async function() {
         return;
     }
 
-    const getDeviceResult = this.getDehydratedDevice();
+    const getDeviceResult = await this.getDehydratedDevice();
     if (!getDeviceResult) {
         return;
     }
