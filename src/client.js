@@ -2854,7 +2854,11 @@ MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
 
     // add this event immediately to the local store as 'sending'.
     if (room) {
-        room.addPendingEvent(localEvent, txnId);
+        try {
+            room.addPendingEvent(localEvent, txnId);
+        } catch (e) {
+            logger.warn(`_sendCompleteEvent adding pending event failed because of: ${e ? e.message : "unknown reason"}`); 
+        }
     }
 
     // addPendingEvent can change the state to NOT_SENT if it believes
