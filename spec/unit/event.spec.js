@@ -17,6 +17,7 @@ limitations under the License.
 
 import {logger} from "../../src/logger";
 import {MatrixEvent} from "../../src/models/event";
+import {mkMessage} from "../test-utils";
 
 describe("MatrixEvent", () => {
     describe(".attemptDecryption", () => {
@@ -71,6 +72,29 @@ describe("MatrixEvent", () => {
                 // make sure the second attemptDecryption resolves
                 return prom2;
             });
+        });
+    });
+
+    describe(".getContent", () => {
+        it('should provide the plain-text body for plain text messages', () => {
+            const event = mkMessage({
+                room: "!foo:bar",
+                user: "@baz:bar",
+                msg: "a plain text message",
+                event: true,
+            });
+            expect(event.getContent().body).toEqual("a plain text message");
+        });
+
+        it("will replace the fallback body for HTML messages", function() {
+            const event = mkMessage({
+                room: "!foo:bar",
+                user: "@baz:bar",
+                msg: "at the end of the movie, [Spoiler](it turns out it was all a dream)",
+                html: "at the end of the movie, <span data-mx-spoiler>it turns out it was all a dream</span>",
+                event: true,
+            });
+            expect(event.getContent().body).toEqual("at the end of the movie, ███████████████████████████████");
         });
     });
 });

@@ -54,6 +54,7 @@
     "bs58": "^4.0.1",
     "content-type": "^1.0.4",
     "loglevel": "^1.7.1",
+    "parse5": "^6.0.1",
     "qs": "^6.9.6",
     "request": "^2.88.2",
     "unhomoglyph": "^1.0.6"
@@ -73,6 +74,7 @@
     "@babel/register": "^7.12.10",
     "@types/jest": "^26.0.20",
     "@types/node": "12",
+    "@types/parse5": "^6.0.0",
     "@types/request": "^2.48.5",
     "@typescript-eslint/eslint-plugin": "^4.17.0",
     "@typescript-eslint/parser": "^4.17.0",

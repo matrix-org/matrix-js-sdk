@@ -308,4 +308,38 @@ describe("utils", function() {
             expect(promiseCount).toEqual(2);
         });
     });
+
+    describe("htmlToText", function() {
+        it("should redact spoilers", function() {
+            expect(utils.htmlToText(
+                "<p>Spoiler alert: <span data-mx-spoiler>The person reading this is cute</span></p>",
+            )).toEqual("Spoiler alert: ███████████████████████████████");
+        });
+
+        it("should preserve spans that aren't spoilers", function() {
+            expect(utils.htmlToText(
+                `<p>Check out these <span data-mx-color="red">awesome colors!</span></p>`,
+            )).toEqual("Check out these awesome colors!");
+        });
+
+        it("should preserve <del> tags", function() {
+            expect(utils.htmlToText(
+                "<p>This food tastes <del>awful</del> delicious!</p>",
+            )).toEqual("This food tastes <del>awful</del> delicious!");
+        });
+
+        it("should space out block elements", function() {
+            expect(utils.htmlToText(
+                "<p>Here's a paragraph.</p><p>Here's another paragraph.</p>",
+            )).toEqual("Here's a paragraph. Here's another paragraph.");
+        });
+
+        it("should handle empty strings", function() {
+            expect(utils.htmlToText("")).toEqual("");
+        });
+
+        it("should handle strings with no tags", function() {
+            expect(utils.htmlToText("This is a test")).toEqual("This is a test");
+        });
+    });
 });

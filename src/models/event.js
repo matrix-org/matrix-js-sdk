@@ -254,7 +254,14 @@ utils.extend(MatrixEvent.prototype, {
         if (this._localRedactionEvent) {
             return {};
         }
-        return this._clearEvent.content || this.event.content || {};
+        const content = this._clearEvent.content || this.event.content || {};
+        const format = content.format || "";
+        // MSC3124: discard original fallback body of HTML messages
+        // and replace it with a spoiler-free version derived from the formatted_body
+        if (format === "org.matrix.custom.html") {
+            content.body = utils.htmlToText(content.formatted_body || "");
+        }
+        return content;
     },
 
     /**

@@ -159,6 +159,9 @@ export function mkMembership(opts) {
  * @param {string} opts.room The room ID for the event.
  * @param {string} opts.user The user ID for the event.
  * @param {string} opts.msg Optional. The content.body for the event.
+ * @param {string} opts.html Optional. If provided, will add
+ * content.format as "org.matrix.custom.html" and set
+ * content.formatted_body to this value.
  * @param {boolean} opts.event True to make a MatrixEvent.
  * @return {Object|MatrixEvent} The event
  */
@@ -174,6 +177,10 @@ export function mkMessage(opts) {
         msgtype: "m.text",
         body: opts.msg,
     };
+    if (opts.html) {
+        opts.content.format = "org.matrix.custom.html";
+        opts.content.formatted_body = opts.html;
+    }
     return mkEvent(opts);
 }
 

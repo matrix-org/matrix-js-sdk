@@ -21,6 +21,7 @@ limitations under the License.
  */
 
 import unhomoglyph from 'unhomoglyph';
+import * as parse5 from 'parse5';
 
 /**
  * Encode a dictionary of query parameters.
@@ -766,4 +767,51 @@ export function setCrypto(c: Object) {
 
 export function getCrypto(): Object {
     return crypto;
+}
+
+// Return a very rough text representation of an HTML message body for
+// use in notifications/etc.
+export function htmlToText(html: string): string {
+    const fragment: parse5.DocumentFragment = parse5.parseFragment(html);
+    return nodeToText(fragment).trim().replace(/\s\s+/g, " ");
+}
+
+function nodeToText(node: parse5.Node): string {
+    if (node.nodeName === "#text") {
+        return (node as parse5.TextNode).value;
+    }
+
+    const reducer = (acc: string, val: parse5.Node) => acc.concat(nodeToText(val));
+    const content = (node as parse5.ParentNode).childNodes.reduce(reducer, "");
+
+    switch (node.nodeName) {
+        // Redact spoilers
+        case "span":
+            if ((node as parse5.Element).attrs.some((attr) => attr.name === "data-mx-spoiler")) {
+                return "█".repeat(content.length);
+            } else {
+                return content;
+            }
+        // Handle <del> specially since it has more semantic importance
+        case "del":
+            return `<del>${content}</del>`;
+        // Add spaces before/after supported block elements
+        case "h1":
+        case "h2":
+        case "h3":
+        case "h4":
+        case "h5":
+        case "h6":
+        case "blockquote":
+        case "p":
+        case "li":
+        case "div":
+        case "pre":
+        case "th":
+        case "td":
+            return ` ${content} `;
+        // Everything else, just strip the tags and call it a day
+        default:
+            return content;
+    }
 }
