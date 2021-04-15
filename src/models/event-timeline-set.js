@@ -576,7 +576,7 @@ EventTimelineSet.prototype.addEventToTimeline = function(event, timeline,
 EventTimelineSet.prototype.handleRemoteEcho = function(localEvent, oldEventId,
                                                         newEventId) {
     // XXX: why don't we infer newEventId from localEvent?
-    const existingTimeline = this._eventIdToTimeline[oldEventId];
+    const existingTimeline = this._eventIdToTimeline[oldEventId] || this._eventIdToTimeline[newEventId];
     if (existingTimeline) {
         delete this._eventIdToTimeline[oldEventId];
         this._eventIdToTimeline[newEventId] = existingTimeline;
