@@ -2858,7 +2858,7 @@ MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
             room.addPendingEvent(localEvent, txnId);
         } catch (e) {
             logger.warn(
-                `_sendCompleteEvent adding pending event failed because of: ${e ? e.message : "unknown reason"}`
+                `_sendCompleteEvent adding pending event failed because of: ${e ? e.message : "unknown reason"}`,
             );
         }
     }
