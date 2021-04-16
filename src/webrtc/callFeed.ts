@@ -16,6 +16,8 @@ limitations under the License.
 
 import EventEmitter from "events";
 import {SDPStreamMetadataPurpose} from "./callEventTypes";
+import MatrixClient from "../client"
+import {RoomMember} from "../models/room-member";
 
 export enum CallFeedEvent {
     NewStream = "new_stream",
@@ -26,7 +28,7 @@ export class CallFeed extends EventEmitter {
         public stream: MediaStream,
         public userId: string,
         public purpose: SDPStreamMetadataPurpose,
-        private client: any, // Fix when client is TSified
+        private client: MatrixClient, // Fix when client is TSified
         private roomId: string,
     ) {
         super()
@@ -36,7 +38,7 @@ export class CallFeed extends EventEmitter {
      * Returns callRoom member
      * @returns member of the callRoom
      */
-    public getMember() {
+    public getMember(): RoomMember {
         const callRoom = this.client.getRoom(this.roomId);
         return callRoom.getMember(this.userId);
     }
@@ -45,7 +47,7 @@ export class CallFeed extends EventEmitter {
      * Returns true if CallFeed is local, otherwise returns false
      * @returns {boolean} is local?
      */
-    public isLocal() {
+    public isLocal(): boolean {
         return this.userId === this.client.getUserId();
     }
 
