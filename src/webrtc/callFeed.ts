@@ -28,7 +28,7 @@ export class CallFeed extends EventEmitter {
         public stream: MediaStream,
         public userId: string,
         public purpose: SDPStreamMetadataPurpose,
-        private client: MatrixClient, // Fix when client is TSified
+        private client: MatrixClient,
         private roomId: string,
     ) {
         super()
