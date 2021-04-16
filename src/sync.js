@@ -476,7 +476,7 @@ SyncApi.prototype.sync = function() {
 
     this._running = true;
 
-    if (global.window) {
+    if (global.window && global.window.addEventListener) {
         this._onOnlineBound = this._onOnline.bind(this);
         global.window.addEventListener("online", this._onOnlineBound, false);
     }

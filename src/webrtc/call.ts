@@ -216,9 +216,9 @@ export function getDesktopCapturerSources(): Promise<Array<DesktopCapturerSource
 }
 
 export class CallError extends Error {
-    code : string;
+    code: string;
 
-    constructor(code : CallErrorCode, msg: string, err: Error) {
+    constructor(code: CallErrorCode, msg: string, err: Error) {
         // Stil ldon't think there's any way to have proper nested errors
         super(msg + ": " + err);
 
@@ -1104,7 +1104,7 @@ export class MatrixCall extends EventEmitter {
         }
     }
 
-    private callHasEnded() : boolean {
+    private callHasEnded(): boolean {
         // This exists as workaround to typescript trying to be clever and erroring
         // when putting if (this.state === CallState.Ended) return; twice in the same
         // function, even though that function is async.

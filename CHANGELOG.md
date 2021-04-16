@@ -1,3 +1,28 @@
+Changes in [9.11.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.11.0) (2021-04-12)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.11.0-rc.1...v9.11.0)
+
+ * No changes since rc.1
+
+Changes in [9.11.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.11.0-rc.1) (2021-04-07)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.10.0...v9.11.0-rc.1)
+
+ * Only try to cache private keys we know exist
+   [\#1657](https://github.com/matrix-org/matrix-js-sdk/pull/1657)
+ * Properly terminate screen-share calls if NoUserMedia
+   [\#1654](https://github.com/matrix-org/matrix-js-sdk/pull/1654)
+ * Attended transfer
+   [\#1652](https://github.com/matrix-org/matrix-js-sdk/pull/1652)
+ * Remove catch handlers in private key retrieval
+   [\#1653](https://github.com/matrix-org/matrix-js-sdk/pull/1653)
+ * Fixed the media fail error on caller's side
+   [\#1651](https://github.com/matrix-org/matrix-js-sdk/pull/1651)
+ * Add function to share megolm keys for historical messages, take 2
+   [\#1640](https://github.com/matrix-org/matrix-js-sdk/pull/1640)
+ * Cache cross-signing private keys if needed on bootstrap
+   [\#1649](https://github.com/matrix-org/matrix-js-sdk/pull/1649)
+
 Changes in [9.10.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.10.0) (2021-03-29)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.10.0-rc.1...v9.10.0)

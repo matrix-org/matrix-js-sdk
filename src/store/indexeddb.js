@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/* eslint-disable babel/no-invalid-this */
+/* eslint-disable @babel/no-invalid-this */
 
 import {MemoryStore} from "./memory";
 import * as utils from "../utils";
