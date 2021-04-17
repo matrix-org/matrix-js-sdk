@@ -267,6 +267,10 @@ export function PushProcessor(client) {
         if (cond.value) {
             return cond.value === val;
         }
+        
+        if (typeof cond.pattern !== 'string') {
+            return false;
+        }
 
         let regex;
 
