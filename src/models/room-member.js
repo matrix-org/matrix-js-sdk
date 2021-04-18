@@ -61,6 +61,7 @@ export function RoomMember(roomId, userId) {
     };
     this._isOutOfBand = false;
     this._updateModifiedTime();
+    this.disambiguate = false;
 }
 utils.inherits(RoomMember, EventEmitter);
 
@@ -90,6 +91,8 @@ RoomMember.prototype.isOutOfBand = function() {
  * @fires module:client~MatrixClient#event:"RoomMember.membership"
  */
 RoomMember.prototype.setMembershipEvent = function(event, roomState) {
+    const displayName = event.getDirectionalContent().displayname;
+
     if (event.getType() !== "m.room.member") {
         return;
     }
@@ -101,11 +104,19 @@ RoomMember.prototype.setMembershipEvent = function(event, roomState) {
     const oldMembership = this.membership;
     this.membership = event.getDirectionalContent().membership;
 
+    this.disambiguate = shouldDisambiguate(
+        this.userId,
+        displayName,
+        roomState,
+    );
+
     const oldName = this.name;
     this.name = calculateDisplayName(
         this.userId,
-        event.getDirectionalContent().displayname,
-        roomState);
+        displayName,
+        roomState,
+        this.disambiguate,
+    );
 
     this.rawDisplayName = event.getDirectionalContent().displayname || this.userId;
     if (oldMembership !== this.membership) {
@@ -293,43 +304,40 @@ RoomMember.prototype.getMxcAvatarUrl = function() {
 const MXID_PATTERN = /@.+:.+/;
 const LTR_RTL_PATTERN = /[\u200E\u200F\u202A-\u202F]/;
 
-function calculateDisplayName(selfUserId, displayName, roomState) {
-    if (!displayName || displayName === selfUserId) {
-        return selfUserId;
-    }
+function shouldDisambiguate(selfUserId, displayName, roomState) {
+    if (!displayName || displayName === selfUserId) return false;
 
     // First check if the displayname is something we consider truthy
     // after stripping it of zero width characters and padding spaces
-    if (!utils.removeHiddenChars(displayName)) {
-        return selfUserId;
-    }
+    if (!utils.removeHiddenChars(displayName)) return false;
 
-    if (!roomState) {
-        return displayName;
-    }
+    if (!roomState) return false;
 
     // Next check if the name contains something that look like a mxid
     // If it does, it may be someone trying to impersonate someone else
     // Show full mxid in this case
-    let disambiguate = MXID_PATTERN.test(displayName);
+    if (MXID_PATTERN.test(displayName)) return true;
 
-    if (!disambiguate) {
-        // Also show mxid if the display name contains any LTR/RTL characters as these
-        // make it very difficult for us to find similar *looking* display names
-        // E.g "Mark" could be cloned by writing "kraM" but in RTL.
-        disambiguate = LTR_RTL_PATTERN.test(displayName);
-    }
+    // Also show mxid if the display name contains any LTR/RTL characters as these
+    // make it very difficult for us to find similar *looking* display names
+    // E.g "Mark" could be cloned by writing "kraM" but in RTL.
+    if (LTR_RTL_PATTERN.test(displayName)) return true;
 
-    if (!disambiguate) {
-        // Also show mxid if there are other people with the same or similar
-        // displayname, after hidden character removal.
-        const userIds = roomState.getUserIdsWithDisplayName(displayName);
-        disambiguate = userIds.some((u) => u !== selfUserId);
-    }
+    // Also show mxid if there are other people with the same or similar
+    // displayname, after hidden character removal.
+    const userIds = roomState.getUserIdsWithDisplayName(displayName);
+    if (userIds.some((u) => u !== selfUserId)) return true;
+}
 
-    if (disambiguate) {
-        return displayName + " (" + selfUserId + ")";
-    }
+function calculateDisplayName(selfUserId, displayName, roomState, disambiguate) {
+    if (disambiguate) return displayName + " (" + selfUserId + ")";
+
+    if (!displayName || displayName === selfUserId) return selfUserId;
+
+    // First check if the displayname is something we consider truthy
+    // after stripping it of zero width characters and padding spaces
+    if (!utils.removeHiddenChars(displayName)) return selfUserId;
+
     return displayName;
 }
 
