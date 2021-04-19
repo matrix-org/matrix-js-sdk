@@ -62,6 +62,11 @@ interface TurnServer {
     ttl?: number,
 }
 
+interface AssertedIdentity {
+    id: string,
+    displayName: string,
+}
+
 export enum CallState {
     Fledgling = 'fledgling',
     InviteSent = 'invite_sent',
@@ -101,6 +106,8 @@ export enum CallEvent {
     RemoteHoldUnhold = 'remote_hold_unhold',
     // backwards compat alias for LocalHoldUnhold: remove in a major version bump
     HoldUnhold = 'hold_unhold',
+
+    AssertedIdentityChanged = 'asserted_identity_changed',
 }
 
 export enum CallErrorCode {
@@ -292,6 +299,8 @@ export class MatrixCall extends EventEmitter {
     // the call) we buffer them up here so we can then add the ones from the party we pick
     private remoteCandidateBuffer = new Map<string, RTCIceCandidate[]>();
 
+    private remoteAssertedIdentity: AssertedIdentity;
+
     constructor(opts: CallOpts) {
         super();
         this.roomId = opts.roomId;
@@ -417,6 +426,10 @@ export class MatrixCall extends EventEmitter {
 
     public opponentCanBeTransferred() {
         return Boolean(this.opponentCaps && this.opponentCaps["m.call.transferee"]);
+    }
+
+    public getRemoteAssertedIdentity(): AssertedIdentity {
+        return this.remoteAssertedIdentity;
     }
 
     /**
@@ -1197,6 +1210,16 @@ export class MatrixCall extends EventEmitter {
             // also this one for backwards compat
             this.emit(CallEvent.HoldUnhold, newLocalOnHold);
         }
+    }
+
+    async onAssertedIdentityReceived(event: MatrixEvent) {
+        if (!event.getContent().asserted_identity) return;
+
+        this.remoteAssertedIdentity = {
+            id: event.getContent().asserted_identity.id,
+            displayName: event.getContent().asserted_identity.displayName,
+        };
+        this.emit(CallEvent.AssertedIdentityChanged);
     }
 
     private callHasEnded(): boolean {
