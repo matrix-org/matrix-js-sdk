@@ -276,7 +276,8 @@ export class CallEventHandler {
 
             call.onNegotiateReceived(event);
         } else if (
-            event.getType() === EventType.CallAssertedIdentity || event.getType() === EventType.CallAssertedIdentityPrefix
+            event.getType() === EventType.CallAssertedIdentity ||
+            event.getType() === EventType.CallAssertedIdentityPrefix
         ) {
             if (!call) return;
 
