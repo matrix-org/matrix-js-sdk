@@ -110,6 +110,7 @@ RoomMember.prototype.setMembershipEvent = function(event, roomState) {
         displayName,
         roomState,
     );
+    if (this.userId == "@jboi:jboi.nl") console.log("LOG roomMember", this);
 
     const oldName = this.name;
     this.name = calculateDisplayName(
@@ -328,6 +329,8 @@ function shouldDisambiguate(selfUserId, displayName, roomState) {
     // displayname, after hidden character removal.
     const userIds = roomState.getUserIdsWithDisplayName(displayName);
     if (userIds.some((u) => u !== selfUserId)) return true;
+
+    return false;
 }
 
 function calculateDisplayName(selfUserId, displayName, roomState, disambiguate) {
