@@ -254,4 +254,43 @@ describe('Call', function() {
             sdpMid: '',
         });
     });
+
+    it('should map asserted identity messages to remoteAssertedIdentity', async function() {
+        const callPromise = call.placeVoiceCall();
+        await client.httpBackend.flush();
+        await callPromise;
+        await call.onAnswerReceived({
+            getContent: () => {
+                return {
+                    version: 1,
+                    call_id: call.callId,
+                    party_id: 'party_id',
+                    answer: {
+                        sdp: DUMMY_SDP,
+                    },
+                };
+            },
+        });
+
+        await call.onAssertedIdentityReceived({
+            getContent: () => {
+                return {
+                    version: 1,
+                    call_id: call.callId,
+                    party_id: 'party_id',
+                    asserted_identity: {
+                        id: "@steve:example.com",
+                        display_name: "Steve Gibbons",
+                    },
+                };
+            },
+        });
+
+        const ident = call.getRemoteAssertedIdentity();
+        expect(ident.id).toEqual("@steve:example.com");
+        expect(ident.displayName).toEqual("Steve Gibbons");
+
+        // Hangup to stop timers
+        call.hangup(CallErrorCode.UserHangup, true);
+    });
 });
