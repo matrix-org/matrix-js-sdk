@@ -110,7 +110,6 @@ RoomMember.prototype.setMembershipEvent = function(event, roomState) {
         displayName,
         roomState,
     );
-    if (this.userId == "@jboi:jboi.nl") console.log("LOG roomMember", this);
 
     const oldName = this.name;
     this.name = calculateDisplayName(
