@@ -273,7 +273,7 @@ describe('Call', function() {
         });
 
         const identChangedCallback = jest.fn();
-        call.on(CallEvent.AssertedIdentityChanged, identChangedCallback)
+        call.on(CallEvent.AssertedIdentityChanged, identChangedCallback);
 
         await call.onAssertedIdentityReceived({
             getContent: () => {
