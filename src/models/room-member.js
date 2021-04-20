@@ -45,6 +45,7 @@ import * as utils from "../utils";
  * @prop {string} membership The membership state for this room member e.g. 'join'.
  * @prop {Object} events The events describing this RoomMember.
  * @prop {MatrixEvent} events.member The m.room.member event for this RoomMember.
+ * @prop {boolean} disambiguate True if the client show disambiguate display names
  */
 export function RoomMember(roomId, userId) {
     this.roomId = roomId;
