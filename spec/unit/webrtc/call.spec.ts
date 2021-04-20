@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import {TestClient} from '../../TestClient';
-import {MatrixCall, CallErrorCode} from '../../../src/webrtc/call';
+import {MatrixCall, CallErrorCode, CallEvent} from '../../../src/webrtc/call';
 
 const DUMMY_SDP = (
     "v=0\r\n" +
@@ -272,6 +272,9 @@ describe('Call', function() {
             },
         });
 
+        const identChangedCallback = jest.fn();
+        call.on(CallEvent.AssertedIdentityChanged, identChangedCallback)
+
         await call.onAssertedIdentityReceived({
             getContent: () => {
                 return {
@@ -285,6 +288,8 @@ describe('Call', function() {
                 };
             },
         });
+
+        expect(identChangedCallback).toHaveBeenCalled();
 
         const ident = call.getRemoteAssertedIdentity();
         expect(ident.id).toEqual("@steve:example.com");
