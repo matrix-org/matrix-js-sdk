@@ -1217,7 +1217,7 @@ export class MatrixCall extends EventEmitter {
 
         this.remoteAssertedIdentity = {
             id: event.getContent().asserted_identity.id,
-            displayName: event.getContent().asserted_identity.displayName,
+            displayName: event.getContent().asserted_identity.display_name,
         };
         this.emit(CallEvent.AssertedIdentityChanged);
     }
