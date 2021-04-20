@@ -351,8 +351,14 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
         } else if (event.getType() === "m.room.power_levels") {
             const members = utils.values(self.members);
             utils.forEach(members, function(member) {
+                // We only propagate `RoomState.members` event if the
+                // power levels has been changed
+                // large room suffer from large re-rendering especially when not needed
+                const oldLastModified = member.getLastModifiedTime();
                 member.setPowerLevelEvent(event);
-                self.emit("RoomState.members", event, self, member);
+                if (oldLastModified !== member.getLastModifiedTime()) {
+                    self.emit("RoomState.members", event, self, member);
+                }
             });
 
             // assume all our sentinels are now out-of-date
