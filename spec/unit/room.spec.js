@@ -3,6 +3,7 @@ import {EventStatus, MatrixEvent} from "../../src/models/event";
 import {EventTimeline} from "../../src/models/event-timeline";
 import {RoomState} from "../../src/models/room-state";
 import {Room} from "../../src/models/room";
+import {TestClient} from "../TestClient";
 
 describe("Room", function() {
     const roomId = "!foo:bar";
@@ -1176,7 +1177,10 @@ describe("Room", function() {
     describe("addPendingEvent", function() {
         it("should add pending events to the pendingEventList if " +
                       "pendingEventOrdering == 'detached'", function() {
-            const room = new Room(roomId, null, userA, {
+            const client = (new TestClient(
+                "@alice:example.com", "alicedevice",
+            )).client;
+            const room = new Room(roomId, client, userA, {
                 pendingEventOrdering: "detached",
             });
             const eventA = utils.mkMessage({
@@ -1226,7 +1230,10 @@ describe("Room", function() {
 
     describe("updatePendingEvent", function() {
         it("should remove cancelled events from the pending list", function() {
-            const room = new Room(roomId, null, userA, {
+            const client = (new TestClient(
+                "@alice:example.com", "alicedevice",
+            )).client;
+            const room = new Room(roomId, client, userA, {
                 pendingEventOrdering: "detached",
             });
             const eventA = utils.mkMessage({

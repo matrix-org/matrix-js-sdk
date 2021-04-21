@@ -57,6 +57,7 @@ export enum EventType {
     KeyVerificationStart = "m.key.verification.start",
     KeyVerificationCancel = "m.key.verification.cancel",
     KeyVerificationMac = "m.key.verification.mac",
+    KeyVerificationDone = "m.key.verification.done",
     // use of this is discouraged https://matrix.org/docs/spec/client_server/r0.6.1#m-room-message-feedback
     RoomMessageFeedback = "m.room.message.feedback",
 
