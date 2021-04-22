@@ -983,6 +983,15 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
  };
 
 /**
+ * Get all currently loaded members from the current
+ * room state.
+ * @returns {RoomMember[]} Room members
+ */
+Room.prototype.getMembers = function() {
+    return this.currentState.getMembers();
+};
+
+/**
  * Get a list of members whose membership state is "join".
  * @return {RoomMember[]} A list of currently joined members.
  */
