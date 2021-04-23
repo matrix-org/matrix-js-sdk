@@ -1936,6 +1936,9 @@ export function setAudioInput(deviceId: string) { audioInput = deviceId; }
 export function setVideoInput(deviceId: string) { videoInput = deviceId; }
 
 /**
+ * DEPRECATED
+ * Use client.createCall()
+ *
  * Create a new Matrix call for the browser.
  * @param {MatrixClient} client The client instance to use.
  * @param {string} roomId The room the call is in.
