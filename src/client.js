@@ -4799,7 +4799,8 @@ MatrixClient.prototype._processRoomEventsSearch = function(searchResults, respon
     searchResults.highlights = Object.keys(highlights);
 
     // append the new results to our existing results
-    for (let i = 0; i < room_events.results.length; i++) {
+    const resultsLength = room_events.results ? room_events.results.length : 0;
+    for (let i = 0; i < resultsLength; i++) {
         const sr = SearchResult.fromJson(room_events.results[i], this.getEventMapper());
         searchResults.results.push(sr);
     }
