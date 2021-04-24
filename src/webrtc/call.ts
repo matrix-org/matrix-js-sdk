@@ -260,7 +260,6 @@ export class MatrixCall extends EventEmitter {
     private peerConn: RTCPeerConnection;
     private feeds: Array<CallFeed>;
     private screenSharingStream: MediaStream;
-    private remoteStream: MediaStream;
     private localAVStream: MediaStream;
     private inviteOrAnswerSent: boolean;
     private waitForLocalAVStream: boolean;
@@ -497,17 +496,19 @@ export class MatrixCall extends EventEmitter {
             this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
             return;
         }
+        
+        let remoteStream = this.feeds.find((feed) => {return !feed.isLocal()})?.stream;
 
         // According to previous comments in this file, firefox at some point did not
         // add streams until media started ariving on them. Testing latest firefox
         // (81 at time of writing), this is no longer a problem, so let's do it the correct way.
-        if (!this.remoteStream || this.remoteStream.getTracks().length === 0) {
+        if (!remoteStream || remoteStream.getTracks().length === 0) {
             logger.error("No remote stream or no tracks after setting remote description!");
             this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
             return;
         }
 
-        this.type = this.remoteStream.getTracks().some(t => t.kind === 'video') ? CallType.Video : CallType.Voice;
+        this.type = remoteStream.getTracks().some(t => t.kind === 'video') ? CallType.Video : CallType.Voice;
 
         this.setState(CallState.Ringing);
 
@@ -1259,28 +1260,31 @@ export class MatrixCall extends EventEmitter {
             logger.warn(`Streamless ${ev.track.kind} found: ignoring.`);
             return;
         }
+
+        let remoteStream = this.feeds.find((feed) => {return !feed.isLocal()})?.stream;
+
         // If we already have a stream, check this track is from the same one
-        if (this.remoteStream && ev.streams[0].id !== this.remoteStream.id) {
+        // Note that we check by ID and always set the remote stream: Chrome appears
+        // to make new stream objects when tranciever directionality is changed and the 'active'
+        // status of streams change - Dave
+        if (remoteStream && ev.streams[0].id !== remoteStream.id) {
             logger.warn(
-                `Ignoring new stream ID ${ev.streams[0].id}: we already have stream ID ${this.remoteStream.id}`,
+                `Ignoring new stream ID ${ev.streams[0].id}: we already have stream ID ${remoteStream.id}`,
             );
             return;
         }
 
-        if (!this.remoteStream) {
+        if (!remoteStream) {
             logger.info("Got remote stream with id " + ev.streams[0].id);
         }
 
-        // Note that we check by ID above and always set the remote stream: Chrome appears
-        // to make new stream objects when tranciever directionality is changed and the 'active'
-        // status of streams change
-        this.remoteStream = ev.streams[0];
+        remoteStream = ev.streams[0];
 
         logger.debug(`Track id ${ev.track.id} of kind ${ev.track.kind} added`);
 
-        this.pushNewFeed(this.remoteStream, this.getOpponentMember().userId, SDPStreamMetadataPurpose.Usermedia)
+        this.pushNewFeed(remoteStream, this.getOpponentMember().userId, SDPStreamMetadataPurpose.Usermedia)
 
-        logger.info("playing remote. stream active? " + this.remoteStream.active);
+        logger.info("playing remote. stream active? " + remoteStream.active);
     };
 
     onNegotiationNeeded = async () => {
