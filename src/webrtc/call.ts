@@ -1466,12 +1466,13 @@ export class MatrixCall extends EventEmitter {
             this.inviteTimeout = null;
         }
 
+        // Order is important here: first we stopAllMedia() and only then we can deleteAllFeeds()
+        this.stopAllMedia();
         this.deleteAllFeeds();
 
         this.hangupParty = hangupParty;
         this.hangupReason = hangupReason;
         this.setState(CallState.Ended);
-        this.stopAllMedia();
         if (this.peerConn && this.peerConn.signalingState !== 'closed') {
             this.peerConn.close();
         }
