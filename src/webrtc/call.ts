@@ -496,8 +496,8 @@ export class MatrixCall extends EventEmitter {
             this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
             return;
         }
-        
-        let remoteStream = this.feeds.find((feed) => {return !feed.isLocal()})?.stream;
+
+        const remoteStream = this.feeds.find((feed) => {return !feed.isLocal()})?.stream;
 
         // According to previous comments in this file, firefox at some point did not
         // add streams until media started ariving on them. Testing latest firefox
