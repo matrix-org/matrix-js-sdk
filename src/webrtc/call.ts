@@ -1478,19 +1478,9 @@ export class MatrixCall extends EventEmitter {
 
     private stopAllMedia() {
         logger.debug(`stopAllMedia (stream=${this.localAVStream})`);
-        if (this.localAVStream) {
-            for (const track of this.localAVStream.getTracks()) {
-                track.stop();
-            }
-        }
-        if (this.screenSharingStream) {
-            for (const track of this.screenSharingStream.getTracks()) {
-                track.stop();
-            }
-        }
 
-        if (this.remoteStream) {
-            for (const track of this.remoteStream.getTracks()) {
+        for (const feed of this.feeds) {
+            for (const track of feed.stream.getTracks()) {
                 track.stop();
             }
         }
