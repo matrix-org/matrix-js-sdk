@@ -27,7 +27,7 @@
   "keywords": [
     "matrix-org"
   ],
-  "main": "./lib/index.js",
+  "main": "./src/index.ts",
   "browser": "./lib/browser-index.js",
   "matrix_src_main": "./src/index.ts",
   "matrix_src_browser": "./src/browser-index.js",
@@ -98,6 +98,5 @@
   },
   "jest": {
     "testEnvironment": "node"
-  },
-  "typings": "./lib/index.d.ts"
+  }
 }
