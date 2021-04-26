@@ -1,3 +1,30 @@
+Changes in [10.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v10.0.0) (2021-04-26)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v10.0.0-rc.1...v10.0.0)
+
+ * No changes since rc.1
+
+Changes in [10.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v10.0.0-rc.1) (2021-04-21)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.11.0...v10.0.0-rc.1)
+
+ * Restrict event emit for room members that had power levels changed
+   [\#1675](https://github.com/matrix-org/matrix-js-sdk/pull/1675)
+ * Fix sync with misconfigured push rules
+   [\#1669](https://github.com/matrix-org/matrix-js-sdk/pull/1669)
+ * Add missing await
+   [\#1665](https://github.com/matrix-org/matrix-js-sdk/pull/1665)
+ * Migrate to `eslint-plugin-matrix-org`
+   [\#1642](https://github.com/matrix-org/matrix-js-sdk/pull/1642)
+ * Add missing event type enum for key verification done
+   [\#1664](https://github.com/matrix-org/matrix-js-sdk/pull/1664)
+ * Fix timeline jumpiness by setting correct txnId
+   [\#1663](https://github.com/matrix-org/matrix-js-sdk/pull/1663)
+ * Fix calling addEventListener if it does not exist
+   [\#1661](https://github.com/matrix-org/matrix-js-sdk/pull/1661)
+ * Persist unsent messages for subsequent sessions
+   [\#1655](https://github.com/matrix-org/matrix-js-sdk/pull/1655)
+
 Changes in [9.11.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v9.11.0) (2021-04-12)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.11.0-rc.1...v9.11.0)
