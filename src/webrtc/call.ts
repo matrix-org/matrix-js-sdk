@@ -1261,30 +1261,30 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        let remoteStream = this.feeds.find((feed) => {return !feed.isLocal()})?.stream;
+        const oldRemoteStream = this.feeds.find((feed) => {return !feed.isLocal()})?.stream;
 
         // If we already have a stream, check this track is from the same one
         // Note that we check by ID and always set the remote stream: Chrome appears
         // to make new stream objects when tranciever directionality is changed and the 'active'
         // status of streams change - Dave
-        if (remoteStream && ev.streams[0].id !== remoteStream.id) {
+        if (oldRemoteStream && ev.streams[0].id !== oldRemoteStream.id) {
             logger.warn(
-                `Ignoring new stream ID ${ev.streams[0].id}: we already have stream ID ${remoteStream.id}`,
+                `Ignoring new stream ID ${ev.streams[0].id}: we already have stream ID ${oldRemoteStream.id}`,
             );
             return;
         }
 
-        if (!remoteStream) {
+        if (!oldRemoteStream) {
             logger.info("Got remote stream with id " + ev.streams[0].id);
         }
 
-        remoteStream = ev.streams[0];
+        const newRemoteStream = ev.streams[0];
 
         logger.debug(`Track id ${ev.track.id} of kind ${ev.track.kind} added`);
 
-        this.pushNewFeed(remoteStream, this.getOpponentMember().userId, SDPStreamMetadataPurpose.Usermedia)
+        this.pushNewFeed(newRemoteStream, this.getOpponentMember().userId, SDPStreamMetadataPurpose.Usermedia)
 
-        logger.info("playing remote. stream active? " + remoteStream.active);
+        logger.info("playing remote. stream active? " + newRemoteStream.active);
     };
 
     onNegotiationNeeded = async () => {
