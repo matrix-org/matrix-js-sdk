@@ -8,6 +8,14 @@ Changes in [10.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/ta
 ============================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v9.11.0...v10.0.0-rc.1)
 
+BREAKING CHANGES
+---
+
+ * The `RoomState.members` event is now only emitted when the room member's power level or the room's normal power level actually changes
+
+All changes
+---
+
  * Restrict event emit for room members that had power levels changed
    [\#1675](https://github.com/matrix-org/matrix-js-sdk/pull/1675)
  * Fix sync with misconfigured push rules
