@@ -420,6 +420,22 @@ export class MatrixCall extends EventEmitter {
     }
 
     /**
+     * Returns an array of all local CallFeeds
+     * @returns {Array<CallFeed>} local CallFeeds
+     */
+    public getLocalFeeds(): Array<CallFeed> {
+        return this.feeds.filter((feed) => {return feed.isLocal()});
+    }
+
+    /**
+     * Returns an array of all remote CallFeeds
+     * @returns {Array<CallFeed>} remote CallFeeds
+     */
+    public getRemoteFeeds(): Array<CallFeed> {
+        return this.feeds.filter((feed) => {return !feed.isLocal()});
+    }
+
+    /**
      * Returns true if there are no incoming feeds,
      * otherwise returns false
      * @returns {boolean} no incoming feeds
