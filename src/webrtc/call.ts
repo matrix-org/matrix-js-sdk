@@ -70,6 +70,11 @@ interface TurnServer {
     ttl?: number,
 }
 
+interface AssertedIdentity {
+    id: string,
+    displayName: string,
+}
+
 export enum CallState {
     Fledgling = 'fledgling',
     InviteSent = 'invite_sent',
@@ -111,6 +116,8 @@ export enum CallEvent {
     HoldUnhold = 'hold_unhold',
     // Feeds have changed
     FeedsChanged = 'feeds_changed',
+
+    AssertedIdentityChanged = 'asserted_identity_changed',
 }
 
 export enum CallErrorCode {
@@ -299,6 +306,8 @@ export class MatrixCall extends EventEmitter {
     // the call) we buffer them up here so we can then add the ones from the party we pick
     private remoteCandidateBuffer = new Map<string, RTCIceCandidate[]>();
 
+    private remoteAssertedIdentity: AssertedIdentity;
+
     constructor(opts: CallOpts) {
         super();
         this.roomId = opts.roomId;
@@ -409,6 +418,10 @@ export class MatrixCall extends EventEmitter {
 
     public opponentCanBeTransferred() {
         return Boolean(this.opponentCaps && this.opponentCaps["m.call.transferee"]);
+    }
+
+    public getRemoteAssertedIdentity(): AssertedIdentity {
+        return this.remoteAssertedIdentity;
     }
 
     /**
@@ -1121,6 +1134,16 @@ export class MatrixCall extends EventEmitter {
         }
     }
 
+    async onAssertedIdentityReceived(event: MatrixEvent) {
+        if (!event.getContent().asserted_identity) return;
+
+        this.remoteAssertedIdentity = {
+            id: event.getContent().asserted_identity.id,
+            displayName: event.getContent().asserted_identity.display_name,
+        };
+        this.emit(CallEvent.AssertedIdentityChanged);
+    }
+
     private callHasEnded(): boolean {
         // This exists as workaround to typescript trying to be clever and erroring
         // when putting if (this.state === CallState.Ended) return; twice in the same
@@ -1750,6 +1773,9 @@ export function setAudioInput(deviceId: string) { audioInput = deviceId; }
 export function setVideoInput(deviceId: string) { videoInput = deviceId; }
 
 /**
+ * DEPRECATED
+ * Use client.createCall()
+ *
  * Create a new Matrix call for the browser.
  * @param {MatrixClient} client The client instance to use.
  * @param {string} roomId The room the call is in.

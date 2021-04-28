@@ -500,7 +500,7 @@ MatrixClient.prototype.rehydrateDevice = async function() {
         return;
     }
 
-    const getDeviceResult = this.getDehydratedDevice();
+    const getDeviceResult = await this.getDehydratedDevice();
     if (!getDeviceResult) {
         return;
     }
@@ -727,6 +727,17 @@ MatrixClient.prototype.setForceTURN = function(forceTURN) {
  */
 MatrixClient.prototype.setSupportsCallTransfer = function(supportsCallTransfer) {
     this._supportsCallTransfer = supportsCallTransfer;
+};
+
+/**
+ * Creates a new call.
+ * The place*Call methods on the returned call can be used to actually place a call
+ *
+ * @param {string} roomId The room the call is to be placed in.
+ * @return {MatrixCall} the call or null if the browser doesn't support calling.
+ */
+MatrixClient.prototype.createCall = function(roomId) {
+    return createNewMatrixCall(this, roomId);
 };
 
 /**
@@ -4799,7 +4810,8 @@ MatrixClient.prototype._processRoomEventsSearch = function(searchResults, respon
     searchResults.highlights = Object.keys(highlights);
 
     // append the new results to our existing results
-    for (let i = 0; i < room_events.results.length; i++) {
+    const resultsLength = room_events.results ? room_events.results.length : 0;
+    for (let i = 0; i < resultsLength; i++) {
         const sr = SearchResult.fromJson(room_events.results[i], this.getEventMapper());
         searchResults.results.push(sr);
     }
