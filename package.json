@@ -17,8 +17,8 @@
     "lint": "yarn lint:types && yarn lint:js",
     "lint:js": "eslint --max-warnings 72 src spec",
     "lint:types": "tsc --noEmit",
-    "test": "jest spec/ --coverage --testEnvironment node",
-    "test:watch": "jest spec/ --coverage --testEnvironment node --watch"
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "repository": {
     "type": "git",
@@ -97,6 +97,9 @@
     "typescript": "^4.1.3"
   },
   "jest": {
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "testMatch": [
+      "<rootDir>/spec/**/*.spec.{js,ts}"
+    ]
   }
 }
