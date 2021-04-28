@@ -730,6 +730,17 @@ MatrixClient.prototype.setSupportsCallTransfer = function(supportsCallTransfer) 
 };
 
 /**
+ * Creates a new call.
+ * The place*Call methods on the returned call can be used to actually place a call
+ *
+ * @param {string} roomId The room the call is to be placed in.
+ * @return {MatrixCall} the call or null if the browser doesn't support calling.
+ */
+MatrixClient.prototype.createCall = function(roomId) {
+    return createNewMatrixCall(this, roomId);
+};
+
+/**
  * Get the current sync state.
  * @return {?string} the sync state, which may be null.
  * @see module:client~MatrixClient#event:"sync"

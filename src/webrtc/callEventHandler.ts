@@ -87,7 +87,11 @@ export class CallEventHandler {
 
     private onEvent = (event: MatrixEvent) => {
         // any call events or ones that might be once they're decrypted
-        if (event.getType().indexOf("m.call.") === 0 || event.isBeingDecrypted()) {
+        if (
+            event.getType().indexOf("m.call.") === 0 ||
+            event.getType().indexOf("org.matrix.call.") === 0
+            || event.isBeingDecrypted()
+        ) {
             // queue up for processing once all events from this sync have been
             // processed (see above).
             this.callEventBuffer.push(event);
@@ -271,6 +275,18 @@ export class CallEventHandler {
             }
 
             call.onNegotiateReceived(event);
+        } else if (
+            event.getType() === EventType.CallAssertedIdentity ||
+            event.getType() === EventType.CallAssertedIdentityPrefix
+        ) {
+            if (!call) return;
+
+            if (event.getContent().party_id === call.ourPartyId) {
+                // Ignore remote echo (not that we send asserted identity, but still...)
+                return;
+            }
+
+            call.onAssertedIdentityReceived(event);
         }
     }
 }
