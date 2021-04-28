@@ -18,7 +18,8 @@
     "lint:js": "eslint --max-warnings 72 src spec",
     "lint:types": "tsc --noEmit",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "coverage": "yarn test --coverage"
   },
   "repository": {
     "type": "git",
@@ -100,6 +101,12 @@
     "testEnvironment": "node",
     "testMatch": [
       "<rootDir>/spec/**/*.spec.{js,ts}"
+    ],
+    "collectCoverageFrom": [
+      "<rootDir>/src/**/*.{js,ts}"
+    ],
+    "coverageReporters": [
+      "text"
     ]
   }
 }
