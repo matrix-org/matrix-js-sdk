@@ -60,7 +60,8 @@ log.methodFactory = function(methodName, logLevel, loggerName) {
  * Can be tailored down to specific use cases if needed.
  */
 export const logger: PrefixedLogger = log.getLogger(DEFAULT_NAMESPACE);
-logger.setLevel(log.levels.DEBUG);
+// XXX: @@TR: Return to DEBUG (for https://github.com/vector-im/element-web/issues/17090)
+logger.setLevel(log.levels.TRACE);
 
 interface PrefixedLogger extends Logger {
     withPrefix?: (prefix: string) => PrefixedLogger;
