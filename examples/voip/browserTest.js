@@ -38,11 +38,11 @@ function addListeners(call) {
         const remoteElement = document.getElementById("remote");
         const localElement = document.getElementById("local");
 
-        if (remoteFeed && remoteFeed.stream) {
+        if (remoteFeed) {
             remoteElement.srcObject = remoteFeed.stream;
             remoteElement.play();
         }
-        if (localFeed && localFeed.stream) {
+        if (localFeed) {
             localElement.muted = true;
             localElement.srcObject = localFeed.stream;
             localElement.play();
