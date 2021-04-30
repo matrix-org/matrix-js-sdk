@@ -433,7 +433,7 @@ export class AutoDiscovery {
         }
 
         const response = await this._fetchWellKnownObject(
-            `https://${domain}/.well-known/matrix/client`,
+            `http://${domain}:8008/.well-known/matrix/client`,
         );
         if (!response) return {};
         return response.raw || {};
