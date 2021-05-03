@@ -2858,8 +2858,7 @@ MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
     }
 
     const type = localEvent.getType();
-    // XXX: @@TR: Return to .log (for https://github.com/vector-im/element-web/issues/17090)
-    logger.trace(`sendEvent of type ${type} in ${roomId} with txnId ${txnId}`);
+    logger.log(`sendEvent of type ${type} in ${roomId} with txnId ${txnId}`);
 
     localEvent.setTxnId(txnId);
     localEvent.setStatus(EventStatus.SENDING);
