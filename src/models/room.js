@@ -1257,9 +1257,6 @@ Room.prototype.addPendingEvent = function(event, txnId) {
                         txnId);
     }
 
-    // XXX: @@TR: Remove logging (for https://github.com/vector-im/element-web/issues/17090)
-    logger.trace(`addPendingEvent called for txn ${txnId} and event type ${event.getType()}`);
-
     // call setEventMetadata to set up event.sender etc
     // as event is shared over all timelineSets, we set up its metadata based
     // on the unfiltered timelineSet.
