@@ -707,12 +707,12 @@ SyncApi.prototype._syncFromCache = async function(savedSync) {
         const breadcrumbsRooms = breadcrumbs?.getContent().recent_rooms || [];
 
         this.client.getRooms().forEach(room => {
-            const readReceipt = room.getAccountData("m.fully_read");
+            const readReceiptEventId = room.getEventReadUpTo(this.client.getUserId(), true);
 
             const events = room.getLiveTimeline().getEvents();
             const isInBreadcrumb = breadcrumbsRooms.includes(room.roomId);
             const readReceiptTimelineIndex = events.findIndex(matrixEvent => {
-                return matrixEvent.event.event_id === readReceipt?.getContent().event_id
+                return matrixEvent.event.event_id === readReceiptEventId
             });
             const decryptFromIndex = isInBreadcrumb
                 ? 0
