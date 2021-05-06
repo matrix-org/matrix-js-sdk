@@ -701,7 +701,31 @@ SyncApi.prototype._syncFromCache = async function(savedSync) {
     };
 
     try {
-        await this._processSyncResponse(syncEventData, data);
+        await this._processSyncResponse(syncEventData, data, false);
+
+        const breadcrumbs = this.client.store.getAccountData("im.vector.setting.breadcrumbs");
+        const breadcrumbsRooms = breadcrumbs?.getContent().recent_rooms || [];
+
+        this.client.getRooms().forEach(room => {
+            const readReceipt = room.getAccountData("m.fully_read");
+
+            const events = room.getLiveTimeline().getEvents();
+            const isInBreadcrumb = breadcrumbsRooms.includes(room.roomId);
+            const readReceiptTimelineIndex = events.findIndex(matrixEvent => {
+                return matrixEvent.event.event_id === readReceipt?.getContent().event_id
+            });
+            const decryptFromIndex = isInBreadcrumb
+                ? 0
+                : readReceiptTimelineIndex
+
+            events
+                .slice(decryptFromIndex)
+                .forEach(event => {
+                    if (event.isEncrypted() && !event.isBeingDecrypted()) {
+                        event.attemptDecryption(this.client._crypto, true);
+                    }
+                });
+        });
     } catch (e) {
         logger.error("Error processing cached sync", e.stack || e);
     }
@@ -942,7 +966,7 @@ SyncApi.prototype._onSyncError = function(err, syncOptions) {
  * @param {Object} data The response from /sync
  */
 SyncApi.prototype._processSyncResponse = async function(
-    syncEventData, data,
+    syncEventData, data, decrypt = true
 ) {
     const client = this.client;
     const self = this;
@@ -1158,7 +1182,7 @@ SyncApi.prototype._processSyncResponse = async function(
     await utils.promiseMapSeries(joinRooms, async function(joinObj) {
         const room = joinObj.room;
         const stateEvents = self._mapSyncEventsFormat(joinObj.state, room);
-        const timelineEvents = self._mapSyncEventsFormat(joinObj.timeline, room);
+        const timelineEvents = self._mapSyncEventsFormat(joinObj.timeline, room, decrypt);
         const ephemeralEvents = self._mapSyncEventsFormat(joinObj.ephemeral);
         const accountDataEvents = self._mapSyncEventsFormat(joinObj.account_data);
 
@@ -1518,7 +1542,7 @@ SyncApi.prototype._mapSyncResponseToRoomArray = function(obj) {
  * @param {Room} room
  * @return {MatrixEvent[]}
  */
-SyncApi.prototype._mapSyncEventsFormat = function(obj, room) {
+SyncApi.prototype._mapSyncEventsFormat = function(obj, room, decrypt = true) {
     if (!obj || !utils.isArray(obj.events)) {
         return [];
     }

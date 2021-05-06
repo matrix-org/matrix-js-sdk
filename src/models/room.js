@@ -228,6 +228,20 @@ function pendingEventsKey(roomId) {
 
 utils.inherits(Room, EventEmitter);
 
+Room.prototype.lazyDecryptEvents = async function() {
+    return Promise.allSettled(this
+        .getUnfilteredTimelineSet()
+        .getTimelines()
+        .reduce((decryptionPromises, timeline) => {
+            return decryptionPromises.concat(
+                timeline
+                    .getEvents()
+                    .filter(event => event.isEncrypted() && !event.isBeingDecrypted())
+                    .map(event => event.attemptDecryption(this._client._crypto, true))
+            );
+        }, []));
+}
+
 /**
  * Gets the version of the room
  * @returns {string} The version of the room, or null if it could not be determined
