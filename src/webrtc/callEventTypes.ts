@@ -1,9 +1,20 @@
 // allow camelcase as these are events type that go onto the wire
 /* eslint-disable camelcase */
 
+// TODO: Change to "sdp_stream_metadata" when MSC3077 is merged
+export const SDPStreamMetadataKey = "org.matrix.msc3077.sdp_stream_metadata";
+
 export enum SDPStreamMetadataPurpose {
     Usermedia = "m.usermedia",
     Screenshare = "m.screenshare",
+}
+
+export interface SDPStreamMetadataObject {
+    purpose: SDPStreamMetadataPurpose,
+}
+
+export interface SDPStreamMetadata {
+    [key: string]: SDPStreamMetadataObject,
 }
 
 interface CallOfferAnswer {
@@ -18,6 +29,7 @@ export interface CallCapabilities {
 export interface MCallAnswer {
     answer: CallOfferAnswer;
     capabilities: CallCapabilities;
+    [SDPStreamMetadataKey]: SDPStreamMetadata;
 }
 
 export interface MCallOfferNegotiate {
@@ -25,6 +37,7 @@ export interface MCallOfferNegotiate {
     description: CallOfferAnswer;
     lifetime: number;
     capabilities: CallCapabilities;
+    [SDPStreamMetadataKey]: SDPStreamMetadata;
 }
 
 export interface MCallReplacesTarget {
