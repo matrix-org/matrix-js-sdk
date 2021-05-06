@@ -1547,6 +1547,7 @@ SyncApi.prototype._mapSyncEventsFormat = function(obj, room, decrypt = true) {
         return [];
     }
     const mapper = this.client.getEventMapper();
+    const mapper = this.client.getEventMapper({ decrypt });
     return obj.events.map(function(e) {
         if (room) {
             e.room_id = room.roomId;
