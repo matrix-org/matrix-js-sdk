@@ -34,6 +34,8 @@ import {
     MCallOfferNegotiate,
     CallCapabilities,
     SDPStreamMetadataPurpose,
+    SDPStreamMetadata,
+    SDPStreamMetadataKey,
 } from './callEventTypes';
 import { CallFeed } from './callFeed';
 
@@ -449,6 +451,20 @@ export class MatrixCall extends EventEmitter {
     }
 
     /**
+     * Generates and returns localSDPStreamMetadata
+     * @returns {SDPStreamMetadata} localSDPStreamMetadata
+     */
+    private getLocalSDPStreamMetadata(): SDPStreamMetadata {
+        const metadata = {};
+        this.getLocalFeeds().map((localFeed) => {
+            metadata[localFeed.stream.id] = {
+                purpose: localFeed.purpose,
+            };
+        });
+        return metadata;
+    }
+
+    /**
      * Returns true if there are no incoming feeds,
      * otherwise returns false
      * @returns {boolean} no incoming feeds
@@ -812,7 +828,8 @@ export class MatrixCall extends EventEmitter {
             logger.debug(
                 "Setting screen sharing stream to the local video element",
             );
-            this.pushNewFeed(this.screenSharingStream, this.client.getUserId(), SDPStreamMetadataPurpose.Screenshare);
+            // XXX: Because this is to support backwards compatibility we pretend like this stream is usermedia
+            this.pushNewFeed(this.screenSharingStream, this.client.getUserId(), SDPStreamMetadataPurpose.Usermedia);
         } else {
             this.pushNewFeed(stream, this.client.getUserId(), SDPStreamMetadataPurpose.Usermedia);
         }
@@ -1195,6 +1212,8 @@ export class MatrixCall extends EventEmitter {
                 'm.call.transferee': true,
             }
         }
+
+        content[SDPStreamMetadataKey] = this.getLocalSDPStreamMetadata();
 
         // Get rid of any candidates waiting to be sent: they'll be included in the local
         // description we just got and will send in the offer.
