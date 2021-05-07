@@ -1449,7 +1449,9 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        this.pushRemoteFeed(ev.streams[0]);
+        const stream = ev.streams[0];
+        this.pushRemoteFeed(stream);
+        stream.addEventListener("removetrack", () => this.deleteRemoteFeedByStream(stream));
     };
 
     onNegotiationNeeded = async () => {
