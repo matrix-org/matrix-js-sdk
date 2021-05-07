@@ -1184,6 +1184,13 @@ export class MatrixCall extends EventEmitter {
             this.unholdingRemote = false;
         }
 
+        const metadata = event.getContent()[SDPStreamMetadataKey];
+        if (metadata) {
+            this.remoteSDPStreamMetadata = metadata;
+        } else {
+            logger.warn("Received negotiation event without SDPStreamMetadata!")
+        }
+
         try {
             await this.peerConn.setRemoteDescription(description);
 
