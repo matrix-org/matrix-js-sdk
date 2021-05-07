@@ -1060,6 +1060,13 @@ export class MatrixCall extends EventEmitter {
 
         this.setState(CallState.Connecting);
 
+        const sdpStreamMetadata = event.getContent()[SDPStreamMetadataKey];
+        if (sdpStreamMetadata) {
+            this.remoteSDPStreamMetadata = sdpStreamMetadata;
+        } else {
+            logger.debug("Did not get any SDPStreamMetadata! Can not send/receive multiple streams");
+        }
+
         try {
             await this.peerConn.setRemoteDescription(event.getContent().answer);
         } catch (e) {
