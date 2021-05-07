@@ -1230,6 +1230,7 @@ export class MatrixCall extends EventEmitter {
 
                 this.sendVoipEvent(EventType.CallNegotiate, {
                     description: this.peerConn.localDescription,
+                    [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(),
                 });
             }
         } catch (err) {
