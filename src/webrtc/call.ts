@@ -485,6 +485,18 @@ export class MatrixCall extends EventEmitter {
             this.feeds.push(new CallFeed(stream, userId, purpose, this.client, this.roomId));
             this.emit(CallEvent.FeedsChanged, this.feeds);
         }
+
+    private pushLocalFeed(stream: MediaStream, purpose: SDPStreamMetadataPurpose) {
+        const userId = this.client.getUserId();
+
+        // We try to replace an existing feed if there already is one with the same purpose
+        const existingFeed = this.getLocalFeeds().find((feed) => feed.purpose === purpose);
+        if (existingFeed) {
+            existingFeed.setNewStream(stream);
+        } else {
+            this.feeds.push(new CallFeed(stream, userId, purpose, this.client, this.roomId));
+            this.emit(CallEvent.FeedsChanged, this.feeds);
+        }
     }
 
     private deleteAllFeeds() {
@@ -838,9 +850,9 @@ export class MatrixCall extends EventEmitter {
                 "Setting screen sharing stream to the local video element",
             );
             // XXX: Because this is to support backwards compatibility we pretend like this stream is usermedia
-            this.pushNewFeed(this.screenSharingStream, this.client.getUserId(), SDPStreamMetadataPurpose.Usermedia);
+            this.pushLocalFeed(this.screenSharingStream, SDPStreamMetadataPurpose.Usermedia);
         } else {
-            this.pushNewFeed(stream, this.client.getUserId(), SDPStreamMetadataPurpose.Usermedia);
+            this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
         }
 
         // why do we enable audio (and only audio) tracks here? -- matthew
@@ -910,7 +922,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        this.pushNewFeed(stream, this.client.getUserId(), SDPStreamMetadataPurpose.Usermedia);
+        this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
 
         this.localAVStream = stream;
         logger.info("Got local AV stream with id " + this.localAVStream.id);
