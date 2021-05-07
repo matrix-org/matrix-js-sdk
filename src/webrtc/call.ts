@@ -475,7 +475,52 @@ export class MatrixCall extends EventEmitter {
         return !this.feeds.some((feed) => !feed.isLocal());
     }
 
-    private pushNewFeed(stream: MediaStream, userId: string, purpose: SDPStreamMetadataPurpose) {
+    private pushRemoteFeed(stream: MediaStream) {
+        // Fallback to old behavior if the other side doesn't support SDPStreamMetadata
+        if (!this.remoteSDPStreamMetadata) {
+            this.pushRemoteFeedWithoutMetadata(stream);
+            return;
+        }
+
+        const userId = this.getOpponentMember().userId;
+        const streamMetadata = this.remoteSDPStreamMetadata[stream.id];
+
+        if (!streamMetadata) {
+            logger.warn(`Ignoring stream with id ${stream.id} because we didn't get any metadata about it`);
+            return;
+        }
+
+        // Try to find a feed with the same purpose as the new stream,
+        // if we find it replace the old stream with the new one
+        const existingFeed = this.getRemoteFeeds().find((feed) => feed.purpose === streamMetadata.purpose);
+        if (existingFeed) {
+            existingFeed.setNewStream(stream);
+        } else {
+            this.feeds.push(new CallFeed(stream, userId, streamMetadata.purpose, this.client, this.roomId));
+            this.emit(CallEvent.FeedsChanged, this.feeds);
+        }
+
+        logger.info(`Pushed remote stream with id ${stream.id}. Stream active? ${stream.active}`);
+    }
+
+    /**
+     * This method is used ONLY if the other client doesn't support sending SDPStreamMetadata
+     */
+    private pushRemoteFeedWithoutMetadata(stream: MediaStream) {
+        const userId = this.getOpponentMember().userId;
+        // We can guess the purpose here since the other client can only send one stream
+        const purpose = SDPStreamMetadataPurpose.Usermedia;
+        const oldRemoteStream = this.feeds.find((feed) => {return !feed.isLocal()})?.stream;
+
+        // Note that we check by ID and always set the remote stream: Chrome appears
+        // to make new stream objects when transceiver directionality is changed and the 'active'
+        // status of streams change - Dave
+        // If we already have a stream, check this stream has the same id
+        if (oldRemoteStream && stream.id !== oldRemoteStream.id) {
+            logger.warn(`Ignoring new stream ID ${stream.id}: we already have stream ID ${oldRemoteStream.id}`);
+            return;
+        }
+
         // Try to find a feed with the same stream id as the new stream,
         // if we find it replace the old stream with the new one
         const feed = this.feeds.find((feed) => feed.stream.id === stream.id);
@@ -485,6 +530,9 @@ export class MatrixCall extends EventEmitter {
             this.feeds.push(new CallFeed(stream, userId, purpose, this.client, this.roomId));
             this.emit(CallEvent.FeedsChanged, this.feeds);
         }
+
+        logger.info(`Pushed remote stream with id ${stream.id}. Stream active? ${stream.active}`);
+    }
 
     private pushLocalFeed(stream: MediaStream, purpose: SDPStreamMetadataPurpose) {
         const userId = this.client.getUserId();
@@ -1348,30 +1396,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        const oldRemoteStream = this.feeds.find((feed) => {return !feed.isLocal()})?.stream;
-
-        // If we already have a stream, check this track is from the same one
-        // Note that we check by ID and always set the remote stream: Chrome appears
-        // to make new stream objects when tranciever directionality is changed and the 'active'
-        // status of streams change - Dave
-        if (oldRemoteStream && ev.streams[0].id !== oldRemoteStream.id) {
-            logger.warn(
-                `Ignoring new stream ID ${ev.streams[0].id}: we already have stream ID ${oldRemoteStream.id}`,
-            );
-            return;
-        }
-
-        if (!oldRemoteStream) {
-            logger.info("Got remote stream with id " + ev.streams[0].id);
-        }
-
-        const newRemoteStream = ev.streams[0];
-
-        logger.debug(`Track id ${ev.track.id} of kind ${ev.track.kind} added`);
-
-        this.pushNewFeed(newRemoteStream, this.getOpponentMember().userId, SDPStreamMetadataPurpose.Usermedia)
-
-        logger.info("playing remote. stream active? " + newRemoteStream.active);
+        this.pushRemoteFeed(ev.streams[0]);
     };
 
     onNegotiationNeeded = async () => {
