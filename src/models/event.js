@@ -399,6 +399,12 @@ utils.extend(MatrixEvent.prototype, {
             this._clearEvent.content.msgtype === "m.bad.encrypted";
     },
 
+    shouldAttemptDecryption: function() {
+        return this.isEncrypted()
+            && !this.isBeingDecrypted()
+            && this.getClearContent() === null
+    },
+
     /**
      * Start the process of trying to decrypt this event.
      *

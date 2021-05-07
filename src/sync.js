@@ -1158,6 +1158,10 @@ SyncApi.prototype._processSyncResponse = async function(
     await utils.promiseMapSeries(joinRooms, async function(joinObj) {
         const room = joinObj.room;
         const stateEvents = self._mapSyncEventsFormat(joinObj.state, room);
+        // Prevent events from being decrypted ahead of time
+        // this helps large account to speed up faster
+        // room::decryptCriticalEvent is in charge of decrypting all the events
+        // required for a client to function properly
         const timelineEvents = self._mapSyncEventsFormat(joinObj.timeline, room, false);
         const ephemeralEvents = self._mapSyncEventsFormat(joinObj.ephemeral);
         const accountDataEvents = self._mapSyncEventsFormat(joinObj.account_data);
