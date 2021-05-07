@@ -545,6 +545,14 @@ export class MatrixCall extends EventEmitter {
             this.feeds.push(new CallFeed(stream, userId, purpose, this.client, this.roomId));
             this.emit(CallEvent.FeedsChanged, this.feeds);
         }
+
+        // why do we enable audio (and only audio) tracks here? -- matthew
+        setTracksEnabled(stream.getAudioTracks(), true);
+
+        for (const track of stream.getTracks()) {
+            logger.info(`Adding track with id ${track.id} and with kind ${track.kind} to peer connection`)
+            this.peerConn.addTrack(track, stream);
+        }
     }
 
     private deleteAllFeeds() {
@@ -903,18 +911,6 @@ export class MatrixCall extends EventEmitter {
             this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
         }
 
-        // why do we enable audio (and only audio) tracks here? -- matthew
-        setTracksEnabled(stream.getAudioTracks(), true);
-
-        for (const audioTrack of stream.getAudioTracks()) {
-            logger.info("Adding audio track with id " + audioTrack.id);
-            this.peerConn.addTrack(audioTrack, stream);
-        }
-        for (const videoTrack of (this.screenSharingStream || stream).getVideoTracks()) {
-            logger.info("Adding video track with id " + videoTrack.id);
-            this.peerConn.addTrack(videoTrack, stream);
-        }
-
         // Now we wait for the negotiationneeded event
     };
 
@@ -975,10 +971,6 @@ export class MatrixCall extends EventEmitter {
 
         this.localAVStream = stream;
         logger.info("Got local AV stream with id " + this.localAVStream.id);
-        setTracksEnabled(stream.getAudioTracks(), true);
-        for (const track of stream.getTracks()) {
-            this.peerConn.addTrack(track, stream);
-        }
 
         this.setState(CallState.CreateAnswer);
 
