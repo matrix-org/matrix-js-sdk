@@ -228,18 +228,32 @@ function pendingEventsKey(roomId) {
 
 utils.inherits(Room, EventEmitter);
 
-Room.prototype.lazyDecryptEvents = async function() {
-    return Promise.allSettled(this
+Room.prototype.decryptCriticalEvents = function() {
+    const readReceiptEventId = this.getEventReadUpTo(this._client.getUserId(), true);
+    const events = this.getLiveTimeline().getEvents();
+    const readReceiptTimelineIndex = events.findIndex(matrixEvent => {
+        return matrixEvent.event.event_id === readReceiptEventId
+    });
+
+    const decryptionPromises = events
+        .slice(readReceiptTimelineIndex)
+        .filter(event => event.isEncrypted() && !event.isBeingDecrypted())
+        .reverse()
+        .map(event => event.attemptDecryption(this._client._crypto, true));
+
+    return Promise.allSettled(decryptionPromises);
+}
+
+Room.prototype.decryptAllEvents = function() {
+    const decryptionPromises = this
         .getUnfilteredTimelineSet()
-        .getTimelines()
-        .reduce((decryptionPromises, timeline) => {
-            return decryptionPromises.concat(
-                timeline
-                    .getEvents()
-                    .filter(event => event.isEncrypted() && !event.isBeingDecrypted())
-                    .map(event => event.attemptDecryption(this._client._crypto, true))
-            );
-        }, []));
+        .getLiveTimeline()
+        .getEvents()
+        .filter(event => event.isEncrypted() && !event.isBeingDecrypted())
+        .reverse()
+        .map(event => event.attemptDecryption(this._client._crypto, true));
+
+    return Promise.allSettled(decryptionPromises);
 }
 
 /**
