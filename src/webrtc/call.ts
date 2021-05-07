@@ -310,6 +310,8 @@ export class MatrixCall extends EventEmitter {
 
     private remoteAssertedIdentity: AssertedIdentity;
 
+    private remoteSDPStreamMetadata: SDPStreamMetadata;
+
     constructor(opts: CallOpts) {
         super();
         this.roomId = opts.roomId;
@@ -526,6 +528,13 @@ export class MatrixCall extends EventEmitter {
         const haveTurnCreds = await this.client._checkTurnServers();
         if (!haveTurnCreds) {
             logger.warn("Failed to get TURN credentials! Proceeding with call anyway...");
+        }
+
+        const sdpStreamMetadata = invite[SDPStreamMetadataKey];
+        if (sdpStreamMetadata) {
+            this.remoteSDPStreamMetadata = sdpStreamMetadata;
+        } else {
+            logger.debug("Did not get any SDPStreamMetadata! Can not send/receive multiple streams");
         }
 
         this.peerConn = this.createPeerConnection();
