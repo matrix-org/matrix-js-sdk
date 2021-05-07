@@ -816,6 +816,65 @@ export class MatrixCall extends EventEmitter {
     }
 
     /**
+     * Starts/stops screensharing
+     * @param enabled the desired screensharing state
+     * @param selectDesktopCapturerSource callBack to select a screensharing stream on desktop
+     * @returns {boolean} new screensharing state
+     */
+    public async setScreensharingEnabled(
+        enabled: boolean,
+        selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>,
+    ) {
+        if (!this.opponentSupportsSDPStreamMetadata) {
+            logger.warn("The other side doesn't support multiple stream, therefore we can't screenshare");
+            // TODO: Use replaceTrack()
+            return false;
+        }
+
+        logger.debug(`Set screensharing enabled? ${enabled}`);
+        if (enabled) {
+            if (this.isScreensharing()) {
+                logger.warn(`There is already a screensharing stream - there is nothing to do!`);
+                return false;
+            }
+
+            try {
+                const screenshareConstraints = await getScreenshareContraints(selectDesktopCapturerSource);
+                if (!screenshareConstraints) {
+                    logger.error("Failed to get screensharing constraints!");
+                    return;
+                }
+
+                if (window.electron?.getDesktopCapturerSources) {
+                    // We are using Electron
+                    logger.debug("Getting screen stream using getUserMedia()...");
+                    this.screenSharingStream = await navigator.mediaDevices.getUserMedia(screenshareConstraints);
+                } else {
+                    // We are not using Electron
+                    logger.debug("Getting screen stream using getDisplayMedia()...");
+                    this.screenSharingStream = await navigator.mediaDevices.getDisplayMedia(screenshareConstraints);
+                }
+
+                this.pushLocalFeed(this.screenSharingStream, SDPStreamMetadataPurpose.Screenshare);
+                return true;
+            } catch (err) {
+                this.emit(CallEvent.Error,
+                    new CallError(CallErrorCode.NoUserMedia, "Failed to get screen-sharing stream: ", err),
+                );
+                return false;
+            }
+        } else {
+            if (!this.isScreensharing()) {
+                logger.warn(`There already isn't a screensharing stream - there is nothing to do!`);
+                return false;
+            }
+            this.deleteLocalFeedByStream(this.screenSharingStream);
+            this.screenSharingStream = null;
+            return false;
+        }
+    }
+
+    /**
      * Set whether our outbound video should be muted or not.
      * @param {boolean} muted True to mute the outbound video.
      */
