@@ -10,11 +10,11 @@ export enum SDPStreamMetadataPurpose {
 }
 
 export interface SDPStreamMetadataObject {
-    purpose: SDPStreamMetadataPurpose,
+    purpose: SDPStreamMetadataPurpose;
 }
 
 export interface SDPStreamMetadata {
-    [key: string]: SDPStreamMetadataObject,
+    [key: string]: SDPStreamMetadataObject;
 }
 
 interface CallOfferAnswer {
