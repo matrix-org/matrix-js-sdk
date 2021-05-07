@@ -228,6 +228,12 @@ function pendingEventsKey(roomId) {
 
 utils.inherits(Room, EventEmitter);
 
+function shouldAttemptDecryption(event) {
+    return event.isEncrypted()
+        && !event.isBeingDecrypted()
+        && event.getClearContent() === null
+}
+
 Room.prototype.decryptCriticalEvents = function() {
     const readReceiptEventId = this.getEventReadUpTo(this._client.getUserId(), true);
     const events = this.getLiveTimeline().getEvents();
@@ -237,7 +243,7 @@ Room.prototype.decryptCriticalEvents = function() {
 
     const decryptionPromises = events
         .slice(readReceiptTimelineIndex)
-        .filter(event => event.isEncrypted() && !event.isBeingDecrypted())
+        .filter(event => shouldAttemptDecryption(event))
         .reverse()
         .map(event => event.attemptDecryption(this._client._crypto, true));
 
@@ -249,7 +255,7 @@ Room.prototype.decryptAllEvents = function() {
         .getUnfilteredTimelineSet()
         .getLiveTimeline()
         .getEvents()
-        .filter(event => event.isEncrypted() && !event.isBeingDecrypted())
+        .filter(event => shouldAttemptDecryption(event))
         .reverse()
         .map(event => event.attemptDecryption(this._client._crypto, true));
 
