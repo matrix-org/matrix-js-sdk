@@ -763,6 +763,23 @@ export class MatrixCall extends EventEmitter {
     }
 
     /**
+     * Returns true if this.remoteSDPStreamMetadata is defined, otherwise returns false
+     * @returns {boolean} can screenshare
+     */
+    public opponentSupportsSDPStreamMetadata(): boolean {
+        return Boolean(this.remoteSDPStreamMetadata);
+    }
+
+    /**
+     * If there is a screensharing stream returns true, otherwise returns false
+     * @returns {boolean} is screensharing
+     */
+    public isScreensharing(): boolean {
+        console.log("LOG stream", this.screenSharingStream);
+        return Boolean(this.screenSharingStream);
+    }
+
+    /**
      * Set whether our outbound video should be muted or not.
      * @param {boolean} muted True to mute the outbound video.
      */
