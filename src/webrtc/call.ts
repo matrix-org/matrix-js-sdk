@@ -560,6 +560,42 @@ export class MatrixCall extends EventEmitter {
         this.emit(CallEvent.FeedsChanged, this.feeds);
     }
 
+    private deleteLocalFeedByStream(stream: MediaStream) {
+        logger.debug(`Removing feed with stream id ${stream.id}`);
+
+        const feed = this.getLocalFeeds().find((feed) => feed.stream.id === stream.id);
+        if (!feed) {
+            logger.warn(`Didn't find the feed with stream id ${stream.id} to delete`);
+            return;
+        }
+
+        this.feeds.splice(this.feeds.indexOf(feed), 1);
+        this.emit(CallEvent.FeedsChanged, this.feeds);
+
+        for (const track of stream.getTracks()) {
+            // XXX: This is ugly and there has to be a way to do this more nicely
+            for (const sender of this.peerConn.getSenders()) {
+                if (sender.track?.id === track.id) {
+                    this.peerConn.removeTrack(sender);
+                }
+            }
+            track.stop();
+        }
+    }
+
+    private deleteRemoteFeedByStream(stream: MediaStream) {
+        logger.debug(`Removing feed with stream id ${stream.id}`);
+
+        const feed = this.getRemoteFeeds().find((feed) => feed.stream.id === stream.id);
+        if (!feed) {
+            logger.warn(`Didn't find the feed with stream id ${stream.id} to delete`);
+            return;
+        }
+
+        this.feeds.splice(this.feeds.indexOf(feed), 1);
+        this.emit(CallEvent.FeedsChanged, this.feeds);
+    }
+
     // The typescript definitions have this type as 'any' :(
     public async getCurrentCallStats(): Promise<any[]> {
         if (this.callHasEnded()) {
