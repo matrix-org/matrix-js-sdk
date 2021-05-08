@@ -399,7 +399,7 @@ export class MatrixCall extends EventEmitter {
             }
 
             logger.debug("Got screen stream, requesting audio stream...");
-            const audioConstraints = getUserMediaContraints(ConstraintsType.Audio);
+            const audioConstraints = getUserMediaContraints(ConstraintsType.Video);
             this.placeCallWithConstraints(audioConstraints);
         } catch (err) {
             this.emit(CallEvent.Error,
@@ -875,6 +875,8 @@ export class MatrixCall extends EventEmitter {
                 });
                 userMediaVideoSender.replaceTrack(videoScreensharingTrack);
 
+                this.pushLocalFeed(this.screenSharingStream, SDPStreamMetadataPurpose.Screenshare, false);
+
                 return true;
             } catch (err) {
                 this.emit(CallEvent.Error,
@@ -888,20 +890,18 @@ export class MatrixCall extends EventEmitter {
                 return false;
             }
 
-            const videoScreensharingTrack = this.localAVStream.getTracks().find((track) => {
+            const track = this.localAVStream.getTracks().find((track) => {
                 return track.kind === "video";
             });
-            const userMediaVideoSender = this.usermediaSenders.find((sender) => {
+            const sender = this.usermediaSenders.find((sender) => {
                 return sender.track?.kind === "video";
             });
-            if (!userMediaVideoSender) {
-                this.peerConn.removeTrack(userMediaVideoSender);
-            }
-            userMediaVideoSender.replaceTrack(videoScreensharingTrack);
+            sender.replaceTrack(track);
 
             for (const track of this.screenSharingStream.getTracks()) {
                 track.stop();
             }
+            this.deleteFeedByStream(this.screenSharingStream);
             this.screenSharingStream = null;
 
             return false;
@@ -1051,11 +1051,17 @@ export class MatrixCall extends EventEmitter {
             logger.debug(
                 "Setting screen sharing stream to the local video element",
             );
-            const videoTrack = this.screenSharingStream.getTracks().find((track) => track.kind === "video");
-            this.localAVStream.addTrack(videoTrack);
 
-            // XXX: Because this is to support backwards compatibility we pretend like this stream is usermedia
+            this.pushLocalFeed(this.screenSharingStream, SDPStreamMetadataPurpose.Screenshare, false);
             this.pushLocalFeed(this.localAVStream, SDPStreamMetadataPurpose.Usermedia);
+
+            const videoScreensharingTrack = this.screenSharingStream.getTracks().find((track) => {
+                return track.kind === "video";
+            });
+            const userMediaVideoSender = this.usermediaSenders.find((sender) => {
+                return sender.track?.kind === "video";
+            });
+            userMediaVideoSender.replaceTrack(videoScreensharingTrack);
         } else {
             this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
         }
