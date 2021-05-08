@@ -557,6 +557,8 @@ export class MatrixCall extends EventEmitter {
                 senderArray.push(this.peerConn.addTrack(track, stream));
             }
         }
+
+        logger.info(`Pushed local stream with id ${stream.id}. Stream active? ${stream.active}`);
     }
 
     private deleteAllFeeds() {
