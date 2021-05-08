@@ -1875,6 +1875,26 @@ export class MatrixCall extends EventEmitter {
     }
 }
 
+async function getScreensharingStream(
+    selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>,
+): Promise<MediaStream> {
+    const screenshareConstraints = await getScreenshareContraints(selectDesktopCapturerSource);
+    if (!screenshareConstraints) {
+        logger.error("Failed to get screensharing constraints!");
+        return;
+    }
+
+    if (window.electron?.getDesktopCapturerSources) {
+        // We are using Electron
+        logger.debug("Getting screen stream using getUserMedia()...");
+        return await navigator.mediaDevices.getUserMedia(screenshareConstraints);
+    } else {
+        // We are not using Electron
+        logger.debug("Getting screen stream using getDisplayMedia()...");
+        return await navigator.mediaDevices.getDisplayMedia(screenshareConstraints);
+    }
+}
+
 function setTracksEnabled(tracks: Array<MediaStreamTrack>, enabled: boolean) {
     for (let i = 0; i < tracks.length; i++) {
         tracks[i].enabled = enabled;
