@@ -804,7 +804,7 @@ export class MatrixCall extends EventEmitter {
         enabled: boolean,
         selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>,
     ) {
-        if (!this.opponentSupportsSDPStreamMetadata) {
+        if (!this.opponentSupportsSDPStreamMetadata()) {
             return await this.setScreensharingEnabledWithoutMetadataSupport(enabled, selectDesktopCapturerSource);
         }
 
