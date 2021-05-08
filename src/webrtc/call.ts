@@ -790,7 +790,6 @@ export class MatrixCall extends EventEmitter {
      * @returns {boolean} is screensharing
      */
     public isScreensharing(): boolean {
-        console.log("LOG stream", this.screenSharingStream);
         return Boolean(this.screenSharingStream);
     }
 
@@ -893,6 +892,9 @@ export class MatrixCall extends EventEmitter {
             const userMediaVideoSender = this.usermediaSenders.find((sender) => {
                 return sender.track?.kind === "video";
             });
+            if (!userMediaVideoSender) {
+                this.peerConn.removeTrack(userMediaVideoSender);
+            }
             userMediaVideoSender.replaceTrack(videoScreensharingTrack);
 
             for (const track of this.screenSharingStream.getTracks()) {
