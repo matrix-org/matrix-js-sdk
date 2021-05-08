@@ -16,6 +16,7 @@ limitations under the License.
 
 import {TestClient} from '../../TestClient';
 import {MatrixCall, CallErrorCode, CallEvent} from '../../../src/webrtc/call';
+import { SDPStreamMetadataKey, SDPStreamMetadataPurpose } from '../../../src/webrtc/callEventTypes';
 
 const DUMMY_SDP = (
     "v=0\r\n" +
@@ -297,5 +298,34 @@ describe('Call', function() {
 
         // Hangup to stop timers
         call.hangup(CallErrorCode.UserHangup, true);
+    });
+
+    it("should map SDPStreamMetadata to feeds", async () => {
+        const callPromise = call.placeVoiceCall();
+        await client.httpBackend.flush();
+        await callPromise;
+
+        call.getOpponentMember = () => {return {userId: "@bob:bar.uk"}};
+
+        await call.onAnswerReceived({
+            getContent: () => {
+                return {
+                    version: 1,
+                    call_id: call.callId,
+                    party_id: 'party_id',
+                    answer: {
+                        sdp: DUMMY_SDP,
+                    },
+                    [SDPStreamMetadataKey]: {
+                        "stream_id": {
+                            purpose: SDPStreamMetadataPurpose.Usermedia,
+                        }
+                    }
+                };
+            },
+        });
+
+        call.pushRemoteFeed({id: "stream_id"});
+        expect(call.getFeeds().find((feed) => feed.stream.id === "stream_id")?.purpose).toBe(SDPStreamMetadataPurpose.Usermedia);
     });
 });
