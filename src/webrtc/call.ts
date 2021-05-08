@@ -474,7 +474,7 @@ export class MatrixCall extends EventEmitter {
 
     private pushRemoteFeed(stream: MediaStream) {
         // Fallback to old behavior if the other side doesn't support SDPStreamMetadata
-        if (!this.remoteSDPStreamMetadata) {
+        if (!this.opponentSupportsSDPStreamMetadata()) {
             this.pushRemoteFeedWithoutMetadata(stream);
             return;
         }
