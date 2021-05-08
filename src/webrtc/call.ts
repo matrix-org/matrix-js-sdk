@@ -531,7 +531,7 @@ export class MatrixCall extends EventEmitter {
         logger.info(`Pushed remote stream with id ${stream.id}. Stream active? ${stream.active}`);
     }
 
-    private pushLocalFeed(stream: MediaStream, purpose: SDPStreamMetadataPurpose) {
+    private pushLocalFeed(stream: MediaStream, purpose: SDPStreamMetadataPurpose, addToPeerConnection = true) {
         const userId = this.client.getUserId();
 
         // We try to replace an existing feed if there already is one with the same purpose
@@ -546,14 +546,16 @@ export class MatrixCall extends EventEmitter {
         // why do we enable audio (and only audio) tracks here? -- matthew
         setTracksEnabled(stream.getAudioTracks(), true);
 
-        const senderArray = purpose === SDPStreamMetadataPurpose.Usermedia ?
-            this.usermediaSenders : this.screensharingSenders;
-        // Empty the array
-        senderArray.splice(0, senderArray.length);
+        if (addToPeerConnection) {
+            const senderArray = purpose === SDPStreamMetadataPurpose.Usermedia ?
+                this.usermediaSenders : this.screensharingSenders;
+            // Empty the array
+            senderArray.splice(0, senderArray.length);
 
-        for (const track of stream.getTracks()) {
-            logger.info(`Adding track with id ${track.id} and with kind ${track.kind} to peer connection`)
-            senderArray.push(this.peerConn.addTrack(track, stream));
+            for (const track of stream.getTracks()) {
+                logger.info(`Adding track with id ${track.id} and with kind ${track.kind} to peer connection`)
+                senderArray.push(this.peerConn.addTrack(track, stream));
+            }
         }
     }
 
