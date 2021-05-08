@@ -455,11 +455,11 @@ export class MatrixCall extends EventEmitter {
      */
     private getLocalSDPStreamMetadata(): SDPStreamMetadata {
         const metadata = {};
-        this.getLocalFeeds().map((localFeed) => {
+        for (const localFeed of this.getLocalFeeds()) {
             metadata[localFeed.stream.id] = {
                 purpose: localFeed.purpose,
             };
-        });
+        }
         return metadata;
     }
 
