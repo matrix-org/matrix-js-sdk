@@ -824,15 +824,37 @@ export class MatrixCall extends EventEmitter {
         if (enabled) {
             if (this.isScreensharing()) {
                 logger.warn(`There is already a screensharing stream - there is nothing to do!`);
-                return false;
+                return true;
             }
 
             try {
-                const screenshareConstraints = await getScreenshareContraints(selectDesktopCapturerSource);
-                if (!screenshareConstraints) {
-                    logger.error("Failed to get screensharing constraints!");
-                    return;
-                }
+                this.screenSharingStream = await getScreensharingStream(selectDesktopCapturerSource);
+                if (!this.screenSharingStream) return false;
+                this.pushLocalFeed(this.screenSharingStream, SDPStreamMetadataPurpose.Screenshare);
+                return true;
+            } catch (err) {
+                this.emit(CallEvent.Error,
+                    new CallError(CallErrorCode.NoUserMedia, "Failed to get screen-sharing stream: ", err),
+                );
+                return false;
+            }
+        } else {
+            if (!this.isScreensharing()) {
+                logger.warn(`There already isn't a screensharing stream - there is nothing to do!`);
+                return false;
+            }
+
+            for (const sender of this.screensharingSenders) {
+                this.peerConn.removeTrack(sender);
+            }
+            for (const track of this.screenSharingStream.getTracks()) {
+                track.stop();
+            }
+            this.deleteFeedByStream(this.screenSharingStream);
+            this.screenSharingStream = null;
+            return false;
+        }
+    }
 
                 if (window.electron?.getDesktopCapturerSources) {
                     // We are using Electron
