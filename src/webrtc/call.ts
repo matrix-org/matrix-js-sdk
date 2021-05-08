@@ -1260,7 +1260,7 @@ export class MatrixCall extends EventEmitter {
         if (sdpStreamMetadata) {
             this.remoteSDPStreamMetadata = sdpStreamMetadata;
         } else {
-            logger.debug("Did not get any SDPStreamMetadata! Can not send/receive multiple streams");
+            logger.warn("Did not get any SDPStreamMetadata! Can not send/receive multiple streams");
         }
 
         try {
