@@ -392,20 +392,10 @@ export class MatrixCall extends EventEmitter {
         logger.debug("placeScreenSharingCall");
         this.checkForErrorListener();
         try {
-            const screenshareConstraints = await getScreenshareContraints(selectDesktopCapturerSource);
-            if (!screenshareConstraints) {
+            this.screenSharingStream = await getScreensharingStream(selectDesktopCapturerSource);
+            if (!this.screenSharingStream) {
                 this.terminate(CallParty.Local, CallErrorCode.NoUserMedia, false);
                 return;
-            }
-
-            if (window.electron?.getDesktopCapturerSources) {
-                // We are using Electron
-                logger.debug("Getting screen stream using getUserMedia()...");
-                this.screenSharingStream = await navigator.mediaDevices.getUserMedia(screenshareConstraints);
-            } else {
-                // We are not using Electron
-                logger.debug("Getting screen stream using getDisplayMedia()...");
-                this.screenSharingStream = await navigator.mediaDevices.getDisplayMedia(screenshareConstraints);
             }
 
             logger.debug("Got screen stream, requesting audio stream...");
