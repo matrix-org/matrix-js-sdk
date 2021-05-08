@@ -1025,8 +1025,11 @@ export class MatrixCall extends EventEmitter {
             logger.debug(
                 "Setting screen sharing stream to the local video element",
             );
+            const videoTrack = this.screenSharingStream.getTracks().find((track) => track.kind === "video");
+            this.localAVStream.addTrack(videoTrack);
+
             // XXX: Because this is to support backwards compatibility we pretend like this stream is usermedia
-            this.pushLocalFeed(this.screenSharingStream, SDPStreamMetadataPurpose.Usermedia);
+            this.pushLocalFeed(this.localAVStream, SDPStreamMetadataPurpose.Usermedia);
         } else {
             this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
         }
