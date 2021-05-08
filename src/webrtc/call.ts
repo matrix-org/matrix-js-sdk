@@ -269,10 +269,14 @@ export class MatrixCall extends EventEmitter {
     private peerConn: RTCPeerConnection;
     private feeds: Array<CallFeed>;
     private screenSharingStream: MediaStream;
+    // TODO: Rename to usermedia rather than AV for consistency
     private localAVStream: MediaStream;
+    private usermediaSenders: Array<RTCRtpSender>;
+    private screensharingSenders: Array<RTCRtpSender>;
     private inviteOrAnswerSent: boolean;
     private waitForLocalAVStream: boolean;
     // XXX: I don't know why this is called 'config'.
+    // XXX: Do we even needs this? Seems to be unused
     private config: MediaStreamConstraints;
     private successor: MatrixCall;
     private opponentMember: RoomMember;
@@ -349,6 +353,9 @@ export class MatrixCall extends EventEmitter {
         this.vidMuted = false;
 
         this.feeds = [];
+
+        this.usermediaSenders = [];
+        this.screensharingSenders = [];
     }
 
     /**
@@ -549,9 +556,14 @@ export class MatrixCall extends EventEmitter {
         // why do we enable audio (and only audio) tracks here? -- matthew
         setTracksEnabled(stream.getAudioTracks(), true);
 
+        const senderArray = purpose === SDPStreamMetadataPurpose.Usermedia ?
+            this.usermediaSenders : this.screensharingSenders;
+        // Empty the array
+        senderArray.splice(0, senderArray.length);
+
         for (const track of stream.getTracks()) {
             logger.info(`Adding track with id ${track.id} and with kind ${track.kind} to peer connection`)
-            this.peerConn.addTrack(track, stream);
+            senderArray.push(this.peerConn.addTrack(track, stream));
         }
     }
 
@@ -560,33 +572,10 @@ export class MatrixCall extends EventEmitter {
         this.emit(CallEvent.FeedsChanged, this.feeds);
     }
 
-    private deleteLocalFeedByStream(stream: MediaStream) {
+    private deleteFeedByStream(stream: MediaStream) {
         logger.debug(`Removing feed with stream id ${stream.id}`);
 
-        const feed = this.getLocalFeeds().find((feed) => feed.stream.id === stream.id);
-        if (!feed) {
-            logger.warn(`Didn't find the feed with stream id ${stream.id} to delete`);
-            return;
-        }
-
-        this.feeds.splice(this.feeds.indexOf(feed), 1);
-        this.emit(CallEvent.FeedsChanged, this.feeds);
-
-        for (const track of stream.getTracks()) {
-            // XXX: This is ugly and there has to be a way to do this more nicely
-            for (const sender of this.peerConn.getSenders()) {
-                if (sender.track?.id === track.id) {
-                    this.peerConn.removeTrack(sender);
-                }
-            }
-            track.stop();
-        }
-    }
-
-    private deleteRemoteFeedByStream(stream: MediaStream) {
-        logger.debug(`Removing feed with stream id ${stream.id}`);
-
-        const feed = this.getRemoteFeeds().find((feed) => feed.stream.id === stream.id);
+        const feed = this.feeds.find((feed) => feed.stream.id === stream.id);
         if (!feed) {
             logger.warn(`Didn't find the feed with stream id ${stream.id} to delete`);
             return;
@@ -868,7 +857,14 @@ export class MatrixCall extends EventEmitter {
                 logger.warn(`There already isn't a screensharing stream - there is nothing to do!`);
                 return false;
             }
-            this.deleteLocalFeedByStream(this.screenSharingStream);
+
+            for (const sender of this.screensharingSenders) {
+                this.peerConn.removeTrack(sender);
+            }
+            for (const track of this.screenSharingStream.getTracks()) {
+                track.stop();
+            }
+            this.deleteFeedByStream(this.screenSharingStream);
             this.screenSharingStream = null;
             return false;
         }
@@ -1510,7 +1506,7 @@ export class MatrixCall extends EventEmitter {
 
         const stream = ev.streams[0];
         this.pushRemoteFeed(stream);
-        stream.addEventListener("removetrack", () => this.deleteRemoteFeedByStream(stream));
+        stream.addEventListener("removetrack", () => this.deleteFeedByStream(stream));
     };
 
     onNegotiationNeeded = async () => {
