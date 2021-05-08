@@ -805,9 +805,7 @@ export class MatrixCall extends EventEmitter {
         selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>,
     ) {
         if (!this.opponentSupportsSDPStreamMetadata) {
-            logger.warn("The other side doesn't support multiple stream, therefore we can't screenshare");
-            // TODO: Use replaceTrack()
-            return false;
+            return await this.setScreensharingEnabledWithoutMetadataSupport(enabled, selectDesktopCapturerSource);
         }
 
         logger.debug(`Set screensharing enabled? ${enabled}`);
@@ -846,17 +844,36 @@ export class MatrixCall extends EventEmitter {
         }
     }
 
-                if (window.electron?.getDesktopCapturerSources) {
-                    // We are using Electron
-                    logger.debug("Getting screen stream using getUserMedia()...");
-                    this.screenSharingStream = await navigator.mediaDevices.getUserMedia(screenshareConstraints);
-                } else {
-                    // We are not using Electron
-                    logger.debug("Getting screen stream using getDisplayMedia()...");
-                    this.screenSharingStream = await navigator.mediaDevices.getDisplayMedia(screenshareConstraints);
-                }
+    /**
+     * Starts/stops screensharing
+     * Should be used ONLY if the opponent doesn't support SDPStreamMetadata
+     * @param enabled the desired screensharing state
+     * @param selectDesktopCapturerSource callBack to select a screensharing stream on desktop
+     * @returns {boolean} new screensharing state
+     */
+    private async setScreensharingEnabledWithoutMetadataSupport(
+        enabled: boolean,
+        selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>,
+    ) {
+        logger.debug(`Set screensharing enabled? ${enabled} using replaceTrack()`);
+        if (enabled) {
+            if (this.isScreensharing()) {
+                logger.warn(`There is already a screensharing stream - there is nothing to do!`);
+                return true;
+            }
 
-                this.pushLocalFeed(this.screenSharingStream, SDPStreamMetadataPurpose.Screenshare);
+            try {
+                this.screenSharingStream = await getScreensharingStream(selectDesktopCapturerSource);
+                if (!this.screenSharingStream) return false;
+
+                const videoScreensharingTrack = this.screenSharingStream.getTracks().find((track) => {
+                    return track.kind === "video";
+                });
+                const userMediaVideoSender = this.usermediaSenders.find((sender) => {
+                    return sender.track?.kind === "video";
+                });
+                userMediaVideoSender.replaceTrack(videoScreensharingTrack);
+
                 return true;
             } catch (err) {
                 this.emit(CallEvent.Error,
@@ -870,14 +887,19 @@ export class MatrixCall extends EventEmitter {
                 return false;
             }
 
-            for (const sender of this.screensharingSenders) {
-                this.peerConn.removeTrack(sender);
-            }
+            const videoScreensharingTrack = this.localAVStream.getTracks().find((track) => {
+                return track.kind === "video";
+            });
+            const userMediaVideoSender = this.usermediaSenders.find((sender) => {
+                return sender.track?.kind === "video";
+            });
+            userMediaVideoSender.replaceTrack(videoScreensharingTrack);
+
             for (const track of this.screenSharingStream.getTracks()) {
                 track.stop();
             }
-            this.deleteFeedByStream(this.screenSharingStream);
             this.screenSharingStream = null;
+
             return false;
         }
     }
