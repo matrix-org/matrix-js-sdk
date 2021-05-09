@@ -807,17 +807,22 @@ export class MatrixCall extends EventEmitter {
         enabled: boolean,
         selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>,
     ) {
+        // Skip if there is nothing to do
+        if (enabled && this.isScreensharing()) {
+            logger.warn(`There is already a screensharing stream - there is nothing to do!`);
+            return true;
+        } else if (!enabled && !this.isScreensharing()) {
+            logger.warn(`There already isn't a screensharing stream - there is nothing to do!`);
+            return false;
+        }
+
+        // Fallback to replaceTrack()
         if (!this.opponentSupportsSDPStreamMetadata()) {
             return await this.setScreensharingEnabledWithoutMetadataSupport(enabled, selectDesktopCapturerSource);
         }
 
         logger.debug(`Set screensharing enabled? ${enabled}`);
         if (enabled) {
-            if (this.isScreensharing()) {
-                logger.warn(`There is already a screensharing stream - there is nothing to do!`);
-                return true;
-            }
-
             try {
                 this.screenSharingStream = await getScreensharingStream(selectDesktopCapturerSource);
                 if (!this.screenSharingStream) return false;
@@ -830,11 +835,6 @@ export class MatrixCall extends EventEmitter {
                 return false;
             }
         } else {
-            if (!this.isScreensharing()) {
-                logger.warn(`There already isn't a screensharing stream - there is nothing to do!`);
-                return false;
-            }
-
             for (const sender of this.screensharingSenders) {
                 this.peerConn.removeTrack(sender);
             }
@@ -860,11 +860,6 @@ export class MatrixCall extends EventEmitter {
     ) {
         logger.debug(`Set screensharing enabled? ${enabled} using replaceTrack()`);
         if (enabled) {
-            if (this.isScreensharing()) {
-                logger.warn(`There is already a screensharing stream - there is nothing to do!`);
-                return true;
-            }
-
             try {
                 this.screenSharingStream = await getScreensharingStream(selectDesktopCapturerSource);
                 if (!this.screenSharingStream) return false;
@@ -887,11 +882,6 @@ export class MatrixCall extends EventEmitter {
                 return false;
             }
         } else {
-            if (!this.isScreensharing()) {
-                logger.warn(`There already isn't a screensharing stream - there is nothing to do!`);
-                return false;
-            }
-
             const track = this.localAVStream.getTracks().find((track) => {
                 return track.kind === "video";
             });
