@@ -239,7 +239,7 @@ Room.prototype.decryptCriticalEvents = function() {
         .slice(readReceiptTimelineIndex)
         .filter(event => event.shouldAttemptDecryption())
         .reverse()
-        .map(event => event.attemptDecryption(this._client._crypto, true));
+        .map(event => event.attemptDecryption(this._client._crypto, { isRetry: true }));
 
     return Promise.allSettled(decryptionPromises);
 }
@@ -251,7 +251,7 @@ Room.prototype.decryptAllEvents = function() {
         .getEvents()
         .filter(event => event.shouldAttemptDecryption())
         .reverse()
-        .map(event => event.attemptDecryption(this._client._crypto, true));
+        .map(event => event.attemptDecryption(this._client._crypto, { isRetry: true }));
 
     return Promise.allSettled(decryptionPromises);
 }
