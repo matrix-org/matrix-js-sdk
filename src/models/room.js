@@ -244,7 +244,7 @@ Room.prototype.decryptCriticalEvents = function() {
     const readReceiptEventId = this.getEventReadUpTo(this._client.getUserId(), true);
     const events = this.getLiveTimeline().getEvents();
     const readReceiptTimelineIndex = events.findIndex(matrixEvent => {
-        return matrixEvent.event.event_id === readReceiptEventId
+        return matrixEvent.event.event_id === readReceiptEventId;
     });
 
     const decryptionPromises = events
@@ -254,7 +254,7 @@ Room.prototype.decryptCriticalEvents = function() {
         .map(event => event.attemptDecryption(this._client._crypto, { isRetry: true }));
 
     return Promise.allSettled(decryptionPromises);
-}
+};
 
 /**
  * Bulk decrypt events in a room
@@ -271,7 +271,7 @@ Room.prototype.decryptAllEvents = function() {
         .map(event => event.attemptDecryption(this._client._crypto, { isRetry: true }));
 
     return Promise.allSettled(decryptionPromises);
-}
+};
 
 /**
  * Gets the version of the room

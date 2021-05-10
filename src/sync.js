@@ -942,7 +942,7 @@ SyncApi.prototype._onSyncError = function(err, syncOptions) {
  * @param {Object} data The response from /sync
  */
 SyncApi.prototype._processSyncResponse = async function(
-    syncEventData, data
+    syncEventData, data,
 ) {
     const client = this.client;
     const self = this;
@@ -1525,6 +1525,7 @@ SyncApi.prototype._mapSyncResponseToRoomArray = function(obj) {
 /**
  * @param {Object} obj
  * @param {Room} room
+ * @param {bool} decrypt
  * @return {MatrixEvent[]}
  */
 SyncApi.prototype._mapSyncEventsFormat = function(obj, room, decrypt = true) {

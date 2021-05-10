@@ -402,7 +402,7 @@ utils.extend(MatrixEvent.prototype, {
     shouldAttemptDecryption: function() {
         return this.isEncrypted()
             && !this.isBeingDecrypted()
-            && this.getClearContent() === null
+            && this.getClearContent() === null;
     },
 
     /**
@@ -413,6 +413,7 @@ utils.extend(MatrixEvent.prototype, {
      * @internal
      *
      * @param {module:crypto} crypto crypto module
+     * @param {object} options
      * @param {bool} options.isRetry True if this is a retry (enables more logging)
      * @param {bool} options.emit Emits "event.decrypted" if set to true
      *
