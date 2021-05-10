@@ -699,7 +699,7 @@ describe("megolm", function() {
 
                 // the crypto stuff can take a while, so give the requests a whole second.
                 aliceTestClient.httpBackend.flushAllExpected({
-                    timeout: 10000,
+                    timeout: 1000,
                 }),
             ]);
         }).then(function() {
