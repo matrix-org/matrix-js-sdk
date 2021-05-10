@@ -1356,7 +1356,7 @@ export class MatrixCall extends EventEmitter {
         } catch (err) {
             logger.debug("Error setting local description!", err);
             this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);
-            return
+            return;
         }
 
         if (this.peerConn.iceGatheringState === 'gathering') {
