@@ -1001,32 +1001,13 @@ export class MatrixCall extends EventEmitter {
             this.stopAllMedia();
             return;
         }
-        this.localAVStream = stream;
-        logger.info("Got local AV stream with id " + this.localAVStream.id);
 
+        this.localAVStream = stream;
+        this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
         this.setState(CallState.CreateOffer);
 
+        logger.info("Got local AV stream with id " + this.localAVStream.id);
         logger.debug("gotUserMediaForInvite -> " + this.type);
-
-        if (this.screenSharingStream) {
-            logger.debug(
-                "Setting screen sharing stream to the local video element",
-            );
-
-            this.pushLocalFeed(this.screenSharingStream, SDPStreamMetadataPurpose.Screenshare, false);
-            this.pushLocalFeed(this.localAVStream, SDPStreamMetadataPurpose.Usermedia);
-
-            const videoScreensharingTrack = this.screenSharingStream.getTracks().find((track) => {
-                return track.kind === "video";
-            });
-            const userMediaVideoSender = this.usermediaSenders.find((sender) => {
-                return sender.track?.kind === "video";
-            });
-            userMediaVideoSender.replaceTrack(videoScreensharingTrack);
-        } else {
-            this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
-        }
-
         // Now we wait for the negotiationneeded event
     };
 
