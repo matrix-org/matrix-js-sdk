@@ -1887,10 +1887,7 @@ async function getScreensharingStream(
     selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>,
 ): Promise<MediaStream> {
     const screenshareConstraints = await getScreenshareContraints(selectDesktopCapturerSource);
-    if (!screenshareConstraints) {
-        logger.error("Failed to get screensharing constraints!");
-        return;
-    }
+    if (!screenshareConstraints) return null;
 
     if (window.electron?.getDesktopCapturerSources) {
         // We are using Electron
