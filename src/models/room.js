@@ -228,6 +228,18 @@ function pendingEventsKey(roomId) {
 
 utils.inherits(Room, EventEmitter);
 
+
+/**
+ * Bulk decrypt critical events in a room
+ *
+ * Critical events represents the minimal set of events to decrypt
+ * for the UI to function properly
+ *
+ * - Last event of every room (to generate message preview)
+ * - All events are the read receipt (to calculate an accurate notification count)
+ *
+ * @returns {Promise} Signals when all events have been decrypted
+ */
 Room.prototype.decryptCriticalEvents = function() {
     const readReceiptEventId = this.getEventReadUpTo(this._client.getUserId(), true);
     const events = this.getLiveTimeline().getEvents();
@@ -244,6 +256,11 @@ Room.prototype.decryptCriticalEvents = function() {
     return Promise.allSettled(decryptionPromises);
 }
 
+/**
+ * Bulk decrypt events in a room
+ *
+ * @returns {Promise} Signals when all events have been decrypted
+ */
 Room.prototype.decryptAllEvents = function() {
     const decryptionPromises = this
         .getUnfilteredTimelineSet()
