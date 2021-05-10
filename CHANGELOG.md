@@ -1,3 +1,9 @@
+Changes in [10.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v10.1.0) (2021-05-10)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v10.1.0-rc.1...v10.1.0)
+
+ * No changes since rc.1
+
 Changes in [10.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v10.1.0-rc.1) (2021-05-04)
 ============================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v10.0.0...v10.1.0-rc.1)
