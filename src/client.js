@@ -5556,7 +5556,7 @@ function _resolve(callback, resolve, res) {
 
 function _PojoToMatrixEventMapper(client, options = {}) {
     const preventReEmit = Boolean(options.preventReEmit);
-    const decrypt = options.decrypt === true;
+    const decrypt = options.decrypt !== false;
     function mapper(plainOldJsObject) {
         const event = new MatrixEvent(plainOldJsObject);
         if (event.isEncrypted()) {

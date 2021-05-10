@@ -484,8 +484,9 @@ describe("megolm", function() {
             return aliceTestClient.flushSync().then(() => {
                 return aliceTestClient.flushSync();
             });
-        }).then(function() {
+        }).then(async function() {
             const room = aliceTestClient.client.getRoom(ROOM_ID);
+            await room.decryptCriticalEvents();
             const event = room.getLiveTimeline().getEvents()[0];
             expect(event.getContent().body).toEqual('42');
         });
@@ -698,7 +699,7 @@ describe("megolm", function() {
 
                 // the crypto stuff can take a while, so give the requests a whole second.
                 aliceTestClient.httpBackend.flushAllExpected({
-                    timeout: 1000,
+                    timeout: 10000,
                 }),
             ]);
         }).then(function() {
@@ -933,8 +934,9 @@ describe("megolm", function() {
 
             aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
             return aliceTestClient.flushSync();
-        }).then(function() {
+        }).then(async function() {
             const room = aliceTestClient.client.getRoom(ROOM_ID);
+            await room.decryptCriticalEvents();
             const event = room.getLiveTimeline().getEvents()[0];
             expect(event.getContent().body).toEqual('42');
 
