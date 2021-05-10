@@ -833,13 +833,13 @@ export class MatrixCall extends EventEmitter {
                 this.screenSharingStream = await getScreensharingStream(selectDesktopCapturerSource);
                 if (!this.screenSharingStream) return false;
 
-                const videoScreensharingTrack = this.screenSharingStream.getTracks().find((track) => {
+                const track = this.screenSharingStream.getTracks().find((track) => {
                     return track.kind === "video";
                 });
-                const userMediaVideoSender = this.usermediaSenders.find((sender) => {
+                const sender = this.usermediaSenders.find((sender) => {
                     return sender.track?.kind === "video";
                 });
-                userMediaVideoSender.replaceTrack(videoScreensharingTrack);
+                sender.replaceTrack(track);
 
                 this.pushLocalFeed(this.screenSharingStream, SDPStreamMetadataPurpose.Screenshare, false);
 
