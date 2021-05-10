@@ -382,37 +382,6 @@ export class MatrixCall extends EventEmitter {
         await this.placeCallWithConstraints(constraints);
     }
 
-    /**
-     * Place a screen-sharing call to this room. This includes audio.
-     * <b>This method is EXPERIMENTAL and subject to change without warning. It
-     * only works in Google Chrome and Firefox >= 44.</b>
-     * @throws If you have not specified a listener for 'error' events.
-     */
-    async placeScreenSharingCall(selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>) {
-        logger.debug("placeScreenSharingCall");
-        this.checkForErrorListener();
-        try {
-            this.screenSharingStream = await getScreensharingStream(selectDesktopCapturerSource);
-            if (!this.screenSharingStream) {
-                this.terminate(CallParty.Local, CallErrorCode.NoUserMedia, false);
-                return;
-            }
-
-            logger.debug("Got screen stream, requesting audio stream...");
-            const audioConstraints = getUserMediaContraints(ConstraintsType.Video);
-            this.placeCallWithConstraints(audioConstraints);
-        } catch (err) {
-            this.emit(CallEvent.Error,
-                new CallError(
-                    CallErrorCode.NoUserMedia,
-                    "Failed to get screen-sharing stream: ", err,
-                ),
-            );
-            this.terminate(CallParty.Local, CallErrorCode.NoUserMedia, false);
-        }
-        this.type = CallType.Video;
-    }
-
     public getOpponentMember() {
         return this.opponentMember;
     }
