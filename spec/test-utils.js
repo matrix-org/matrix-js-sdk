@@ -212,6 +212,9 @@ MockStorageApi.prototype = {
  * @returns {Promise} promise which resolves (to `event`) when the event has been decrypted
  */
 export function awaitDecryption(event) {
+    // An event is not always decrypted ahead of time
+    // getClearContent is a good signal to know whether an event has been decrypted
+    // already
     if (event.getClearContent() !== null) {
         return event;
     } else {
