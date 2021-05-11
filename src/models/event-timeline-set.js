@@ -19,12 +19,12 @@ limitations under the License.
  * @module models/event-timeline-set
  */
 
-import {EventEmitter} from "events";
-import {EventTimeline} from "./event-timeline";
-import {EventStatus} from "./event";
+import { EventEmitter } from "events";
+import { EventTimeline } from "./event-timeline";
+import { EventStatus } from "./event";
 import * as utils from "../utils";
-import {logger} from '../logger';
-import {Relations} from './relations';
+import { logger } from '../logger';
+import { Relations } from './relations';
 
 // var DEBUG = false;
 const DEBUG = true;
@@ -271,7 +271,6 @@ EventTimelineSet.prototype.addTimeline = function() {
     return timeline;
 };
 
-
 /**
  * Add events to a timeline
  *
@@ -474,7 +473,7 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
     // timeline we ended up on.
     if (lastEventWasNew || !didUpdate) {
         if (direction === EventTimeline.FORWARDS && timeline === this._liveTimeline) {
-            logger.warn({lastEventWasNew, didUpdate}); // for debugging
+            logger.warn({ lastEventWasNew, didUpdate }); // for debugging
             logger.warn(
                 `Refusing to set forwards pagination token of live timeline ` +
                 `${timeline} to ${paginationToken}`,

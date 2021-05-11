@@ -20,7 +20,7 @@ limitations under the License.
  */
 
 import * as utils from "../utils";
-import {EventContext} from "./event-context";
+import { EventContext } from "./event-context";
 
 /**
  * Construct a new SearchResult

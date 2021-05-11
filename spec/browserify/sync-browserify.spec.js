@@ -17,10 +17,10 @@ limitations under the License.
 // load XmlHttpRequest mock
 import "./setupTests";
 import "../../dist/browser-matrix"; // uses browser-matrix instead of the src
-import {MockStorageApi} from "../MockStorageApi";
-import {WebStorageSessionStore} from "../../src/store/session/webstorage";
+import { MockStorageApi } from "../MockStorageApi";
+import { WebStorageSessionStore } from "../../src/store/session/webstorage";
 import MockHttpBackend from "matrix-mock-request";
-import {LocalStorageCryptoStore} from "../../src/crypto/store/localStorage-crypto-store";
+import { LocalStorageCryptoStore } from "../../src/crypto/store/localStorage-crypto-store";
 import * as utils from "../test-utils";
 
 const USER_ID = "@user:test.server";
@@ -58,7 +58,7 @@ describe("Browserify Test", function() {
     }
 
     beforeEach(async () => {
-        ({client, httpBackend} = await createTestClient());
+        ({ client, httpBackend } = await createTestClient());
         await client.startClient();
     });
 

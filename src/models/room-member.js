@@ -19,8 +19,8 @@ limitations under the License.
  * @module models/room-member
  */
 
-import {EventEmitter} from "events";
-import {getHttpUriForMxc} from "../content-repo";
+import { EventEmitter } from "events";
+import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
 
 /**
@@ -202,7 +202,6 @@ RoomMember.prototype.getLastModifiedTime = function() {
     return this._modified;
 };
 
-
 RoomMember.prototype.isKicked = function() {
     return this.membership === "leave" &&
         this.events.member.getSender() !== this.events.member.getStateKey();
@@ -238,7 +237,6 @@ RoomMember.prototype.getDMInviter = function() {
         }
     }
 };
-
 
 /**
  * Get the avatar URL for a room member.

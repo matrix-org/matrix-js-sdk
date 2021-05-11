@@ -19,7 +19,7 @@ limitations under the License.
  * @module filter
  */
 
-import {FilterComponent} from "./filter-component";
+import { FilterComponent } from "./filter-component";
 
 /**
  * @param {Object} obj

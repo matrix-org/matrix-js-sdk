@@ -26,15 +26,15 @@ limitations under the License.
  * for HTTP and WS at some point.
  */
 
-import {User} from "./models/user";
-import {Room} from "./models/room";
-import {Group} from "./models/group";
+import { User } from "./models/user";
+import { Room } from "./models/room";
+import { Group } from "./models/group";
 import * as utils from "./utils";
-import {Filter} from "./filter";
-import {EventTimeline} from "./models/event-timeline";
-import {PushProcessor} from "./pushprocessor";
-import {logger} from './logger';
-import {InvalidStoreError} from './errors';
+import { Filter } from "./filter";
+import { EventTimeline } from "./models/event-timeline";
+import { PushProcessor } from "./pushprocessor";
+import { logger } from './logger';
+import { InvalidStoreError } from './errors';
 
 const DEBUG = true;
 
@@ -61,7 +61,6 @@ function debuglog(...params) {
     }
     logger.log(...params);
 }
-
 
 /**
  * <b>Internal class - unstable.</b>
@@ -187,7 +186,6 @@ SyncApi.prototype._deregisterStateListeners = function(room) {
     room.currentState.removeAllListeners("RoomState.members");
     room.currentState.removeAllListeners("RoomState.newMember");
 };
-
 
 /**
  * Sync rooms the user has left.
@@ -1479,7 +1477,7 @@ SyncApi.prototype._processGroupSyncEntry = function(groupsSection, sectionName) 
             );
         }
         if (groupInfo.inviter) {
-            group.setInviter({userId: groupInfo.inviter});
+            group.setInviter({ userId: groupInfo.inviter });
         }
         group.setMyMembership(sectionName);
         if (isBrandNew) {

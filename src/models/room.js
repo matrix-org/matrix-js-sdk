@@ -20,17 +20,17 @@ limitations under the License.
  * @module models/room
  */
 
-import {EventEmitter} from "events";
-import {EventTimelineSet} from "./event-timeline-set";
-import {EventTimeline} from "./event-timeline";
-import {getHttpUriForMxc} from "../content-repo";
+import { EventEmitter } from "events";
+import { EventTimelineSet } from "./event-timeline-set";
+import { EventTimeline } from "./event-timeline";
+import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
-import {EventStatus, MatrixEvent} from "./event";
-import {RoomMember} from "./room-member";
-import {RoomSummary} from "./room-summary";
-import {logger} from '../logger';
-import {ReEmitter} from '../ReEmitter';
-import {EventType, RoomCreateTypeField, RoomType} from "../@types/event";
+import { EventStatus, MatrixEvent } from "./event";
+import { RoomMember } from "./room-member";
+import { RoomSummary } from "./room-summary";
+import { logger } from '../logger';
+import { ReEmitter } from '../ReEmitter';
+import { EventType, RoomCreateTypeField, RoomType } from "../@types/event";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -57,7 +57,6 @@ function synthesizeReceipt(userId, event, receiptType) {
     };
     return new MatrixEvent(fakeReceipt);
 }
-
 
 /**
  * Construct a new Room.
@@ -441,7 +440,6 @@ Room.prototype.getLiveTimeline = function() {
     return this.getUnfilteredTimelineSet().getLiveTimeline();
 };
 
-
 /**
  * Get the timestamp of the last message in the room
  *
@@ -580,12 +578,11 @@ Room.prototype._loadMembersFromServer = async function() {
         at: lastSyncToken,
     });
     const path = utils.encodeUri("/rooms/$roomId/members?" + queryString,
-        {$roomId: this.roomId});
+        { $roomId: this.roomId });
     const http = this._client._http;
     const response = await http.authedRequest(undefined, "GET", path);
     return response.chunk;
 };
-
 
 Room.prototype._loadMembers = async function() {
     // were the members loaded from the server?
@@ -599,7 +596,7 @@ Room.prototype._loadMembers = async function() {
             `members from server for room ${this.roomId}`);
     }
     const memberEvents = rawMembersEvents.map(this._client.getEventMapper());
-    return {memberEvents, fromServer};
+    return { memberEvents, fromServer };
 };
 
 /**
@@ -1071,7 +1068,6 @@ Room.prototype.getInvitedAndJoinedMemberCount = function() {
     return calculateRoomName(this, userId, true);
  };
 
-
  /**
  * Check if the given user_id has the given membership state.
  * @param {string} userId The user ID to check.
@@ -1227,7 +1223,6 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy, fromCache) {
         // reset the lastActiveAgo and lastPresenceTs from the RoomState's user.
     }
 };
-
 
 /**
  * Add a pending outgoing event to this room.
@@ -1639,7 +1634,6 @@ Room.prototype.removeEvent = function(eventId) {
     return removedAny;
 };
 
-
 /**
  * Recalculate various aspects of the room, including the room name and
  * room summary. Call this any time the room's current state is modified.
@@ -1863,7 +1857,6 @@ Room.prototype._buildReceiptCache = function(receipts) {
     return receiptCacheByEventId;
 };
 
-
 /**
  * Add a temporary local-echo receipt to the room to reflect in the
  * client the fact that we've sent one.
@@ -1920,7 +1913,6 @@ Room.prototype.addAccountData = function(events) {
 Room.prototype.getAccountData = function(type) {
     return this.accountData[type];
 };
-
 
 /**
  * Returns whether the syncing user has permission to send a message in the room

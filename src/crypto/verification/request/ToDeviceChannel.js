@@ -15,8 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {randomString} from '../../../randomstring';
-import {logger} from '../../../logger';
+import { randomString } from '../../../randomstring';
+import { logger } from '../../../logger';
 import {
     CANCEL_TYPE,
     PHASE_STARTED,
@@ -26,8 +26,8 @@ import {
     START_TYPE,
     VerificationRequest,
 } from "./VerificationRequest";
-import {errorFromEvent, newUnexpectedMessageError} from "../Error";
-import {MatrixEvent} from "../../../models/event";
+import { errorFromEvent, newUnexpectedMessageError } from "../Error";
+import { MatrixEvent } from "../../../models/event";
 
 /**
  * A key verification channel that sends verification events over to_device messages.
@@ -277,7 +277,7 @@ export class ToDeviceChannel {
                 msgMap[deviceId] = content;
             }
 
-            return this._client.sendToDevice(type, {[this.userId]: msgMap});
+            return this._client.sendToDevice(type, { [this.userId]: msgMap });
         } else {
             return Promise.resolve();
         }
@@ -291,7 +291,6 @@ export class ToDeviceChannel {
         return randomString(32);
     }
 }
-
 
 export class ToDeviceRequests {
     constructor() {

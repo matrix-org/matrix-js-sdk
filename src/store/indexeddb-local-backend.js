@@ -16,10 +16,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {SyncAccumulator} from "../sync-accumulator";
+import { SyncAccumulator } from "../sync-accumulator";
 import * as utils from "../utils";
 import * as IndexedDBHelpers from "../indexeddb-helpers";
-import {logger} from '../logger';
+import { logger } from '../logger';
 
 const VERSION = 3;
 
@@ -45,9 +45,8 @@ function upgradeSchemaV2(db) {
 
 function upgradeSchemaV3(db) {
     db.createObjectStore("client_options",
-        { keyPath: ["clobber"]});
+        { keyPath: ["clobber"] });
 }
-
 
 /**
  * Helper method to collect results from a Cursor and promiseify it.

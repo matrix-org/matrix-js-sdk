@@ -17,46 +17,45 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-
 /**
  * This is an internal module. See {@link MatrixClient} for the public class.
  * @module client
  */
 
 import url from "url";
-import {EventEmitter} from "events";
-import {MatrixBaseApis} from "./base-apis";
-import {Filter} from "./filter";
-import {SyncApi} from "./sync";
-import {EventStatus, MatrixEvent} from "./models/event";
-import {EventTimeline} from "./models/event-timeline";
-import {SearchResult} from "./models/search-result";
-import {StubStore} from "./store/stub";
-import {createNewMatrixCall} from "./webrtc/call";
-import {CallEventHandler} from './webrtc/callEventHandler';
+import { EventEmitter } from "events";
+import { MatrixBaseApis } from "./base-apis";
+import { Filter } from "./filter";
+import { SyncApi } from "./sync";
+import { EventStatus, MatrixEvent } from "./models/event";
+import { EventTimeline } from "./models/event-timeline";
+import { SearchResult } from "./models/search-result";
+import { StubStore } from "./store/stub";
+import { createNewMatrixCall } from "./webrtc/call";
+import { CallEventHandler } from './webrtc/callEventHandler';
 import * as utils from './utils';
-import {sleep} from './utils';
+import { sleep } from './utils';
 import {
     MatrixError,
     PREFIX_MEDIA_R0,
     PREFIX_UNSTABLE,
     retryNetworkOperation,
 } from "./http-api";
-import {getHttpUriForMxc} from "./content-repo";
+import { getHttpUriForMxc } from "./content-repo";
 import * as ContentHelpers from "./content-helpers";
 import * as olmlib from "./crypto/olmlib";
-import {ReEmitter} from './ReEmitter';
-import {RoomList} from './crypto/RoomList';
-import {logger} from './logger';
-import {Crypto, isCryptoAvailable, fixBackupKey} from './crypto';
-import {decodeRecoveryKey} from './crypto/recoverykey';
-import {keyFromAuthData} from './crypto/key_passphrase';
-import {randomString} from './randomstring';
-import {PushProcessor} from "./pushprocessor";
-import {encodeBase64, decodeBase64} from "./crypto/olmlib";
+import { ReEmitter } from './ReEmitter';
+import { RoomList } from './crypto/RoomList';
+import { logger } from './logger';
+import { Crypto, isCryptoAvailable, fixBackupKey } from './crypto';
+import { decodeRecoveryKey } from './crypto/recoverykey';
+import { keyFromAuthData } from './crypto/key_passphrase';
+import { randomString } from './randomstring';
+import { PushProcessor } from "./pushprocessor";
+import { encodeBase64, decodeBase64 } from "./crypto/olmlib";
 import { User } from "./models/user";
-import {AutoDiscovery} from "./autodiscovery";
-import {DEHYDRATION_ALGORITHM} from "./crypto/dehydration";
+import { AutoDiscovery } from "./autodiscovery";
+import { DEHYDRATION_ALGORITHM } from "./crypto/dehydration";
 
 const SCROLLBACK_DELAY_MS = 3000;
 export const CRYPTO_ENABLED = isCryptoAvailable();
@@ -702,7 +701,6 @@ MatrixClient.prototype.getDeviceId = function() {
     return this.deviceId;
 };
 
-
 /**
  * Check if the runtime environment supports VoIP calling.
  * @return {boolean} True if VoIP is supported.
@@ -965,13 +963,11 @@ MatrixClient.prototype.initCrypto = async function() {
 
     this.olmVersion = Crypto.getOlmVersion();
 
-
     // if crypto initialisation was successful, tell it to attach its event
     // handlers.
     crypto.registerEventHandlers(this);
     this._crypto = crypto;
 };
-
 
 /**
  * Is end-to-end crypto enabled for this client.
@@ -1786,7 +1782,7 @@ MatrixClient.prototype.checkKeyBackup = function() {
 MatrixClient.prototype.getKeyBackupVersion = function() {
     return this._http.authedRequest(
         undefined, "GET", "/room_keys/version", undefined, undefined,
-        {prefix: PREFIX_UNSTABLE},
+        { prefix: PREFIX_UNSTABLE },
     ).then((res) => {
         if (res.algorithm !== olmlib.MEGOLM_BACKUP_ALGORITHM) {
             const err = "Unknown backup algorithm: " + res.algorithm;
@@ -1964,7 +1960,7 @@ MatrixClient.prototype.createKeyBackupVersion = async function(info) {
 
     const res = await this._http.authedRequest(
         undefined, "POST", "/room_keys/version", undefined, data,
-        {prefix: PREFIX_UNSTABLE},
+        { prefix: PREFIX_UNSTABLE },
     );
 
     // We could assume everything's okay and enable directly, but this ensures
@@ -1996,7 +1992,7 @@ MatrixClient.prototype.deleteKeyBackupVersion = function(version) {
 
     return this._http.authedRequest(
         undefined, "DELETE", path, undefined, undefined,
-        {prefix: PREFIX_UNSTABLE},
+        { prefix: PREFIX_UNSTABLE },
     );
 };
 
@@ -2038,7 +2034,7 @@ MatrixClient.prototype.sendKeyBackup = function(roomId, sessionId, version, data
     const path = this._makeKeyBackupPath(roomId, sessionId, version);
     return this._http.authedRequest(
         undefined, "PUT", path.path, path.queryData, data,
-        {prefix: PREFIX_UNSTABLE},
+        { prefix: PREFIX_UNSTABLE },
     );
 };
 
@@ -2238,7 +2234,7 @@ MatrixClient.prototype._restoreKeyBackup = function(
     // doesn't match the one in the auth_data, the user has enetered
     // a different recovery key / the wrong passphrase.
     if (backupPubKey !== backupInfo.auth_data.public_key) {
-        return Promise.reject({errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY});
+        return Promise.reject({ errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY });
     }
 
     // Cache the key, if possible.
@@ -2256,7 +2252,7 @@ MatrixClient.prototype._restoreKeyBackup = function(
 
     return this._http.authedRequest(
         undefined, "GET", path.path, path.queryData, undefined,
-        {prefix: PREFIX_UNSTABLE},
+        { prefix: PREFIX_UNSTABLE },
     ).then((res) => {
         if (res.rooms) {
             for (const [roomId, roomData] of Object.entries(res.rooms)) {
@@ -2296,7 +2292,7 @@ MatrixClient.prototype._restoreKeyBackup = function(
     }).then(() => {
         return this._crypto.setTrustedBackupPubKey(backupPubKey);
     }).then(() => {
-        return {total: totalKeyCount, imported: keys.length};
+        return { total: totalKeyCount, imported: keys.length };
     }).finally(() => {
         decryption.free();
     });
@@ -2310,7 +2306,7 @@ MatrixClient.prototype.deleteKeysFromBackup = function(roomId, sessionId, versio
     const path = this._makeKeyBackupPath(roomId, sessionId, version);
     return this._http.authedRequest(
         undefined, "DELETE", path.path, path.queryData, undefined,
-        {prefix: PREFIX_UNSTABLE},
+        { prefix: PREFIX_UNSTABLE },
     );
 };
 
@@ -2545,7 +2541,7 @@ MatrixClient.prototype.getIgnoredUsers = function() {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.setIgnoredUsers = function(userIds, callback) {
-    const content = {ignored_users: {}};
+    const content = { ignored_users: {} };
     userIds.map((u) => content.ignored_users[u] = {});
     return this.setAccountData("m.ignored_user_list", content, callback);
 };
@@ -2606,7 +2602,7 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
         queryString["server_name"] = opts.viaServers;
     }
 
-    const reqOpts = {qsStringifyOptions: {arrayFormat: 'repeat'}};
+    const reqOpts = { qsStringifyOptions: { arrayFormat: 'repeat' } };
 
     const self = this;
     const prom = new Promise((resolve, reject) => {
@@ -2616,7 +2612,7 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
                 data.third_party_signed = signed_invite_object;
             }
 
-            const path = utils.encodeUri("/join/$roomid", { $roomid: roomIdOrAlias});
+            const path = utils.encodeUri("/join/$roomid", { $roomid: roomIdOrAlias });
             return self._http.authedRequest(
                 undefined, "POST", path, queryString, data, reqOpts);
         }).then(function(res) {
@@ -2680,7 +2676,7 @@ MatrixClient.prototype.cancelPendingEvent = function(event) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.setRoomName = function(roomId, name, callback) {
-    return this.sendStateEvent(roomId, "m.room.name", {name: name},
+    return this.sendStateEvent(roomId, "m.room.name", { name: name },
                                undefined, callback);
 };
 
@@ -2692,7 +2688,7 @@ MatrixClient.prototype.setRoomName = function(roomId, name, callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.setRoomTopic = function(roomId, topic, callback) {
-    return this.sendStateEvent(roomId, "m.room.topic", {topic: topic},
+    return this.sendStateEvent(roomId, "m.room.topic", { topic: topic },
                                undefined, callback);
 };
 
@@ -2877,7 +2873,6 @@ MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
 
     return _sendEvent(this, room, localEvent, callback);
 };
-
 
 // encrypts the event if necessary
 // adds the event to the queue, or sends it
@@ -3726,7 +3721,7 @@ function _setMembershipState(client, roomId, userId, membershipValue, reason,
 
     const path = utils.encodeUri(
         "/rooms/$roomId/state/m.room.member/$userId",
-        { $roomId: roomId, $userId: userId},
+        { $roomId: roomId, $userId: userId },
     );
 
     return client._http.authedRequest(callback, "PUT", path, undefined, {
@@ -4041,7 +4036,7 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
 
     let params = undefined;
     if (this._clientOpts.lazyLoadMembers) {
-        params = {filter: JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER)};
+        params = { filter: JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER) };
     }
 
     // TODO: we should implement a backoff (as per scrollback()) to deal more
@@ -4107,7 +4102,7 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
 MatrixClient.prototype._createMessagesRequest =
 function(roomId, fromToken, limit, dir, timelineFilter = undefined) {
     const path = utils.encodeUri(
-        "/rooms/$roomId/messages", {$roomId: roomId},
+        "/rooms/$roomId/messages", { $roomId: roomId },
     );
     if (limit === undefined) {
         limit = 30;
@@ -4562,7 +4557,6 @@ MatrixClient.prototype._requestTokenFromEndpoint = async function(endpoint, para
     );
 };
 
-
 // Push operations
 // ===============
 
@@ -4741,7 +4735,7 @@ MatrixClient.prototype.searchRoomEvents = function(opts) {
         highlights: [],
     };
 
-    return this.search({body: body}).then(
+    return this.search({ body: body }).then(
         this._processRoomEventsSearch.bind(this, searchResults),
     );
 };
@@ -4817,7 +4811,6 @@ MatrixClient.prototype._processRoomEventsSearch = function(searchResults, respon
     }
     return searchResults;
 };
-
 
 /**
  * Populate the store with rooms the user has left.
@@ -4964,7 +4957,6 @@ MatrixClient.prototype.getOrCreateFilter = async function(filterName, filter) {
     return createdFilter.filterId;
 };
 
-
 /**
  * Gets a bearer token from the Home Server that the user can
  * present to a third party in order to prove their ownership
@@ -4981,7 +4973,6 @@ MatrixClient.prototype.getOpenIdToken = function() {
         undefined, "POST", path, undefined, {},
     );
 };
-
 
 // VoIP operations
 // ===============
@@ -5092,7 +5083,7 @@ MatrixClient.prototype.isSynapseAdministrator = function() {
         { $userId: this.getUserId() },
     );
     return this._http.authedRequest(
-        undefined, 'GET', path, undefined, undefined, {prefix: ''},
+        undefined, 'GET', path, undefined, undefined, { prefix: '' },
     ).then(r => r['admin']); // pull out the specific boolean we want
 };
 
@@ -5109,7 +5100,7 @@ MatrixClient.prototype.whoisSynapseUser = function(userId) {
         { $userId: userId },
     );
     return this._http.authedRequest(
-        undefined, 'GET', path, undefined, undefined, {prefix: ''},
+        undefined, 'GET', path, undefined, undefined, { prefix: '' },
     );
 };
 
@@ -5125,7 +5116,7 @@ MatrixClient.prototype.deactivateSynapseUser = function(userId) {
         { $userId: userId },
     );
     return this._http.authedRequest(
-        undefined, 'POST', path, undefined, undefined, {prefix: ''},
+        undefined, 'POST', path, undefined, undefined, { prefix: '' },
     );
 };
 
@@ -5142,7 +5133,6 @@ MatrixClient.prototype.deactivateSynapseUser = function(userId) {
 //     displayname changes
 //   due to ambiguity (or should this be on a chat-specific layer)?
 //   reconnect after connectivity outages
-
 
 /**
  * High level helper method to begin syncing and poll for new events. To listen for these
@@ -5294,7 +5284,7 @@ MatrixClient.prototype._unstable_getSharedRooms = async function(userId) {
     });
     const res = await this._http.authedRequest(
         undefined, "GET", path, undefined, undefined,
-        {prefix: PREFIX_UNSTABLE},
+        { prefix: PREFIX_UNSTABLE },
     );
     return res.joined;
 };

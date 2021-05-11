@@ -22,14 +22,13 @@ limitations under the License.
  * Manages the list of other users' devices
  */
 
-import {EventEmitter} from 'events';
-import {logger} from '../logger';
-import {DeviceInfo} from './deviceinfo';
-import {CrossSigningInfo} from './CrossSigning';
+import { EventEmitter } from 'events';
+import { logger } from '../logger';
+import { DeviceInfo } from './deviceinfo';
+import { CrossSigningInfo } from './CrossSigning';
 import * as olmlib from './olmlib';
-import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
-import {chunkPromises, defer, sleep} from '../utils';
-
+import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
+import { chunkPromises, defer, sleep } from '../utils';
 
 /* State transition diagram for DeviceList._deviceTrackingStatus
  *
@@ -50,7 +49,6 @@ import {chunkPromises, defer, sleep} from '../utils';
  *   ^                            V                              |
  *   +----------------------- UP_TO_DATE ------------------------+
  */
-
 
 // constants for DeviceList._deviceTrackingStatus
 const TRACKING_STATUS_NOT_TRACKED = 0;
@@ -891,7 +889,6 @@ class DeviceListUpdateSerialiser {
         }
     }
 }
-
 
 async function _updateStoredDeviceKeysForUser(
     _olmDevice, userId, userStore, userResult, localUserId, localDeviceId,

@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {randomString} from '../randomstring';
+import { randomString } from '../randomstring';
 
 const DEFAULT_ITERATIONS = 500000;
 
@@ -63,7 +63,7 @@ export async function deriveKey(password, salt, iterations, numBits = DEFAULT_BI
     const key = await subtleCrypto.importKey(
         'raw',
         new TextEncoder().encode(password),
-        {name: 'PBKDF2'},
+        { name: 'PBKDF2' },
         false,
         ['deriveBits'],
     );

@@ -15,10 +15,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {TestClient} from '../../../TestClient';
-import {MatrixEvent} from "../../../../src/models/event";
+import { TestClient } from '../../../TestClient';
+import { MatrixEvent } from "../../../../src/models/event";
 import nodeCrypto from "crypto";
-import {logger} from '../../../../src/logger';
+import { logger } from '../../../../src/logger';
 
 export async function makeTestClients(userInfos, options) {
     const clients = [];
@@ -76,7 +76,7 @@ export async function makeTestClients(userInfos, options) {
             }
         });
 
-        return Promise.resolve({event_id: eventId});
+        return Promise.resolve({ event_id: eventId });
     };
 
     for (const userInfo of userInfos) {

@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {EventEmitter} from 'events';
-import {EventStatus} from '../models/event';
-import {logger} from '../logger';
+import { EventEmitter } from 'events';
+import { EventStatus } from '../models/event';
+import { logger } from '../logger';
 
 /**
  * A container for relation events that supports easy access to common ways of

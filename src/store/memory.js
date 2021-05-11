@@ -22,7 +22,7 @@ limitations under the License.
  * @module store/memory
  */
 
-import {User} from "../models/user";
+import { User } from "../models/user";
 import * as utils from "../utils";
 
 function isValidFilterId(filterId) {

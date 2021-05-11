@@ -20,7 +20,7 @@ limitations under the License.
  */
 
 import * as utils from "../utils";
-import {EventEmitter} from "events";
+import { EventEmitter } from "events";
 
 /**
  * Construct a new User. A User must have an ID and can optionally have extra
@@ -139,7 +139,6 @@ User.prototype.setDisplayName = function(name) {
     }
 };
 
-
 /**
  * Manually set this user's non-disambiguated display name. No event is emitted
  * in response to this as there is no underlying MatrixEvent to emit with.
@@ -152,7 +151,6 @@ User.prototype.setRawDisplayName = function(name) {
         this.rawDisplayName = undefined;
     }
 };
-
 
 /**
  * Manually set this user's avatar URL. No event is emitted in response to this

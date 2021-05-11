@@ -21,7 +21,7 @@ limitations under the License.
  * @module scheduler
  */
 import * as utils from "./utils";
-import {logger} from './logger';
+import { logger } from './logger';
 
 const DEBUG = false;  // set true to enable console logging.
 
@@ -92,7 +92,6 @@ MatrixScheduler.prototype.removeEventFromQueue = function(event) {
     });
     return removed;
 };
-
 
 /**
  * Set the process function. Required for events in the queue to be processed.

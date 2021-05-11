@@ -20,9 +20,9 @@ limitations under the License.
  * @module http-api
  */
 
-import {parse as parseContentType} from "content-type";
+import { parse as parseContentType } from "content-type";
 import * as utils from "./utils";
-import {logger} from './logger';
+import { logger } from './logger';
 
 // we use our own implementation of setTimeout, so that if we get suspended in
 // the middle of a /sync, we cancel the sync as soon as we awake, rather than
@@ -344,7 +344,7 @@ MatrixHttpApi.prototype = {
             promise = this.authedRequest(
                 opts.callback, "POST", "/upload", queryParams, body, {
                     prefix: "/_matrix/media/r0",
-                    headers: {"Content-Type": contentType},
+                    headers: { "Content-Type": contentType },
                     json: false,
                     bodyParser: bodyParser,
                 },
@@ -861,7 +861,6 @@ function parseErrorResponse(response, body) {
     err.httpStatus = httpStatus;
     return err;
 }
-
 
 /**
  * extract the Content-Type header from the response object, and

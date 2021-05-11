@@ -1,7 +1,6 @@
 import * as utils from "../test-utils";
-import {EventStatus} from "../../src/models/event";
-import {TestClient} from "../TestClient";
-
+import { EventStatus } from "../../src/models/event";
+import { TestClient } from "../TestClient";
 
 describe("MatrixClient room timelines", function() {
     let client = null;
@@ -104,7 +103,7 @@ describe("MatrixClient room timelines", function() {
             "DEVICE",
             accessToken,
             undefined,
-            {timelineSupport: true},
+            { timelineSupport: true },
         );
         httpBackend = testClient.httpBackend;
         client = testClient.client;
@@ -166,7 +165,7 @@ describe("MatrixClient room timelines", function() {
                 body: "I am a fish", user: userId, room: roomId,
             });
             ev.event_id = eventId;
-            ev.unsigned = {transaction_id: "txn1"};
+            ev.unsigned = { transaction_id: "txn1" };
             setNextSyncData([ev]);
 
             client.on("sync", function(state) {
@@ -198,7 +197,7 @@ describe("MatrixClient room timelines", function() {
                 body: "I am a fish", user: userId, room: roomId,
             });
             ev.event_id = eventId;
-            ev.unsigned = {transaction_id: "txn1"};
+            ev.unsigned = { transaction_id: "txn1" };
             setNextSyncData([ev]);
 
             client.on("sync", function(state) {
@@ -396,8 +395,8 @@ describe("MatrixClient room timelines", function() {
     describe("new events", function() {
         it("should be added to the right place in the timeline", function() {
             const eventData = [
-                utils.mkMessage({user: userId, room: roomId}),
-                utils.mkMessage({user: userId, room: roomId}),
+                utils.mkMessage({ user: userId, room: roomId }),
+                utils.mkMessage({ user: userId, room: roomId }),
             ];
             setNextSyncData(eventData);
 
@@ -434,11 +433,11 @@ describe("MatrixClient room timelines", function() {
 
         it("should set the right event.sender values", function() {
             const eventData = [
-                utils.mkMessage({user: userId, room: roomId}),
+                utils.mkMessage({ user: userId, room: roomId }),
                 utils.mkMembership({
                     user: userId, room: roomId, mship: "join", name: "New Name",
                 }),
-                utils.mkMessage({user: userId, room: roomId}),
+                utils.mkMessage({ user: userId, room: roomId }),
             ];
             eventData[1].__prev_event = USER_MEMBERSHIP_EVENT;
             setNextSyncData(eventData);
@@ -546,7 +545,7 @@ describe("MatrixClient room timelines", function() {
     describe("gappy sync", function() {
         it("should copy the last known state to the new timeline", function() {
             const eventData = [
-                utils.mkMessage({user: userId, room: roomId}),
+                utils.mkMessage({ user: userId, room: roomId }),
             ];
             setNextSyncData(eventData);
             NEXT_SYNC_DATA.rooms.join[roomId].timeline.limited = true;
@@ -579,7 +578,7 @@ describe("MatrixClient room timelines", function() {
 
         it("should emit a 'Room.timelineReset' event", function() {
             const eventData = [
-                utils.mkMessage({user: userId, room: roomId}),
+                utils.mkMessage({ user: userId, room: roomId }),
             ];
             setNextSyncData(eventData);
             NEXT_SYNC_DATA.rooms.join[roomId].timeline.limited = true;

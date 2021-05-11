@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {EventEmitter} from 'events';
-import {logger} from '../logger';
+import { EventEmitter } from 'events';
+import { logger } from '../logger';
 import * as olmlib from './olmlib';
-import {randomString} from '../randomstring';
-import {encryptAES, decryptAES} from './aes';
-import {encodeBase64} from "./olmlib";
+import { randomString } from '../randomstring';
+import { encryptAES, decryptAES } from './aes';
+import { encodeBase64 } from "./olmlib";
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES
     = "m.secret_storage.v1.aes-hmac-sha2";
@@ -86,7 +86,7 @@ export class SecretStorage extends EventEmitter {
      *     keyInfo: {object} details about the key (iv, mac, passphrase)
      */
     async addKey(algorithm, opts, keyId) {
-        const keyInfo = {algorithm};
+        const keyInfo = { algorithm };
 
         if (!opts) opts = {};
 
@@ -99,7 +99,7 @@ export class SecretStorage extends EventEmitter {
                 keyInfo.passphrase = opts.passphrase;
             }
             if (opts.key) {
-                const {iv, mac} = await SecretStorage._calculateKeyCheck(opts.key);
+                const { iv, mac } = await SecretStorage._calculateKeyCheck(opts.key);
                 keyInfo.iv = iv;
                 keyInfo.mac = mac;
             }
@@ -171,7 +171,7 @@ export class SecretStorage extends EventEmitter {
     async checkKey(key, info) {
         if (info.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             if (info.mac) {
-                const {mac} = await SecretStorage._calculateKeyCheck(key, info.iv);
+                const { mac } = await SecretStorage._calculateKeyCheck(key, info.iv);
                 return info.mac.replace(/=+$/g, '') === mac.replace(/=+$/g, '');
             } else {
                 // if we have no information, we have to assume the key is right
@@ -220,7 +220,7 @@ export class SecretStorage extends EventEmitter {
 
             // encrypt secret, based on the algorithm
             if (keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
-                const keys = {[keyId]: keyInfo};
+                const keys = { [keyId]: keyInfo };
                 const [, encryption] = await this._getSecretStorageKey(keys, name);
                 encrypted[keyId] = await encryption.encrypt(secret);
             } else {
@@ -231,7 +231,7 @@ export class SecretStorage extends EventEmitter {
         }
 
         // save encrypted secret
-        await this._baseApis.setAccountData(name, {encrypted});
+        await this._baseApis.setAccountData(name, { encrypted });
     }
 
     /**
