@@ -233,10 +233,10 @@ utils.inherits(Room, EventEmitter);
  * Bulk decrypt critical events in a room
  *
  * Critical events represents the minimal set of events to decrypt
- * for the UI to function properly
+ * for a typical UI to function properly
  *
- * - Last event of every room (to generate message preview)
- * - All events are the read receipt (to calculate an accurate notification count)
+ * - Last event of every room (to generate likely message preview)
+ * - All events up to the read receipt (to calculate an accurate notification count)
  *
  * @returns {Promise} Signals when all events have been decrypted
  */
