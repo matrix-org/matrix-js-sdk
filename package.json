@@ -1,6 +1,6 @@
 {
   "name": "matrix-js-sdk",
-  "version": "10.1.0",
+  "version": "11.0.0-rc.1",
   "description": "Matrix Client-Server SDK for Javascript",
   "scripts": {
     "prepublishOnly": "yarn build",
@@ -28,7 +28,7 @@
   "keywords": [
     "matrix-org"
   ],
-  "main": "./src/index.ts",
+  "main": "./lib/index.js",
   "browser": "./lib/browser-index.js",
   "matrix_src_main": "./src/index.ts",
   "matrix_src_browser": "./src/browser-index.js",
@@ -108,5 +108,6 @@
     "coverageReporters": [
       "text"
     ]
-  }
+  },
+  "typings": "./lib/index.d.ts"
 }
