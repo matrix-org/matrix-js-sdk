@@ -421,12 +421,11 @@ utils.extend(MatrixEvent.prototype, {
      * attempt is completed.
      */
     attemptDecryption: async function(crypto, options = {}) {
-
         // For backwards compatibility purposes
         // The function signature used to be attemptDecryption(crypto, isRetry)
         if (typeof options === "boolean") {
             options = {
-                isRetry: options
+                isRetry: options,
             };
         }
 
