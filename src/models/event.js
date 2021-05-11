@@ -421,6 +421,15 @@ utils.extend(MatrixEvent.prototype, {
      * attempt is completed.
      */
     attemptDecryption: async function(crypto, options = {}) {
+
+        // For backwards compatibility purposes
+        // The function signature used to be attemptDecryption(crypto, isRetry)
+        if (typeof options === "boolean") {
+            options = {
+                isRetry: options
+            };
+        }
+
         // start with a couple of sanity checks.
         if (!this.isEncrypted()) {
             throw new Error("Attempt to decrypt event which isn't encrypted");
