@@ -1158,10 +1158,15 @@ SyncApi.prototype._processSyncResponse = async function(
     await utils.promiseMapSeries(joinRooms, async function(joinObj) {
         const room = joinObj.room;
         const stateEvents = self._mapSyncEventsFormat(joinObj.state, room);
-        const timelineEvents = self._mapSyncEventsFormat(joinObj.timeline, room);
+        // Prevent events from being decrypted ahead of time
+        // this helps large account to speed up faster
+        // room::decryptCriticalEvent is in charge of decrypting all the events
+        // required for a client to function properly
+        const timelineEvents = self._mapSyncEventsFormat(joinObj.timeline, room, false);
         const ephemeralEvents = self._mapSyncEventsFormat(joinObj.ephemeral);
         const accountDataEvents = self._mapSyncEventsFormat(joinObj.account_data);
 
+        const encrypted = client.isRoomEncrypted(room.roomId);
         // we do this first so it's correct when any of the events fire
         if (joinObj.unread_notifications) {
             room.setUnreadNotificationCount(
@@ -1172,7 +1177,6 @@ SyncApi.prototype._processSyncResponse = async function(
             // bother setting it here. We trust our calculations better than the
             // server's for this case, and therefore will assume that our non-zero
             // count is accurate.
-            const encrypted = client.isRoomEncrypted(room.roomId);
             if (!encrypted
                 || (encrypted && room.getUnreadNotificationCount('highlight') <= 0)) {
                 room.setUnreadNotificationCount(
@@ -1294,6 +1298,11 @@ SyncApi.prototype._processSyncResponse = async function(
         });
 
         room.updateMyMembership("join");
+
+        // Decrypt only the last message in all rooms to make sure we can generate a preview
+        // And decrypt all events after the recorded read receipt to ensure an accurate
+        // notification count
+        room.decryptCriticalEvents();
     });
 
     // Handle leaves (e.g. kicked rooms)
@@ -1516,13 +1525,14 @@ SyncApi.prototype._mapSyncResponseToRoomArray = function(obj) {
 /**
  * @param {Object} obj
  * @param {Room} room
+ * @param {bool} decrypt
  * @return {MatrixEvent[]}
  */
-SyncApi.prototype._mapSyncEventsFormat = function(obj, room) {
+SyncApi.prototype._mapSyncEventsFormat = function(obj, room, decrypt = true) {
     if (!obj || !utils.isArray(obj.events)) {
         return [];
     }
-    const mapper = this.client.getEventMapper();
+    const mapper = this.client.getEventMapper({ decrypt });
     return obj.events.map(function(e) {
         if (room) {
             e.room_id = room.roomId;

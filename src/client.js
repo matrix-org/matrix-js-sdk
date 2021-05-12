@@ -5554,8 +5554,9 @@ function _resolve(callback, resolve, res) {
     resolve(res);
 }
 
-function _PojoToMatrixEventMapper(client, options) {
-    const preventReEmit = Boolean(options && options.preventReEmit);
+function _PojoToMatrixEventMapper(client, options = {}) {
+    const preventReEmit = Boolean(options.preventReEmit);
+    const decrypt = options.decrypt !== false;
     function mapper(plainOldJsObject) {
         const event = new MatrixEvent(plainOldJsObject);
         if (event.isEncrypted()) {
@@ -5564,7 +5565,9 @@ function _PojoToMatrixEventMapper(client, options) {
                     "Event.decrypted",
                 ]);
             }
-            event.attemptDecryption(client._crypto);
+            if (decrypt) {
+                event.attemptDecryption(client._crypto);
+            }
         }
         if (!preventReEmit) {
             client.reEmitter.reEmit(event, ["Event.replaced"]);
@@ -5577,6 +5580,7 @@ function _PojoToMatrixEventMapper(client, options) {
 /**
  * @param {object} [options]
  * @param {bool} options.preventReEmit don't reemit events emitted on an event mapped by this mapper on the client
+ * @param {bool} options.decrypt decrypt event proactively
  * @return {Function}
  */
 MatrixClient.prototype.getEventMapper = function(options = undefined) {

@@ -228,6 +228,51 @@ function pendingEventsKey(roomId) {
 
 utils.inherits(Room, EventEmitter);
 
+
+/**
+ * Bulk decrypt critical events in a room
+ *
+ * Critical events represents the minimal set of events to decrypt
+ * for a typical UI to function properly
+ *
+ * - Last event of every room (to generate likely message preview)
+ * - All events up to the read receipt (to calculate an accurate notification count)
+ *
+ * @returns {Promise} Signals when all events have been decrypted
+ */
+Room.prototype.decryptCriticalEvents = function() {
+    const readReceiptEventId = this.getEventReadUpTo(this._client.getUserId(), true);
+    const events = this.getLiveTimeline().getEvents();
+    const readReceiptTimelineIndex = events.findIndex(matrixEvent => {
+        return matrixEvent.event.event_id === readReceiptEventId;
+    });
+
+    const decryptionPromises = events
+        .slice(readReceiptTimelineIndex)
+        .filter(event => event.shouldAttemptDecryption())
+        .reverse()
+        .map(event => event.attemptDecryption(this._client._crypto, { isRetry: true }));
+
+    return Promise.allSettled(decryptionPromises);
+};
+
+/**
+ * Bulk decrypt events in a room
+ *
+ * @returns {Promise} Signals when all events have been decrypted
+ */
+Room.prototype.decryptAllEvents = function() {
+    const decryptionPromises = this
+        .getUnfilteredTimelineSet()
+        .getLiveTimeline()
+        .getEvents()
+        .filter(event => event.shouldAttemptDecryption())
+        .reverse()
+        .map(event => event.attemptDecryption(this._client._crypto, { isRetry: true }));
+
+    return Promise.allSettled(decryptionPromises);
+};
+
 /**
  * Gets the version of the room
  * @returns {string} The version of the room, or null if it could not be determined
