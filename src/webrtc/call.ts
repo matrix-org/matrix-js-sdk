@@ -1506,7 +1506,8 @@ export class MatrixCall extends EventEmitter {
         }
 
         // Order is important here: first we stopAllMedia() and only then we can deleteAllFeeds()
-        this.stopAllMedia();
+        // We don't stop media if the call was replaced as we want to re-use streams in the successor
+        if (hangupReason !== CallErrorCode.Replaced) this.stopAllMedia();
         this.deleteAllFeeds();
 
         this.hangupParty = hangupParty;
