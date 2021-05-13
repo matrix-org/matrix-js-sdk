@@ -77,25 +77,6 @@ export function map<T, S>(array: T[], fn: (t: T) => S): S[] {
 }
 
 /**
- * Applies a filter function to the given array.
- * @param {Array} array The array to apply the function to.
- * @param {Function} fn The function that will be invoked for each element in
- * the array. It should return true to keep the element. The function signature
- * looks like <code>fn(element, index, array){...}</code>.
- * @return {Array} A new array with the results of the function.
- */
-export function filter<T>(array: T[],
-    fn: (t: T, i?: number, a?: T[]) => boolean): T[] {
-    const results: T[] = [];
-    for (let i = 0; i < array.length; i++) {
-        if (fn(array[i], i, array)) {
-            results.push(array[i]);
-        }
-    }
-    return results;
-}
-
-/**
  * Invoke a function for each item in the array.
  * @param {Array} array The array.
  * @param {Function} fn The function to invoke for each element. Has the

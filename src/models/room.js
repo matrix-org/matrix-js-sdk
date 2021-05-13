@@ -1077,7 +1077,7 @@ Room.prototype.getInvitedAndJoinedMemberCount = function() {
  * @return {RoomMember[]} A list of members with the given membership state.
  */
  Room.prototype.getMembersWithMembership = function(membership) {
-    return utils.filter(this.currentState.getMembers(), function(m) {
+    return this.currentState.getMembers().filter(function(m) {
         return m.membership === membership;
     });
  };

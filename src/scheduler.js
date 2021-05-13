@@ -196,7 +196,7 @@ function _startProcessingQueues(scheduler) {
         return;
     }
     // for each inactive queue with events in them
-    utils.forEach(utils.filter(Object.keys(scheduler._queues), function(queueName) {
+    utils.forEach(Object.keys(scheduler._queues).filter(function(queueName) {
         return scheduler._activeQueues.indexOf(queueName) === -1 &&
                 scheduler._queues[queueName].length > 0;
     }), function(queueName) {
