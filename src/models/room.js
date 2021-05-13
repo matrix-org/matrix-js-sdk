@@ -1850,9 +1850,9 @@ Room.prototype.addReceipt = function(event, fake) {
  */
 Room.prototype._addReceiptsToStructure = function(event, receipts) {
     const self = this;
-    utils.keys(event.getContent()).forEach(function(eventId) {
-        utils.keys(event.getContent()[eventId]).forEach(function(receiptType) {
-            utils.keys(event.getContent()[eventId][receiptType]).forEach(
+    Object.keys(event.getContent()).forEach(function(eventId) {
+        Object.keys(event.getContent()[eventId]).forEach(function(receiptType) {
+            Object.keys(event.getContent()[eventId][receiptType]).forEach(
             function(userId) {
                 const receipt = event.getContent()[eventId][receiptType][userId];
 
@@ -1892,8 +1892,8 @@ Room.prototype._addReceiptsToStructure = function(event, receipts) {
  */
 Room.prototype._buildReceiptCache = function(receipts) {
     const receiptCacheByEventId = {};
-    utils.keys(receipts).forEach(function(receiptType) {
-        utils.keys(receipts[receiptType]).forEach(function(userId) {
+    Object.keys(receipts).forEach(function(receiptType) {
+        Object.keys(receipts[receiptType]).forEach(function(userId) {
             const receipt = receipts[receiptType][userId];
             if (!receiptCacheByEventId[receipt.eventId]) {
                 receiptCacheByEventId[receipt.eventId] = [];

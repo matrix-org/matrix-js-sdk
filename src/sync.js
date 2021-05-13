@@ -1508,7 +1508,7 @@ SyncApi.prototype._mapSyncResponseToRoomArray = function(obj) {
     // [{stuff+Room+isBrandNewRoom}, {stuff+Room+isBrandNewRoom}]
     const client = this.client;
     const self = this;
-    return utils.keys(obj).map(function(roomId) {
+    return Object.keys(obj).map(function(roomId) {
         const arrObj = obj[roomId];
         let room = client.store.getRoom(roomId);
         let isBrandNewRoom = false;

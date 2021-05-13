@@ -96,38 +96,6 @@ export function filter<T>(array: T[],
 }
 
 /**
- * Get the keys for an object. Same as <code>Object.keys()</code>.
- * @param {Object} obj The object to get the keys for.
- * @return {string[]} The keys of the object.
- */
-export function keys(obj: object): string[] {
-    const result = [];
-    for (const key in obj) {
-        if (!obj.hasOwnProperty(key)) {
-            continue;
-        }
-        result.push(key);
-    }
-    return result;
-}
-
-/**
- * Get the values for an object.
- * @param {Object} obj The object to get the values for.
- * @return {Array<*>} The values of the object.
- */
-export function values<T>(obj: Record<string, T>): T[] {
-    const result = [];
-    for (const key in obj) {
-        if (!obj.hasOwnProperty(key)) {
-            continue;
-        }
-        result.push(obj[key]);
-    }
-    return result;
-}
-
-/**
  * Invoke a function for each item in the array.
  * @param {Array} array The array.
  * @param {Function} fn The function to invoke for each element. Has the

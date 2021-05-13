@@ -154,7 +154,7 @@ RoomState.prototype.setInvitedMemberCount = function(count) {
  * @return {Array<RoomMember>} A list of RoomMembers.
  */
 RoomState.prototype.getMembers = function() {
-    return utils.values(this.members);
+    return Object.values(this.members);
 };
 
 /**
@@ -163,7 +163,7 @@ RoomState.prototype.getMembers = function() {
  * @return {Array<RoomMember>} A list of RoomMembers.
  */
 RoomState.prototype.getMembersExcept = function(excludedIds) {
-    return utils.values(this.members)
+    return Object.values(this.members)
         .filter((m) => !excludedIds.includes(m.userId));
 };
 
@@ -349,7 +349,7 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
             self._updateMember(member);
             self.emit("RoomState.members", event, self, member);
         } else if (event.getType() === "m.room.power_levels") {
-            const members = utils.values(self.members);
+            const members = Object.values(self.members);
             utils.forEach(members, function(member) {
                 // We only propagate `RoomState.members` event if the
                 // power levels has been changed
@@ -511,7 +511,7 @@ RoomState.prototype._setOutOfBandMember = function(stateEvent) {
  * @param {MatrixEvent} event The typing event
  */
 RoomState.prototype.setTypingEvent = function(event) {
-    utils.forEach(utils.values(this.members), function(member) {
+    utils.forEach(Object.values(this.members), function(member) {
         member.setTypingEvent(event);
     });
 };
