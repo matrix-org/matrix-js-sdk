@@ -61,6 +61,7 @@ export enum EventType {
     KeyVerificationDone = "m.key.verification.done",
     // use of this is discouraged https://matrix.org/docs/spec/client_server/r0.6.1#m-room-message-feedback
     RoomMessageFeedback = "m.room.message.feedback",
+    Reaction = "m.reaction",
 
     // Room ephemeral events
     Typing = "m.typing",
