@@ -1076,7 +1076,7 @@ MegolmEncryption.prototype._removeUnknownDevices = function(devicesInRoom) {
  */
 MegolmEncryption.prototype._getDevicesInRoom = async function(room) {
     const members = await room.getEncryptionTargetMembers();
-    const roomMembers = utils.map(members, function(u) {
+    const roomMembers = members.map(function(u) {
         return u.userId;
     });
 
@@ -1371,7 +1371,7 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
     if (event.getType() == "m.forwarded_room_key") {
         exportFormat = true;
         forwardingKeyChain = content.forwarding_curve25519_key_chain;
-        if (!utils.isArray(forwardingKeyChain)) {
+        if (!Array.isArray(forwardingKeyChain)) {
             forwardingKeyChain = [];
         }
 

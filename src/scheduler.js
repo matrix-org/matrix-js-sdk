@@ -65,7 +65,7 @@ MatrixScheduler.prototype.getQueueForEvent = function(event) {
     if (!name || !this._queues[name]) {
         return null;
     }
-    return utils.map(this._queues[name], function(obj) {
+    return this._queues[name].map(function(obj) {
         return obj.event;
     });
 };
@@ -196,16 +196,18 @@ function _startProcessingQueues(scheduler) {
         return;
     }
     // for each inactive queue with events in them
-    utils.forEach(utils.filter(utils.keys(scheduler._queues), function(queueName) {
-        return scheduler._activeQueues.indexOf(queueName) === -1 &&
-                scheduler._queues[queueName].length > 0;
-    }), function(queueName) {
-        // mark the queue as active
-        scheduler._activeQueues.push(queueName);
-        // begin processing the head of the queue
-        debuglog("Spinning up queue: '%s'", queueName);
-        _processQueue(scheduler, queueName);
-    });
+    Object.keys(scheduler._queues)
+        .filter(function(queueName) {
+            return scheduler._activeQueues.indexOf(queueName) === -1 &&
+                    scheduler._queues[queueName].length > 0;
+        })
+        .forEach(function(queueName) {
+            // mark the queue as active
+            scheduler._activeQueues.push(queueName);
+            // begin processing the head of the queue
+            debuglog("Spinning up queue: '%s'", queueName);
+            _processQueue(scheduler, queueName);
+        });
 }
 
 function _processQueue(scheduler, queueName) {
@@ -267,7 +269,7 @@ function _processQueue(scheduler, queueName) {
 
 function _peekNextEvent(scheduler, queueName) {
     const queue = scheduler._queues[queueName];
-    if (!utils.isArray(queue)) {
+    if (!Array.isArray(queue)) {
         return null;
     }
     return queue[0];
@@ -275,7 +277,7 @@ function _peekNextEvent(scheduler, queueName) {
 
 function _removeNextEvent(scheduler, queueName) {
     const queue = scheduler._queues[queueName];
-    if (!utils.isArray(queue)) {
+    if (!Array.isArray(queue)) {
         return null;
     }
     return queue.shift();

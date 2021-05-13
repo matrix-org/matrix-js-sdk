@@ -249,7 +249,7 @@ EventTimelineSet.prototype.findEventById = function(eventId) {
     if (!tl) {
         return undefined;
     }
-    return utils.findElement(tl.getEvents(), function(ev) {
+    return tl.getEvents().find(function(ev) {
         return ev.getId() == eventId;
     });
 };

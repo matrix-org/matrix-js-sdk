@@ -186,7 +186,7 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     // map from algorithm to DecryptionAlgorithm instance, for each room
     this._roomDecryptors = {};
 
-    this._supportedAlgorithms = utils.keys(
+    this._supportedAlgorithms = Object.keys(
         algorithms.DECRYPTION_CLASSES,
     );
 
