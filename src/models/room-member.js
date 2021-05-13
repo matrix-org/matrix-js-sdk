@@ -172,7 +172,7 @@ RoomMember.prototype.setTypingEvent = function(event) {
     const oldTyping = this.typing;
     this.typing = false;
     const typingList = event.getContent().user_ids;
-    if (!utils.isArray(typingList)) {
+    if (!Array.isArray(typingList)) {
         // malformed event :/ bail early. TODO: whine?
         return;
     }

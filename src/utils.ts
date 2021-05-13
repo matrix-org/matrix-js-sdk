@@ -186,16 +186,6 @@ export function isFunction(value: any) {
 }
 
 /**
- * Checks if the given thing is an array.
- * @param {*} value The thing to check.
- * @return {boolean} True if it is an array.
- */
-export function isArray(value: any) {
-    return Array.isArray ? Array.isArray(value) :
-        Boolean(value && value.constructor === Array);
-}
-
-/**
  * Checks that the given object has the specified keys.
  * @param {Object} obj The object to check.
  * @param {string[]} keys The list of keys that 'obj' must have.

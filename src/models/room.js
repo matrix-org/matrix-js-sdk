@@ -949,7 +949,7 @@ Room.prototype.getAliases = function() {
     if (aliasEvents) {
         for (let i = 0; i < aliasEvents.length; ++i) {
             const aliasEvent = aliasEvents[i];
-            if (utils.isArray(aliasEvent.getContent().aliases)) {
+            if (Array.isArray(aliasEvent.getContent().aliases)) {
                 const filteredAliases = aliasEvent.getContent().aliases.filter(a => {
                     if (typeof(a) !== "string") return false;
                     if (a[0] !== '#') return false;

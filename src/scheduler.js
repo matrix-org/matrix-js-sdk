@@ -267,7 +267,7 @@ function _processQueue(scheduler, queueName) {
 
 function _peekNextEvent(scheduler, queueName) {
     const queue = scheduler._queues[queueName];
-    if (!utils.isArray(queue)) {
+    if (!Array.isArray(queue)) {
         return null;
     }
     return queue[0];
@@ -275,7 +275,7 @@ function _peekNextEvent(scheduler, queueName) {
 
 function _removeNextEvent(scheduler, queueName) {
     const queue = scheduler._queues[queueName];
-    if (!utils.isArray(queue)) {
+    if (!Array.isArray(queue)) {
         return null;
     }
     return queue.shift();
