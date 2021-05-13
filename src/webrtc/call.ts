@@ -429,6 +429,7 @@ export class MatrixCall extends EventEmitter {
                 purpose: localFeed.purpose,
             };
         }
+        logger.debug("Got local SDPStreamMetadata", metadata);
         return metadata;
     }
 
