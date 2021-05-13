@@ -133,7 +133,7 @@ RoomMember.prototype.setPowerLevelEvent = function(powerLevelEvent) {
     const evContent = powerLevelEvent.getDirectionalContent();
 
     let maxLevel = evContent.users_default || 0;
-    utils.forEach(Object.values(evContent.users), function(lvl) {
+    Object.values(evContent.users).forEach(function(lvl) {
         maxLevel = Math.max(maxLevel, lvl);
     });
     const oldPowerLevel = this.powerLevel;

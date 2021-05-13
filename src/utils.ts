@@ -77,18 +77,6 @@ export function map<T, S>(array: T[], fn: (t: T) => S): S[] {
 }
 
 /**
- * Invoke a function for each item in the array.
- * @param {Array} array The array.
- * @param {Function} fn The function to invoke for each element. Has the
- * function signature <code>fn(element, index)</code>.
- */
-export function forEach<T>(array: T[], fn: (t: T, i: number) => void) {
-    for (let i = 0; i < array.length; i++) {
-        fn(array[i], i);
-    }
-}
-
-/**
  * The findElement() method returns a value in the array, if an element in the array
  * satisfies (returns true) the provided testing function. Otherwise undefined
  * is returned.
