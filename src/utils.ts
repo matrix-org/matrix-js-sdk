@@ -62,38 +62,6 @@ export function encodeUri(pathTemplate: string,
 }
 
 /**
- * The findElement() method returns a value in the array, if an element in the array
- * satisfies (returns true) the provided testing function. Otherwise undefined
- * is returned.
- * @param {Array} array The array.
- * @param {Function} fn Function to execute on each value in the array, with the
- * function signature <code>fn(element, index, array)</code>
- * @param {boolean} reverse True to search in reverse order.
- * @return {*} The first value in the array which returns <code>true</code> for
- * the given function.
- */
-export function findElement<T>(
-    array: T[],
-    fn: (t: T, i?: number, a?: T[]) => boolean,
-    reverse?: boolean,
-) {
-    let i;
-    if (reverse) {
-        for (i = array.length - 1; i >= 0; i--) {
-            if (fn(array[i], i, array)) {
-                return array[i];
-            }
-        }
-    } else {
-        for (i = 0; i < array.length; i++) {
-            if (fn(array[i], i, array)) {
-                return array[i];
-            }
-        }
-    }
-}
-
-/**
  * The removeElement() method removes the first element in the array that
  * satisfies (returns true) the provided testing function.
  * @param {Array} array The array.

@@ -286,7 +286,7 @@ SyncApi.prototype.peek = function(roomId) {
         // XXX: copypasted from /sync until we kill off this
         // minging v1 API stuff)
         // handle presence events (User objects)
-        if (response.presence && utils.isArray(response.presence)) {
+        if (response.presence && Array.isArray(response.presence)) {
             response.presence.map(client.getEventMapper()).forEach(
             function(presenceEvent) {
                 let user = client.store.getUser(presenceEvent.getContent().user_id);
@@ -1001,7 +1001,7 @@ SyncApi.prototype._processSyncResponse = async function(
     // - The isBrandNewRoom boilerplate is boilerplatey.
 
     // handle presence events (User objects)
-    if (data.presence && utils.isArray(data.presence.events)) {
+    if (data.presence && Array.isArray(data.presence.events)) {
         data.presence.events.map(client.getEventMapper()).forEach(
         function(presenceEvent) {
             let user = client.store.getUser(presenceEvent.getSender());
@@ -1017,7 +1017,7 @@ SyncApi.prototype._processSyncResponse = async function(
     }
 
     // handle non-room account_data
-    if (data.account_data && utils.isArray(data.account_data.events)) {
+    if (data.account_data && Array.isArray(data.account_data.events)) {
         const events = data.account_data.events.map(client.getEventMapper());
         const prevEventsMap = events.reduce((m, c) => {
             m[c.getId()] = client.store.getAccountData(c.getType());
@@ -1042,7 +1042,7 @@ SyncApi.prototype._processSyncResponse = async function(
     }
 
     // handle to-device events
-    if (data.to_device && utils.isArray(data.to_device.events) &&
+    if (data.to_device && Array.isArray(data.to_device.events) &&
         data.to_device.events.length > 0
        ) {
         const cancelledKeyVerificationTxns = [];
@@ -1524,7 +1524,7 @@ SyncApi.prototype._mapSyncResponseToRoomArray = function(obj) {
  * @return {MatrixEvent[]}
  */
 SyncApi.prototype._mapSyncEventsFormat = function(obj, room, decrypt = true) {
-    if (!obj || !utils.isArray(obj.events)) {
+    if (!obj || !Array.isArray(obj.events)) {
         return [];
     }
     const mapper = this.client.getEventMapper({ decrypt });
