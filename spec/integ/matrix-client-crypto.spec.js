@@ -30,7 +30,6 @@ import '../olm-loader';
 
 import {logger} from '../../src/logger';
 import * as testUtils from "../test-utils";
-import * as utils from "../../src/utils";
 import {TestClient} from "../TestClient";
 import {CRYPTO_ENABLED} from "../../src/client";
 
@@ -244,7 +243,7 @@ function bobSendsReplyMessage() {
 function expectAliSendMessageRequest() {
     return expectSendMessageRequest(aliTestClient.httpBackend).then(function(content) {
         aliMessages.push(content);
-        expect(utils.keys(content.ciphertext)).toEqual([bobTestClient.getDeviceKey()]);
+        expect(Object.keys(content.ciphertext)).toEqual([bobTestClient.getDeviceKey()]);
         const ciphertext = content.ciphertext[bobTestClient.getDeviceKey()];
         expect(ciphertext).toBeTruthy();
         return ciphertext;
@@ -261,7 +260,7 @@ function expectBobSendMessageRequest() {
         bobMessages.push(content);
         const aliKeyId = "curve25519:" + aliDeviceId;
         const aliDeviceCurve25519Key = aliTestClient.deviceKeys.keys[aliKeyId];
-        expect(utils.keys(content.ciphertext)).toEqual([aliDeviceCurve25519Key]);
+        expect(Object.keys(content.ciphertext)).toEqual([aliDeviceCurve25519Key]);
         const ciphertext = content.ciphertext[aliDeviceCurve25519Key];
         expect(ciphertext).toBeTruthy();
         return ciphertext;

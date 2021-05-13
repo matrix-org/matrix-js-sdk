@@ -19,7 +19,6 @@ limitations under the License.
  * @module models/search-result
  */
 
-import * as utils from "../utils";
 import {EventContext} from "./event-context";
 
 /**

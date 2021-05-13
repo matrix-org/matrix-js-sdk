@@ -19,7 +19,6 @@ import * as utils from "./utils";
 import request from "request";
 
 matrixcs.request(request);
-utils.runPolyfills();
 
 try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires

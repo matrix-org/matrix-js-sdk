@@ -23,7 +23,6 @@ limitations under the License.
  */
 
 import {User} from "../models/user";
-import * as utils from "../utils";
 
 function isValidFilterId(filterId) {
     const isValidStr = typeof filterId === "string" &&

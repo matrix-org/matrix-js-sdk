@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import {logger} from '../logger';
-import * as utils from '../utils';
 
 /**
  * Internal module. Management of outgoing room key requests.
