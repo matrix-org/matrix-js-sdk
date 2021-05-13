@@ -65,7 +65,7 @@ MatrixScheduler.prototype.getQueueForEvent = function(event) {
     if (!name || !this._queues[name]) {
         return null;
     }
-    return utils.map(this._queues[name], function(obj) {
+    return this._queues[name].map(function(obj) {
         return obj.event;
     });
 };

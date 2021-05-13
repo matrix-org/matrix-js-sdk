@@ -278,15 +278,10 @@ SyncApi.prototype.peek = function(roomId) {
 
         // FIXME: Mostly duplicated from _processRoomEvents but not entirely
         // because "state" in this API is at the BEGINNING of the chunk
-        const oldStateEvents = utils.map(
-            utils.deepCopy(response.state), client.getEventMapper(),
-        );
-        const stateEvents = utils.map(
-            response.state, client.getEventMapper(),
-        );
-        const messages = utils.map(
-            response.messages.chunk, client.getEventMapper(),
-        );
+        const oldStateEvents = utils.deepCopy(response.state)
+            .map(client.getEventMapper());
+        const stateEvents = response.state.map(client.getEventMapper());
+        const messages = response.messages.chunk.map(client.getEventMapper());
 
         // XXX: copypasted from /sync until we kill off this
         // minging v1 API stuff)

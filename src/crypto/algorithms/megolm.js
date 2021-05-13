@@ -1076,7 +1076,7 @@ MegolmEncryption.prototype._removeUnknownDevices = function(devicesInRoom) {
  */
 MegolmEncryption.prototype._getDevicesInRoom = async function(room) {
     const members = await room.getEncryptionTargetMembers();
-    const roomMembers = utils.map(members, function(u) {
+    const roomMembers = members.map(function(u) {
         return u.userId;
     });
 

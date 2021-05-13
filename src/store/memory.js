@@ -194,7 +194,7 @@ MemoryStore.prototype = {
      * @return {RoomSummary[]} A summary of each room.
      */
     getRoomSummaries: function() {
-        return utils.map(Object.values(this.rooms), function(room) {
+        return Object.values(this.rooms).map(function(room) {
             return room.summary;
         });
     },

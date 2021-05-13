@@ -62,21 +62,6 @@ export function encodeUri(pathTemplate: string,
 }
 
 /**
- * Applies a map function to the given array.
- * @param {Array} array The array to apply the function to.
- * @param {Function} fn The function that will be invoked for each element in
- * the array with the signature <code>fn(element){...}</code>
- * @return {Array} A new array with the results of the function.
- */
-export function map<T, S>(array: T[], fn: (t: T) => S): S[] {
-    const results = new Array(array.length);
-    for (let i = 0; i < array.length; i++) {
-        results[i] = fn(array[i]);
-    }
-    return results;
-}
-
-/**
  * The findElement() method returns a value in the array, if an element in the array
  * satisfies (returns true) the provided testing function. Otherwise undefined
  * is returned.

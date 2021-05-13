@@ -3976,9 +3976,9 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
                 limit,
                 'b');
         }).then(function(res) {
-            const matrixEvents = utils.map(res.chunk, _PojoToMatrixEventMapper(self));
+            const matrixEvents = res.chunk.map(_PojoToMatrixEventMapper(self));
             if (res.state) {
-                const stateEvents = utils.map(res.state, _PojoToMatrixEventMapper(self));
+                const stateEvents = res.state.map(_PojoToMatrixEventMapper(self));
                 room.currentState.setUnknownStateEvents(stateEvents);
             }
             room.addEventsToTimeline(matrixEvents, true, room.getLiveTimeline());
@@ -4067,16 +4067,16 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
         const events = res.events_after
             .concat([res.event])
             .concat(res.events_before);
-        const matrixEvents = utils.map(events, self.getEventMapper());
+        const matrixEvents = events.map(self.getEventMapper());
 
         let timeline = timelineSet.getTimelineForEvent(matrixEvents[0].getId());
         if (!timeline) {
             timeline = timelineSet.addTimeline();
-            timeline.initialiseState(utils.map(res.state,
+            timeline.initialiseState(res.state.map(
                                                self.getEventMapper()));
             timeline.getState(EventTimeline.FORWARDS).paginationToken = res.end;
         } else {
-            const stateEvents = utils.map(res.state, self.getEventMapper());
+            const stateEvents = res.state.map(self.getEventMapper());
             timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(stateEvents);
         }
         timelineSet.addEventsToTimeline(matrixEvents, true, timeline, res.start);
@@ -4239,11 +4239,11 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
         promise.then(function(res) {
             if (res.state) {
                 const roomState = eventTimeline.getState(dir);
-                const stateEvents = utils.map(res.state, self.getEventMapper());
+                const stateEvents = res.state.map(self.getEventMapper());
                 roomState.setUnknownStateEvents(stateEvents);
             }
             const token = res.end;
-            const matrixEvents = utils.map(res.chunk, self.getEventMapper());
+            const matrixEvents = res.chunk.map(self.getEventMapper());
             eventTimeline.getTimelineSet()
                 .addEventsToTimeline(matrixEvents, backwards, eventTimeline, token);
 
