@@ -467,7 +467,7 @@ export class MatrixCall extends EventEmitter {
             this.emit(CallEvent.FeedsChanged, this.feeds);
         }
 
-        logger.info(`Pushed remote stream with id ${stream.id}. Stream active? ${stream.active}`);
+        logger.info(`Pushed remote stream (id="${stream.id}", active="${stream.active}")`);
     }
 
     /**
@@ -498,7 +498,7 @@ export class MatrixCall extends EventEmitter {
             this.emit(CallEvent.FeedsChanged, this.feeds);
         }
 
-        logger.info(`Pushed remote stream with id ${stream.id}. Stream active? ${stream.active}`);
+        logger.info(`Pushed remote stream (id="${stream.id}", active="${stream.active}")`);
     }
 
     private pushLocalFeed(stream: MediaStream, purpose: SDPStreamMetadataPurpose, addToPeerConnection = true) {
@@ -522,13 +522,21 @@ export class MatrixCall extends EventEmitter {
             // Empty the array
             senderArray.splice(0, senderArray.length);
 
+            this.emit(CallEvent.FeedsChanged, this.feeds);
             for (const track of stream.getTracks()) {
-                logger.info(`Adding track with id ${track.id} and with kind ${track.kind} to peer connection`)
+                logger.info(
+                    `Adding track (` +
+                    `id="${track.id}", ` +
+                    `kind="${track.kind}", ` +
+                    `streamId="${stream.id}", ` +
+                    `streamPurpose="${purpose}"` +
+                    `) to peer connection`,
+                )
                 senderArray.push(this.peerConn.addTrack(track, stream));
             }
         }
 
-        logger.info(`Pushed local stream with id ${stream.id}. Stream active? ${stream.active}`);
+        logger.info(`Pushed local stream (id="${stream.id}", active="${stream.active}", purpose="${purpose}")`);
     }
 
     private deleteAllFeeds() {
