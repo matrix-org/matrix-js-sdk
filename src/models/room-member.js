@@ -133,14 +133,15 @@ RoomMember.prototype.setPowerLevelEvent = function(powerLevelEvent) {
     const evContent = powerLevelEvent.getDirectionalContent();
 
     let maxLevel = evContent.users_default || 0;
-    Object.values(evContent.users).forEach(function(lvl) {
+    const users = evContent.users || {};
+    Object.values(users).forEach(function(lvl) {
         maxLevel = Math.max(maxLevel, lvl);
     });
     const oldPowerLevel = this.powerLevel;
     const oldPowerLevelNorm = this.powerLevelNorm;
 
-    if (evContent.users && evContent.users[this.userId] !== undefined) {
-        this.powerLevel = evContent.users[this.userId];
+    if (users[this.userId] !== undefined) {
+        this.powerLevel = users[this.userId];
     } else if (evContent.users_default !== undefined) {
         this.powerLevel = evContent.users_default;
     } else {
