@@ -450,24 +450,24 @@ export class MatrixCall extends EventEmitter {
         }
 
         const userId = this.getOpponentMember().userId;
-        const streamMetadata = this.remoteSDPStreamMetadata[stream.id];
+        const purpose = this.remoteSDPStreamMetadata[stream.id].purpose;
 
-        if (!streamMetadata) {
+        if (!purpose) {
             logger.warn(`Ignoring stream with id ${stream.id} because we didn't get any metadata about it`);
             return;
         }
 
         // Try to find a feed with the same purpose as the new stream,
         // if we find it replace the old stream with the new one
-        const existingFeed = this.getRemoteFeeds().find((feed) => feed.purpose === streamMetadata.purpose);
+        const existingFeed = this.getRemoteFeeds().find((feed) => feed.purpose === purpose);
         if (existingFeed) {
             existingFeed.setNewStream(stream);
         } else {
-            this.feeds.push(new CallFeed(stream, userId, streamMetadata.purpose, this.client, this.roomId));
+            this.feeds.push(new CallFeed(stream, userId, purpose, this.client, this.roomId));
             this.emit(CallEvent.FeedsChanged, this.feeds);
         }
 
-        logger.info(`Pushed remote stream (id="${stream.id}", active="${stream.active}")`);
+        logger.info(`Pushed remote stream (id="${stream.id}", active="${stream.active}", purpose=${purpose})`);
     }
 
     /**
