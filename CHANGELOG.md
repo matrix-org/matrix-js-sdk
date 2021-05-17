@@ -1,3 +1,10 @@
+Changes in [11.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v11.0.0) (2021-05-17)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v11.0.0-rc.1...v11.0.0)
+
+ * [Release] Fix regressed glare
+   [\#1695](https://github.com/matrix-org/matrix-js-sdk/pull/1695)
+
 Changes in [11.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v11.0.0-rc.1) (2021-05-11)
 ============================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v10.1.0...v11.0.0-rc.1)
