@@ -5566,7 +5566,7 @@ function _PojoToMatrixEventMapper(client, options = {}) {
                 ]);
             }
             if (decrypt) {
-                client.decryptEvent(event);
+                client.decryptEventIfNeeded(event);
             }
         }
         if (!preventReEmit) {
@@ -5616,7 +5616,7 @@ MatrixClient.prototype.generateClientSecret = function() {
  * @param {bool} options.isRetry True if this is a retry (enables more logging)
  * @param {bool} options.emit Emits "event.decrypted" if set to true
  */
-MatrixClient.prototype.decryptEvent = function(event, options) {
+MatrixClient.prototype.decryptEventIfNeeded = function(event, options) {
     if (event.shouldAttemptDecryption()) {
         event.attemptDecryption(this._crypto, options);
     }
