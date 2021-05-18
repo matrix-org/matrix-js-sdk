@@ -35,7 +35,6 @@ import {StubStore} from "./store/stub";
 import {createNewMatrixCall} from "./webrtc/call";
 import {CallEventHandler} from './webrtc/callEventHandler';
 import * as utils from './utils';
-import {sleep} from './utils';
 import {
     MatrixError,
     PREFIX_MEDIA_R0,
@@ -63,29 +62,6 @@ const SCROLLBACK_DELAY_MS = 3000;
 export const CRYPTO_ENABLED = isCryptoAvailable();
 const CAPABILITIES_CACHE_MS = 21600000; // 6 hours - an arbitrary value
 const TURN_CHECK_INTERVAL = 10 * 60 * 1000; // poll for turn credentials every 10 minutes
-
-function keysFromRecoverySession(sessions, decryptionKey, roomId) {
-    const keys = [];
-    for (const [sessionId, sessionData] of Object.entries(sessions)) {
-        try {
-            const decrypted = keyFromRecoverySession(sessionData, decryptionKey);
-            decrypted.session_id = sessionId;
-            decrypted.room_id = roomId;
-            keys.push(decrypted);
-        } catch (e) {
-            logger.log("Failed to decrypt megolm session from backup", e);
-        }
-    }
-    return keys;
-}
-
-function keyFromRecoverySession(session, decryptionKey) {
-    return JSON.parse(decryptionKey.decrypt(
-        session.session_data.ephemeral,
-        session.session_data.mac,
-        session.session_data.ciphertext,
-    ));
-}
 
 /**
  * Construct a Matrix Client. Only directly construct this if you want to use
@@ -1843,13 +1819,15 @@ MatrixClient.prototype.getKeyBackupEnabled = function() {
  * getKeyBackupVersion.
  *
  * @param {object} info Backup information object as returned by getKeyBackupVersion
+ *
+ * @returns {Promise<void>}
  */
-MatrixClient.prototype.enableKeyBackup = function(info) {
+MatrixClient.prototype.enableKeyBackup = async function(info) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
 
-    return this._crypto.backupManager.enableKeyBackup();
+    await this._crypto.backupManager.enableKeyBackup();
 };
 
 /**

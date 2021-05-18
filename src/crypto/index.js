@@ -174,7 +174,7 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
                 await this.storeSecret("m.megolm_backup.v1", fixedKey, [keyId]);
             }
 
-            return decodeBase64(fixedKey || storedKey);
+            return olmlib.decodeBase64(fixedKey || storedKey);
         }
 
         // try to get key from app
