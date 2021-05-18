@@ -166,7 +166,7 @@ export class BackupManager {
      * one of the user's verified devices, start backing up
      * to it.
      */
-    async checkAndStart(): Promise<{backupInfo: any, trustInfo: TrustInfo}> {
+    async checkAndStart(): Promise<{backupInfo: BackupInfo, trustInfo: TrustInfo}> {
         logger.log("Checking key backup status...");
         if (this.baseApis.isGuest()) {
             logger.log("Skipping key backup check since user is guest");
@@ -232,7 +232,7 @@ export class BackupManager {
      *     trust information (as returned by isKeyBackupTrusted)
      *     in trustInfo.
      */
-    async checkKeyBackup(): Promise<{backupInfo: AuthData, trustInfo: TrustInfo}> {
+    async checkKeyBackup(): Promise<{backupInfo: BackupInfo, trustInfo: TrustInfo}> {
         this.checkedForBackup = false;
         return this.checkAndStart();
     }
@@ -248,7 +248,7 @@ export class BackupManager {
      *     ]
      * }
      */
-    async isKeyBackupTrusted(backupInfo: any | undefined): Promise<TrustInfo> {
+    async isKeyBackupTrusted(backupInfo: BackupInfo): Promise<TrustInfo> {
         const ret = {
             usable: false,
             trusted_locally: false,
