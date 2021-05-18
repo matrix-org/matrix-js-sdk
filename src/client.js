@@ -5566,7 +5566,7 @@ function _PojoToMatrixEventMapper(client, options = {}) {
                 ]);
             }
             if (decrypt) {
-                event.attemptDecryption(client._crypto);
+                client.decryptEventIfNeeded(event);
             }
         }
         if (!preventReEmit) {
@@ -5606,6 +5606,26 @@ MatrixClient.prototype.getCrossSigningCacheCallbacks = function() {
  */
 MatrixClient.prototype.generateClientSecret = function() {
     return randomString(32);
+};
+
+/**
+ * Attempts to decrypt an event
+ * @param {MatrixEvent} event The event to decrypt
+ * @returns {Promise<void>} A decryption promise
+ * @param {object} options
+ * @param {bool} options.isRetry True if this is a retry (enables more logging)
+ * @param {bool} options.emit Emits "event.decrypted" if set to true
+ */
+MatrixClient.prototype.decryptEventIfNeeded = function(event, options) {
+    if (event.shouldAttemptDecryption()) {
+        event.attemptDecryption(this._crypto, options);
+    }
+
+    if (event.isBeingDecrypted()) {
+        return event._decryptionPromise;
+    } else {
+        return Promise.resolve();
+    }
 };
 
 // MatrixClient Event JSDocs

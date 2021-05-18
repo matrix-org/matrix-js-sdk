@@ -3322,7 +3322,10 @@ Crypto.prototype._onToDeviceEvent = function(event) {
             this._onKeyVerificationMessage(event);
         } else if (event.getContent().msgtype === "m.bad.encrypted") {
             this._onToDeviceBadEncrypted(event);
-        } else if (event.isBeingDecrypted()) {
+        } else if (event.isBeingDecrypted() || event.shouldAttemptDecryption()) {
+            if (!event.isBeingDecrypted()) {
+                event.attemptDecryption(this);
+            }
             // once the event has been decrypted, try again
             event.once('Event.decrypted', (ev) => {
                 this._onToDeviceEvent(ev);
