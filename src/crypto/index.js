@@ -2,7 +2,7 @@
 Copyright 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
 Copyright 2018-2019 New Vector Ltd
-Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+Copyright 2019-2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -58,6 +58,7 @@ import {KeySignatureUploadError} from "../errors";
 import {decryptAES, encryptAES} from './aes';
 import {DehydrationManager} from './dehydration';
 import { MatrixEvent } from "../models/event";
+import { BackupManager } from "./backup";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -85,7 +86,6 @@ export function isCryptoAvailable() {
 }
 
 const MIN_FORCE_SESSION_INTERVAL_MS = 60 * 60 * 1000;
-const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 
 /**
  * Cryptography bits
@@ -154,13 +154,36 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     } else {
         this._verificationMethods = defaultVerificationMethods;
     }
-    // track whether this device's megolm keys are being backed up incrementally
-    // to the server or not.
-    // XXX: this should probably have a single source of truth from OlmAccount
-    this.backupInfo = null; // The info dict from /room_keys/version
-    this.backupKey = null; // The encryption key object
-    this._checkedForBackup = false; // Have we checked the server for a backup we can use?
-    this._sendingBackups = false; // Are we currently sending backups?
+
+    this._backupManager = new BackupManager(baseApis, async (algorithm) => {
+        // try to get key from cache
+        const cachedKey = await this.getSessionBackupPrivateKey();
+        if (cachedKey) {
+            return cachedKey;
+        }
+
+        // try to get key from secret storage
+        const storedKey = await this.getSecret("m.megolm_backup.v1");
+
+        if (storedKey) {
+            // ensure that the key is in the right format.  If not, fix the key and
+            // store the fixed version
+            const fixedKey = fixBackupKey(storedKey);
+            if (fixedKey) {
+                const [keyId] = await this._crypto.getSecretStorageKey();
+                await this.storeSecret("m.megolm_backup.v1", fixedKey, [keyId]);
+            }
+
+            return decodeBase64(fixedKey || storedKey);
+        }
+
+        // try to get key from app
+        if (this._baseApis._cryptoCallbacks && this._baseApis._cryptoCallbacks.getBackupKey) {
+            return await this._baseApis._cryptoCallbacks.getBackupKey(algorithm);
+        }
+
+        throw new Error("Unable to get private key");
+    });
 
     this._olmDevice = new OlmDevice(cryptoStore);
     this._deviceList = new DeviceList(
@@ -331,7 +354,7 @@ Crypto.prototype.init = async function(opts) {
     this._deviceList.startTrackingDeviceList(this._userId);
 
     logger.log("Crypto: checking for key backup...");
-    this._checkAndStartKeyBackup();
+    this._backupManager.checkAndStart();
 };
 
 /**
@@ -458,7 +481,7 @@ Crypto.prototype.isSecretStorageReady = async function() {
         this._secretStorage,
     );
     const sessionBackupInStorage = (
-        !this._baseApis.getKeyBackupEnabled() ||
+        !this._backupManager.getKeyBackupEnabled() ||
         this._baseApis.isKeyBackupKeyStored()
     );
 
@@ -522,9 +545,11 @@ Crypto.prototype.bootstrapCrossSigning = async function({
         builder.addKeySignature(this._userId, this._deviceId, deviceSignature);
 
         // Sign message key backup with cross-signing master key
-        if (this.backupInfo) {
-            await crossSigningInfo.signObject(this.backupInfo.auth_data, "master");
-            builder.addSessionBackup(this.backupInfo);
+        if (this._backupManager.backupInfo) {
+            await crossSigningInfo.signObject(
+                this._backupManager.backupInfo.auth_data, "master",
+            );
+            builder.addSessionBackup(this._backupManager.backupInfo);
         }
     };
 
@@ -766,6 +791,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             keyBackupInfo.auth_data.private_key_salt &&
             keyBackupInfo.auth_data.private_key_iterations
         ) {
+            // FIXME: ???
             opts.passphrase = {
                 algorithm: "m.pbkdf2",
                 iterations: keyBackupInfo.auth_data.private_key_iterations,
@@ -1477,7 +1503,7 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function({
     }
 
     // Now we may be able to trust our key backup
-    await this.checkKeyBackup();
+    await this._backupManager.checkKeyBackup();
     // FIXME: if we previously trusted the backup, should we automatically sign
     // the backup with the new key (if not already signed)?
 };
@@ -1539,206 +1565,11 @@ Crypto.prototype._checkDeviceVerifications = async function(userId) {
     logger.info(`Finished device verification upgrade for ${userId}`);
 };
 
-/**
- * Check the server for an active key backup and
- * if one is present and has a valid signature from
- * one of the user's verified devices, start backing up
- * to it.
- */
-Crypto.prototype._checkAndStartKeyBackup = async function() {
-    logger.log("Checking key backup status...");
-    if (this._baseApis.isGuest()) {
-        logger.log("Skipping key backup check since user is guest");
-        this._checkedForBackup = true;
-        return null;
-    }
-    let backupInfo;
-    try {
-        backupInfo = await this._baseApis.getKeyBackupVersion();
-    } catch (e) {
-        logger.log("Error checking for active key backup", e);
-        if (e.httpStatus === 404) {
-            // 404 is returned when the key backup does not exist, so that
-            // counts as successfully checking.
-            this._checkedForBackup = true;
-        }
-        return null;
-    }
-    this._checkedForBackup = true;
-
-    const trustInfo = await this.isKeyBackupTrusted(backupInfo);
-
-    if (trustInfo.usable && !this.backupInfo) {
-        logger.log(
-            "Found usable key backup v" + backupInfo.version +
-            ": enabling key backups",
-        );
-        this._baseApis.enableKeyBackup(backupInfo);
-    } else if (!trustInfo.usable && this.backupInfo) {
-        logger.log("No usable key backup: disabling key backup");
-        this._baseApis.disableKeyBackup();
-    } else if (!trustInfo.usable && !this.backupInfo) {
-        logger.log("No usable key backup: not enabling key backup");
-    } else if (trustInfo.usable && this.backupInfo) {
-        // may not be the same version: if not, we should switch
-        if (backupInfo.version !== this.backupInfo.version) {
-            logger.log(
-                "On backup version " + this.backupInfo.version + " but found " +
-                "version " + backupInfo.version + ": switching.",
-            );
-            this._baseApis.disableKeyBackup();
-            this._baseApis.enableKeyBackup(backupInfo);
-            // We're now using a new backup, so schedule all the keys we have to be
-            // uploaded to the new backup. This is a bit of a workaround to upload
-            // keys to a new backup in *most* cases, but it won't cover all cases
-            // because we don't remember what backup version we uploaded keys to:
-            // see https://github.com/vector-im/element-web/issues/14833
-            await this.scheduleAllGroupSessionsForBackup();
-        } else {
-            logger.log("Backup version " + backupInfo.version + " still current");
-        }
-    }
-
-    return {backupInfo, trustInfo};
-};
-
 Crypto.prototype.setTrustedBackupPubKey = async function(trustedPubKey) {
     // This should be redundant post cross-signing is a thing, so just
     // plonk it in localStorage for now.
     this._sessionStore.setLocalTrustedBackupPubKey(trustedPubKey);
-    await this.checkKeyBackup();
-};
-
-/**
- * Forces a re-check of the key backup and enables/disables it
- * as appropriate.
- *
- * @return {Object} Object with backup info (as returned by
- *     getKeyBackupVersion) in backupInfo and
- *     trust information (as returned by isKeyBackupTrusted)
- *     in trustInfo.
- */
-Crypto.prototype.checkKeyBackup = async function() {
-    this._checkedForBackup = false;
-    return this._checkAndStartKeyBackup();
-};
-
-/**
- * @param {object} backupInfo key backup info dict from /room_keys/version
- * @return {object} {
- *     usable: [bool], // is the backup trusted, true iff there is a sig that is valid & from a trusted device
- *     sigs: [
- *         valid: [bool || null], // true: valid, false: invalid, null: cannot attempt validation
- *         deviceId: [string],
- *         device: [DeviceInfo || null],
- *     ]
- * }
- */
-Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
-    const ret = {
-        usable: false,
-        trusted_locally: false,
-        sigs: [],
-    };
-
-    if (
-        !backupInfo ||
-        !backupInfo.algorithm ||
-        !backupInfo.auth_data ||
-        !backupInfo.auth_data.public_key ||
-        !backupInfo.auth_data.signatures
-    ) {
-        logger.info("Key backup is absent or missing required data");
-        return ret;
-    }
-
-    const trustedPubkey = this._sessionStore.getLocalTrustedBackupPubKey();
-
-    if (backupInfo.auth_data.public_key === trustedPubkey) {
-        logger.info("Backup public key " + trustedPubkey + " is trusted locally");
-        ret.trusted_locally = true;
-    }
-
-    const mySigs = backupInfo.auth_data.signatures[this._userId] || [];
-
-    for (const keyId of Object.keys(mySigs)) {
-        const keyIdParts = keyId.split(':');
-        if (keyIdParts[0] !== 'ed25519') {
-            logger.log("Ignoring unknown signature type: " + keyIdParts[0]);
-            continue;
-        }
-        // Could be a cross-signing master key, but just say this is the device
-        // ID for backwards compat
-        const sigInfo = { deviceId: keyIdParts[1] };
-
-        // first check to see if it's from our cross-signing key
-        const crossSigningId = this._crossSigningInfo.getId();
-        if (crossSigningId === sigInfo.deviceId) {
-            sigInfo.crossSigningId = true;
-            try {
-                await olmlib.verifySignature(
-                    this._olmDevice,
-                    backupInfo.auth_data,
-                    this._userId,
-                    sigInfo.deviceId,
-                    crossSigningId,
-                );
-                sigInfo.valid = true;
-            } catch (e) {
-                logger.warning(
-                    "Bad signature from cross signing key " + crossSigningId, e,
-                );
-                sigInfo.valid = false;
-            }
-            ret.sigs.push(sigInfo);
-            continue;
-        }
-
-        // Now look for a sig from a device
-        // At some point this can probably go away and we'll just support
-        // it being signed by the cross-signing master key
-        const device = this._deviceList.getStoredDevice(
-            this._userId, sigInfo.deviceId,
-        );
-        if (device) {
-            sigInfo.device = device;
-            sigInfo.deviceTrust = await this.checkDeviceTrust(
-                this._userId, sigInfo.deviceId,
-            );
-            try {
-                await olmlib.verifySignature(
-                    this._olmDevice,
-                    backupInfo.auth_data,
-                    this._userId,
-                    device.deviceId,
-                    device.getFingerprint(),
-                );
-                sigInfo.valid = true;
-            } catch (e) {
-                logger.info(
-                    "Bad signature from key ID " + keyId + " userID " + this._userId +
-                    " device ID " + device.deviceId + " fingerprint: " +
-                    device.getFingerprint(), backupInfo.auth_data, e,
-                );
-                sigInfo.valid = false;
-            }
-        } else {
-            sigInfo.valid = null; // Can't determine validity because we don't have the signing device
-            logger.info("Ignoring signature from unknown key " + keyId);
-        }
-        ret.sigs.push(sigInfo);
-    }
-
-    ret.usable = ret.sigs.some((s) => {
-        return (
-            s.valid && (
-                (s.device && s.deviceTrust.isVerified()) ||
-                (s.crossSigningId)
-            )
-        );
-    });
-    ret.usable |= ret.trusted_locally;
-    return ret;
+    await this._backupManager.checkKeyBackup();
 };
 
 /**
@@ -2790,190 +2621,11 @@ Crypto.prototype.importRoomKeys = function(keys, opts = {}) {
 };
 
 /**
- * Schedules sending all keys waiting to be sent to the backup, if not already
- * scheduled. Retries if necessary.
- *
- * @param {number} maxDelay Maximum delay to wait in ms. 0 means no delay.
- */
-Crypto.prototype.scheduleKeyBackupSend = async function(maxDelay = 10000) {
-    if (this._sendingBackups) return;
-
-    this._sendingBackups = true;
-
-    try {
-        // wait between 0 and `maxDelay` seconds, to avoid backup
-        // requests from different clients hitting the server all at
-        // the same time when a new key is sent
-        const delay = Math.random() * maxDelay;
-        await sleep(delay);
-        let numFailures = 0; // number of consecutive failures
-        while (1) {
-            if (!this.backupKey) {
-                return;
-            }
-            try {
-                const numBackedUp =
-                    await this._backupPendingKeys(KEY_BACKUP_KEYS_PER_REQUEST);
-                if (numBackedUp === 0) {
-                    // no sessions left needing backup: we're done
-                    return;
-                }
-                numFailures = 0;
-            } catch (err) {
-                numFailures++;
-                logger.log("Key backup request failed", err);
-                if (err.data) {
-                    if (
-                        err.data.errcode == 'M_NOT_FOUND' ||
-                        err.data.errcode == 'M_WRONG_ROOM_KEYS_VERSION'
-                    ) {
-                        // Re-check key backup status on error, so we can be
-                        // sure to present the current situation when asked.
-                        await this.checkKeyBackup();
-                        // Backup version has changed or this backup version
-                        // has been deleted
-                        this.emit("crypto.keyBackupFailed", err.data.errcode);
-                        throw err;
-                    }
-                }
-            }
-            if (numFailures) {
-                // exponential backoff if we have failures
-                await sleep(1000 * Math.pow(2, Math.min(numFailures - 1, 4)));
-            }
-        }
-    } finally {
-        this._sendingBackups = false;
-    }
-};
-
-/**
- * Take some e2e keys waiting to be backed up and send them
- * to the backup.
- *
- * @param {integer} limit Maximum number of keys to back up
- * @returns {integer} Number of sessions backed up
- */
-Crypto.prototype._backupPendingKeys = async function(limit) {
-    const sessions = await this._cryptoStore.getSessionsNeedingBackup(limit);
-    if (!sessions.length) {
-        return 0;
-    }
-
-    let remaining = await this._cryptoStore.countSessionsNeedingBackup();
-    this.emit("crypto.keyBackupSessionsRemaining", remaining);
-
-    const data = {};
-    for (const session of sessions) {
-        const roomId = session.sessionData.room_id;
-        if (data[roomId] === undefined) {
-            data[roomId] = {sessions: {}};
-        }
-
-        const sessionData = await this._olmDevice.exportInboundGroupSession(
-            session.senderKey, session.sessionId, session.sessionData,
-        );
-        sessionData.algorithm = olmlib.MEGOLM_ALGORITHM;
-        delete sessionData.session_id;
-        delete sessionData.room_id;
-        const firstKnownIndex = sessionData.first_known_index;
-        delete sessionData.first_known_index;
-        const encrypted = this.backupKey.encrypt(JSON.stringify(sessionData));
-
-        const forwardedCount =
-              (sessionData.forwarding_curve25519_key_chain || []).length;
-
-        const userId = this._deviceList.getUserByIdentityKey(
-            olmlib.MEGOLM_ALGORITHM, session.senderKey,
-        );
-        const device = this._deviceList.getDeviceByIdentityKey(
-            olmlib.MEGOLM_ALGORITHM, session.senderKey,
-        );
-        const verified = this._checkDeviceInfoTrust(userId, device).isVerified();
-
-        data[roomId]['sessions'][session.sessionId] = {
-            first_message_index: firstKnownIndex,
-            forwarded_count: forwardedCount,
-            is_verified: verified,
-            session_data: encrypted,
-        };
-    }
-
-    await this._baseApis.sendKeyBackup(
-        undefined, undefined, this.backupInfo.version,
-        {rooms: data},
-    );
-
-    await this._cryptoStore.unmarkSessionsNeedingBackup(sessions);
-    remaining = await this._cryptoStore.countSessionsNeedingBackup();
-    this.emit("crypto.keyBackupSessionsRemaining", remaining);
-
-    return sessions.length;
-};
-
-Crypto.prototype.backupGroupSession = async function(
-    roomId, senderKey, forwardingCurve25519KeyChain,
-    sessionId, sessionKey, keysClaimed,
-    exportFormat,
-) {
-    await this._cryptoStore.markSessionsNeedingBackup([{
-        senderKey: senderKey,
-        sessionId: sessionId,
-    }]);
-
-    if (this.backupInfo) {
-        // don't wait for this to complete: it will delay so
-        // happens in the background
-        this.scheduleKeyBackupSend();
-    }
-    // if this.backupInfo is not set, then the keys will be backed up when
-    // client.enableKeyBackup is called
-};
-
-/**
- * Marks all group sessions as needing to be backed up and schedules them to
- * upload in the background as soon as possible.
- */
-Crypto.prototype.scheduleAllGroupSessionsForBackup = async function() {
-    await this.flagAllGroupSessionsForBackup();
-
-    // Schedule keys to upload in the background as soon as possible.
-    this.scheduleKeyBackupSend(0 /* maxDelay */);
-};
-
-/**
- * Marks all group sessions as needing to be backed up without scheduling
- * them to upload in the background.
- * @returns {Promise<int>} Resolves to the number of sessions now requiring a backup
- *     (which will be equal to the number of sessions in the store).
- */
-Crypto.prototype.flagAllGroupSessionsForBackup = async function() {
-    await this._cryptoStore.doTxn(
-        'readwrite',
-        [
-            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
-            IndexedDBCryptoStore.STORE_BACKUP,
-        ],
-        (txn) => {
-            this._cryptoStore.getAllEndToEndInboundGroupSessions(txn, (session) => {
-                if (session !== null) {
-                    this._cryptoStore.markSessionsNeedingBackup([session], txn);
-                }
-            });
-        },
-    );
-
-    const remaining = await this._cryptoStore.countSessionsNeedingBackup();
-    this.emit("crypto.keyBackupSessionsRemaining", remaining);
-    return remaining;
-};
-
-/**
  * Counts the number of end to end session keys that are waiting to be backed up
  * @returns {Promise<int>} Resolves to the number of sessions requiring backup
  */
 Crypto.prototype.countSessionsNeedingBackup = function() {
-    return this._cryptoStore.countSessionsNeedingBackup();
+    return this._backupManager.countSessionsNeedingBackup();
 };
 
 /**
@@ -3347,10 +2999,10 @@ Crypto.prototype._onRoomKeyEvent = function(event) {
         return;
     }
 
-    if (!this._checkedForBackup) {
+    if (!this._backupManager.checkedForBackup) {
         // don't bother awaiting on this - the important thing is that we retry if we
         // haven't managed to check before
-        this._checkAndStartKeyBackup();
+        this._backupManager.checkAndStart();
     }
 
     const alg = this._getRoomDecryptor(content.room_id, content.algorithm);

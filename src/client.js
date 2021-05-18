@@ -2,7 +2,7 @@
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
 Copyright 2018-2019 New Vector Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2019, 2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -57,6 +57,7 @@ import {encodeBase64, decodeBase64} from "./crypto/olmlib";
 import { User } from "./models/user";
 import {AutoDiscovery} from "./autodiscovery";
 import {DEHYDRATION_ALGORITHM} from "./crypto/dehydration";
+import { BackupManager } from "./crypto/backup";
 
 const SCROLLBACK_DELAY_MS = 3000;
 export const CRYPTO_ENABLED = isCryptoAvailable();
@@ -257,6 +258,10 @@ function keyFromRecoverySession(session, decryptionKey) {
  *           }
  *       }
  *   {string} name the name of the value we want to read out of SSSS, for UI purposes.
+ *
+ * @param {function} [opts.cryptoCallbacks.getBackupKey]
+ * Optional. Function called when the backup key is required.  The callback function
+ *     should return a promise that resolves to the backup key as a Uint8Array.
  *
  * @param {function} [opts.cryptoCallbacks.cacheSecretStorageKey]
  * Optional. Function called when a new encryption key for secret storage
@@ -1088,7 +1093,7 @@ MatrixClient.prototype.setDeviceVerified = function(userId, deviceId, verified) 
     // check the key backup status, since whether or not we use this depends on
     // whether it has a signature from a verified device
     if (userId == this.credentials.userId) {
-        this._crypto.checkKeyBackup();
+        this.checkKeyBackup();
     }
     return prom;
 };
@@ -1776,7 +1781,7 @@ MatrixClient.prototype.importRoomKeys = function(keys, opts) {
  *     in trustInfo.
  */
 MatrixClient.prototype.checkKeyBackup = function() {
-    return this._crypto.checkKeyBackup();
+    return this._crypto._backupManager.checkKeyBackup();
 };
 
 /**
@@ -1818,7 +1823,7 @@ MatrixClient.prototype.getKeyBackupVersion = function() {
  * }
  */
 MatrixClient.prototype.isKeyBackupTrusted = function(info) {
-    return this._crypto.isKeyBackupTrusted(info);
+    return this._crypto._backupManager.isKeyBackupTrusted(info);
 };
 
 /**
@@ -1830,10 +1835,7 @@ MatrixClient.prototype.getKeyBackupEnabled = function() {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
-    if (!this._crypto._checkedForBackup) {
-        return null;
-    }
-    return Boolean(this._crypto.backupKey);
+    return this._crypto._backupManager.getKeyBackupEnabled();
 };
 
 /**
@@ -1847,16 +1849,7 @@ MatrixClient.prototype.enableKeyBackup = function(info) {
         throw new Error("End-to-end encryption disabled");
     }
 
-    this._crypto.backupInfo = info;
-    if (this._crypto.backupKey) this._crypto.backupKey.free();
-    this._crypto.backupKey = new global.Olm.PkEncryption();
-    this._crypto.backupKey.set_recipient_key(info.auth_data.public_key);
-
-    this.emit('crypto.keyBackupStatus', true);
-
-    // There may be keys left over from a partially completed backup, so
-    // schedule a send to check.
-    this._crypto.scheduleKeyBackupSend();
+    return this._crypto.backupManager.enableKeyBackup();
 };
 
 /**
@@ -1867,11 +1860,7 @@ MatrixClient.prototype.disableKeyBackup = function() {
         throw new Error("End-to-end encryption disabled");
     }
 
-    this._crypto.backupInfo = null;
-    if (this._crypto.backupKey) this._crypto.backupKey.free();
-    this._crypto.backupKey = null;
-
-    this.emit('crypto.keyBackupStatus', false);
+    this._crypto.backupManager.disableKeyBackup();
 };
 
 /**
@@ -1896,26 +1885,19 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(
         throw new Error("End-to-end encryption disabled");
     }
 
-    const { keyInfo, encodedPrivateKey, privateKey } =
-        await this.createRecoveryKeyFromPassphrase(password);
+    // eslint-disable-next-line camelcase
+    const {algorithm, auth_data, recovery_key, privateKey} =
+          await this._crypto._backupManager.prepareKeyBackupVersion(password);
 
     if (secureSecretStorage) {
         await this.storeSecret("m.megolm_backup.v1", encodeBase64(privateKey));
         logger.info("Key backup private key stored in secret storage");
     }
 
-    // Reshape objects into form expected for key backup
-    const authData = {
-        public_key: keyInfo.pubkey,
-    };
-    if (keyInfo.passphrase) {
-        authData.private_key_salt = keyInfo.passphrase.salt;
-        authData.private_key_iterations = keyInfo.passphrase.iterations;
-    }
     return {
-        algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
-        auth_data: authData,
-        recovery_key: encodedPrivateKey,
+        algorithm,
+        auth_data,
+        recovery_key,
     };
 };
 
@@ -1940,6 +1922,8 @@ MatrixClient.prototype.createKeyBackupVersion = async function(info) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
+
+    await this._crypto._backupManager.createKeyBackupVersion(info);
 
     const data = {
         algorithm: info.algorithm,
@@ -1986,8 +1970,8 @@ MatrixClient.prototype.deleteKeyBackupVersion = function(version) {
     // If we're currently backing up to this backup... stop.
     // (We start using it automatically in createKeyBackupVersion
     // so this is symmetrical).
-    if (this._crypto.backupInfo && this._crypto.backupInfo.version === version) {
-        this.disableKeyBackup();
+    if (this._crypto._backupManager.version) {
+        this._crypto._backupManager.disableKeyBackup();
     }
 
     const path = utils.encodeUri("/room_keys/version/$version", {
@@ -2051,7 +2035,7 @@ MatrixClient.prototype.scheduleAllGroupSessionsForBackup = async function() {
         throw new Error("End-to-end encryption disabled");
     }
 
-    await this._crypto.scheduleAllGroupSessionsForBackup();
+    await this._crypto._backupManager.scheduleAllGroupSessionsForBackup();
 };
 
 /**
@@ -2064,7 +2048,7 @@ MatrixClient.prototype.flagAllGroupSessionsForBackup = function() {
         throw new Error("End-to-end encryption disabled");
     }
 
-    return this._crypto.flagAllGroupSessionsForBackup();
+    return this._crypto._backupManager.flagAllGroupSessionsForBackup();
 };
 
 MatrixClient.prototype.isValidRecoveryKey = function(recoveryKey) {
@@ -2208,7 +2192,7 @@ MatrixClient.prototype.restoreKeyBackupWithCache = async function(
     );
 };
 
-MatrixClient.prototype._restoreKeyBackup = function(
+MatrixClient.prototype._restoreKeyBackup = async function(
     privKey, targetRoomId, targetSessionId, backupInfo,
     {
         cacheCompleteCallback, // For sequencing during tests
@@ -2225,46 +2209,41 @@ MatrixClient.prototype._restoreKeyBackup = function(
         targetRoomId, targetSessionId, backupInfo.version,
     );
 
-    const decryption = new global.Olm.PkDecryption();
-    let backupPubKey;
+    const algorithm = await BackupManager.makeAlgorithm(backupInfo, async () => { return privKey; });
+
     try {
-        backupPubKey = decryption.init_with_private_key(privKey);
-    } catch (e) {
-        decryption.free();
-        throw e;
-    }
+        // If the pubkey computed from the private data we've been given
+        // doesn't match the one in the auth_data, the user has entered
+        // a different recovery key / the wrong passphrase.
+        if (!await algorithm.keyMatches(privKey)) {
+            return Promise.reject({ errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY });
+        }
 
-    // If the pubkey computed from the private data we've been given
-    // doesn't match the one in the auth_data, the user has enetered
-    // a different recovery key / the wrong passphrase.
-    if (backupPubKey !== backupInfo.auth_data.public_key) {
-        return Promise.reject({errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY});
-    }
+        // Cache the key, if possible.
+        // This is async.
+        this._crypto.storeSessionBackupPrivateKey(privKey)
+            .catch((e) => {
+                logger.warn("Error caching session backup key:", e);
+            }).then(cacheCompleteCallback);
 
-    // Cache the key, if possible.
-    // This is async.
-    this._crypto.storeSessionBackupPrivateKey(privKey)
-    .catch((e) => {
-        logger.warn("Error caching session backup key:", e);
-    }).then(cacheCompleteCallback);
+        if (progressCallback) {
+            progressCallback({
+                stage: "fetch",
+            });
+        }
 
-    if (progressCallback) {
-        progressCallback({
-            stage: "fetch",
-        });
-    }
+        const res = await this._http.authedRequest(
+            undefined, "GET", path.path, path.queryData, undefined,
+            { prefix: PREFIX_UNSTABLE },
+        );
 
-    return this._http.authedRequest(
-        undefined, "GET", path.path, path.queryData, undefined,
-        {prefix: PREFIX_UNSTABLE},
-    ).then((res) => {
         if (res.rooms) {
             for (const [roomId, roomData] of Object.entries(res.rooms)) {
                 if (!roomData.sessions) continue;
 
                 totalKeyCount += Object.keys(roomData.sessions).length;
-                const roomKeys = keysFromRecoverySession(
-                    roomData.sessions, decryption, roomId,
+                const roomKeys = await algorithm.decryptSessions(
+                    roomData.sessions,
                 );
                 for (const k of roomKeys) {
                     k.room_id = roomId;
@@ -2273,13 +2252,18 @@ MatrixClient.prototype._restoreKeyBackup = function(
             }
         } else if (res.sessions) {
             totalKeyCount = Object.keys(res.sessions).length;
-            keys = keysFromRecoverySession(
-                res.sessions, decryption, targetRoomId, keys,
+            keys = await algorithm.decryptSessions(
+                res.sessions,
             );
+            for (const k of keys) {
+                k.room_id = targetRoomId;
+            }
         } else {
             totalKeyCount = 1;
             try {
-                const key = keyFromRecoverySession(res, decryption);
+                const [key] = await algorithm.decryptSessions({
+                    [targetSessionId]: res,
+                });
                 key.room_id = targetRoomId;
                 key.session_id = targetSessionId;
                 keys.push(key);
@@ -2287,19 +2271,20 @@ MatrixClient.prototype._restoreKeyBackup = function(
                 logger.log("Failed to decrypt megolm session from backup", e);
             }
         }
+    } finally {
+        algorithm.free();
+    }
 
-        return this.importRoomKeys(keys, {
-            progressCallback,
-            untrusted: true,
-            source: "backup",
-        });
-    }).then(() => {
-        return this._crypto.setTrustedBackupPubKey(backupPubKey);
-    }).then(() => {
-        return {total: totalKeyCount, imported: keys.length};
-    }).finally(() => {
-        decryption.free();
+    await this.importRoomKeys(keys, {
+        progressCallback,
+        untrusted: true,
+        source: "backup",
     });
+
+    // await this._crypto.setTrustedBackupPubKey(backupPubKey);
+    await this.checkKeyBackup();
+
+    return {total: totalKeyCount, imported: keys.length};
 };
 
 MatrixClient.prototype.deleteKeysFromBackup = function(roomId, sessionId, version) {
