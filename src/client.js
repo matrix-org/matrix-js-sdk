@@ -5626,7 +5626,7 @@ MatrixClient.prototype.decryptEvent = function(event, options) {
     } else {
         return Promise.resolve();
     }
-}
+};
 
 // MatrixClient Event JSDocs
 
