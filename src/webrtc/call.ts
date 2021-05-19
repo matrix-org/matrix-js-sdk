@@ -1505,6 +1505,44 @@ export class MatrixCall extends EventEmitter {
         stream.addEventListener("removetrack", () => this.deleteFeedByStream(stream));
     };
 
+    /**
+     * This method removes all video/rtx codecs from video transceivers.
+     * This is necessary since they can cause problems. Without this the
+     * following steps should produce an error:
+     *   Chromium calls Firefox
+     *   Firefox answers
+     *   Firefox starts screen-sharing
+     *   Chromium starts screen-sharing
+     *   Call crashes for Chromium with:
+     *       [96685:23:0518/162603.933321:ERROR:webrtc_video_engine.cc(3296)] RTX codec (PT=97) mapped to PT=96 which is not in the codec list.
+     *       [96685:23:0518/162603.933377:ERROR:webrtc_video_engine.cc(1171)] GetChangedRecvParameters called without any video codecs.
+     *       [96685:23:0518/162603.933430:ERROR:sdp_offer_answer.cc(4302)] Failed to set local video description recv parameters for m-section with mid='2'. (INVALID_PARAMETER)
+     */
+    private getRidOfRTXCodecs() {
+        // RTCRtpReceiver.getCapabilities and RTCRtpSender.getCapabilities don't seem to be supported on FF
+        if (RTCRtpReceiver.getCapabilities && RTCRtpSender.getCapabilities) {
+            const recvCodecs = RTCRtpReceiver.getCapabilities("video").codecs;
+            const sendCodecs = RTCRtpSender.getCapabilities("video").codecs;
+            const codecs = [...sendCodecs, ...recvCodecs];
+
+            for (const codec of codecs) {
+                if (codec.mimeType === "video/rtx") {
+                    const rtxCodecIndex = codecs.indexOf(codec);
+                    codecs.splice(rtxCodecIndex, 1);
+                }
+            }
+
+            for (const trans of this.peerConn.getTransceivers()) {
+                if (
+                    trans.sender.track?.kind === "video" ||
+                    trans.receiver.track?.kind === "video"
+                ) {
+                    trans.setCodecPreferences(codecs);
+                }
+            }
+        }
+    }
+
     onNegotiationNeeded = async () => {
         logger.info("Negotation is needed!");
 
@@ -1515,6 +1553,7 @@ export class MatrixCall extends EventEmitter {
 
         this.makingOffer = true;
         try {
+            this.getRidOfRTXCodecs();
             const myOffer = await this.peerConn.createOffer();
             await this.gotLocalOffer(myOffer);
         } catch (e) {
