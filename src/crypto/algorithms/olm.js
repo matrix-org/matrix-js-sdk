@@ -95,7 +95,7 @@ OlmEncryption.prototype.encryptMessage = async function(room, eventType, content
 
     const members = await room.getEncryptionTargetMembers();
 
-    const users = utils.map(members, function(u) {
+    const users = members.map(function(u) {
         return u.userId;
     });
 

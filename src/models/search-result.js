@@ -19,7 +19,6 @@ limitations under the License.
  * @module models/search-result
  */
 
-import * as utils from "../utils";
 import {EventContext} from "./event-context";
 
 /**
@@ -52,8 +51,8 @@ SearchResult.fromJson = function(jsonObj, eventMapper) {
     const context = new EventContext(eventMapper(jsonObj.result));
 
     context.setPaginateToken(jsonContext.start, true);
-    context.addEvents(utils.map(events_before, eventMapper), true);
-    context.addEvents(utils.map(events_after, eventMapper), false);
+    context.addEvents(events_before.map(eventMapper), true);
+    context.addEvents(events_after.map(eventMapper), false);
     context.setPaginateToken(jsonContext.end, false);
 
     return new SearchResult(jsonObj.rank, context);

@@ -23,7 +23,6 @@ limitations under the License.
  */
 
 import {User} from "../models/user";
-import * as utils from "../utils";
 
 function isValidFilterId(filterId) {
     const isValidStr = typeof filterId === "string" &&
@@ -113,7 +112,7 @@ MemoryStore.prototype = {
      * @return {Group[]} A list of groups, which may be empty.
      */
     getGroups: function() {
-        return utils.values(this.groups);
+        return Object.values(this.groups);
     },
 
     /**
@@ -175,7 +174,7 @@ MemoryStore.prototype = {
      * @return {Room[]} A list of rooms, which may be empty.
      */
     getRooms: function() {
-        return utils.values(this.rooms);
+        return Object.values(this.rooms);
     },
 
     /**
@@ -194,7 +193,7 @@ MemoryStore.prototype = {
      * @return {RoomSummary[]} A summary of each room.
      */
     getRoomSummaries: function() {
-        return utils.map(utils.values(this.rooms), function(room) {
+        return Object.values(this.rooms).map(function(room) {
             return room.summary;
         });
     },
@@ -221,7 +220,7 @@ MemoryStore.prototype = {
      * @return {User[]} A list of users, which may be empty.
      */
     getUsers: function() {
-        return utils.values(this.users);
+        return Object.values(this.users);
     },
 
     /**

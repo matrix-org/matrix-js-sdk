@@ -228,6 +228,51 @@ function pendingEventsKey(roomId) {
 
 utils.inherits(Room, EventEmitter);
 
+
+/**
+ * Bulk decrypt critical events in a room
+ *
+ * Critical events represents the minimal set of events to decrypt
+ * for a typical UI to function properly
+ *
+ * - Last event of every room (to generate likely message preview)
+ * - All events up to the read receipt (to calculate an accurate notification count)
+ *
+ * @returns {Promise} Signals when all events have been decrypted
+ */
+Room.prototype.decryptCriticalEvents = function() {
+    const readReceiptEventId = this.getEventReadUpTo(this._client.getUserId(), true);
+    const events = this.getLiveTimeline().getEvents();
+    const readReceiptTimelineIndex = events.findIndex(matrixEvent => {
+        return matrixEvent.event.event_id === readReceiptEventId;
+    });
+
+    const decryptionPromises = events
+        .slice(readReceiptTimelineIndex)
+        .filter(event => event.shouldAttemptDecryption())
+        .reverse()
+        .map(event => event.attemptDecryption(this._client._crypto, { isRetry: true }));
+
+    return Promise.allSettled(decryptionPromises);
+};
+
+/**
+ * Bulk decrypt events in a room
+ *
+ * @returns {Promise} Signals when all events have been decrypted
+ */
+Room.prototype.decryptAllEvents = function() {
+    const decryptionPromises = this
+        .getUnfilteredTimelineSet()
+        .getLiveTimeline()
+        .getEvents()
+        .filter(event => event.shouldAttemptDecryption())
+        .reverse()
+        .map(event => event.attemptDecryption(this._client._crypto, { isRetry: true }));
+
+    return Promise.allSettled(decryptionPromises);
+};
+
 /**
  * Gets the version of the room
  * @returns {string} The version of the room, or null if it could not be determined
@@ -904,7 +949,7 @@ Room.prototype.getAliases = function() {
     if (aliasEvents) {
         for (let i = 0; i < aliasEvents.length; ++i) {
             const aliasEvent = aliasEvents[i];
-            if (utils.isArray(aliasEvent.getContent().aliases)) {
+            if (Array.isArray(aliasEvent.getContent().aliases)) {
                 const filteredAliases = aliasEvent.getContent().aliases.filter(a => {
                     if (typeof(a) !== "string") return false;
                     if (a[0] !== '#') return false;
@@ -1032,7 +1077,7 @@ Room.prototype.getInvitedAndJoinedMemberCount = function() {
  * @return {RoomMember[]} A list of members with the given membership state.
  */
  Room.prototype.getMembersWithMembership = function(membership) {
-    return utils.filter(this.currentState.getMembers(), function(m) {
+    return this.currentState.getMembers().filter(function(m) {
         return m.membership === membership;
     });
  };
@@ -1655,7 +1700,7 @@ Room.prototype.recalculate = function() {
     );
     if (membershipEvent && membershipEvent.getContent().membership === "invite") {
         const strippedStateEvents = membershipEvent.event.invite_room_state || [];
-        utils.forEach(strippedStateEvents, function(strippedEvent) {
+        strippedStateEvents.forEach(function(strippedEvent) {
             const existingEvent = self.currentState.getStateEvents(
                 strippedEvent.type, strippedEvent.state_key,
             );
@@ -1805,9 +1850,9 @@ Room.prototype.addReceipt = function(event, fake) {
  */
 Room.prototype._addReceiptsToStructure = function(event, receipts) {
     const self = this;
-    utils.keys(event.getContent()).forEach(function(eventId) {
-        utils.keys(event.getContent()[eventId]).forEach(function(receiptType) {
-            utils.keys(event.getContent()[eventId][receiptType]).forEach(
+    Object.keys(event.getContent()).forEach(function(eventId) {
+        Object.keys(event.getContent()[eventId]).forEach(function(receiptType) {
+            Object.keys(event.getContent()[eventId][receiptType]).forEach(
             function(userId) {
                 const receipt = event.getContent()[eventId][receiptType][userId];
 
@@ -1847,8 +1892,8 @@ Room.prototype._addReceiptsToStructure = function(event, receipts) {
  */
 Room.prototype._buildReceiptCache = function(receipts) {
     const receiptCacheByEventId = {};
-    utils.keys(receipts).forEach(function(receiptType) {
-        utils.keys(receipts[receiptType]).forEach(function(userId) {
+    Object.keys(receipts).forEach(function(receiptType) {
+        Object.keys(receipts[receiptType]).forEach(function(userId) {
             const receipt = receipts[receiptType][userId];
             if (!receiptCacheByEventId[receipt.eventId]) {
                 receiptCacheByEventId[receipt.eventId] = [];

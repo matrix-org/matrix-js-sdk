@@ -133,14 +133,15 @@ RoomMember.prototype.setPowerLevelEvent = function(powerLevelEvent) {
     const evContent = powerLevelEvent.getDirectionalContent();
 
     let maxLevel = evContent.users_default || 0;
-    utils.forEach(utils.values(evContent.users), function(lvl) {
+    const users = evContent.users || {};
+    Object.values(users).forEach(function(lvl) {
         maxLevel = Math.max(maxLevel, lvl);
     });
     const oldPowerLevel = this.powerLevel;
     const oldPowerLevelNorm = this.powerLevelNorm;
 
-    if (evContent.users && evContent.users[this.userId] !== undefined) {
-        this.powerLevel = evContent.users[this.userId];
+    if (users[this.userId] !== undefined) {
+        this.powerLevel = users[this.userId];
     } else if (evContent.users_default !== undefined) {
         this.powerLevel = evContent.users_default;
     } else {
@@ -172,7 +173,7 @@ RoomMember.prototype.setTypingEvent = function(event) {
     const oldTyping = this.typing;
     this.typing = false;
     const typingList = event.getContent().user_ids;
-    if (!utils.isArray(typingList)) {
+    if (!Array.isArray(typingList)) {
         // malformed event :/ bail early. TODO: whine?
         return;
     }

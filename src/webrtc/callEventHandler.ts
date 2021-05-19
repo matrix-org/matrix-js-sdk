@@ -55,7 +55,9 @@ export class CallEventHandler {
     private evaluateEventBuffer = () => {
         if (this.client.getSyncState() === "SYNCING") {
             // don't process any events until they are all decrypted
-            if (this.callEventBuffer.some((e) => e.isBeingDecrypted())) return;
+            if (this.callEventBuffer.some((e) => {
+                return e.isBeingDecrypted() || e.shouldAttemptDecryption()
+            })) return;
 
             const ignoreCallIds = new Set<String>();
             // inspect the buffer and mark all calls which have been answered
@@ -87,17 +89,19 @@ export class CallEventHandler {
 
     private onEvent = (event: MatrixEvent) => {
         // any call events or ones that might be once they're decrypted
+        const isBeingDecrypted = event.isBeingDecrypted();
+        const shouldAttemptDecryption = event.shouldAttemptDecryption();
         if (
             event.getType().indexOf("m.call.") === 0 ||
             event.getType().indexOf("org.matrix.call.") === 0
-            || event.isBeingDecrypted()
+            || isBeingDecrypted || shouldAttemptDecryption
         ) {
             // queue up for processing once all events from this sync have been
             // processed (see above).
             this.callEventBuffer.push(event);
         }
 
-        if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
+        if (event.isDecryptionFailure() || isBeingDecrypted || shouldAttemptDecryption) {
             // add an event listener for once the event is decrypted.
             event.once("Event.decrypted", () => {
                 if (event.getType().indexOf("m.call.") === -1) return;

@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import {logger} from '../logger';
-import * as utils from '../utils';
 
 /**
  * Internal module. Management of outgoing room key requests.
@@ -496,7 +495,7 @@ function stringifyRequestBody(requestBody) {
 
 function stringifyRecipientList(recipients) {
     return '['
-        + utils.map(recipients, (r) => `${r.userId}:${r.deviceId}`).join(",")
+        + recipients.map((r) => `${r.userId}:${r.deviceId}`).join(",")
         + ']';
 }
 
