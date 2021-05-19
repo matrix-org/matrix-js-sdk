@@ -1,3 +1,34 @@
+Changes in [11.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v11.0.0) (2021-05-17)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v11.0.0-rc.1...v11.0.0)
+
+ * [Release] Fix regressed glare
+   [\#1695](https://github.com/matrix-org/matrix-js-sdk/pull/1695)
+
+Changes in [11.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v11.0.0-rc.1) (2021-05-11)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v10.1.0...v11.0.0-rc.1)
+
+BREAKING CHANGES
+---
+
+ * `MatrixCall` and related APIs have been redesigned to support multiple streams 
+   (see [\#1660](https://github.com/matrix-org/matrix-js-sdk/pull/1660) for more details)
+
+All changes
+---
+
+ * Switch from MSC1772 unstable prefixes to stable
+   [\#1679](https://github.com/matrix-org/matrix-js-sdk/pull/1679)
+ * Update the VoIP example to work with the new changes
+   [\#1680](https://github.com/matrix-org/matrix-js-sdk/pull/1680)
+ * Bump hosted-git-info from 2.8.8 to 2.8.9
+   [\#1687](https://github.com/matrix-org/matrix-js-sdk/pull/1687)
+ * Support for multiple streams (not MSC3077)
+   [\#1660](https://github.com/matrix-org/matrix-js-sdk/pull/1660)
+ * Tweak missing m.room.create errors to describe their source
+   [\#1683](https://github.com/matrix-org/matrix-js-sdk/pull/1683)
+
 Changes in [10.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v10.1.0) (2021-05-10)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v10.1.0-rc.1...v10.1.0)
