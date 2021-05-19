@@ -55,10 +55,11 @@ export class CallEventHandler {
         this.client.removeListener("event", this.onEvent);
     }
 
-    private evaluateEventBuffer = () => {
+    private evaluateEventBuffer = async () => {
         if (this.client.getSyncState() === "SYNCING") {
-            // don't process any events until they are all decrypted
-            if (this.callEventBuffer.some((e) => e.isBeingDecrypted())) return;
+            await Promise.all(this.callEventBuffer.map(event => {
+                this.client.decryptEventIfNeeded(event);
+            }));
 
             const ignoreCallIds = new Set<String>();
             // inspect the buffer and mark all calls which have been answered
@@ -88,15 +89,37 @@ export class CallEventHandler {
         }
     }
 
-    private onEvent = async (event: MatrixEvent) => {
-        await this.client.decryptEventIfNeeded(event);
+    private onEvent = (event: MatrixEvent) => {
+        this.client.decryptEventIfNeeded(event);
+        // any call events or ones that might be once they're decrypted
         if (
             event.getType().indexOf("m.call.") === 0 ||
             event.getType().indexOf("org.matrix.call.") === 0
+            || event.isBeingDecrypted()
         ) {
             // queue up for processing once all events from this sync have been
             // processed (see above).
             this.callEventBuffer.push(event);
+        }
+
+        if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
+            // add an event listener for once the event is decrypted.
+            event.once("Event.decrypted", () => {
+                if (event.getType().indexOf("m.call.") === -1) return;
+
+                if (this.callEventBuffer.includes(event)) {
+                    // we were waiting for that event to decrypt, so recheck the buffer
+                    this.evaluateEventBuffer();
+                } else {
+                    // This one wasn't buffered so just run the event handler for it
+                    // straight away
+                    try {
+                        this.handleCallEvent(event);
+                    } catch (e) {
+                        logger.error("Caught exception handling call event", e);
+                    }
+                }
+            });
         }
     }
 
