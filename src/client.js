@@ -353,6 +353,10 @@ export function MatrixClient(opts) {
     if (call) {
         this._callEventHandler = new CallEventHandler(this);
         this._supportsVoip = true;
+        // Start listening for calls after the initial sync is done
+        // We do not need to backfill the call event buffer
+        // with encrypted events that might never get decrypted
+        this.once("sync", () => this._callEventHandler.start());
     } else {
         this._callEventHandler = null;
     }
