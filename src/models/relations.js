@@ -41,6 +41,7 @@ export class Relations extends EventEmitter {
         super();
         this.relationType = relationType;
         this.eventType = eventType;
+        this._relationEventIds = new Set();
         this._relations = new Set();
         this._annotationsByKey = {};
         this._annotationsBySender = {};
@@ -56,7 +57,7 @@ export class Relations extends EventEmitter {
      * The new relation event to be added.
      */
     async addEvent(event) {
-        if (this._relations.has(event)) {
+        if (this._relationEventIds.has(event.getId())) {
             return;
         }
 
@@ -81,6 +82,7 @@ export class Relations extends EventEmitter {
         }
 
         this._relations.add(event);
+        this._relationEventIds.add(event.getId());
 
         if (this.relationType === "m.annotation") {
             this._addAnnotationToAggregation(event);
