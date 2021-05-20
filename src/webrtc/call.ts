@@ -1080,6 +1080,7 @@ export class MatrixCall extends EventEmitter {
 
         let myAnswer;
         try {
+            this.getRidOfRTXCodecs();
             myAnswer = await this.peerConn.createAnswer();
         } catch (err) {
             logger.debug("Failed to create answer: ", err);
@@ -1306,6 +1307,7 @@ export class MatrixCall extends EventEmitter {
                 for (const tranceiver of this.peerConn.getTransceivers()) {
                     tranceiver.direction = this.isRemoteOnHold() ? 'inactive' : 'sendrecv';
                 }
+                this.getRidOfRTXCodecs();
                 const localDescription = await this.peerConn.createAnswer();
                 await this.peerConn.setLocalDescription(localDescription);
                 // Now we've got our answer, set the direction to the outcome of the negotiation.
