@@ -347,7 +347,7 @@ export function removeHiddenChars(str: string): string {
 }
 
 export function normalize(str: string): string {
-    // Note: we have to match the filter with the removeHiddenChars() room name because the
+    // Note: we have to match the filter with the removeHiddenChars() because the
     // function strips spaces and other characters (M becomes RN for example, in lowercase).
     return removeHiddenChars(str.toLowerCase())
         // Strip all punctuation
