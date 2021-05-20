@@ -31,6 +31,7 @@ import {RoomSummary} from "./room-summary";
 import {logger} from '../logger';
 import {ReEmitter} from '../ReEmitter';
 import {EventType, RoomCreateTypeField, RoomType} from "../@types/event";
+import { normalize } from "../utils";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -102,6 +103,7 @@ function synthesizeReceipt(userId, event, receiptType) {
  *
  * @prop {string} roomId The ID of this room.
  * @prop {string} name The human-readable display name for this room.
+ * @prop {string} normalizedName The unhomoglyphed name for this room.
  * @prop {Array<MatrixEvent>} timeline The live event timeline for this room,
  * with the oldest event at index 0. Present for backwards compatibility -
  * prefer getLiveTimeline().getEvents().
@@ -216,6 +218,10 @@ export function Room(roomId, client, myUserId, opts) {
     } else {
         this._membersPromise = null;
     }
+
+    // flags to stop logspam about missing m.room.create events
+    this.getTypeWarning = false;
+    this.getVersionWarning = false;
 }
 
 /**
@@ -280,7 +286,10 @@ Room.prototype.decryptAllEvents = function() {
 Room.prototype.getVersion = function() {
     const createEvent = this.currentState.getStateEvents("m.room.create", "");
     if (!createEvent) {
-        logger.warn("[getVersion] Room " + this.roomId + " does not have an m.room.create event");
+        if (!this.getVersionWarning) {
+            logger.warn("[getVersion] Room " + this.roomId + " does not have an m.room.create event");
+            this.getVersionWarning = true;
+        }
         return '1';
     }
     const ver = createEvent.getContent()['room_version'];
@@ -1720,6 +1729,7 @@ Room.prototype.recalculate = function() {
 
     const oldName = this.name;
     this.name = calculateRoomName(this, this.myUserId);
+    this.normalizedName = normalize(this.name);
     this.summary = new RoomSummary(this.roomId, {
         title: this.name,
     });
@@ -2008,7 +2018,10 @@ Room.prototype.getJoinRule = function() {
 Room.prototype.getType = function() {
     const createEvent = this.currentState.getStateEvents("m.room.create", "");
     if (!createEvent) {
-        logger.warn("[getType] Room " + this.roomId + " does not have an m.room.create event");
+        if (!this.getTypeWarning) {
+            logger.warn("[getType] Room " + this.roomId + " does not have an m.room.create event");
+            this.getTypeWarning = true;
+        }
         return undefined;
     }
     return createEvent.getContent()[RoomCreateTypeField];

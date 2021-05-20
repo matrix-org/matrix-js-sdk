@@ -2043,7 +2043,10 @@ export function createNewMatrixCall(client: any, roomId: string, options?: CallO
             window.RTCIceCandidate || navigator.mediaDevices,
         );
         if (!supported) {
-            logger.error("WebRTC is not supported in this browser / environment");
+            // Adds a lot of noise to test runs, so disable logging there.
+            if (process.env.NODE_ENV !== "test") {
+                logger.error("WebRTC is not supported in this browser / environment");
+            }
             return null;
         }
     } catch (e) {
