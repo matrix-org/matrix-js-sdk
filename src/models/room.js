@@ -218,6 +218,10 @@ export function Room(roomId, client, myUserId, opts) {
     } else {
         this._membersPromise = null;
     }
+
+    // flags to stop logspam about missing m.room.create events
+    this.getTypeWarning = false;
+    this.getVersionWarning = false;
 }
 
 /**
@@ -282,7 +286,10 @@ Room.prototype.decryptAllEvents = function() {
 Room.prototype.getVersion = function() {
     const createEvent = this.currentState.getStateEvents("m.room.create", "");
     if (!createEvent) {
-        logger.warn("[getVersion] Room " + this.roomId + " does not have an m.room.create event");
+        if (!this.getVersionWarning) {
+            logger.warn("[getVersion] Room " + this.roomId + " does not have an m.room.create event");
+            this.getVersionWarning = true;
+        }
         return '1';
     }
     const ver = createEvent.getContent()['room_version'];
@@ -2011,7 +2018,10 @@ Room.prototype.getJoinRule = function() {
 Room.prototype.getType = function() {
     const createEvent = this.currentState.getStateEvents("m.room.create", "");
     if (!createEvent) {
-        logger.warn("[getType] Room " + this.roomId + " does not have an m.room.create event");
+        if (!this.getTypeWarning) {
+            logger.warn("[getType] Room " + this.roomId + " does not have an m.room.create event");
+            this.getTypeWarning = true;
+        }
         return undefined;
     }
     return createEvent.getContent()[RoomCreateTypeField];
