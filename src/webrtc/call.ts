@@ -555,10 +555,6 @@ export class MatrixCall extends EventEmitter {
 
         this.feeds.splice(this.feeds.indexOf(feed), 1);
         this.emit(CallEvent.FeedsChanged, this.feeds);
-
-        for (const track of stream.getTracks()) {
-            track.stop();
-        }
     }
 
     // The typescript definitions have this type as 'any' :(
@@ -821,6 +817,9 @@ export class MatrixCall extends EventEmitter {
                 this.peerConn.removeTrack(sender);
             }
             this.deleteFeedByStream(this.screenSharingStream);
+            for (const track of this.screensharingSenders.getTracks()) {
+                track.stop();
+            }
             this.screenSharingStream = null;
             return false;
         }
@@ -870,6 +869,9 @@ export class MatrixCall extends EventEmitter {
             sender.replaceTrack(track);
 
             this.deleteFeedByStream(this.screenSharingStream);
+            for (const track of this.screenSharingStream.getTracks()) {
+                track.stop();
+            }
             this.screenSharingStream = null;
 
             return false;
