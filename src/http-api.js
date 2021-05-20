@@ -790,8 +790,6 @@ const requestCallback = function(
     userDefinedCallback = userDefinedCallback || function() {};
 
     return function(err, response, body) {
-        const httpStatus = response.status || response.statusCode; // XMLHttpRequest vs http.IncomingMessage
-
         if (err) {
             // the unit tests use matrix-mock-request, which throw the string "aborted" when aborting a request.
             // See https://github.com/matrix-org/matrix-mock-request/blob/3276d0263a561b5b8326b47bae720578a2c7473a/src/index.js#L48
@@ -805,6 +803,7 @@ const requestCallback = function(
         }
         if (!err) {
             try {
+                const httpStatus = response.status || response.statusCode; // XMLHttpRequest vs http.IncomingMessage
                 if (httpStatus >= 400) {
                     err = parseErrorResponse(response, body);
                 } else if (bodyParser) {
@@ -820,7 +819,7 @@ const requestCallback = function(
             userDefinedCallback(err);
         } else {
             const res = {
-                code: httpStatus,
+                code: response.status || response.statusCode, // XMLHttpRequest vs http.IncomingMessage
 
                 // XXX: why do we bother with this? it doesn't work for
                 // XMLHttpRequest, so clearly we don't use it.
