@@ -31,6 +31,7 @@ import {RoomSummary} from "./room-summary";
 import {logger} from '../logger';
 import {ReEmitter} from '../ReEmitter';
 import {EventType, RoomCreateTypeField, RoomType} from "../@types/event";
+import { normalize } from "../utils";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -102,6 +103,7 @@ function synthesizeReceipt(userId, event, receiptType) {
  *
  * @prop {string} roomId The ID of this room.
  * @prop {string} name The human-readable display name for this room.
+ * @prop {string} normalizedName The unhomoglyphed name for this room.
  * @prop {Array<MatrixEvent>} timeline The live event timeline for this room,
  * with the oldest event at index 0. Present for backwards compatibility -
  * prefer getLiveTimeline().getEvents().
@@ -1720,6 +1722,7 @@ Room.prototype.recalculate = function() {
 
     const oldName = this.name;
     this.name = calculateRoomName(this, this.myUserId);
+    this.normalizedName = normalize(this.name);
     this.summary = new RoomSummary(this.roomId, {
         title: this.name,
     });
