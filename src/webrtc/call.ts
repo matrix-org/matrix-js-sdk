@@ -817,7 +817,7 @@ export class MatrixCall extends EventEmitter {
                 this.peerConn.removeTrack(sender);
             }
             this.deleteFeedByStream(this.screenSharingStream);
-            for (const track of this.screensharingSenders.getTracks()) {
+            for (const track of this.screenSharingStream.getTracks()) {
                 track.stop();
             }
             this.screenSharingStream = null;
