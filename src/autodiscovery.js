@@ -19,6 +19,7 @@ limitations under the License.
 
 import {logger} from './logger';
 import {URL as NodeURL} from "url";
+import * as utils from "./utils";
 
 // Dev note: Auto discovery is part of the spec.
 // See: https://matrix.org/docs/spec/client_server/r0.4.0.html#server-discovery
@@ -248,10 +249,21 @@ export class AutoDiscovery {
             clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_INVALID_HS_BASE_URL;
             return Promise.resolve(clientConfig);
         }
-
+        /// Support sandstorm-style webkeys, where the hash is
+        /// sent as the bearer auth token.
+        const parsed = new URL(hsUrl);
+        const opts = {};
+        if (parsed.hash) {
+            opts.headers = {
+                "Authorization": "Bearer " + parsed.hash.replace(/^#/, ''),
+            };
+        }
+        parsed.pathname = parsed.pathname.replace(/\/$/, '') +
+            '/_matrix/client/versions';
         // Step 3: Make sure the homeserver URL points to a homeserver.
         const hsVersions = await this._fetchWellKnownObject(
-            `${hsUrl}/_matrix/client/versions`,
+            parsed.toString(),
+            opts,
         );
         if (!hsVersions || !hsVersions.raw["versions"]) {
             logger.error("Invalid /versions response");
@@ -301,6 +313,7 @@ export class AutoDiscovery {
             // URL.
             const isResponse = await this._fetchWellKnownObject(
                 `${isUrl}/_matrix/identity/api/v1`,
+                opts,
             );
             if (!isResponse || !isResponse.raw || isResponse.action !== "SUCCESS") {
                 logger.error("Invalid /api/v1 response");
@@ -472,6 +485,10 @@ export class AutoDiscovery {
             if (saferUrl.endsWith("/")) {
                 saferUrl = saferUrl.substring(0, saferUrl.length - 1);
             }
+            // preserve hash, if present, since it can be used as a webkey.
+            if (parsed.hash) {
+                saferUrl = saferUrl + parsed.hash;
+            }
             return saferUrl;
         } catch (e) {
             logger.error(e);
@@ -492,15 +509,20 @@ export class AutoDiscovery {
      *   reason: Relatively human readable description of what went wrong.
      *   error: The actual Error, if one exists.
      * @param {string} url The URL to fetch a JSON object from.
+     * @param {object} extraOpts Optional object of extra request options.
      * @return {Promise<object>} Resolves to the returned state.
      * @private
      */
-    static async _fetchWellKnownObject(url) {
+    static async _fetchWellKnownObject(url, extraOpts) {
         return new Promise(function(resolve, reject) {
             const request = require("./matrix").getRequest();
             if (!request) throw new Error("No request library available");
+            const opts = utils.extend(
+                { method: "GET", uri: url, timeout: 25000 },
+                extraOpts || {},
+            );
             request(
-                { method: "GET", uri: url, timeout: 5000 },
+                opts,
                 (err, response, body) => {
                     if (err || response &&
                         (response.statusCode < 200 || response.statusCode >= 300)

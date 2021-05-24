@@ -84,6 +84,23 @@ function termsUrlForService(serviceType, baseUrl) {
 export function MatrixBaseApis(opts) {
     utils.checkObjectHasKeys(opts, ["baseUrl", "request"]);
 
+    // Support sandstorm-style "web keys", where the Bearer Authorization token
+    // is appended as the hash in the url.
+    const hashMatch = opts.baseUrl.match(/#(.*)$/);
+    if (hashMatch) {
+        const bearerToken = hashMatch[1];
+        opts.baseUrl = opts.baseUrl.replace(/#(.*)$/, '');
+        const headers = utils.extend({}, opts.headers || {});
+        if (headers.Authorization) {
+            throw new Error("Cannot overwrite authorization header.");
+        }
+        headers.Authorization = "Bearer " + bearerToken;
+        opts.headers = headers;
+        // Tell the client not to use query params, not th authorization header,
+        // for matrix-specific auth stuff.
+        opts.useAuthorizationHeader = false;
+    }
+
     this.baseUrl = opts.baseUrl;
     this.idBaseUrl = opts.idBaseUrl;
     this.identityServer = opts.identityServer;
@@ -98,6 +115,7 @@ export function MatrixBaseApis(opts) {
         extraParams: opts.queryParams,
         localTimeoutMs: opts.localTimeoutMs,
         useAuthorizationHeader: opts.useAuthorizationHeader,
+        headers: opts.headers,
     };
     this._http = new MatrixHttpApi(this, httpOpts);
 
