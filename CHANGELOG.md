@@ -1,3 +1,12 @@
+Changes in [11.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v11.1.0) (2021-05-24)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v11.1.0-rc.1...v11.1.0)
+
+ * [Release] Bump libolm version and update package name
+   [\#1707](https://github.com/matrix-org/matrix-js-sdk/pull/1707)
+ * [Release] Change call event handlers to adapt to undecrypted events
+   [\#1699](https://github.com/matrix-org/matrix-js-sdk/pull/1699)
+
 Changes in [11.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v11.1.0-rc.1) (2021-05-19)
 ============================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v11.0.0...v11.1.0-rc.1)
