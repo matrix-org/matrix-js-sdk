@@ -35,6 +35,7 @@ import {StubStore} from "./store/stub";
 import {createNewMatrixCall} from "./webrtc/call";
 import {CallEventHandler} from './webrtc/callEventHandler';
 import * as utils from './utils';
+import {sleep} from './utils';
 import {
     MatrixError,
     PREFIX_MEDIA_R0,

@@ -26,7 +26,6 @@ import {EventEmitter} from 'events';
 import {ReEmitter} from '../ReEmitter';
 import {logger} from '../logger';
 import * as utils from "../utils";
-import {sleep} from "../utils";
 import {OlmDevice} from "./OlmDevice";
 import * as olmlib from "./olmlib";
 import {DeviceList} from "./DeviceList";
