@@ -48,6 +48,7 @@ export class Relations extends EventEmitter {
         this._sortedAnnotationsByKey = [];
         this._targetEvent = null;
         this._room = room;
+        this._creationEmitted = false;
     }
 
     /**
@@ -94,6 +95,8 @@ export class Relations extends EventEmitter {
         event.on("Event.beforeRedaction", this._onBeforeRedaction);
 
         this.emit("Relations.add", event);
+
+        this._maybeEmitCreated();
     }
 
     /**
@@ -345,6 +348,7 @@ export class Relations extends EventEmitter {
             return;
         }
         this._targetEvent = event;
+
         if (this.relationType === "m.replace") {
             const replacement = await this.getLastReplacement();
             // this is the initial update, so only call it if we already have something
@@ -353,5 +357,24 @@ export class Relations extends EventEmitter {
                 this._targetEvent.makeReplaced(replacement);
             }
         }
+
+        this._maybeEmitCreated();
+    }
+
+    _maybeEmitCreated() {
+        if (this._creationEmitted) {
+            return;
+        }
+        // Only emit we're "created" once we have a target event instance _and_
+        // at least one related event.
+        if (!this._targetEvent || !this._relations.size) {
+            return;
+        }
+        this._creationEmitted = true;
+        this._targetEvent.emit(
+            "Event.relationsCreated",
+            this.relationType,
+            this.eventType,
+        );
     }
 }
