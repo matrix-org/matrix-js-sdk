@@ -376,7 +376,7 @@ describe("Secrets", function() {
                 ]);
                 this.emit("accountData", event);
             };
-            bob._crypto.checkKeyBackup = async () => {};
+            bob._crypto._backupManager.checkKeyBackup = async () => {};
 
             const crossSigning = bob._crypto._crossSigningInfo;
             const secretStorage = bob._crypto._secretStorage;
