@@ -1827,7 +1827,7 @@ MatrixClient.prototype.enableKeyBackup = async function(info) {
         throw new Error("End-to-end encryption disabled");
     }
 
-    await this._crypto.backupManager.enableKeyBackup();
+    await this._crypto._backupManager.enableKeyBackup(info);
 };
 
 /**
@@ -1838,7 +1838,7 @@ MatrixClient.prototype.disableKeyBackup = function() {
         throw new Error("End-to-end encryption disabled");
     }
 
-    this._crypto.backupManager.disableKeyBackup();
+    this._crypto._backupManager.disableKeyBackup();
 };
 
 /**

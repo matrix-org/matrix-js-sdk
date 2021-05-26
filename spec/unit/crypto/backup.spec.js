@@ -28,6 +28,7 @@ import * as testUtils from "../../test-utils";
 import {OlmDevice} from "../../../src/crypto/OlmDevice";
 import {Crypto} from "../../../src/crypto";
 import {resetCrossSigningKeys} from "./crypto-utils";
+import {BackupManager} from "../../../src/crypto/backup";
 
 const Olm = global.Olm;
 
@@ -73,7 +74,7 @@ const KEY_BACKUP_DATA = {
 };
 
 const BACKUP_INFO = {
-    algorithm: "m.megolm_backup.v1",
+    algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
     version: 1,
     auth_data: {
         public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
@@ -138,6 +139,7 @@ describe("MegolmBackup", function() {
     let megolmDecryption;
     beforeEach(async function() {
         mockCrypto = testUtils.mock(Crypto, 'Crypto');
+        mockCrypto._backupManager = testUtils.mock(BackupManager, "BackupManager");
         mockCrypto.backupKey = new Olm.PkEncryption();
         mockCrypto.backupKey.set_recipient_key(
             "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
@@ -215,12 +217,14 @@ describe("MegolmBackup", function() {
             };
             mockCrypto.cancelRoomKeyRequest = function() {};
 
-            mockCrypto.backupGroupSession = jest.fn();
+            mockCrypto._backupManager = {
+                backupGroupSession: jest.fn(),
+            };
 
             return event.attemptDecryption(mockCrypto).then(() => {
                 return megolmDecryption.onRoomKeyEvent(event);
             }).then(() => {
-                expect(mockCrypto.backupGroupSession).toHaveBeenCalled();
+                expect(mockCrypto._backupManager.backupGroupSession).toHaveBeenCalled();
             });
         });
 
@@ -264,7 +268,7 @@ describe("MegolmBackup", function() {
                 })
                 .then(() => {
                     client.enableKeyBackup({
-                        algorithm: "m.megolm_backup.v1",
+                        algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
                         version: 1,
                         auth_data: {
                             public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
@@ -292,12 +296,9 @@ describe("MegolmBackup", function() {
                             resolve();
                             return Promise.resolve({});
                         };
-                        client._crypto.backupGroupSession(
-                            "roomId",
+                        client._crypto._backupManager.backupGroupSession(
                             "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
-                            [],
                             groupSession.session_id(),
-                            groupSession.session_key(),
                         );
                     }).then(() => {
                         expect(numCalls).toBe(1);
@@ -335,39 +336,48 @@ describe("MegolmBackup", function() {
             });
             await resetCrossSigningKeys(client);
             let numCalls = 0;
-            await new Promise((resolve, reject) => {
-                client._http.authedRequest = function(
-                    callback, method, path, queryParams, data, opts,
-                ) {
-                    ++numCalls;
-                    expect(numCalls).toBeLessThanOrEqual(1);
-                    if (numCalls >= 2) {
-                        // exit out of retry loop if there's something wrong
-                        reject(new Error("authedRequest called too many timmes"));
-                        return Promise.resolve({});
-                    }
-                    expect(method).toBe("POST");
-                    expect(path).toBe("/room_keys/version");
-                    try {
-                        // make sure auth_data is signed by the master key
-                        olmlib.pkVerify(
-                            data.auth_data, client.getCrossSigningId(), "@alice:bar",
-                        );
-                    } catch (e) {
-                        reject(e);
-                        return Promise.resolve({});
-                    }
-                    resolve();
-                    return Promise.resolve({});
-                };
+            await Promise.all([
+                new Promise((resolve, reject) => {
+                    let backupInfo;
+                    client._http.authedRequest = function(
+                        callback, method, path, queryParams, data, opts,
+                    ) {
+                        ++numCalls;
+                        expect(numCalls).toBeLessThanOrEqual(2);
+                        if (numCalls === 1) {
+                            expect(method).toBe("POST");
+                            expect(path).toBe("/room_keys/version");
+                            try {
+                                // make sure auth_data is signed by the master key
+                                olmlib.pkVerify(
+                                    data.auth_data, client.getCrossSigningId(), "@alice:bar",
+                                );
+                            } catch (e) {
+                                reject(e);
+                                return Promise.resolve({});
+                            }
+                            backupInfo = data;
+                            return Promise.resolve({});
+                        } else if (numCalls === 2) {
+                            expect(method).toBe("GET");
+                            expect(path).toBe("/room_keys/version");
+                            resolve();
+                            return Promise.resolve(backupInfo);
+                        } else {
+                            // exit out of retry loop if there's something wrong
+                            reject(new Error("authedRequest called too many times"));
+                            return Promise.resolve({});
+                        }
+                    };
+                }),
                 client.createKeyBackupVersion({
-                    algorithm: "m.megolm_backup.v1",
+                    algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
                     auth_data: {
                         public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
                     },
-                });
-            });
-            expect(numCalls).toBe(1);
+                }),
+            ]);
+            expect(numCalls).toBe(2);
         });
 
         it('retries when a backup fails', function() {
@@ -434,7 +444,7 @@ describe("MegolmBackup", function() {
                 })
                 .then(() => {
                     client.enableKeyBackup({
-                        algorithm: "foobar",
+                        algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
                         version: 1,
                         auth_data: {
                             public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
@@ -468,12 +478,9 @@ describe("MegolmBackup", function() {
                                 );
                             }
                         };
-                        client._crypto.backupGroupSession(
-                            "roomId",
+                        client._crypto._backupManager.backupGroupSession(
                             "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
-                            [],
                             groupSession.session_id(),
-                            groupSession.session_key(),
                         );
                     }).then(() => {
                         expect(numCalls).toBe(2);
