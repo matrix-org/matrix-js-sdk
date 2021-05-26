@@ -27,6 +27,7 @@ import { LocalIndexedDBStoreBackend } from "./store/indexeddb-local-backend";
 import { RemoteIndexedDBStoreBackend } from "./store/indexeddb-remote-backend";
 import { MatrixScheduler } from "./scheduler";
 import { MatrixClient } from "./client";
+import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
 
 export * from "./client";
 export * from "./http-api";
@@ -113,19 +114,95 @@ export function setCryptoStoreFactory(fac) {
 
 export interface ICreateClientOpts {
     baseUrl: string;
+
     idBaseUrl?: string;
+
+    /**
+     * The data store used for sync data from the homeserver. If not specified,
+     * this client will not store any HTTP responses. The `createClient` helper
+     * will create a default store if needed.
+     */
     store?: Store;
+
+    /**
+     * A store to be used for end-to-end crypto session data. If not specified,
+     * end-to-end crypto will be disabled. The `createClient` helper will create
+     * a default store if needed.
+     */
     cryptoStore?: CryptoStore;
+
+    /**
+     * The scheduler to use. If not
+     * specified, this client will not retry requests on failure. This client
+     * will supply its own processing function to
+     * {@link module:scheduler~MatrixScheduler#setProcessFunction}.
+     */
     scheduler?: MatrixScheduler;
+
+    /**
+     * The function to invoke for HTTP
+     * requests. The value of this property is typically <code>require("request")
+     * </code> as it returns a function which meets the required interface. See
+     * {@link requestFunction} for more information.
+     */
     request?: Request;
+
     userId?: string;
+
+    /**
+     * A unique identifier for this device; used for tracking things like crypto
+     * keys and access tokens. If not specified, end-to-end encryption will be
+     * disabled.
+     */
     deviceId?: string;
+
     accessToken?: string;
-    identityServer?: any;
+
+    /**
+     * Identity server provider to retrieve the user's access token when accessing
+     * the identity server. See also https://github.com/vector-im/element-web/issues/10615
+     * which seeks to replace the previous approach of manual access tokens params
+     * with this callback throughout the SDK.
+     */
+    identityServer?: IIdentityServerProvider;
+
+    /**
+     * The default maximum amount of
+     * time to wait before timing out HTTP requests. If not specified, there is no timeout.
+     */
     localTimeoutMs?: number;
+
+    /**
+     * Set to true to use
+     * Authorization header instead of query param to send the access token to the server.
+     *
+     * Default false.
+     */
     useAuthorizationHeader?: boolean;
+
+    /**
+     * Set to true to enable
+     * improved timeline support ({@link module:client~MatrixClient#getEventTimeline getEventTimeline}). It is
+     * disabled by default for compatibility with older clients - in particular to
+     * maintain support for back-paginating the live timeline after a '/sync'
+     * result with a gap.
+     */
     timelineSupport?: boolean;
+
+    /**
+     * Extra query parameters to append
+     * to all requests with this client. Useful for application services which require
+     * <code>?user_id=</code>.
+     */
     queryParams?: Record<string, unknown>;
+
+    /**
+     * Device data exported with
+     * "exportDevice" method that must be imported to recreate this device.
+     * Should only be useful for devices with end-to-end crypto enabled.
+     * If provided, deviceId and userId should **NOT** be provided at the top
+     * level (they are present in the exported data).
+     */
     deviceToImport?: {
         olmDevice: {
             pickledAccount: string;
@@ -135,14 +212,52 @@ export interface ICreateClientOpts {
         userId: string;
         deviceId: string;
     };
+
+    /**
+     * Key used to pickle olm objects or other sensitive data.
+     */
     pickleKey?: string;
+
+    /**
+     * A store to be used for end-to-end crypto session data. Most data has been
+     * migrated out of here to `cryptoStore` instead. If not specified,
+     * end-to-end crypto will be disabled. The `createClient` helper
+     * _will not_ create this store at the moment.
+     */
     sessionStore?: any;
+
+    /**
+     * Set to true to enable client-side aggregation of event relations
+     * via `EventTimelineSet#getRelationsForEvent`.
+     * This feature is currently unstable and the API may change without notice.
+     */
     unstableClientRelationAggregation?: boolean;
+
     verificationMethods?: Array<any>;
+
+    /**
+     * Whether relaying calls through a TURN server should be forced. Default false.
+     */
     forceTURN?: boolean;
-    iceCandidatePoolSize?: number,
-    supportsCallTransfer?: boolean,
+
+    /**
+     * Up to this many ICE candidates will be gathered when an incoming call arrives.
+     * Gathering does not send data to the caller, but will communicate with the configured TURN
+     * server. Default 0.
+     */
+    iceCandidatePoolSize?: number;
+
+    /**
+     * True to advertise support for call transfers to other parties on Matrix calls. Default false.
+     */
+    supportsCallTransfer?: boolean;
+
+    /**
+     * Whether to allow a fallback ICE server should be used for negotiating a
+     * WebRTC connection if the homeserver doesn't provide any servers. Defaults to false.
+     */
     fallbackICEServerAllowed?: boolean;
+
     cryptoCallbacks?: ICryptoCallbacks;
 }
 
