@@ -189,6 +189,11 @@ export enum CallErrorCode {
      * Signalling for the call could not be sent (other than the initial invite)
      */
     SignallingFailed = 'signalling_timeout',
+
+    /**
+     * The remote party is busy
+     */
+    UserBusy = 'user_busy'
 }
 
 enum ConstraintsType {
@@ -643,7 +648,7 @@ export class MatrixCall extends EventEmitter {
         // Continue to send no reason for user hangups temporarily, until
         // clients understand the user_hangup reason (voip v1)
         if (reason !== CallErrorCode.UserHangup) content['reason'] = reason;
-        this.sendVoipEvent(EventType.CallHangup, {});
+        this.sendVoipEvent(EventType.CallHangup, content);
     }
 
     /**
@@ -1375,7 +1380,7 @@ export class MatrixCall extends EventEmitter {
         );
 
         if (shouldTerminate) {
-            this.terminate(CallParty.Remote, CallErrorCode.UserHangup, true);
+            this.terminate(CallParty.Remote, msg.reason || CallErrorCode.UserHangup, true);
         } else {
             logger.debug(`Call is in state: ${this.state}: ignoring reject`);
         }
