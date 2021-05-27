@@ -1523,28 +1523,28 @@ export class MatrixCall extends EventEmitter {
      */
     private getRidOfRTXCodecs() {
         // RTCRtpReceiver.getCapabilities and RTCRtpSender.getCapabilities don't seem to be supported on FF
-        if (RTCRtpReceiver.getCapabilities && RTCRtpSender.getCapabilities) {
-            const recvCodecs = RTCRtpReceiver.getCapabilities("video").codecs;
-            const sendCodecs = RTCRtpSender.getCapabilities("video").codecs;
-            const codecs = [...sendCodecs, ...recvCodecs];
+        if (!RTCRtpReceiver.getCapabilities || !RTCRtpSender.getCapabilities) return;
 
-            for (const codec of codecs) {
-                if (codec.mimeType === "video/rtx") {
-                    const rtxCodecIndex = codecs.indexOf(codec);
-                    codecs.splice(rtxCodecIndex, 1);
-                }
+        const recvCodecs = RTCRtpReceiver.getCapabilities("video").codecs;
+        const sendCodecs = RTCRtpSender.getCapabilities("video").codecs;
+        const codecs = [...sendCodecs, ...recvCodecs];
+
+        for (const codec of codecs) {
+            if (codec.mimeType === "video/rtx") {
+                const rtxCodecIndex = codecs.indexOf(codec);
+                codecs.splice(rtxCodecIndex, 1);
             }
+        }
 
-            for (const trans of this.peerConn.getTransceivers()) {
-                if (
-                    this.screensharingSenders.includes(trans.sender) &&
+        for (const trans of this.peerConn.getTransceivers()) {
+            if (
+                this.screensharingSenders.includes(trans.sender) &&
                     (
                         trans.sender.track?.kind === "video" ||
                         trans.receiver.track?.kind === "video"
                     )
-                ) {
-                    trans.setCodecPreferences(codecs);
-                }
+            ) {
+                trans.setCodecPreferences(codecs);
             }
         }
     }
