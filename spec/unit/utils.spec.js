@@ -26,40 +26,6 @@ describe("utils", function() {
         });
     });
 
-    describe("forEach", function() {
-        it("should be invoked for each element", function() {
-            const arr = [];
-            utils.forEach([55, 66, 77], function(element) {
-                arr.push(element);
-            });
-            expect(arr).toEqual([55, 66, 77]);
-        });
-    });
-
-    describe("findElement", function() {
-        it("should find only 1 element if there is a match", function() {
-            const matchFn = function() {
-                return true;
-            };
-            const arr = [55, 66, 77];
-            expect(utils.findElement(arr, matchFn)).toEqual(55);
-        });
-        it("should be able to find in reverse order", function() {
-            const matchFn = function() {
-                return true;
-            };
-            const arr = [55, 66, 77];
-            expect(utils.findElement(arr, matchFn, true)).toEqual(77);
-        });
-        it("should find nothing if the function never returns true", function() {
-            const matchFn = function() {
-                return false;
-            };
-            const arr = [55, 66, 77];
-            expect(utils.findElement(arr, matchFn)).toBeFalsy();
-        });
-    });
-
     describe("removeElement", function() {
         it("should remove only 1 element if there is a match", function() {
             const matchFn = function() {
@@ -100,20 +66,6 @@ describe("utils", function() {
             expect(utils.isFunction(function() {})).toBe(true);
             const s = { foo: function() {} };
             expect(utils.isFunction(s.foo)).toBe(true);
-        });
-    });
-
-    describe("isArray", function() {
-        it("should return true for arrays", function() {
-            expect(utils.isArray([])).toBe(true);
-            expect(utils.isArray([5, 3, 7])).toBe(true);
-
-            expect(utils.isArray()).toBe(false);
-            expect(utils.isArray(null)).toBe(false);
-            expect(utils.isArray({})).toBe(false);
-            expect(utils.isArray("foo")).toBe(false);
-            expect(utils.isArray(555)).toBe(false);
-            expect(utils.isArray(function() {})).toBe(false);
         });
     });
 

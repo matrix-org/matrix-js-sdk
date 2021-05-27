@@ -803,7 +803,8 @@ const requestCallback = function(
         }
         if (!err) {
             try {
-                if (response.statusCode >= 400) {
+                const httpStatus = response.status || response.statusCode; // XMLHttpRequest vs http.IncomingMessage
+                if (httpStatus >= 400) {
                     err = parseErrorResponse(response, body);
                 } else if (bodyParser) {
                     body = bodyParser(body);
@@ -818,7 +819,7 @@ const requestCallback = function(
             userDefinedCallback(err);
         } else {
             const res = {
-                code: response.statusCode,
+                code: response.status || response.statusCode, // XMLHttpRequest vs http.IncomingMessage
 
                 // XXX: why do we bother with this? it doesn't work for
                 // XMLHttpRequest, so clearly we don't use it.
@@ -842,7 +843,7 @@ const requestCallback = function(
  * @returns {Error}
  */
 function parseErrorResponse(response, body) {
-    const httpStatus = response.statusCode;
+    const httpStatus = response.status || response.statusCode; // XMLHttpRequest vs http.IncomingMessage
     const contentType = getResponseContentType(response);
 
     let err;

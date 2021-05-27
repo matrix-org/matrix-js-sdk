@@ -210,18 +210,21 @@ MockStorageApi.prototype = {
  * @returns {Promise} promise which resolves (to `event`) when the event has been decrypted
  */
 export function awaitDecryption(event) {
-    if (!event.isBeingDecrypted()) {
-        return Promise.resolve(event);
-    }
+    // An event is not always decrypted ahead of time
+    // getClearContent is a good signal to know whether an event has been decrypted
+    // already
+    if (event.getClearContent() !== null) {
+        return event;
+    } else {
+        logger.log(`${Date.now()} event ${event.getId()} is being decrypted; waiting`);
 
-    logger.log(`${Date.now()} event ${event.getId()} is being decrypted; waiting`);
-
-    return new Promise((resolve, reject) => {
-        event.once('Event.decrypted', (ev) => {
-            logger.log(`${Date.now()} event ${event.getId()} now decrypted`);
-            resolve(ev);
+        return new Promise((resolve, reject) => {
+            event.once('Event.decrypted', (ev) => {
+                logger.log(`${Date.now()} event ${event.getId()} now decrypted`);
+                resolve(ev);
+            });
         });
-    });
+    }
 }
 
 export function HttpResponse(

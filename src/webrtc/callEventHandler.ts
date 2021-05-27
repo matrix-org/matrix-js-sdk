@@ -43,6 +43,9 @@ export class CallEventHandler {
         // after loading and after we've been offline for a bit.
         this.callEventBuffer = [];
         this.candidateEventsByCall = new Map<string, Array<MatrixEvent>>();
+    }
+
+    public start() {
         this.client.on("sync", this.evaluateEventBuffer);
         this.client.on("event", this.onEvent);
     }
@@ -52,10 +55,11 @@ export class CallEventHandler {
         this.client.removeListener("event", this.onEvent);
     }
 
-    private evaluateEventBuffer = () => {
+    private evaluateEventBuffer = async () => {
         if (this.client.getSyncState() === "SYNCING") {
-            // don't process any events until they are all decrypted
-            if (this.callEventBuffer.some((e) => e.isBeingDecrypted())) return;
+            await Promise.all(this.callEventBuffer.map(event => {
+                this.client.decryptEventIfNeeded(event);
+            }));
 
             const ignoreCallIds = new Set<String>();
             // inspect the buffer and mark all calls which have been answered
@@ -86,6 +90,7 @@ export class CallEventHandler {
     }
 
     private onEvent = (event: MatrixEvent) => {
+        this.client.decryptEventIfNeeded(event);
         // any call events or ones that might be once they're decrypted
         if (
             event.getType().indexOf("m.call.") === 0 ||

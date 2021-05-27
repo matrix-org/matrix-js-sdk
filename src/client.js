@@ -352,6 +352,10 @@ export function MatrixClient(opts) {
     if (call) {
         this._callEventHandler = new CallEventHandler(this);
         this._supportsVoip = true;
+        // Start listening for calls after the initial sync is done
+        // We do not need to backfill the call event buffer
+        // with encrypted events that might never get decrypted
+        this.on("sync", this._startCallEventHandler);
     } else {
         this._callEventHandler = null;
     }
@@ -3971,9 +3975,9 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
                 limit,
                 'b');
         }).then(function(res) {
-            const matrixEvents = utils.map(res.chunk, _PojoToMatrixEventMapper(self));
+            const matrixEvents = res.chunk.map(_PojoToMatrixEventMapper(self));
             if (res.state) {
-                const stateEvents = utils.map(res.state, _PojoToMatrixEventMapper(self));
+                const stateEvents = res.state.map(_PojoToMatrixEventMapper(self));
                 room.currentState.setUnknownStateEvents(stateEvents);
             }
             room.addEventsToTimeline(matrixEvents, true, room.getLiveTimeline());
@@ -4062,16 +4066,16 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
         const events = res.events_after
             .concat([res.event])
             .concat(res.events_before);
-        const matrixEvents = utils.map(events, self.getEventMapper());
+        const matrixEvents = events.map(self.getEventMapper());
 
         let timeline = timelineSet.getTimelineForEvent(matrixEvents[0].getId());
         if (!timeline) {
             timeline = timelineSet.addTimeline();
-            timeline.initialiseState(utils.map(res.state,
+            timeline.initialiseState(res.state.map(
                                                self.getEventMapper()));
             timeline.getState(EventTimeline.FORWARDS).paginationToken = res.end;
         } else {
-            const stateEvents = utils.map(res.state, self.getEventMapper());
+            const stateEvents = res.state.map(self.getEventMapper());
             timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(stateEvents);
         }
         timelineSet.addEventsToTimeline(matrixEvents, true, timeline, res.start);
@@ -4234,11 +4238,11 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
         promise.then(function(res) {
             if (res.state) {
                 const roomState = eventTimeline.getState(dir);
-                const stateEvents = utils.map(res.state, self.getEventMapper());
+                const stateEvents = res.state.map(self.getEventMapper());
                 roomState.setUnknownStateEvents(stateEvents);
             }
             const token = res.end;
-            const matrixEvents = utils.map(res.chunk, self.getEventMapper());
+            const matrixEvents = res.chunk.map(self.getEventMapper());
             eventTimeline.getTimelineSet()
                 .addEventsToTimeline(matrixEvents, backwards, eventTimeline, token);
 
@@ -4977,6 +4981,13 @@ MatrixClient.prototype.getOpenIdToken = function() {
 // VoIP operations
 // ===============
 
+MatrixClient.prototype._startCallEventHandler = function() {
+    if (this.isInitialSyncComplete()) {
+        this._callEventHandler.start();
+        this.off("sync", this._startCallEventHandler);
+    }
+};
+
 /**
  * @param {module:client.callback} callback Optional.
  * @return {Promise} Resolves: TODO
@@ -5544,8 +5555,9 @@ function _resolve(callback, resolve, res) {
     resolve(res);
 }
 
-function _PojoToMatrixEventMapper(client, options) {
-    const preventReEmit = Boolean(options && options.preventReEmit);
+function _PojoToMatrixEventMapper(client, options = {}) {
+    const preventReEmit = Boolean(options.preventReEmit);
+    const decrypt = options.decrypt !== false;
     function mapper(plainOldJsObject) {
         const event = new MatrixEvent(plainOldJsObject);
         if (event.isEncrypted()) {
@@ -5554,7 +5566,9 @@ function _PojoToMatrixEventMapper(client, options) {
                     "Event.decrypted",
                 ]);
             }
-            event.attemptDecryption(client._crypto);
+            if (decrypt) {
+                client.decryptEventIfNeeded(event);
+            }
         }
         if (!preventReEmit) {
             client.reEmitter.reEmit(event, ["Event.replaced"]);
@@ -5567,6 +5581,7 @@ function _PojoToMatrixEventMapper(client, options) {
 /**
  * @param {object} [options]
  * @param {bool} options.preventReEmit don't reemit events emitted on an event mapped by this mapper on the client
+ * @param {bool} options.decrypt decrypt event proactively
  * @return {Function}
  */
 MatrixClient.prototype.getEventMapper = function(options = undefined) {
@@ -5592,6 +5607,26 @@ MatrixClient.prototype.getCrossSigningCacheCallbacks = function() {
  */
 MatrixClient.prototype.generateClientSecret = function() {
     return randomString(32);
+};
+
+/**
+ * Attempts to decrypt an event
+ * @param {MatrixEvent} event The event to decrypt
+ * @returns {Promise<void>} A decryption promise
+ * @param {object} options
+ * @param {bool} options.isRetry True if this is a retry (enables more logging)
+ * @param {bool} options.emit Emits "event.decrypted" if set to true
+ */
+MatrixClient.prototype.decryptEventIfNeeded = function(event, options) {
+    if (event.shouldAttemptDecryption()) {
+        event.attemptDecryption(this._crypto, options);
+    }
+
+    if (event.isBeingDecrypted()) {
+        return event._decryptionPromise;
+    } else {
+        return Promise.resolve();
+    }
 };
 
 // MatrixClient Event JSDocs

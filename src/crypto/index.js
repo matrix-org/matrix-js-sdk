@@ -186,7 +186,7 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     // map from algorithm to DecryptionAlgorithm instance, for each room
     this._roomDecryptors = {};
 
-    this._supportedAlgorithms = utils.keys(
+    this._supportedAlgorithms = Object.keys(
         algorithms.DECRYPTION_CLASSES,
     );
 
@@ -3317,7 +3317,10 @@ Crypto.prototype._onToDeviceEvent = function(event) {
             this._onKeyVerificationMessage(event);
         } else if (event.getContent().msgtype === "m.bad.encrypted") {
             this._onToDeviceBadEncrypted(event);
-        } else if (event.isBeingDecrypted()) {
+        } else if (event.isBeingDecrypted() || event.shouldAttemptDecryption()) {
+            if (!event.isBeingDecrypted()) {
+                event.attemptDecryption(this);
+            }
             // once the event has been decrypted, try again
             event.once('Event.decrypted', (ev) => {
                 this._onToDeviceEvent(ev);

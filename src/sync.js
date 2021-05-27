@@ -276,20 +276,15 @@ SyncApi.prototype.peek = function(roomId) {
 
         // FIXME: Mostly duplicated from _processRoomEvents but not entirely
         // because "state" in this API is at the BEGINNING of the chunk
-        const oldStateEvents = utils.map(
-            utils.deepCopy(response.state), client.getEventMapper(),
-        );
-        const stateEvents = utils.map(
-            response.state, client.getEventMapper(),
-        );
-        const messages = utils.map(
-            response.messages.chunk, client.getEventMapper(),
-        );
+        const oldStateEvents = utils.deepCopy(response.state)
+            .map(client.getEventMapper());
+        const stateEvents = response.state.map(client.getEventMapper());
+        const messages = response.messages.chunk.map(client.getEventMapper());
 
         // XXX: copypasted from /sync until we kill off this
         // minging v1 API stuff)
         // handle presence events (User objects)
-        if (response.presence && utils.isArray(response.presence)) {
+        if (response.presence && Array.isArray(response.presence)) {
             response.presence.map(client.getEventMapper()).forEach(
             function(presenceEvent) {
                 let user = client.store.getUser(presenceEvent.getContent().user_id);
@@ -1004,7 +999,7 @@ SyncApi.prototype._processSyncResponse = async function(
     // - The isBrandNewRoom boilerplate is boilerplatey.
 
     // handle presence events (User objects)
-    if (data.presence && utils.isArray(data.presence.events)) {
+    if (data.presence && Array.isArray(data.presence.events)) {
         data.presence.events.map(client.getEventMapper()).forEach(
         function(presenceEvent) {
             let user = client.store.getUser(presenceEvent.getSender());
@@ -1020,7 +1015,7 @@ SyncApi.prototype._processSyncResponse = async function(
     }
 
     // handle non-room account_data
-    if (data.account_data && utils.isArray(data.account_data.events)) {
+    if (data.account_data && Array.isArray(data.account_data.events)) {
         const events = data.account_data.events.map(client.getEventMapper());
         const prevEventsMap = events.reduce((m, c) => {
             m[c.getId()] = client.store.getAccountData(c.getType());
@@ -1045,7 +1040,7 @@ SyncApi.prototype._processSyncResponse = async function(
     }
 
     // handle to-device events
-    if (data.to_device && utils.isArray(data.to_device.events) &&
+    if (data.to_device && Array.isArray(data.to_device.events) &&
         data.to_device.events.length > 0
        ) {
         const cancelledKeyVerificationTxns = [];
@@ -1156,10 +1151,15 @@ SyncApi.prototype._processSyncResponse = async function(
     await utils.promiseMapSeries(joinRooms, async function(joinObj) {
         const room = joinObj.room;
         const stateEvents = self._mapSyncEventsFormat(joinObj.state, room);
-        const timelineEvents = self._mapSyncEventsFormat(joinObj.timeline, room);
+        // Prevent events from being decrypted ahead of time
+        // this helps large account to speed up faster
+        // room::decryptCriticalEvent is in charge of decrypting all the events
+        // required for a client to function properly
+        const timelineEvents = self._mapSyncEventsFormat(joinObj.timeline, room, false);
         const ephemeralEvents = self._mapSyncEventsFormat(joinObj.ephemeral);
         const accountDataEvents = self._mapSyncEventsFormat(joinObj.account_data);
 
+        const encrypted = client.isRoomEncrypted(room.roomId);
         // we do this first so it's correct when any of the events fire
         if (joinObj.unread_notifications) {
             room.setUnreadNotificationCount(
@@ -1170,7 +1170,6 @@ SyncApi.prototype._processSyncResponse = async function(
             // bother setting it here. We trust our calculations better than the
             // server's for this case, and therefore will assume that our non-zero
             // count is accurate.
-            const encrypted = client.isRoomEncrypted(room.roomId);
             if (!encrypted
                 || (encrypted && room.getUnreadNotificationCount('highlight') <= 0)) {
                 room.setUnreadNotificationCount(
@@ -1292,6 +1291,11 @@ SyncApi.prototype._processSyncResponse = async function(
         });
 
         room.updateMyMembership("join");
+
+        // Decrypt only the last message in all rooms to make sure we can generate a preview
+        // And decrypt all events after the recorded read receipt to ensure an accurate
+        // notification count
+        room.decryptCriticalEvents();
     });
 
     // Handle leaves (e.g. kicked rooms)
@@ -1497,7 +1501,7 @@ SyncApi.prototype._mapSyncResponseToRoomArray = function(obj) {
     // [{stuff+Room+isBrandNewRoom}, {stuff+Room+isBrandNewRoom}]
     const client = this.client;
     const self = this;
-    return utils.keys(obj).map(function(roomId) {
+    return Object.keys(obj).map(function(roomId) {
         const arrObj = obj[roomId];
         let room = client.store.getRoom(roomId);
         let isBrandNewRoom = false;
@@ -1514,13 +1518,14 @@ SyncApi.prototype._mapSyncResponseToRoomArray = function(obj) {
 /**
  * @param {Object} obj
  * @param {Room} room
+ * @param {bool} decrypt
  * @return {MatrixEvent[]}
  */
-SyncApi.prototype._mapSyncEventsFormat = function(obj, room) {
-    if (!obj || !utils.isArray(obj.events)) {
+SyncApi.prototype._mapSyncEventsFormat = function(obj, room, decrypt = true) {
+    if (!obj || !Array.isArray(obj.events)) {
         return [];
     }
-    const mapper = this.client.getEventMapper();
+    const mapper = this.client.getEventMapper({ decrypt });
     return obj.events.map(function(e) {
         if (room) {
             e.room_id = room.roomId;

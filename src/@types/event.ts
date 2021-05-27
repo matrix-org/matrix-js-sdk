@@ -36,9 +36,8 @@ export enum EventType {
      */
     RoomAliases = "m.room.aliases", // deprecated https://matrix.org/docs/spec/client_server/r0.6.1#historical-events
 
-    // Spaces MSC1772
-    SpaceChild = "org.matrix.msc1772.space.child",
-    SpaceParent = "org.matrix.msc1772.space.parent",
+    SpaceChild = "m.space.child",
+    SpaceParent = "m.space.parent",
 
     // Room timeline events
     RoomRedaction = "m.room.redaction",
@@ -62,6 +61,7 @@ export enum EventType {
     KeyVerificationDone = "m.key.verification.done",
     // use of this is discouraged https://matrix.org/docs/spec/client_server/r0.6.1#m-room-message-feedback
     RoomMessageFeedback = "m.room.message.feedback",
+    Reaction = "m.reaction",
 
     // Room ephemeral events
     Typing = "m.typing",
@@ -95,8 +95,8 @@ export enum MsgType {
     Video = "m.video",
 }
 
-export const RoomCreateTypeField = "org.matrix.msc1772.type"; // Spaces MSC1772
+export const RoomCreateTypeField = "type";
 
 export enum RoomType {
-    Space = "org.matrix.msc1772.space", // Spaces MSC1772
+    Space = "m.space",
 }
