@@ -21,11 +21,11 @@ limitations under the License.
  * @module webrtc/call
  */
 
-import {logger} from '../logger';
-import {EventEmitter} from 'events';
+import { logger } from '../logger';
+import { EventEmitter } from 'events';
 import * as utils from '../utils';
 import MatrixEvent from '../models/event';
-import {EventType} from '../@types/event';
+import { EventType } from '../@types/event';
 import { RoomMember } from '../models/room-member';
 import { randomString } from '../randomstring';
 import {
@@ -38,7 +38,6 @@ import {
     SDPStreamMetadataKey,
 } from './callEventTypes';
 import { CallFeed } from './callFeed';
-
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
@@ -1945,7 +1944,7 @@ function getUserMediaContraints(type: ConstraintsType) {
         case ConstraintsType.Audio: {
             return {
                 audio: {
-                    deviceId: audioInput ? {ideal: audioInput} : undefined,
+                    deviceId: audioInput ? { ideal: audioInput } : undefined,
                 },
                 video: false,
             };
@@ -1953,9 +1952,9 @@ function getUserMediaContraints(type: ConstraintsType) {
         case ConstraintsType.Video: {
             return {
                 audio: {
-                    deviceId: audioInput ? {ideal: audioInput} : undefined,
+                    deviceId: audioInput ? { ideal: audioInput } : undefined,
                 }, video: {
-                    deviceId: videoInput ? {ideal: videoInput} : undefined,
+                    deviceId: videoInput ? { ideal: videoInput } : undefined,
                     /* We want 640x360.  Chrome will give it only if we ask exactly,
                        FF refuses entirely if we ask exactly, so have to ask for ideal
                        instead

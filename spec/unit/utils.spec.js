@@ -140,19 +140,19 @@ describe("utils", function() {
 
         it("should handle simple objects", function() {
             assert.isTrue(utils.deepCompare({}, {}));
-            assert.isTrue(utils.deepCompare({a: 1, b: 2}, {a: 1, b: 2}));
-            assert.isTrue(utils.deepCompare({a: 1, b: 2}, {b: 2, a: 1}));
-            assert.isFalse(utils.deepCompare({a: 1, b: 2}, {a: 1, b: 3}));
+            assert.isTrue(utils.deepCompare({ a: 1, b: 2 }, { a: 1, b: 2 }));
+            assert.isTrue(utils.deepCompare({ a: 1, b: 2 }, { b: 2, a: 1 }));
+            assert.isFalse(utils.deepCompare({ a: 1, b: 2 }, { a: 1, b: 3 }));
 
-            assert.isTrue(utils.deepCompare({1: {name: "mhc", age: 28},
-                                             2: {name: "arb", age: 26}},
-                                            {1: {name: "mhc", age: 28},
-                                             2: {name: "arb", age: 26}}));
+            assert.isTrue(utils.deepCompare({ 1: { name: "mhc", age: 28 },
+                                             2: { name: "arb", age: 26 } },
+                                            { 1: { name: "mhc", age: 28 },
+                                             2: { name: "arb", age: 26 } }));
 
-            assert.isFalse(utils.deepCompare({1: {name: "mhc", age: 28},
-                                              2: {name: "arb", age: 26}},
-                                             {1: {name: "mhc", age: 28},
-                                              2: {name: "arb", age: 27}}));
+            assert.isFalse(utils.deepCompare({ 1: { name: "mhc", age: 28 },
+                                              2: { name: "arb", age: 26 } },
+                                             { 1: { name: "mhc", age: 28 },
+                                              2: { name: "arb", age: 27 } }));
 
             assert.isFalse(utils.deepCompare({}, null));
             assert.isFalse(utils.deepCompare({}, undefined));
@@ -174,7 +174,6 @@ describe("utils", function() {
             assert.isFalse(utils.deepCompare({ a: { b: func } }, { a: { b: func2 } }));
         });
     });
-
 
     describe("extend", function() {
         const SOURCE = { "prop2": 1, "string2": "x", "newprop": "new" };

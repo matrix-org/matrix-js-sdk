@@ -18,11 +18,11 @@ limitations under the License.
 import '../../olm-loader';
 import anotherjson from 'another-json';
 import * as olmlib from "../../../src/crypto/olmlib";
-import {TestClient} from '../../TestClient';
-import {HttpResponse, setHttpResponses} from '../../test-utils';
+import { TestClient } from '../../TestClient';
+import { HttpResponse, setHttpResponses } from '../../test-utils';
 import { resetCrossSigningKeys } from "./crypto-utils";
 import { MatrixError } from '../../../src/http-api';
-import {logger} from '../../../src/logger';
+import { logger } from '../../../src/logger';
 
 async function makeTestClient(userInfo, options, keys) {
     if (!keys) keys = {};
@@ -60,7 +60,7 @@ describe("Cross Signing", function() {
 
     it("should sign the master key with the device key", async function() {
         const alice = await makeTestClient(
-            {userId: "@alice:example.com", deviceId: "Osborne2"},
+            { userId: "@alice:example.com", deviceId: "Osborne2" },
         );
         alice.uploadDeviceSigningKeys = jest.fn(async (auth, keys) => {
             await olmlib.verifySignature(
@@ -80,7 +80,7 @@ describe("Cross Signing", function() {
 
     it("should abort bootstrap if device signing auth fails", async function() {
         const alice = await makeTestClient(
-            {userId: "@alice:example.com", deviceId: "Osborne2"},
+            { userId: "@alice:example.com", deviceId: "Osborne2" },
         );
         alice.uploadDeviceSigningKeys = async (auth, keys) => {
             const errorResponse = {
@@ -131,7 +131,7 @@ describe("Cross Signing", function() {
 
     it("should upload a signature when a user is verified", async function() {
         const alice = await makeTestClient(
-            {userId: "@alice:example.com", deviceId: "Osborne2"},
+            { userId: "@alice:example.com", deviceId: "Osborne2" },
         );
         alice.uploadDeviceSigningKeys = async () => {};
         alice.uploadKeySignatures = async () => {};
@@ -175,7 +175,7 @@ describe("Cross Signing", function() {
         ]);
 
         const alice = await makeTestClient(
-            {userId: "@alice:example.com", deviceId: "Osborne2"},
+            { userId: "@alice:example.com", deviceId: "Osborne2" },
             {
                 cryptoCallbacks: {
                     // will be called to sign our own device
@@ -328,7 +328,7 @@ describe("Cross Signing", function() {
 
     it("should use trust chain to determine device verification", async function() {
         const alice = await makeTestClient(
-            {userId: "@alice:example.com", deviceId: "Osborne2"},
+            { userId: "@alice:example.com", deviceId: "Osborne2" },
         );
         alice.uploadDeviceSigningKeys = async () => {};
         alice.uploadKeySignatures = async () => {};
@@ -413,7 +413,7 @@ describe("Cross Signing", function() {
     it("should trust signatures received from other devices", async function() {
         const aliceKeys = {};
         const alice = await makeTestClient(
-            {userId: "@alice:example.com", deviceId: "Osborne2"},
+            { userId: "@alice:example.com", deviceId: "Osborne2" },
             null,
             aliceKeys,
         );
@@ -575,7 +575,7 @@ describe("Cross Signing", function() {
 
     it("should dis-trust an unsigned device", async function() {
         const alice = await makeTestClient(
-            {userId: "@alice:example.com", deviceId: "Osborne2"},
+            { userId: "@alice:example.com", deviceId: "Osborne2" },
         );
         alice.uploadDeviceSigningKeys = async () => {};
         alice.uploadKeySignatures = async () => {};
@@ -644,7 +644,7 @@ describe("Cross Signing", function() {
 
     it("should dis-trust a user when their ssk changes", async function() {
         const alice = await makeTestClient(
-            {userId: "@alice:example.com", deviceId: "Osborne2"},
+            { userId: "@alice:example.com", deviceId: "Osborne2" },
         );
         alice.uploadDeviceSigningKeys = async () => {};
         alice.uploadKeySignatures = async () => {};
@@ -782,7 +782,7 @@ describe("Cross Signing", function() {
         let upgradeResolveFunc;
 
         const alice = await makeTestClient(
-            {userId: "@alice:example.com", deviceId: "Osborne2"},
+            { userId: "@alice:example.com", deviceId: "Osborne2" },
             {
                 cryptoCallbacks: {
                     shouldUpgradeDeviceVerifications: (verifs) => {
@@ -794,7 +794,7 @@ describe("Cross Signing", function() {
             },
         );
         const bob = await makeTestClient(
-            {userId: "@bob:example.com", deviceId: "Dynabook"},
+            { userId: "@bob:example.com", deviceId: "Dynabook" },
         );
 
         bob.uploadDeviceSigningKeys = async () => {};

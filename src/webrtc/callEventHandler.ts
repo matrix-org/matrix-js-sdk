@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import MatrixEvent from '../models/event';
-import {logger} from '../logger';
+import { logger } from '../logger';
 import { createNewMatrixCall, MatrixCall, CallErrorCode, CallState, CallDirection } from './call';
 import { EventType } from '../@types/event';
 import { MatrixClient } from '../client';

@@ -20,13 +20,13 @@ limitations under the License.
  * @module crypto/verification/QRCode
  */
 
-import {VerificationBase as Base} from "./Base";
+import { VerificationBase as Base } from "./Base";
 import {
     newKeyMismatchError,
     newUserCancelledError,
 } from './Error';
-import {encodeUnpaddedBase64, decodeBase64} from "../olmlib";
-import {logger} from '../../logger';
+import { encodeUnpaddedBase64, decodeBase64 } from "../olmlib";
+import { logger } from '../../logger';
 
 export const SHOW_QR_CODE_METHOD = "m.qr_code.show.v1";
 export const SCAN_QR_CODE_METHOD = "m.qr_code.scan.v1";
@@ -51,7 +51,7 @@ export class ReciprocateQRCode extends Base {
                 "with this method yet.");
         }
 
-        const {qrCodeData} = this.request;
+        const { qrCodeData } = this.request;
         // 1. check the secret
         if (this.startEvent.getContent()['secret'] !== qrCodeData.encodedSharedSecret) {
             throw newKeyMismatchError();

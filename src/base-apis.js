@@ -24,11 +24,11 @@ limitations under the License.
  * @module base-apis
  */
 
-import {SERVICE_TYPES} from './service-types';
-import {logger} from './logger';
-import {PushProcessor} from "./pushprocessor";
+import { SERVICE_TYPES } from './service-types';
+import { logger } from './logger';
+import { PushProcessor } from "./pushprocessor";
 import * as utils from "./utils";
-import {MatrixHttpApi, PREFIX_IDENTITY_V2, PREFIX_R0, PREFIX_UNSTABLE} from "./http-api";
+import { MatrixHttpApi, PREFIX_IDENTITY_V2, PREFIX_R0, PREFIX_UNSTABLE } from "./http-api";
 
 function termsUrlForService(serviceType, baseUrl) {
     switch (serviceType) {
@@ -158,7 +158,6 @@ MatrixBaseApis.prototype.makeTxnId = function() {
     return "m" + new Date().getTime() + "." + (this._txnCtr++);
 };
 
-
 // Registration/Login operations
 // =============================
 
@@ -197,7 +196,7 @@ MatrixBaseApis.prototype.register = function(
 ) {
     // backwards compat
     if (bindThreepids === true) {
-        bindThreepids = {email: true};
+        bindThreepids = { email: true };
     } else if (bindThreepids === null || bindThreepids === undefined) {
         bindThreepids = {};
     }
@@ -401,7 +400,6 @@ MatrixBaseApis.prototype.loginWithToken = function(token, callback) {
     }, callback);
 };
 
-
 /**
  * Logs out the current session.
  * Obviously, further calls that require authorisation should fail after this
@@ -547,7 +545,7 @@ MatrixBaseApis.prototype.fetchRelations =
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.roomState = function(roomId, callback) {
-    const path = utils.encodeUri("/rooms/$roomId/state", {$roomId: roomId});
+    const path = utils.encodeUri("/rooms/$roomId/state", { $roomId: roomId });
     return this._http.authedRequest(callback, "GET", path);
 };
 
@@ -595,7 +593,7 @@ function(roomId, includeMembership, excludeMembership, atEventId, callback) {
     const queryString = utils.encodeParams(queryParams);
 
     const path = utils.encodeUri("/rooms/$roomId/members?" + queryString,
-        {$roomId: roomId});
+        { $roomId: roomId });
     return this._http.authedRequest(callback, "GET", path);
 };
 
@@ -607,12 +605,11 @@ function(roomId, includeMembership, excludeMembership, atEventId, callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.upgradeRoom = function(roomId, newVersion) {
-    const path = utils.encodeUri("/rooms/$roomId/upgrade", {$roomId: roomId});
+    const path = utils.encodeUri("/rooms/$roomId/upgrade", { $roomId: roomId });
     return this._http.authedRequest(
-        undefined, "POST", path, undefined, {new_version: newVersion},
+        undefined, "POST", path, undefined, { new_version: newVersion },
     );
 };
-
 
 /**
  * @param {string} groupId
@@ -620,7 +617,7 @@ MatrixBaseApis.prototype.upgradeRoom = function(roomId, newVersion) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.getGroupSummary = function(groupId) {
-    const path = utils.encodeUri("/groups/$groupId/summary", {$groupId: groupId});
+    const path = utils.encodeUri("/groups/$groupId/summary", { $groupId: groupId });
     return this._http.authedRequest(undefined, "GET", path);
 };
 
@@ -630,7 +627,7 @@ MatrixBaseApis.prototype.getGroupSummary = function(groupId) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.getGroupProfile = function(groupId) {
-    const path = utils.encodeUri("/groups/$groupId/profile", {$groupId: groupId});
+    const path = utils.encodeUri("/groups/$groupId/profile", { $groupId: groupId });
     return this._http.authedRequest(undefined, "GET", path);
 };
 
@@ -645,7 +642,7 @@ MatrixBaseApis.prototype.getGroupProfile = function(groupId) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.setGroupProfile = function(groupId, profile) {
-    const path = utils.encodeUri("/groups/$groupId/profile", {$groupId: groupId});
+    const path = utils.encodeUri("/groups/$groupId/profile", { $groupId: groupId });
     return this._http.authedRequest(
         undefined, "POST", path, undefined, profile,
     );
@@ -663,7 +660,7 @@ MatrixBaseApis.prototype.setGroupProfile = function(groupId, profile) {
 MatrixBaseApis.prototype.setGroupJoinPolicy = function(groupId, policy) {
     const path = utils.encodeUri(
         "/groups/$groupId/settings/m.join_policy",
-        {$groupId: groupId},
+        { $groupId: groupId },
     );
     return this._http.authedRequest(
         undefined, "PUT", path, undefined, {
@@ -678,7 +675,7 @@ MatrixBaseApis.prototype.setGroupJoinPolicy = function(groupId, policy) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.getGroupUsers = function(groupId) {
-    const path = utils.encodeUri("/groups/$groupId/users", {$groupId: groupId});
+    const path = utils.encodeUri("/groups/$groupId/users", { $groupId: groupId });
     return this._http.authedRequest(undefined, "GET", path);
 };
 
@@ -688,7 +685,7 @@ MatrixBaseApis.prototype.getGroupUsers = function(groupId) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.getGroupInvitedUsers = function(groupId) {
-    const path = utils.encodeUri("/groups/$groupId/invited_users", {$groupId: groupId});
+    const path = utils.encodeUri("/groups/$groupId/invited_users", { $groupId: groupId });
     return this._http.authedRequest(undefined, "GET", path);
 };
 
@@ -698,7 +695,7 @@ MatrixBaseApis.prototype.getGroupInvitedUsers = function(groupId) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.getGroupRooms = function(groupId) {
-    const path = utils.encodeUri("/groups/$groupId/rooms", {$groupId: groupId});
+    const path = utils.encodeUri("/groups/$groupId/rooms", { $groupId: groupId });
     return this._http.authedRequest(undefined, "GET", path);
 };
 
@@ -711,7 +708,7 @@ MatrixBaseApis.prototype.getGroupRooms = function(groupId) {
 MatrixBaseApis.prototype.inviteUserToGroup = function(groupId, userId) {
     const path = utils.encodeUri(
         "/groups/$groupId/admin/users/invite/$userId",
-        {$groupId: groupId, $userId: userId},
+        { $groupId: groupId, $userId: userId },
     );
     return this._http.authedRequest(undefined, "PUT", path, undefined, {});
 };
@@ -725,7 +722,7 @@ MatrixBaseApis.prototype.inviteUserToGroup = function(groupId, userId) {
 MatrixBaseApis.prototype.removeUserFromGroup = function(groupId, userId) {
     const path = utils.encodeUri(
         "/groups/$groupId/admin/users/remove/$userId",
-        {$groupId: groupId, $userId: userId},
+        { $groupId: groupId, $userId: userId },
     );
     return this._http.authedRequest(undefined, "PUT", path, undefined, {});
 };
@@ -742,7 +739,7 @@ MatrixBaseApis.prototype.addUserToGroupSummary = function(groupId, userId, roleI
         roleId ?
             "/groups/$groupId/summary/$roleId/users/$userId" :
             "/groups/$groupId/summary/users/$userId",
-        {$groupId: groupId, $roleId: roleId, $userId: userId},
+        { $groupId: groupId, $roleId: roleId, $userId: userId },
     );
     return this._http.authedRequest(undefined, "PUT", path, undefined, {});
 };
@@ -756,7 +753,7 @@ MatrixBaseApis.prototype.addUserToGroupSummary = function(groupId, userId, roleI
 MatrixBaseApis.prototype.removeUserFromGroupSummary = function(groupId, userId) {
     const path = utils.encodeUri(
         "/groups/$groupId/summary/users/$userId",
-        {$groupId: groupId, $userId: userId},
+        { $groupId: groupId, $userId: userId },
     );
     return this._http.authedRequest(undefined, "DELETE", path, undefined, {});
 };
@@ -773,7 +770,7 @@ MatrixBaseApis.prototype.addRoomToGroupSummary = function(groupId, roomId, categ
         categoryId ?
             "/groups/$groupId/summary/$categoryId/rooms/$roomId" :
             "/groups/$groupId/summary/rooms/$roomId",
-        {$groupId: groupId, $categoryId: categoryId, $roomId: roomId},
+        { $groupId: groupId, $categoryId: categoryId, $roomId: roomId },
     );
     return this._http.authedRequest(undefined, "PUT", path, undefined, {});
 };
@@ -787,7 +784,7 @@ MatrixBaseApis.prototype.addRoomToGroupSummary = function(groupId, roomId, categ
 MatrixBaseApis.prototype.removeRoomFromGroupSummary = function(groupId, roomId) {
     const path = utils.encodeUri(
         "/groups/$groupId/summary/rooms/$roomId",
-        {$groupId: groupId, $roomId: roomId},
+        { $groupId: groupId, $roomId: roomId },
     );
     return this._http.authedRequest(undefined, "DELETE", path, undefined, {});
 };
@@ -805,7 +802,7 @@ MatrixBaseApis.prototype.addRoomToGroup = function(groupId, roomId, isPublic) {
     }
     const path = utils.encodeUri(
         "/groups/$groupId/admin/rooms/$roomId",
-        {$groupId: groupId, $roomId: roomId},
+        { $groupId: groupId, $roomId: roomId },
     );
     return this._http.authedRequest(undefined, "PUT", path, undefined,
         { "m.visibility": { type: isPublic ? "public" : "private" } },
@@ -827,7 +824,7 @@ MatrixBaseApis.prototype.updateGroupRoomVisibility = function(groupId, roomId, i
 
     const path = utils.encodeUri(
         "/groups/$groupId/admin/rooms/$roomId/config/m.visibility",
-        {$groupId: groupId, $roomId: roomId},
+        { $groupId: groupId, $roomId: roomId },
     );
     return this._http.authedRequest(undefined, "PUT", path, undefined,
         { type: isPublic ? "public" : "private" },
@@ -843,7 +840,7 @@ MatrixBaseApis.prototype.updateGroupRoomVisibility = function(groupId, roomId, i
 MatrixBaseApis.prototype.removeRoomFromGroup = function(groupId, roomId) {
     const path = utils.encodeUri(
         "/groups/$groupId/admin/rooms/$roomId",
-        {$groupId: groupId, $roomId: roomId},
+        { $groupId: groupId, $roomId: roomId },
     );
     return this._http.authedRequest(undefined, "DELETE", path, undefined, {});
 };
@@ -857,7 +854,7 @@ MatrixBaseApis.prototype.removeRoomFromGroup = function(groupId, roomId) {
 MatrixBaseApis.prototype.acceptGroupInvite = function(groupId, opts = null) {
     const path = utils.encodeUri(
         "/groups/$groupId/self/accept_invite",
-        {$groupId: groupId},
+        { $groupId: groupId },
     );
     return this._http.authedRequest(undefined, "PUT", path, undefined, opts || {});
 };
@@ -870,7 +867,7 @@ MatrixBaseApis.prototype.acceptGroupInvite = function(groupId, opts = null) {
 MatrixBaseApis.prototype.joinGroup = function(groupId) {
     const path = utils.encodeUri(
         "/groups/$groupId/self/join",
-        {$groupId: groupId},
+        { $groupId: groupId },
     );
     return this._http.authedRequest(undefined, "PUT", path, undefined, {});
 };
@@ -883,7 +880,7 @@ MatrixBaseApis.prototype.joinGroup = function(groupId) {
 MatrixBaseApis.prototype.leaveGroup = function(groupId) {
     const path = utils.encodeUri(
         "/groups/$groupId/self/leave",
-        {$groupId: groupId},
+        { $groupId: groupId },
     );
     return this._http.authedRequest(undefined, "PUT", path, undefined, {});
 };
@@ -940,7 +937,7 @@ MatrixBaseApis.prototype.getPublicisedGroups = function(userIds) {
 MatrixBaseApis.prototype.setGroupPublicity = function(groupId, isPublic) {
     const path = utils.encodeUri(
         "/groups/$groupId/self/update_publicity",
-        {$groupId: groupId},
+        { $groupId: groupId },
     );
     return this._http.authedRequest(undefined, "PUT", path, undefined, {
         publicise: isPublic,
@@ -1008,7 +1005,7 @@ MatrixBaseApis.prototype.roomInitialSync = function(roomId, limit, callback) {
         callback = limit; limit = undefined;
     }
     const path = utils.encodeUri("/rooms/$roomId/initialSync",
-        {$roomId: roomId},
+        { $roomId: roomId },
     );
     if (!limit) {
         limit = 30;
@@ -1159,7 +1156,7 @@ MatrixBaseApis.prototype.deleteAlias = function(alias, callback) {
 MatrixBaseApis.prototype.unstableGetLocalAliases =
 function(roomId, callback) {
     const path = utils.encodeUri("/rooms/$roomId/aliases",
-        {$roomId: roomId});
+        { $roomId: roomId });
     const prefix = PREFIX_UNSTABLE + "/org.matrix.msc2432";
     return this._http.authedRequest(callback, "GET", path,
         null, null, { prefix });
@@ -1190,7 +1187,7 @@ MatrixBaseApis.prototype.getRoomIdForAlias = function(alias, callback) {
  */
 MatrixBaseApis.prototype.resolveRoomAlias = function(roomAlias, callback) {
     // TODO: deprecate this or getRoomIdForAlias
-    const path = utils.encodeUri("/directory/room/$alias", {$alias: roomAlias});
+    const path = utils.encodeUri("/directory/room/$alias", { $alias: roomAlias });
     return this._http.request(callback, "GET", path);
 };
 
@@ -1278,7 +1275,6 @@ MatrixBaseApis.prototype.searchUserDirectory = function(opts) {
     );
 };
 
-
 // Media operations
 // ================
 
@@ -1347,7 +1343,6 @@ MatrixBaseApis.prototype.getCurrentUploads = function() {
     return this._http.getCurrentUploads();
 };
 
-
 // Profile operations
 // ==================
 
@@ -1371,7 +1366,6 @@ MatrixBaseApis.prototype.getProfileInfo = function(userId, info, callback) {
              { $userId: userId });
     return this._http.authedRequest(callback, "GET", path);
 };
-
 
 // Account operations
 // ==================
@@ -1518,7 +1512,6 @@ MatrixBaseApis.prototype.setPassword = function(authDict, newPassword, callback)
     );
 };
 
-
 // Device operations
 // =================
 
@@ -1595,7 +1588,7 @@ MatrixBaseApis.prototype.deleteDevice = function(device_id, auth) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.deleteMultipleDevices = function(devices, auth) {
-    const body = {devices};
+    const body = { devices };
 
     if (auth) {
         body.auth = auth;
@@ -1604,7 +1597,6 @@ MatrixBaseApis.prototype.deleteMultipleDevices = function(devices, auth) {
     const path = "/delete_devices";
     return this._http.authedRequest(undefined, "POST", path, undefined, body);
 };
-
 
 // Push operations
 // ===============
@@ -1703,7 +1695,7 @@ MatrixBaseApis.prototype.setPushRuleEnabled = function(scope, kind,
         $ruleId: ruleId,
     });
     return this._http.authedRequest(
-        callback, "PUT", path, undefined, {"enabled": enabled},
+        callback, "PUT", path, undefined, { "enabled": enabled },
     );
 };
 
@@ -1724,10 +1716,9 @@ MatrixBaseApis.prototype.setPushRuleActions = function(scope, kind,
         $ruleId: ruleId,
     });
     return this._http.authedRequest(
-        callback, "PUT", path, undefined, {"actions": actions},
+        callback, "PUT", path, undefined, { "actions": actions },
     );
 };
-
 
 // Search
 // ======
@@ -1842,7 +1833,7 @@ MatrixBaseApis.prototype.claimOneTimeKeys = function(devices, key_algorithm, tim
         queries[userId] = query;
         query[deviceId] = key_algorithm;
     }
-    const content = {one_time_keys: queries};
+    const content = { one_time_keys: queries };
     if (timeout) {
         content.timeout = timeout;
     }
@@ -1872,7 +1863,7 @@ MatrixBaseApis.prototype.getKeyChanges = function(oldToken, newToken) {
 
 MatrixBaseApis.prototype.uploadDeviceSigningKeys = function(auth, keys) {
     const data = Object.assign({}, keys);
-    if (auth) Object.assign(data, {auth});
+    if (auth) Object.assign(data, { auth });
     return this._http.authedRequest(
         undefined, "POST", "/keys/device_signing/upload", undefined, data, {
             prefix: PREFIX_UNSTABLE,
@@ -2166,7 +2157,7 @@ MatrixBaseApis.prototype.identityHashedLookup = async function(
             throw new Error("Identity server returned more results than expected");
         }
 
-        foundAddresses.push({address: plainAddress, mxid});
+        foundAddresses.push({ address: plainAddress, mxid });
     }
     return foundAddresses;
 };
@@ -2257,7 +2248,7 @@ MatrixBaseApis.prototype.bulkLookupThreePids = async function(
         ]);
     }
 
-    return {threepids: v1results};
+    return { threepids: v1results };
 };
 
 /**
@@ -2401,7 +2392,7 @@ MatrixBaseApis.prototype.reportEvent = function(roomId, eventId, score, reason) 
         $eventId: eventId,
     });
 
-    return this._http.authedRequest(undefined, "POST", path, null, {score, reason});
+    return this._http.authedRequest(undefined, "POST", path, null, { score, reason });
 };
 
 /**

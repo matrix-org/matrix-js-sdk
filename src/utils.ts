@@ -418,7 +418,7 @@ export function defer() {
         reject = _reject;
     });
 
-    return {resolve, reject, promise};
+    return { resolve, reject, promise };
 }
 
 export async function promiseMapSeries<T>(

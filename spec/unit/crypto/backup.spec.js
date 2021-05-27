@@ -16,18 +16,18 @@ limitations under the License.
 */
 
 import '../../olm-loader';
-import {logger} from "../../../src/logger";
+import { logger } from "../../../src/logger";
 import * as olmlib from "../../../src/crypto/olmlib";
-import {MatrixClient} from "../../../src/client";
-import {MatrixEvent} from "../../../src/models/event";
+import { MatrixClient } from "../../../src/client";
+import { MatrixEvent } from "../../../src/models/event";
 import * as algorithms from "../../../src/crypto/algorithms";
-import {WebStorageSessionStore} from "../../../src/store/session/webstorage";
-import {MemoryCryptoStore} from "../../../src/crypto/store/memory-crypto-store";
-import {MockStorageApi} from "../../MockStorageApi";
+import { WebStorageSessionStore } from "../../../src/store/session/webstorage";
+import { MemoryCryptoStore } from "../../../src/crypto/store/memory-crypto-store";
+import { MockStorageApi } from "../../MockStorageApi";
 import * as testUtils from "../../test-utils";
-import {OlmDevice} from "../../../src/crypto/OlmDevice";
-import {Crypto} from "../../../src/crypto";
-import {resetCrossSigningKeys} from "./crypto-utils";
+import { OlmDevice } from "../../../src/crypto/OlmDevice";
+import { Crypto } from "../../../src/crypto";
+import { resetCrossSigningKeys } from "./crypto-utils";
 
 const Olm = global.Olm;
 

@@ -1,14 +1,14 @@
 import '../../../olm-loader';
 import * as algorithms from "../../../../src/crypto/algorithms";
-import {MemoryCryptoStore} from "../../../../src/crypto/store/memory-crypto-store";
-import {MockStorageApi} from "../../../MockStorageApi";
+import { MemoryCryptoStore } from "../../../../src/crypto/store/memory-crypto-store";
+import { MockStorageApi } from "../../../MockStorageApi";
 import * as testUtils from "../../../test-utils";
-import {OlmDevice} from "../../../../src/crypto/OlmDevice";
-import {Crypto} from "../../../../src/crypto";
-import {logger} from "../../../../src/logger";
-import {MatrixEvent} from "../../../../src/models/event";
-import {TestClient} from "../../../TestClient";
-import {Room} from "../../../../src/models/room";
+import { OlmDevice } from "../../../../src/crypto/OlmDevice";
+import { Crypto } from "../../../../src/crypto";
+import { logger } from "../../../../src/logger";
+import { MatrixEvent } from "../../../../src/models/event";
+import { TestClient } from "../../../TestClient";
+import { Room } from "../../../../src/models/room";
 import * as olmlib from "../../../../src/crypto/olmlib";
 
 const MegolmDecryption = algorithms.DECRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
@@ -49,7 +49,6 @@ describe("MegolmDecryption", function() {
             baseApis: mockBaseApis,
             roomId: ROOM_ID,
         });
-
 
         // we stub out the olm encryption bits
         mockOlmLib = {};
@@ -136,9 +135,9 @@ describe("MegolmDecryption", function() {
                 mockCrypto.getStoredDevice.mockReturnValue(deviceInfo);
 
                 mockOlmLib.ensureOlmSessionsForDevices.mockResolvedValue({
-                    '@alice:foo': {'alidevice': {
+                    '@alice:foo': { 'alidevice': {
                         sessionId: 'alisession',
-                    }},
+                    } },
                 });
 
                 const awaitEncryptForDevice = new Promise((res, rej) => {
@@ -313,7 +312,7 @@ describe("MegolmDecryption", function() {
             });
             const mockRoom = {
                 getEncryptionTargetMembers: jest.fn().mockReturnValue(
-                    [{userId: "@alice:home.server"}],
+                    [{ userId: "@alice:home.server" }],
                 ),
                 getBlacklistUnverifiedDevices: jest.fn().mockReturnValue(false),
             };
@@ -373,7 +372,7 @@ describe("MegolmDecryption", function() {
         const roomId = "!someroom";
         const room = new Room(roomId, aliceClient, "@alice:example.com", {});
         room.getEncryptionTargetMembers = async function() {
-            return [{userId: "@bob:example.com"}];
+            return [{ userId: "@bob:example.com" }];
         };
         room.setBlacklistUnverifiedDevices(true);
         aliceClient.store.storeRoom(room);

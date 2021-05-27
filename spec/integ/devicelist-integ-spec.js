@@ -16,9 +16,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {TestClient} from '../TestClient';
+import { TestClient } from '../TestClient';
 import * as testUtils from '../test-utils';
-import {logger} from '../../src/logger';
+import { logger } from '../../src/logger';
 
 const ROOM_ID = "!room:id";
 
@@ -67,7 +67,6 @@ function getSyncResponse(roomMembers) {
     return syncResponse;
 }
 
-
 describe("DeviceList management:", function() {
     if (!global.Olm) {
         logger.warn('not running deviceList tests: Olm not present');
@@ -98,7 +97,7 @@ describe("DeviceList management:", function() {
     });
 
     it("Alice shouldn't do a second /query for non-e2e-capable devices", function() {
-        aliceTestClient.expectKeyQuery({device_keys: {'@alice:localhost': {}}});
+        aliceTestClient.expectKeyQuery({ device_keys: { '@alice:localhost': {} } });
         return aliceTestClient.start().then(function() {
             const syncResponse = getSyncResponse(['@bob:xyz']);
             aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
@@ -137,11 +136,10 @@ describe("DeviceList management:", function() {
         });
     });
 
-
     it("We should not get confused by out-of-order device query responses",
        () => {
            // https://github.com/vector-im/element-web/issues/3126
-           aliceTestClient.expectKeyQuery({device_keys: {'@alice:localhost': {}}});
+           aliceTestClient.expectKeyQuery({ device_keys: { '@alice:localhost': {} } });
            return aliceTestClient.start().then(() => {
                aliceTestClient.httpBackend.when('GET', '/sync').respond(
                    200, getSyncResponse(['@bob:xyz', '@chris:abc']));
@@ -160,7 +158,7 @@ describe("DeviceList management:", function() {
                );
 
                aliceTestClient.httpBackend.when('PUT', '/send/').respond(
-                   200, {event_id: '$event1'});
+                   200, { event_id: '$event1' });
 
                return Promise.all([
                    aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
@@ -199,7 +197,7 @@ describe("DeviceList management:", function() {
                    },
                    token: '3',
                }).respond(200, {
-                   device_keys: {'@chris:abc': {}},
+                   device_keys: { '@chris:abc': {} },
                });
                return aliceTestClient.httpBackend.flush('/keys/query', 1);
            }).then((flushed) => {
@@ -228,7 +226,7 @@ describe("DeviceList management:", function() {
                    },
                    token: '2',
                }).respond(200, {
-                   device_keys: {'@bob:xyz': {}},
+                   device_keys: { '@bob:xyz': {} },
                });
                return aliceTestClient.httpBackend.flush('/keys/query', 1);
            }).then((flushed) => {
@@ -322,7 +320,6 @@ describe("DeviceList management:", function() {
                     },
                 },
             );
-
 
             await aliceTestClient.flushSync();
             await aliceTestClient.client._crypto._deviceList.saveIfDirty();

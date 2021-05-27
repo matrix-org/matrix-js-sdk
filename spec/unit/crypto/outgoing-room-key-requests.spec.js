@@ -17,7 +17,7 @@ limitations under the License.
 import {
     IndexedDBCryptoStore,
 } from '../../../src/crypto/store/indexeddb-crypto-store';
-import {MemoryCryptoStore} from '../../../src/crypto/store/memory-crypto-store';
+import { MemoryCryptoStore } from '../../../src/crypto/store/memory-crypto-store';
 import 'fake-indexeddb/auto';
 import 'jest-localstorage-mock';
 

@@ -15,9 +15,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {logger} from "../../src/logger";
-import {InteractiveAuth} from "../../src/interactive-auth";
-import {MatrixError} from "../../src/http-api";
+import { logger } from "../../src/logger";
+import { InteractiveAuth } from "../../src/interactive-auth";
+import { MatrixError } from "../../src/http-api";
 
 // Trivial client object to test interactive auth
 // (we do not need TestClient here)
@@ -63,7 +63,7 @@ describe("InteractiveAuth", function() {
         });
 
         // .. which should trigger a call here
-        const requestRes = {"a": "b"};
+        const requestRes = { "a": "b" };
         doRequest.mockImplementation(function(authData) {
             logger.log('cccc');
             expect(authData).toEqual({
@@ -112,7 +112,7 @@ describe("InteractiveAuth", function() {
         });
 
         // .. which should be followed by a call to stateUpdated
-        const requestRes = {"a": "b"};
+        const requestRes = { "a": "b" };
         stateUpdated.mockImplementation(function(stage) {
             expect(stage).toEqual("logintype");
             expect(ia.getSessionId()).toEqual("sessionId");
