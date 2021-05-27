@@ -92,11 +92,7 @@ export class CallEventHandler {
     private onEvent = (event: MatrixEvent) => {
         this.client.decryptEventIfNeeded(event);
         // any call events or ones that might be once they're decrypted
-        if (
-            event.getType().indexOf("m.call.") === 0 ||
-            event.getType().indexOf("org.matrix.call.") === 0
-            || event.isBeingDecrypted()
-        ) {
+        if (this.eventIsACall(event) || event.isBeingDecrypted()) {
             // queue up for processing once all events from this sync have been
             // processed (see above).
             this.callEventBuffer.push(event);
@@ -105,7 +101,7 @@ export class CallEventHandler {
         if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
             // add an event listener for once the event is decrypted.
             event.once("Event.decrypted", () => {
-                if (event.getType().indexOf("m.call.") === -1) return;
+                if (!this.eventIsACall(event)) return;
 
                 if (this.callEventBuffer.includes(event)) {
                     // we were waiting for that event to decrypt, so recheck the buffer
@@ -121,6 +117,15 @@ export class CallEventHandler {
                 }
             });
         }
+    }
+
+    private eventIsACall(event: MatrixEvent): boolean {
+        const type = event.getType();
+        /**
+         * Unstable prefixes:
+         *   - org.matrix.call. : MSC3086 https://github.com/matrix-org/matrix-doc/pull/3086
+         */
+        return type.startsWith("m.call.") || type.startsWith("org.matrix.call.");
     }
 
     private handleCallEvent(event: MatrixEvent) {
