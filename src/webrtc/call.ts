@@ -1509,9 +1509,9 @@ export class MatrixCall extends EventEmitter {
     };
 
     /**
-     * This method removes all video/rtx codecs from video transceivers.
-     * This is necessary since they can cause problems. Without this the
-     * following steps should produce an error:
+     * This method removes all video/rtx codecs from screensharing video
+     * transceivers. This is necessary since they can cause problems. Without
+     * this the following steps should produce an error:
      *   Chromium calls Firefox
      *   Firefox answers
      *   Firefox starts screen-sharing
@@ -1537,8 +1537,11 @@ export class MatrixCall extends EventEmitter {
 
             for (const trans of this.peerConn.getTransceivers()) {
                 if (
-                    trans.sender.track?.kind === "video" ||
-                    trans.receiver.track?.kind === "video"
+                    this.screensharingSenders.includes(trans.sender) &&
+                    (
+                        trans.sender.track?.kind === "video" ||
+                        trans.receiver.track?.kind === "video"
+                    )
                 ) {
                     trans.setCodecPreferences(codecs);
                 }
