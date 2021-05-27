@@ -18,14 +18,14 @@ limitations under the License.
 
 /* eslint-disable @babel/no-invalid-this */
 
-import {MemoryStore} from "./memory";
+import { MemoryStore } from "./memory";
 import * as utils from "../utils";
-import {EventEmitter} from 'events';
-import {LocalIndexedDBStoreBackend} from "./indexeddb-local-backend.js";
-import {RemoteIndexedDBStoreBackend} from "./indexeddb-remote-backend.js";
-import {User} from "../models/user";
-import {MatrixEvent} from "../models/event";
-import {logger} from '../logger';
+import { EventEmitter } from 'events';
+import { LocalIndexedDBStoreBackend } from "./indexeddb-local-backend.js";
+import { RemoteIndexedDBStoreBackend } from "./indexeddb-remote-backend.js";
+import { User } from "../models/user";
+import { MatrixEvent } from "../models/event";
+import { logger } from '../logger';
 
 /**
  * This is an internal module. See {@link IndexedDBStore} for the public class.
@@ -38,7 +38,6 @@ import {logger} from '../logger';
 // often does not affect the length of the pause since the entire /sync
 // response is persisted each time.
 const WRITE_DELAY_MS = 1000 * 60 * 5; // once every 5 minutes
-
 
 /**
  * Construct a new Indexed Database store, which extends MemoryStore.

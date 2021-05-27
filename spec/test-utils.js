@@ -1,8 +1,8 @@
 // load olm before the sdk if possible
 import './olm-loader';
 
-import {logger} from '../src/logger';
-import {MatrixEvent} from "../src/models/event";
+import { logger } from '../src/logger';
+import { MatrixEvent } from "../src/models/event";
 
 /**
  * Return a promise that is resolved when the client next emits a
@@ -177,7 +177,6 @@ export function mkMessage(opts) {
     return mkEvent(opts);
 }
 
-
 /**
  * A mock implementation of webstorage
  *
@@ -204,7 +203,6 @@ MockStorageApi.prototype = {
     },
 };
 
-
 /**
  * If an event is being decrypted, wait for it to finish being decrypted.
  *
@@ -228,7 +226,6 @@ export function awaitDecryption(event) {
         });
     }
 }
-
 
 export function HttpResponse(
     httpLookups, acceptKeepalives, ignoreUnhandledSync,

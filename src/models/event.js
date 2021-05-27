@@ -21,9 +21,9 @@ limitations under the License.
  * @module models/event
  */
 
-import {EventEmitter} from 'events';
+import { EventEmitter } from 'events';
 import * as utils from '../utils';
-import {logger} from '../logger';
+import { logger } from '../logger';
 
 /**
  * Enum for event statuses.
@@ -179,7 +179,6 @@ export const MatrixEvent = function(
     this._localTimestamp = Date.now() - this.getAge();
 };
 utils.inherits(MatrixEvent, EventEmitter);
-
 
 utils.extend(MatrixEvent.prototype, {
     /**
@@ -1146,7 +1145,6 @@ utils.extend(MatrixEvent.prototype, {
     },
 });
 
-
 /* _REDACT_KEEP_KEY_MAP gives the keys we keep when an event is redacted
  *
  * This is specified here:
@@ -1165,16 +1163,15 @@ const _REDACT_KEEP_KEY_MAP = [
 
 // a map from event type to the .content keys we keep when an event is redacted
 const _REDACT_KEEP_CONTENT_MAP = {
-    'm.room.member': {'membership': 1},
-    'm.room.create': {'creator': 1},
-    'm.room.join_rules': {'join_rule': 1},
-    'm.room.power_levels': {'ban': 1, 'events': 1, 'events_default': 1,
+    'm.room.member': { 'membership': 1 },
+    'm.room.create': { 'creator': 1 },
+    'm.room.join_rules': { 'join_rule': 1 },
+    'm.room.power_levels': { 'ban': 1, 'events': 1, 'events_default': 1,
                             'kick': 1, 'redact': 1, 'state_default': 1,
                             'users': 1, 'users_default': 1,
                            },
-    'm.room.aliases': {'aliases': 1},
+    'm.room.aliases': { 'aliases': 1 },
 };
-
 
 /**
  * Fires when an event is decrypted

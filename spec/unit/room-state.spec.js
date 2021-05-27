@@ -1,6 +1,6 @@
 import * as utils from "../test-utils";
-import {RoomState} from "../../src/models/room-state";
-import {RoomMember} from "../../src/models/room-member";
+import { RoomState } from "../../src/models/room-state";
+import { RoomMember } from "../../src/models/room-member";
 
 describe("RoomState", function() {
     const roomId = "!foo:bar";
@@ -471,13 +471,13 @@ describe("RoomState", function() {
 
         it("should update after adding joined member", function() {
             state.setStateEvents([
-                utils.mkMembership({event: true, mship: "join",
-                    user: userA, room: roomId}),
+                utils.mkMembership({ event: true, mship: "join",
+                    user: userA, room: roomId }),
             ]);
             expect(state.getJoinedMemberCount()).toEqual(1);
             state.setStateEvents([
-                utils.mkMembership({event: true, mship: "join",
-                    user: userC, room: roomId}),
+                utils.mkMembership({ event: true, mship: "join",
+                    user: userC, room: roomId }),
             ]);
             expect(state.getJoinedMemberCount()).toEqual(2);
         });
@@ -490,13 +490,13 @@ describe("RoomState", function() {
 
         it("should update after adding invited member", function() {
             state.setStateEvents([
-                utils.mkMembership({event: true, mship: "invite",
-                    user: userA, room: roomId}),
+                utils.mkMembership({ event: true, mship: "invite",
+                    user: userA, room: roomId }),
             ]);
             expect(state.getInvitedMemberCount()).toEqual(1);
             state.setStateEvents([
-                utils.mkMembership({event: true, mship: "invite",
-                    user: userC, room: roomId}),
+                utils.mkMembership({ event: true, mship: "invite",
+                    user: userC, room: roomId }),
             ]);
             expect(state.getInvitedMemberCount()).toEqual(2);
         });
@@ -509,15 +509,15 @@ describe("RoomState", function() {
 
         it("should, once used, override counting members from state", function() {
             state.setStateEvents([
-                utils.mkMembership({event: true, mship: "join",
-                    user: userA, room: roomId}),
+                utils.mkMembership({ event: true, mship: "join",
+                    user: userA, room: roomId }),
             ]);
             expect(state.getJoinedMemberCount()).toEqual(1);
             state.setJoinedMemberCount(100);
             expect(state.getJoinedMemberCount()).toEqual(100);
             state.setStateEvents([
-                utils.mkMembership({event: true, mship: "join",
-                    user: userC, room: roomId}),
+                utils.mkMembership({ event: true, mship: "join",
+                    user: userC, room: roomId }),
             ]);
             expect(state.getJoinedMemberCount()).toEqual(100);
         });
@@ -525,14 +525,14 @@ describe("RoomState", function() {
         it("should, once used, override counting members from state, " +
         "also after clone", function() {
             state.setStateEvents([
-                utils.mkMembership({event: true, mship: "join",
-                    user: userA, room: roomId}),
+                utils.mkMembership({ event: true, mship: "join",
+                    user: userA, room: roomId }),
             ]);
             state.setJoinedMemberCount(100);
             const copy = state.clone();
             copy.setStateEvents([
-                utils.mkMembership({event: true, mship: "join",
-                    user: userC, room: roomId}),
+                utils.mkMembership({ event: true, mship: "join",
+                    user: userC, room: roomId }),
             ]);
             expect(state.getJoinedMemberCount()).toEqual(100);
         });
@@ -545,15 +545,15 @@ describe("RoomState", function() {
 
         it("should, once used, override counting members from state", function() {
             state.setStateEvents([
-                utils.mkMembership({event: true, mship: "invite",
-                    user: userB, room: roomId}),
+                utils.mkMembership({ event: true, mship: "invite",
+                    user: userB, room: roomId }),
             ]);
             expect(state.getInvitedMemberCount()).toEqual(1);
             state.setInvitedMemberCount(100);
             expect(state.getInvitedMemberCount()).toEqual(100);
             state.setStateEvents([
-                utils.mkMembership({event: true, mship: "invite",
-                    user: userC, room: roomId}),
+                utils.mkMembership({ event: true, mship: "invite",
+                    user: userC, room: roomId }),
             ]);
             expect(state.getInvitedMemberCount()).toEqual(100);
         });
@@ -561,14 +561,14 @@ describe("RoomState", function() {
         it("should, once used, override counting members from state, " +
         "also after clone", function() {
             state.setStateEvents([
-                utils.mkMembership({event: true, mship: "invite",
-                    user: userB, room: roomId}),
+                utils.mkMembership({ event: true, mship: "invite",
+                    user: userB, room: roomId }),
             ]);
             state.setInvitedMemberCount(100);
             const copy = state.clone();
             copy.setStateEvents([
-                utils.mkMembership({event: true, mship: "invite",
-                    user: userC, room: roomId}),
+                utils.mkMembership({ event: true, mship: "invite",
+                    user: userC, room: roomId }),
             ]);
             expect(state.getInvitedMemberCount()).toEqual(100);
         });

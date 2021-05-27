@@ -20,7 +20,7 @@ limitations under the License.
  * Manages the list of encrypted rooms
  */
 
-import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
+import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 
 /**
  * @alias module:crypto/RoomList

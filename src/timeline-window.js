@@ -17,8 +17,8 @@ limitations under the License.
 
 /** @module timeline-window */
 
-import {EventTimeline} from './models/event-timeline';
-import {logger} from './logger';
+import { EventTimeline } from './models/event-timeline';
+import { logger } from './logger';
 
 /**
  * @private
@@ -335,7 +335,6 @@ TimelineWindow.prototype.paginate = function(direction, size, makeRequest,
     return prom;
 };
 
-
 /**
  * Remove `delta` events from the start or end of the timeline.
  *
@@ -367,7 +366,6 @@ TimelineWindow.prototype.unpaginate = function(delta, startOfTimeline) {
                  " (now " + this._eventCount + ")");
     }
 };
-
 
 /**
  * Get a list of the events currently in the window
@@ -419,7 +417,6 @@ TimelineWindow.prototype.getEvents = function() {
 
     return result;
 };
-
 
 /**
  * a thing which contains a timeline reference, and an index into it.

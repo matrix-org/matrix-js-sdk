@@ -1,6 +1,6 @@
-import {logger} from "../../src/logger";
-import {MatrixClient} from "../../src/client";
-import {Filter} from "../../src/filter";
+import { logger } from "../../src/logger";
+import { MatrixClient } from "../../src/client";
+import { Filter } from "../../src/filter";
 
 jest.useFakeTimers();
 
@@ -178,7 +178,7 @@ describe("MatrixClient", function() {
         const filterId = "ehfewf";
         store.getFilterIdByName.mockReturnValue(filterId);
         const filter = new Filter(0, filterId);
-        filter.setDefinition({"room": {"timeline": {"limit": 8}}});
+        filter.setDefinition({ "room": { "timeline": { "limit": 8 } } });
         store.getFilter.mockReturnValue(filter);
         const syncPromise = new Promise((resolve, reject) => {
             client.on("sync", function syncListener(state) {

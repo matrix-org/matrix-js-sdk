@@ -18,15 +18,15 @@ limitations under the License.
 
 import type Request from "request";
 
-import {MemoryCryptoStore} from "./crypto/store/memory-crypto-store";
-import {LocalStorageCryptoStore} from "./crypto/store/localStorage-crypto-store";
-import {IndexedDBCryptoStore} from "./crypto/store/indexeddb-crypto-store";
-import {MemoryStore} from "./store/memory";
-import {StubStore} from "./store/stub";
-import {LocalIndexedDBStoreBackend} from "./store/indexeddb-local-backend";
-import {RemoteIndexedDBStoreBackend} from "./store/indexeddb-remote-backend";
-import {MatrixScheduler} from "./scheduler";
-import {MatrixClient} from "./client";
+import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store";
+import { LocalStorageCryptoStore } from "./crypto/store/localStorage-crypto-store";
+import { IndexedDBCryptoStore } from "./crypto/store/indexeddb-crypto-store";
+import { MemoryStore } from "./store/memory";
+import { StubStore } from "./store/stub";
+import { LocalIndexedDBStoreBackend } from "./store/indexeddb-local-backend";
+import { RemoteIndexedDBStoreBackend } from "./store/indexeddb-remote-backend";
+import { MatrixScheduler } from "./scheduler";
+import { MatrixClient } from "./client";
 
 export * from "./client";
 export * from "./http-api";
@@ -58,7 +58,6 @@ export {
     setAudioInput as setMatrixCallAudioInput,
     setVideoInput as setMatrixCallVideoInput,
 } from "./webrtc/call";
-
 
 // expose the underlying request object so different environments can use
 // different request libs (e.g. request or browser-request)

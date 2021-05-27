@@ -15,8 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {escapeRegExp, globToRegexp, isNullOrUndefined} from "./utils";
-import {logger} from './logger';
+import { escapeRegExp, globToRegexp, isNullOrUndefined } from "./utils";
+import { logger } from './logger';
 
 /**
  * @module pushprocessor
@@ -360,7 +360,6 @@ export function PushProcessor(client) {
         return ret;
     };
 
-
     /**
      * Get the user's push actions for the given event
      *
@@ -467,5 +466,4 @@ PushProcessor.rewriteDefaultRules = function(incomingRules) {
  * @property {boolean} tweaks.sound Whether this notification should produce a
  * noise.
  */
-
 

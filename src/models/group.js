@@ -20,7 +20,7 @@ limitations under the License.
  */
 
 import * as utils from "../utils";
-import {EventEmitter} from "events";
+import { EventEmitter } from "events";
 
 /**
  * Construct a new Group.

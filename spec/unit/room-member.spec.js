@@ -1,5 +1,5 @@
 import * as utils from "../test-utils";
-import {RoomMember} from "../../src/models/room-member";
+import { RoomMember } from "../../src/models/room-member";
 
 describe("RoomMember", function() {
     const roomId = "!foo:bar";

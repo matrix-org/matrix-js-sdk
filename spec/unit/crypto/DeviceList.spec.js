@@ -16,10 +16,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {logger} from "../../../src/logger";
+import { logger } from "../../../src/logger";
 import * as utils from "../../../src/utils";
-import {MemoryCryptoStore} from "../../../src/crypto/store/memory-crypto-store";
-import {DeviceList} from "../../../src/crypto/DeviceList";
+import { MemoryCryptoStore } from "../../../src/crypto/store/memory-crypto-store";
+import { DeviceList } from "../../../src/crypto/DeviceList";
 
 const signedDeviceList = {
     "failures": {},

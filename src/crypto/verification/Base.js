@@ -20,12 +20,12 @@ limitations under the License.
  * @module crypto/verification/Base
  */
 
-import {MatrixEvent} from '../../models/event';
-import {EventEmitter} from 'events';
-import {logger} from '../../logger';
-import {DeviceInfo} from '../deviceinfo';
-import {newTimeoutError} from "./Error";
-import {requestKeysDuringVerification} from "../CrossSigning";
+import { MatrixEvent } from '../../models/event';
+import { EventEmitter } from 'events';
+import { logger } from '../../logger';
+import { DeviceInfo } from '../deviceinfo';
+import { newTimeoutError } from "./Error";
+import { requestKeysDuringVerification } from "../CrossSigning";
 
 const timeoutException = new Error("Verification timed out");
 
@@ -138,7 +138,7 @@ export class VerificationBase extends EventEmitter {
     switchStartEvent(event) {
         if (this.canSwitchStartEvent(event)) {
             logger.log("Verification Base: switching verification start event",
-                {restartingFlow: !!this._rejectEvent});
+                { restartingFlow: !!this._rejectEvent });
             if (this._rejectEvent) {
                 const reject = this._rejectEvent;
                 this._rejectEvent = undefined;
@@ -167,7 +167,7 @@ export class VerificationBase extends EventEmitter {
             // there is only promise to reject if verify has been called
             if (reject) {
                 const content = e.getContent();
-                const {reason, code} = content;
+                const { reason, code } = content;
                 reject(new Error(`Other side cancelled verification ` +
                     `because ${reason} (${code})`));
             }
