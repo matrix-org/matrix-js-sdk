@@ -305,7 +305,7 @@ describe('Call', function() {
         await client.httpBackend.flush();
         await callPromise;
 
-        call.getOpponentMember = () => {return {userId: "@bob:bar.uk"}};
+        call.getOpponentMember = () => {return { userId: "@bob:bar.uk" }};
 
         await call.onAnswerReceived({
             getContent: () => {
@@ -319,14 +319,16 @@ describe('Call', function() {
                     [SDPStreamMetadataKey]: {
                         "stream_id": {
                             purpose: SDPStreamMetadataPurpose.Usermedia,
-                        }
-                    }
+                        },
+                    },
                 };
             },
         });
 
-        call.pushRemoteFeed({id: "stream_id"});
-        expect(call.getFeeds().find((feed) => feed.stream.id === "stream_id")?.purpose).toBe(SDPStreamMetadataPurpose.Usermedia);
+        call.pushRemoteFeed({ id: "stream_id" });
+        expect(call.getFeeds().find((feed) => {
+            return feed.stream.id === "stream_id";
+        })?.purpose).toBe(SDPStreamMetadataPurpose.Usermedia);
     });
 
     it("should fallback to replaceTrack() if the other side doesn't support SPDStreamMetadata", async () => {
@@ -334,7 +336,7 @@ describe('Call', function() {
         await client.httpBackend.flush();
         await callPromise;
 
-        call.getOpponentMember = () => {return {userId: "@bob:bar.uk"}};
+        call.getOpponentMember = () => {return { userId: "@bob:bar.uk" }};
 
         await call.onAnswerReceived({
             getContent: () => {
