@@ -28,10 +28,10 @@ limitations under the License.
 // load olm before the sdk if possible
 import '../olm-loader';
 
-import {logger} from '../../src/logger';
+import { logger } from '../../src/logger';
 import * as testUtils from "../test-utils";
-import {TestClient} from "../TestClient";
-import {CRYPTO_ENABLED} from "../../src/client";
+import { TestClient } from "../TestClient";
+import { CRYPTO_ENABLED } from "../../src/client";
 
 let aliTestClient;
 const roomId = "!room:localhost";
@@ -75,7 +75,7 @@ function expectAliQueryKeys() {
         );
         const result = {};
         result[bobUserId] = bobKeys;
-        return {device_keys: result};
+        return { device_keys: result };
     });
     return aliTestClient.httpBackend.flush("/keys/query", 1);
 }
@@ -103,7 +103,7 @@ function expectBobQueryKeys() {
         );
         const result = {};
         result[aliUserId] = aliKeys;
-        return {device_keys: result};
+        return { device_keys: result };
     });
     return bobTestClient.httpBackend.flush("/keys/query", 1);
 }
@@ -132,7 +132,7 @@ function expectAliClaimKeys() {
             result[bobUserId] = {};
             result[bobUserId][bobDeviceId] = {};
             result[bobUserId][bobDeviceId][keyId] = keys[keyId];
-            return {one_time_keys: result};
+            return { one_time_keys: result };
         });
     }).then(() => {
         // it can take a while to process the key query, so give it some extra
@@ -143,7 +143,6 @@ function expectAliClaimKeys() {
         });
     });
 }
-
 
 function aliDownloadsKeys() {
     // can't query keys before bob has uploaded them
@@ -269,7 +268,7 @@ function expectBobSendMessageRequest() {
 
 function sendMessage(client) {
     return client.sendMessage(
-        roomId, {msgtype: "m.text", body: "Hello, World"},
+        roomId, { msgtype: "m.text", body: "Hello, World" },
     );
 }
 
@@ -357,7 +356,6 @@ function recvMessage(httpBackend, client, sender, message) {
     });
 }
 
-
 /**
  * Send an initial sync response to the client (which just includes the member
  * list for our test room).
@@ -394,7 +392,6 @@ function firstSync(testClient) {
     testClient.httpBackend.when("GET", "/sync").respond(200, syncData);
     return testClient.flushSync();
 }
-
 
 describe("MatrixClient crypto", function() {
     if (!CRYPTO_ENABLED) {
@@ -477,7 +474,7 @@ describe("MatrixClient crypto", function() {
         ).respond(200, function(path, content) {
             const result = {};
             result[bobUserId] = bobKeys;
-            return {device_keys: result};
+            return { device_keys: result };
         });
 
         return Promise.all([
@@ -519,7 +516,7 @@ describe("MatrixClient crypto", function() {
         ).respond(200, function(path, content) {
             const result = {};
             result[bobUserId] = bobKeys;
-            return {device_keys: result};
+            return { device_keys: result };
         });
 
         return Promise.all([
@@ -533,7 +530,6 @@ describe("MatrixClient crypto", function() {
         });
     });
 
-
     it("Bob starts his client and uploads device keys and one-time keys", function() {
         return Promise.resolve()
             .then(() => bobTestClient.start())
@@ -545,7 +541,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Ali sends a message", function() {
-        aliTestClient.expectKeyQuery({device_keys: {[aliUserId]: {}}});
+        aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} } });
         return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
@@ -555,7 +551,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Bob receives a message", function() {
-        aliTestClient.expectKeyQuery({device_keys: {[aliUserId]: {}}});
+        aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} } });
         return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
@@ -566,7 +562,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Bob receives a message with a bogus sender", function() {
-        aliTestClient.expectKeyQuery({device_keys: {[aliUserId]: {}}});
+        aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} } });
         return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
@@ -620,7 +616,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Ali blocks Bob's device", function() {
-        aliTestClient.expectKeyQuery({device_keys: {[aliUserId]: {}}});
+        aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} } });
         return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
@@ -640,7 +636,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Bob receives two pre-key messages", function() {
-        aliTestClient.expectKeyQuery({device_keys: {[aliUserId]: {}}});
+        aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} } });
         return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
@@ -653,8 +649,8 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Bob replies to the message", function() {
-        aliTestClient.expectKeyQuery({device_keys: {[aliUserId]: {}}});
-        bobTestClient.expectKeyQuery({device_keys: {[bobUserId]: {}}});
+        aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} } });
+        bobTestClient.expectKeyQuery({ device_keys: { [bobUserId]: {} } });
         return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
@@ -672,7 +668,7 @@ describe("MatrixClient crypto", function() {
     it("Ali does a key query when encryption is enabled", function() {
         // enabling encryption in the room should make alice download devices
         // for both members.
-        aliTestClient.expectKeyQuery({device_keys: {[aliUserId]: {}}});
+        aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} } });
         return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => firstSync(aliTestClient))

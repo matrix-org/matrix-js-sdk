@@ -19,7 +19,7 @@ limitations under the License.
  * @module models/search-result
  */
 
-import {EventContext} from "./event-context";
+import { EventContext } from "./event-context";
 
 /**
  * Construct a new SearchResult
