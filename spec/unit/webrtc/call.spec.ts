@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {TestClient} from '../../TestClient';
-import {MatrixCall, CallErrorCode, CallEvent} from '../../../src/webrtc/call';
+import { TestClient } from '../../TestClient';
+import { MatrixCall, CallErrorCode, CallEvent } from '../../../src/webrtc/call';
 
 const DUMMY_SDP = (
     "v=0\r\n" +
