@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {logger} from '../logger';
+import { logger } from '../logger';
 
 /**
  * Internal module. Management of outgoing room key requests.

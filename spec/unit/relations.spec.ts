@@ -72,7 +72,7 @@ describe("Relations", function() {
         }
     });
 
-    it("should emit created regardless of ordering", async function () {
+    it("should emit created regardless of ordering", async function() {
         const targetEvent = new MatrixEvent({
             "sender": "@bob:example.com",
             "type": "m.room.message",
