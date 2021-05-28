@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Matrix.org Foundation C.I.C.
+Copyright 2020-2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,9 +19,22 @@ import { IndexedDBCryptoStore } from '../crypto/store/indexeddb-crypto-store';
 import { decryptAES, encryptAES } from './aes';
 import anotherjson from "another-json";
 import { logger } from '../logger';
+import { ISecretStorageKeyInfo } from "../matrix";
 
 // FIXME: these types should eventually go in a different file
 type Signatures = Record<string, Record<string, string>>;
+
+export interface IDehydratedDevice {
+    device_id: string;
+    device_data: ISecretStorageKeyInfo & {
+        algorithm: string;
+        account: string; // pickle
+    };
+}
+
+export interface IDehydratedDeviceKeyInfo {
+    passphrase: string;
+}
 
 interface DeviceKeys {
     algorithms: Array<string>;
