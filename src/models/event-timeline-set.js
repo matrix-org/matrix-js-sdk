@@ -719,9 +719,7 @@ EventTimelineSet.prototype.getRelationsForEvent = function(
 
     // debuglog("Getting relations for: ", eventId, relationType, eventType);
 
-    const relationsForEvent = this._relations[eventId] || {};
-    const relationsWithRelType = relationsForEvent[relationType] || {};
-    return relationsWithRelType[eventType];
+    return this.createOrGetRelation(eventId, relationType, eventType);
 };
 
 /**
@@ -746,6 +744,43 @@ EventTimelineSet.prototype.setRelationsTarget = function(event) {
         }
     }
 };
+
+/**
+ * Creates a new relation in this timeline set. Should just be used internally to create
+ * a new relation.
+ *
+ * @param {string} eventId
+ * @param {string} relationType
+ * @param {string} eventType
+ * 
+ * @returns {Relations}
+ */
+EventTimelineSet.prototype.createOrGetRelation = function(eventId, relationType, eventType) {
+    let relationsForEvent = this._relations[eventId];
+    if (!relationsForEvent) {
+        relationsForEvent = this._relations[eventId] = {};
+    }
+    let relationsWithRelType = relationsForEvent[relationType];
+    if (!relationsWithRelType) {
+        relationsWithRelType = relationsForEvent[relationType] = {};
+    }
+    let relationsWithEventType = relationsWithRelType[eventType];
+
+    let relatesToEvent;
+    if (!relationsWithEventType) {
+        relationsWithEventType = relationsWithRelType[eventType] = new Relations(
+            relationType,
+            eventType,
+            this.room,
+        );
+        relatesToEvent = this.findEventById(eventId) || this.room.getPendingEvent(eventId);
+        if (relatesToEvent) {
+            relationsWithEventType.setTargetEvent(relatesToEvent);
+        }
+    }
+
+    return relationsWithEventType;
+}
 
 /**
  * Add relation events to the relevant relation collection.
@@ -781,28 +816,7 @@ EventTimelineSet.prototype.aggregateRelations = function(event) {
 
     // debuglog("Aggregating relation: ", event.getId(), eventType, relation);
 
-    let relationsForEvent = this._relations[relatesToEventId];
-    if (!relationsForEvent) {
-        relationsForEvent = this._relations[relatesToEventId] = {};
-    }
-    let relationsWithRelType = relationsForEvent[relationType];
-    if (!relationsWithRelType) {
-        relationsWithRelType = relationsForEvent[relationType] = {};
-    }
-    let relationsWithEventType = relationsWithRelType[eventType];
-
-    let relatesToEvent;
-    if (!relationsWithEventType) {
-        relationsWithEventType = relationsWithRelType[eventType] = new Relations(
-            relationType,
-            eventType,
-            this.room,
-        );
-        relatesToEvent = this.findEventById(relatesToEventId) || this.room.getPendingEvent(relatesToEventId);
-        if (relatesToEvent) {
-            relationsWithEventType.setTargetEvent(relatesToEvent);
-        }
-    }
+    const relationsWithEventType = this.createOrGetRelation(relatesToEventId, relationType, eventType);
 
     relationsWithEventType.addEvent(event);
 };
