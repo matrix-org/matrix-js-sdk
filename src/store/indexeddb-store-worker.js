@@ -16,8 +16,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {LocalIndexedDBStoreBackend} from "./indexeddb-local-backend.js";
-import {logger} from '../logger';
+import { LocalIndexedDBStoreBackend } from "./indexeddb-local-backend.js";
+import { logger } from '../logger';
 
 /**
  * This class lives in the webworker and drives a LocalIndexedDBStoreBackend

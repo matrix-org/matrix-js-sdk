@@ -22,11 +22,11 @@ import {
 import {
     IndexedDBCryptoStore,
 } from '../../../src/crypto/store/indexeddb-crypto-store';
-import {MemoryCryptoStore} from '../../../src/crypto/store/memory-crypto-store';
+import { MemoryCryptoStore } from '../../../src/crypto/store/memory-crypto-store';
 import 'fake-indexeddb/auto';
 import 'jest-localstorage-mock';
-import {OlmDevice} from "../../../src/crypto/OlmDevice";
-import {logger} from '../../../src/logger';
+import { OlmDevice } from "../../../src/crypto/OlmDevice";
+import { logger } from '../../../src/logger';
 
 const userId = "@alice:example.com";
 
@@ -66,7 +66,7 @@ describe("CrossSigningInfo.getCrossSigningKey", function() {
     });
 
     it.each(types)("should throw if the callback returns falsey",
-                   async ({type, shouldCache}) => {
+                   async ({ type, shouldCache }) => {
         const info = new CrossSigningInfo(userId, {
             getCrossSigningKey: () => false,
         });

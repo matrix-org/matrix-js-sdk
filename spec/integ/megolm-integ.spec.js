@@ -16,10 +16,9 @@ limitations under the License.
 */
 
 import anotherjson from "another-json";
-import * as utils from "../../src/utils";
 import * as testUtils from "../test-utils";
-import {TestClient} from "../TestClient";
-import {logger} from "../../src/logger";
+import { TestClient } from "../TestClient";
+import { logger } from "../../src/logger";
 
 const ROOM_ID = "!room:id";
 
@@ -32,7 +31,7 @@ const ROOM_ID = "!room:id";
  */
 function createOlmSession(olmAccount, recipientTestClient) {
     return recipientTestClient.awaitOneTimeKeyUpload().then((keys) => {
-        const otkId = utils.keys(keys)[0];
+        const otkId = Object.keys(keys)[0];
         const otk = keys[otkId];
 
         const session = new global.Olm.Session();
@@ -197,7 +196,6 @@ function getSyncResponse(roomMembers) {
     return syncResponse;
 }
 
-
 describe("megolm", function() {
     if (!global.Olm) {
         logger.warn('not running megolm tests: Olm not present');
@@ -257,7 +255,7 @@ describe("megolm", function() {
         const testOneTimeKeys = JSON.parse(testOlmAccount.one_time_keys());
         testOlmAccount.mark_keys_as_published();
 
-        const keyId = utils.keys(testOneTimeKeys.curve25519)[0];
+        const keyId = Object.keys(testOneTimeKeys.curve25519)[0];
         const oneTimeKey = testOneTimeKeys.curve25519[keyId];
         const keyResult = {
             'key': oneTimeKey,
@@ -269,7 +267,7 @@ describe("megolm", function() {
             'ed25519:DEVICE_ID': sig,
         };
 
-        const claimResponse = {one_time_keys: {}};
+        const claimResponse = { one_time_keys: {} };
         claimResponse.one_time_keys[userId] = {
             'DEVICE_ID': {},
         };
@@ -484,8 +482,9 @@ describe("megolm", function() {
             return aliceTestClient.flushSync().then(() => {
                 return aliceTestClient.flushSync();
             });
-        }).then(function() {
+        }).then(async function() {
             const room = aliceTestClient.client.getRoom(ROOM_ID);
+            await room.decryptCriticalEvents();
             const event = room.getLiveTimeline().getEvents()[0];
             expect(event.getContent().body).toEqual('42');
         });
@@ -494,7 +493,7 @@ describe("megolm", function() {
     it('Alice sends a megolm message', function() {
         let p2pSession;
 
-        aliceTestClient.expectKeyQuery({device_keys: {'@alice:localhost': {}}});
+        aliceTestClient.expectKeyQuery({ device_keys: { '@alice:localhost': {} } });
         return aliceTestClient.start().then(() => {
             // establish an olm session with alice
             return createOlmSession(testOlmAccount, aliceTestClient);
@@ -577,7 +576,7 @@ describe("megolm", function() {
     });
 
     it("We shouldn't attempt to send to blocked devices", function() {
-        aliceTestClient.expectKeyQuery({device_keys: {'@alice:localhost': {}}});
+        aliceTestClient.expectKeyQuery({ device_keys: { '@alice:localhost': {} } });
         return aliceTestClient.start().then(() => {
             // establish an olm session with alice
             return createOlmSession(testOlmAccount, aliceTestClient);
@@ -634,7 +633,7 @@ describe("megolm", function() {
         let p2pSession;
         let megolmSessionId;
 
-        aliceTestClient.expectKeyQuery({device_keys: {'@alice:localhost': {}}});
+        aliceTestClient.expectKeyQuery({ device_keys: { '@alice:localhost': {} } });
         return aliceTestClient.start().then(() => {
             // establish an olm session with alice
             return createOlmSession(testOlmAccount, aliceTestClient);
@@ -841,13 +840,12 @@ describe("megolm", function() {
         });
     });
 
-
     it('Alice should wait for device list to complete when sending a megolm message',
     function() {
         let downloadPromise;
         let sendPromise;
 
-        aliceTestClient.expectKeyQuery({device_keys: {'@alice:localhost': {}}});
+        aliceTestClient.expectKeyQuery({ device_keys: { '@alice:localhost': {} } });
         return aliceTestClient.start().then(() => {
             // establish an olm session with alice
             return createOlmSession(testOlmAccount, aliceTestClient);
@@ -887,11 +885,10 @@ describe("megolm", function() {
         });
     });
 
-
     it("Alice exports megolm keys and imports them to a new device", function() {
         let messageEncrypted;
 
-        aliceTestClient.expectKeyQuery({device_keys: {'@alice:localhost': {}}});
+        aliceTestClient.expectKeyQuery({ device_keys: { '@alice:localhost': {} } });
         return aliceTestClient.start().then(() => {
             // establish an olm session with alice
             return createOlmSession(testOlmAccount, aliceTestClient);
@@ -933,8 +930,9 @@ describe("megolm", function() {
 
             aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
             return aliceTestClient.flushSync();
-        }).then(function() {
+        }).then(async function() {
             const room = aliceTestClient.client.getRoom(ROOM_ID);
+            await room.decryptCriticalEvents();
             const event = room.getLiveTimeline().getEvents()[0];
             expect(event.getContent().body).toEqual('42');
 

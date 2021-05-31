@@ -15,8 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {logger} from '../../logger';
-import {MemoryCryptoStore} from './memory-crypto-store';
+import { logger } from '../../logger';
+import { MemoryCryptoStore } from './memory-crypto-store';
 
 /**
  * Internal module. Partial localStorage backed storage for e2e.
@@ -136,7 +136,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
     async storeEndToEndSessionProblem(deviceKey, type, fixed) {
         const key = keyEndToEndSessionProblems(deviceKey);
         const problems = getJsonItem(this.store, key) || [];
-        problems.push({type, fixed, time: Date.now()});
+        problems.push({ type, fixed, time: Date.now() });
         problems.sort((a, b) => {
             return a.time - b.time;
         });
@@ -152,7 +152,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         const lastProblem = problems[problems.length - 1];
         for (const problem of problems) {
             if (problem.time > timestamp) {
-                return Object.assign({}, problem, {fixed: lastProblem.fixed});
+                return Object.assign({}, problem, { fixed: lastProblem.fixed });
             }
         }
         if (lastProblem.fixed) {
@@ -168,7 +168,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         const ret = [];
 
         for (const device of devices) {
-            const {userId, deviceInfo} = device;
+            const { userId, deviceInfo } = device;
             if (userId in notifiedErrorDevices) {
                 if (!(deviceInfo.deviceId in notifiedErrorDevices[userId])) {
                     ret.push(device);
@@ -176,7 +176,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
                 }
             } else {
                 ret.push(device);
-                notifiedErrorDevices[userId] = {[deviceInfo.deviceId]: true };
+                notifiedErrorDevices[userId] = { [deviceInfo.deviceId]: true };
             }
         }
 

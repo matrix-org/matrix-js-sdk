@@ -15,8 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {logger} from "../../src/logger";
-import {MatrixEvent} from "../../src/models/event";
+import { logger } from "../../src/logger";
+import { MatrixEvent } from "../../src/models/event";
 
 describe("MatrixEvent", () => {
     describe(".attemptDecryption", () => {

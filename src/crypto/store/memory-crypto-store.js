@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {logger} from '../../logger';
+import { logger } from '../../logger';
 import * as utils from "../../utils";
 
 /**
@@ -186,7 +186,7 @@ export class MemoryCryptoStore {
 
         for (const req of this._outgoingRoomKeyRequests) {
             for (const state of wantedStates) {
-                if (req.state === state && req.recipients.includes({userId, deviceId})) {
+                if (req.state === state && req.recipients.includes({ userId, deviceId })) {
                     results.push(req);
                 }
             }
@@ -324,7 +324,7 @@ export class MemoryCryptoStore {
     async storeEndToEndSessionProblem(deviceKey, type, fixed) {
         const problems = this._sessionProblems[deviceKey]
               = this._sessionProblems[deviceKey] || [];
-        problems.push({type, fixed, time: Date.now()});
+        problems.push({ type, fixed, time: Date.now() });
         problems.sort((a, b) => {
             return a.time - b.time;
         });
@@ -338,7 +338,7 @@ export class MemoryCryptoStore {
         const lastProblem = problems[problems.length - 1];
         for (const problem of problems) {
             if (problem.time > timestamp) {
-                return Object.assign({}, problem, {fixed: lastProblem.fixed});
+                return Object.assign({}, problem, { fixed: lastProblem.fixed });
             }
         }
         if (lastProblem.fixed) {
@@ -353,7 +353,7 @@ export class MemoryCryptoStore {
         const ret = [];
 
         for (const device of devices) {
-            const {userId, deviceInfo} = device;
+            const { userId, deviceInfo } = device;
             if (userId in notifiedErrorDevices) {
                 if (!(deviceInfo.deviceId in notifiedErrorDevices[userId])) {
                     ret.push(device);
@@ -361,7 +361,7 @@ export class MemoryCryptoStore {
                 }
             } else {
                 ret.push(device);
-                notifiedErrorDevices[userId] = {[deviceInfo.deviceId]: true };
+                notifiedErrorDevices[userId] = { [deviceInfo.deviceId]: true };
             }
         }
 

@@ -13,9 +13,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import {InRoomChannel} from "../../../../src/crypto/verification/request/InRoomChannel";
+import { InRoomChannel } from "../../../../src/crypto/verification/request/InRoomChannel";
     "../../../../src/crypto/verification/request/ToDeviceChannel";
-import {MatrixEvent} from "../../../../src/models/event";
+import { MatrixEvent } from "../../../../src/models/event";
 
 describe("InRoomChannel tests", function() {
     const ALICE = "@alice:hs.tld";

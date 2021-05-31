@@ -1,7 +1,7 @@
 import * as utils from "../test-utils";
-import {EventTimeline} from "../../src/matrix";
-import {logger} from "../../src/logger";
-import {TestClient} from "../TestClient";
+import { EventTimeline } from "../../src/matrix";
+import { logger } from "../../src/logger";
+import { TestClient } from "../TestClient";
 
 const userId = "@alice:localhost";
 const userName = "Alice";
@@ -127,7 +127,7 @@ describe("getEventTimeline support", function() {
             "DEVICE",
             accessToken,
             undefined,
-            {timelineSupport: true},
+            { timelineSupport: true },
         );
         client = testClient.client;
         httpBackend = testClient.httpBackend;
@@ -140,7 +140,6 @@ describe("getEventTimeline support", function() {
             }).not.toThrow();
         });
     });
-
 
     it("scrollback should be able to scroll back to before a gappy /sync",
       function() {
@@ -218,7 +217,7 @@ describe("MatrixClient event timelines", function() {
             "DEVICE",
             accessToken,
             undefined,
-            {timelineSupport: true},
+            { timelineSupport: true },
         );
         client = testClient.client;
         httpBackend = testClient.httpBackend;
@@ -516,7 +515,7 @@ describe("MatrixClient event timelines", function() {
                 client.getEventTimeline(timelineSet, EVENTS[0].event_id,
                 ).then(function(tl0) {
                     tl = tl0;
-                    return client.paginateEventTimeline(tl, {backwards: true});
+                    return client.paginateEventTimeline(tl, { backwards: true });
                 }).then(function(success) {
                     expect(success).toBeTruthy();
                     expect(tl.getEvents().length).toEqual(3);
@@ -531,7 +530,6 @@ describe("MatrixClient event timelines", function() {
                 httpBackend.flushAllExpected(),
             ]);
         });
-
 
         it("should allow you to paginate forwards", function() {
             const room = client.getRoom(roomId);
@@ -569,7 +567,7 @@ describe("MatrixClient event timelines", function() {
                 ).then(function(tl0) {
                     tl = tl0;
                     return client.paginateEventTimeline(
-                        tl, {backwards: false, limit: 20});
+                        tl, { backwards: false, limit: 20 });
                 }).then(function(success) {
                     expect(success).toBeTruthy();
                     expect(tl.getEvents().length).toEqual(3);
@@ -591,7 +589,7 @@ describe("MatrixClient event timelines", function() {
         const event = utils.mkMessage({
             room: roomId, user: userId, msg: "a body",
         });
-        event.unsigned = {transaction_id: TXN_ID};
+        event.unsigned = { transaction_id: TXN_ID };
 
         beforeEach(function() {
             // set up handlers for both the message send, and the
@@ -679,7 +677,6 @@ describe("MatrixClient event timelines", function() {
             ]);
         });
     });
-
 
     it("should handle gappy syncs after redactions", function() {
         // https://github.com/vector-im/vector-web/issues/1389

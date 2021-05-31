@@ -1,6 +1,6 @@
 {
   "name": "matrix-js-sdk",
-  "version": "9.11.0",
+  "version": "11.1.0",
   "description": "Matrix Client-Server SDK for Javascript",
   "scripts": {
     "prepublishOnly": "yarn build",
@@ -17,8 +17,9 @@
     "lint": "yarn lint:types && yarn lint:js",
     "lint:js": "eslint --max-warnings 72 src spec",
     "lint:types": "tsc --noEmit",
-    "test": "jest spec/ --coverage --testEnvironment node",
-    "test:watch": "jest spec/ --coverage --testEnvironment node --watch"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "coverage": "yarn test --coverage"
   },
   "repository": {
     "type": "git",
@@ -71,6 +72,7 @@
     "@babel/preset-env": "^7.12.11",
     "@babel/preset-typescript": "^7.12.7",
     "@babel/register": "^7.12.10",
+    "@matrix-org/olm": "https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.3.tgz",
     "@types/jest": "^26.0.20",
     "@types/node": "12",
     "@types/request": "^2.48.5",
@@ -90,13 +92,21 @@
     "jest-localstorage-mock": "^2.4.6",
     "jsdoc": "^3.6.6",
     "matrix-mock-request": "^1.2.3",
-    "olm": "https://packages.matrix.org/npm/olm/olm-3.2.1.tgz",
     "rimraf": "^3.0.2",
     "terser": "^5.5.1",
     "tsify": "^5.0.2",
     "typescript": "^4.1.3"
   },
   "jest": {
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "testMatch": [
+      "<rootDir>/spec/**/*.spec.{js,ts}"
+    ],
+    "collectCoverageFrom": [
+      "<rootDir>/src/**/*.{js,ts}"
+    ],
+    "coverageReporters": [
+      "text"
+    ]
   }
 }

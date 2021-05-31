@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {SyncAccumulator} from "../../src/sync-accumulator";
+import { SyncAccumulator } from "../../src/sync-accumulator";
 
 // The event body & unsigned object get frozen to assert that they don't get altered
 // by the impl

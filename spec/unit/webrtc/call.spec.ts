@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {TestClient} from '../../TestClient';
-import {MatrixCall, CallErrorCode} from '../../../src/webrtc/call';
+import { TestClient } from '../../TestClient';
+import { MatrixCall, CallErrorCode, CallEvent } from '../../../src/webrtc/call';
 
 const DUMMY_SDP = (
     "v=0\r\n" +
@@ -253,5 +253,49 @@ describe('Call', function() {
             candidate: 'the_correct_candidate',
             sdpMid: '',
         });
+    });
+
+    it('should map asserted identity messages to remoteAssertedIdentity', async function() {
+        const callPromise = call.placeVoiceCall();
+        await client.httpBackend.flush();
+        await callPromise;
+        await call.onAnswerReceived({
+            getContent: () => {
+                return {
+                    version: 1,
+                    call_id: call.callId,
+                    party_id: 'party_id',
+                    answer: {
+                        sdp: DUMMY_SDP,
+                    },
+                };
+            },
+        });
+
+        const identChangedCallback = jest.fn();
+        call.on(CallEvent.AssertedIdentityChanged, identChangedCallback);
+
+        await call.onAssertedIdentityReceived({
+            getContent: () => {
+                return {
+                    version: 1,
+                    call_id: call.callId,
+                    party_id: 'party_id',
+                    asserted_identity: {
+                        id: "@steve:example.com",
+                        display_name: "Steve Gibbons",
+                    },
+                };
+            },
+        });
+
+        expect(identChangedCallback).toHaveBeenCalled();
+
+        const ident = call.getRemoteAssertedIdentity();
+        expect(ident.id).toEqual("@steve:example.com");
+        expect(ident.displayName).toEqual("Steve Gibbons");
+
+        // Hangup to stop timers
+        call.hangup(CallErrorCode.UserHangup, true);
     });
 });

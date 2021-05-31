@@ -1,5 +1,5 @@
-import {FilterComponent} from "../../src/filter-component";
-import {mkEvent} from '../test-utils';
+import { FilterComponent } from "../../src/filter-component";
+import { mkEvent } from '../test-utils';
 
 describe("Filter Component", function() {
     describe("types", function() {

@@ -21,14 +21,21 @@ limitations under the License.
  * @module webrtc/call
  */
 
-import {logger} from '../logger';
-import {EventEmitter} from 'events';
+import { logger } from '../logger';
+import { EventEmitter } from 'events';
 import * as utils from '../utils';
 import MatrixEvent from '../models/event';
-import {EventType} from '../@types/event';
+import { EventType } from '../@types/event';
 import { RoomMember } from '../models/room-member';
 import { randomString } from '../randomstring';
-import { MCallReplacesEvent, MCallAnswer, MCallOfferNegotiate, CallCapabilities } from './callEventTypes';
+import {
+    MCallReplacesEvent,
+    MCallAnswer,
+    MCallOfferNegotiate,
+    CallCapabilities,
+    SDPStreamMetadataPurpose,
+} from './callEventTypes';
+import { CallFeed } from './callFeed';
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
@@ -60,6 +67,11 @@ interface TurnServer {
     username?: string,
     password?: string,
     ttl?: number,
+}
+
+interface AssertedIdentity {
+    id: string,
+    displayName: string,
 }
 
 export enum CallState {
@@ -101,6 +113,10 @@ export enum CallEvent {
     RemoteHoldUnhold = 'remote_hold_unhold',
     // backwards compat alias for LocalHoldUnhold: remove in a major version bump
     HoldUnhold = 'hold_unhold',
+    // Feeds have changed
+    FeedsChanged = 'feeds_changed',
+
+    AssertedIdentityChanged = 'asserted_identity_changed',
 }
 
 export enum CallErrorCode {
@@ -172,6 +188,11 @@ export enum CallErrorCode {
      * Signalling for the call could not be sent (other than the initial invite)
      */
     SignallingFailed = 'signalling_timeout',
+
+    /**
+     * The remote party is busy
+     */
+    UserBusy = 'user_busy'
 }
 
 enum ConstraintsType {
@@ -248,11 +269,8 @@ export class MatrixCall extends EventEmitter {
     private candidateSendTries: number;
     private sentEndOfCandidates: boolean;
     private peerConn: RTCPeerConnection;
-    private localVideoElement: HTMLVideoElement;
-    private remoteVideoElement: HTMLVideoElement;
-    private remoteAudioElement: HTMLAudioElement;
+    private feeds: Array<CallFeed>;
     private screenSharingStream: MediaStream;
-    private remoteStream: MediaStream;
     private localAVStream: MediaStream;
     private inviteOrAnswerSent: boolean;
     private waitForLocalAVStream: boolean;
@@ -292,6 +310,8 @@ export class MatrixCall extends EventEmitter {
     // the call) we buffer them up here so we can then add the ones from the party we pick
     private remoteCandidateBuffer = new Map<string, RTCIceCandidate[]>();
 
+    private remoteAssertedIdentity: AssertedIdentity;
+
     constructor(opts: CallOpts) {
         super();
         this.roomId = opts.roomId;
@@ -327,6 +347,8 @@ export class MatrixCall extends EventEmitter {
         this.unholdingRemote = false;
         this.micMuted = false;
         this.vidMuted = false;
+
+        this.feeds = [];
     }
 
     /**
@@ -343,17 +365,11 @@ export class MatrixCall extends EventEmitter {
 
     /**
      * Place a video call to this room.
-     * @param {Element} remoteVideoElement a <code>&lt;video&gt;</code> DOM element
-     * to render video to.
-     * @param {Element} localVideoElement a <code>&lt;video&gt;</code> DOM element
-     * to render the local camera preview.
      * @throws If you have not specified a listener for 'error' events.
      */
-    async placeVideoCall(remoteVideoElement: HTMLVideoElement, localVideoElement: HTMLVideoElement) {
+    async placeVideoCall() {
         logger.debug("placeVideoCall");
         this.checkForErrorListener();
-        this.localVideoElement = localVideoElement;
-        this.remoteVideoElement = remoteVideoElement;
         const constraints = getUserMediaContraints(ConstraintsType.Video);
         this.type = CallType.Video;
         await this.placeCallWithConstraints(constraints);
@@ -363,22 +379,11 @@ export class MatrixCall extends EventEmitter {
      * Place a screen-sharing call to this room. This includes audio.
      * <b>This method is EXPERIMENTAL and subject to change without warning. It
      * only works in Google Chrome and Firefox >= 44.</b>
-     * @param {Element} remoteVideoElement a <code>&lt;video&gt;</code> DOM element
-     * to render video to.
-     * @param {Element} localVideoElement a <code>&lt;video&gt;</code> DOM element
-     * to render the local camera preview.
      * @throws If you have not specified a listener for 'error' events.
      */
-    async placeScreenSharingCall(
-        remoteVideoElement: HTMLVideoElement,
-        localVideoElement: HTMLVideoElement,
-        selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>,
-    ) {
+    async placeScreenSharingCall(selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>) {
         logger.debug("placeScreenSharingCall");
         this.checkForErrorListener();
-        this.localVideoElement = localVideoElement;
-        this.remoteVideoElement = remoteVideoElement;
-
         try {
             const screenshareConstraints = await getScreenshareContraints(selectDesktopCapturerSource);
             if (!screenshareConstraints) {
@@ -419,86 +424,58 @@ export class MatrixCall extends EventEmitter {
         return Boolean(this.opponentCaps && this.opponentCaps["m.call.transferee"]);
     }
 
-    /**
-     * Retrieve the local <code>&lt;video&gt;</code> DOM element.
-     * @return {Element} The dom element
-     */
-    public getLocalVideoElement(): HTMLVideoElement {
-        return this.localVideoElement;
+    public getRemoteAssertedIdentity(): AssertedIdentity {
+        return this.remoteAssertedIdentity;
     }
 
     /**
-     * Retrieve the remote <code>&lt;video&gt;</code> DOM element
-     * used for playing back video capable streams.
-     * @return {Element} The dom element
+     * Returns an array of all CallFeeds
+     * @returns {Array<CallFeed>} CallFeeds
      */
-    public getRemoteVideoElement(): HTMLVideoElement {
-        return this.remoteVideoElement;
+    public getFeeds(): Array<CallFeed> {
+        return this.feeds;
     }
 
     /**
-     * Retrieve the remote <code>&lt;audio&gt;</code> DOM element
-     * used for playing back audio only streams.
-     * @return {Element} The dom element
+     * Returns an array of all local CallFeeds
+     * @returns {Array<CallFeed>} local CallFeeds
      */
-    public getRemoteAudioElement(): HTMLAudioElement {
-        return this.remoteAudioElement;
+    public getLocalFeeds(): Array<CallFeed> {
+        return this.feeds.filter((feed) => {return feed.isLocal()});
     }
 
     /**
-     * Set the local <code>&lt;video&gt;</code> DOM element. If this call is active,
-     * video will be rendered to it immediately.
-     * @param {Element} element The <code>&lt;video&gt;</code> DOM element.
+     * Returns an array of all remote CallFeeds
+     * @returns {Array<CallFeed>} remote CallFeeds
      */
-    public async setLocalVideoElement(element: HTMLVideoElement) {
-        this.localVideoElement = element;
+    public getRemoteFeeds(): Array<CallFeed> {
+        return this.feeds.filter((feed) => {return !feed.isLocal()});
+    }
 
-        if (element && this.localAVStream && this.type === CallType.Video) {
-            element.autoplay = true;
+    /**
+     * Returns true if there are no incoming feeds,
+     * otherwise returns false
+     * @returns {boolean} no incoming feeds
+     */
+    public noIncomingFeeds(): boolean {
+        return !this.feeds.some((feed) => !feed.isLocal());
+    }
 
-            element.srcObject = this.localAVStream;
-            element.muted = true;
-            try {
-                await element.play();
-            } catch (e) {
-                logger.info("Failed to play local video element", e);
-            }
+    private pushNewFeed(stream: MediaStream, userId: string, purpose: SDPStreamMetadataPurpose) {
+        // Try to find a feed with the same stream id as the new stream,
+        // if we find it replace the old stream with the new one
+        const feed = this.feeds.find((feed) => feed.stream.id === stream.id);
+        if (feed) {
+            feed.setNewStream(stream);
+        } else {
+            this.feeds.push(new CallFeed(stream, userId, purpose, this.client, this.roomId));
+            this.emit(CallEvent.FeedsChanged, this.feeds);
         }
     }
 
-    /**
-     * Set the remote <code>&lt;video&gt;</code> DOM element. If this call is active,
-     * the first received video-capable stream will be rendered to it immediately.
-     * @param {Element} element The <code>&lt;video&gt;</code> DOM element.
-     */
-    public setRemoteVideoElement(element: HTMLVideoElement) {
-        if (element === this.remoteVideoElement) return;
-
-        element.autoplay = true;
-
-        // if we already have an audio element set, use that instead and mute the audio
-        // on this video element.
-        if (this.remoteAudioElement) element.muted = true;
-
-        this.remoteVideoElement = element;
-
-        if (this.remoteStream) {
-            this.playRemoteVideo();
-        }
-    }
-
-    /**
-     * Set the remote <code>&lt;audio&gt;</code> DOM element. If this call is active,
-     * the first received audio-only stream will be rendered to it immediately.
-     * The audio will *not* be rendered from the remoteVideoElement.
-     * @param {Element} element The <code>&lt;video&gt;</code> DOM element.
-     */
-    public async setRemoteAudioElement(element: HTMLAudioElement) {
-        if (element === this.remoteAudioElement) return;
-
-        this.remoteAudioElement = element;
-
-        if (this.remoteStream) this.playRemoteAudio();
+    private deleteAllFeeds() {
+        this.feeds = [];
+        this.emit(CallEvent.FeedsChanged, this.feeds);
     }
 
     // The typescript definitions have this type as 'any' :(
@@ -553,16 +530,18 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
+        const remoteStream = this.feeds.find((feed) => {return !feed.isLocal()})?.stream;
+
         // According to previous comments in this file, firefox at some point did not
         // add streams until media started ariving on them. Testing latest firefox
         // (81 at time of writing), this is no longer a problem, so let's do it the correct way.
-        if (!this.remoteStream || this.remoteStream.getTracks().length === 0) {
+        if (!remoteStream || remoteStream.getTracks().length === 0) {
             logger.error("No remote stream or no tracks after setting remote description!");
             this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
             return;
         }
 
-        this.type = this.remoteStream.getTracks().some(t => t.kind === 'video') ? CallType.Video : CallType.Voice;
+        this.type = remoteStream.getTracks().some(t => t.kind === 'video') ? CallType.Video : CallType.Voice;
 
         this.setState(CallState.Ringing);
 
@@ -647,9 +626,6 @@ export class MatrixCall extends EventEmitter {
             newCall.gotUserMediaForAnswer(this.localAVStream);
             delete(this.localAVStream);
         }
-        newCall.localVideoElement = this.localVideoElement;
-        newCall.remoteVideoElement = this.remoteVideoElement;
-        newCall.remoteAudioElement = this.remoteAudioElement;
         this.successor = newCall;
         this.emit(CallEvent.Replaced, newCall);
         this.hangup(CallErrorCode.Replaced, true);
@@ -671,7 +647,7 @@ export class MatrixCall extends EventEmitter {
         // Continue to send no reason for user hangups temporarily, until
         // clients understand the user_hangup reason (voip v1)
         if (reason !== CallErrorCode.UserHangup) content['reason'] = reason;
-        this.sendVoipEvent(EventType.CallHangup, {});
+        this.sendVoipEvent(EventType.CallHangup, content);
     }
 
     /**
@@ -761,10 +737,6 @@ export class MatrixCall extends EventEmitter {
         }
         this.updateMuteStatus();
 
-        if (!onHold) {
-            this.playRemoteAudio();
-        }
-
         this.emit(CallEvent.RemoteHoldUnhold, this.remoteOnHold);
     }
 
@@ -818,16 +790,6 @@ export class MatrixCall extends EventEmitter {
 
         const vidShouldBeMuted = this.vidMuted || this.remoteOnHold;
         setTracksEnabled(this.localAVStream.getVideoTracks(), !vidShouldBeMuted);
-
-        if (this.remoteOnHold) {
-            if (this.remoteAudioElement && this.remoteAudioElement.srcObject === this.remoteStream) {
-                this.remoteAudioElement.muted = true;
-            } else if (this.remoteVideoElement && this.remoteVideoElement.srcObject === this.remoteStream) {
-                this.remoteVideoElement.muted = true;
-            }
-        } else {
-            this.playRemoteAudio();
-        }
     }
 
     /**
@@ -850,24 +812,13 @@ export class MatrixCall extends EventEmitter {
 
         logger.debug("gotUserMediaForInvite -> " + this.type);
 
-        const videoEl = this.getLocalVideoElement();
-
-        if (videoEl && this.type === CallType.Video) {
-            videoEl.autoplay = true;
-            if (this.screenSharingStream) {
-                logger.debug(
-                    "Setting screen sharing stream to the local video element",
-                );
-                videoEl.srcObject = this.screenSharingStream;
-            } else {
-                videoEl.srcObject = stream;
-            }
-            videoEl.muted = true;
-            try {
-                await videoEl.play();
-            } catch (e) {
-                logger.info("Failed to play local video element", e);
-            }
+        if (this.screenSharingStream) {
+            logger.debug(
+                "Setting screen sharing stream to the local video element",
+            );
+            this.pushNewFeed(this.screenSharingStream, this.client.getUserId(), SDPStreamMetadataPurpose.Screenshare);
+        } else {
+            this.pushNewFeed(stream, this.client.getUserId(), SDPStreamMetadataPurpose.Usermedia);
         }
 
         // why do we enable audio (and only audio) tracks here? -- matthew
@@ -937,19 +888,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        const localVidEl = this.getLocalVideoElement();
-
-        if (localVidEl && this.type === CallType.Video) {
-            localVidEl.autoplay = true;
-            localVidEl.srcObject = stream;
-
-            localVidEl.muted = true;
-            try {
-                await localVidEl.play();
-            } catch (e) {
-                logger.info("Failed to play local video element", e);
-            }
-        }
+        this.pushNewFeed(stream, this.client.getUserId(), SDPStreamMetadataPurpose.Usermedia);
 
         this.localAVStream = stream;
         logger.info("Got local AV stream with id " + this.localAVStream.id);
@@ -1199,6 +1138,16 @@ export class MatrixCall extends EventEmitter {
         }
     }
 
+    async onAssertedIdentityReceived(event: MatrixEvent) {
+        if (!event.getContent().asserted_identity) return;
+
+        this.remoteAssertedIdentity = {
+            id: event.getContent().asserted_identity.id,
+            displayName: event.getContent().asserted_identity.display_name,
+        };
+        this.emit(CallEvent.AssertedIdentityChanged);
+    }
+
     private callHasEnded(): boolean {
         // This exists as workaround to typescript trying to be clever and erroring
         // when putting if (this.state === CallState.Ended) return; twice in the same
@@ -1354,32 +1303,31 @@ export class MatrixCall extends EventEmitter {
             logger.warn(`Streamless ${ev.track.kind} found: ignoring.`);
             return;
         }
+
+        const oldRemoteStream = this.feeds.find((feed) => {return !feed.isLocal()})?.stream;
+
         // If we already have a stream, check this track is from the same one
-        if (this.remoteStream && ev.streams[0].id !== this.remoteStream.id) {
+        // Note that we check by ID and always set the remote stream: Chrome appears
+        // to make new stream objects when tranciever directionality is changed and the 'active'
+        // status of streams change - Dave
+        if (oldRemoteStream && ev.streams[0].id !== oldRemoteStream.id) {
             logger.warn(
-                `Ignoring new stream ID ${ev.streams[0].id}: we already have stream ID ${this.remoteStream.id}`,
+                `Ignoring new stream ID ${ev.streams[0].id}: we already have stream ID ${oldRemoteStream.id}`,
             );
             return;
         }
 
-        if (!this.remoteStream) {
+        if (!oldRemoteStream) {
             logger.info("Got remote stream with id " + ev.streams[0].id);
         }
 
-        // Note that we check by ID above and always set the remote stream: Chrome appears
-        // to make new stream objects when tranciever directionality is changed and the 'active'
-        // status of streams change
-        this.remoteStream = ev.streams[0];
+        const newRemoteStream = ev.streams[0];
 
         logger.debug(`Track id ${ev.track.id} of kind ${ev.track.kind} added`);
 
-        if (ev.track.kind === 'video') {
-            if (this.remoteVideoElement) {
-                this.playRemoteVideo();
-            }
-        } else {
-            if (this.remoteAudioElement) this.playRemoteAudio();
-        }
+        this.pushNewFeed(newRemoteStream, this.getOpponentMember().userId, SDPStreamMetadataPurpose.Usermedia)
+
+        logger.info("playing remote. stream active? " + newRemoteStream.active);
     };
 
     onNegotiationNeeded = async () => {
@@ -1401,52 +1349,6 @@ export class MatrixCall extends EventEmitter {
             this.makingOffer = false;
         }
     };
-
-    async playRemoteAudio() {
-        if (this.remoteVideoElement) this.remoteVideoElement.muted = true;
-        this.remoteAudioElement.muted = false;
-
-        this.remoteAudioElement.srcObject = this.remoteStream;
-
-        // if audioOutput is non-default:
-        try {
-            if (audioOutput) {
-                // This seems quite unreliable in Chrome, although I haven't yet managed to make a jsfiddle where
-                // it fails.
-                // It seems reliable if you set the sink ID after setting the srcObject and then set the sink ID
-                // back to the default after the call is over
-                logger.info("Setting audio sink to " + audioOutput + ", was " + this.remoteAudioElement.sinkId);
-                await this.remoteAudioElement.setSinkId(audioOutput);
-            }
-        } catch (e) {
-            logger.warn("Couldn't set requested audio output device: using default", e);
-        }
-
-        try {
-            await this.remoteAudioElement.play();
-        } catch (e) {
-            logger.error("Failed to play remote audio element", e);
-        }
-    }
-
-    private async playRemoteVideo() {
-        // A note on calling methods on media elements:
-        // We used to have queues per media element to serialise all calls on those elements.
-        // The reason given for this was that load() and play() were racing. However, we now
-        // never call load() explicitly so this seems unnecessary. However, serialising every
-        // operation was causing bugs where video would not resume because some play command
-        // had got stuck and all media operations were queued up behind it. If necessary, we
-        // should serialise the ones that need to be serialised but then be able to interrupt
-        // them with another load() which will cancel the pending one, but since we don't call
-        // load() explicitly, it shouldn't be a problem.
-        this.remoteVideoElement.srcObject = this.remoteStream;
-        logger.info("playing remote video. stream active? " + this.remoteStream.active);
-        try {
-            await this.remoteVideoElement.play();
-        } catch (e) {
-            logger.info("Failed to play remote video element", e);
-        }
-    }
 
     onHangupReceived = (msg) => {
         logger.debug("Hangup received for call ID " + this.callId);
@@ -1477,7 +1379,7 @@ export class MatrixCall extends EventEmitter {
         );
 
         if (shouldTerminate) {
-            this.terminate(CallParty.Remote, CallErrorCode.UserHangup, true);
+            this.terminate(CallParty.Remote, msg.reason || CallErrorCode.UserHangup, true);
         } else {
             logger.debug(`Call is in state: ${this.state}: ignoring reject`);
         }
@@ -1607,33 +1509,14 @@ export class MatrixCall extends EventEmitter {
             this.inviteTimeout = null;
         }
 
-        const remoteVid = this.getRemoteVideoElement();
-        const remoteAud = this.getRemoteAudioElement();
-        const localVid = this.getLocalVideoElement();
+        // Order is important here: first we stopAllMedia() and only then we can deleteAllFeeds()
+        // We don't stop media if the call was replaced as we want to re-use streams in the successor
+        if (hangupReason !== CallErrorCode.Replaced) this.stopAllMedia();
+        this.deleteAllFeeds();
 
-        if (remoteVid) {
-            remoteVid.pause();
-            remoteVid.srcObject = null;
-        }
-        if (remoteAud) {
-            remoteAud.pause();
-            remoteAud.srcObject = null;
-            try {
-                // As per comment in playRemoteAudio, setting the sink ID back to the default
-                // once the call is over makes setSinkId work reliably.
-                await this.remoteAudioElement.setSinkId('')
-            } catch (e) {
-                logger.warn("Failed to set sink ID back to default");
-            }
-        }
-        if (localVid) {
-            localVid.pause();
-            localVid.srcObject = null;
-        }
         this.hangupParty = hangupParty;
         this.hangupReason = hangupReason;
         this.setState(CallState.Ended);
-        this.stopAllMedia();
         if (this.peerConn && this.peerConn.signalingState !== 'closed') {
             this.peerConn.close();
         }
@@ -1644,19 +1527,9 @@ export class MatrixCall extends EventEmitter {
 
     private stopAllMedia() {
         logger.debug(`stopAllMedia (stream=${this.localAVStream})`);
-        if (this.localAVStream) {
-            for (const track of this.localAVStream.getTracks()) {
-                track.stop();
-            }
-        }
-        if (this.screenSharingStream) {
-            for (const track of this.screenSharingStream.getTracks()) {
-                track.stop();
-            }
-        }
 
-        if (this.remoteStream) {
-            for (const track of this.remoteStream.getTracks()) {
+        for (const feed of this.feeds) {
+            for (const track of feed.stream.getTracks()) {
                 track.stop();
             }
         }
@@ -1837,7 +1710,7 @@ function getUserMediaContraints(type: ConstraintsType) {
         case ConstraintsType.Audio: {
             return {
                 audio: {
-                    deviceId: audioInput ? {ideal: audioInput} : undefined,
+                    deviceId: audioInput ? { ideal: audioInput } : undefined,
                 },
                 video: false,
             };
@@ -1845,9 +1718,9 @@ function getUserMediaContraints(type: ConstraintsType) {
         case ConstraintsType.Video: {
             return {
                 audio: {
-                    deviceId: audioInput ? {ideal: audioInput} : undefined,
+                    deviceId: audioInput ? { ideal: audioInput } : undefined,
                 }, video: {
-                    deviceId: videoInput ? {ideal: videoInput} : undefined,
+                    deviceId: videoInput ? { ideal: videoInput } : undefined,
                     /* We want 640x360.  Chrome will give it only if we ask exactly,
                        FF refuses entirely if we ask exactly, so have to ask for ideal
                        instead
@@ -1887,16 +1760,8 @@ async function getScreenshareContraints(selectDesktopCapturerSource?: () => Prom
     }
 }
 
-let audioOutput: string;
 let audioInput: string;
 let videoInput: string;
-/**
- * Set an audio output device to use for MatrixCalls
- * @function
- * @param {string=} deviceId the identifier for the device
- * undefined treated as unset
- */
-export function setAudioOutput(deviceId: string) { audioOutput = deviceId; }
 /**
  * Set an audio input device to use for MatrixCalls
  * @function
@@ -1913,6 +1778,9 @@ export function setAudioInput(deviceId: string) { audioInput = deviceId; }
 export function setVideoInput(deviceId: string) { videoInput = deviceId; }
 
 /**
+ * DEPRECATED
+ * Use client.createCall()
+ *
  * Create a new Matrix call for the browser.
  * @param {MatrixClient} client The client instance to use.
  * @param {string} roomId The room the call is in.
@@ -1940,7 +1808,10 @@ export function createNewMatrixCall(client: any, roomId: string, options?: CallO
             window.RTCIceCandidate || navigator.mediaDevices,
         );
         if (!supported) {
-            logger.error("WebRTC is not supported in this browser / environment");
+            // Adds a lot of noise to test runs, so disable logging there.
+            if (process.env.NODE_ENV !== "test") {
+                logger.error("WebRTC is not supported in this browser / environment");
+            }
             return null;
         }
     } catch (e) {

@@ -20,11 +20,11 @@ limitations under the License.
  * @module crypto/CrossSigning
  */
 
-import {decodeBase64, encodeBase64, pkSign, pkVerify} from './olmlib';
-import {EventEmitter} from 'events';
-import {logger} from '../logger';
-import {IndexedDBCryptoStore} from '../crypto/store/indexeddb-crypto-store';
-import {decryptAES, encryptAES} from './aes';
+import { decodeBase64, encodeBase64, pkSign, pkVerify } from './olmlib';
+import { EventEmitter } from 'events';
+import { logger } from '../logger';
+import { IndexedDBCryptoStore } from '../crypto/store/indexeddb-crypto-store';
+import { decryptAES, encryptAES } from './aes';
 
 const KEY_REQUEST_TIMEOUT_MS = 1000 * 60;
 

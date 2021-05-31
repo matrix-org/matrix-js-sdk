@@ -26,40 +26,6 @@ describe("utils", function() {
         });
     });
 
-    describe("forEach", function() {
-        it("should be invoked for each element", function() {
-            const arr = [];
-            utils.forEach([55, 66, 77], function(element) {
-                arr.push(element);
-            });
-            expect(arr).toEqual([55, 66, 77]);
-        });
-    });
-
-    describe("findElement", function() {
-        it("should find only 1 element if there is a match", function() {
-            const matchFn = function() {
-                return true;
-            };
-            const arr = [55, 66, 77];
-            expect(utils.findElement(arr, matchFn)).toEqual(55);
-        });
-        it("should be able to find in reverse order", function() {
-            const matchFn = function() {
-                return true;
-            };
-            const arr = [55, 66, 77];
-            expect(utils.findElement(arr, matchFn, true)).toEqual(77);
-        });
-        it("should find nothing if the function never returns true", function() {
-            const matchFn = function() {
-                return false;
-            };
-            const arr = [55, 66, 77];
-            expect(utils.findElement(arr, matchFn)).toBeFalsy();
-        });
-    });
-
     describe("removeElement", function() {
         it("should remove only 1 element if there is a match", function() {
             const matchFn = function() {
@@ -100,20 +66,6 @@ describe("utils", function() {
             expect(utils.isFunction(function() {})).toBe(true);
             const s = { foo: function() {} };
             expect(utils.isFunction(s.foo)).toBe(true);
-        });
-    });
-
-    describe("isArray", function() {
-        it("should return true for arrays", function() {
-            expect(utils.isArray([])).toBe(true);
-            expect(utils.isArray([5, 3, 7])).toBe(true);
-
-            expect(utils.isArray()).toBe(false);
-            expect(utils.isArray(null)).toBe(false);
-            expect(utils.isArray({})).toBe(false);
-            expect(utils.isArray("foo")).toBe(false);
-            expect(utils.isArray(555)).toBe(false);
-            expect(utils.isArray(function() {})).toBe(false);
         });
     });
 
@@ -188,19 +140,19 @@ describe("utils", function() {
 
         it("should handle simple objects", function() {
             assert.isTrue(utils.deepCompare({}, {}));
-            assert.isTrue(utils.deepCompare({a: 1, b: 2}, {a: 1, b: 2}));
-            assert.isTrue(utils.deepCompare({a: 1, b: 2}, {b: 2, a: 1}));
-            assert.isFalse(utils.deepCompare({a: 1, b: 2}, {a: 1, b: 3}));
+            assert.isTrue(utils.deepCompare({ a: 1, b: 2 }, { a: 1, b: 2 }));
+            assert.isTrue(utils.deepCompare({ a: 1, b: 2 }, { b: 2, a: 1 }));
+            assert.isFalse(utils.deepCompare({ a: 1, b: 2 }, { a: 1, b: 3 }));
 
-            assert.isTrue(utils.deepCompare({1: {name: "mhc", age: 28},
-                                             2: {name: "arb", age: 26}},
-                                            {1: {name: "mhc", age: 28},
-                                             2: {name: "arb", age: 26}}));
+            assert.isTrue(utils.deepCompare({ 1: { name: "mhc", age: 28 },
+                                             2: { name: "arb", age: 26 } },
+                                            { 1: { name: "mhc", age: 28 },
+                                             2: { name: "arb", age: 26 } }));
 
-            assert.isFalse(utils.deepCompare({1: {name: "mhc", age: 28},
-                                              2: {name: "arb", age: 26}},
-                                             {1: {name: "mhc", age: 28},
-                                              2: {name: "arb", age: 27}}));
+            assert.isFalse(utils.deepCompare({ 1: { name: "mhc", age: 28 },
+                                              2: { name: "arb", age: 26 } },
+                                             { 1: { name: "mhc", age: 28 },
+                                              2: { name: "arb", age: 27 } }));
 
             assert.isFalse(utils.deepCompare({}, null));
             assert.isFalse(utils.deepCompare({}, undefined));
@@ -222,7 +174,6 @@ describe("utils", function() {
             assert.isFalse(utils.deepCompare({ a: { b: func } }, { a: { b: func2 } }));
         });
     });
-
 
     describe("extend", function() {
         const SOURCE = { "prop2": 1, "string2": "x", "newprop": "new" };

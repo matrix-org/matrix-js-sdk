@@ -22,7 +22,6 @@ InvalidStoreError.prototype = Object.create(Error.prototype, {
 });
 Reflect.setPrototypeOf(InvalidStoreError, Error);
 
-
 export function InvalidCryptoStoreError(reason) {
     const message = `Crypto store is invalid because ${reason}, ` +
         `please stop the client, delete all data and start the client again`;

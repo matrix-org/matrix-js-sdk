@@ -2,7 +2,9 @@ module.exports = {
     plugins: [
         "matrix-org",
     ],
-    extends: ["plugin:matrix-org/javascript"],
+    extends: [
+        "plugin:matrix-org/babel",
+    ],
     env: {
         browser: true,
         node: true,
@@ -31,14 +33,26 @@ module.exports = {
         "no-console": "error",
     },
     overrides: [{
-        "files": ["src/**/*.ts"],
-        "extends": ["plugin:matrix-org/typescript"],
-        "rules": {
+        files: [
+            "**/*.ts",
+        ],
+        extends: [
+            "plugin:matrix-org/typescript",
+        ],
+        rules: {
+            // TypeScript has its own version of this
+            "@babel/no-invalid-this": "off",
+
             // We're okay being explicit at the moment
             "@typescript-eslint/no-empty-interface": "off",
-            // While we're converting to ts we make heavy use of this
+            // We disable this while we're transitioning
             "@typescript-eslint/no-explicit-any": "off",
+            // We'd rather not do this but we do
+            "@typescript-eslint/ban-ts-comment": "off",
+
             "quotes": "off",
+            // We use a `logger` intermediary module
+            "no-console": "error",
         },
     }],
 };

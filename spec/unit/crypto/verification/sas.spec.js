@@ -15,14 +15,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import "../../../olm-loader";
-import {makeTestClients, setupWebcrypto, teardownWebcrypto} from './util';
-import {MatrixEvent} from "../../../../src/models/event";
-import {SAS} from "../../../../src/crypto/verification/SAS";
-import {DeviceInfo} from "../../../../src/crypto/deviceinfo";
-import {verificationMethods} from "../../../../src/crypto";
+import { makeTestClients, setupWebcrypto, teardownWebcrypto } from './util';
+import { MatrixEvent } from "../../../../src/models/event";
+import { SAS } from "../../../../src/crypto/verification/SAS";
+import { DeviceInfo } from "../../../../src/crypto/deviceinfo";
+import { verificationMethods } from "../../../../src/crypto";
 import * as olmlib from "../../../../src/crypto/olmlib";
-import {logger} from "../../../../src/logger";
-import {resetCrossSigningKeys} from "../crypto-utils";
+import { logger } from "../../../../src/logger";
+import { resetCrossSigningKeys } from "../crypto-utils";
 
 const Olm = global.Olm;
 
@@ -79,8 +79,8 @@ describe("SAS verification", function() {
         beforeEach(async () => {
             [alice, bob] = await makeTestClients(
                 [
-                    {userId: "@alice:example.com", deviceId: "Osborne2"},
-                    {userId: "@bob:example.com", deviceId: "Dynabook"},
+                    { userId: "@alice:example.com", deviceId: "Osborne2" },
+                    { userId: "@bob:example.com", deviceId: "Dynabook" },
                 ],
                 {
                     verificationMethods: [verificationMethods.SAS],
@@ -336,8 +336,8 @@ describe("SAS verification", function() {
     it("should send a cancellation message on error", async function() {
         const [alice, bob] = await makeTestClients(
             [
-                {userId: "@alice:example.com", deviceId: "Osborne2"},
-                {userId: "@bob:example.com", deviceId: "Dynabook"},
+                { userId: "@alice:example.com", deviceId: "Osborne2" },
+                { userId: "@bob:example.com", deviceId: "Dynabook" },
             ],
             {
                 verificationMethods: [verificationMethods.SAS],
@@ -390,8 +390,8 @@ describe("SAS verification", function() {
         beforeEach(async function() {
             [alice, bob] = await makeTestClients(
                 [
-                    {userId: "@alice:example.com", deviceId: "Osborne2"},
-                    {userId: "@bob:example.com", deviceId: "Dynabook"},
+                    { userId: "@alice:example.com", deviceId: "Osborne2" },
+                    { userId: "@bob:example.com", deviceId: "Dynabook" },
                 ],
                 {
                     verificationMethods: [verificationMethods.SAS],
