@@ -752,7 +752,7 @@ EventTimelineSet.prototype.setRelationsTarget = function(event) {
  * @param {string} eventId
  * @param {string} relationType
  * @param {string} eventType
- * 
+ *
  * @returns {Relations}
  */
 EventTimelineSet.prototype.createOrGetRelation = function(eventId, relationType, eventType) {
@@ -780,7 +780,7 @@ EventTimelineSet.prototype.createOrGetRelation = function(eventId, relationType,
     }
 
     return relationsWithEventType;
-}
+};
 
 /**
  * Add relation events to the relevant relation collection.
