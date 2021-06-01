@@ -3368,6 +3368,10 @@ MatrixClient.prototype.getUrlPreview = function(url, ts, callback) {
     // Surely 60-second accuracy is enough for anyone.
     ts = Math.floor(ts / 60000) * 60000;
 
+    const parsed = new URL(url);
+    parsed.hash = ""; // strip the hash as it won't affect the preview
+    url = parsed.toString();
+
     const key = ts + "_" + url;
 
     // If there's already a request in flight (or we've handled it), return that instead.
