@@ -112,6 +112,7 @@ export type Store = StubStore | MemoryStore | LocalIndexedDBStoreBackend | Remot
 export type CryptoStore = MemoryCryptoStore | LocalStorageCryptoStore | IndexedDBCryptoStore;
 
 export type Callback = (err: Error | any | null, data?: any) => void;
+export type ResetTimelineCallback = (roomId: string) => boolean;
 
 const SCROLLBACK_DELAY_MS = 3000;
 export const CRYPTO_ENABLED: boolean = isCryptoAvailable();
@@ -358,7 +359,7 @@ export interface IStartClientOpts {
 
 export interface IStoredClientOpts extends IStartClientOpts {
     crypto: Crypto;
-    canResetEntireTimeline: (roomId: string) => boolean;
+    canResetEntireTimeline: ResetTimelineCallback;
 }
 
 /**
@@ -405,7 +406,7 @@ export class MatrixClient extends EventEmitter {
     private syncedLeftRooms = false;
     private clientOpts: IStoredClientOpts;
     private clientWellKnownIntervalID: number;
-    private canResetTimelineCallback: Callback;
+    private canResetTimelineCallback: ResetTimelineCallback;
 
     // The pushprocessor caches useful things, so keep one and re-use it
     private pushProcessor = new PushProcessor(this);
@@ -485,7 +486,7 @@ export class MatrixClient extends EventEmitter {
                 if (eventToSend.status !== EventStatus.SENDING) {
                     this.updatePendingEventStatus(room, eventToSend, EventStatus.SENDING);
                 }
-                const res = await sendEventHttpRequest(this, eventToSend);
+                const res = await this.sendEventHttpRequest(eventToSend);
                 if (room) {
                     // ensure we update pending event before the next scheduler run so that any listeners to event id
                     // updates on the synchronous event emitter get a chance to run first.
@@ -1229,7 +1230,7 @@ export class MatrixClient extends EventEmitter {
      * Download the keys for a list of users and stores the keys in the session
      * store.
      * @param {Array} userIds The users to fetch.
-     * @param {bool} forceDownload Always download the keys even if cached.
+     * @param {boolean} forceDownload Always download the keys even if cached.
      *
      * @return {Promise} A promise which resolves to a map userId->deviceId->{@link
         * module:crypto~DeviceInfo|DeviceInfo}.
@@ -1590,7 +1591,7 @@ export class MatrixClient extends EventEmitter {
      * to fix things such that it returns true. That is to say, after
      * bootstrapCrossSigning() completes successfully, this function should
      * return true.
-     * @return {bool} True if cross-signing is ready to be used on this device
+     * @return {boolean} True if cross-signing is ready to be used on this device
      */
     public isCrossSigningReady(): boolean {
         if (!this.crypto) {
@@ -1612,7 +1613,7 @@ export class MatrixClient extends EventEmitter {
      *
      * @param {function} opts.authUploadDeviceSigningKeys Function
      * called to await an interactive auth flow when uploading device signing keys.
-     * @param {bool} [opts.setupNewCrossSigning] Optional. Reset even if keys
+     * @param {boolean} [opts.setupNewCrossSigning] Optional. Reset even if keys
      * already exist.
      * Args:
      *     {function} A function that makes the request requiring auth. Receives the
@@ -1635,7 +1636,7 @@ export class MatrixClient extends EventEmitter {
      *
      * Default: true
      *
-     * @return {bool} True if trusting cross-signed devices
+     * @return {boolean} True if trusting cross-signed devices
      */
     public getCryptoTrustCrossSignedDevices() : boolean {
         if (!this.crypto) {
@@ -1649,7 +1650,7 @@ export class MatrixClient extends EventEmitter {
 
      * This may be set before initCrypto() is called to ensure no races occur.
      *
-     * @param {bool} val True to trust cross-signed devices
+     * @param {boolean} val True to trust cross-signed devices
      */
     public setCryptoTrustCrossSignedDevices(val: boolean) {
         if (!this.crypto) {
@@ -1714,7 +1715,7 @@ export class MatrixClient extends EventEmitter {
      *
      * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
      *
-     * @return {bool} True if secret storage is ready to be used on this device
+     * @return {boolean} True if secret storage is ready to be used on this device
      */
     public isSecretStorageReady(): boolean {
         if (!this.crypto) {
@@ -1956,7 +1957,7 @@ export class MatrixClient extends EventEmitter {
     /**
      * Whether encryption is enabled for a room.
      * @param {string} roomId the room id to query.
-     * @return {bool} whether encryption is enabled.
+     * @return {boolean} whether encryption is enabled.
      */
     public isRoomEncrypted(roomId: string): boolean {
         const room = this.getRoom(roomId);
@@ -2082,7 +2083,7 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
-     * @returns {bool} true if the client is configured to back up keys to
+     * @returns {boolean} true if the client is configured to back up keys to
      *     the server, otherwise false. If we haven't completed a successful check
      *     of key backup status yet, returns null.
      */
@@ -2835,7 +2836,8 @@ export class MatrixClient extends EventEmitter {
 
         try {
             const data: any = {};
-            const signedInviteObj = await signPromise;
+            // XXX: Explicit cast due to underlying types not existing
+            const signedInviteObj = <Promise<any>><any>(await signPromise);
             if (signedInviteObj) {
                 data['third_party_signed'] = signedInviteObj;
             }
@@ -2866,9 +2868,9 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public resendEvent(event: MatrixEvent, room: Room): Promise<void> {
+    public resendEvent(event: MatrixEvent, room: Room): Promise<any> { // TODO: Types
         this.updatePendingEventStatus(room, event, EventStatus.SENDING);
-        return this.sendEvent(room, event);
+        return this.encryptAndSendEvent(room, event);
     }
 
     /**
@@ -3505,7 +3507,7 @@ export class MatrixClient extends EventEmitter {
      * <b>This property is unstable and may change in the future.</b>
      * @return {Promise} Resolves: the empty object, {}.
      */
-    public async setRoomReadMarkers(roomId: string, rmEventId: string, rrEvent: MatrixEvent, opts: {hidden?: boolean}): Promise<void> {
+    public async setRoomReadMarkers(roomId: string, rmEventId: string, rrEvent: MatrixEvent, opts: {hidden?: boolean}): Promise<any> { // TODO: Types
         const room = this.getRoom(roomId);
         if (room && room.hasPendingEvent(rmEventId)) {
             throw new Error(`Cannot set read marker to a pending event (${rmEventId})`);
@@ -4124,7 +4126,7 @@ export class MatrixClient extends EventEmitter {
                     room.oldState.paginationToken,
                     limit,
                     'b');
-            }).then((res) => {
+            }).then((res: any) => { // TODO: Types
                 const matrixEvents = res.chunk.map(this.getEventMapper());
                 if (res.state) {
                     const stateEvents = res.state.map(this.getEventMapper());
@@ -4159,8 +4161,8 @@ export class MatrixClient extends EventEmitter {
 
     /**
      * @param {object} [options]
-     * @param {bool} options.preventReEmit don't reemit events emitted on an event mapped by this mapper on the client
-     * @param {bool} options.decrypt decrypt event proactively
+     * @param {boolean} options.preventReEmit don't reemit events emitted on an event mapped by this mapper on the client
+     * @param {boolean} options.decrypt decrypt event proactively
      * @return {Function}
      */
     public getEventMapper(options?: MapperOpts): EventMapper {
@@ -4297,7 +4299,7 @@ export class MatrixClient extends EventEmitter {
      * @param {module:models/event-timeline~EventTimeline} eventTimeline timeline
      *    object to be updated
      * @param {Object}   [opts]
-     * @param {bool}     [opts.backwards = false]  true to fill backwards,
+     * @param {boolean}     [opts.backwards = false]  true to fill backwards,
      *    false to go forwards
      * @param {number}   [opts.limit = 30]         number of events to request
      *
@@ -4305,7 +4307,7 @@ export class MatrixClient extends EventEmitter {
      *    events and we reached either end of the timeline; else true.
      */
     public paginateEventTimeline(eventTimeline: EventTimeline, opts: IPaginateOpts): Promise<boolean> {
-        const isNotifTimeline = (eventTimeline.getTimelineSet() === this._notifTimelineSet);
+        const isNotifTimeline = (eventTimeline.getTimelineSet() === this.notifTimelineSet);
 
         // TODO: we should implement a backoff (as per scrollback()) to deal more
         // nicely with HTTP errors.
@@ -4492,13 +4494,13 @@ export class MatrixClient extends EventEmitter {
     public setGuestAccess(roomId: string, opts: IGuestAccessOpts): Promise<void> {
         const writePromise = this.sendStateEvent(roomId, "m.room.guest_access", {
             guest_access: opts.allowJoin ? "can_join" : "forbidden",
-        });
+        }, "");
 
         let readPromise = Promise.resolve();
         if (opts.allowRead) {
             readPromise = this.sendStateEvent(roomId, "m.room.history_visibility", {
                 history_visibility: "world_readable",
-            });
+            }, "");
         }
 
         return Promise.all([readPromise, writePromise]).then(); // .then() to hide results for contract
@@ -5466,7 +5468,7 @@ export class MatrixClient extends EventEmitter {
      * Default: returns false.
      * @param {Function} cb The callback which will be invoked.
      */
-    public setCanResetTimelineCallback(cb: Callback) {
+    public setCanResetTimelineCallback(cb: ResetTimelineCallback) {
         this.canResetTimelineCallback = cb;
     }
 
@@ -5474,7 +5476,7 @@ export class MatrixClient extends EventEmitter {
      * Get the callback set via `setCanResetTimelineCallback`.
      * @return {?Function} The callback or null
      */
-    public getCanResetTimelineCallback(): Callback {
+    public getCanResetTimelineCallback(): ResetTimelineCallback {
         return this.canResetTimelineCallback;
     }
 
@@ -5545,10 +5547,10 @@ export class MatrixClient extends EventEmitter {
      * @param {MatrixEvent} event The event to decrypt
      * @returns {Promise<void>} A decryption promise
      * @param {object} options
-     * @param {bool} options.isRetry True if this is a retry (enables more logging)
-     * @param {bool} options.emit Emits "event.decrypted" if set to true
+     * @param {boolean} options.isRetry True if this is a retry (enables more logging)
+     * @param {boolean} options.emit Emits "event.decrypted" if set to true
      */
-    public decryptEventIfNeeded(event: MatrixEvent, options: {emit: boolean, isRetry: boolean}): Promise<void> {
+    public decryptEventIfNeeded(event: MatrixEvent, options?: {emit: boolean, isRetry: boolean}): Promise<void> {
         if (event.shouldAttemptDecryption()) {
             event.attemptDecryption(this.crypto, options);
         }
@@ -6146,7 +6148,7 @@ export class MatrixClient extends EventEmitter {
      * property is currently unstable and may change in the future.</b>
      * @return {Promise} Resolves: the empty object, {}.
      */
-    public setRoomReadMarkersHttpRequest(roomId: string, rmEventId: string, rrEventId: string, opts: {hidden: boolean}): Promise<{}> {
+    public setRoomReadMarkersHttpRequest(roomId: string, rmEventId: string, rrEventId: string, opts: {hidden?: boolean}): Promise<{}> {
         const path = utils.encodeUri("/rooms/$roomId/read_markers", {
             $roomId: roomId,
         });
@@ -6727,7 +6729,7 @@ export class MatrixClient extends EventEmitter {
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public getPushRules(callback?: Callback): Promise<any> { // TODO: Types
-        return this._http.authedRequest(callback, "GET", "/pushrules/").then(rules => {
+        return this.http.authedRequest(callback, "GET", "/pushrules/").then(rules => {
             return PushProcessor.rewriteDefaultRules(rules);
         });
     }
@@ -6818,7 +6820,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public search(opts: {body: any, next_batch: string}, callback?: Callback): Promise<any> { // TODO: Types
+    public search(opts: {body: any, next_batch?: string}, callback?: Callback): Promise<any> { // TODO: Types
         const queryParams: any = {};
         if (opts.next_batch) {
             queryParams.next_batch = opts.next_batch;
@@ -7639,7 +7641,7 @@ export class MatrixClient extends EventEmitter {
     /**
      * @param {string} groupId
      * @param {string} roomId
-     * @param {bool} isPublic Whether the room-group association is visible to non-members
+     * @param {boolean} isPublic Whether the room-group association is visible to non-members
      * @return {Promise} Resolves: Empty object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
@@ -7660,7 +7662,7 @@ export class MatrixClient extends EventEmitter {
      * Configure the visibility of a room-group association.
      * @param {string} groupId
      * @param {string} roomId
-     * @param {bool} isPublic Whether the room-group association is visible to non-members
+     * @param {boolean} isPublic Whether the room-group association is visible to non-members
      * @return {Promise} Resolves: Empty object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
@@ -7777,7 +7779,7 @@ export class MatrixClient extends EventEmitter {
 
     /**
      * @param {string} groupId
-     * @param {bool} isPublic Whether the user's membership of this group is made public
+     * @param {boolean} isPublic Whether the user's membership of this group is made public
      * @return {Promise} Resolves: Empty object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
@@ -8058,7 +8060,7 @@ export class MatrixClient extends EventEmitter {
  * Fires whenever the stored devices for a user have changed
  * @event module:client~MatrixClient#"crypto.devicesUpdated"
  * @param {String[]} users A list of user IDs that were updated
- * @param {bool} initialFetch If true, the store was empty (apart
+ * @param {boolean} initialFetch If true, the store was empty (apart
  *     from our own device) and has been seeded.
  */
 
@@ -8066,14 +8068,14 @@ export class MatrixClient extends EventEmitter {
  * Fires whenever the stored devices for a user will be updated
  * @event module:client~MatrixClient#"crypto.willUpdateDevices"
  * @param {String[]} users A list of user IDs that will be updated
- * @param {bool} initialFetch If true, the store is empty (apart
+ * @param {boolean} initialFetch If true, the store is empty (apart
  *     from our own device) and is being seeded.
  */
 
 /**
  * Fires whenever the status of e2e key backup changes, as returned by getKeyBackupEnabled()
  * @event module:client~MatrixClient#"crypto.keyBackupStatus"
- * @param {bool} enabled true if key backup has been enabled, otherwise false
+ * @param {boolean} enabled true if key backup has been enabled, otherwise false
  * @example
  * matrixClient.on("crypto.keyBackupStatus", function(enabled){
  *   if (enabled) {
