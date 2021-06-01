@@ -386,7 +386,6 @@ export class MatrixClient extends EventEmitter {
 
     private canSupportVoip = false;
     private callEventHandler: CallEventHandler;
-    private syncingRetry = null; // TODO: @@TR
     private peekSync: SyncApi = null;
     private isGuestAccount = false;
     private ongoingScrollbacks = {}; // TODO: @@TR
