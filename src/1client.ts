@@ -32,6 +32,7 @@ import { Group } from "./models/group";
 import { EventTimeline } from "./models/event-timeline";
 import { PushAction, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery } from "./autodiscovery";
+import { MatrixError } from "./http-api";
 import * as olmlib from "./crypto/olmlib";
 import { decodeBase64, encodeBase64 } from "./crypto/olmlib";
 import { ReEmitter } from './ReEmitter';
