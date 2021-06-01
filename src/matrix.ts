@@ -18,7 +18,7 @@ import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store";
 import { MemoryStore } from "./store/memory";
 import { MatrixScheduler } from "./scheduler";
 import { MatrixClient } from "./client";
-import { ICreateClientOpts } from "./1client";
+import { ICreateClientOpts } from "./client";
 
 export * from "./client";
 export * from "./http-api";

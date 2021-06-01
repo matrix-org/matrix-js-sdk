@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixClient } from "./1client";
+import { MatrixClient } from "./client";
 import {MatrixEvent} from "./models/event";
 
 export type EventMapper = (obj: any) => MatrixEvent;

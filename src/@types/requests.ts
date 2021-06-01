@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Callback } from "../1client";
+import { Callback } from "../client";
 
 export interface IJoinRoomOpts {
     /**
