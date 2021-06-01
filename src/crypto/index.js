@@ -97,7 +97,7 @@ const KEY_BACKUP_KEYS_PER_REQUEST = 200;
  *
  * @internal
  *
- * @param {module:base-apis~MatrixBaseApis} baseApis base matrix api interface
+ * @param {MatrixClient} baseApis base matrix api interface
  *
  * @param {module:store/session/webstorage~WebStorageSessionStore} sessionStore
  *    Store to be used for end-to-end crypto session data

@@ -725,7 +725,7 @@ export function createCryptoStoreCacheCallbacks(store, olmdevice) {
 /**
  * Request cross-signing keys from another device during verification.
  *
- * @param {module:base-apis~MatrixBaseApis} baseApis base Matrix API interface
+ * @param {MatrixClient} baseApis base Matrix API interface
  * @param {string} userId The user ID being verified
  * @param {string} deviceId The device ID being verified
  */

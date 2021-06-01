@@ -49,9 +49,10 @@ export class VerificationBase extends EventEmitter {
      *
      * @class
      *
-     * @param {module:base-apis~Channel} channel the verification channel to send verification messages over.
+     * TODO: Channel types
+     * @param {Channel} channel the verification channel to send verification messages over.
      *
-     * @param {module:base-apis~MatrixBaseApis} baseApis base matrix api interface
+     * @param {MatrixClient} baseApis base matrix api interface
      *
      * @param {string} userId the user ID that is being verified
      *
