@@ -31,19 +31,27 @@ import { sleep } from './utils';
 import { Group } from "./models/group";
 import { EventTimeline } from "./models/event-timeline";
 import { PushAction, PushProcessor } from "./pushprocessor";
-import { PREFIX_MEDIA_R0, PREFIX_UNSTABLE, retryNetworkOperation, } from "./http-api";
-import {AutoDiscovery} from "./autodiscovery";
+import { AutoDiscovery } from "./autodiscovery";
 import * as olmlib from "./crypto/olmlib";
 import { decodeBase64, encodeBase64 } from "./crypto/olmlib";
 import { ReEmitter } from './ReEmitter';
 import { RoomList } from './crypto/RoomList';
 import { logger } from './logger';
+import { SERVICE_TYPES } from './service-types';
+import {
+    MatrixHttpApi,
+    PREFIX_IDENTITY_V2,
+    PREFIX_MEDIA_R0,
+    PREFIX_R0,
+    PREFIX_UNSTABLE,
+    retryNetworkOperation
+} from "./http-api";
 import { Crypto, DeviceInfo, fixBackupKey, isCryptoAvailable } from './crypto';
 import { decodeRecoveryKey } from './crypto/recoverykey';
 import { keyFromAuthData } from './crypto/key_passphrase';
 import { User } from "./models/user";
 import { getHttpUriForMxc } from "./content-repo";
-import {SearchResult} from "./models/search-result";
+import { SearchResult } from "./models/search-result";
 import { DEHYDRATION_ALGORITHM, IDehydratedDevice, IDehydratedDeviceKeyInfo } from "./crypto/dehydration";
 import {
     IKeyBackupPrepareOpts,
@@ -82,19 +90,22 @@ import {
 import { CrossSigningInfo, UserTrustLevel } from "./crypto/CrossSigning";
 import { Room } from "./models/Room";
 import {
+    ICreateRoomOpts,
     IEventSearchOpts,
     IGuestAccessOpts,
     IJoinRoomOpts,
     IPaginateOpts,
     IPresenceOpts,
-    IRedactOpts, ISearchOpts,
-    ISendEventResponse
+    IRedactOpts, IRoomDirectoryOptions,
+    ISearchOpts,
+    ISendEventResponse, IUploadOpts
 } from "./@types/requests";
 import { EventType } from "./@types/event";
 import { IImageInfo } from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
 import url from "url";
 import { randomString } from "./randomstring";
+import { ReadStream } from "fs";
 
 export type Store = StubStore | MemoryStore | LocalIndexedDBStoreBackend | RemoteIndexedDBStoreBackend;
 
@@ -413,6 +424,11 @@ export class MatrixClient extends EventEmitter {
     private turnServersExpiry = 0;
     private checkTurnServersIntervalID: number;
     private exportedOlmDeviceToImport: IOlmDevice;
+    private baseUrl: string;
+    private idBaseUrl: string;
+    private identityServer: any; // TODO: @@TR
+    private http: MatrixHttpApi;
+    private txnCtr = 0;
 
     constructor(opts: IMatrixClientCreateOpts) {
         super();
@@ -426,6 +442,18 @@ export class MatrixClient extends EventEmitter {
 
         const userId = opts.userId || null;
         this.credentials = {userId};
+
+        this.http = new MatrixHttpApi(this, {
+            baseUrl: opts.baseUrl,
+            idBaseUrl: opts.idBaseUrl,
+            accessToken: opts.accessToken,
+            request: opts.request,
+            prefix: PREFIX_R0,
+            onlyData: true,
+            extraParams: opts.queryParams,
+            localTimeoutMs: opts.localTimeoutMs,
+            useAuthorizationHeader: opts.useAuthorizationHeader,
+        });
 
         if (opts.deviceToImport) {
             if (this.deviceId) {
@@ -5531,7 +5559,2239 @@ export class MatrixClient extends EventEmitter {
             return Promise.resolve();
         }
     }
+
+    private termsUrlForService(serviceType: SERVICE_TYPES, baseUrl: string) {
+        switch (serviceType) {
+            case SERVICE_TYPES.IS:
+                return baseUrl + PREFIX_IDENTITY_V2 + '/terms';
+            case SERVICE_TYPES.IM:
+                return baseUrl + '/_matrix/integrations/v1/terms';
+            default:
+                throw new Error('Unsupported service type');
+        }
+    }
+
+    /**
+     * Get the Homeserver URL of this client
+     * @return {string} Homeserver URL of this client
+     */
+    public getHomeserverUrl(): string {
+        return this.baseUrl;
+    }
+
+    /**
+     * Get the Identity Server URL of this client
+     * @param {boolean} stripProto whether or not to strip the protocol from the URL
+     * @return {string} Identity Server URL of this client
+     */
+    public getIdentityServerUrl(stripProto = false): string {
+        if (stripProto && (this.idBaseUrl.startsWith("http://") ||
+            this.idBaseUrl.startsWith("https://"))) {
+            return this.idBaseUrl.split("://")[1];
+        }
+        return this.idBaseUrl;
+    }
+
+    /**
+     * Set the Identity Server URL of this client
+     * @param {string} url New Identity Server URL
+     */
+    public setIdentityServerUrl(url: string) {
+        this.idBaseUrl = utils.ensureNoTrailingSlash(url);
+        this.http.setIdBaseUrl(this.idBaseUrl);
+    }
+
+    /**
+     * Get the access token associated with this account.
+     * @return {?String} The access_token or null
+     */
+    public getAccessToken(): string {
+        return this.http.opts.accessToken || null;
+    }
+
+    /**
+     * @return {boolean} true if there is a valid access_token for this client.
+     */
+    public isLoggedIn(): boolean {
+        return this.http.opts.accessToken !== undefined;
+    }
+
+    /**
+     * Make up a new transaction id
+     *
+     * @return {string} a new, unique, transaction id
+     */
+    public makeTxnId(): string {
+        return "m" + new Date().getTime() + "." + (this.txnCtr++);
+    }
+
+    /**
+     * Check whether a username is available prior to registration. An error response
+     * indicates an invalid/unavailable username.
+     * @param {string} username The username to check the availability of.
+     * @return {Promise} Resolves: to `true`.
+     */
+    public isUsernameAvailable(username: string): Promise<true> {
+        return this.http.authedRequest(
+            undefined, "GET", '/register/available', { username: username },
+        ).then((response) => {
+            return response.available;
+        });
+    }
+
+    /**
+     * @param {string} username
+     * @param {string} password
+     * @param {string} sessionId
+     * @param {Object} auth
+     * @param {Object} bindThreepids Set key 'email' to true to bind any email
+     *     threepid uses during registration in the ID server. Set 'msisdn' to
+     *     true to bind msisdn.
+     * @param {string} guestAccessToken
+     * @param {string} inhibitLogin
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public register(username: string, password: string, sessionId: string, auth: any, bindThreepids: any, guestAccessToken: string, inhibitLogin: boolean, callback?: Callback): Promise<any> { // TODO: Types (many)
+        // backwards compat
+        if (bindThreepids === true) {
+            bindThreepids = { email: true };
+        } else if (bindThreepids === null || bindThreepids === undefined) {
+            bindThreepids = {};
+        }
+        if (typeof inhibitLogin === 'function') {
+            callback = inhibitLogin;
+            inhibitLogin = undefined;
+        }
+
+        if (sessionId) {
+            auth.session = sessionId;
+        }
+
+        const params: any = {
+            auth: auth,
+        };
+        if (username !== undefined && username !== null) {
+            params.username = username;
+        }
+        if (password !== undefined && password !== null) {
+            params.password = password;
+        }
+        if (bindThreepids.email) {
+            params.bind_email = true;
+        }
+        if (bindThreepids.msisdn) {
+            params.bind_msisdn = true;
+        }
+        if (guestAccessToken !== undefined && guestAccessToken !== null) {
+            params.guest_access_token = guestAccessToken;
+        }
+        if (inhibitLogin !== undefined && inhibitLogin !== null) {
+            params.inhibit_login = inhibitLogin;
+        }
+        // Temporary parameter added to make the register endpoint advertise
+        // msisdn flows. This exists because there are clients that break
+        // when given stages they don't recognise. This parameter will cease
+        // to be necessary once these old clients are gone.
+        // Only send it if we send any params at all (the password param is
+        // mandatory, so if we send any params, we'll send the password param)
+        if (password !== undefined && password !== null) {
+            params.x_show_msisdn = true;
+        }
+
+        return this.registerRequest(params, undefined, callback);
+    }
+
+    /**
+     * Register a guest account.
+     * This method returns the auth info needed to create a new authenticated client,
+     * Remember to call `setGuest(true)` on the (guest-)authenticated client, e.g:
+     * ```javascript
+     * const tmpClient = await sdk.createClient(MATRIX_INSTANCE);
+     * const { user_id, device_id, access_token } = tmpClient.registerGuest();
+     * const client = createClient({
+     *   baseUrl: MATRIX_INSTANCE,
+     *   accessToken: access_token,
+     *   userId: user_id,
+     *   deviceId: device_id,
+     * })
+     * client.setGuest(true);
+     * ```
+     *
+     * @param {Object=} opts Registration options
+     * @param {Object} opts.body JSON HTTP body to provide.
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: JSON object that contains:
+     *                   { user_id, device_id, access_token, home_server }
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public registerGuest(opts: {body?: any}, callback?: Callback): Promise<any> { // TODO: Types
+        opts = opts || {};
+        opts.body = opts.body || {};
+        return this.registerRequest(opts.body, "guest", callback);
+    }
+
+    /**
+     * @param {Object} data   parameters for registration request
+     * @param {string=} kind  type of user to register. may be "guest"
+     * @param {module:client.callback=} callback
+     * @return {Promise} Resolves: to the /register response
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public registerRequest(data: any, kind: string, callback?: Callback): Promise<any> { // TODO: Types
+        const params: any = {};
+        if (kind) {
+            params.kind = kind;
+        }
+
+        return this.http.request(callback, "POST", "/register", params, data);
+    }
+
+    /**
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public loginFlows(callback?: Callback): Promise<any> { // TODO: Types
+        return this.http.request(callback, "GET", "/login");
+    }
+
+    /**
+     * @param {string} loginType
+     * @param {Object} data
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public login(loginType: string, data: any, callback?: Callback): Promise<any> { // TODO: Types
+        const login_data = {
+            type: loginType,
+        };
+
+        // merge data into login_data
+        utils.extend(login_data, data);
+
+        return this.http.authedRequest(
+            (error, response) => {
+                if (response && response.access_token && response.user_id) {
+                    this.http.opts.accessToken = response.access_token;
+                    this.credentials = {
+                        userId: response.user_id,
+                    };
+                }
+
+                if (callback) {
+                    callback(error, response);
+                }
+            }, "POST", "/login", undefined, login_data,
+        );
+    }
+
+    /**
+     * @param {string} user
+     * @param {string} password
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public loginWithPassword(user: string, password: string, callback?: Callback): Promise<any> { // TODO: Types
+        return this.login("m.login.password", {
+            user: user,
+            password: password,
+        }, callback);
+    }
+
+    /**
+     * @param {string} relayState URL Callback after SAML2 Authentication
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public loginWithSAML2(relayState: string, callback?: Callback): Promise<any> { // TODO: Types
+        return this.login("m.login.saml2", {
+            relay_state: relayState,
+        }, callback);
+    }
+
+    /**
+     * @param {string} redirectUrl The URL to redirect to after the HS
+     * authenticates with CAS.
+     * @return {string} The HS URL to hit to begin the CAS login process.
+     */
+    public getCasLoginUrl(redirectUrl: string): Promise<string> {
+        return this.getSsoLoginUrl(redirectUrl, "cas");
+    }
+
+    /**
+     * @param {string} redirectUrl The URL to redirect to after the HS
+     *     authenticates with the SSO.
+     * @param {string} loginType The type of SSO login we are doing (sso or cas).
+     *     Defaults to 'sso'.
+     * @param {string} idpId The ID of the Identity Provider being targeted, optional.
+     * @return {string} The HS URL to hit to begin the SSO login process.
+     */
+    public getSsoLoginUrl(redirectUrl: string, loginType = "sso", idpId?: string): Promise<string> {
+        let prefix = PREFIX_R0;
+        let url = "/login/" + loginType + "/redirect";
+        if (idpId) {
+            url += "/" + idpId;
+            prefix = "/_matrix/client/unstable/org.matrix.msc2858";
+        }
+
+        return this.http.getUrl(url, { redirectUrl }, prefix);
+    }
+
+    /**
+     * @param {string} token Login token previously received from homeserver
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public loginWithToken(token: string, callback?: Callback): Promise<any> { // TODO: Types
+        return this.login("m.login.token", {
+            token: token,
+        }, callback);
+    }
+
+    /**
+     * Logs out the current session.
+     * Obviously, further calls that require authorisation should fail after this
+     * method is called. The state of the MatrixClient object is not affected:
+     * it is up to the caller to either reset or destroy the MatrixClient after
+     * this method succeeds.
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: On success, the empty object
+     */
+    public logout(callback?: Callback): Promise<{}> {
+        return this.http.authedRequest(
+            callback, "POST", '/logout',
+        );
+    }
+
+    /**
+     * Deactivates the logged-in account.
+     * Obviously, further calls that require authorisation should fail after this
+     * method is called. The state of the MatrixClient object is not affected:
+     * it is up to the caller to either reset or destroy the MatrixClient after
+     * this method succeeds.
+     * @param {object} auth Optional. Auth data to supply for User-Interactive auth.
+     * @param {boolean} erase Optional. If set, send as `erase` attribute in the
+     * JSON request body, indicating whether the account should be erased. Defaults
+     * to false.
+     * @return {Promise} Resolves: On success, the empty object
+     */
+    public deactivateAccount(auth?: any, erase?: boolean): Promise<{}> {
+        if (typeof(erase) === 'function') {
+            throw new Error(
+                'deactivateAccount no longer accepts a callback parameter',
+            );
+        }
+
+        const body: any = {};
+        if (auth) {
+            body.auth = auth;
+        }
+        if (erase !== undefined) {
+            body.erase = erase;
+        }
+
+        return this.http.authedRequest(
+            undefined, "POST", '/account/deactivate', undefined, body,
+        );
+    }
+
+    /**
+     * Get the fallback URL to use for unknown interactive-auth stages.
+     *
+     * @param {string} loginType     the type of stage being attempted
+     * @param {string} authSessionId the auth session ID provided by the homeserver
+     *
+     * @return {string} HS URL to hit to for the fallback interface
+     */
+    public getFallbackAuthUrl(loginType: string, authSessionId: string): Promise<string> {
+        const path = utils.encodeUri("/auth/$loginType/fallback/web", {
+            $loginType: loginType,
+        });
+
+        return this.http.getUrl(path, {
+            session: authSessionId,
+        }, PREFIX_R0);
+    }
+
+    /**
+     * Create a new room.
+     * @param {Object} options a list of options to pass to the /createRoom API.
+     * @param {string} options.room_alias_name The alias localpart to assign to
+     * this room.
+     * @param {string} options.visibility Either 'public' or 'private'.
+     * @param {string[]} options.invite A list of user IDs to invite to this room.
+     * @param {string} options.name The name to give this room.
+     * @param {string} options.topic The topic to give this room.
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: <code>{room_id: {string},
+     * room_alias: {string(opt)}}</code>
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public async createRoom(options: ICreateRoomOpts, callback?: Callback): Promise<{roomId: string, room_alias?: string}> {
+        // some valid options include: room_alias_name, visibility, invite
+
+        // inject the id_access_token if inviting 3rd party addresses
+        const invitesNeedingToken = (options.invite_3pid || [])
+            .filter(i => !i.id_access_token);
+        if (
+            invitesNeedingToken.length > 0 &&
+            this.identityServer &&
+            this.identityServer.getAccessToken &&
+            await this.doesServerAcceptIdentityAccessToken()
+        ) {
+            const identityAccessToken = await this.identityServer.getAccessToken();
+            if (identityAccessToken) {
+                for (const invite of invitesNeedingToken) {
+                    invite.id_access_token = identityAccessToken;
+                }
+            }
+        }
+
+        return this.http.authedRequest(
+            callback, "POST", "/createRoom", undefined, options,
+        );
+    }
+
+    /**
+     * Fetches relations for a given event
+     * @param {string} roomId the room of the event
+     * @param {string} eventId the id of the event
+     * @param {string} relationType the rel_type of the relations requested
+     * @param {string} eventType the event type of the relations requested
+     * @param {Object} opts options with optional values for the request.
+     * @param {Object} opts.from the pagination token returned from a previous request as `next_batch` to return following relations.
+     * @return {Object} the response, with chunk and next_batch.
+     */
+    public async fetchRelations(roomId: string, eventId: string, relationType: string, eventType: string, opts: {from: string}): Promise<any> { // TODO: Types
+        const queryParams: any = {};
+        if (opts.from) {
+            queryParams.from = opts.from;
+        }
+        const queryString = utils.encodeParams(queryParams);
+        const path = utils.encodeUri(
+            "/rooms/$roomId/relations/$eventId/$relationType/$eventType?" + queryString, {
+                $roomId: roomId,
+                $eventId: eventId,
+                $relationType: relationType,
+                $eventType: eventType,
+            });
+        return await this.http.authedRequest(
+            undefined, "GET", path, null, null, {
+                prefix: PREFIX_UNSTABLE,
+            },
+        );
+    }
+
+    /**
+     * @param {string} roomId
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public roomState(roomId: string, callback?: Callback): Promise<any> { // TODO: Types
+        const path = utils.encodeUri("/rooms/$roomId/state", { $roomId: roomId });
+        return this.http.authedRequest(callback, "GET", path);
+    }
+
+    /**
+     * Get an event in a room by its event id.
+     * @param {string} roomId
+     * @param {string} eventId
+     * @param {module:client.callback} callback Optional.
+     *
+     * @return {Promise} Resolves to an object containing the event.
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public fetchRoomEvent(roomId: string, eventId: string, callback?: Callback): Promise<any> { // TODO: Types
+        const path = utils.encodeUri(
+            "/rooms/$roomId/event/$eventId", {
+                $roomId: roomId,
+                $eventId: eventId,
+            },
+        );
+        return this.http.authedRequest(callback, "GET", path);
+    }
+
+    /**
+     * @param {string} roomId
+     * @param {string} includeMembership the membership type to include in the response
+     * @param {string} excludeMembership the membership type to exclude from the response
+     * @param {string} atEventId the id of the event for which moment in the timeline the members should be returned for
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: dictionary of userid to profile information
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public members(roomId: string, includeMembership?: string[], excludeMembership?: string[], atEventId?: string, callback?: Callback): Promise<{[userId: string]: any}> {
+        const queryParams: any = {};
+        if (includeMembership) {
+            queryParams.membership = includeMembership;
+        }
+        if (excludeMembership) {
+            queryParams.not_membership = excludeMembership;
+        }
+        if (atEventId) {
+            queryParams.at = atEventId;
+        }
+
+        const queryString = utils.encodeParams(queryParams);
+
+        const path = utils.encodeUri("/rooms/$roomId/members?" + queryString,
+            { $roomId: roomId });
+        return this.http.authedRequest(callback, "GET", path);
+    }
+
+    /**
+     * Upgrades a room to a new protocol version
+     * @param {string} roomId
+     * @param {string} newVersion The target version to upgrade to
+     * @return {Promise} Resolves: Object with key 'replacement_room'
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public upgradeRoom(roomId: string, newVersion: string): Promise<{replacement_room: string}> {
+        const path = utils.encodeUri("/rooms/$roomId/upgrade", { $roomId: roomId });
+        return this.http.authedRequest(
+            undefined, "POST", path, undefined, { new_version: newVersion },
+        );
+    }
+
+    /**
+     * Retrieve a state event.
+     * @param {string} roomId
+     * @param {string} eventType
+     * @param {string} stateKey
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public getStateEvent(roomId: string, eventType: string, stateKey: string, callback?: Callback): Promise<any> {
+        const pathParams = {
+            $roomId: roomId,
+            $eventType: eventType,
+            $stateKey: stateKey,
+        };
+        let path = utils.encodeUri("/rooms/$roomId/state/$eventType", pathParams);
+        if (stateKey !== undefined) {
+            path = utils.encodeUri(path + "/$stateKey", pathParams);
+        }
+        return this.http.authedRequest(
+            callback, "GET", path,
+        );
+    }
+
+    /**
+     * @param {string} roomId
+     * @param {string} eventType
+     * @param {Object} content
+     * @param {string} stateKey
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public sendStateEvent(roomId: string, eventType: string, content: any, stateKey: string, callback?: Callback): Promise<any> { // TODO: Types
+        const pathParams = {
+            $roomId: roomId,
+            $eventType: eventType,
+            $stateKey: stateKey,
+        };
+        let path = utils.encodeUri("/rooms/$roomId/state/$eventType", pathParams);
+        if (stateKey !== undefined) {
+            path = utils.encodeUri(path + "/$stateKey", pathParams);
+        }
+        return this.http.authedRequest(
+            callback, "PUT", path, undefined, content,
+        );
+    }
+
+    /**
+     * @param {string} roomId
+     * @param {Number} limit
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public roomInitialSync(roomId: string, limit: number, callback?: Callback): Promise<any> { // TODO: Types
+        if (utils.isFunction(limit)) {
+            callback = limit as any as Callback; // legacy
+            limit = undefined;
+        }
+        const path = utils.encodeUri("/rooms/$roomId/initialSync",
+            { $roomId: roomId },
+        );
+        if (!limit) {
+            limit = 30;
+        }
+        return this.http.authedRequest(
+            callback, "GET", path, { limit: limit },
+        );
+    }
+
+    /**
+     * Set a marker to indicate the point in a room before which the user has read every
+     * event. This can be retrieved from room account data (the event type is `m.fully_read`)
+     * and displayed as a horizontal line in the timeline that is visually distinct to the
+     * position of the user's own read receipt.
+     * @param {string} roomId ID of the room that has been read
+     * @param {string} rmEventId ID of the event that has been read
+     * @param {string} rrEventId ID of the event tracked by the read receipt. This is here
+     * for convenience because the RR and the RM are commonly updated at the same time as
+     * each other. Optional.
+     * @param {object} opts Options for the read markers.
+     * @param {object} opts.hidden True to hide the read receipt from other users. <b>This
+     * property is currently unstable and may change in the future.</b>
+     * @return {Promise} Resolves: the empty object, {}.
+     */
+    public setRoomReadMarkersHttpRequest(roomId: string, rmEventId: string, rrEventId: string, opts: {hidden: boolean}): Promise<{}> {
+        const path = utils.encodeUri("/rooms/$roomId/read_markers", {
+            $roomId: roomId,
+        });
+
+        const content = {
+            "m.fully_read": rmEventId,
+            "m.read": rrEventId,
+            "m.hidden": Boolean(opts ? opts.hidden : false),
+        };
+
+        return this.http.authedRequest(
+            undefined, "POST", path, undefined, content,
+        );
+    }
+
+    /**
+     * @return {Promise} Resolves: A list of the user's current rooms
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public getJoinedRooms(): Promise<string[]> {
+        const path = utils.encodeUri("/joined_rooms", {});
+        return this.http.authedRequest(undefined, "GET", path);
+    }
+
+    /**
+     * Retrieve membership info. for a room.
+     * @param {string} roomId ID of the room to get membership for
+     * @return {Promise} Resolves: A list of currently joined users
+     *                                 and their profile data.
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public getJoinedRoomMembers(roomId: string): Promise<any> { // TODO: Types
+        const path = utils.encodeUri("/rooms/$roomId/joined_members", {
+            $roomId: roomId,
+        });
+        return this.http.authedRequest(undefined, "GET", path);
+    }
+
+    /**
+     * @param {Object} options Options for this request
+     * @param {string} options.server The remote server to query for the room list.
+     *                                Optional. If unspecified, get the local home
+     *                                server's public room list.
+     * @param {number} options.limit Maximum number of entries to return
+     * @param {string} options.since Token to paginate from
+     * @param {object} options.filter Filter parameters
+     * @param {string} options.filter.generic_search_term String to search for
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public publicRooms(options: IRoomDirectoryOptions, callback?: Callback): Promise<any> { // TODO: Types
+        if (typeof(options) == 'function') {
+            callback = options;
+            options = {};
+        }
+        if (options === undefined) {
+            options = {};
+        }
+
+        const query_params: any = {};
+        if (options.server) {
+            query_params.server = options.server;
+            delete options.server;
+        }
+
+        if (Object.keys(options).length === 0 && Object.keys(query_params).length === 0) {
+            return this.http.authedRequest(callback, "GET", "/publicRooms");
+        } else {
+            return this.http.authedRequest(
+                callback, "POST", "/publicRooms", query_params, options,
+            );
+        }
+    }
+
+    /**
+     * Create an alias to room ID mapping.
+     * @param {string} alias The room alias to create.
+     * @param {string} roomId The room ID to link the alias to.
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO.
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public createAlias(alias: string, roomId: string, callback?: Callback): Promise<any> { // TODO: Types
+        const path = utils.encodeUri("/directory/room/$alias", {
+            $alias: alias,
+        });
+        const data = {
+            room_id: roomId,
+        };
+        return this.http.authedRequest(
+            callback, "PUT", path, undefined, data,
+        );
+    }
+
+    /**
+     * Delete an alias to room ID mapping.  This alias must be on your local server
+     * and you must have sufficient access to do this operation.
+     * @param {string} alias The room alias to delete.
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO.
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public deleteAlias(alias: string, callback?: Callback): Promise<any> { // TODO: Types
+        const path = utils.encodeUri("/directory/room/$alias", {
+            $alias: alias,
+        });
+        return this.http.authedRequest(
+            callback, "DELETE", path, undefined, undefined,
+        );
+    }
+
+    /**
+     * @param {string} roomId
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: an object with an `aliases` property, containing an array of local aliases
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public unstableGetLocalAliases(roomId: string, callback?: Callback): Promise<{aliases: string[]}> {
+        const path = utils.encodeUri("/rooms/$roomId/aliases",
+            { $roomId: roomId });
+        const prefix = PREFIX_UNSTABLE + "/org.matrix.msc2432";
+        return this.http.authedRequest(callback, "GET", path,
+            null, null, { prefix });
+    }
+
+    /**
+     * Get room info for the given alias.
+     * @param {string} alias The room alias to resolve.
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: Object with room_id and servers.
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public getRoomIdForAlias(alias: string, callback?: Callback): Promise<{room_id: string, servers: string[]}> {
+        // TODO: deprecate this or resolveRoomAlias
+        const path = utils.encodeUri("/directory/room/$alias", {
+            $alias: alias,
+        });
+        return this.http.authedRequest(
+            callback, "GET", path,
+        );
+    }
+
+    /**
+     * @param {string} roomAlias
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public resolveRoomAlias(roomAlias: string, callback?: Callback): Promise<any> { // TODO: Types
+        // TODO: deprecate this or getRoomIdForAlias
+        const path = utils.encodeUri("/directory/room/$alias", { $alias: roomAlias });
+        return this.http.request(callback, "GET", path);
+    }
+
+    /**
+     * Get the visibility of a room in the current HS's room directory
+     * @param {string} roomId
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public getRoomDirectoryVisibility(roomId: string, callback?: Callback): Promise<any> { // TODO: Types
+        const path = utils.encodeUri("/directory/list/room/$roomId", {
+            $roomId: roomId,
+        });
+        return this.http.authedRequest(callback, "GET", path);
+    }
+
+    /**
+     * Set the visbility of a room in the current HS's room directory
+     * @param {string} roomId
+     * @param {string} visibility "public" to make the room visible
+     *                 in the public directory, or "private" to make
+     *                 it invisible.
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: result object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public setRoomDirectoryVisibility(roomId: string, visibility: "public" | "private", callback?: Callback): Promise<any> { // TODO: Types
+        const path = utils.encodeUri("/directory/list/room/$roomId", {
+            $roomId: roomId,
+        });
+        return this.http.authedRequest(
+            callback, "PUT", path, undefined, { "visibility": visibility },
+        );
+    }
+
+    /**
+     * Set the visbility of a room bridged to a 3rd party network in
+     * the current HS's room directory.
+     * @param {string} networkId the network ID of the 3rd party
+     *                 instance under which this room is published under.
+     * @param {string} roomId
+     * @param {string} visibility "public" to make the room visible
+     *                 in the public directory, or "private" to make
+     *                 it invisible.
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: result object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public setRoomDirectoryVisibilityAppService(networkId: string, roomId: string, visibility: "public" | "private", callback?: Callback): Promise<any> { // TODO: Types
+        const path = utils.encodeUri("/directory/list/appservice/$networkId/$roomId", {
+            $networkId: networkId,
+            $roomId: roomId,
+        });
+        return this.http.authedRequest(
+            callback, "PUT", path, undefined, { "visibility": visibility },
+        );
+    }
+
+    /**
+     * Query the user directory with a term matching user IDs, display names and domains.
+     * @param {object} opts options
+     * @param {string} opts.term the term with which to search.
+     * @param {number} opts.limit the maximum number of results to return. The server will
+     *                 apply a limit if unspecified.
+     * @return {Promise} Resolves: an array of results.
+     */
+    public searchUserDirectory(opts: {term: string, limit?: number}): Promise<any[]> { // TODO: Types
+        const body: any = {
+            search_term: opts.term,
+        };
+
+        if (opts.limit !== undefined) {
+            body.limit = opts.limit;
+        }
+
+        return this.http.authedRequest(
+            undefined, "POST", "/user_directory/search", undefined, body,
+        );
+    }
+
+    /**
+     * Upload a file to the media repository on the home server.
+     *
+     * @param {object} file The object to upload. On a browser, something that
+     *   can be sent to XMLHttpRequest.send (typically a File).  Under node.js,
+     *   a a Buffer, String or ReadStream.
+     *
+     * @param {object} opts  options object
+     *
+     * @param {string=} opts.name   Name to give the file on the server. Defaults
+     *   to <tt>file.name</tt>.
+     *
+     * @param {boolean=} opts.includeFilename if false will not send the filename,
+     *   e.g for encrypted file uploads where filename leaks are undesirable.
+     *   Defaults to true.
+     *
+     * @param {string=} opts.type   Content-type for the upload. Defaults to
+     *   <tt>file.type</tt>, or <tt>applicaton/octet-stream</tt>.
+     *
+     * @param {boolean=} opts.rawResponse Return the raw body, rather than
+     *   parsing the JSON. Defaults to false (except on node.js, where it
+     *   defaults to true for backwards compatibility).
+     *
+     * @param {boolean=} opts.onlyContentUri Just return the content URI,
+     *   rather than the whole body. Defaults to false (except on browsers,
+     *   where it defaults to true for backwards compatibility). Ignored if
+     *   opts.rawResponse is true.
+     *
+     * @param {Function=} opts.callback Deprecated. Optional. The callback to
+     *    invoke on success/failure. See the promise return values for more
+     *    information.
+     *
+     * @param {Function=} opts.progressHandler Optional. Called when a chunk of
+     *    data has been uploaded, with an object containing the fields `loaded`
+     *    (number of bytes transferred) and `total` (total size, if known).
+     *
+     * @return {Promise} Resolves to response object, as
+     *    determined by this.opts.onlyData, opts.rawResponse, and
+     *    opts.onlyContentUri.  Rejects with an error (usually a MatrixError).
+     */
+    public uploadContent(file: File | String | Buffer | ReadStream, opts: IUploadOpts): Promise<any> { // TODO: Advanced types
+        return this.http.uploadContent(file, opts);
+    }
+
+    /**
+     * Cancel a file upload in progress
+     * @param {Promise} promise The promise returned from uploadContent
+     * @return {boolean} true if canceled, otherwise false
+     */
+    public cancelUpload(promise: Promise<any>): boolean { // TODO: Advanced types
+        return this.http.cancelUpload(promise);
+    }
+
+    /**
+     * Get a list of all file uploads in progress
+     * @return {array} Array of objects representing current uploads.
+     * Currently in progress is element 0. Keys:
+     *  - promise: The promise associated with the upload
+     *  - loaded: Number of bytes uploaded
+     *  - total: Total number of bytes to upload
+     */
+    public getCurrentUploads(): {promise: Promise<any>, loaded: number, total: number}[] { // TODO: Advanced types (promise)
+        return this.http.getCurrentUploads();
+    }
+
+    /**
+     * @param {string} userId
+     * @param {string} info The kind of info to retrieve (e.g. 'displayname',
+     * 'avatar_url').
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public getProfileInfo(userId: string, info: string, callback?: Callback): Promise<any> { // TODO: Types
+        if (utils.isFunction(info)) {
+            callback = info as any as Callback; // legacy
+            info = undefined;
+        }
+
+        const path = info ?
+            utils.encodeUri("/profile/$userId/$info",
+                { $userId: userId, $info: info }) :
+            utils.encodeUri("/profile/$userId",
+                { $userId: userId });
+        return this.http.authedRequest(callback, "GET", path);
+    }
+
+    /**
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public getThreePids(callback?: Callback): Promise<any> { // TODO: Types
+        const path = "/account/3pid";
+        return this.http.authedRequest(
+            callback, "GET", path, undefined, undefined,
+        );
+    }
+
+    /**
+     * Add a 3PID to your homeserver account and optionally bind it to an identity
+     * server as well. An identity server is required as part of the `creds` object.
+     *
+     * This API is deprecated, and you should instead use `addThreePidOnly`
+     * for homeservers that support it.
+     *
+     * @param {Object} creds
+     * @param {boolean} bind
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: on success
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public addThreePid(creds: any, bind: boolean, callback?: Callback): Promise<any> { // TODO: Types
+        const path = "/account/3pid";
+        const data = {
+            'threePidCreds': creds,
+            'bind': bind,
+        };
+        return this.http.authedRequest(
+            callback, "POST", path, null, data,
+        );
+    }
+
+    /**
+     * Add a 3PID to your homeserver account. This API does not use an identity
+     * server, as the homeserver is expected to handle 3PID ownership validation.
+     *
+     * You can check whether a homeserver supports this API via
+     * `doesServerSupportSeparateAddAndBind`.
+     *
+     * @param {Object} data A object with 3PID validation data from having called
+     * `account/3pid/<medium>/requestToken` on the homeserver.
+     * @return {Promise} Resolves: on success
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public async addThreePidOnly(data: any): Promise<void> { // TODO: Types
+        const path = "/account/3pid/add";
+        const prefix = await this.isVersionSupported("r0.6.0") ?
+            PREFIX_R0 : PREFIX_UNSTABLE;
+        return this.http.authedRequest(
+            undefined, "POST", path, null, data, { prefix },
+        );
+    }
+
+    /**
+     * Bind a 3PID for discovery onto an identity server via the homeserver. The
+     * identity server handles 3PID ownership validation and the homeserver records
+     * the new binding to track where all 3PIDs for the account are bound.
+     *
+     * You can check whether a homeserver supports this API via
+     * `doesServerSupportSeparateAddAndBind`.
+     *
+     * @param {Object} data A object with 3PID validation data from having called
+     * `validate/<medium>/requestToken` on the identity server. It should also
+     * contain `id_server` and `id_access_token` fields as well.
+     * @return {Promise} Resolves: on success
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public async bindThreePid(data: any): Promise<void> { // TODO: Types
+        const path = "/account/3pid/bind";
+        const prefix = await this.isVersionSupported("r0.6.0") ?
+            PREFIX_R0 : PREFIX_UNSTABLE;
+        return this.http.authedRequest(
+            undefined, "POST", path, null, data, { prefix },
+        );
+    }
+
+    /**
+     * Unbind a 3PID for discovery on an identity server via the homeserver. The
+     * homeserver removes its record of the binding to keep an updated record of
+     * where all 3PIDs for the account are bound.
+     *
+     * @param {string} medium The threepid medium (eg. 'email')
+     * @param {string} address The threepid address (eg. 'bob@example.com')
+     *        this must be as returned by getThreePids.
+     * @return {Promise} Resolves: on success
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public async unbindThreePid(medium: string, address: string): Promise<void> {
+        const path = "/account/3pid/unbind";
+        const data = {
+            medium,
+            address,
+            id_server: this.getIdentityServerUrl(true),
+        };
+        const prefix = await this.isVersionSupported("r0.6.0") ?
+            PREFIX_R0 : PREFIX_UNSTABLE;
+        return this.http.authedRequest(
+            undefined, "POST", path, null, data, { prefix },
+        );
+    }
+
+    /**
+     * @param {string} medium The threepid medium (eg. 'email')
+     * @param {string} address The threepid address (eg. 'bob@example.com')
+     *        this must be as returned by getThreePids.
+     * @return {Promise} Resolves: The server response on success
+     *     (generally the empty JSON object)
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public deleteThreePid(medium: string, address: string): Promise<void> {
+        const path = "/account/3pid/delete";
+        const data = {
+            'medium': medium,
+            'address': address,
+        };
+        return this.http.authedRequest(undefined, "POST", path, null, data);
+    }
+
+    /**
+     * Make a request to change your password.
+     * @param {Object} authDict
+     * @param {string} newPassword The new desired password.
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public setPassword(authDict: any, newPassword: string, callback?: Callback): Promise<any> { // TODO: Types
+        const path = "/account/password";
+        const data = {
+            'auth': authDict,
+            'new_password': newPassword,
+        };
+
+        return this.http.authedRequest(
+            callback, "POST", path, null, data,
+        );
+    }
+
+    /**
+     * Gets all devices recorded for the logged-in user
+     * @return {Promise} Resolves: result object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public getDevices(): Promise<any> { // TODO: Types
+        return this.http.authedRequest(
+            undefined, 'GET', "/devices", undefined, undefined,
+        );
+    }
+
+    /**
+     * Gets specific device details for the logged-in user
+     * @param {string} deviceId  device to query
+     * @return {Promise} Resolves: result object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public getDevice(deviceId: string): Promise<any> { // TODO: Types
+        const path = utils.encodeUri("/devices/$device_id", {
+            $device_id: deviceId,
+        });
+        return this.http.authedRequest(
+            undefined, 'GET', path, undefined, undefined,
+        );
+    }
+
+    /**
+     * Update the given device
+     *
+     * @param {string} deviceId  device to update
+     * @param {Object} body       body of request
+     * @return {Promise} Resolves: result object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public setDeviceDetails(deviceId: string, body: any): Promise<any> { // TODO: Types
+        const path = utils.encodeUri("/devices/$device_id", {
+            $device_id: deviceId,
+        });
+
+        return this.http.authedRequest(undefined, "PUT", path, undefined, body);
+    }
+
+    /**
+     * Delete the given device
+     *
+     * @param {string} deviceId  device to delete
+     * @param {object} auth Optional. Auth data to supply for User-Interactive auth.
+     * @return {Promise} Resolves: result object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public deleteDevice(deviceId: string, auth?: any): Promise<any> { // TODO: Types
+        const path = utils.encodeUri("/devices/$device_id", {
+            $device_id: deviceId,
+        });
+
+        const body: any = {};
+
+        if (auth) {
+            body.auth = auth;
+        }
+
+        return this.http.authedRequest(undefined, "DELETE", path, undefined, body);
+    }
+
+    /**
+     * Delete multiple device
+     *
+     * @param {string[]} devices IDs of the devices to delete
+     * @param {object} auth Optional. Auth data to supply for User-Interactive auth.
+     * @return {Promise} Resolves: result object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public deleteMultipleDevices(devices: string[], auth?: any): Promise<any> { // TODO: Types
+        const body: any = { devices };
+
+        if (auth) {
+            body.auth = auth;
+        }
+
+        const path = "/delete_devices";
+        return this.http.authedRequest(undefined, "POST", path, undefined, body);
+    }
+
+    /**
+     * Gets all pushers registered for the logged-in user
+     *
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: Array of objects representing pushers
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public getPushers(callback?: Callback): Promise<any[]> { // TODO: Types
+        const path = "/pushers";
+        return this.http.authedRequest(
+            callback, "GET", path, undefined, undefined,
+        );
+    }
+
+    /**
+     * Adds a new pusher or updates an existing pusher
+     *
+     * @param {Object} pusher Object representing a pusher
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: Empty json object on success
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public setPusher(pusher: any, callback?: Callback): Promise<any> { // TODO: Types
+        const path = "/pushers/set";
+        return this.http.authedRequest(
+            callback, "POST", path, null, pusher,
+        );
+    }
+
+    /**
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public getPushRules(callback?: Callback): Promise<any> { // TODO: Types
+        return this._http.authedRequest(callback, "GET", "/pushrules/").then(rules => {
+            return PushProcessor.rewriteDefaultRules(rules);
+        });
+    }
+
+    /**
+     * @param {string} scope
+     * @param {string} kind
+     * @param {string} ruleId
+     * @param {Object} body
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public addPushRule(scope: string, kind: string, ruleId: string, body: any, callback?: Callback): Promise<any> { // TODO: Types
+        // NB. Scope not uri encoded because devices need the '/'
+        const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
+            $kind: kind,
+            $ruleId: ruleId,
+        });
+        return this.http.authedRequest(
+            callback, "PUT", path, undefined, body,
+        );
+    }
+
+    /**
+     * @param {string} scope
+     * @param {string} kind
+     * @param {string} ruleId
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public deletePushRule(scope: string, kind: string, ruleId: string, callback?: Callback): Promise<any> { // TODO: Types
+        // NB. Scope not uri encoded because devices need the '/'
+        const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
+            $kind: kind,
+            $ruleId: ruleId,
+        });
+        return this.http.authedRequest(callback, "DELETE", path);
+    }
+
+    /**
+     * Enable or disable a push notification rule.
+     * @param {string} scope
+     * @param {string} kind
+     * @param {string} ruleId
+     * @param {boolean} enabled
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: result object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public setPushRuleEnabled(scope: string, kind: string, ruleId: string, enabled: boolean, callback?: Callback): Promise<any> { // TODO: Types
+        const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId/enabled", {
+            $kind: kind,
+            $ruleId: ruleId,
+        });
+        return this.http.authedRequest(
+            callback, "PUT", path, undefined, { "enabled": enabled },
+        );
+    }
+
+    /**
+     * Set the actions for a push notification rule.
+     * @param {string} scope
+     * @param {string} kind
+     * @param {string} ruleId
+     * @param {array} actions
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: result object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public setPushRuleActions(scope: string, kind: string, ruleId: string, actions: string[], callback?: Callback): Promise<any> { // TODO: Types
+        const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId/actions", {
+            $kind: kind,
+            $ruleId: ruleId,
+        });
+        return this.http.authedRequest(
+            callback, "PUT", path, undefined, { "actions": actions },
+        );
+    }
+
+    /**
+     * Perform a server-side search.
+     * @param {Object} opts
+     * @param {string} opts.next_batch the batch token to pass in the query string
+     * @param {Object} opts.body the JSON object to pass to the request body.
+     * @param {module:client.callback} callback Optional.
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public search(opts: {body: any, next_batch: string}, callback?: Callback): Promise<any> { // TODO: Types
+        const queryParams: any = {};
+        if (opts.next_batch) {
+            queryParams.next_batch = opts.next_batch;
+        }
+        return this.http.authedRequest(
+            callback, "POST", "/search", queryParams, opts.body,
+        );
+    }
+
+    /**
+     * Upload keys
+     *
+     * @param {Object} content  body of upload request
+     *
+     * @param {Object=} opts this method no longer takes any opts,
+     *  used to take opts.device_id but this was not removed from the spec as a redundant parameter
+     *
+     * @param {module:client.callback=} callback
+     *
+     * @return {Promise} Resolves: result object. Rejects: with
+     *     an error response ({@link module:http-api.MatrixError}).
+     */
+    public uploadKeysRequest(content: any, opts?: any, callback?: Callback): Promise<any> { // TODO: Types
+        return this.http.authedRequest(callback, "POST", "/keys/upload", undefined, content);
+    }
+
+    public uploadKeySignatures(content: any): Promise<any> { // TODO: Types
+        return this.http.authedRequest(
+            undefined, "POST", '/keys/signatures/upload', undefined,
+            content, {
+                prefix: PREFIX_UNSTABLE,
+            },
+        );
+    }
+
+    /**
+     * Download device keys
+     *
+     * @param {string[]} userIds  list of users to get keys for
+     *
+     * @param {Object=} opts
+     *
+     * @param {string=} opts.token   sync token to pass in the query request, to help
+     *   the HS give the most recent results
+     *
+     * @return {Promise} Resolves: result object. Rejects: with
+     *     an error response ({@link module:http-api.MatrixError}).
+     */
+    public downloadKeysForUsers(userIds: string[], opts: {token?: string}): Promise<any> { // TODO: Types
+        if (utils.isFunction(opts)) {
+            // opts used to be 'callback'.
+            throw new Error(
+                'downloadKeysForUsers no longer accepts a callback parameter',
+            );
+        }
+        opts = opts || {};
+
+        const content: any = {
+            device_keys: {},
+        };
+        if ('token' in opts) {
+            content.token = opts.token;
+        }
+        userIds.forEach((u) => {
+            content.device_keys[u] = [];
+        });
+
+        return this.http.authedRequest(undefined, "POST", "/keys/query", undefined, content);
+    }
+
+    /**
+     * Claim one-time keys
+     *
+     * @param {string[]} devices  a list of [userId, deviceId] pairs
+     *
+     * @param {string} [keyAlgorithm = signed_curve25519]  desired key type
+     *
+     * @param {number} [timeout] the time (in milliseconds) to wait for keys from remote
+     *     servers
+     *
+     * @return {Promise} Resolves: result object. Rejects: with
+     *     an error response ({@link module:http-api.MatrixError}).
+     */
+    public claimOneTimeKeys(devices: string[], keyAlgorithm = "signed_curve25519", timeout?: number): Promise<any> { // TODO: Types
+        const queries = {};
+
+        if (keyAlgorithm === undefined) {
+            keyAlgorithm = "signed_curve25519";
+        }
+
+        for (let i = 0; i < devices.length; ++i) {
+            const userId = devices[i][0];
+            const deviceId = devices[i][1];
+            const query = queries[userId] || {};
+            queries[userId] = query;
+            query[deviceId] = keyAlgorithm;
+        }
+        const content: any = { one_time_keys: queries };
+        if (timeout) {
+            content.timeout = timeout;
+        }
+        const path = "/keys/claim";
+        return this.http.authedRequest(undefined, "POST", path, undefined, content);
+    }
+
+    /**
+     * Ask the server for a list of users who have changed their device lists
+     * between a pair of sync tokens
+     *
+     * @param {string} oldToken
+     * @param {string} newToken
+     *
+     * @return {Promise} Resolves: result object. Rejects: with
+     *     an error response ({@link module:http-api.MatrixError}).
+     */
+    public getKeyChanges(oldToken: string, newToken: string): Promise<any> { // TODO: Types
+        const qps = {
+            from: oldToken,
+            to: newToken,
+        };
+
+        const path = "/keys/changes";
+        return this.http.authedRequest(undefined, "GET", path, qps, undefined);
+    }
+
+    public uploadDeviceSigningKeys(auth: any, keys: any): Promise<any> { // TODO: Lots of types
+        const data = Object.assign({}, keys);
+        if (auth) Object.assign(data, { auth });
+        return this.http.authedRequest(
+            undefined, "POST", "/keys/device_signing/upload", undefined, data, {
+                prefix: PREFIX_UNSTABLE,
+            },
+        );
+    }
+
+    /**
+     * Register with an Identity Server using the OpenID token from the user's
+     * Homeserver, which can be retrieved via
+     * {@link module:client~MatrixClient#getOpenIdToken}.
+     *
+     * Note that the `/account/register` endpoint (as well as IS authentication in
+     * general) was added as part of the v2 API version.
+     *
+     * @param {object} hsOpenIdToken
+     * @return {Promise} Resolves: with object containing an Identity
+     * Server access token.
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public registerWithIdentityServer(hsOpenIdToken: any): Promise<any> { // TODO: Types
+        if (!this.idBaseUrl) {
+            throw new Error("No Identity Server base URL set");
+        }
+
+        const uri = this.idBaseUrl + PREFIX_IDENTITY_V2 + "/account/register";
+        return this.http.requestOtherUrl(
+            undefined, "POST", uri,
+            null, hsOpenIdToken,
+        );
+    }
+
+    /**
+     * Requests an email verification token directly from an identity server.
+     *
+     * This API is used as part of binding an email for discovery on an identity
+     * server. The validation data that results should be passed to the
+     * `bindThreePid` method to complete the binding process.
+     *
+     * @param {string} email The email address to request a token for
+     * @param {string} clientSecret A secret binary string generated by the client.
+     *                 It is recommended this be around 16 ASCII characters.
+     * @param {number} sendAttempt If an identity server sees a duplicate request
+     *                 with the same sendAttempt, it will not send another email.
+     *                 To request another email to be sent, use a larger value for
+     *                 the sendAttempt param as was used in the previous request.
+     * @param {string} nextLink Optional If specified, the client will be redirected
+     *                 to this link after validation.
+     * @param {module:client.callback} callback Optional.
+     * @param {string} identityAccessToken The `access_token` field of the identity
+     * server `/account/register` response (see {@link registerWithIdentityServer}).
+     *
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     * @throws Error if no identity server is set
+     */
+    public async requestEmailToken(email: string, clientSecret: string, sendAttempt: number, nextLink: string, callback?: Callback, identityAccessToken?: string): Promise<any> { // TODO: Types
+        const params = {
+            client_secret: clientSecret,
+            email: email,
+            send_attempt: sendAttempt,
+            next_link: nextLink,
+        };
+
+        return await this.http.idServerRequest(
+            callback, "POST", "/validate/email/requestToken",
+            params, PREFIX_IDENTITY_V2, identityAccessToken,
+        );
+    }
+
+    /**
+     * Requests a MSISDN verification token directly from an identity server.
+     *
+     * This API is used as part of binding a MSISDN for discovery on an identity
+     * server. The validation data that results should be passed to the
+     * `bindThreePid` method to complete the binding process.
+     *
+     * @param {string} phoneCountry The ISO 3166-1 alpha-2 code for the country in
+     *                 which phoneNumber should be parsed relative to.
+     * @param {string} phoneNumber The phone number, in national or international
+     *                 format
+     * @param {string} clientSecret A secret binary string generated by the client.
+     *                 It is recommended this be around 16 ASCII characters.
+     * @param {number} sendAttempt If an identity server sees a duplicate request
+     *                 with the same sendAttempt, it will not send another SMS.
+     *                 To request another SMS to be sent, use a larger value for
+     *                 the sendAttempt param as was used in the previous request.
+     * @param {string} nextLink Optional If specified, the client will be redirected
+     *                 to this link after validation.
+     * @param {module:client.callback} callback Optional.
+     * @param {string} identityAccessToken The `access_token` field of the Identity
+     * Server `/account/register` response (see {@link registerWithIdentityServer}).
+     *
+     * @return {Promise} Resolves: TODO
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     * @throws Error if no identity server is set
+     */
+    public async requestMsisdnToken(phoneCountry: string, phoneNumber: string, clientSecret: string, sendAttempt: number, nextLink: string, callback?: Callback, identityAccessToken?: string): Promise<any> { // TODO: Types
+        const params = {
+            client_secret: clientSecret,
+            country: phoneCountry,
+            phone_number: phoneNumber,
+            send_attempt: sendAttempt,
+            next_link: nextLink,
+        };
+
+        return await this.http.idServerRequest(
+            callback, "POST", "/validate/msisdn/requestToken",
+            params, PREFIX_IDENTITY_V2, identityAccessToken,
+        );
+    }
+
+    /**
+     * Submits a MSISDN token to the identity server
+     *
+     * This is used when submitting the code sent by SMS to a phone number.
+     * The ID server has an equivalent API for email but the js-sdk does
+     * not expose this, since email is normally validated by the user clicking
+     * a link rather than entering a code.
+     *
+     * @param {string} sid The sid given in the response to requestToken
+     * @param {string} clientSecret A secret binary string generated by the client.
+     *                 This must be the same value submitted in the requestToken call.
+     * @param {string} msisdnToken The MSISDN token, as enetered by the user.
+     * @param {string} identityAccessToken The `access_token` field of the Identity
+     * Server `/account/register` response (see {@link registerWithIdentityServer}).
+     *
+     * @return {Promise} Resolves: Object, currently with no parameters.
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     * @throws Error if No ID server is set
+     */
+    public async submitMsisdnToken(sid: string, clientSecret: string, msisdnToken: string, identityAccessToken: string): Promise<any> { // TODO: Types
+        const params = {
+            sid: sid,
+            client_secret: clientSecret,
+            token: msisdnToken,
+        };
+
+        return await this.http.idServerRequest(
+            undefined, "POST", "/validate/msisdn/submitToken",
+            params, PREFIX_IDENTITY_V2, identityAccessToken,
+        );
+    }
+
+    /**
+     * Submits a MSISDN token to an arbitrary URL.
+     *
+     * This is used when submitting the code sent by SMS to a phone number in the
+     * newer 3PID flow where the homeserver validates 3PID ownership (as part of
+     * `requestAdd3pidMsisdnToken`). The homeserver response may include a
+     * `submit_url` to specify where the token should be sent, and this helper can
+     * be used to pass the token to this URL.
+     *
+     * @param {string} url The URL to submit the token to
+     * @param {string} sid The sid given in the response to requestToken
+     * @param {string} clientSecret A secret binary string generated by the client.
+     *                 This must be the same value submitted in the requestToken call.
+     * @param {string} msisdnToken The MSISDN token, as enetered by the user.
+     *
+     * @return {Promise} Resolves: Object, currently with no parameters.
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public submitMsisdnTokenOtherUrl(url: string, sid: string, clientSecret: string, msisdnToken: string): Promise<any> { // TODO: Types
+        const params = {
+            sid: sid,
+            client_secret: clientSecret,
+            token: msisdnToken,
+        };
+
+        return this.http.requestOtherUrl(
+            undefined, "POST", url, undefined, params,
+        );
+    }
+
+    /**
+     * Gets the V2 hashing information from the identity server. Primarily useful for
+     * lookups.
+     * @param {string} identityAccessToken The access token for the identity server.
+     * @returns {Promise<object>} The hashing information for the identity server.
+     */
+    public getIdentityHashDetails(identityAccessToken: string): Promise<any> { // TODO: Types
+        return this.http.idServerRequest(
+            undefined, "GET", "/hash_details",
+            null, PREFIX_IDENTITY_V2, identityAccessToken,
+        );
+    }
+
+    /**
+     * Performs a hashed lookup of addresses against the identity server. This is
+     * only supported on identity servers which have at least the version 2 API.
+     * @param {Array<Array<string,string>>} addressPairs An array of 2 element arrays.
+     * The first element of each pair is the address, the second is the 3PID medium.
+     * Eg: ["email@example.org", "email"]
+     * @param {string} identityAccessToken The access token for the identity server.
+     * @returns {Promise<Array<{address, mxid}>>} A collection of address mappings to
+     * found MXIDs. Results where no user could be found will not be listed.
+     */
+    public async identityHashedLookup(addressPairs: [string, string][], identityAccessToken: string): Promise<{address: string, mxid: string}[]> {
+        const params = {
+            // addresses: ["email@example.org", "10005550000"],
+            // algorithm: "sha256",
+            // pepper: "abc123"
+        };
+
+        // Get hash information first before trying to do a lookup
+        const hashes = await this.getIdentityHashDetails(identityAccessToken);
+        if (!hashes || !hashes['lookup_pepper'] || !hashes['algorithms']) {
+            throw new Error("Unsupported identity server: bad response");
+        }
+
+        params['pepper'] = hashes['lookup_pepper'];
+
+        const localMapping = {
+            // hashed identifier => plain text address
+            // For use in this function's return format
+        };
+
+        // When picking an algorithm, we pick the hashed over no hashes
+        if (hashes['algorithms'].includes('sha256')) {
+            // Abuse the olm hashing
+            const olmutil = new global.Olm.Utility();
+            params["addresses"] = addressPairs.map(p => {
+                const addr = p[0].toLowerCase(); // lowercase to get consistent hashes
+                const med = p[1].toLowerCase();
+                const hashed = olmutil.sha256(`${addr} ${med} ${params['pepper']}`)
+                    .replace(/\+/g, '-').replace(/\//g, '_'); // URL-safe base64
+                // Map the hash to a known (case-sensitive) address. We use the case
+                // sensitive version because the caller might be expecting that.
+                localMapping[hashed] = p[0];
+                return hashed;
+            });
+            params["algorithm"] = "sha256";
+        } else if (hashes['algorithms'].includes('none')) {
+            params["addresses"] = addressPairs.map(p => {
+                const addr = p[0].toLowerCase(); // lowercase to get consistent hashes
+                const med = p[1].toLowerCase();
+                const unhashed = `${addr} ${med}`;
+                // Map the unhashed values to a known (case-sensitive) address. We use
+                // the case sensitive version because the caller might be expecting that.
+                localMapping[unhashed] = p[0];
+                return unhashed;
+            });
+            params["algorithm"] = "none";
+        } else {
+            throw new Error("Unsupported identity server: unknown hash algorithm");
+        }
+
+        const response = await this.http.idServerRequest(
+            undefined, "POST", "/lookup",
+            params, PREFIX_IDENTITY_V2, identityAccessToken,
+        );
+
+        if (!response || !response['mappings']) return []; // no results
+
+        const foundAddresses = [/* {address: "plain@example.org", mxid} */];
+        for (const hashed of Object.keys(response['mappings'])) {
+            const mxid = response['mappings'][hashed];
+            const plainAddress = localMapping[hashed];
+            if (!plainAddress) {
+                throw new Error("Identity server returned more results than expected");
+            }
+
+            foundAddresses.push({ address: plainAddress, mxid });
+        }
+        return foundAddresses;
+    }
+
+    /**
+     * Looks up the public Matrix ID mapping for a given 3rd party
+     * identifier from the Identity Server
+     *
+     * @param {string} medium The medium of the threepid, eg. 'email'
+     * @param {string} address The textual address of the threepid
+     * @param {module:client.callback} callback Optional.
+     * @param {string} identityAccessToken The `access_token` field of the Identity
+     * Server `/account/register` response (see {@link registerWithIdentityServer}).
+     *
+     * @return {Promise} Resolves: A threepid mapping
+     *                                 object or the empty object if no mapping
+     *                                 exists
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public async lookupThreePid(medium: string, address: string, callback?: Callback, identityAccessToken?: string): Promise<any> { // TODO: Types
+        // Note: we're using the V2 API by calling this function, but our
+        // function contract requires a V1 response. We therefore have to
+        // convert it manually.
+        const response = await this.identityHashedLookup(
+            [[address, medium]], identityAccessToken,
+        );
+        const result = response.find(p => p.address === address);
+        if (!result) {
+            if (callback) callback(null, {});
+            return {};
+        }
+
+        const mapping = {
+            address,
+            medium,
+            mxid: result.mxid,
+
+            // We can't reasonably fill these parameters:
+            // not_before
+            // not_after
+            // ts
+            // signatures
+        };
+
+        if (callback) callback(null, mapping);
+        return mapping;
+    }
+
+    /**
+     * Looks up the public Matrix ID mappings for multiple 3PIDs.
+     *
+     * @param {Array.<Array.<string>>} query Array of arrays containing
+     * [medium, address]
+     * @param {string} identityAccessToken The `access_token` field of the Identity
+     * Server `/account/register` response (see {@link registerWithIdentityServer}).
+     *
+     * @return {Promise} Resolves: Lookup results from IS.
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public async bulkLookupThreePids(query: [string, string][], identityAccessToken: string): Promise<any> { // TODO: Types
+        // Note: we're using the V2 API by calling this function, but our
+        // function contract requires a V1 response. We therefore have to
+        // convert it manually.
+        const response = await this.identityHashedLookup(
+            // We have to reverse the query order to get [address, medium] pairs
+            query.map(p => [p[1], p[0]]), identityAccessToken,
+        );
+
+        const v1results = [];
+        for (const mapping of response) {
+            const originalQuery = query.find(p => p[1] === mapping.address);
+            if (!originalQuery) {
+                throw new Error("Identity sever returned unexpected results");
+            }
+
+            v1results.push([
+                originalQuery[0], // medium
+                mapping.address,
+                mapping.mxid,
+            ]);
+        }
+
+        return { threepids: v1results };
+    }
+
+    /**
+     * Get account info from the Identity Server. This is useful as a neutral check
+     * to verify that other APIs are likely to approve access by testing that the
+     * token is valid, terms have been agreed, etc.
+     *
+     * @param {string} identityAccessToken The `access_token` field of the Identity
+     * Server `/account/register` response (see {@link registerWithIdentityServer}).
+     *
+     * @return {Promise} Resolves: an object with account info.
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public getIdentityAccount(identityAccessToken: string): Promise<any> { // TODO: Types
+        return this.http.idServerRequest(
+            undefined, "GET", "/account",
+            undefined, PREFIX_IDENTITY_V2, identityAccessToken,
+        );
+    }
+
+    /**
+     * Send an event to a specific list of devices
+     *
+     * @param {string} eventType  type of event to send
+     * @param {Object.<string, Object<string, Object>>} contentMap
+     *    content to send. Map from user_id to device_id to content object.
+     * @param {string=} txnId     transaction id. One will be made up if not
+     *    supplied.
+     * @return {Promise} Resolves to the result object
+     */
+    public sendToDevice(eventType: string, contentMap: any, txnId?: string): Promise<any> { // TODO: Types
+        const path = utils.encodeUri("/sendToDevice/$eventType/$txnId", {
+            $eventType: eventType,
+            $txnId: txnId ? txnId : this.makeTxnId(),
+        });
+
+        const body = {
+            messages: contentMap,
+        };
+
+        const targets = Object.keys(contentMap).reduce((obj, key) => {
+            obj[key] = Object.keys(contentMap[key]);
+            return obj;
+        }, {});
+        logger.log(`PUT ${path}`, targets);
+
+        return this.http.authedRequest(undefined, "PUT", path, undefined, body);
+    }
+
+    /**
+     * Get the third party protocols that can be reached using
+     * this HS
+     * @return {Promise} Resolves to the result object
+     */
+    public getThirdpartyProtocols(): Promise<any> { // TODO: Types
+        return this.http.authedRequest(
+            undefined, "GET", "/thirdparty/protocols", undefined, undefined,
+        ).then((response) => {
+            // sanity check
+            if (!response || typeof(response) !== 'object') {
+                throw new Error(
+                    `/thirdparty/protocols did not return an object: ${response}`,
+                );
+            }
+            return response;
+        });
+    }
+
+    /**
+     * Get information on how a specific place on a third party protocol
+     * may be reached.
+     * @param {string} protocol The protocol given in getThirdpartyProtocols()
+     * @param {object} params Protocol-specific parameters, as given in the
+     *                        response to getThirdpartyProtocols()
+     * @return {Promise} Resolves to the result object
+     */
+    public getThirdpartyLocation(protocol: string, params: any): Promise<any> { // TODO: Types
+        const path = utils.encodeUri("/thirdparty/location/$protocol", {
+            $protocol: protocol,
+        });
+
+        return this.http.authedRequest(undefined, "GET", path, params, undefined);
+    }
+
+    /**
+     * Get information on how a specific user on a third party protocol
+     * may be reached.
+     * @param {string} protocol The protocol given in getThirdpartyProtocols()
+     * @param {object} params Protocol-specific parameters, as given in the
+     *                        response to getThirdpartyProtocols()
+     * @return {Promise} Resolves to the result object
+     */
+    public getThirdpartyUser(protocol: string, params: any): Promise<any> { // TODO: Types
+        const path = utils.encodeUri("/thirdparty/user/$protocol", {
+            $protocol: protocol,
+        });
+
+        return this.http.authedRequest(undefined, "GET", path, params, undefined);
+    }
+
+    public getTerms(serviceType: SERVICE_TYPES, baseUrl: string): Promise<any> { // TODO: Types
+        const url = this.termsUrlForService(serviceType, baseUrl);
+        return this.http.requestOtherUrl(
+            undefined, 'GET', url,
+        );
+    }
+
+    public agreeToTerms(serviceType: SERVICE_TYPES, baseUrl: string, accessToken: string, termsUrls: string[]): Promise<any> { // TODO: Types
+        const url = this.termsUrlForService(serviceType, baseUrl);
+        const headers = {
+            Authorization: "Bearer " + accessToken,
+        };
+        return this.http.requestOtherUrl(
+            undefined, 'POST', url, null, { user_accepts: termsUrls }, { headers },
+        );
+    }
+
+    /**
+     * Reports an event as inappropriate to the server, which may then notify the appropriate people.
+     * @param {string} roomId The room in which the event being reported is located.
+     * @param {string} eventId The event to report.
+     * @param {number} score The score to rate this content as where -100 is most offensive and 0 is inoffensive.
+     * @param {string} reason The reason the content is being reported. May be blank.
+     * @returns {Promise} Resolves to an empty object if successful
+     */
+    public reportEvent(roomId: string, eventId: string, score: number, reason: string): Promise<any> { // TODO: Types
+        const path = utils.encodeUri("/rooms/$roomId/report/$eventId", {
+            $roomId: roomId,
+            $eventId: eventId,
+        });
+
+        return this.http.authedRequest(undefined, "POST", path, null, { score, reason });
+    }
+
+    /**
+     * Fetches or paginates a summary of a space as defined by MSC2946
+     * @param {string} roomId The ID of the space-room to use as the root of the summary.
+     * @param {number?} maxRoomsPerSpace The maximum number of rooms to return per subspace.
+     * @param {boolean?} suggestedOnly Whether to only return rooms with suggested=true.
+     * @param {boolean?} autoJoinOnly Whether to only return rooms with auto_join=true.
+     * @param {number?} limit The maximum number of rooms to return in total.
+     * @param {string?} batch The opaque token to paginate a previous summary request.
+     * @returns {Promise} the response, with next_batch, rooms, events fields.
+     */
+    public getSpaceSummary(roomId: string, maxRoomsPerSpace?: number, suggestedOnly?: boolean, autoJoinOnly?: boolean, limit?: number, batch?: string): Promise<any> { // TODO: Types
+        const path = utils.encodeUri("/rooms/$roomId/spaces", {
+            $roomId: roomId,
+        });
+
+        return this.http.authedRequest(undefined, "POST", path, null, {
+            max_rooms_per_space: maxRoomsPerSpace,
+            suggested_only: suggestedOnly,
+            auto_join_only: autoJoinOnly,
+            limit,
+            batch,
+        }, {
+            prefix: "/_matrix/client/unstable/org.matrix.msc2946",
+        });
+    }
+
+    // TODO: @@TR: Remove warning, eventually
+    // ======================================================
+    // **                ANCIENT APIS BELOW                **
+    // ======================================================
+
+    /**
+     * @param {string} groupId
+     * @return {Promise} Resolves: Group summary object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public getGroupSummary(groupId: string): Promise<any> {
+        const path = utils.encodeUri("/groups/$groupId/summary", { $groupId: groupId });
+        return this.http.authedRequest(undefined, "GET", path);
+    }
+
+    /**
+     * @param {string} groupId
+     * @return {Promise} Resolves: Group profile object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public getGroupProfile(groupId: string): Promise<any> {
+        const path = utils.encodeUri("/groups/$groupId/profile", { $groupId: groupId });
+        return this.http.authedRequest(undefined, "GET", path);
+    }
+
+    /**
+     * @param {string} groupId
+     * @param {Object} profile The group profile object
+     * @param {string=} profile.name Name of the group
+     * @param {string=} profile.avatar_url MXC avatar URL
+     * @param {string=} profile.short_description A short description of the room
+     * @param {string=} profile.long_description A longer HTML description of the room
+     * @return {Promise} Resolves: Empty object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public setGroupProfile(groupId: string, profile: any): Promise<any> {
+        const path = utils.encodeUri("/groups/$groupId/profile", { $groupId: groupId });
+        return this.http.authedRequest(
+            undefined, "POST", path, undefined, profile,
+        );
+    }
+
+    /**
+     * @param {string} groupId
+     * @param {object} policy The join policy for the group. Must include at
+     *     least a 'type' field which is 'open' if anyone can join the group
+     *     the group without prior approval, or 'invite' if an invite is
+     *     required to join.
+     * @return {Promise} Resolves: Empty object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public setGroupJoinPolicy(groupId: string, policy: any): Promise<any> {
+        const path = utils.encodeUri(
+            "/groups/$groupId/settings/m.join_policy",
+            { $groupId: groupId },
+        );
+        return this.http.authedRequest(
+            undefined, "PUT", path, undefined, {
+                'm.join_policy': policy,
+            },
+        );
+    }
+
+    /**
+     * @param {string} groupId
+     * @return {Promise} Resolves: Group users list object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public getGroupUsers(groupId: string): Promise<any> {
+        const path = utils.encodeUri("/groups/$groupId/users", { $groupId: groupId });
+        return this.http.authedRequest(undefined, "GET", path);
+    }
+
+    /**
+     * @param {string} groupId
+     * @return {Promise} Resolves: Group users list object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public getGroupInvitedUsers(groupId: string): Promise<any> {
+        const path = utils.encodeUri("/groups/$groupId/invited_users", { $groupId: groupId });
+        return this.http.authedRequest(undefined, "GET", path);
+    }
+
+    /**
+     * @param {string} groupId
+     * @return {Promise} Resolves: Group rooms list object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public getGroupRooms(groupId: string): Promise<any> {
+        const path = utils.encodeUri("/groups/$groupId/rooms", { $groupId: groupId });
+        return this.http.authedRequest(undefined, "GET", path);
+    }
+
+    /**
+     * @param {string} groupId
+     * @param {string} userId
+     * @return {Promise} Resolves: Empty object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public inviteUserToGroup(groupId: string, userId: string): Promise<any> {
+        const path = utils.encodeUri(
+            "/groups/$groupId/admin/users/invite/$userId",
+            { $groupId: groupId, $userId: userId },
+        );
+        return this.http.authedRequest(undefined, "PUT", path, undefined, {});
+    }
+
+    /**
+     * @param {string} groupId
+     * @param {string} userId
+     * @return {Promise} Resolves: Empty object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public removeUserFromGroup(groupId: string, userId: string): Promise<any> {
+        const path = utils.encodeUri(
+            "/groups/$groupId/admin/users/remove/$userId",
+            { $groupId: groupId, $userId: userId },
+        );
+        return this.http.authedRequest(undefined, "PUT", path, undefined, {});
+    }
+
+    /**
+     * @param {string} groupId
+     * @param {string} userId
+     * @param {string} roleId Optional.
+     * @return {Promise} Resolves: Empty object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public addUserToGroupSummary(groupId: string, userId: string, roleId: string): Promise<any> {
+        const path = utils.encodeUri(
+            roleId ?
+                "/groups/$groupId/summary/$roleId/users/$userId" :
+                "/groups/$groupId/summary/users/$userId",
+            { $groupId: groupId, $roleId: roleId, $userId: userId },
+        );
+        return this.http.authedRequest(undefined, "PUT", path, undefined, {});
+    }
+
+    /**
+     * @param {string} groupId
+     * @param {string} userId
+     * @return {Promise} Resolves: Empty object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public removeUserFromGroupSummary(groupId: string, userId: string): Promise<any> {
+        const path = utils.encodeUri(
+            "/groups/$groupId/summary/users/$userId",
+            { $groupId: groupId, $userId: userId },
+        );
+        return this.http.authedRequest(undefined, "DELETE", path, undefined, {});
+    }
+
+    /**
+     * @param {string} groupId
+     * @param {string} roomId
+     * @param {string} categoryId Optional.
+     * @return {Promise} Resolves: Empty object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public addRoomToGroupSummary(groupId: string, roomId: string, categoryId: string): Promise<any> {
+        const path = utils.encodeUri(
+            categoryId ?
+                "/groups/$groupId/summary/$categoryId/rooms/$roomId" :
+                "/groups/$groupId/summary/rooms/$roomId",
+            { $groupId: groupId, $categoryId: categoryId, $roomId: roomId },
+        );
+        return this.http.authedRequest(undefined, "PUT", path, undefined, {});
+    }
+
+    /**
+     * @param {string} groupId
+     * @param {string} roomId
+     * @return {Promise} Resolves: Empty object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public removeRoomFromGroupSummary(groupId: string, roomId: string): Promise<any> {
+        const path = utils.encodeUri(
+            "/groups/$groupId/summary/rooms/$roomId",
+            { $groupId: groupId, $roomId: roomId },
+        );
+        return this.http.authedRequest(undefined, "DELETE", path, undefined, {});
+    }
+
+    /**
+     * @param {string} groupId
+     * @param {string} roomId
+     * @param {bool} isPublic Whether the room-group association is visible to non-members
+     * @return {Promise} Resolves: Empty object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public addRoomToGroup(groupId: string, roomId: string, isPublic: boolean): Promise<any> {
+        if (isPublic === undefined) {
+            isPublic = true;
+        }
+        const path = utils.encodeUri(
+            "/groups/$groupId/admin/rooms/$roomId",
+            { $groupId: groupId, $roomId: roomId },
+        );
+        return this.http.authedRequest(undefined, "PUT", path, undefined,
+            { "m.visibility": { type: isPublic ? "public" : "private" } },
+        );
+    }
+
+    /**
+     * Configure the visibility of a room-group association.
+     * @param {string} groupId
+     * @param {string} roomId
+     * @param {bool} isPublic Whether the room-group association is visible to non-members
+     * @return {Promise} Resolves: Empty object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public updateGroupRoomVisibility(groupId: string, roomId: string, isPublic: boolean): Promise<any> {
+        // NB: The /config API is generic but there's not much point in exposing this yet as synapse
+        //     is the only server to implement this. In future we should consider an API that allows
+        //     arbitrary configuration, i.e. "config/$configKey".
+
+        const path = utils.encodeUri(
+            "/groups/$groupId/admin/rooms/$roomId/config/m.visibility",
+            { $groupId: groupId, $roomId: roomId },
+        );
+        return this.http.authedRequest(undefined, "PUT", path, undefined,
+            { type: isPublic ? "public" : "private" },
+        );
+    }
+
+    /**
+     * @param {string} groupId
+     * @param {string} roomId
+     * @return {Promise} Resolves: Empty object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public removeRoomFromGroup(groupId: string, roomId: string): Promise<any> {
+        const path = utils.encodeUri(
+            "/groups/$groupId/admin/rooms/$roomId",
+            { $groupId: groupId, $roomId: roomId },
+        );
+        return this.http.authedRequest(undefined, "DELETE", path, undefined, {});
+    }
+
+    /**
+     * @param {string} groupId
+     * @param {Object} opts Additional options to send alongside the acceptance.
+     * @return {Promise} Resolves: Empty object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public acceptGroupInvite(groupId: string, opts = null): Promise<any> {
+        const path = utils.encodeUri(
+            "/groups/$groupId/self/accept_invite",
+            { $groupId: groupId },
+        );
+        return this.http.authedRequest(undefined, "PUT", path, undefined, opts || {});
+    }
+
+    /**
+     * @param {string} groupId
+     * @return {Promise} Resolves: Empty object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public joinGroup(groupId: string): Promise<any> {
+        const path = utils.encodeUri(
+            "/groups/$groupId/self/join",
+            { $groupId: groupId },
+        );
+        return this.http.authedRequest(undefined, "PUT", path, undefined, {});
+    }
+
+    /**
+     * @param {string} groupId
+     * @return {Promise} Resolves: Empty object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public leaveGroup(groupId: string): Promise<any> {
+        const path = utils.encodeUri(
+            "/groups/$groupId/self/leave",
+            { $groupId: groupId },
+        );
+        return this.http.authedRequest(undefined, "PUT", path, undefined, {});
+    }
+
+    /**
+     * @return {Promise} Resolves: The groups to which the user is joined
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public getJoinedGroups(): Promise<any> {
+        const path = utils.encodeUri("/joined_groups", {});
+        return this.http.authedRequest(undefined, "GET", path);
+    }
+
+    /**
+     * @param {Object} content Request content
+     * @param {string} content.localpart The local part of the desired group ID
+     * @param {Object} content.profile Group profile object
+     * @return {Promise} Resolves: Object with key group_id: id of the created group
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public createGroup(content: any): Promise<any>{
+        const path = utils.encodeUri("/create_group", {});
+        return this.http.authedRequest(
+            undefined, "POST", path, undefined, content,
+        );
+    }
+
+    /**
+     * @param {string[]} userIds List of user IDs
+     * @return {Promise} Resolves: Object as exmaple below
+     *
+     *     {
+     *         "users": {
+     *             "@bob:example.com": {
+     *                 "+example:example.com"
+     *             }
+     *         }
+     *     }
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public getPublicisedGroups(userIds: string[]): Promise<any> {
+        const path = utils.encodeUri("/publicised_groups", {});
+        return this.http.authedRequest(
+            undefined, "POST", path, undefined, { user_ids: userIds },
+        );
+    }
+
+    /**
+     * @param {string} groupId
+     * @param {bool} isPublic Whether the user's membership of this group is made public
+     * @return {Promise} Resolves: Empty object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public setGroupPublicity(groupId: string, isPublic: boolean): Promise<any> {
+        const path = utils.encodeUri(
+            "/groups/$groupId/self/update_publicity",
+            { $groupId: groupId },
+        );
+        return this.http.authedRequest(undefined, "PUT", path, undefined, {
+            publicise: isPublic,
+        });
+    }
 }
+
 
 /**
  * Fires whenever the SDK receives a new event.

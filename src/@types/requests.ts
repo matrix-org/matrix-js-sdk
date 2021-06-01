@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { Callback } from "../1client";
+
 export interface IJoinRoomOpts {
     /**
      * True to do a room initial sync on the resulting
@@ -64,4 +66,29 @@ export interface ISearchOpts {
 export interface IEventSearchOpts {
     filter: any; // TODO: Types
     term: string;
+}
+
+export interface ICreateRoomOpts {
+    room_alias_name?: string;
+    visibility?: "public" | "private";
+    name?: string;
+    topic?: string;
+    invite_3pid?: any[]; // TODO: Types
+}
+
+export interface IRoomDirectoryOptions {
+    server?: string;
+    limit?: number;
+    since?: string;
+    filter?: any & {generic_search_term: string}; // TODO: Types
+}
+
+export interface IUploadOpts {
+    name?: string;
+    includeFilename?: boolean;
+    type?: string;
+    rawResponse?: boolean;
+    onlyContentUri?: boolean;
+    callback?: Callback;
+    progressHandler?: (state: {loaded: number, total: number}) => void;
 }
