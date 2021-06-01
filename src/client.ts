@@ -383,6 +383,7 @@ export class MatrixClient extends EventEmitter {
     public timelineSupport = false;
     public urlPreviewCache: { [key: string]: Promise<unknown> } = {}; // TODO: @@TR
     public unstableClientRelationAggregation = false;
+    public identityServer: IIdentityServerProvider;
 
     private canSupportVoip = false;
     private callEventHandler: CallEventHandler;
@@ -427,7 +428,6 @@ export class MatrixClient extends EventEmitter {
     private exportedOlmDeviceToImport: IOlmDevice;
     private baseUrl: string;
     private idBaseUrl: string;
-    private identityServer: any; // TODO: @@TR
     private http: MatrixHttpApi;
     private txnCtr = 0;
 
