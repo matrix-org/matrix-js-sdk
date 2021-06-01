@@ -238,6 +238,8 @@ export class BackupManager {
     }
 
     /**
+     * Check if the given backup info is trusted.
+     *
      * @param {object} backupInfo key backup info dict from /room_keys/version
      * @return {object} {
      *     usable: [bool], // is the backup trusted, true iff there is a sig that is valid & from a trusted device
@@ -351,7 +353,7 @@ export class BackupManager {
                 )
             );
         });
-        ret.usable ||= ret.trusted_locally;
+        ret.usable = ret.usable || ret.trusted_locally;
         return ret;
     }
 

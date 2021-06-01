@@ -576,5 +576,21 @@ describe("MegolmBackup", function() {
             const cachedKey = await client._crypto.getSessionBackupPrivateKey();
             expect(cachedKey).not.toBeNull();
         });
+
+        it("fails if an known algorithm is used", async function() {
+            const BAD_BACKUP_INFO = Object.assign({}, BACKUP_INFO, {
+                algorithm: "this.algorithm.does.not.exist",
+            });
+            client._http.authedRequest = function() {
+                return Promise.resolve(KEY_BACKUP_DATA);
+            };
+
+            await expect(client.restoreKeyBackupWithRecoveryKey(
+                "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d",
+                ROOM_ID,
+                SESSION_ID,
+                BAD_BACKUP_INFO,
+            )).rejects.toThrow();
+        });
     });
 });
