@@ -5836,14 +5836,12 @@ export class MatrixClient extends EventEmitter {
      * @return {string} The HS URL to hit to begin the SSO login process.
      */
     public getSsoLoginUrl(redirectUrl: string, loginType = "sso", idpId?: string): Promise<string> {
-        let prefix = PREFIX_R0;
         let url = "/login/" + loginType + "/redirect";
         if (idpId) {
             url += "/" + idpId;
-            prefix = "/_matrix/client/unstable/org.matrix.msc2858";
         }
 
-        return this.http.getUrl(url, { redirectUrl }, prefix);
+        return this.http.getUrl(url, { redirectUrl }, PREFIX_R0);
     }
 
     /**
