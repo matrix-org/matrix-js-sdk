@@ -374,7 +374,7 @@ export class MatrixClient extends EventEmitter {
     public static readonly RESTORE_BACKUP_ERROR_BAD_KEY = 'RESTORE_BACKUP_ERROR_BAD_KEY';
 
     public reEmitter = new ReEmitter(this);
-    public olmVersion: number = null; // populated after initCrypto
+    public olmVersion: string = null; // populated after initCrypto
     public usingExternalCrypto = false;
     public store: Store;
     public deviceId?: string;
