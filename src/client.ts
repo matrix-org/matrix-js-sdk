@@ -4676,8 +4676,8 @@ export class MatrixClient extends EventEmitter {
         email: string,
         clientSecret: string,
         sendAttempt: number,
-        nextLink: string,
-    ): Promise<void> {
+        nextLink?: string,
+    ): Promise<any> { // TODO: Types
         return this.requestTokenFromEndpoint(
             "/register/email/requestToken",
             {
@@ -4708,8 +4708,8 @@ export class MatrixClient extends EventEmitter {
         phoneNumber: string,
         clientSecret: string,
         sendAttempt: number,
-        nextLink: string,
-    ): Promise<void> {
+        nextLink?: string,
+    ): Promise<any> { // TODO: Types
         return this.requestTokenFromEndpoint(
             "/register/msisdn/requestToken",
             {
@@ -4744,7 +4744,7 @@ export class MatrixClient extends EventEmitter {
         clientSecret: string,
         sendAttempt: number,
         nextLink: string,
-    ): Promise<void> {
+    ): Promise<any> { // TODO: Types
         return this.requestTokenFromEndpoint(
             "/account/3pid/email/requestToken",
             {
@@ -4776,7 +4776,7 @@ export class MatrixClient extends EventEmitter {
         clientSecret: string,
         sendAttempt: number,
         nextLink: string,
-    ): Promise<void> {
+    ): Promise<any> { // TODO: Types
         return this.requestTokenFromEndpoint(
             "/account/3pid/msisdn/requestToken",
             {
@@ -4813,7 +4813,7 @@ export class MatrixClient extends EventEmitter {
         clientSecret: string,
         sendAttempt: number,
         nextLink: string,
-    ): Promise<void> {
+    ): Promise<any> { // TODO: Types
         return this.requestTokenFromEndpoint(
             "/account/password/email/requestToken",
             {
@@ -4844,7 +4844,7 @@ export class MatrixClient extends EventEmitter {
         clientSecret: string,
         sendAttempt: number,
         nextLink: string,
-    ): Promise<void> {
+    ): Promise<any> { // TODO: Types
         return this.requestTokenFromEndpoint(
             "/account/password/msisdn/requestToken",
             {
@@ -5934,7 +5934,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: to the /register response
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public registerRequest(data: any, kind: string, callback?: Callback): Promise<any> { // TODO: Types
+    public registerRequest(data: any, kind?: string, callback?: Callback): Promise<any> { // TODO: Types
         const params: any = {};
         if (kind) {
             params.kind = kind;
@@ -6102,7 +6102,7 @@ export class MatrixClient extends EventEmitter {
      *
      * @return {string} HS URL to hit to for the fallback interface
      */
-    public getFallbackAuthUrl(loginType: string, authSessionId: string): Promise<string> {
+    public getFallbackAuthUrl(loginType: string, authSessionId: string): string {
         const path = utils.encodeUri("/auth/$loginType/fallback/web", {
             $loginType: loginType,
         });
@@ -6600,7 +6600,7 @@ export class MatrixClient extends EventEmitter {
      *                 apply a limit if unspecified.
      * @return {Promise} Resolves: an array of results.
      */
-    public searchUserDirectory(opts: { term: string, limit?: number }): Promise<any[]> { // TODO: Types
+    public searchUserDirectory(opts: { term: string, limit?: number }): Promise<any> { // TODO: Types
         const body: any = {
             search_term: opts.term,
         };
@@ -6936,7 +6936,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: Array of objects representing pushers
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getPushers(callback?: Callback): Promise<any[]> { // TODO: Types
+    public getPushers(callback?: Callback): Promise<any> { // TODO: Types
         const path = "/pushers";
         return this.http.authedRequest(
             callback, "GET", path, undefined, undefined,
