@@ -667,7 +667,7 @@ export class MatrixClient extends EventEmitter {
             }
             return this.canResetTimelineCallback(roomId);
         };
-        this.syncApi = new SyncApi(this, opts);
+        this.syncApi = new SyncApi(this, this.clientOpts);
         this.syncApi.sync();
 
         if (opts.clientWellKnownPollPeriod !== undefined) {
@@ -1418,6 +1418,13 @@ export class MatrixClient extends EventEmitter {
             throw new Error("End-to-end encryption disabled");
         }
         return this.crypto.beginKeyVerification(method, userId, deviceId);
+    }
+
+    public checkSecretStorageKey(key: any, info: any): Promise<any> { // TODO: Types
+        if (!this.crypto) {
+            throw new Error("End-to-end encryption disabled");
+        }
+        return this.crypto.checkSecretStorageKey(key, info);
     }
 
     /**
@@ -4876,14 +4883,7 @@ export class MatrixClient extends EventEmitter {
             highlights: [],
         };
 
-        // TODO: @@TR: wtf is this
-        // prev:
-        /*
-        return this.search({ body: body }).then(
-            this._processRoomEventsSearch.bind(this, searchResults),
-        );
-         */
-        return this.search({ body: body }).then(res => this.processRoomEventsSearch(res, searchResults));
+        return this.search({ body: body }).then(res => this.processRoomEventsSearch(searchResults, res));
     }
 
     /**
@@ -4911,12 +4911,11 @@ export class MatrixClient extends EventEmitter {
             next_batch: searchResults.next_batch,
         };
 
-        // TODO: @@TR: wtf
-        const promise = this.search(searchOpts).then(
-            this.processRoomEventsSearch.bind(this, searchResults),
-        ).finally(() => {
-            searchResults.pendingRequest = null;
-        });
+        const promise = this.search(searchOpts)
+            .then(res => this.processRoomEventsSearch(searchResults, res))
+            .finally(() => {
+                searchResults.pendingRequest = null;
+            });
         searchResults.pendingRequest = promise;
 
         return promise;

@@ -495,7 +495,7 @@ Crypto.prototype.bootstrapCrossSigning = async function({
 } = {}) {
     logger.log("Bootstrapping cross-signing");
 
-    const delegateCryptoCallbacks = this.baseApis.cryptoCallbacks;
+    const delegateCryptoCallbacks = this._baseApis.cryptoCallbacks;
     const builder = new EncryptionSetupBuilder(
         this._baseApis.store.accountData,
         delegateCryptoCallbacks,
