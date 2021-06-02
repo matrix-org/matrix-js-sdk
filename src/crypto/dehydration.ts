@@ -33,7 +33,7 @@ export interface IDehydratedDevice {
 }
 
 export interface IDehydratedDeviceKeyInfo {
-    passphrase: string;
+    passphrase?: string;
 }
 
 interface DeviceKeys {

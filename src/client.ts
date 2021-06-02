@@ -1417,7 +1417,7 @@ export class MatrixClient extends EventEmitter {
      * @returns {Promise<module:crypto/verification/request/VerificationRequest>} resolves to a VerificationRequest
      *    when the request has been sent to the other party.
      */
-    public requestVerification(userId: string, devices: string[]): Promise<VerificationRequest> {
+    public requestVerification(userId: string, devices?: string[]): Promise<VerificationRequest> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -1510,7 +1510,7 @@ export class MatrixClient extends EventEmitter {
      *
      * @returns {string} the key ID
      */
-    public getCrossSigningId(type = CrossSigningKey.Master): string {
+    public getCrossSigningId(type: CrossSigningKey | string = CrossSigningKey.Master): string {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2445,9 +2445,9 @@ export class MatrixClient extends EventEmitter {
     // TODO: Types
     public async restoreKeyBackupWithSecretStorage(
         backupInfo: IKeyBackupVersion,
-        targetRoomId: string,
-        targetSessionId: string,
-        opts: IKeyBackupRestoreOpts,
+        targetRoomId?: string,
+        targetSessionId?: string,
+        opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult> {
         const storedKey = await this.getSecret("m.megolm_backup.v1");
 
@@ -2866,7 +2866,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: Room object.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async joinRoom(roomIdOrAlias: string, opts: IJoinRoomOpts, callback?: Callback): Promise<Room> {
+    public async joinRoom(roomIdOrAlias: string, opts?: IJoinRoomOpts, callback?: Callback): Promise<Room> {
         // to help people when upgrading..
         if (utils.isFunction(opts)) {
             throw new Error("Expected 'opts' object, got function.");
@@ -3894,7 +3894,10 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves when completed with an object keyed
      * by room ID and value of the error encountered when leaving or null.
      */
-    public leaveRoomChain(roomId: string, includeFuture = true): Promise<{ [roomId: string]: Error | null }> {
+    public leaveRoomChain(
+        roomId: string,
+        includeFuture = true,
+    ): Promise<{ [roomId: string]: Error | MatrixError | null }> {
         const upgradeHistory = this.getRoomUpgradeHistory(roomId);
 
         let eligibleToLeave = upgradeHistory;
@@ -4140,10 +4143,10 @@ export class MatrixClient extends EventEmitter {
      */
     public mxcUrlToHttp(
         mxcUrl: string,
-        width: number,
-        height: number,
-        resizeMethod: string,
-        allowDirectLinks: boolean,
+        width?: number,
+        height?: number,
+        resizeMethod?: string,
+        allowDirectLinks?: boolean,
     ): string | null {
         return getHttpUriForMxc(this.baseUrl, mxcUrl, width, height, resizeMethod, allowDirectLinks);
     }
@@ -6126,7 +6129,7 @@ export class MatrixClient extends EventEmitter {
     public async createRoom(
         options: ICreateRoomOpts,
         callback?: Callback,
-    ): Promise<{ roomId: string, room_alias?: string }> { // eslint-disable-line camelcase
+    ): Promise<{ room_id: string, room_alias?: string }> { // eslint-disable-line camelcase
         // some valid options include: room_alias_name, visibility, invite
 
         // inject the id_access_token if inviting 3rd party addresses
@@ -6305,7 +6308,7 @@ export class MatrixClient extends EventEmitter {
         roomId: string,
         eventType: string,
         content: any,
-        stateKey: string,
+        stateKey = "",
         callback?: Callback,
     ): Promise<any> { // TODO: Types
         const pathParams = {
@@ -6653,7 +6656,7 @@ export class MatrixClient extends EventEmitter {
      */
     public uploadContent(
         file: File | String | Buffer | ReadStream | Blob,
-        opts: IUploadOpts,
+        opts?: IUploadOpts,
     ): Promise<any> { // TODO: Advanced types
         return this.http.uploadContent(file, opts);
     }
@@ -6687,7 +6690,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getProfileInfo(userId: string, info: string, callback?: Callback): Promise<any> { // TODO: Types
+    public getProfileInfo(userId: string, info?: string, callback?: Callback): Promise<any> { // TODO: Types
         if (utils.isFunction(info)) {
             callback = info as any as Callback; // legacy
             info = undefined;

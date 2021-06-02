@@ -73,6 +73,7 @@ export interface ICreateRoomOpts {
     visibility?: "public" | "private";
     name?: string;
     topic?: string;
+    preset?: string;
     // TODO: Types (next line)
     invite_3pid?: any[]; // eslint-disable-line camelcase
 }
