@@ -272,7 +272,7 @@ describe("MegolmBackup", function() {
                     });
                     let numCalls = 0;
                     return new Promise((resolve, reject) => {
-                        client._http.authedRequest = function(
+                        client.http.authedRequest = function(
                             callback, method, path, queryParams, data, opts,
                         ) {
                             ++numCalls;
@@ -292,7 +292,7 @@ describe("MegolmBackup", function() {
                             resolve();
                             return Promise.resolve({});
                         };
-                        client._crypto.backupGroupSession(
+                        client.crypto.backupGroupSession(
                             "roomId",
                             "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
                             [],
@@ -336,7 +336,7 @@ describe("MegolmBackup", function() {
             await resetCrossSigningKeys(client);
             let numCalls = 0;
             await new Promise((resolve, reject) => {
-                client._http.authedRequest = function(
+                client.http.authedRequest = function(
                     callback, method, path, queryParams, data, opts,
                 ) {
                     ++numCalls;
@@ -442,7 +442,7 @@ describe("MegolmBackup", function() {
                     });
                     let numCalls = 0;
                     return new Promise((resolve, reject) => {
-                        client._http.authedRequest = function(
+                        client.http.authedRequest = function(
                             callback, method, path, queryParams, data, opts,
                         ) {
                             ++numCalls;
@@ -468,7 +468,7 @@ describe("MegolmBackup", function() {
                                 );
                             }
                         };
-                        client._crypto.backupGroupSession(
+                        client.crypto.backupGroupSession(
                             "roomId",
                             "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
                             [],
@@ -506,7 +506,7 @@ describe("MegolmBackup", function() {
         });
 
         it('can restore from backup', function() {
-            client._http.authedRequest = function() {
+            client.http.authedRequest = function() {
                 return Promise.resolve(KEY_BACKUP_DATA);
             };
             return client.restoreKeyBackupWithRecoveryKey(
@@ -523,7 +523,7 @@ describe("MegolmBackup", function() {
         });
 
         it('can restore backup by room', function() {
-            client._http.authedRequest = function() {
+            client.http.authedRequest = function() {
                 return Promise.resolve({
                     rooms: {
                         [ROOM_ID]: {
@@ -546,15 +546,15 @@ describe("MegolmBackup", function() {
 
         it('has working cache functions', async function() {
             const key = Uint8Array.from([1, 2, 3, 4, 5, 6, 7, 8]);
-            await client._crypto.storeSessionBackupPrivateKey(key);
-            const result = await client._crypto.getSessionBackupPrivateKey();
+            await client.crypto.storeSessionBackupPrivateKey(key);
+            const result = await client.crypto.getSessionBackupPrivateKey();
             expect(new Uint8Array(result)).toEqual(key);
         });
 
         it('caches session backup keys as it encounters them', async function() {
-            const cachedNull = await client._crypto.getSessionBackupPrivateKey();
+            const cachedNull = await client.crypto.getSessionBackupPrivateKey();
             expect(cachedNull).toBeNull();
-            client._http.authedRequest = function() {
+            client.http.authedRequest = function() {
                 return Promise.resolve(KEY_BACKUP_DATA);
             };
             await new Promise((resolve) => {
@@ -566,7 +566,7 @@ describe("MegolmBackup", function() {
                     { cacheCompleteCallback: resolve },
                 );
             });
-            const cachedKey = await client._crypto.getSessionBackupPrivateKey();
+            const cachedKey = await client.crypto.getSessionBackupPrivateKey();
             expect(cachedKey).not.toBeNull();
         });
     });

@@ -232,7 +232,7 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     // processing the response.
     this._sendKeyRequestsImmediately = false;
 
-    const cryptoCallbacks = this._baseApis._cryptoCallbacks || {};
+    const cryptoCallbacks = this._baseApis.cryptoCallbacks || {};
     const cacheCallbacks = createCryptoStoreCacheCallbacks(cryptoStore, this._olmDevice);
 
     this._crossSigningInfo = new CrossSigningInfo(
@@ -495,7 +495,7 @@ Crypto.prototype.bootstrapCrossSigning = async function({
 } = {}) {
     logger.log("Bootstrapping cross-signing");
 
-    const delegateCryptoCallbacks = this._baseApis._cryptoCallbacks;
+    const delegateCryptoCallbacks = this.baseApis.cryptoCallbacks;
     const builder = new EncryptionSetupBuilder(
         this._baseApis.store.accountData,
         delegateCryptoCallbacks,
@@ -579,7 +579,7 @@ Crypto.prototype.bootstrapCrossSigning = async function({
     const crossSigningPrivateKeys = builder.crossSigningCallbacks.privateKeys;
     if (
         crossSigningPrivateKeys.size &&
-        !this._baseApis._cryptoCallbacks.saveCrossSigningKeys
+        !this._baseApis.cryptoCallbacks.saveCrossSigningKeys
     ) {
         const secretStorage = new SecretStorage(
             builder.accountDataClientAdapter,
@@ -646,7 +646,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     getKeyBackupPassphrase,
 } = {}) {
     logger.log("Bootstrapping Secure Secret Storage");
-    const delegateCryptoCallbacks = this._baseApis._cryptoCallbacks;
+    const delegateCryptoCallbacks = this._baseApis.cryptoCallbacks;
     const builder = new EncryptionSetupBuilder(
         this._baseApis.store.accountData,
         delegateCryptoCallbacks,
@@ -681,7 +681,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
 
     const ensureCanCheckPassphrase = async (keyId, keyInfo) => {
         if (!keyInfo.mac) {
-            const key = await this._baseApis._cryptoCallbacks.getSecretStorageKey(
+            const key = await this._baseApis.cryptoCallbacks.getSecretStorageKey(
                 { keys: { [keyId]: keyInfo } }, "",
             );
             if (key) {
@@ -801,7 +801,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     // If we have cross-signing private keys cached, store them in secret
     // storage if they are not there already.
     if (
-        !this._baseApis._cryptoCallbacks.saveCrossSigningKeys &&
+        !this._baseApis.cryptoCallbacks.saveCrossSigningKeys &&
         await this.isCrossSigningReady() &&
         (newKeyId || !await this._crossSigningInfo.isStoredInSecretStorage(secretStorage))
     ) {
@@ -1071,7 +1071,7 @@ Crypto.prototype._afterCrossSigningLocalKeyChange = async function() {
     upload({ shouldEmit: true });
 
     const shouldUpgradeCb = (
-        this._baseApis._cryptoCallbacks.shouldUpgradeDeviceVerifications
+        this._baseApis.cryptoCallbacks.shouldUpgradeDeviceVerifications
     );
     if (shouldUpgradeCb) {
         logger.info("Starting device verification upgrade");
@@ -1509,7 +1509,7 @@ Crypto.prototype._storeTrustedSelfKeys = async function(keys) {
  */
 Crypto.prototype._checkDeviceVerifications = async function(userId) {
     const shouldUpgradeCb = (
-        this._baseApis._cryptoCallbacks.shouldUpgradeDeviceVerifications
+        this._baseApis.cryptoCallbacks.shouldUpgradeDeviceVerifications
     );
     if (!shouldUpgradeCb) {
         // Upgrading skipped when callback is not present.

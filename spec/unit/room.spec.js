@@ -1384,7 +1384,7 @@ describe("Room", function() {
             }
             expect(hasThrown).toEqual(true);
 
-            client._http.serverResponse = [memberEvent];
+            client.http.serverResponse = [memberEvent];
             await room.loadMembersIfNeeded();
             const memberA = room.getMember("@user_a:bar");
             expect(memberA.name).toEqual("User A");

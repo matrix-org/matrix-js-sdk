@@ -739,7 +739,7 @@ export async function requestKeysDuringVerification(baseApis, userId, deviceId) 
     // it.  We return here in order to test.
     return new Promise((resolve, reject) => {
         const client = baseApis;
-        const original = client._crypto._crossSigningInfo;
+        const original = client.crypto._crossSigningInfo;
 
         // We already have all of the infrastructure we need to validate and
         // cache cross-signing keys, so instead of replicating that, here we set
@@ -775,7 +775,7 @@ export async function requestKeysDuringVerification(baseApis, userId, deviceId) 
 
         // also request and cache the key backup key
         const backupKeyPromise = new Promise(async resolve => {
-            const cachedKey = await client._crypto.getSessionBackupPrivateKey();
+            const cachedKey = await client.crypto.getSessionBackupPrivateKey();
             if (!cachedKey) {
                 logger.info("No cached backup key found. Requesting...");
                 const secretReq = client.requestSecret(
@@ -785,7 +785,7 @@ export async function requestKeysDuringVerification(baseApis, userId, deviceId) 
                 logger.info("Got key backup key, decoding...");
                 const decodedKey = decodeBase64(base64Key);
                 logger.info("Decoded backup key, storing...");
-                client._crypto.storeSessionBackupPrivateKey(
+                client.crypto.storeSessionBackupPrivateKey(
                     Uint8Array.from(decodedKey),
                 );
                 logger.info("Backup key stored. Starting backup restore...");

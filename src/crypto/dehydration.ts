@@ -205,7 +205,7 @@ export class DehydrationManager {
             }
 
             logger.log("Uploading account to server");
-            const dehydrateResult = await this.crypto._baseApis._http.authedRequest(
+            const dehydrateResult = await this.crypto._baseApis.http.authedRequest(
                 undefined,
                 "PUT",
                 "/dehydrated_device",
@@ -268,7 +268,7 @@ export class DehydrationManager {
             }
 
             logger.log("Uploading keys to server");
-            await this.crypto._baseApis._http.authedRequest(
+            await this.crypto._baseApis.http.authedRequest(
                 undefined,
                 "POST",
                 "/keys/upload/" + encodeURI(deviceId),

@@ -385,21 +385,22 @@ export class MatrixClient extends EventEmitter {
     public urlPreviewCache: { [key: string]: Promise<any> } = {}; // TODO: Types
     public unstableClientRelationAggregation = false;
     public identityServer: IIdentityServerProvider;
+    public sessionStore: SessionStore; // XXX: Intended private, used in code.
+    public http: MatrixHttpApi; // XXX: Intended private, used in code.
+    public crypto: Crypto; // XXX: Intended private, used in code.
+    public cryptoCallbacks: ICryptoCallbacks; // XXX: Intended private, used in code.
+    public callEventHandler: CallEventHandler; // XXX: Intended private, used in code.
+    public supportsCallTransfer = false; // XXX: Intended private, used in code.
+    public forceTURN = false; // XXX: Intended private, used in code.
+    public iceCandidatePoolSize = 0; // XXX: Intended private, used in code.
 
     private canSupportVoip = false;
-    private callEventHandler: CallEventHandler;
     private peekSync: SyncApi = null;
     private isGuestAccount = false;
     private ongoingScrollbacks:{[roomId: string]: {promise?: Promise<any>, errorTs: number}} = {}; // TODO: Types
     private notifTimelineSet: EventTimelineSet = null;
-    private crypto: Crypto;
     private cryptoStore: CryptoStore;
-    private sessionStore: SessionStore;
     private verificationMethods: string[];
-    private cryptoCallbacks: ICryptoCallbacks;
-    private forceTURN = false;
-    private iceCandidatePoolSize = 0;
-    private supportsCallTransfer = false;
     private fallbackICEServerAllowed = false;
     private roomList: RoomList;
     private syncApi: SyncApi;
@@ -429,7 +430,6 @@ export class MatrixClient extends EventEmitter {
     private exportedOlmDeviceToImport: IOlmDevice;
     private baseUrl: string;
     private idBaseUrl: string;
-    private http: MatrixHttpApi;
     private txnCtr = 0;
 
     constructor(opts: IMatrixClientCreateOpts) {
@@ -437,6 +437,8 @@ export class MatrixClient extends EventEmitter {
 
         opts.baseUrl = utils.ensureNoTrailingSlash(opts.baseUrl);
         opts.idBaseUrl = utils.ensureNoTrailingSlash(opts.idBaseUrl);
+
+        this.baseUrl = opts.baseUrl;
 
         this.usingExternalCrypto = opts.usingExternalCrypto;
         this.store = opts.store || new StubStore();
@@ -4168,7 +4170,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Function}
      */
     public getEventMapper(options?: MapperOpts): EventMapper {
-        return eventMapperFor(this, options);
+        return eventMapperFor(this, options || {});
     }
 
     /**
@@ -4264,7 +4266,8 @@ export class MatrixClient extends EventEmitter {
      * @param {Filter} timelineFilter the timeline filter to pass
      * @return {Promise}
      */
-    private createMessagesRequest(roomId: string, fromToken: string, limit: number, dir: string, timelineFilter?: Filter): Promise<unknown> { // TODO: Types
+    // XXX: Intended private, used in code.
+    public createMessagesRequest(roomId: string, fromToken: string, limit: number, dir: string, timelineFilter?: Filter): Promise<unknown> { // TODO: Types
         const path = utils.encodeUri(
             "/rooms/$roomId/messages", { $roomId: roomId },
         );
@@ -4928,7 +4931,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Object} searchResults
      * @private
      */
-    private processRoomEventsSearch(searchResults: any, response: any): any {
+    public processRoomEventsSearch(searchResults: any, response: any): any { // XXX: Intended private, used in code
         const room_events = response.search_categories.room_events;
 
         searchResults.count = room_events.count;
@@ -5143,7 +5146,8 @@ export class MatrixClient extends EventEmitter {
         return this.turnServersExpiry;
     }
 
-    private async checkTurnServers(): Promise<boolean> {
+    // XXX: Intended private, used in code.
+    public async checkTurnServers(): Promise<boolean> {
         if (!this.canSupportVoip) {
             return;
         }
@@ -5282,7 +5286,7 @@ export class MatrixClient extends EventEmitter {
      * @param {object} opts the complete set of client options
      * @return {Promise} for store operation
      */
-    private storeClientOptions() {
+    public storeClientOptions() { // XXX: Intended private, used in code
         const primTypes = ["boolean", "string", "number"];
         const serializableOpts = Object.entries(this.clientOpts)
             .filter(([key, value]) => {
