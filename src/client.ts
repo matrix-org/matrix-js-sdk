@@ -107,9 +107,10 @@ import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
 import url from "url";
 import { randomString } from "./randomstring";
 import { ReadStream } from "fs";
+import { WebStorageSessionStore } from "./store/session/webstorage";
 
 export type Store = StubStore | MemoryStore | LocalIndexedDBStoreBackend | RemoteIndexedDBStoreBackend;
-
+export type SessionStore = WebStorageSessionStore;
 export type CryptoStore = MemoryCryptoStore | LocalStorageCryptoStore | IndexedDBCryptoStore;
 
 export type Callback = (err: Error | any | null, data?: any) => void;
@@ -259,7 +260,7 @@ export interface ICreateClientOpts {
      * end-to-end crypto will be disabled. The `createClient` helper
      * _will not_ create this store at the moment.
      */
-    sessionStore?: any;
+    sessionStore?: SessionStore;
 
     /**
      * Set to true to enable client-side aggregation of event relations
@@ -381,7 +382,7 @@ export class MatrixClient extends EventEmitter {
     public scheduler: MatrixScheduler;
     public clientRunning = false;
     public timelineSupport = false;
-    public urlPreviewCache: { [key: string]: Promise<unknown> } = {}; // TODO: @@TR
+    public urlPreviewCache: { [key: string]: Promise<any> } = {}; // TODO: Types
     public unstableClientRelationAggregation = false;
     public identityServer: IIdentityServerProvider;
 
@@ -389,11 +390,11 @@ export class MatrixClient extends EventEmitter {
     private callEventHandler: CallEventHandler;
     private peekSync: SyncApi = null;
     private isGuestAccount = false;
-    private ongoingScrollbacks = {}; // TODO: @@TR
+    private ongoingScrollbacks:{[roomId: string]: {promise?: Promise<any>, errorTs: number}} = {}; // TODO: Types
     private notifTimelineSet: EventTimelineSet = null;
     private crypto: Crypto;
     private cryptoStore: CryptoStore;
-    private sessionStore: any; // TODO: @@TR
+    private sessionStore: SessionStore;
     private verificationMethods: string[];
     private cryptoCallbacks: ICryptoCallbacks;
     private forceTURN = false;
@@ -402,7 +403,7 @@ export class MatrixClient extends EventEmitter {
     private fallbackICEServerAllowed = false;
     private roomList: RoomList;
     private syncApi: SyncApi;
-    private pushRules: any; // TODO: @@TR
+    private pushRules: any; // TODO: Types
     private syncLeftRoomsPromise: Promise<Room[]>;
     private syncedLeftRooms = false;
     private clientOpts: IStoredClientOpts;
@@ -422,7 +423,7 @@ export class MatrixClient extends EventEmitter {
     };
     private clientWellKnown: any;
     private clientWellKnownPromise: Promise<any>;
-    private turnServers: any[] = []; // TODO: @@TR
+    private turnServers: any[] = []; // TODO: Types
     private turnServersExpiry = 0;
     private checkTurnServersIntervalID: number;
     private exportedOlmDeviceToImport: IOlmDevice;
@@ -7456,7 +7457,8 @@ export class MatrixClient extends EventEmitter {
         });
     }
 
-    // TODO: @@TR: Remove warning, eventually
+    // TODO: Remove this warning, alongside the functions
+    // See https://github.com/vector-im/element-web/issues/17532
     // ======================================================
     // **                ANCIENT APIS BELOW                **
     // ======================================================
