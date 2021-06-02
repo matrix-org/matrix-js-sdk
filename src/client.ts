@@ -89,7 +89,7 @@ import {
     ISecretStorageKey,
 } from "./crypto/api";
 import { CrossSigningInfo, UserTrustLevel } from "./crypto/CrossSigning";
-import type { Room } from "./models/Room";
+import { Room } from "./models/room";
 import {
     ICreateRoomOpts,
     IEventSearchOpts,
