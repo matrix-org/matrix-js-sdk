@@ -101,10 +101,10 @@ export interface ICreateSecretStorageOpts {
 
     /**
      * Function called to get the user's
-     * current key backup passphrase. Should return a promise that resolves with a Buffer
+     * current key backup passphrase. Should return a promise that resolves with a Uint8Array
      * containing the key, or rejects if the key cannot be obtained.
      */
-    getKeyBackupPassphrase?: () => Promise<Buffer>;
+    getKeyBackupPassphrase?: () => Promise<Uint8Array>;
 }
 
 export interface ISecretStorageKey {

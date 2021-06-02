@@ -394,6 +394,8 @@ export class MatrixClient extends EventEmitter {
     public supportsCallTransfer = false; // XXX: Intended private, used in code.
     public forceTURN = false; // XXX: Intended private, used in code.
     public iceCandidatePoolSize = 0; // XXX: Intended private, used in code.
+    public idBaseUrl: string;
+    public baseUrl: string;
 
     private canSupportVoip = false;
     private peekSync: SyncApi = null;
@@ -429,8 +431,6 @@ export class MatrixClient extends EventEmitter {
     private turnServersExpiry = 0;
     private checkTurnServersIntervalID: number;
     private exportedOlmDeviceToImport: IOlmDevice;
-    private baseUrl: string;
-    private idBaseUrl: string;
     private txnCtr = 0;
 
     constructor(opts: IMatrixClientCreateOpts) {
@@ -671,11 +671,12 @@ export class MatrixClient extends EventEmitter {
         this.syncApi = new SyncApi(this, this.clientOpts);
         this.syncApi.sync();
 
-        if (opts.clientWellKnownPollPeriod !== undefined) {
+        if (this.clientOpts.clientWellKnownPollPeriod !== undefined) {
             this.clientWellKnownIntervalID =
+                // XXX: Typecast on timer ID because we know better
                 setInterval(() => {
                     this.fetchClientWellKnown();
-                }, 1000 * opts.clientWellKnownPollPeriod) as any as number; // XXX: Typecast because we know better
+                }, 1000 * this.clientOpts.clientWellKnownPollPeriod) as any as number;
             this.fetchClientWellKnown();
         }
     }
@@ -1249,7 +1250,7 @@ export class MatrixClient extends EventEmitter {
      */
     public downloadKeys(
         userIds: string[],
-        forceDownload: boolean,
+        forceDownload?: boolean,
     ): Promise<Record<string, Record<string, DeviceInfo>>> {
         if (!this.crypto) {
             return Promise.reject(new Error("End-to-end encryption disabled"));
@@ -2512,9 +2513,10 @@ export class MatrixClient extends EventEmitter {
         targetRoomId: string,
         targetSessionId: string,
         backupInfo: IKeyBackupVersion,
-        opts: IKeyBackupRestoreOpts,
+        opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult> {
-        const { cacheCompleteCallback, progressCallback } = opts;
+        const cacheCompleteCallback = opts?.cacheCompleteCallback;
+        const progressCallback = opts?.progressCallback;
 
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
@@ -3376,7 +3378,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public sendMessage(roomId: string, content: any, txnId: string, callback?: Callback): Promise<ISendEventResponse> {
+    public sendMessage(roomId: string, content: any, txnId?: string, callback?: Callback): Promise<ISendEventResponse> {
         if (utils.isFunction(txnId)) {
             callback = txnId as any as Callback; // for legacy
             txnId = undefined;
@@ -6008,7 +6010,7 @@ export class MatrixClient extends EventEmitter {
      * authenticates with CAS.
      * @return {string} The HS URL to hit to begin the CAS login process.
      */
-    public getCasLoginUrl(redirectUrl: string): Promise<string> {
+    public getCasLoginUrl(redirectUrl: string): string {
         return this.getSsoLoginUrl(redirectUrl, "cas");
     }
 
@@ -6020,7 +6022,7 @@ export class MatrixClient extends EventEmitter {
      * @param {string} idpId The ID of the Identity Provider being targeted, optional.
      * @return {string} The HS URL to hit to begin the SSO login process.
      */
-    public getSsoLoginUrl(redirectUrl: string, loginType = "sso", idpId?: string): Promise<string> {
+    public getSsoLoginUrl(redirectUrl: string, loginType = "sso", idpId?: string): string {
         let url = "/login/" + loginType + "/redirect";
         if (idpId) {
             url += "/" + idpId;
@@ -6648,7 +6650,10 @@ export class MatrixClient extends EventEmitter {
      *    determined by this.opts.onlyData, opts.rawResponse, and
      *    opts.onlyContentUri.  Rejects with an error (usually a MatrixError).
      */
-    public uploadContent(file: File | String | Buffer | ReadStream, opts: IUploadOpts): Promise<any> { // TODO: Advanced types
+    public uploadContent(
+        file: File | String | Buffer | ReadStream | Blob,
+        opts: IUploadOpts,
+    ): Promise<any> { // TODO: Advanced types
         return this.http.uploadContent(file, opts);
     }
 

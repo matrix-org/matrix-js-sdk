@@ -99,11 +99,11 @@ describe("Secrets", function() {
                 },
             },
         );
-        alice._crypto._crossSigningInfo.setKeys({
+        alice.crypto._crossSigningInfo.setKeys({
             master: signingkeyInfo,
         });
 
-        const secretStorage = alice._crypto._secretStorage;
+        const secretStorage = alice.crypto._secretStorage;
 
         alice.setAccountData = async function(eventType, contents, callback) {
             alice.store.storeAccountDataEvents([
@@ -120,7 +120,7 @@ describe("Secrets", function() {
         const keyAccountData = {
             algorithm: SECRET_STORAGE_ALGORITHM_V1_AES,
         };
-        await alice._crypto._crossSigningInfo.signObject(keyAccountData, 'master');
+        await alice.crypto._crossSigningInfo.signObject(keyAccountData, 'master');
 
         alice.store.storeAccountDataEvents([
             new MatrixEvent({
@@ -249,7 +249,7 @@ describe("Secrets", function() {
                 },
             },
         });
-        vax.client.crypto.deviceList.storeDevicesForUser("@alice:example.com", {
+        vax.client.crypto._deviceList.storeDevicesForUser("@alice:example.com", {
             "Osborne2": {
                 user_id: "@alice:example.com",
                 device_id: "Osborne2",
@@ -334,8 +334,8 @@ describe("Secrets", function() {
                 createSecretStorageKey,
             });
 
-            const crossSigning = bob._crypto._crossSigningInfo;
-            const secretStorage = bob._crypto._secretStorage;
+            const crossSigning = bob.crypto._crossSigningInfo;
+            const secretStorage = bob.crypto._secretStorage;
 
             expect(crossSigning.getId()).toBeTruthy();
             expect(await crossSigning.isStoredInSecretStorage(secretStorage))
@@ -376,10 +376,10 @@ describe("Secrets", function() {
                 ]);
                 this.emit("accountData", event);
             };
-            bob._crypto.checkKeyBackup = async () => {};
+            bob.crypto.checkKeyBackup = async () => {};
 
-            const crossSigning = bob._crypto._crossSigningInfo;
-            const secretStorage = bob._crypto._secretStorage;
+            const crossSigning = bob.crypto._crossSigningInfo;
+            const secretStorage = bob.crypto._secretStorage;
 
             // Set up cross-signing keys from scratch with specific storage key
             await bob.bootstrapCrossSigning({
@@ -394,7 +394,7 @@ describe("Secrets", function() {
             });
 
             // Clear local cross-signing keys and read from secret storage
-            bob._crypto._deviceList.storeCrossSigningForUser(
+            bob.crypto._deviceList.storeCrossSigningForUser(
                 "@bob:example.com",
                 crossSigning.toStorage(),
             );
@@ -479,7 +479,7 @@ describe("Secrets", function() {
                     },
                 }),
             ]);
-            alice._crypto._deviceList.storeCrossSigningForUser("@alice:example.com", {
+            alice.crypto._deviceList.storeCrossSigningForUser("@alice:example.com", {
                 keys: {
                     master: {
                         user_id: "@alice:example.com",
@@ -619,7 +619,7 @@ describe("Secrets", function() {
                     },
                 }),
             ]);
-            alice._crypto._deviceList.storeCrossSigningForUser("@alice:example.com", {
+            alice.crypto._deviceList.storeCrossSigningForUser("@alice:example.com", {
                 keys: {
                     master: {
                         user_id: "@alice:example.com",
