@@ -21,7 +21,7 @@ limitations under the License.
  * TODO:
  * This class mainly serves to take all the syncing logic out of client.js and
  * into a separate file. It's all very fluid, and this class gut wrenches a lot
- * of MatrixClient props (e.g. _http). Given we want to support WebSockets as
+ * of MatrixClient props (e.g. http). Given we want to support WebSockets as
  * an alternative syncing API, we may want to have a proper syncing interface
  * for HTTP and WS at some point.
  */

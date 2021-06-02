@@ -1314,7 +1314,7 @@ describe("Room", function() {
                 isRoomEncrypted: function() {
                     return false;
                 },
-                _http: {
+                http: {
                     serverResponse,
                     authedRequest: function() {
                         if (this.serverResponse instanceof Error) {

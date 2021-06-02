@@ -144,7 +144,7 @@ describe("MatrixClient", function() {
             scheduler: scheduler,
             userId: userId,
         });
-        // FIXME: We shouldn't be yanking _http like this.
+        // FIXME: We shouldn't be yanking http like this.
         client.http = [
             "authedRequest", "getContentUri", "request", "uploadContent",
         ].reduce((r, k) => { r[k] = jest.fn(); return r; }, {});

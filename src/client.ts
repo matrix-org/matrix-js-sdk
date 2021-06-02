@@ -440,6 +440,7 @@ export class MatrixClient extends EventEmitter {
         opts.idBaseUrl = utils.ensureNoTrailingSlash(opts.idBaseUrl);
 
         this.baseUrl = opts.baseUrl;
+        this.idBaseUrl = opts.idBaseUrl;
 
         this.usingExternalCrypto = opts.usingExternalCrypto;
         this.store = opts.store || new StubStore();

@@ -201,20 +201,24 @@ describe("Cross Signing", function() {
 
         const uploadSigsPromise = new Promise((resolve, reject) => {
             alice.uploadKeySignatures = jest.fn(async (content) => {
-                await olmlib.verifySignature(
-                    alice.crypto._olmDevice,
-                    content["@alice:example.com"][
-                        "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk"
-                    ],
-                    "@alice:example.com",
-                    "Osborne2", alice.crypto._olmDevice.deviceEd25519Key,
-                );
-                olmlib.pkVerify(
-                    content["@alice:example.com"]["Osborne2"],
-                    "EmkqvokUn8p+vQAGZitOk4PWjp7Ukp3txV2TbMPEiBQ",
-                    "@alice:example.com",
-                );
-                resolve();
+                try {
+                    await olmlib.verifySignature(
+                        alice.crypto._olmDevice,
+                        content["@alice:example.com"][
+                            "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk"
+                            ],
+                        "@alice:example.com",
+                        "Osborne2", alice.crypto._olmDevice.deviceEd25519Key,
+                    );
+                    olmlib.pkVerify(
+                        content["@alice:example.com"]["Osborne2"],
+                        "EmkqvokUn8p+vQAGZitOk4PWjp7Ukp3txV2TbMPEiBQ",
+                        "@alice:example.com",
+                    );
+                    resolve();
+                } catch (e) {
+                    reject(e);
+                }
             });
         });
 
