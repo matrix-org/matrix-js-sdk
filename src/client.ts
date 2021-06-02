@@ -63,7 +63,7 @@ import {
     IKeyBackupTrustInfo,
     IKeyBackupVersion,
 } from "./crypto/keybackup";
-import { PkDecryption } from "olm";
+import { PkDecryption } from "@matrix-org/olm";
 import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
 import type Request from "request";
 import { MatrixScheduler } from "./scheduler";
@@ -398,7 +398,7 @@ export class MatrixClient extends EventEmitter {
     private canSupportVoip = false;
     private peekSync: SyncApi = null;
     private isGuestAccount = false;
-    private ongoingScrollbacks: {[roomId: string]: {promise?: Promise<any>, errorTs: number}} = {}; // TODO: Types
+    private ongoingScrollbacks: {[roomId: string]: {promise?: Promise<any>, errorTs?: number}} = {}; // TODO: Types
     private notifTimelineSet: EventTimelineSet = null;
     private cryptoStore: CryptoStore;
     private verificationMethods: string[];
