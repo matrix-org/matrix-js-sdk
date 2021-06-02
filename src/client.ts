@@ -45,7 +45,7 @@ import {
     PREFIX_MEDIA_R0,
     PREFIX_R0,
     PREFIX_UNSTABLE,
-    retryNetworkOperation
+    retryNetworkOperation,
 } from "./http-api";
 import { Crypto, DeviceInfo, fixBackupKey, isCryptoAvailable } from './crypto';
 import { decodeRecoveryKey } from './crypto/recoverykey';
@@ -61,7 +61,7 @@ import {
     IKeyBackupRoomSessions,
     IKeyBackupSession,
     IKeyBackupTrustInfo,
-    IKeyBackupVersion
+    IKeyBackupVersion,
 } from "./crypto/keybackup";
 import { PkDecryption } from "olm";
 import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
@@ -86,7 +86,7 @@ import {
     IEncryptedEventInfo,
     IImportRoomKeysOpts,
     IRecoveryKey,
-    ISecretStorageKey
+    ISecretStorageKey,
 } from "./crypto/api";
 import { CrossSigningInfo, UserTrustLevel } from "./crypto/CrossSigning";
 import { Room } from "./models/Room";
@@ -99,7 +99,8 @@ import {
     IPresenceOpts,
     IRedactOpts, IRoomDirectoryOptions,
     ISearchOpts,
-    ISendEventResponse, IUploadOpts
+    ISendEventResponse,
+    IUploadOpts,
 } from "./@types/requests";
 import { EventType } from "./@types/event";
 import { IImageInfo } from "./@types/partials";
@@ -397,7 +398,7 @@ export class MatrixClient extends EventEmitter {
     private canSupportVoip = false;
     private peekSync: SyncApi = null;
     private isGuestAccount = false;
-    private ongoingScrollbacks:{[roomId: string]: {promise?: Promise<any>, errorTs: number}} = {}; // TODO: Types
+    private ongoingScrollbacks: {[roomId: string]: {promise?: Promise<any>, errorTs: number}} = {}; // TODO: Types
     private notifTimelineSet: EventTimelineSet = null;
     private cryptoStore: CryptoStore;
     private verificationMethods: string[];
@@ -816,7 +817,11 @@ export class MatrixClient extends EventEmitter {
      *     dehydrated device.
      * @return {Promise} A promise that resolves when the dehydrated device is stored.
      */
-    public async setDehydrationKey(key: Uint8Array, keyInfo: IDehydratedDeviceKeyInfo, deviceDisplayName?: string): Promise<void> {
+    public async setDehydrationKey(
+        key: Uint8Array,
+        keyInfo: IDehydratedDeviceKeyInfo,
+        deviceDisplayName?: string
+    ): Promise<void> {
         if (!this.crypto) {
             logger.warn('not dehydrating device if crypto is not enabled');
             return;
@@ -7797,7 +7802,6 @@ export class MatrixClient extends EventEmitter {
         });
     }
 }
-
 
 /**
  * Fires whenever the SDK receives a new event.

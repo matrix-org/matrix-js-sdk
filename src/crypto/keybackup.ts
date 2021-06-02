@@ -18,10 +18,10 @@ import { ISignatures } from "../@types/signed";
 import { DeviceInfo } from "./deviceinfo";
 
 export interface IKeyBackupSession {
-    first_message_index: number;
-    forwarded_count: number;
-    is_verified: boolean;
-    session_data: {
+    first_message_index: number; // eslint-disable-line camelcase
+    forwarded_count: number; // eslint-disable-line camelcase
+    is_verified: boolean; // eslint-disable-line camelcase
+    session_data: { // eslint-disable-line camelcase
         ciphertext: string;
         ephemeral: string;
         mac: string;
@@ -34,8 +34,8 @@ export interface IKeyBackupRoomSessions {
 
 export interface IKeyBackupVersion {
     algorithm: string;
-    auth_data: {
-        public_key: string;
+    auth_data: { // eslint-disable-line camelcase
+        public_key: string; // eslint-disable-line camelcase
         signatures: ISignatures;
     };
     count: number;

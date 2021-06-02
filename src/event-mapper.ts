@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { MatrixClient } from "./client";
-import {MatrixEvent} from "./models/event";
+import { MatrixEvent } from "./models/event";
 
 export type EventMapper = (obj: any) => MatrixEvent;
 
@@ -27,6 +27,7 @@ export interface MapperOpts {
 export function eventMapperFor(client: MatrixClient, options: MapperOpts): EventMapper {
     const preventReEmit = Boolean(options.preventReEmit);
     const decrypt = options.decrypt !== false;
+
     function mapper(plainOldJsObject) {
         const event = new MatrixEvent(plainOldJsObject);
         if (event.isEncrypted()) {
@@ -44,5 +45,6 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
         }
         return event;
     }
+
     return mapper;
 }

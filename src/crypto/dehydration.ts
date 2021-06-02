@@ -25,8 +25,8 @@ import { ISecretStorageKeyInfo } from "../matrix";
 type Signatures = Record<string, Record<string, string>>;
 
 export interface IDehydratedDevice {
-    device_id: string;
-    device_data: ISecretStorageKeyInfo & {
+    device_id: string; // eslint-disable-line camelcase
+    device_data: ISecretStorageKeyInfo & { // eslint-disable-line camelcase
         algorithm: string;
         account: string; // pickle
     };

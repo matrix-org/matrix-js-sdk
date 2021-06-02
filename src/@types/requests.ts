@@ -40,12 +40,12 @@ export interface IRedactOpts {
 }
 
 export interface ISendEventResponse {
-    event_id: string;
+    event_id: string; // eslint-disable-line camelcase
 }
 
 export interface IPresenceOpts {
     presence: "online" | "offline" | "unavailable";
-    status_msg?: string;
+    status_msg?: string; // eslint-disable-line camelcase
 }
 
 export interface IPaginateOpts {
@@ -69,18 +69,21 @@ export interface IEventSearchOpts {
 }
 
 export interface ICreateRoomOpts {
-    room_alias_name?: string;
+    room_alias_name?: string; // eslint-disable-line camelcase
     visibility?: "public" | "private";
     name?: string;
     topic?: string;
-    invite_3pid?: any[]; // TODO: Types
+    // TODO: Types (next line)
+    invite_3pid?: any[]; // eslint-disable-line camelcase
 }
 
 export interface IRoomDirectoryOptions {
     server?: string;
     limit?: number;
     since?: string;
-    filter?: any & {generic_search_term: string}; // TODO: Types
+
+    // TODO: Proper types
+    filter?: any & {generic_search_term: string};  // eslint-disable-line camelcase
 }
 
 export interface IUploadOpts {
