@@ -441,7 +441,7 @@ export class MatrixCall extends EventEmitter {
      * @returns {Array<CallFeed>} local CallFeeds
      */
     public getLocalFeeds(): Array<CallFeed> {
-        return this.feeds.filter((feed) => {return feed.isLocal()});
+        return this.feeds.filter((feed) => {return feed.isLocal();});
     }
 
     /**
@@ -449,7 +449,7 @@ export class MatrixCall extends EventEmitter {
      * @returns {Array<CallFeed>} remote CallFeeds
      */
     public getRemoteFeeds(): Array<CallFeed> {
-        return this.feeds.filter((feed) => {return !feed.isLocal()});
+        return this.feeds.filter((feed) => {return !feed.isLocal();});
     }
 
     /**
@@ -530,7 +530,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        const remoteStream = this.feeds.find((feed) => {return !feed.isLocal()})?.stream;
+        const remoteStream = this.feeds.find((feed) => {return !feed.isLocal();})?.stream;
 
         // According to previous comments in this file, firefox at some point did not
         // add streams until media started ariving on them. Testing latest firefox
@@ -598,7 +598,7 @@ export class MatrixCall extends EventEmitter {
                 this.gotUserMediaForAnswer(mediaStream);
             } catch (e) {
                 this.getUserMediaFailed(e);
-                return
+                return;
             }
         } else if (this.localAVStream) {
             this.gotUserMediaForAnswer(this.localAVStream);
@@ -849,7 +849,7 @@ export class MatrixCall extends EventEmitter {
         if (this.client._supportsCallTransfer) {
             answerContent.capabilities = {
                 'm.call.transferee': true,
-            }
+            };
         }
 
         // We have just taken the local description from the peerconnection which will
@@ -1169,7 +1169,7 @@ export class MatrixCall extends EventEmitter {
         } catch (err) {
             logger.debug("Error setting local description!", err);
             this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);
-            return
+            return;
         }
 
         if (this.peerConn.iceGatheringState === 'gathering') {
@@ -1197,7 +1197,7 @@ export class MatrixCall extends EventEmitter {
         if (this.client._supportsCallTransfer) {
             content.capabilities = {
                 'm.call.transferee': true,
-            }
+            };
         }
 
         // Get rid of any candidates waiting to be sent: they'll be included in the local
@@ -1304,7 +1304,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        const oldRemoteStream = this.feeds.find((feed) => {return !feed.isLocal()})?.stream;
+        const oldRemoteStream = this.feeds.find((feed) => {return !feed.isLocal();})?.stream;
 
         // If we already have a stream, check this track is from the same one
         // Note that we check by ID and always set the remote stream: Chrome appears
@@ -1325,7 +1325,7 @@ export class MatrixCall extends EventEmitter {
 
         logger.debug(`Track id ${ev.track.id} of kind ${ev.track.kind} added`);
 
-        this.pushNewFeed(newRemoteStream, this.getOpponentMember().userId, SDPStreamMetadataPurpose.Usermedia)
+        this.pushNewFeed(newRemoteStream, this.getOpponentMember().userId, SDPStreamMetadataPurpose.Usermedia);
 
         logger.info("playing remote. stream active? " + newRemoteStream.active);
     };

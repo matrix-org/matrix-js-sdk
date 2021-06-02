@@ -87,7 +87,7 @@ export class CallEventHandler {
             }
             this.callEventBuffer = [];
         }
-    }
+    };
 
     private onEvent = (event: MatrixEvent) => {
         this.client.decryptEventIfNeeded(event);
@@ -117,7 +117,7 @@ export class CallEventHandler {
                 }
             });
         }
-    }
+    };
 
     private eventIsACall(event: MatrixEvent): boolean {
         const type = event.getType();
