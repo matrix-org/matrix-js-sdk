@@ -4697,7 +4697,13 @@ export class MatrixClient extends EventEmitter {
      * @param {string} nextLink As requestEmailToken
      * @return {Promise} Resolves: As requestEmailToken
      */
-    public requestRegisterMsisdnToken(phoneCountry: string, phoneNumber: string, clientSecret: string, sendAttempt: number, nextLink: string): Promise<void> {
+    public requestRegisterMsisdnToken(
+        phoneCountry: string,
+        phoneNumber: string,
+        clientSecret: string,
+        sendAttempt: number,
+        nextLink: string,
+    ): Promise<void> {
         return this.requestTokenFromEndpoint(
             "/register/msisdn/requestToken",
             {
