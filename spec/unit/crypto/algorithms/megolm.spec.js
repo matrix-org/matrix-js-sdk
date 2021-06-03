@@ -257,6 +257,9 @@ describe("MegolmDecryption", function() {
         });
 
         it("re-uses sessions for sequential messages", async function() {
+            mockCrypto._backupManager = {
+                backupGroupSession: () => {},
+            };
             const mockStorage = new MockStorageApi();
             const cryptoStore = new MemoryCryptoStore(mockStorage);
 

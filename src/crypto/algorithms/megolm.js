@@ -413,9 +413,8 @@ MegolmEncryption.prototype._prepareNewSession = async function(sharedHistory) {
     );
 
     // don't wait for it to complete
-    this._crypto.backupGroupSession(
-        this._roomId, this._olmDevice.deviceCurve25519Key, [],
-        sessionId, key.key,
+    this._crypto._backupManager.backupGroupSession(
+        this._olmDevice.deviceCurve25519Key, sessionId,
     );
 
     return new OutboundSessionInfo(sessionId, sharedHistory);
@@ -1425,11 +1424,7 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
             });
     }).then(() => {
         // don't wait for the keys to be backed up for the server
-        this._crypto.backupGroupSession(
-            content.room_id, senderKey, forwardingKeyChain,
-            content.session_id, content.session_key, keysClaimed,
-            exportFormat,
-        );
+        this._crypto._backupManager.backupGroupSession(senderKey, content.session_id);
     }).catch((e) => {
         logger.error(`Error handling m.room_key_event: ${e}`);
     });
@@ -1645,14 +1640,8 @@ MegolmDecryption.prototype.importRoomKey = function(session, opts = {}) {
     ).then(() => {
         if (opts.source !== "backup") {
             // don't wait for it to complete
-            this._crypto.backupGroupSession(
-                session.room_id,
-                session.sender_key,
-                session.forwarding_curve25519_key_chain,
-                session.session_id,
-                session.session_key,
-                session.sender_claimed_keys,
-                true,
+            this._crypto._backupManager.backupGroupSession(
+                session.sender_key, session.session_id,
             ).catch((e) => {
                 // This throws if the upload failed, but this is fine
                 // since it will have written it to the db and will retry.
