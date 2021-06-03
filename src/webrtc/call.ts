@@ -441,7 +441,7 @@ export class MatrixCall extends EventEmitter {
      * @returns {Array<CallFeed>} local CallFeeds
      */
     public getLocalFeeds(): Array<CallFeed> {
-        return this.feeds.filter((feed) => {return feed.isLocal();});
+        return this.feeds.filter((feed) => feed.isLocal());
     }
 
     /**
@@ -449,7 +449,7 @@ export class MatrixCall extends EventEmitter {
      * @returns {Array<CallFeed>} remote CallFeeds
      */
     public getRemoteFeeds(): Array<CallFeed> {
-        return this.feeds.filter((feed) => {return !feed.isLocal();});
+        return this.feeds.filter((feed) => !feed.isLocal());
     }
 
     /**
@@ -530,7 +530,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        const remoteStream = this.feeds.find((feed) => {return !feed.isLocal();})?.stream;
+        const remoteStream = this.feeds.find((feed) => !feed.isLocal())?.stream;
 
         // According to previous comments in this file, firefox at some point did not
         // add streams until media started ariving on them. Testing latest firefox
@@ -1304,7 +1304,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        const oldRemoteStream = this.feeds.find((feed) => {return !feed.isLocal();})?.stream;
+        const oldRemoteStream = this.feeds.find((feed) => !feed.isLocal())?.stream;
 
         // If we already have a stream, check this track is from the same one
         // Note that we check by ID and always set the remote stream: Chrome appears
