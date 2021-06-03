@@ -1865,7 +1865,7 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(
     }
 
     // eslint-disable-next-line camelcase
-    const {algorithm, auth_data, recovery_key, privateKey} =
+    const { algorithm, auth_data, recovery_key, privateKey } =
           await this._crypto._backupManager.prepareKeyBackupVersion(password);
 
     if (secureSecretStorage) {
@@ -2260,10 +2260,9 @@ MatrixClient.prototype._restoreKeyBackup = async function(
         source: "backup",
     });
 
-    // await this._crypto.setTrustedBackupPubKey(backupPubKey);
     await this.checkKeyBackup();
 
-    return {total: totalKeyCount, imported: keys.length};
+    return { total: totalKeyCount, imported: keys.length };
 };
 
 MatrixClient.prototype.deleteKeysFromBackup = function(roomId, sessionId, version) {

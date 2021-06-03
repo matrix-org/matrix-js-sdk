@@ -20,15 +20,15 @@ limitations under the License.
  * Classes for dealing with key backup.
  */
 
-import {MatrixClient} from "../client";
-import {logger} from "../logger";
-import {MEGOLM_ALGORITHM, verifySignature} from "./olmlib";
-import {DeviceInfo} from "./deviceinfo"
-import {DeviceTrustLevel} from './CrossSigning';
-import {keyFromPassphrase} from './key_passphrase';
-import {sleep} from "../utils";
-import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
-import {encodeRecoveryKey} from './recoverykey';
+import { MatrixClient } from "../client";
+import { logger } from "../logger";
+import { MEGOLM_ALGORITHM, verifySignature } from "./olmlib";
+import { DeviceInfo } from "./deviceinfo"
+import { DeviceTrustLevel } from './CrossSigning';
+import { keyFromPassphrase } from './key_passphrase';
+import { sleep } from "../utils";
+import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
+import { encodeRecoveryKey } from './recoverykey';
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 
@@ -220,7 +220,7 @@ export class BackupManager {
             }
         }
 
-        return {backupInfo, trustInfo};
+        return { backupInfo, trustInfo };
     }
 
     /**
@@ -435,7 +435,7 @@ export class BackupManager {
         for (const session of sessions) {
             const roomId = session.sessionData.room_id;
             if (data[roomId] === undefined) {
-                data[roomId] = {sessions: {}};
+                data[roomId] = { sessions: {} };
             }
 
             const sessionData = await this.baseApis._crypto._olmDevice.exportInboundGroupSession(
@@ -464,7 +464,7 @@ export class BackupManager {
 
         await this.baseApis.sendKeyBackup(
             undefined, undefined, this.backupInfo.version,
-            {rooms: data},
+            { rooms: data },
         );
 
         await this.baseApis._crypto._cryptoStore.unmarkSessionsNeedingBackup(sessions);
@@ -573,7 +573,6 @@ export class Curve25519 implements BackupAlgorithm {
                 const derivation = await keyFromPassphrase(key);
                 authData.private_key_salt = derivation.salt;
                 authData.private_key_iterations = derivation.iterations;
-                // FIXME: algorithm?
                 authData.public_key = decryption.init_with_private_key(derivation.key);
             }
             const publicKey = new global.Olm.PkEncryption();
@@ -604,7 +603,7 @@ export class Curve25519 implements BackupAlgorithm {
 
             if (backupPubKey !== this.authData.public_key) {
                 // eslint-disable-next-line no-throw-literal
-                throw {errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY};
+                throw { errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY };
             }
 
             const keys = [];
