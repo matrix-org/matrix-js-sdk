@@ -397,41 +397,44 @@ export class MatrixClient extends EventEmitter {
     public idBaseUrl: string;
     public baseUrl: string;
 
-    private canSupportVoip = false;
-    private peekSync: SyncApi = null;
-    private isGuestAccount = false;
-    private ongoingScrollbacks: {[roomId: string]: {promise?: Promise<any>, errorTs?: number}} = {}; // TODO: Types
-    private notifTimelineSet: EventTimelineSet = null;
-    private cryptoStore: CryptoStore;
-    private verificationMethods: string[];
-    private fallbackICEServerAllowed = false;
-    private roomList: RoomList;
-    private syncApi: SyncApi;
-    private pushRules: any; // TODO: Types
-    private syncLeftRoomsPromise: Promise<Room[]>;
-    private syncedLeftRooms = false;
-    private clientOpts: IStoredClientOpts;
-    private clientWellKnownIntervalID: number;
-    private canResetTimelineCallback: ResetTimelineCallback;
+    // Note: these are all `protected` to let downstream consumers make mistakes if they want to.
+    // We don't technically support this usage, but have reasons to do this.
+
+    protected canSupportVoip = false;
+    protected peekSync: SyncApi = null;
+    protected isGuestAccount = false;
+    protected ongoingScrollbacks: {[roomId: string]: {promise?: Promise<any>, errorTs?: number}} = {}; // TODO: Types
+    protected notifTimelineSet: EventTimelineSet = null;
+    protected cryptoStore: CryptoStore;
+    protected verificationMethods: string[];
+    protected fallbackICEServerAllowed = false;
+    protected roomList: RoomList;
+    protected syncApi: SyncApi;
+    protected pushRules: any; // TODO: Types
+    protected syncLeftRoomsPromise: Promise<Room[]>;
+    protected syncedLeftRooms = false;
+    protected clientOpts: IStoredClientOpts;
+    protected clientWellKnownIntervalID: number;
+    protected canResetTimelineCallback: ResetTimelineCallback;
 
     // The pushprocessor caches useful things, so keep one and re-use it
-    private pushProcessor = new PushProcessor(this);
+    protected pushProcessor = new PushProcessor(this);
 
     // Promise to a response of the server's /versions response
     // TODO: This should expire: https://github.com/matrix-org/matrix-js-sdk/issues/1020
-    private serverVersionsPromise: Promise<any>;
+    protected serverVersionsPromise: Promise<any>;
 
-    private cachedCapabilities: {
+    protected cachedCapabilities: {
         capabilities: Record<string, any>;
         expiration: number;
     };
-    private clientWellKnown: any;
-    private clientWellKnownPromise: Promise<any>;
-    private turnServers: any[] = []; // TODO: Types
-    private turnServersExpiry = 0;
-    private checkTurnServersIntervalID: number;
-    private exportedOlmDeviceToImport: IOlmDevice;
-    private txnCtr = 0;
+    protected clientWellKnown: any;
+    protected clientWellKnownPromise: Promise<any>;
+    protected turnServers: any[] = []; // TODO: Types
+    protected turnServersExpiry = 0;
+    protected checkTurnServersIntervalID: number;
+    protected exportedOlmDeviceToImport: IOlmDevice;
+    protected txnCtr = 0;
 
     constructor(opts: IMatrixClientCreateOpts) {
         super();
