@@ -84,16 +84,16 @@ export class BackupManager {
     private backupInfo: BackupInfo | undefined; // The info dict from /room_keys/version
     public checkedForBackup: boolean; // Have we checked the server for a backup we can use?
     private sendingBackups: boolean; // Are we currently sending backups?
-    constructor(private readonly baseApis, readonly getKey: GetKey) {
+    constructor(private readonly baseApis, public readonly getKey: GetKey) {
         this.checkedForBackup = false;
         this.sendingBackups = false;
     }
 
-    get version(): string | undefined {
+    public get version(): string | undefined {
         return this.backupInfo && this.backupInfo.version;
     }
 
-    static async makeAlgorithm(info: BackupInfo, getKey: GetKey): Promise<BackupAlgorithm> {
+    public static async makeAlgorithm(info: BackupInfo, getKey: GetKey): Promise<BackupAlgorithm> {
         const Algorithm = algorithmsByName[info.algorithm];
         if (!Algorithm) {
             throw new Error("Unknown backup algorithm");
@@ -101,7 +101,7 @@ export class BackupManager {
         return await Algorithm.init(info.auth_data, getKey);
     }
 
-    async enableKeyBackup(info: BackupInfo): Promise<void> {
+    public async enableKeyBackup(info: BackupInfo): Promise<void> {
         this.backupInfo = info;
         if (this.algorithm) {
             this.algorithm.free();
@@ -119,7 +119,7 @@ export class BackupManager {
     /**
      * Disable backing up of keys.
      */
-    disableKeyBackup(): void {
+    public disableKeyBackup(): void {
         if (this.algorithm) {
             this.algorithm.free();
         }
@@ -130,14 +130,14 @@ export class BackupManager {
         this.baseApis.emit('crypto.keyBackupStatus', false);
     }
 
-    getKeyBackupEnabled(): boolean | null {
+    public getKeyBackupEnabled(): boolean | null {
         if (!this.checkedForBackup) {
             return null;
         }
         return Boolean(this.algorithm);
     }
 
-    async prepareKeyBackupVersion(
+    public async prepareKeyBackupVersion(
         key?: string | Uint8Array | null,
         algorithm?: string | undefined,
     ): Promise<BackupInfo> {
@@ -156,7 +156,7 @@ export class BackupManager {
         };
     }
 
-    async createKeyBackupVersion(info: BackupInfo): Promise<void> {
+    public async createKeyBackupVersion(info: BackupInfo): Promise<void> {
         this.algorithm = await BackupManager.makeAlgorithm(info, this.getKey);
     }
 
@@ -166,7 +166,7 @@ export class BackupManager {
      * one of the user's verified devices, start backing up
      * to it.
      */
-    async checkAndStart(): Promise<{backupInfo: BackupInfo, trustInfo: TrustInfo}> {
+    public async checkAndStart(): Promise<{backupInfo: BackupInfo, trustInfo: TrustInfo}> {
         logger.log("Checking key backup status...");
         if (this.baseApis.isGuest()) {
             logger.log("Skipping key backup check since user is guest");
@@ -232,7 +232,7 @@ export class BackupManager {
      *     trust information (as returned by isKeyBackupTrusted)
      *     in trustInfo.
      */
-    async checkKeyBackup(): Promise<{backupInfo: BackupInfo, trustInfo: TrustInfo}> {
+    public async checkKeyBackup(): Promise<{backupInfo: BackupInfo, trustInfo: TrustInfo}> {
         this.checkedForBackup = false;
         return this.checkAndStart();
     }
@@ -250,7 +250,7 @@ export class BackupManager {
      *     ]
      * }
      */
-    async isKeyBackupTrusted(backupInfo: BackupInfo): Promise<TrustInfo> {
+    public async isKeyBackupTrusted(backupInfo: BackupInfo): Promise<TrustInfo> {
         const ret = {
             usable: false,
             trusted_locally: false,
@@ -363,7 +363,7 @@ export class BackupManager {
      *
      * @param maxDelay Maximum delay to wait in ms. 0 means no delay.
      */
-    async scheduleKeyBackupSend(maxDelay = 10000): Promise<void> {
+    public async scheduleKeyBackupSend(maxDelay = 10000): Promise<void> {
         if (this.sendingBackups) return;
 
         this.sendingBackups = true;
@@ -474,7 +474,7 @@ export class BackupManager {
         return sessions.length;
     }
 
-    async backupGroupSession(
+    public async backupGroupSession(
         senderKey: string, sessionId: string,
     ): Promise<void> {
         await this.baseApis._crypto._cryptoStore.markSessionsNeedingBackup([{
@@ -495,7 +495,7 @@ export class BackupManager {
      * Marks all group sessions as needing to be backed up and schedules them to
      * upload in the background as soon as possible.
      */
-    async scheduleAllGroupSessionsForBackup(): Promise<void> {
+    public async scheduleAllGroupSessionsForBackup(): Promise<void> {
         await this.flagAllGroupSessionsForBackup();
 
         // Schedule keys to upload in the background as soon as possible.
@@ -508,7 +508,7 @@ export class BackupManager {
      * @returns {Promise<int>} Resolves to the number of sessions now requiring a backup
      *     (which will be equal to the number of sessions in the store).
      */
-    async flagAllGroupSessionsForBackup(): Promise<number> {
+    public async flagAllGroupSessionsForBackup(): Promise<number> {
         await this.baseApis._crypto._cryptoStore.doTxn(
             'readwrite',
             [
@@ -533,13 +533,13 @@ export class BackupManager {
      * Counts the number of end to end session keys that are waiting to be backed up
      * @returns {Promise<int>} Resolves to the number of sessions requiring backup
      */
-    countSessionsNeedingBackup(): Promise<number> {
+    public countSessionsNeedingBackup(): Promise<number> {
         return this.baseApis._crypto._cryptoStore.countSessionsNeedingBackup();
     }
 }
 
 export class Curve25519 implements BackupAlgorithm {
-    static algorithmName = "m.megolm_backup.v1.curve25519-aes-sha2";
+    public static algorithmName = "m.megolm_backup.v1.curve25519-aes-sha2";
 
     constructor(
         public authData: AuthData,
@@ -547,7 +547,7 @@ export class Curve25519 implements BackupAlgorithm {
         private getKey: () => Promise<Uint8Array>,
     ) {}
 
-    static async init(
+    public static async init(
         authData: AuthData,
         getKey: () => Promise<Uint8Array>,
     ): Promise<Curve25519> {
@@ -559,7 +559,7 @@ export class Curve25519 implements BackupAlgorithm {
         return new Curve25519(authData, publicKey, getKey);
     }
 
-    static async prepare(
+    public static async prepare(
         key: string | Uint8Array | null,
     ): Promise<[Uint8Array, AuthData]> {
         const decryption = new global.Olm.PkDecryption();
@@ -588,7 +588,7 @@ export class Curve25519 implements BackupAlgorithm {
         }
     }
 
-    async encryptSession(data: Record<string, any>): Promise<any> {
+    public async encryptSession(data: Record<string, any>): Promise<any> {
         const plainText: Record<string, any> = Object.assign({}, data);
         delete plainText.session_id;
         delete plainText.room_id;
@@ -596,7 +596,7 @@ export class Curve25519 implements BackupAlgorithm {
         return this.publicKey.encrypt(JSON.stringify(plainText));
     }
 
-    async decryptSessions(sessions: Record<string, Record<string, any>>): Promise<Record<string, any>[]> {
+    public async decryptSessions(sessions: Record<string, Record<string, any>>): Promise<Record<string, any>[]> {
         const privKey = await this.getKey();
         const decryption = new global.Olm.PkDecryption();
         try {
@@ -628,7 +628,7 @@ export class Curve25519 implements BackupAlgorithm {
         }
     }
 
-    async keyMatches(key: Uint8Array): Promise<boolean> {
+    public async keyMatches(key: Uint8Array): Promise<boolean> {
         const decryption = new global.Olm.PkDecryption();
         let pubKey;
         try {
@@ -640,7 +640,7 @@ export class Curve25519 implements BackupAlgorithm {
         return pubKey === this.authData.public_key;
     }
 
-    free(): void {
+    public free(): void {
         this.publicKey.free();
     }
 }
