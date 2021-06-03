@@ -16,13 +16,13 @@ limitations under the License.
 
 import '../../olm-loader';
 import * as olmlib from "../../../src/crypto/olmlib";
-import {SECRET_STORAGE_ALGORITHM_V1_AES} from "../../../src/crypto/SecretStorage";
-import {MatrixEvent} from "../../../src/models/event";
-import {TestClient} from '../../TestClient';
-import {makeTestClients} from './verification/util';
-import {encryptAES} from "../../../src/crypto/aes";
-import {resetCrossSigningKeys, createSecretStorageKey} from "./crypto-utils";
-import {logger} from '../../../src/logger';
+import { SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/crypto/SecretStorage";
+import { MatrixEvent } from "../../../src/models/event";
+import { TestClient } from '../../TestClient';
+import { makeTestClients } from './verification/util';
+import { encryptAES } from "../../../src/crypto/aes";
+import { resetCrossSigningKeys, createSecretStorageKey } from "./crypto-utils";
+import { logger } from '../../../src/logger';
 
 import * as utils from "../../../src/utils";
 
@@ -91,7 +91,7 @@ describe("Secrets", function() {
         });
 
         const alice = await makeTestClient(
-            {userId: "@alice:example.com", deviceId: "Osborne2"},
+            { userId: "@alice:example.com", deviceId: "Osborne2" },
             {
                 cryptoCallbacks: {
                     getCrossSigningKey: t => signingKey,
@@ -141,7 +141,7 @@ describe("Secrets", function() {
 
     it("should throw if given a key that doesn't exist", async function() {
         const alice = await makeTestClient(
-            {userId: "@alice:example.com", deviceId: "Osborne2"},
+            { userId: "@alice:example.com", deviceId: "Osborne2" },
         );
 
         try {
@@ -155,7 +155,7 @@ describe("Secrets", function() {
 
     it("should refuse to encrypt with zero keys", async function() {
         const alice = await makeTestClient(
-            {userId: "@alice:example.com", deviceId: "Osborne2"},
+            { userId: "@alice:example.com", deviceId: "Osborne2" },
         );
 
         try {
@@ -175,7 +175,7 @@ describe("Secrets", function() {
 
         let keys = {};
         const alice = await makeTestClient(
-            {userId: "@alice:example.com", deviceId: "Osborne2"},
+            { userId: "@alice:example.com", deviceId: "Osborne2" },
             {
                 cryptoCallbacks: {
                     getCrossSigningKey: t => keys[t],
@@ -208,7 +208,7 @@ describe("Secrets", function() {
 
     it("should refuse to encrypt if no keys given and no default key", async function() {
         const alice = await makeTestClient(
-            {userId: "@alice:example.com", deviceId: "Osborne2"},
+            { userId: "@alice:example.com", deviceId: "Osborne2" },
         );
 
         try {
@@ -221,8 +221,8 @@ describe("Secrets", function() {
     it("should request secrets from other clients", async function() {
         const [osborne2, vax] = await makeTestClients(
             [
-                {userId: "@alice:example.com", deviceId: "Osborne2"},
-                {userId: "@alice:example.com", deviceId: "VAX"},
+                { userId: "@alice:example.com", deviceId: "Osborne2" },
+                { userId: "@alice:example.com", deviceId: "VAX" },
             ],
             {
                 cryptoCallbacks: {
@@ -419,12 +419,12 @@ describe("Secrets", function() {
                 key_id: SSSSKey,
             };
             const alice = await makeTestClient(
-                {userId: "@alice:example.com", deviceId: "Osborne2"},
+                { userId: "@alice:example.com", deviceId: "Osborne2" },
                 {
                     cryptoCallbacks: {
                         getCrossSigningKey: t => crossSigningKeys[t],
                         saveCrossSigningKeys: k => crossSigningKeys = k,
-                        getSecretStorageKey: ({keys}, name) => {
+                        getSecretStorageKey: ({ keys }, name) => {
                             for (const keyId of Object.keys(keys)) {
                                 if (secretStorageKeys[keyId]) {
                                     return [keyId, secretStorageKeys[keyId]];
@@ -458,7 +458,7 @@ describe("Secrets", function() {
                     type: "m.cross_signing.master",
                     content: {
                         encrypted: {
-                            key_id: {ciphertext: "bla", mac: "bla", iv: "bla"},
+                            key_id: { ciphertext: "bla", mac: "bla", iv: "bla" },
                         },
                     },
                 }),
@@ -466,7 +466,7 @@ describe("Secrets", function() {
                     type: "m.cross_signing.self_signing",
                     content: {
                         encrypted: {
-                            key_id: {ciphertext: "bla", mac: "bla", iv: "bla"},
+                            key_id: { ciphertext: "bla", mac: "bla", iv: "bla" },
                         },
                     },
                 }),
@@ -474,7 +474,7 @@ describe("Secrets", function() {
                     type: "m.cross_signing.user_signing",
                     content: {
                         encrypted: {
-                            key_id: {ciphertext: "bla", mac: "bla", iv: "bla"},
+                            key_id: { ciphertext: "bla", mac: "bla", iv: "bla" },
                         },
                     },
                 }),
@@ -525,7 +525,7 @@ describe("Secrets", function() {
             await alice.bootstrapSecretStorage();
 
             expect(alice.getAccountData("m.secret_storage.default_key").getContent())
-                .toEqual({key: "key_id"});
+                .toEqual({ key: "key_id" });
             const keyInfo = alice.getAccountData("m.secret_storage.key.key_id")
                 .getContent();
             expect(keyInfo.algorithm)
@@ -550,12 +550,12 @@ describe("Secrets", function() {
                 key_id: SSSSKey,
             };
             const alice = await makeTestClient(
-                {userId: "@alice:example.com", deviceId: "Osborne2"},
+                { userId: "@alice:example.com", deviceId: "Osborne2" },
                 {
                     cryptoCallbacks: {
                         getCrossSigningKey: t => crossSigningKeys[t],
                         saveCrossSigningKeys: k => crossSigningKeys = k,
-                        getSecretStorageKey: ({keys}, name) => {
+                        getSecretStorageKey: ({ keys }, name) => {
                             for (const keyId of Object.keys(keys)) {
                                 if (secretStorageKeys[keyId]) {
                                     return [keyId, secretStorageKeys[keyId]];
@@ -587,7 +587,7 @@ describe("Secrets", function() {
                     type: "m.cross_signing.master",
                     content: {
                         encrypted: {
-                            key_id: {ciphertext: "bla", mac: "bla", iv: "bla"},
+                            key_id: { ciphertext: "bla", mac: "bla", iv: "bla" },
                         },
                     },
                 }),
@@ -595,7 +595,7 @@ describe("Secrets", function() {
                     type: "m.cross_signing.self_signing",
                     content: {
                         encrypted: {
-                            key_id: {ciphertext: "bla", mac: "bla", iv: "bla"},
+                            key_id: { ciphertext: "bla", mac: "bla", iv: "bla" },
                         },
                     },
                 }),
@@ -603,7 +603,7 @@ describe("Secrets", function() {
                     type: "m.cross_signing.user_signing",
                     content: {
                         encrypted: {
-                            key_id: {ciphertext: "bla", mac: "bla", iv: "bla"},
+                            key_id: { ciphertext: "bla", mac: "bla", iv: "bla" },
                         },
                     },
                 }),

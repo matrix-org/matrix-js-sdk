@@ -20,10 +20,10 @@ limitations under the License.
  * @module crypto/verification/Error
  */
 
-import {MatrixEvent} from "../../models/event";
+import { MatrixEvent } from "../../models/event";
 
 export function newVerificationError(code, reason, extradata) {
-    const content = Object.assign({}, {code, reason}, extradata);
+    const content = Object.assign({}, { code, reason }, extradata);
     return new MatrixEvent({
         type: "m.key.verification.cancel",
         content,
@@ -87,9 +87,9 @@ export const newInvalidMessageError = errorFactory(
 export function errorFromEvent(event) {
     const content = event.getContent();
     if (content) {
-        const {code, reason} = content;
-        return {code, reason};
+        const { code, reason } = content;
+        return { code, reason };
     } else {
-        return {code: "Unknown error", reason: "m.unknown"};
+        return { code: "Unknown error", reason: "m.unknown" };
     }
 }

@@ -20,7 +20,7 @@ limitations under the License.
 
 import url from "url";
 import * as utils from "./utils";
-import {logger} from './logger';
+import { logger } from './logger';
 
 const EMAIL_STAGE_TYPE = "m.login.email.identity";
 const MSISDN_STAGE_TYPE = "m.login.msisdn";

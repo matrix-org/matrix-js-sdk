@@ -22,7 +22,7 @@ limitations under the License.
  */
 
 import * as utils from "../../utils";
-import {logger} from '../../logger';
+import { logger } from '../../logger';
 
 const DEBUG = false;  // set true to enable console logging.
 const E2E_PREFIX = "session.e2e.";

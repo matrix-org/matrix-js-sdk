@@ -1,5 +1,5 @@
-import {EventTimeline} from "../../src/models/event-timeline";
-import {TimelineIndex, TimelineWindow} from "../../src/timeline-window";
+import { EventTimeline } from "../../src/models/event-timeline";
+import { TimelineIndex, TimelineWindow } from "../../src/timeline-window";
 import * as utils from "../test-utils";
 
 const ROOM_ID = "roomId";
@@ -18,7 +18,7 @@ function createTimeline(numEvents, baseIndex) {
     }
 
     // XXX: this is a horrid hack
-    const timelineSet = { room: { roomId: ROOM_ID }};
+    const timelineSet = { room: { roomId: ROOM_ID } };
     timelineSet.room.getUnfilteredTimelineSet = function() {
         return timelineSet;
     };
@@ -46,7 +46,6 @@ function addEventsToTimeline(timeline, numEvents, atStart) {
     }
 }
 
-
 /*
  * create a pair of linked timelines
  */
@@ -57,7 +56,6 @@ function createLinkedTimelines() {
     tl2.setNeighbouringTimeline(tl1, EventTimeline.BACKWARDS);
     return [tl1, tl2];
 }
-
 
 describe("TimelineIndex", function() {
     describe("minIndex", function() {
@@ -133,7 +131,6 @@ describe("TimelineIndex", function() {
     });
 });
 
-
 describe("TimelineWindow", function() {
     /**
      * create a dummy eventTimelineSet and client, and a TimelineWindow
@@ -142,7 +139,7 @@ describe("TimelineWindow", function() {
     let timelineSet;
     let client;
     function createWindow(timeline, opts) {
-        timelineSet = {getTimelineForEvent: () => null};
+        timelineSet = { getTimelineForEvent: () => null };
         client = {};
         client.getEventTimeline = function(timelineSet0, eventId0) {
             expect(timelineSet0).toBe(timelineSet);
@@ -171,7 +168,7 @@ describe("TimelineWindow", function() {
             const timeline = createTimeline();
             const eventId = timeline.getEvents()[1].getId();
 
-            const timelineSet = {getTimelineForEvent: () => null};
+            const timelineSet = { getTimelineForEvent: () => null };
             const client = {};
             client.getEventTimeline = function(timelineSet0, eventId0) {
                 expect(timelineSet0).toBe(timelineSet);
@@ -193,7 +190,7 @@ describe("TimelineWindow", function() {
 
             const eventId = timeline.getEvents()[1].getId();
 
-            const timelineSet = {getTimelineForEvent: () => null};
+            const timelineSet = { getTimelineForEvent: () => null };
             const client = {};
 
             const timelineWindow = new TimelineWindow(client, timelineSet);
@@ -266,7 +263,7 @@ describe("TimelineWindow", function() {
         it("should advance into next timeline", function() {
             const tls = createLinkedTimelines();
             const eventId = tls[0].getEvents()[1].getId();
-            const timelineWindow = createWindow(tls[0], {windowLimit: 5});
+            const timelineWindow = createWindow(tls[0], { windowLimit: 5 });
 
             return timelineWindow.load(eventId, 3).then(function() {
                 const expectedEvents = tls[0].getEvents();
@@ -311,7 +308,7 @@ describe("TimelineWindow", function() {
         it("should retreat into previous timeline", function() {
             const tls = createLinkedTimelines();
             const eventId = tls[1].getEvents()[1].getId();
-            const timelineWindow = createWindow(tls[1], {windowLimit: 5});
+            const timelineWindow = createWindow(tls[1], { windowLimit: 5 });
 
             return timelineWindow.load(eventId, 3).then(function() {
                 const expectedEvents = tls[1].getEvents();
@@ -357,7 +354,7 @@ describe("TimelineWindow", function() {
             const timeline = createTimeline();
             timeline.setPaginationToken("toktok", EventTimeline.FORWARDS);
 
-            const timelineWindow = createWindow(timeline, {windowLimit: 5});
+            const timelineWindow = createWindow(timeline, { windowLimit: 5 });
             const eventId = timeline.getEvents()[1].getId();
 
             client.paginateEventTimeline = function(timeline0, opts) {
@@ -385,12 +382,11 @@ describe("TimelineWindow", function() {
             });
         });
 
-
         it("should make backward pagination requests", function() {
             const timeline = createTimeline();
             timeline.setPaginationToken("toktok", EventTimeline.BACKWARDS);
 
-            const timelineWindow = createWindow(timeline, {windowLimit: 5});
+            const timelineWindow = createWindow(timeline, { windowLimit: 5 });
             const eventId = timeline.getEvents()[1].getId();
 
             client.paginateEventTimeline = function(timeline0, opts) {
@@ -422,7 +418,7 @@ describe("TimelineWindow", function() {
             const timeline = createTimeline();
             timeline.setPaginationToken("toktok", EventTimeline.FORWARDS);
 
-            const timelineWindow = createWindow(timeline, {windowLimit: 5});
+            const timelineWindow = createWindow(timeline, { windowLimit: 5 });
             const eventId = timeline.getEvents()[1].getId();
 
             let paginateCount = 0;

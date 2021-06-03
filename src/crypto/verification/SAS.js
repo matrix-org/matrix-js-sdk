@@ -19,7 +19,7 @@ limitations under the License.
  * @module crypto/verification/SAS
  */
 
-import {VerificationBase as Base, SwitchStartEventError} from "./Base";
+import { VerificationBase as Base, SwitchStartEventError } from "./Base";
 import anotherjson from 'another-json';
 import {
     errorFactory,
@@ -28,7 +28,7 @@ import {
     newUnknownMethodError,
     newUserCancelledError,
 } from './Error';
-import {logger} from '../../logger';
+import { logger } from '../../logger';
 
 const START_TYPE = "m.key.verification.start";
 
@@ -323,7 +323,6 @@ export class SAS extends Base {
                 key: this.ourSASPubKey,
             });
 
-
             e = await this._waitForEvent("m.key.verification.key");
             // FIXME: make sure event is properly formed
             content = e.getContent();
@@ -352,7 +351,6 @@ export class SAS extends Base {
                 };
                 this.emit("show_sas", this.sasEvent);
             });
-
 
             [e] = await Promise.all([
                 this._waitForEvent("m.key.verification.mac")
@@ -411,7 +409,6 @@ export class SAS extends Base {
                 commitment: olmutil.sha256(commitmentStr),
             });
 
-
             let e = await this._waitForEvent("m.key.verification.key");
             // FIXME: make sure event is properly formed
             content = e.getContent();
@@ -439,7 +436,6 @@ export class SAS extends Base {
                 };
                 this.emit("show_sas", this.sasEvent);
             });
-
 
             [e] = await Promise.all([
                 this._waitForEvent("m.key.verification.mac")

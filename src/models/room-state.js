@@ -19,11 +19,11 @@ limitations under the License.
  * @module models/room-state
  */
 
-import {EventEmitter} from "events";
-import {RoomMember} from "./room-member";
-import {logger} from '../logger';
+import { EventEmitter } from "events";
+import { RoomMember } from "./room-member";
+import { logger } from '../logger';
 import * as utils from "../utils";
-import {EventType} from "../@types/event";
+import { EventType } from "../@types/event";
 
 // possible statuses for out-of-band member loading
 const OOB_STATUS_NOTSTARTED = 1;
@@ -349,6 +349,11 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
             self._updateMember(member);
             self.emit("RoomState.members", event, self, member);
         } else if (event.getType() === "m.room.power_levels") {
+            // events with unknown state keys should be ignored
+            // and should not aggregate onto members power levels
+            if (event.getStateKey() !== "") {
+                return;
+            }
             const members = Object.values(self.members);
             members.forEach(function(member) {
                 // We only propagate `RoomState.members` event if the
@@ -734,7 +739,6 @@ RoomState.prototype.getJoinRule = function() {
     const joinRuleContent = joinRuleEvent ? joinRuleEvent.getContent() : {};
     return joinRuleContent["join_rule"] || "invite";
 };
-
 
 function _updateThirdPartyTokenCache(roomState, memberEvent) {
     if (!memberEvent.getContent().third_party_invite) {

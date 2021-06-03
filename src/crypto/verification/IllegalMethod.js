@@ -20,7 +20,7 @@ limitations under the License.
  * @module crypto/verification/IllegalMethod
  */
 
-import {VerificationBase as Base} from "./Base";
+import { VerificationBase as Base } from "./Base";
 
 /**
  * @class crypto/verification/IllegalMethod/IllegalMethod

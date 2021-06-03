@@ -21,11 +21,11 @@ limitations under the License.
  * @module webrtc/call
  */
 
-import {logger} from '../logger';
-import {EventEmitter} from 'events';
+import { logger } from '../logger';
+import { EventEmitter } from 'events';
 import * as utils from '../utils';
 import MatrixEvent from '../models/event';
-import {EventType} from '../@types/event';
+import { EventType } from '../@types/event';
 import { RoomMember } from '../models/room-member';
 import { randomString } from '../randomstring';
 import {
@@ -36,7 +36,6 @@ import {
     SDPStreamMetadataPurpose,
 } from './callEventTypes';
 import { CallFeed } from './callFeed';
-
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
@@ -189,6 +188,11 @@ export enum CallErrorCode {
      * Signalling for the call could not be sent (other than the initial invite)
      */
     SignallingFailed = 'signalling_timeout',
+
+    /**
+     * The remote party is busy
+     */
+    UserBusy = 'user_busy'
 }
 
 enum ConstraintsType {
@@ -643,7 +647,7 @@ export class MatrixCall extends EventEmitter {
         // Continue to send no reason for user hangups temporarily, until
         // clients understand the user_hangup reason (voip v1)
         if (reason !== CallErrorCode.UserHangup) content['reason'] = reason;
-        this.sendVoipEvent(EventType.CallHangup, {});
+        this.sendVoipEvent(EventType.CallHangup, content);
     }
 
     /**
@@ -1102,21 +1106,8 @@ export class MatrixCall extends EventEmitter {
             await this.peerConn.setRemoteDescription(description);
 
             if (description.type === 'offer') {
-                // First we sent the direction of the tranciever to what we'd like it to be,
-                // irresepective of whether the other side has us on hold - so just whether we
-                // want the call to be on hold or not. This is necessary because in a few lines,
-                // we'll adjust the direction and unless we do this too, we'll never come off hold.
-                for (const tranceiver of this.peerConn.getTransceivers()) {
-                    tranceiver.direction = this.isRemoteOnHold() ? 'inactive' : 'sendrecv';
-                }
                 const localDescription = await this.peerConn.createAnswer();
                 await this.peerConn.setLocalDescription(localDescription);
-                // Now we've got our answer, set the direction to the outcome of the negotiation.
-                // We need to do this otherwise Firefox will notice that the direction is not the
-                // currentDirection and try to negotiate itself off hold again.
-                for (const tranceiver of this.peerConn.getTransceivers()) {
-                    tranceiver.direction = tranceiver.currentDirection;
-                }
 
                 this.sendVoipEvent(EventType.CallNegotiate, {
                     description: this.peerConn.localDescription,
@@ -1375,7 +1366,7 @@ export class MatrixCall extends EventEmitter {
         );
 
         if (shouldTerminate) {
-            this.terminate(CallParty.Remote, CallErrorCode.UserHangup, true);
+            this.terminate(CallParty.Remote, msg.reason || CallErrorCode.UserHangup, true);
         } else {
             logger.debug(`Call is in state: ${this.state}: ignoring reject`);
         }
@@ -1706,7 +1697,7 @@ function getUserMediaContraints(type: ConstraintsType) {
         case ConstraintsType.Audio: {
             return {
                 audio: {
-                    deviceId: audioInput ? {ideal: audioInput} : undefined,
+                    deviceId: audioInput ? { ideal: audioInput } : undefined,
                 },
                 video: false,
             };
@@ -1714,9 +1705,9 @@ function getUserMediaContraints(type: ConstraintsType) {
         case ConstraintsType.Video: {
             return {
                 audio: {
-                    deviceId: audioInput ? {ideal: audioInput} : undefined,
+                    deviceId: audioInput ? { ideal: audioInput } : undefined,
                 }, video: {
-                    deviceId: videoInput ? {ideal: videoInput} : undefined,
+                    deviceId: videoInput ? { ideal: videoInput } : undefined,
                     /* We want 640x360.  Chrome will give it only if we ask exactly,
                        FF refuses entirely if we ask exactly, so have to ask for ideal
                        instead
@@ -1804,7 +1795,10 @@ export function createNewMatrixCall(client: any, roomId: string, options?: CallO
             window.RTCIceCandidate || navigator.mediaDevices,
         );
         if (!supported) {
-            logger.error("WebRTC is not supported in this browser / environment");
+            // Adds a lot of noise to test runs, so disable logging there.
+            if (process.env.NODE_ENV !== "test") {
+                logger.error("WebRTC is not supported in this browser / environment");
+            }
             return null;
         }
     } catch (e) {

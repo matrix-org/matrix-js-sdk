@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {decodeBase64, encodeBase64} from './olmlib';
-import {IndexedDBCryptoStore} from '../crypto/store/indexeddb-crypto-store';
-import {decryptAES, encryptAES} from './aes';
+import { decodeBase64, encodeBase64 } from './olmlib';
+import { IndexedDBCryptoStore } from '../crypto/store/indexeddb-crypto-store';
+import { decryptAES, encryptAES } from './aes';
 import anotherjson from "another-json";
-import {logger} from '../logger';
+import { logger } from '../logger';
 
 // FIXME: these types should eventually go in a different file
 type Signatures = Record<string, Record<string, string>>;
@@ -59,7 +59,7 @@ export class DehydrationManager {
                     txn,
                     async (result) => {
                         if (result) {
-                            const {key, keyInfo, deviceDisplayName, time} = result;
+                            const { key, keyInfo, deviceDisplayName, time } = result;
                             const pickleKey = Buffer.from(this.crypto._olmDevice._pickleKey);
                             const decrypted = await decryptAES(key, pickleKey, DEHYDRATION_ALGORITHM);
                             this.key = decodeBase64(decrypted);
@@ -231,7 +231,7 @@ export class DehydrationManager {
             logger.log("Preparing one-time keys");
             const oneTimeKeys = {};
             for (const [keyId, key] of Object.entries(otks.curve25519)) {
-                const k: OneTimeKey = {key};
+                const k: OneTimeKey = { key };
                 const signature = account.sign(anotherjson.stringify(k));
                 k.signatures = {
                     [this.crypto._userId]: {
@@ -244,7 +244,7 @@ export class DehydrationManager {
             logger.log("Preparing fallback keys");
             const fallbackKeys = {};
             for (const [keyId, key] of Object.entries(fallbacks.curve25519)) {
-                const k: OneTimeKey = {key, fallback: true};
+                const k: OneTimeKey = { key, fallback: true };
                 const signature = account.sign(anotherjson.stringify(k));
                 k.signatures = {
                     [this.crypto._userId]: {

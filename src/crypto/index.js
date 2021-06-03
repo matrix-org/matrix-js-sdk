@@ -22,14 +22,14 @@ limitations under the License.
  */
 
 import anotherjson from "another-json";
-import {EventEmitter} from 'events';
-import {ReEmitter} from '../ReEmitter';
-import {logger} from '../logger';
+import { EventEmitter } from 'events';
+import { ReEmitter } from '../ReEmitter';
+import { logger } from '../logger';
 import * as utils from "../utils";
-import {OlmDevice} from "./OlmDevice";
+import { OlmDevice } from "./OlmDevice";
 import * as olmlib from "./olmlib";
-import {DeviceList} from "./DeviceList";
-import {DeviceInfo} from "./deviceinfo";
+import { DeviceList } from "./DeviceList";
+import { DeviceInfo } from "./deviceinfo";
 import * as algorithms from "./algorithms";
 import {
     CrossSigningInfo,
@@ -37,25 +37,25 @@ import {
     UserTrustLevel,
     createCryptoStoreCacheCallbacks,
 } from './CrossSigning';
-import {EncryptionSetupBuilder} from "./EncryptionSetup";
-import {SECRET_STORAGE_ALGORITHM_V1_AES, SecretStorage} from './SecretStorage';
-import {OutgoingRoomKeyRequestManager} from './OutgoingRoomKeyRequestManager';
-import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
+import { EncryptionSetupBuilder } from "./EncryptionSetup";
+import { SECRET_STORAGE_ALGORITHM_V1_AES, SecretStorage } from './SecretStorage';
+import { OutgoingRoomKeyRequestManager } from './OutgoingRoomKeyRequestManager';
+import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import {
     ReciprocateQRCode,
     SCAN_QR_CODE_METHOD,
     SHOW_QR_CODE_METHOD,
 } from './verification/QRCode';
-import {SAS} from './verification/SAS';
-import {keyFromPassphrase} from './key_passphrase';
-import {encodeRecoveryKey, decodeRecoveryKey} from './recoverykey';
-import {VerificationRequest} from "./verification/request/VerificationRequest";
-import {InRoomChannel, InRoomRequests} from "./verification/request/InRoomChannel";
-import {ToDeviceChannel, ToDeviceRequests} from "./verification/request/ToDeviceChannel";
-import {IllegalMethod} from "./verification/IllegalMethod";
-import {KeySignatureUploadError} from "../errors";
-import {decryptAES, encryptAES} from './aes';
-import {DehydrationManager} from './dehydration';
+import { SAS } from './verification/SAS';
+import { keyFromPassphrase } from './key_passphrase';
+import { encodeRecoveryKey, decodeRecoveryKey } from './recoverykey';
+import { VerificationRequest } from "./verification/request/VerificationRequest";
+import { InRoomChannel, InRoomRequests } from "./verification/request/InRoomChannel";
+import { ToDeviceChannel, ToDeviceRequests } from "./verification/request/ToDeviceChannel";
+import { IllegalMethod } from "./verification/IllegalMethod";
+import { KeySignatureUploadError } from "../errors";
+import { decryptAES, encryptAES } from './aes';
+import { DehydrationManager } from './dehydration';
 import { MatrixEvent } from "../models/event";
 import { BackupManager } from "./backup";
 
@@ -706,12 +706,12 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     const ensureCanCheckPassphrase = async (keyId, keyInfo) => {
         if (!keyInfo.mac) {
             const key = await this._baseApis._cryptoCallbacks.getSecretStorageKey(
-                {keys: {[keyId]: keyInfo}}, "",
+                { keys: { [keyId]: keyInfo } }, "",
             );
             if (key) {
                 const privateKey = key[1];
                 builder.ssssCryptoCallbacks.addPrivateKey(keyId, keyInfo, privateKey);
-                const {iv, mac} = await SecretStorage._calculateKeyCheck(privateKey);
+                const { iv, mac } = await SecretStorage._calculateKeyCheck(privateKey);
                 keyInfo.iv = iv;
                 keyInfo.mac = mac;
 
@@ -1604,7 +1604,6 @@ Crypto.prototype.registerEventHandlers = function(eventEmitter) {
     eventEmitter.on("Event.decrypted", timelineHandler);
 };
 
-
 /** Start background processes related to crypto */
 Crypto.prototype.start = function() {
     this._outgoingRoomKeyRequestManager.start();
@@ -2061,7 +2060,7 @@ Crypto.prototype.setDeviceVerification = async function(
         }
 
         if (device) {
-            const upload = async ({shouldEmit}) => {
+            const upload = async ({ shouldEmit }) => {
                 logger.info("Uploading signature for " + deviceId);
                 const response = await this._baseApis.uploadKeySignatures({
                     [userId]: {
@@ -2081,7 +2080,7 @@ Crypto.prototype.setDeviceVerification = async function(
                     throw new KeySignatureUploadError("Key upload failed", { failures });
                 }
             };
-            await upload({shouldEmit: true});
+            await upload({ shouldEmit: true });
             // XXX: we'll need to wait for the device list to be updated
         }
     }
@@ -2174,7 +2173,7 @@ Crypto.prototype.beginKeyVerification = function(
         this._toDeviceVerificationRequests.setRequestBySenderAndTxnId(
             userId, transactionId, request);
     }
-    return request.beginKeyVerification(method, {userId, deviceId});
+    return request.beginKeyVerification(method, { userId, deviceId });
 };
 
 Crypto.prototype.legacyDeviceVerification = async function(
@@ -2187,7 +2186,7 @@ Crypto.prototype.legacyDeviceVerification = async function(
         channel, this._verificationMethods, this._baseApis);
     this._toDeviceVerificationRequests.setRequestBySenderAndTxnId(
         userId, transactionId, request);
-    const verifier = request.beginKeyVerification(method, {userId, deviceId});
+    const verifier = request.beginKeyVerification(method, { userId, deviceId });
     // either reject by an error from verify() while sending .start
     // or resolve when the request receives the
     // local (fake remote) echo for sending the .start event
@@ -2197,7 +2196,6 @@ Crypto.prototype.legacyDeviceVerification = async function(
     ]);
     return request;
 };
-
 
 /**
  * Get information on the active olm sessions with a user
@@ -2228,7 +2226,6 @@ Crypto.prototype.getOlmSessionsForUser = async function(userId) {
     }
     return result;
 };
-
 
 /**
  * Get the device which sent an event
@@ -2473,7 +2470,6 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
         logger.log("Enabling encryption in " + roomId);
     }
 };
-
 
 /**
  * Make sure we are tracking the device lists for all users in this room.
@@ -2952,7 +2948,6 @@ Crypto.prototype._getTrackedE2eRooms = function() {
     });
 };
 
-
 Crypto.prototype._onToDeviceEvent = function(event) {
     try {
         logger.log(`received to_device ${event.getType()} from: ` +
@@ -2973,7 +2968,10 @@ Crypto.prototype._onToDeviceEvent = function(event) {
             this._onKeyVerificationMessage(event);
         } else if (event.getContent().msgtype === "m.bad.encrypted") {
             this._onToDeviceBadEncrypted(event);
-        } else if (event.isBeingDecrypted()) {
+        } else if (event.isBeingDecrypted() || event.shouldAttemptDecryption()) {
+            if (!event.isBeingDecrypted()) {
+                event.attemptDecryption(this);
+            }
             // once the event has been decrypted, try again
             event.once('Event.decrypted', (ev) => {
                 this._onToDeviceEvent(ev);
@@ -3090,7 +3088,7 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
  * @param {bool} data.liveEvent whether this is a live event
  */
 Crypto.prototype._onTimelineEvent = function(
-    event, room, atStart, removed, {liveEvent} = {},
+    event, room, atStart, removed, { liveEvent } = {},
 ) {
     if (!InRoomChannel.validateEvent(event, this._baseApis)) {
         return;
@@ -3228,7 +3226,7 @@ Crypto.prototype._onToDeviceBadEncrypted = async function(event) {
         this._olmDevice,
         sender,
         device,
-        {type: "m.dummy"},
+        { type: "m.dummy" },
     );
 
     await this._olmDevice.recordSessionProblem(deviceKey, "wedged", true);
@@ -3239,7 +3237,6 @@ Crypto.prototype._onToDeviceBadEncrypted = async function(event) {
             [device.deviceId]: encryptedContent,
         },
     });
-
 
     // Most of the time this probably won't be necessary since we'll have queued up a key request when
     // we failed to decrypt the message and will be waiting a bit for the key to arrive before sending
@@ -3296,7 +3293,6 @@ Crypto.prototype._onRoomMembership = function(event, member, oldMembership) {
 
     alg.onRoomMembership(event, member, oldMembership);
 };
-
 
 /**
  * Called when we get an m.room_key_request event.
@@ -3450,7 +3446,6 @@ Crypto.prototype._processReceivedRoomKeyRequest = async function(req) {
     this.emit("crypto.roomKeyRequest", req);
 };
 
-
 /**
  * Helper for processReceivedRoomKeyRequests
  *
@@ -3526,7 +3521,6 @@ Crypto.prototype._getRoomDecryptor = function(roomId, algorithm) {
     return alg;
 };
 
-
 /**
  * Get all the room decryptors for a given encryption algorithm.
  *
@@ -3543,7 +3537,6 @@ Crypto.prototype._getRoomDecryptors = function(algorithm) {
     }
     return decryptors;
 };
-
 
 /**
  * sign the given object with our ed25519 key
@@ -3563,7 +3556,6 @@ Crypto.prototype._signObject = async function(obj) {
     obj.signatures = sigs;
     if (unsigned !== undefined) obj.unsigned = unsigned;
 };
-
 
 /**
  * The parameters of a room key request. The details of the request may

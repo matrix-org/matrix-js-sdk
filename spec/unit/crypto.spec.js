@@ -1,16 +1,16 @@
 import '../olm-loader';
-import {Crypto} from "../../src/crypto";
-import {WebStorageSessionStore} from "../../src/store/session/webstorage";
-import {MemoryCryptoStore} from "../../src/crypto/store/memory-crypto-store";
-import {MockStorageApi} from "../MockStorageApi";
-import {TestClient} from "../TestClient";
-import {MatrixEvent} from "../../src/models/event";
-import {Room} from "../../src/models/room";
+import { Crypto } from "../../src/crypto";
+import { WebStorageSessionStore } from "../../src/store/session/webstorage";
+import { MemoryCryptoStore } from "../../src/crypto/store/memory-crypto-store";
+import { MockStorageApi } from "../MockStorageApi";
+import { TestClient } from "../TestClient";
+import { MatrixEvent } from "../../src/models/event";
+import { Room } from "../../src/models/room";
 import * as olmlib from "../../src/crypto/olmlib";
-import {sleep} from "../../src/utils";
-import {EventEmitter} from "events";
-import {CRYPTO_ENABLED} from "../../src/client";
-import {DeviceInfo} from "../../src/crypto/deviceinfo";
+import { sleep } from "../../src/utils";
+import { EventEmitter } from "events";
+import { CRYPTO_ENABLED } from "../../src/client";
+import { DeviceInfo } from "../../src/crypto/deviceinfo";
 
 const Olm = global.Olm;
 
@@ -46,7 +46,7 @@ describe("Crypto", function() {
 
             // unknown sender (e.g. deleted device), forwarded megolm key (untrusted)
             event.getSenderKey = () => 'YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI';
-            event.getWireContent = () => {return {algorithm: olmlib.MEGOLM_ALGORITHM};};
+            event.getWireContent = () => {return { algorithm: olmlib.MEGOLM_ALGORITHM };};
             event.getForwardingCurve25519KeyChain = () => ["not empty"];
             event.isKeySourceUntrusted = () => false;
             event.getClaimedEd25519Key =
