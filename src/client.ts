@@ -1570,12 +1570,13 @@ export class MatrixClient extends EventEmitter {
     /**
      * Check the copy of our cross-signing key that we have in the device list and
      * see if we can get the private key. If so, mark it as trusted.
+     * @param {Object} opts TODO
      */
-    public checkOwnCrossSigningTrust() {
+    public checkOwnCrossSigningTrust(opts: any): Promise<any> { // TODO: Types
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.checkOwnCrossSigningTrust();
+        return this.crypto.checkOwnCrossSigningTrust(opts);
     }
 
     /**
