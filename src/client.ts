@@ -1550,7 +1550,7 @@ export class MatrixClient extends EventEmitter {
      * see if we can get the private key. If so, mark it as trusted.
      * @param {Object} opts TODO
      */
-    public checkOwnCrossSigningTrust(opts: any): Promise<any> { // TODO: Types
+    public checkOwnCrossSigningTrust(opts?: any): Promise<any> { // TODO: Types
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
