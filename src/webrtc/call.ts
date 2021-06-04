@@ -481,7 +481,7 @@ export class MatrixCall extends EventEmitter {
         const userId = this.getOpponentMember().userId;
         // We can guess the purpose here since the other client can only send one stream
         const purpose = SDPStreamMetadataPurpose.Usermedia;
-        const oldRemoteStream = this.feeds.find((feed) => {return !feed.isLocal()})?.stream;
+        const oldRemoteStream = this.feeds.find((feed) => !feed.isLocal())?.stream;
 
         // Note that we check by ID and always set the remote stream: Chrome appears
         // to make new stream objects when transceiver directionality is changed and the 'active'
@@ -535,7 +535,7 @@ export class MatrixCall extends EventEmitter {
                     `streamId="${stream.id}", ` +
                     `streamPurpose="${purpose}"` +
                     `) to peer connection`,
-                )
+                );
                 senderArray.push(this.peerConn.addTrack(track, stream));
             }
         }
@@ -1299,7 +1299,7 @@ export class MatrixCall extends EventEmitter {
         if (metadata) {
             this.remoteSDPStreamMetadata = metadata;
         } else {
-            logger.warn("Received negotiation event without SDPStreamMetadata!")
+            logger.warn("Received negotiation event without SDPStreamMetadata!");
         }
 
         try {
