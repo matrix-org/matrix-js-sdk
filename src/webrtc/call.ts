@@ -411,7 +411,7 @@ export class MatrixCall extends EventEmitter {
      * @returns {Array<CallFeed>} local CallFeeds
      */
     public getLocalFeeds(): Array<CallFeed> {
-        return this.feeds.filter((feed) => {return feed.isLocal()});
+        return this.feeds.filter((feed) => feed.isLocal());
     }
 
     /**
@@ -419,7 +419,7 @@ export class MatrixCall extends EventEmitter {
      * @returns {Array<CallFeed>} remote CallFeeds
      */
     public getRemoteFeeds(): Array<CallFeed> {
-        return this.feeds.filter((feed) => {return !feed.isLocal()});
+        return this.feeds.filter((feed) => !feed.isLocal());
     }
 
     /**
@@ -620,7 +620,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        const remoteStream = this.feeds.find((feed) => {return !feed.isLocal()})?.stream;
+        const remoteStream = this.feeds.find((feed) => !feed.isLocal())?.stream;
 
         // According to previous comments in this file, firefox at some point did not
         // add streams until media started ariving on them. Testing latest firefox
@@ -688,7 +688,7 @@ export class MatrixCall extends EventEmitter {
                 this.gotUserMediaForAnswer(mediaStream);
             } catch (e) {
                 this.getUserMediaFailed(e);
-                return
+                return;
             }
         } else if (this.localAVStream) {
             this.gotUserMediaForAnswer(this.localAVStream);
@@ -1038,7 +1038,7 @@ export class MatrixCall extends EventEmitter {
         if (this.client.supportsCallTransfer) {
             answerContent.capabilities = {
                 'm.call.transferee': true,
-            }
+            };
         }
 
         // We have just taken the local description from the peerconnection which will
@@ -1386,7 +1386,7 @@ export class MatrixCall extends EventEmitter {
         if (this.client.supportsCallTransfer) {
             content.capabilities = {
                 'm.call.transferee': true,
-            }
+            };
         }
 
         content[SDPStreamMetadataKey] = this.getLocalSDPStreamMetadata();
