@@ -204,7 +204,7 @@ export class EncryptionSetupOperation {
                 // The backup is trusted because the user provided the private key.
                 // Sign the backup with the cross signing key so the key backup can
                 // be trusted via cross-signing.
-                await baseApis._http.authedRequest(
+                await baseApis.http.authedRequest(
                     undefined, "PUT", "/room_keys/version/" + this._keyBackupInfo.version,
                     undefined, {
                         algorithm: this._keyBackupInfo.algorithm,
@@ -214,7 +214,7 @@ export class EncryptionSetupOperation {
                 );
             } else {
                 // add new key backup
-                await baseApis._http.authedRequest(
+                await baseApis.http.authedRequest(
                     undefined, "POST", "/room_keys/version",
                     undefined, this._keyBackupInfo,
                     { prefix: PREFIX_UNSTABLE },

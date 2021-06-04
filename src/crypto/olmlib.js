@@ -118,7 +118,7 @@ export async function encryptMessageForDevice(
  *
  * @param {module:crypto/OlmDevice} olmDevice
  *
- * @param {module:base-apis~MatrixBaseApis} baseApis
+ * @param {MatrixClient} baseApis
  *
  * @param {object<string, module:crypto/deviceinfo[]>} devicesByUser
  *    map from userid to list of devices to ensure sessions for
@@ -168,7 +168,7 @@ export async function getExistingOlmSessions(
  *
  * @param {module:crypto/OlmDevice} olmDevice
  *
- * @param {module:base-apis~MatrixBaseApis} baseApis
+ * @param {MatrixClient} baseApis
  *
  * @param {object<string, module:crypto/deviceinfo[]>} devicesByUser
  *    map from userid to list of devices to ensure sessions for

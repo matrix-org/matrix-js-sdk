@@ -69,7 +69,7 @@ describe("self-verifications", () => {
         const restoreKeyBackupWithCache = jest.fn(() => Promise.resolve());
 
         const client = {
-            _crypto: {
+            crypto: {
                 _crossSigningInfo,
                 _secretStorage,
                 storeSessionBackupPrivateKey,

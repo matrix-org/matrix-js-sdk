@@ -36,7 +36,7 @@ export async function makeTestClients(userInfos, options) {
                         });
                         const client = clientMap[userId][deviceId];
                         const decryptionPromise = event.isEncrypted() ?
-                            event.attemptDecryption(client._crypto) :
+                            event.attemptDecryption(client.crypto) :
                             Promise.resolve();
 
                         decryptionPromise.then(

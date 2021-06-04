@@ -257,6 +257,9 @@ describe("MegolmDecryption", function() {
         });
 
         it("re-uses sessions for sequential messages", async function() {
+            mockCrypto._backupManager = {
+                backupGroupSession: () => {},
+            };
             const mockStorage = new MockStorageApi();
             const cryptoStore = new MemoryCryptoStore(mockStorage);
 
@@ -362,9 +365,9 @@ describe("MegolmDecryption", function() {
             bobClient1.initCrypto(),
             bobClient2.initCrypto(),
         ]);
-        const aliceDevice = aliceClient._crypto._olmDevice;
-        const bobDevice1 = bobClient1._crypto._olmDevice;
-        const bobDevice2 = bobClient2._crypto._olmDevice;
+        const aliceDevice = aliceClient.crypto._olmDevice;
+        const bobDevice1 = bobClient1.crypto._olmDevice;
+        const bobDevice2 = bobClient2.crypto._olmDevice;
 
         const encryptionCfg = {
             "algorithm": "m.megolm.v1.aes-sha2",
@@ -401,10 +404,10 @@ describe("MegolmDecryption", function() {
             },
         };
 
-        aliceClient._crypto._deviceList.storeDevicesForUser(
+        aliceClient.crypto._deviceList.storeDevicesForUser(
             "@bob:example.com", BOB_DEVICES,
         );
-        aliceClient._crypto._deviceList.downloadKeys = async function(userIds) {
+        aliceClient.crypto._deviceList.downloadKeys = async function(userIds) {
             return this._getDevicesFromStore(userIds);
         };
 
@@ -445,7 +448,7 @@ describe("MegolmDecryption", function() {
                 body: "secret",
             },
         });
-        await aliceClient._crypto.encryptEvent(event, room);
+        await aliceClient.crypto.encryptEvent(event, room);
 
         expect(run).toBe(true);
 
@@ -465,8 +468,8 @@ describe("MegolmDecryption", function() {
             aliceClient.initCrypto(),
             bobClient.initCrypto(),
         ]);
-        const aliceDevice = aliceClient._crypto._olmDevice;
-        const bobDevice = bobClient._crypto._olmDevice;
+        const aliceDevice = aliceClient.crypto._olmDevice;
+        const bobDevice = bobClient.crypto._olmDevice;
 
         const encryptionCfg = {
             "algorithm": "m.megolm.v1.aes-sha2",
@@ -505,10 +508,10 @@ describe("MegolmDecryption", function() {
             },
         };
 
-        aliceClient._crypto._deviceList.storeDevicesForUser(
+        aliceClient.crypto._deviceList.storeDevicesForUser(
             "@bob:example.com", BOB_DEVICES,
         );
-        aliceClient._crypto._deviceList.downloadKeys = async function(userIds) {
+        aliceClient.crypto._deviceList.downloadKeys = async function(userIds) {
             return this._getDevicesFromStore(userIds);
         };
 
@@ -543,7 +546,7 @@ describe("MegolmDecryption", function() {
             event_id: "$event",
             content: {},
         });
-        await aliceClient._crypto.encryptEvent(event, aliceRoom);
+        await aliceClient.crypto.encryptEvent(event, aliceRoom);
         await sendPromise;
     });
 
@@ -558,11 +561,11 @@ describe("MegolmDecryption", function() {
             aliceClient.initCrypto(),
             bobClient.initCrypto(),
         ]);
-        const bobDevice = bobClient._crypto._olmDevice;
+        const bobDevice = bobClient.crypto._olmDevice;
 
         const roomId = "!someroom";
 
-        aliceClient._crypto._onToDeviceEvent(new MatrixEvent({
+        aliceClient.crypto._onToDeviceEvent(new MatrixEvent({
             type: "org.matrix.room_key.withheld",
             sender: "@bob:example.com",
             content: {
@@ -575,7 +578,7 @@ describe("MegolmDecryption", function() {
             },
         }));
 
-        await expect(aliceClient._crypto.decryptEvent(new MatrixEvent({
+        await expect(aliceClient.crypto.decryptEvent(new MatrixEvent({
             type: "m.room.encrypted",
             sender: "@bob:example.com",
             event_id: "$event",
@@ -601,14 +604,14 @@ describe("MegolmDecryption", function() {
             aliceClient.initCrypto(),
             bobClient.initCrypto(),
         ]);
-        aliceClient._crypto.downloadKeys = async () => {};
-        const bobDevice = bobClient._crypto._olmDevice;
+        aliceClient.crypto.downloadKeys = async () => {};
+        const bobDevice = bobClient.crypto._olmDevice;
 
         const roomId = "!someroom";
 
         const now = Date.now();
 
-        aliceClient._crypto._onToDeviceEvent(new MatrixEvent({
+        aliceClient.crypto._onToDeviceEvent(new MatrixEvent({
             type: "org.matrix.room_key.withheld",
             sender: "@bob:example.com",
             content: {
@@ -625,7 +628,7 @@ describe("MegolmDecryption", function() {
             setTimeout(resolve, 100);
         });
 
-        await expect(aliceClient._crypto.decryptEvent(new MatrixEvent({
+        await expect(aliceClient.crypto.decryptEvent(new MatrixEvent({
             type: "m.room.encrypted",
             sender: "@bob:example.com",
             event_id: "$event",
@@ -652,15 +655,15 @@ describe("MegolmDecryption", function() {
             aliceClient.initCrypto(),
             bobClient.initCrypto(),
         ]);
-        const bobDevice = bobClient._crypto._olmDevice;
-        aliceClient._crypto.downloadKeys = async () => {};
+        const bobDevice = bobClient.crypto._olmDevice;
+        aliceClient.crypto.downloadKeys = async () => {};
 
         const roomId = "!someroom";
 
         const now = Date.now();
 
         // pretend we got an event that we can't decrypt
-        aliceClient._crypto._onToDeviceEvent(new MatrixEvent({
+        aliceClient.crypto._onToDeviceEvent(new MatrixEvent({
             type: "m.room.encrypted",
             sender: "@bob:example.com",
             content: {
@@ -675,7 +678,7 @@ describe("MegolmDecryption", function() {
             setTimeout(resolve, 100);
         });
 
-        await expect(aliceClient._crypto.decryptEvent(new MatrixEvent({
+        await expect(aliceClient.crypto.decryptEvent(new MatrixEvent({
             type: "m.room.encrypted",
             sender: "@bob:example.com",
             event_id: "$event",
