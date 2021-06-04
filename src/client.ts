@@ -488,7 +488,7 @@ export class MatrixClient extends EventEmitter {
             // Start listening for calls after the initial sync is done
             // We do not need to backfill the call event buffer
             // with encrypted events that might never get decrypted
-            this.on("sync", () => this.startCallEventHandler());
+            this.on("sync", this.startCallEventHandler);
         }
 
         this.timelineSupport = Boolean(opts.timelineSupport);
@@ -5244,12 +5244,12 @@ export class MatrixClient extends EventEmitter {
         );
     }
 
-    private startCallEventHandler() {
+    private startCallEventHandler = () => {
         if (this.isInitialSyncComplete()) {
             this.callEventHandler.start();
             this.off("sync", this.startCallEventHandler);
         }
-    }
+    };
 
     /**
      * @param {module:client.callback} callback Optional.
