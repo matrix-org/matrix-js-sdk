@@ -104,7 +104,7 @@ describe("Relations", function() {
         {
             const relationsCreated = new Promise(resolve => {
                 targetEvent.once("Event.relationsCreated", resolve);
-            })
+            });
 
             const timelineSet = new EventTimelineSet(room, {
                 unstableClientRelationAggregation: true,
@@ -119,7 +119,7 @@ describe("Relations", function() {
         {
             const relationsCreated = new Promise(resolve => {
                 targetEvent.once("Event.relationsCreated", resolve);
-            })
+            });
 
             const timelineSet = new EventTimelineSet(room, {
                 unstableClientRelationAggregation: true,

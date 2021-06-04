@@ -2845,8 +2845,8 @@ eslint-config-google@^0.14.0:
   integrity sha512-WsbX4WbjuMvTdeVL6+J3rK1RGhCTqjsFjX7UMSMgZiyxxaNLkoJENbrGExzERFeoTpGw3F3FypTiWAP9ZXzkEw==
 
 "eslint-plugin-matrix-org@github:matrix-org/eslint-plugin-matrix-org#main":
-  version "0.3.1"
-  resolved "https://codeload.github.com/matrix-org/eslint-plugin-matrix-org/tar.gz/b55649a0f48ee27155c1968ed5050b6ddc5afdbe"
+  version "0.3.2"
+  resolved "https://codeload.github.com/matrix-org/eslint-plugin-matrix-org/tar.gz/28d392822533a7468be0dd806d0a4ba573a45d74"
 
 eslint-rule-composer@^0.3.0:
   version "0.3.0"
