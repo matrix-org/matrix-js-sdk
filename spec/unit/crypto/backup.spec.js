@@ -581,7 +581,7 @@ describe("MegolmBackup", function() {
             const BAD_BACKUP_INFO = Object.assign({}, BACKUP_INFO, {
                 algorithm: "this.algorithm.does.not.exist",
             });
-            client._http.authedRequest = function() {
+            client.http.authedRequest = function() {
                 return Promise.resolve(KEY_BACKUP_DATA);
             };
 
