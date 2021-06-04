@@ -511,7 +511,7 @@ export class MatrixCall extends EventEmitter {
 
         // make sure we have valid turn creds. Unless something's gone wrong, it should
         // poll and keep the credentials valid so this should be instant.
-        const haveTurnCreds = await this.client._checkTurnServers();
+        const haveTurnCreds = await this.client.checkTurnServers();
         if (!haveTurnCreds) {
             logger.warn("Failed to get TURN credentials! Proceeding with call anyway...");
         }
@@ -846,7 +846,7 @@ export class MatrixCall extends EventEmitter {
             },
         } as MCallAnswer;
 
-        if (this.client._supportsCallTransfer) {
+        if (this.client.supportsCallTransfer) {
             answerContent.capabilities = {
                 'm.call.transferee': true,
             }
@@ -1181,7 +1181,7 @@ export class MatrixCall extends EventEmitter {
             content.description = this.peerConn.localDescription;
         }
 
-        if (this.client._supportsCallTransfer) {
+        if (this.client.supportsCallTransfer) {
             content.capabilities = {
                 'm.call.transferee': true,
             }
@@ -1579,14 +1579,14 @@ export class MatrixCall extends EventEmitter {
     private async placeCallWithConstraints(constraints: MediaStreamConstraints) {
         logger.log("Getting user media with constraints", constraints);
         // XXX Find a better way to do this
-        this.client._callEventHandler.calls.set(this.callId, this);
+        this.client.callEventHandler.calls.set(this.callId, this);
         this.setState(CallState.WaitLocalMedia);
         this.direction = CallDirection.Outbound;
         this.config = constraints;
 
         // make sure we have valid turn creds. Unless something's gone wrong, it should
         // poll and keep the credentials valid so this should be instant.
-        const haveTurnCreds = await this.client._checkTurnServers();
+        const haveTurnCreds = await this.client.checkTurnServers();
         if (!haveTurnCreds) {
             logger.warn("Failed to get TURN credentials! Proceeding with call anyway...");
         }
@@ -1608,7 +1608,7 @@ export class MatrixCall extends EventEmitter {
         const pc = new window.RTCPeerConnection({
             iceTransportPolicy: this.forceTURN ? 'relay' : undefined,
             iceServers: this.turnServers,
-            iceCandidatePoolSize: this.client._iceCandidatePoolSize,
+            iceCandidatePoolSize: this.client.iceCandidatePoolSize,
         });
 
         // 'connectionstatechange' would be better, but firefox doesn't implement that.
@@ -1813,7 +1813,7 @@ export function createNewMatrixCall(client: any, roomId: string, options?: CallO
         roomId: roomId,
         turnServers: client.getTurnServers(),
         // call level options
-        forceTURN: client._forceTURN || optionsForceTURN,
+        forceTURN: client.forceTURN || optionsForceTURN,
     };
     const call = new MatrixCall(opts);
 

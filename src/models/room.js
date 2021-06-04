@@ -192,13 +192,13 @@ export function Room(roomId, client, myUserId, opts) {
 
     if (this._opts.pendingEventOrdering == "detached") {
         this._pendingEventList = [];
-        const serializedPendingEventList = client._sessionStore.store.getItem(pendingEventsKey(this.roomId));
+        const serializedPendingEventList = client.sessionStore.store.getItem(pendingEventsKey(this.roomId));
         if (serializedPendingEventList) {
             JSON.parse(serializedPendingEventList)
                 .forEach(async serializedEvent => {
                     const event = new MatrixEvent(serializedEvent);
                     if (event.getType() === "m.room.encrypted") {
-                        await event.attemptDecryption(this._client._crypto);
+                        await event.attemptDecryption(this._client.crypto);
                     }
                     event.setStatus(EventStatus.NOT_SENT);
                     this.addPendingEvent(event, event.getTxnId());
@@ -255,7 +255,7 @@ Room.prototype.decryptCriticalEvents = function() {
         .slice(readReceiptTimelineIndex)
         .filter(event => event.shouldAttemptDecryption())
         .reverse()
-        .map(event => event.attemptDecryption(this._client._crypto, { isRetry: true }));
+        .map(event => event.attemptDecryption(this._client.crypto, { isRetry: true }));
 
     return Promise.allSettled(decryptionPromises);
 };
@@ -272,7 +272,7 @@ Room.prototype.decryptAllEvents = function() {
         .getEvents()
         .filter(event => event.shouldAttemptDecryption())
         .reverse()
-        .map(event => event.attemptDecryption(this._client._crypto, { isRetry: true }));
+        .map(event => event.attemptDecryption(this._client.crypto, { isRetry: true }));
 
     return Promise.allSettled(decryptionPromises);
 };
@@ -632,7 +632,7 @@ Room.prototype._loadMembersFromServer = async function() {
     });
     const path = utils.encodeUri("/rooms/$roomId/members?" + queryString,
         { $roomId: this.roomId });
-    const http = this._client._http;
+    const http = this._client.http;
     const response = await http.authedRequest(undefined, "GET", path);
     return response.chunk;
 };
@@ -674,7 +674,7 @@ Room.prototype.loadMembersIfNeeded = function() {
         this.currentState.setOutOfBandMembers(result.memberEvents);
         // now the members are loaded, start to track the e2e devices if needed
         if (this._client.isCryptoEnabled() && this._client.isRoomEncrypted(this.roomId)) {
-            this._client._crypto.trackRoomDevices(this.roomId);
+            this._client.crypto.trackRoomDevices(this.roomId);
         }
         return result.fromServer;
     }).catch((err) => {
@@ -1387,7 +1387,7 @@ Room.prototype._savePendingEvents = function() {
             return isEventEncrypted || !isRoomEncrypted;
         });
 
-        const { store } = this._client._sessionStore;
+        const { store } = this._client.sessionStore;
         if (this._pendingEventList.length > 0) {
             store.setItem(
                 pendingEventsKey(this.roomId),

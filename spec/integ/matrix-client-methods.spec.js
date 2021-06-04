@@ -336,7 +336,7 @@ describe("MatrixClient", function() {
                 var b = JSON.parse(JSON.stringify(o));
                 delete(b.signatures);
                 delete(b.unsigned);
-                return client._crypto._olmDevice.sign(anotherjson.stringify(b));
+                return client.crypto._olmDevice.sign(anotherjson.stringify(b));
             };
 
             logger.log("Ed25519: " + ed25519key);

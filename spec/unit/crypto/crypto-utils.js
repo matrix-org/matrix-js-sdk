@@ -6,7 +6,7 @@ export async function resetCrossSigningKeys(client, {
     level,
     authUploadDeviceSigningKeys = async func => await func(),
 } = {}) {
-    const crypto = client._crypto;
+    const crypto = client.crypto;
 
     const oldKeys = Object.assign({}, crypto._crossSigningInfo.keys);
     try {
