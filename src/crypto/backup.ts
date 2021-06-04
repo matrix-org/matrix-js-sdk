@@ -23,7 +23,7 @@ limitations under the License.
 import { MatrixClient } from "../client";
 import { logger } from "../logger";
 import { MEGOLM_ALGORITHM, verifySignature } from "./olmlib";
-import { DeviceInfo } from "./deviceinfo"
+import { DeviceInfo } from "./deviceinfo";
 import { DeviceTrustLevel } from './CrossSigning';
 import { keyFromPassphrase } from './key_passphrase';
 import { sleep } from "../utils";
@@ -581,7 +581,7 @@ export class Curve25519 implements BackupAlgorithm {
             return [
                 decryption.get_private_key(),
                 authData,
-            ]
+            ];
         } finally {
             decryption.free();
         }
