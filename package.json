@@ -15,7 +15,7 @@
     "build:minify-browser": "terser dist/browser-matrix.js --compress --mangle --source-map --output dist/browser-matrix.min.js",
     "gendoc": "jsdoc -c jsdoc.json -P package.json",
     "lint": "yarn lint:types && yarn lint:js",
-    "lint:js": "eslint --max-warnings 72 src spec",
+    "lint:js": "eslint --max-warnings 57 src spec",
     "lint:types": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
