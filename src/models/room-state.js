@@ -349,6 +349,11 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
             self._updateMember(member);
             self.emit("RoomState.members", event, self, member);
         } else if (event.getType() === "m.room.power_levels") {
+            // events with unknown state keys should be ignored
+            // and should not aggregate onto members power levels
+            if (event.getStateKey() !== "") {
+                return;
+            }
             const members = Object.values(self.members);
             members.forEach(function(member) {
                 // We only propagate `RoomState.members` event if the
