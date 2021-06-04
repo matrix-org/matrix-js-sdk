@@ -305,7 +305,9 @@ describe('Call', function() {
         await client.httpBackend.flush();
         await callPromise;
 
-        call.getOpponentMember = () => {return { userId: "@bob:bar.uk" }};
+        call.getOpponentMember = () => {
+            return { userId: "@bob:bar.uk" };
+        };
 
         await call.onAnswerReceived({
             getContent: () => {
@@ -336,7 +338,9 @@ describe('Call', function() {
         await client.httpBackend.flush();
         await callPromise;
 
-        call.getOpponentMember = () => {return { userId: "@bob:bar.uk" }};
+        call.getOpponentMember = () => {
+            return { userId: "@bob:bar.uk" };
+        };
 
         await call.onAnswerReceived({
             getContent: () => {
