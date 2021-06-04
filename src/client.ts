@@ -58,12 +58,9 @@ import {
     IKeyBackupPrepareOpts,
     IKeyBackupRestoreOpts,
     IKeyBackupRestoreResult,
-    IKeyBackupRoomSessions,
-    IKeyBackupSession,
     IKeyBackupTrustInfo,
     IKeyBackupVersion,
 } from "./crypto/keybackup";
-import { PkDecryption } from "@matrix-org/olm";
 import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
 import type Request from "request";
 import { MatrixScheduler } from "./scheduler";
@@ -109,6 +106,7 @@ import url from "url";
 import { randomString } from "./randomstring";
 import { ReadStream } from "fs";
 import { WebStorageSessionStore } from "./store/session/webstorage";
+import { BackupManager } from "./crypto/backup";
 
 export type Store = StubStore | MemoryStore | LocalIndexedDBStoreBackend | RemoteIndexedDBStoreBackend;
 export type SessionStore = WebStorageSessionStore;
@@ -121,29 +119,6 @@ const SCROLLBACK_DELAY_MS = 3000;
 export const CRYPTO_ENABLED: boolean = isCryptoAvailable();
 const CAPABILITIES_CACHE_MS = 21600000; // 6 hours - an arbitrary value
 const TURN_CHECK_INTERVAL = 10 * 60 * 1000; // poll for turn credentials every 10 minutes
-
-function keysFromRecoverySession(sessions: IKeyBackupRoomSessions, decryptionKey: PkDecryption, roomId: string) {
-    const keys = [];
-    for (const [sessionId, sessionData] of Object.entries(sessions)) {
-        try {
-            const decrypted = keyFromRecoverySession(sessionData, decryptionKey);
-            decrypted.session_id = sessionId;
-            decrypted.room_id = roomId;
-            keys.push(decrypted);
-        } catch (e) {
-            logger.log("Failed to decrypt megolm session from backup", e);
-        }
-    }
-    return keys;
-}
-
-function keyFromRecoverySession(session: IKeyBackupSession, decryptionKey: PkDecryption) {
-    return JSON.parse(decryptionKey.decrypt(
-        session.session_data.ephemeral,
-        session.session_data.mac,
-        session.session_data.ciphertext,
-    ));
-}
 
 interface IOlmDevice {
     pickledAccount: string;
@@ -1312,7 +1287,7 @@ export class MatrixClient extends EventEmitter {
         // check the key backup status, since whether or not we use this depends on
         // whether it has a signature from a verified device
         if (userId == this.credentials.userId) {
-            this.crypto.checkKeyBackup();
+            this.checkKeyBackup();
         }
         return prom;
     }
@@ -2072,7 +2047,7 @@ export class MatrixClient extends EventEmitter {
      *     in trustInfo.
      */
     public checkKeyBackup(): IKeyBackupVersion {
-        return this.crypto.checkKeyBackup();
+        return this.crypto._backupManager.checkKeyBackup();
     }
 
     /**
@@ -2114,7 +2089,7 @@ export class MatrixClient extends EventEmitter {
      * }
      */
     public isKeyBackupTrusted(info: IKeyBackupVersion): IKeyBackupTrustInfo {
-        return this.crypto.isKeyBackupTrusted(info);
+        return this.crypto._backupManager.isKeyBackupTrusted(info);
     }
 
     /**
@@ -2126,11 +2101,7 @@ export class MatrixClient extends EventEmitter {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
-        // XXX: Private member access
-        if (!this.crypto._checkedForBackup) {
-            return null;
-        }
-        return Boolean(this.crypto.backupKey);
+        return this.crypto._backupManager.getKeyBackupEnabled();
     }
 
     /**
@@ -2138,22 +2109,14 @@ export class MatrixClient extends EventEmitter {
      * getKeyBackupVersion.
      *
      * @param {object} info Backup information object as returned by getKeyBackupVersion
+     * @returns {Promise<void>} Resolves when complete.
      */
-    public enableKeyBackup(info: IKeyBackupVersion) {
+    public enableKeyBackup(info: IKeyBackupVersion): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
 
-        this.crypto.backupInfo = info;
-        if (this.crypto.backupKey) this.crypto.backupKey.free();
-        this.crypto.backupKey = new global.Olm.PkEncryption();
-        this.crypto.backupKey.set_recipient_key(info.auth_data.public_key);
-
-        this.emit('crypto.keyBackupStatus', true);
-
-        // There may be keys left over from a partially completed backup, so
-        // schedule a send to check.
-        this.crypto.scheduleKeyBackupSend();
+        return this.crypto._backupManager.enableKeyBackup(info);
     }
 
     /**
@@ -2164,11 +2127,7 @@ export class MatrixClient extends EventEmitter {
             throw new Error("End-to-end encryption disabled");
         }
 
-        this.crypto.backupInfo = null;
-        if (this.crypto.backupKey) this.crypto.backupKey.free();
-        this.crypto.backupKey = null;
-
-        this.emit('crypto.keyBackupStatus', false);
+        this.crypto._backupManager.disableKeyBackup();
     }
 
     /**
@@ -2194,27 +2153,20 @@ export class MatrixClient extends EventEmitter {
             throw new Error("End-to-end encryption disabled");
         }
 
-        const { keyInfo, encodedPrivateKey, privateKey } =
-            await this.createRecoveryKeyFromPassphrase(password);
+        // eslint-disable-next-line camelcase
+        const { algorithm, auth_data, recovery_key, privateKey } =
+            await this.crypto._backupManager.prepareKeyBackupVersion(password);
 
         if (opts.secureSecretStorage) {
             await this.storeSecret("m.megolm_backup.v1", encodeBase64(privateKey));
             logger.info("Key backup private key stored in secret storage");
         }
 
-        // Reshape objects into form expected for key backup
-        const authData: any = { // TODO
-            public_key: keyInfo.pubkey,
-        };
-        if (keyInfo.passphrase) {
-            authData.private_key_salt = keyInfo.passphrase.salt;
-            authData.private_key_iterations = keyInfo.passphrase.iterations;
-        }
         return {
-            algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
-            auth_data: authData,
-            recovery_key: encodedPrivateKey,
-        } as any; // TODO
+            algorithm,
+            auth_data,
+            recovery_key,
+        } as any; // TODO: Types
     }
 
     /**
@@ -2239,6 +2191,8 @@ export class MatrixClient extends EventEmitter {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
+
+        await this.crypto._backupManager.createKeyBackupVersion(info);
 
         const data = {
             algorithm: info.algorithm,
@@ -2288,8 +2242,8 @@ export class MatrixClient extends EventEmitter {
         // If we're currently backing up to this backup... stop.
         // (We start using it automatically in createKeyBackupVersion
         // so this is symmetrical).
-        if (this.crypto.backupInfo && this.crypto.backupInfo.version === version) {
-            this.disableKeyBackup();
+        if (this.crypto._backupManager.version) {
+            this.crypto._backupManager.disableKeyBackup();
         }
 
         const path = utils.encodeUri("/room_keys/version/$version", {
@@ -2354,7 +2308,7 @@ export class MatrixClient extends EventEmitter {
             throw new Error("End-to-end encryption disabled");
         }
 
-        await this.crypto.scheduleAllGroupSessionsForBackup();
+        await this.crypto._backupManager.scheduleAllGroupSessionsForBackup();
     }
 
     /**
@@ -2367,7 +2321,7 @@ export class MatrixClient extends EventEmitter {
             throw new Error("End-to-end encryption disabled");
         }
 
-        return this.crypto.flagAllGroupSessionsForBackup();
+        return this.crypto._backupManager.flagAllGroupSessionsForBackup();
     }
 
     public isValidRecoveryKey(recoveryKey: string): boolean {
@@ -2513,7 +2467,7 @@ export class MatrixClient extends EventEmitter {
         );
     }
 
-    private restoreKeyBackup(
+    private async restoreKeyBackup(
         privKey: Uint8Array,
         targetRoomId: string,
         targetSessionId: string,
@@ -2526,6 +2480,7 @@ export class MatrixClient extends EventEmitter {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
+
         let totalKeyCount = 0;
         let keys = [];
 
@@ -2533,47 +2488,42 @@ export class MatrixClient extends EventEmitter {
             targetRoomId, targetSessionId, backupInfo.version,
         );
 
-        const decryption = new global.Olm.PkDecryption();
-        let backupPubKey;
+        const algorithm = await BackupManager.makeAlgorithm(backupInfo, async () => { return privKey; });
+
         try {
-            backupPubKey = decryption.init_with_private_key(privKey);
-        } catch (e) {
-            decryption.free();
-            throw e;
-        }
+            // If the pubkey computed from the private data we've been given
+            // doesn't match the one in the auth_data, the user has entered
+            // a different recovery key / the wrong passphrase.
+            if (!await algorithm.keyMatches(privKey)) {
+                return Promise.reject({ errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY });
+            }
 
-        // If the pubkey computed from the private data we've been given
-        // doesn't match the one in the auth_data, the user has entered
-        // a different recovery key / the wrong passphrase.
-        if (backupPubKey !== backupInfo.auth_data.public_key) {
-            return Promise.reject(new MatrixError({ errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY }));
-        }
+            // Cache the key, if possible.
+            // This is async.
+            this.crypto.storeSessionBackupPrivateKey(privKey)
+                .catch((e) => {
+                    logger.warn("Error caching session backup key:", e);
+                }).then(cacheCompleteCallback);
 
-        // Cache the key, if possible.
-        // This is async.
-        this.crypto.storeSessionBackupPrivateKey(privKey)
-            .catch((e) => {
-                logger.warn("Error caching session backup key:", e);
-            }).then(cacheCompleteCallback);
+            if (progressCallback) {
+                progressCallback({
+                    stage: "fetch",
+                });
+            }
 
-        if (progressCallback) {
-            progressCallback({
-                stage: "fetch",
-            });
-        }
+            const res = await this.http.authedRequest(
+                undefined, "GET", path.path, path.queryData, undefined,
+                { prefix: PREFIX_UNSTABLE },
+            );
 
-        return this.http.authedRequest(
-            undefined, "GET", path.path, path.queryData, undefined,
-            { prefix: PREFIX_UNSTABLE },
-        ).then((res) => {
             if (res.rooms) {
-                // TODO: Types?
+                // TODO: Types
                 for (const [roomId, roomData] of Object.entries<any>(res.rooms)) {
                     if (!roomData.sessions) continue;
 
                     totalKeyCount += Object.keys(roomData.sessions).length;
-                    const roomKeys = keysFromRecoverySession(
-                        roomData.sessions, decryption, roomId,
+                    const roomKeys = await algorithm.decryptSessions(
+                        roomData.sessions,
                     );
                     for (const k of roomKeys) {
                         k.room_id = roomId;
@@ -2582,13 +2532,18 @@ export class MatrixClient extends EventEmitter {
                 }
             } else if (res.sessions) {
                 totalKeyCount = Object.keys(res.sessions).length;
-                keys = keysFromRecoverySession(
-                    res.sessions, decryption, targetRoomId,
+                keys = await algorithm.decryptSessions(
+                    res.sessions,
                 );
+                for (const k of keys) {
+                    k.room_id = targetRoomId;
+                }
             } else {
                 totalKeyCount = 1;
                 try {
-                    const key = keyFromRecoverySession(res, decryption);
+                    const [key] = await algorithm.decryptSessions({
+                        [targetSessionId]: res,
+                    });
                     key.room_id = targetRoomId;
                     key.session_id = targetSessionId;
                     keys.push(key);
@@ -2596,19 +2551,19 @@ export class MatrixClient extends EventEmitter {
                     logger.log("Failed to decrypt megolm session from backup", e);
                 }
             }
+        } finally {
+            algorithm.free();
+        }
 
-            return this.importRoomKeys(keys, {
-                progressCallback,
-                untrusted: true,
-                source: "backup",
-            });
-        }).then(() => {
-            return this.crypto.setTrustedBackupPubKey(backupPubKey);
-        }).then(() => {
-            return { total: totalKeyCount, imported: keys.length };
-        }).finally(() => {
-            decryption.free();
+        await this.importRoomKeys(keys, {
+            progressCallback,
+            untrusted: true,
+            source: "backup",
         });
+
+        await this.checkKeyBackup();
+
+        return { total: totalKeyCount, imported: keys.length };
     }
 
     public deleteKeysFromBackup(roomId: string, sessionId: string, version: string): Promise<void> {

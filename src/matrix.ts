@@ -118,6 +118,7 @@ export interface ICryptoCallbacks {
         keyInfo: ISecretStorageKeyInfo,
         checkFunc: (Uint8Array) => void,
     ) => Promise<Uint8Array>;
+    getBackupKey?: () => Promise<Uint8Array>;
 }
 
 // TODO: Move this to `SecretStorage` once converted
