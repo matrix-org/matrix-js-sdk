@@ -998,7 +998,7 @@ describe("megolm", function() {
                 ...rawEvent,
                 room: ROOM_ID,
             });
-            return event.attemptDecryption(testClient.client._crypto, true).then(() => {
+            return event.attemptDecryption(testClient.client.crypto, true).then(() => {
                 expect(event.isKeySourceUntrusted()).toBeTruthy();
             });
         }).then(() => {
@@ -1013,14 +1013,14 @@ describe("megolm", function() {
                 event: true,
             });
             event._senderCurve25519Key = testSenderKey;
-            return testClient.client._crypto._onRoomKeyEvent(event);
+            return testClient.client.crypto._onRoomKeyEvent(event);
         }).then(() => {
             const event = testUtils.mkEvent({
                 event: true,
                 ...rawEvent,
                 room: ROOM_ID,
             });
-            return event.attemptDecryption(testClient.client._crypto, true).then(() => {
+            return event.attemptDecryption(testClient.client.crypto, true).then(() => {
                 expect(event.isKeySourceUntrusted()).toBeFalsy();
             });
         });

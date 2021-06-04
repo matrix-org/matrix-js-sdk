@@ -511,7 +511,7 @@ export class MatrixCall extends EventEmitter {
 
         // make sure we have valid turn creds. Unless something's gone wrong, it should
         // poll and keep the credentials valid so this should be instant.
-        const haveTurnCreds = await this.client._checkTurnServers();
+        const haveTurnCreds = await this.client.checkTurnServers();
         if (!haveTurnCreds) {
             logger.warn("Failed to get TURN credentials! Proceeding with call anyway...");
         }
@@ -846,7 +846,7 @@ export class MatrixCall extends EventEmitter {
             },
         } as MCallAnswer;
 
-        if (this.client._supportsCallTransfer) {
+        if (this.client.supportsCallTransfer) {
             answerContent.capabilities = {
                 'm.call.transferee': true,
             };
@@ -1106,21 +1106,8 @@ export class MatrixCall extends EventEmitter {
             await this.peerConn.setRemoteDescription(description);
 
             if (description.type === 'offer') {
-                // First we sent the direction of the tranciever to what we'd like it to be,
-                // irresepective of whether the other side has us on hold - so just whether we
-                // want the call to be on hold or not. This is necessary because in a few lines,
-                // we'll adjust the direction and unless we do this too, we'll never come off hold.
-                for (const tranceiver of this.peerConn.getTransceivers()) {
-                    tranceiver.direction = this.isRemoteOnHold() ? 'inactive' : 'sendrecv';
-                }
                 const localDescription = await this.peerConn.createAnswer();
                 await this.peerConn.setLocalDescription(localDescription);
-                // Now we've got our answer, set the direction to the outcome of the negotiation.
-                // We need to do this otherwise Firefox will notice that the direction is not the
-                // currentDirection and try to negotiate itself off hold again.
-                for (const tranceiver of this.peerConn.getTransceivers()) {
-                    tranceiver.direction = tranceiver.currentDirection;
-                }
 
                 this.sendVoipEvent(EventType.CallNegotiate, {
                     description: this.peerConn.localDescription,
@@ -1194,7 +1181,7 @@ export class MatrixCall extends EventEmitter {
             content.description = this.peerConn.localDescription;
         }
 
-        if (this.client._supportsCallTransfer) {
+        if (this.client.supportsCallTransfer) {
             content.capabilities = {
                 'm.call.transferee': true,
             };
@@ -1592,14 +1579,14 @@ export class MatrixCall extends EventEmitter {
     private async placeCallWithConstraints(constraints: MediaStreamConstraints) {
         logger.log("Getting user media with constraints", constraints);
         // XXX Find a better way to do this
-        this.client._callEventHandler.calls.set(this.callId, this);
+        this.client.callEventHandler.calls.set(this.callId, this);
         this.setState(CallState.WaitLocalMedia);
         this.direction = CallDirection.Outbound;
         this.config = constraints;
 
         // make sure we have valid turn creds. Unless something's gone wrong, it should
         // poll and keep the credentials valid so this should be instant.
-        const haveTurnCreds = await this.client._checkTurnServers();
+        const haveTurnCreds = await this.client.checkTurnServers();
         if (!haveTurnCreds) {
             logger.warn("Failed to get TURN credentials! Proceeding with call anyway...");
         }
@@ -1621,7 +1608,7 @@ export class MatrixCall extends EventEmitter {
         const pc = new window.RTCPeerConnection({
             iceTransportPolicy: this.forceTURN ? 'relay' : undefined,
             iceServers: this.turnServers,
-            iceCandidatePoolSize: this.client._iceCandidatePoolSize,
+            iceCandidatePoolSize: this.client.iceCandidatePoolSize,
         });
 
         // 'connectionstatechange' would be better, but firefox doesn't implement that.
@@ -1826,7 +1813,7 @@ export function createNewMatrixCall(client: any, roomId: string, options?: CallO
         roomId: roomId,
         turnServers: client.getTurnServers(),
         // call level options
-        forceTURN: client._forceTURN || optionsForceTURN,
+        forceTURN: client.forceTURN || optionsForceTURN,
     };
     const call = new MatrixCall(opts);
 

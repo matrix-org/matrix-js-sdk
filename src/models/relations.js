@@ -332,7 +332,7 @@ export class Relations extends EventEmitter {
         }, null);
 
         if (lastReplacement?.shouldAttemptDecryption()) {
-            await lastReplacement.attemptDecryption(this._room._client._crypto);
+            await lastReplacement.attemptDecryption(this._room._client.crypto);
         } else if (lastReplacement?.isBeingDecrypted()) {
             await lastReplacement._decryptionPromise;
         }

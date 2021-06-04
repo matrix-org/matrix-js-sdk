@@ -144,12 +144,12 @@ describe("MatrixClient", function() {
             scheduler: scheduler,
             userId: userId,
         });
-        // FIXME: We shouldn't be yanking _http like this.
-        client._http = [
+        // FIXME: We shouldn't be yanking http like this.
+        client.http = [
             "authedRequest", "getContentUri", "request", "uploadContent",
         ].reduce((r, k) => { r[k] = jest.fn(); return r; }, {});
-        client._http.authedRequest.mockImplementation(httpReq);
-        client._http.request.mockImplementation(httpReq);
+        client.http.authedRequest.mockImplementation(httpReq);
+        client.http.request.mockImplementation(httpReq);
 
         // set reasonable working defaults
         acceptKeepalives = true;
@@ -166,7 +166,7 @@ describe("MatrixClient", function() {
         // means they may call /events and then fail an expect() which will fail
         // a DIFFERENT test (pollution between tests!) - we return unresolved
         // promises to stop the client from continuing to run.
-        client._http.authedRequest.mockImplementation(function() {
+        client.http.authedRequest.mockImplementation(function() {
             return new Promise(() => {});
         });
     });

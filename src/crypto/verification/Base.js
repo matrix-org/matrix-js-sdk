@@ -49,9 +49,10 @@ export class VerificationBase extends EventEmitter {
      *
      * @class
      *
-     * @param {module:base-apis~Channel} channel the verification channel to send verification messages over.
+     * @param {Object} channel the verification channel to send verification messages over.
+     * TODO: Channel types
      *
-     * @param {module:base-apis~MatrixBaseApis} baseApis base matrix api interface
+     * @param {MatrixClient} baseApis base matrix api interface
      *
      * @param {string} userId the user ID that is being verified
      *
@@ -291,7 +292,7 @@ export class VerificationBase extends EventEmitter {
                 await verifier(keyId, device, keyInfo);
                 verifiedDevices.push(deviceId);
             } else {
-                const crossSigningInfo = this._baseApis._crypto._deviceList
+                const crossSigningInfo = this._baseApis.crypto._deviceList
                       .getStoredCrossSigningForUser(userId);
                 if (crossSigningInfo && crossSigningInfo.getId() === deviceId) {
                     await verifier(keyId, DeviceInfo.fromStorage({
