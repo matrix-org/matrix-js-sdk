@@ -2495,7 +2495,7 @@ export class MatrixClient extends EventEmitter {
             // doesn't match the one in the auth_data, the user has entered
             // a different recovery key / the wrong passphrase.
             if (!await algorithm.keyMatches(privKey)) {
-                return Promise.reject({ errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY });
+                return Promise.reject(new MatrixError({ errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY }));
             }
 
             // Cache the key, if possible.
