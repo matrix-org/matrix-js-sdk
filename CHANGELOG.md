@@ -1,3 +1,42 @@
+Changes in [11.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v11.2.0) (2021-06-07)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v11.2.0-rc.1...v11.2.0)
+
+ * No changes since rc.1
+
+Changes in [11.2.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v11.2.0-rc.1) (2021-06-01)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v11.1.0...v11.2.0-rc.1)
+
+ * Switch to stable endpoint/fields for MSC2858
+   [\#1720](https://github.com/matrix-org/matrix-js-sdk/pull/1720)
+ * Bump ws from 7.4.2 to 7.4.6
+   [\#1715](https://github.com/matrix-org/matrix-js-sdk/pull/1715)
+ * Make consistent call event type checks
+   [\#1712](https://github.com/matrix-org/matrix-js-sdk/pull/1712)
+ * Apply new Babel linting config
+   [\#1714](https://github.com/matrix-org/matrix-js-sdk/pull/1714)
+ * Bump browserslist from 4.16.1 to 4.16.6
+   [\#1709](https://github.com/matrix-org/matrix-js-sdk/pull/1709)
+ * Add user_busy call hangup reason
+   [\#1713](https://github.com/matrix-org/matrix-js-sdk/pull/1713)
+ * 👕 New linting rules
+   [\#1688](https://github.com/matrix-org/matrix-js-sdk/pull/1688)
+ * Emit relations created when target event added later
+   [\#1710](https://github.com/matrix-org/matrix-js-sdk/pull/1710)
+ * Bump libolm version and update package name.
+   [\#1705](https://github.com/matrix-org/matrix-js-sdk/pull/1705)
+ * Fix uploadContent not rejecting promise when http status code >= 400
+   [\#1703](https://github.com/matrix-org/matrix-js-sdk/pull/1703)
+ * Reduce noise in tests
+   [\#1702](https://github.com/matrix-org/matrix-js-sdk/pull/1702)
+ * Only log once if a Room lacks an m.room.create event
+   [\#1700](https://github.com/matrix-org/matrix-js-sdk/pull/1700)
+ * Cache normalized room name
+   [\#1701](https://github.com/matrix-org/matrix-js-sdk/pull/1701)
+ * Change call event handlers to adapt to undecrypted events
+   [\#1698](https://github.com/matrix-org/matrix-js-sdk/pull/1698)
+
 Changes in [11.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v11.1.0) (2021-05-24)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v11.1.0-rc.1...v11.1.0)
