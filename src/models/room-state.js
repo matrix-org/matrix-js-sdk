@@ -19,11 +19,11 @@ limitations under the License.
  * @module models/room-state
  */
 
-import {EventEmitter} from "events";
-import {RoomMember} from "./room-member";
-import {logger} from '../logger';
+import { EventEmitter } from "events";
+import { RoomMember } from "./room-member";
+import { logger } from '../logger';
 import * as utils from "../utils";
-import {EventType} from "../@types/event";
+import { EventType } from "../@types/event";
 
 // possible statuses for out-of-band member loading
 const OOB_STATUS_NOTSTARTED = 1;
@@ -154,7 +154,7 @@ RoomState.prototype.setInvitedMemberCount = function(count) {
  * @return {Array<RoomMember>} A list of RoomMembers.
  */
 RoomState.prototype.getMembers = function() {
-    return utils.values(this.members);
+    return Object.values(this.members);
 };
 
 /**
@@ -163,7 +163,7 @@ RoomState.prototype.getMembers = function() {
  * @return {Array<RoomMember>} A list of RoomMembers.
  */
 RoomState.prototype.getMembersExcept = function(excludedIds) {
-    return utils.values(this.members)
+    return Object.values(this.members)
         .filter((m) => !excludedIds.includes(m.userId));
 };
 
@@ -296,7 +296,7 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
     this._updateModifiedTime();
 
     // update the core event dict
-    utils.forEach(stateEvents, function(event) {
+    stateEvents.forEach(function(event) {
         if (event.getRoomId() !== self.roomId) {
             return;
         }
@@ -319,7 +319,7 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
     // core event dict as these structures may depend on other state events in
     // the given array (e.g. disambiguating display names in one go to do both
     // clashing names rather than progressively which only catches 1 of them).
-    utils.forEach(stateEvents, function(event) {
+    stateEvents.forEach(function(event) {
         if (event.getRoomId() !== self.roomId) {
             return;
         }
@@ -349,8 +349,13 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
             self._updateMember(member);
             self.emit("RoomState.members", event, self, member);
         } else if (event.getType() === "m.room.power_levels") {
-            const members = utils.values(self.members);
-            utils.forEach(members, function(member) {
+            // events with unknown state keys should be ignored
+            // and should not aggregate onto members power levels
+            if (event.getStateKey() !== "") {
+                return;
+            }
+            const members = Object.values(self.members);
+            members.forEach(function(member) {
                 // We only propagate `RoomState.members` event if the
                 // power levels has been changed
                 // large room suffer from large re-rendering especially when not needed
@@ -511,7 +516,7 @@ RoomState.prototype._setOutOfBandMember = function(stateEvent) {
  * @param {MatrixEvent} event The typing event
  */
 RoomState.prototype.setTypingEvent = function(event) {
-    utils.forEach(utils.values(this.members), function(member) {
+    Object.values(this.members).forEach(function(member) {
         member.setTypingEvent(event);
     });
 };
@@ -734,7 +739,6 @@ RoomState.prototype.getJoinRule = function() {
     const joinRuleContent = joinRuleEvent ? joinRuleEvent.getContent() : {};
     return joinRuleContent["join_rule"] || "invite";
 };
-
 
 function _updateThirdPartyTokenCache(roomState, memberEvent) {
     if (!memberEvent.getContent().third_party_invite) {

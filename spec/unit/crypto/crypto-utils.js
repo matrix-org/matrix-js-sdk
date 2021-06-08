@@ -1,5 +1,4 @@
-import {IndexedDBCryptoStore} from '../../../src/crypto/store/indexeddb-crypto-store';
-
+import { IndexedDBCryptoStore } from '../../../src/crypto/store/indexeddb-crypto-store';
 
 // needs to be phased out and replaced with bootstrapSecretStorage,
 // but that is doing too much extra stuff for it to be an easy transition.
@@ -7,7 +6,7 @@ export async function resetCrossSigningKeys(client, {
     level,
     authUploadDeviceSigningKeys = async func => await func(),
 } = {}) {
-    const crypto = client._crypto;
+    const crypto = client.crypto;
 
     const oldKeys = Object.assign({}, crypto._crossSigningInfo.keys);
     try {

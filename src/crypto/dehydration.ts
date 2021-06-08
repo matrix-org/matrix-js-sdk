@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Matrix.org Foundation C.I.C.
+Copyright 2020-2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,14 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {decodeBase64, encodeBase64} from './olmlib';
-import {IndexedDBCryptoStore} from '../crypto/store/indexeddb-crypto-store';
-import {decryptAES, encryptAES} from './aes';
+import { decodeBase64, encodeBase64 } from './olmlib';
+import { IndexedDBCryptoStore } from '../crypto/store/indexeddb-crypto-store';
+import { decryptAES, encryptAES } from './aes';
 import anotherjson from "another-json";
-import {logger} from '../logger';
+import { logger } from '../logger';
+import { ISecretStorageKeyInfo } from "../matrix";
 
 // FIXME: these types should eventually go in a different file
 type Signatures = Record<string, Record<string, string>>;
+
+export interface IDehydratedDevice {
+    device_id: string; // eslint-disable-line camelcase
+    device_data: ISecretStorageKeyInfo & { // eslint-disable-line camelcase
+        algorithm: string;
+        account: string; // pickle
+    };
+}
+
+export interface IDehydratedDeviceKeyInfo {
+    passphrase?: string;
+}
 
 interface DeviceKeys {
     algorithms: Array<string>;
@@ -59,7 +72,7 @@ export class DehydrationManager {
                     txn,
                     async (result) => {
                         if (result) {
-                            const {key, keyInfo, deviceDisplayName, time} = result;
+                            const { key, keyInfo, deviceDisplayName, time } = result;
                             const pickleKey = Buffer.from(this.crypto._olmDevice._pickleKey);
                             const decrypted = await decryptAES(key, pickleKey, DEHYDRATION_ALGORITHM);
                             this.key = decodeBase64(decrypted);
@@ -192,7 +205,7 @@ export class DehydrationManager {
             }
 
             logger.log("Uploading account to server");
-            const dehydrateResult = await this.crypto._baseApis._http.authedRequest(
+            const dehydrateResult = await this.crypto._baseApis.http.authedRequest(
                 undefined,
                 "PUT",
                 "/dehydrated_device",
@@ -231,7 +244,7 @@ export class DehydrationManager {
             logger.log("Preparing one-time keys");
             const oneTimeKeys = {};
             for (const [keyId, key] of Object.entries(otks.curve25519)) {
-                const k: OneTimeKey = {key};
+                const k: OneTimeKey = { key };
                 const signature = account.sign(anotherjson.stringify(k));
                 k.signatures = {
                     [this.crypto._userId]: {
@@ -244,7 +257,7 @@ export class DehydrationManager {
             logger.log("Preparing fallback keys");
             const fallbackKeys = {};
             for (const [keyId, key] of Object.entries(fallbacks.curve25519)) {
-                const k: OneTimeKey = {key, fallback: true};
+                const k: OneTimeKey = { key, fallback: true };
                 const signature = account.sign(anotherjson.stringify(k));
                 k.signatures = {
                     [this.crypto._userId]: {
@@ -255,7 +268,7 @@ export class DehydrationManager {
             }
 
             logger.log("Uploading keys to server");
-            await this.crypto._baseApis._http.authedRequest(
+            await this.crypto._baseApis.http.authedRequest(
                 undefined,
                 "POST",
                 "/keys/upload/" + encodeURI(deviceId),

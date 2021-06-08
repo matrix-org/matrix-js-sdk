@@ -22,7 +22,7 @@ limitations under the License.
  * Utilities common to olm encryption algorithms
  */
 
-import {logger} from '../logger';
+import { logger } from '../logger';
 import * as utils from "../utils";
 import anotherjson from "another-json";
 
@@ -40,7 +40,6 @@ export const MEGOLM_ALGORITHM = "m.megolm.v1.aes-sha2";
  * matrix algorithm tag for megolm backups
  */
 export const MEGOLM_BACKUP_ALGORITHM = "m.megolm_backup.v1.curve25519-aes-sha2";
-
 
 /**
  * Encrypt an event payload for an Olm device
@@ -119,7 +118,7 @@ export async function encryptMessageForDevice(
  *
  * @param {module:crypto/OlmDevice} olmDevice
  *
- * @param {module:base-apis~MatrixBaseApis} baseApis
+ * @param {MatrixClient} baseApis
  *
  * @param {object<string, module:crypto/deviceinfo[]>} devicesByUser
  *    map from userid to list of devices to ensure sessions for
@@ -169,7 +168,7 @@ export async function getExistingOlmSessions(
  *
  * @param {module:crypto/OlmDevice} olmDevice
  *
- * @param {module:base-apis~MatrixBaseApis} baseApis
+ * @param {MatrixClient} baseApis
  *
  * @param {object<string, module:crypto/deviceinfo[]>} devicesByUser
  *    map from userid to list of devices to ensure sessions for
@@ -407,7 +406,6 @@ async function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceIn
                 " for device " + userId + ":" + deviceId);
     return sid;
 }
-
 
 /**
  * Verify the signature on an object

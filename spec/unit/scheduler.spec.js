@@ -1,9 +1,9 @@
 // This file had a function whose name is all caps, which displeases eslint
 /* eslint new-cap: "off" */
 
-import {defer} from '../../src/utils';
-import {MatrixError} from "../../src/http-api";
-import {MatrixScheduler} from "../../src/scheduler";
+import { defer } from '../../src/utils';
+import { MatrixError } from "../../src/http-api";
+import { MatrixScheduler } from "../../src/scheduler";
 import * as utils from "../test-utils";
 
 jest.useFakeTimers();
@@ -62,8 +62,8 @@ describe("MatrixScheduler", function() {
             scheduler.queueEvent(eventA),
             scheduler.queueEvent(eventB),
         ]);
-        deferB.resolve({b: true});
-        deferA.resolve({a: true});
+        deferB.resolve({ b: true });
+        deferA.resolve({ a: true });
         const [a, b] = await abPromise;
         expect(a.a).toEqual(true);
         expect(b.b).toEqual(true);
@@ -156,8 +156,8 @@ describe("MatrixScheduler", function() {
         // Expect to have processFn invoked for A&B.
         // Resolve A.
         // Expect to have processFn invoked for D.
-        const eventC = utils.mkMessage({user: "@a:bar", room: roomId, event: true});
-        const eventD = utils.mkMessage({user: "@b:bar", room: roomId, event: true});
+        const eventC = utils.mkMessage({ user: "@a:bar", room: roomId, event: true });
+        const eventD = utils.mkMessage({ user: "@b:bar", room: roomId, event: true });
 
         const buckets = {};
         buckets[eventA.getId()] = "queue_A";
@@ -241,7 +241,7 @@ describe("MatrixScheduler", function() {
             expect(queue).toEqual([eventA, eventB]);
             // modify the queue
             const eventC = utils.mkMessage(
-                {user: "@a:bar", room: roomId, event: true},
+                { user: "@a:bar", room: roomId, event: true },
             );
             queue.push(eventC);
             const queueAgain = scheduler.getQueueForEvent(eventA);

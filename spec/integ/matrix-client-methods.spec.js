@@ -1,7 +1,7 @@
 import * as utils from "../test-utils";
-import {CRYPTO_ENABLED} from "../../src/client";
-import {Filter, MemoryStore, Room} from "../../src/matrix";
-import {TestClient} from "../TestClient";
+import { CRYPTO_ENABLED } from "../../src/client";
+import { Filter, MemoryStore, Room } from "../../src/matrix";
+import { TestClient } from "../TestClient";
 
 describe("MatrixClient", function() {
     let client = null;
@@ -285,7 +285,6 @@ describe("MatrixClient", function() {
         });
     });
 
-
     describe("downloadKeys", function() {
         if (!CRYPTO_ENABLED) {
             return;
@@ -337,7 +336,7 @@ describe("MatrixClient", function() {
                 var b = JSON.parse(JSON.stringify(o));
                 delete(b.signatures);
                 delete(b.unsigned);
-                return client._crypto._olmDevice.sign(anotherjson.stringify(b));
+                return client.crypto._olmDevice.sign(anotherjson.stringify(b));
             };
 
             logger.log("Ed25519: " + ed25519key);
@@ -346,10 +345,10 @@ describe("MatrixClient", function() {
             */
 
             httpBackend.when("POST", "/keys/query").check(function(req) {
-                expect(req.data).toEqual({device_keys: {
+                expect(req.data).toEqual({ device_keys: {
                     'boris': [],
                     'chaz': [],
-                }});
+                } });
             }).respond(200, {
                 device_keys: {
                     boris: borisKeys,
@@ -379,12 +378,12 @@ describe("MatrixClient", function() {
     });
 
     describe("deleteDevice", function() {
-        const auth = {a: 1};
+        const auth = { a: 1 };
         it("should pass through an auth dict", function() {
             httpBackend.when(
                 "DELETE", "/_matrix/client/r0/devices/my_device",
             ).check(function(req) {
-                expect(req.data).toEqual({auth: auth});
+                expect(req.data).toEqual({ auth: auth });
             }).respond(200);
 
             const prom = client.deleteDevice("my_device", auth);

@@ -1,8 +1,8 @@
 import { logger } from "../logger";
-import {MatrixEvent} from "../models/event";
-import {EventEmitter} from "events";
-import {createCryptoStoreCacheCallbacks} from "./CrossSigning";
-import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
+import { MatrixEvent } from "../models/event";
+import { EventEmitter } from "events";
+import { createCryptoStoreCacheCallbacks } from "./CrossSigning";
+import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import {
     PREFIX_UNSTABLE,
 } from "../http-api";
@@ -43,7 +43,7 @@ export class EncryptionSetupBuilder {
      * @param {Object} keys the new keys
      */
     addCrossSigningKeys(authUpload, keys) {
-        this._crossSigningKeys = {authUpload, keys};
+        this._crossSigningKeys = { authUpload, keys };
     }
 
     /**
@@ -85,7 +85,6 @@ export class EncryptionSetupBuilder {
         this._keySignatures[userId] = userSignatures;
         userSignatures[deviceId] = signature;
     }
-
 
     /**
      * @param {String} type
@@ -205,26 +204,25 @@ export class EncryptionSetupOperation {
                 // The backup is trusted because the user provided the private key.
                 // Sign the backup with the cross signing key so the key backup can
                 // be trusted via cross-signing.
-                await baseApis._http.authedRequest(
+                await baseApis.http.authedRequest(
                     undefined, "PUT", "/room_keys/version/" + this._keyBackupInfo.version,
                     undefined, {
                         algorithm: this._keyBackupInfo.algorithm,
                         auth_data: this._keyBackupInfo.auth_data,
                     },
-                    {prefix: PREFIX_UNSTABLE},
+                    { prefix: PREFIX_UNSTABLE },
                 );
             } else {
                 // add new key backup
-                await baseApis._http.authedRequest(
+                await baseApis.http.authedRequest(
                     undefined, "POST", "/room_keys/version",
                     undefined, this._keyBackupInfo,
-                    {prefix: PREFIX_UNSTABLE},
+                    { prefix: PREFIX_UNSTABLE },
                 );
             }
         }
     }
 }
-
 
 /**
  * Catches account data set by SecretStorage during bootstrapping by
@@ -276,7 +274,7 @@ class AccountDataClientAdapter extends EventEmitter {
         // as SecretStorage listens for it while calling this method
         // and it seems to rely on this.
         return Promise.resolve().then(() => {
-            const event = new MatrixEvent({type, content});
+            const event = new MatrixEvent({ type, content });
             this.emit("accountData", event, lastEvent);
         });
     }
@@ -335,7 +333,7 @@ class SSSSCryptoCallbacks {
         // for it to the general crypto callbacks and cache it
         if (this._delegateCryptoCallbacks) {
             const result = await this._delegateCryptoCallbacks.
-                getSecretStorageKey({keys}, name);
+                getSecretStorageKey({ keys }, name);
             if (result) {
                 const [keyId, privateKey] = result;
                 this._privateKeys.set(keyId, privateKey);

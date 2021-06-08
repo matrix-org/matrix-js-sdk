@@ -20,11 +20,11 @@ limitations under the License.
  * @module crypto/algorithms/olm
  */
 
-import {logger} from '../../logger';
+import { logger } from '../../logger';
 import * as utils from "../../utils";
-import {polyfillSuper} from "../../utils";
+import { polyfillSuper } from "../../utils";
 import * as olmlib from "../olmlib";
-import {DeviceInfo} from "../deviceinfo";
+import { DeviceInfo } from "../deviceinfo";
 import {
     DecryptionAlgorithm,
     DecryptionError,
@@ -95,7 +95,7 @@ OlmEncryption.prototype.encryptMessage = async function(room, eventType, content
 
     const members = await room.getEncryptionTargetMembers();
 
-    const users = utils.map(members, function(u) {
+    const users = members.map(function(u) {
         return u.userId;
     });
 
@@ -357,6 +357,5 @@ OlmDecryption.prototype._reallyDecryptMessage = async function(
     );
     return res.payload;
 };
-
 
 registerAlgorithm(olmlib.OLM_ALGORITHM, OlmEncryption, OlmDecryption);

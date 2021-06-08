@@ -15,14 +15,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import "../../../olm-loader";
-import {makeTestClients, setupWebcrypto, teardownWebcrypto} from './util';
-import {MatrixEvent} from "../../../../src/models/event";
-import {SAS} from "../../../../src/crypto/verification/SAS";
-import {DeviceInfo} from "../../../../src/crypto/deviceinfo";
-import {verificationMethods} from "../../../../src/crypto";
+import { makeTestClients, setupWebcrypto, teardownWebcrypto } from './util';
+import { MatrixEvent } from "../../../../src/models/event";
+import { SAS } from "../../../../src/crypto/verification/SAS";
+import { DeviceInfo } from "../../../../src/crypto/deviceinfo";
+import { verificationMethods } from "../../../../src/crypto";
 import * as olmlib from "../../../../src/crypto/olmlib";
-import {logger} from "../../../../src/logger";
-import {resetCrossSigningKeys} from "../crypto-utils";
+import { logger } from "../../../../src/logger";
+import { resetCrossSigningKeys } from "../crypto-utils";
 
 const Olm = global.Olm;
 
@@ -79,16 +79,16 @@ describe("SAS verification", function() {
         beforeEach(async () => {
             [alice, bob] = await makeTestClients(
                 [
-                    {userId: "@alice:example.com", deviceId: "Osborne2"},
-                    {userId: "@bob:example.com", deviceId: "Dynabook"},
+                    { userId: "@alice:example.com", deviceId: "Osborne2" },
+                    { userId: "@bob:example.com", deviceId: "Dynabook" },
                 ],
                 {
                     verificationMethods: [verificationMethods.SAS],
                 },
             );
 
-            const aliceDevice = alice.client._crypto._olmDevice;
-            const bobDevice = bob.client._crypto._olmDevice;
+            const aliceDevice = alice.client.crypto._olmDevice;
+            const bobDevice = bob.client.crypto._olmDevice;
 
             ALICE_DEVICES = {
                 Osborne2: {
@@ -114,14 +114,14 @@ describe("SAS verification", function() {
                 },
             };
 
-            alice.client._crypto._deviceList.storeDevicesForUser(
+            alice.client.crypto._deviceList.storeDevicesForUser(
                 "@bob:example.com", BOB_DEVICES,
             );
             alice.client.downloadKeys = () => {
                 return Promise.resolve();
             };
 
-            bob.client._crypto._deviceList.storeDevicesForUser(
+            bob.client.crypto._deviceList.storeDevicesForUser(
                 "@alice:example.com", ALICE_DEVICES,
             );
             bob.client.downloadKeys = () => {
@@ -296,9 +296,9 @@ describe("SAS verification", function() {
 
             await resetCrossSigningKeys(bob.client);
 
-            bob.client._crypto._deviceList.storeCrossSigningForUser(
+            bob.client.crypto._deviceList.storeCrossSigningForUser(
                 "@alice:example.com", {
-                    keys: alice.client._crypto._crossSigningInfo.keys,
+                    keys: alice.client.crypto._crossSigningInfo.keys,
                 },
             );
 
@@ -336,8 +336,8 @@ describe("SAS verification", function() {
     it("should send a cancellation message on error", async function() {
         const [alice, bob] = await makeTestClients(
             [
-                {userId: "@alice:example.com", deviceId: "Osborne2"},
-                {userId: "@bob:example.com", deviceId: "Dynabook"},
+                { userId: "@alice:example.com", deviceId: "Osborne2" },
+                { userId: "@bob:example.com", deviceId: "Dynabook" },
             ],
             {
                 verificationMethods: [verificationMethods.SAS],
@@ -390,8 +390,8 @@ describe("SAS verification", function() {
         beforeEach(async function() {
             [alice, bob] = await makeTestClients(
                 [
-                    {userId: "@alice:example.com", deviceId: "Osborne2"},
-                    {userId: "@bob:example.com", deviceId: "Dynabook"},
+                    { userId: "@alice:example.com", deviceId: "Osborne2" },
+                    { userId: "@bob:example.com", deviceId: "Dynabook" },
                 ],
                 {
                     verificationMethods: [verificationMethods.SAS],

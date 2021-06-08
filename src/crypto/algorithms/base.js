@@ -46,7 +46,7 @@ export const DECRYPTION_CLASSES = {};
  * @param {string} params.deviceId The identifier for this device.
  * @param {module:crypto} params.crypto crypto core
  * @param {module:crypto/OlmDevice} params.olmDevice olm.js wrapper
- * @param {module:base-apis~MatrixBaseApis} baseApis base matrix api interface
+ * @param {MatrixClient} baseApis base matrix api interface
  * @param {string} params.roomId  The ID of the room we will be sending to
  * @param {object} params.config  The body of the m.room.encryption event
  */
@@ -102,7 +102,7 @@ export class EncryptionAlgorithm {
  * @param {string} params.userId  The UserID for the local user
  * @param {module:crypto} params.crypto crypto core
  * @param {module:crypto/OlmDevice} params.olmDevice olm.js wrapper
- * @param {module:base-apis~MatrixBaseApis} baseApis base matrix api interface
+ * @param {MatrixClient} baseApis base matrix api interface
  * @param {string=} params.roomId The ID of the room we will be receiving
  *     from. Null for to-device events.
  */

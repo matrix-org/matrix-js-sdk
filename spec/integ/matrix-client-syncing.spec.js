@@ -1,7 +1,7 @@
-import {MatrixEvent} from "../../src/models/event";
-import {EventTimeline} from "../../src/models/event-timeline";
+import { MatrixEvent } from "../../src/models/event";
+import { EventTimeline } from "../../src/models/event-timeline";
 import * as utils from "../test-utils";
-import {TestClient} from "../TestClient";
+import { TestClient } from "../TestClient";
 
 describe("MatrixClient syncing", function() {
     let client = null;
@@ -121,7 +121,6 @@ describe("MatrixClient syncing", function() {
             client.startClient({
                 resolveInvitesToProfiles: true,
             });
-
 
             return Promise.all([
                 httpBackend.flushAllExpected(),
@@ -677,8 +676,8 @@ describe("MatrixClient syncing", function() {
         it("should create and use an appropriate filter", function() {
             httpBackend.when("POST", "/filter").check(function(req) {
                 expect(req.data).toEqual({
-                    room: { timeline: {limit: 1},
-                            include_leave: true }});
+                    room: { timeline: { limit: 1 },
+                            include_leave: true } });
             }).respond(200, { filter_id: "another_id" });
 
             const prom = new Promise((resolve) => {

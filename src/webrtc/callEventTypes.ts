@@ -1,6 +1,11 @@
 // allow camelcase as these are events type that go onto the wire
 /* eslint-disable camelcase */
 
+export enum SDPStreamMetadataPurpose {
+    Usermedia = "m.usermedia",
+    Screenshare = "m.screenshare",
+}
+
 interface CallOfferAnswer {
     type: string;
     sdp: string;

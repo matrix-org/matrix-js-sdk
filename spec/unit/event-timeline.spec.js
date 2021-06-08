@@ -1,6 +1,6 @@
 import * as utils from "../test-utils";
-import {EventTimeline} from "../../src/models/event-timeline";
-import {RoomState} from "../../src/models/room-state";
+import { EventTimeline } from "../../src/models/event-timeline";
+import { RoomState } from "../../src/models/room-state";
 
 function mockRoomStates(timeline) {
     timeline._startState = utils.mock(RoomState, "startState");
@@ -15,7 +15,7 @@ describe("EventTimeline", function() {
 
     beforeEach(function() {
         // XXX: this is a horrid hack; should use sinon or something instead to mock
-        const timelineSet = { room: { roomId: roomId }};
+        const timelineSet = { room: { roomId: roomId } };
         timelineSet.room.getUnfilteredTimelineSet = function() {
             return timelineSet;
         };
@@ -94,7 +94,6 @@ describe("EventTimeline", function() {
         });
     });
 
-
     describe("neighbouringTimelines", function() {
         it("neighbouring timelines should start null", function() {
             expect(timeline.getNeighbouringTimeline(EventTimeline.BACKWARDS)).toBe(null);
@@ -102,8 +101,8 @@ describe("EventTimeline", function() {
         });
 
         it("setNeighbouringTimeline should set neighbour", function() {
-            const prev = {a: "a"};
-            const next = {b: "b"};
+            const prev = { a: "a" };
+            const next = { b: "b" };
             timeline.setNeighbouringTimeline(prev, EventTimeline.BACKWARDS);
             timeline.setNeighbouringTimeline(next, EventTimeline.FORWARDS);
             expect(timeline.getNeighbouringTimeline(EventTimeline.BACKWARDS)).toBe(prev);
@@ -111,8 +110,8 @@ describe("EventTimeline", function() {
         });
 
         it("setNeighbouringTimeline should throw if called twice", function() {
-            const prev = {a: "a"};
-            const next = {b: "b"};
+            const prev = { a: "a" };
+            const next = { b: "b" };
             expect(function() {
                 timeline.setNeighbouringTimeline(prev, EventTimeline.BACKWARDS);
             }).not.toThrow();
@@ -277,7 +276,6 @@ describe("EventTimeline", function() {
             expect(timeline.getState(EventTimeline.BACKWARDS).setStateEvents).
                 not.toHaveBeenCalled();
         });
-
 
         it("should call setStateEvents on the right RoomState with the right " +
            "forwardLooking value for old events", function() {

@@ -21,20 +21,20 @@ limitations under the License.
  * TODO:
  * This class mainly serves to take all the syncing logic out of client.js and
  * into a separate file. It's all very fluid, and this class gut wrenches a lot
- * of MatrixClient props (e.g. _http). Given we want to support WebSockets as
+ * of MatrixClient props (e.g. http). Given we want to support WebSockets as
  * an alternative syncing API, we may want to have a proper syncing interface
  * for HTTP and WS at some point.
  */
 
-import {User} from "./models/user";
-import {Room} from "./models/room";
-import {Group} from "./models/group";
+import { User } from "./models/user";
+import { Room } from "./models/room";
+import { Group } from "./models/group";
 import * as utils from "./utils";
-import {Filter} from "./filter";
-import {EventTimeline} from "./models/event-timeline";
-import {PushProcessor} from "./pushprocessor";
-import {logger} from './logger';
-import {InvalidStoreError} from './errors';
+import { Filter } from "./filter";
+import { EventTimeline } from "./models/event-timeline";
+import { PushProcessor } from "./pushprocessor";
+import { logger } from './logger';
+import { InvalidStoreError } from './errors';
 
 const DEBUG = true;
 
@@ -61,7 +61,6 @@ function debuglog(...params) {
     }
     logger.log(...params);
 }
-
 
 /**
  * <b>Internal class - unstable.</b>
@@ -188,7 +187,6 @@ SyncApi.prototype._deregisterStateListeners = function(room) {
     room.currentState.removeAllListeners("RoomState.newMember");
 };
 
-
 /**
  * Sync rooms the user has left.
  * @return {Promise} Resolved when they've been added to the store.
@@ -211,7 +209,7 @@ SyncApi.prototype.syncLeftRooms = function() {
         getFilterName(client.credentials.userId, "LEFT_ROOMS"), filter,
     ).then(function(filterId) {
         qps.filter = filterId;
-        return client._http.authedRequest(
+        return client.http.authedRequest(
             undefined, "GET", "/sync", qps, undefined, localTimeoutMs,
         );
     }).then(function(data) {
@@ -278,20 +276,15 @@ SyncApi.prototype.peek = function(roomId) {
 
         // FIXME: Mostly duplicated from _processRoomEvents but not entirely
         // because "state" in this API is at the BEGINNING of the chunk
-        const oldStateEvents = utils.map(
-            utils.deepCopy(response.state), client.getEventMapper(),
-        );
-        const stateEvents = utils.map(
-            response.state, client.getEventMapper(),
-        );
-        const messages = utils.map(
-            response.messages.chunk, client.getEventMapper(),
-        );
+        const oldStateEvents = utils.deepCopy(response.state)
+            .map(client.getEventMapper());
+        const stateEvents = response.state.map(client.getEventMapper());
+        const messages = response.messages.chunk.map(client.getEventMapper());
 
         // XXX: copypasted from /sync until we kill off this
         // minging v1 API stuff)
         // handle presence events (User objects)
-        if (response.presence && utils.isArray(response.presence)) {
+        if (response.presence && Array.isArray(response.presence)) {
             response.presence.map(client.getEventMapper()).forEach(
             function(presenceEvent) {
                 let user = client.store.getUser(presenceEvent.getContent().user_id);
@@ -356,7 +349,7 @@ SyncApi.prototype._peekPoll = function(peekRoom, token) {
 
     const self = this;
     // FIXME: gut wrenching; hard-coded timeout values
-    this.client._http.authedRequest(undefined, "GET", "/events", {
+    this.client.http.authedRequest(undefined, "GET", "/events", {
         room_id: peekRoom.roomId,
         timeout: 30 * 1000,
         from: token,
@@ -558,7 +551,7 @@ SyncApi.prototype.sync = function() {
         }
         try {
             debuglog("Storing client options...");
-            await this.client._storeClientOptions();
+            await this.client.storeClientOptions();
             debuglog("Stored client options");
         } catch (err) {
             logger.error("Storing client options failed", err);
@@ -822,7 +815,7 @@ SyncApi.prototype._sync = async function(syncOptions) {
 
 SyncApi.prototype._doSyncRequest = function(syncOptions, syncToken) {
     const qps = this._getSyncParams(syncOptions, syncToken);
-    return this.client._http.authedRequest(
+    return this.client.http.authedRequest(
         undefined, "GET", "/sync", qps, undefined,
         qps.timeout + BUFFER_PERIOD_MS,
     );
@@ -1006,7 +999,7 @@ SyncApi.prototype._processSyncResponse = async function(
     // - The isBrandNewRoom boilerplate is boilerplatey.
 
     // handle presence events (User objects)
-    if (data.presence && utils.isArray(data.presence.events)) {
+    if (data.presence && Array.isArray(data.presence.events)) {
         data.presence.events.map(client.getEventMapper()).forEach(
         function(presenceEvent) {
             let user = client.store.getUser(presenceEvent.getSender());
@@ -1022,7 +1015,7 @@ SyncApi.prototype._processSyncResponse = async function(
     }
 
     // handle non-room account_data
-    if (data.account_data && utils.isArray(data.account_data.events)) {
+    if (data.account_data && Array.isArray(data.account_data.events)) {
         const events = data.account_data.events.map(client.getEventMapper());
         const prevEventsMap = events.reduce((m, c) => {
             m[c.getId()] = client.store.getAccountData(c.getType());
@@ -1047,7 +1040,7 @@ SyncApi.prototype._processSyncResponse = async function(
     }
 
     // handle to-device events
-    if (data.to_device && utils.isArray(data.to_device.events) &&
+    if (data.to_device && Array.isArray(data.to_device.events) &&
         data.to_device.events.length > 0
        ) {
         const cancelledKeyVerificationTxns = [];
@@ -1158,10 +1151,15 @@ SyncApi.prototype._processSyncResponse = async function(
     await utils.promiseMapSeries(joinRooms, async function(joinObj) {
         const room = joinObj.room;
         const stateEvents = self._mapSyncEventsFormat(joinObj.state, room);
-        const timelineEvents = self._mapSyncEventsFormat(joinObj.timeline, room);
+        // Prevent events from being decrypted ahead of time
+        // this helps large account to speed up faster
+        // room::decryptCriticalEvent is in charge of decrypting all the events
+        // required for a client to function properly
+        const timelineEvents = self._mapSyncEventsFormat(joinObj.timeline, room, false);
         const ephemeralEvents = self._mapSyncEventsFormat(joinObj.ephemeral);
         const accountDataEvents = self._mapSyncEventsFormat(joinObj.account_data);
 
+        const encrypted = client.isRoomEncrypted(room.roomId);
         // we do this first so it's correct when any of the events fire
         if (joinObj.unread_notifications) {
             room.setUnreadNotificationCount(
@@ -1172,7 +1170,6 @@ SyncApi.prototype._processSyncResponse = async function(
             // bother setting it here. We trust our calculations better than the
             // server's for this case, and therefore will assume that our non-zero
             // count is accurate.
-            const encrypted = client.isRoomEncrypted(room.roomId);
             if (!encrypted
                 || (encrypted && room.getUnreadNotificationCount('highlight') <= 0)) {
                 room.setUnreadNotificationCount(
@@ -1294,6 +1291,11 @@ SyncApi.prototype._processSyncResponse = async function(
         });
 
         room.updateMyMembership("join");
+
+        // Decrypt only the last message in all rooms to make sure we can generate a preview
+        // And decrypt all events after the recorded read receipt to ensure an accurate
+        // notification count
+        room.decryptCriticalEvents();
     });
 
     // Handle leaves (e.g. kicked rooms)
@@ -1424,7 +1426,7 @@ SyncApi.prototype._pokeKeepAlive = function(connDidFail) {
         }
     }
 
-    this.client._http.request(
+    this.client.http.request(
         undefined, // callback
         "GET", "/_matrix/client/versions",
         undefined, // queryParams
@@ -1479,7 +1481,7 @@ SyncApi.prototype._processGroupSyncEntry = function(groupsSection, sectionName) 
             );
         }
         if (groupInfo.inviter) {
-            group.setInviter({userId: groupInfo.inviter});
+            group.setInviter({ userId: groupInfo.inviter });
         }
         group.setMyMembership(sectionName);
         if (isBrandNew) {
@@ -1499,7 +1501,7 @@ SyncApi.prototype._mapSyncResponseToRoomArray = function(obj) {
     // [{stuff+Room+isBrandNewRoom}, {stuff+Room+isBrandNewRoom}]
     const client = this.client;
     const self = this;
-    return utils.keys(obj).map(function(roomId) {
+    return Object.keys(obj).map(function(roomId) {
         const arrObj = obj[roomId];
         let room = client.store.getRoom(roomId);
         let isBrandNewRoom = false;
@@ -1516,13 +1518,14 @@ SyncApi.prototype._mapSyncResponseToRoomArray = function(obj) {
 /**
  * @param {Object} obj
  * @param {Room} room
+ * @param {bool} decrypt
  * @return {MatrixEvent[]}
  */
-SyncApi.prototype._mapSyncEventsFormat = function(obj, room) {
-    if (!obj || !utils.isArray(obj.events)) {
+SyncApi.prototype._mapSyncEventsFormat = function(obj, room, decrypt = true) {
+    if (!obj || !Array.isArray(obj.events)) {
         return [];
     }
-    const mapper = this.client.getEventMapper();
+    const mapper = this.client.getEventMapper({ decrypt });
     return obj.events.map(function(e) {
         if (room) {
             e.room_id = room.roomId;
@@ -1668,19 +1671,9 @@ SyncApi.prototype._processEventsForNotifs = function(room, timelineEventList) {
  * @return {string}
  */
 SyncApi.prototype._getGuestFilter = function() {
-    const guestRooms = this.client._guestRooms; // FIXME: horrible gut-wrenching
-    if (!guestRooms) {
-        return "{}";
-    }
-    // we just need to specify the filter inline if we're a guest because guests
-    // can't create filters.
-    return JSON.stringify({
-        room: {
-            timeline: {
-                limit: 20,
-            },
-        },
-    });
+    // Dev note: This used to be conditional to return a filter of 20 events maximum, but
+    // the condition never went to the other branch. This is now hardcoded.
+    return "{}";
 };
 
 /**

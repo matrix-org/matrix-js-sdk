@@ -21,9 +21,9 @@ limitations under the License.
  * @module models/event
  */
 
-import {EventEmitter} from 'events';
+import { EventEmitter } from 'events';
 import * as utils from '../utils';
-import {logger} from '../logger';
+import { logger } from '../logger';
 
 /**
  * Enum for event statuses.
@@ -179,7 +179,6 @@ export const MatrixEvent = function(
     this._localTimestamp = Date.now() - this.getAge();
 };
 utils.inherits(MatrixEvent, EventEmitter);
-
 
 utils.extend(MatrixEvent.prototype, {
     /**
@@ -399,6 +398,12 @@ utils.extend(MatrixEvent.prototype, {
             this._clearEvent.content.msgtype === "m.bad.encrypted";
     },
 
+    shouldAttemptDecryption: function() {
+        return this.isEncrypted()
+            && !this.isBeingDecrypted()
+            && this.getClearContent() === null;
+    },
+
     /**
      * Start the process of trying to decrypt this event.
      *
@@ -407,12 +412,22 @@ utils.extend(MatrixEvent.prototype, {
      * @internal
      *
      * @param {module:crypto} crypto crypto module
-     * @param {bool} isRetry True if this is a retry (enables more logging)
+     * @param {object} options
+     * @param {bool} options.isRetry True if this is a retry (enables more logging)
+     * @param {bool} options.emit Emits "event.decrypted" if set to true
      *
      * @returns {Promise} promise which resolves (to undefined) when the decryption
      * attempt is completed.
      */
-    attemptDecryption: async function(crypto, isRetry) {
+    attemptDecryption: async function(crypto, options = {}) {
+        // For backwards compatibility purposes
+        // The function signature used to be attemptDecryption(crypto, isRetry)
+        if (typeof options === "boolean") {
+            options = {
+                isRetry: options,
+            };
+        }
+
         // start with a couple of sanity checks.
         if (!this.isEncrypted()) {
             throw new Error("Attempt to decrypt event which isn't encrypted");
@@ -442,7 +457,7 @@ utils.extend(MatrixEvent.prototype, {
             return this._decryptionPromise;
         }
 
-        this._decryptionPromise = this._decryptionLoop(crypto, isRetry);
+        this._decryptionPromise = this._decryptionLoop(crypto, options);
         return this._decryptionPromise;
     },
 
@@ -487,7 +502,7 @@ utils.extend(MatrixEvent.prototype, {
         return recipients;
     },
 
-    _decryptionLoop: async function(crypto, isRetry) {
+    _decryptionLoop: async function(crypto, options = {}) {
         // make sure that this method never runs completely synchronously.
         // (doing so would mean that we would clear _decryptionPromise *before*
         // it is set in attemptDecryption - and hence end up with a stuck
@@ -504,7 +519,7 @@ utils.extend(MatrixEvent.prototype, {
                     res = this._badEncryptedMessage("Encryption not enabled");
                 } else {
                     res = await crypto.decryptEvent(this);
-                    if (isRetry) {
+                    if (options.isRetry === true) {
                         logger.info(`Decrypted event on retry (id=${this.getId()})`);
                     }
                 }
@@ -512,7 +527,7 @@ utils.extend(MatrixEvent.prototype, {
                 if (e.name !== "DecryptionError") {
                     // not a decryption error: log the whole exception as an error
                     // (and don't bother with a retry)
-                    const re = isRetry ? 're' : '';
+                    const re = options.isRetry ? 're' : '';
                     logger.error(
                         `Error ${re}decrypting event ` +
                         `(id=${this.getId()}): ${e.stack || e}`,
@@ -578,7 +593,9 @@ utils.extend(MatrixEvent.prototype, {
             // pick up the wrong contents.
             this.setPushActions(null);
 
-            this.emit("Event.decrypted", this, err);
+            if (options.emit !== false) {
+                this.emit("Event.decrypted", this, err);
+            }
 
             return;
         }
@@ -1128,7 +1145,6 @@ utils.extend(MatrixEvent.prototype, {
     },
 });
 
-
 /* _REDACT_KEEP_KEY_MAP gives the keys we keep when an event is redacted
  *
  * This is specified here:
@@ -1147,16 +1163,15 @@ const _REDACT_KEEP_KEY_MAP = [
 
 // a map from event type to the .content keys we keep when an event is redacted
 const _REDACT_KEEP_CONTENT_MAP = {
-    'm.room.member': {'membership': 1},
-    'm.room.create': {'creator': 1},
-    'm.room.join_rules': {'join_rule': 1},
-    'm.room.power_levels': {'ban': 1, 'events': 1, 'events_default': 1,
+    'm.room.member': { 'membership': 1 },
+    'm.room.create': { 'creator': 1 },
+    'm.room.join_rules': { 'join_rule': 1 },
+    'm.room.power_levels': { 'ban': 1, 'events': 1, 'events_default': 1,
                             'kick': 1, 'redact': 1, 'state_default': 1,
                             'users': 1, 'users_default': 1,
                            },
-    'm.room.aliases': {'aliases': 1},
+    'm.room.aliases': { 'aliases': 1 },
 };
-
 
 /**
  * Fires when an event is decrypted

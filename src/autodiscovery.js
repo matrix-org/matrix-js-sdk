@@ -17,8 +17,8 @@ limitations under the License.
 
 /** @module auto-discovery */
 
-import {logger} from './logger';
-import {URL as NodeURL} from "url";
+import { logger } from './logger';
+import { URL as NodeURL } from "url";
 
 // Dev note: Auto discovery is part of the spec.
 // See: https://matrix.org/docs/spec/client_server/r0.4.0.html#server-discovery
@@ -511,12 +511,12 @@ export class AutoDiscovery {
                             action = "IGNORE";
                             reason = AutoDiscovery.ERROR_MISSING_WELLKNOWN;
                         }
-                        resolve({raw: {}, action: action, reason: reason, error: err});
+                        resolve({ raw: {}, action: action, reason: reason, error: err });
                         return;
                     }
 
                     try {
-                        resolve({raw: JSON.parse(body), action: "SUCCESS"});
+                        resolve({ raw: JSON.parse(body), action: "SUCCESS" });
                     } catch (e) {
                         let reason = AutoDiscovery.ERROR_INVALID;
                         if (e.name === "SyntaxError") {

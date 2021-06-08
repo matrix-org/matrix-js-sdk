@@ -22,9 +22,9 @@ limitations under the License.
  * @module crypto/algorithms/megolm
  */
 
-import {logger} from '../../logger';
+import { logger } from '../../logger';
 import * as utils from "../../utils";
-import {polyfillSuper} from "../../utils";
+import { polyfillSuper } from "../../utils";
 import * as olmlib from "../olmlib";
 import {
     DecryptionAlgorithm,
@@ -34,7 +34,7 @@ import {
     UnknownDeviceError,
 } from "./base";
 
-import {WITHHELD_MESSAGES} from '../OlmDevice';
+import { WITHHELD_MESSAGES } from '../OlmDevice';
 
 // determine whether the key can be shared with invitees
 function isRoomSharedHistory(room) {
@@ -74,7 +74,6 @@ function OutboundSessionInfo(sessionId, sharedHistory = false) {
     this.blockedDevicesNotified = {};
     this.sharedHistory = sharedHistory;
 }
-
 
 /**
  * Check if it's time to rotate the session
@@ -157,7 +156,6 @@ OutboundSessionInfo.prototype.sharedWithTooManyDevices = function(
         }
     }
 };
-
 
 /**
  * Megolm encryption implementation
@@ -328,7 +326,7 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
                             failedServerMap.add(server);
                         }
                         const failedDevices = [];
-                        for (const {userId, deviceInfo} of errorDevices) {
+                        for (const { userId, deviceInfo } of errorDevices) {
                             const userHS = userId.slice(userId.indexOf(":") + 1);
                             if (failedServerMap.has(userHS)) {
                                 retryDevices[userId] = retryDevices[userId] || [];
@@ -336,7 +334,7 @@ MegolmEncryption.prototype._ensureOutboundSession = async function(
                             } else {
                                 // if we aren't going to retry, then handle it
                                 // as a failed device
-                                failedDevices.push({userId, deviceInfo});
+                                failedDevices.push({ userId, deviceInfo });
                             }
                         }
 
@@ -410,14 +408,13 @@ MegolmEncryption.prototype._prepareNewSession = async function(sharedHistory) {
 
     await this._olmDevice.addInboundGroupSession(
         this._roomId, this._olmDevice.deviceCurve25519Key, [], sessionId,
-        key.key, {ed25519: this._olmDevice.deviceEd25519Key}, false,
-        {sharedHistory: sharedHistory},
+        key.key, { ed25519: this._olmDevice.deviceEd25519Key }, false,
+        { sharedHistory: sharedHistory },
     );
 
     // don't wait for it to complete
-    this._crypto.backupGroupSession(
-        this._roomId, this._olmDevice.deviceCurve25519Key, [],
-        sessionId, key.key,
+    this._crypto._backupManager.backupGroupSession(
+        this._olmDevice.deviceCurve25519Key, sessionId,
     );
 
     return new OutboundSessionInfo(sessionId, sharedHistory);
@@ -454,7 +451,7 @@ MegolmEncryption.prototype._getDevicesWithoutSessions = function(
                 // no session with this device, probably because there
                 // were no one-time keys.
 
-                noOlmDevices.push({userId, deviceInfo});
+                noOlmDevices.push({ userId, deviceInfo });
                 delete sessionResults[deviceId];
 
                 // ensureOlmSessionsForUsers has already done the logging,
@@ -819,7 +816,7 @@ MegolmEncryption.prototype._notifyFailedOlmDevices = async function(
 
     // mark the devices that failed as "handled" because we don't want to try
     // to claim a one-time-key for dead devices on every message.
-    for (const {userId, deviceInfo} of failedDevices) {
+    for (const { userId, deviceInfo } of failedDevices) {
         const deviceId = deviceInfo.deviceId;
 
         session.markSharedWithDevice(
@@ -836,7 +833,7 @@ MegolmEncryption.prototype._notifyFailedOlmDevices = async function(
         `in ${this._roomId}`,
     );
     const blockedMap = {};
-    for (const {userId, deviceInfo} of filteredFailedDevices) {
+    for (const { userId, deviceInfo } of filteredFailedDevices) {
         blockedMap[userId] = blockedMap[userId] || {};
         // we use a similar format to what
         // olmlib.ensureOlmSessionsForDevices returns, so that
@@ -1076,7 +1073,7 @@ MegolmEncryption.prototype._removeUnknownDevices = function(devicesInRoom) {
  */
 MegolmEncryption.prototype._getDevicesInRoom = async function(room) {
     const members = await room.getEncryptionTargetMembers();
-    const roomMembers = utils.map(members, function(u) {
+    const roomMembers = members.map(function(u) {
         return u.userId;
     });
 
@@ -1341,7 +1338,6 @@ MegolmDecryption.prototype._removeEventFromPendingList = function(event) {
     }
 };
 
-
 /**
  * @inheritdoc
  *
@@ -1371,7 +1367,7 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
     if (event.getType() == "m.forwarded_room_key") {
         exportFormat = true;
         forwardingKeyChain = content.forwarding_curve25519_key_chain;
-        if (!utils.isArray(forwardingKeyChain)) {
+        if (!Array.isArray(forwardingKeyChain)) {
             forwardingKeyChain = [];
         }
 
@@ -1428,11 +1424,7 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
             });
     }).then(() => {
         // don't wait for the keys to be backed up for the server
-        this._crypto.backupGroupSession(
-            content.room_id, senderKey, forwardingKeyChain,
-            content.session_id, content.session_key, keysClaimed,
-            exportFormat,
-        );
+        this._crypto._backupManager.backupGroupSession(senderKey, content.session_id);
     }).catch((e) => {
         logger.error(`Error handling m.room_key_event: ${e}`);
     });
@@ -1489,7 +1481,7 @@ MegolmDecryption.prototype.onRoomKeyWithheldEvent = async function(event) {
             }
         }
         await olmlib.ensureOlmSessionsForDevices(
-            this._olmDevice, this._baseApis, {[sender]: [device]}, false,
+            this._olmDevice, this._baseApis, { [sender]: [device] }, false,
         );
         const encryptedContent = {
             algorithm: olmlib.OLM_ALGORITHM,
@@ -1503,7 +1495,7 @@ MegolmDecryption.prototype.onRoomKeyWithheldEvent = async function(event) {
             this._olmDevice,
             sender,
             device,
-            {type: "m.dummy"},
+            { type: "m.dummy" },
         );
 
         await this._olmDevice.recordSessionProblem(senderKey, "no_olm", true);
@@ -1648,14 +1640,8 @@ MegolmDecryption.prototype.importRoomKey = function(session, opts = {}) {
     ).then(() => {
         if (opts.source !== "backup") {
             // don't wait for it to complete
-            this._crypto.backupGroupSession(
-                session.room_id,
-                session.sender_key,
-                session.forwarding_curve25519_key_chain,
-                session.session_id,
-                session.session_key,
-                session.sender_claimed_keys,
-                true,
+            this._crypto._backupManager.backupGroupSession(
+                session.sender_key, session.session_id,
             ).catch((e) => {
                 // This throws if the upload failed, but this is fine
                 // since it will have written it to the db and will retry.
@@ -1692,7 +1678,7 @@ MegolmDecryption.prototype._retryDecryption = async function(senderKey, sessionI
 
     await Promise.all([...pending].map(async (ev) => {
         try {
-            await ev.attemptDecryption(this._crypto, true);
+            await ev.attemptDecryption(this._crypto, { isRetry: true });
         } catch (e) {
             // don't die if something goes wrong
         }

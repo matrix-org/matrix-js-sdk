@@ -16,8 +16,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {logger} from '../logger';
-import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
+import { logger } from '../logger';
+import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import * as algorithms from './algorithms';
 
 // The maximum size of an event is 65K, and we base64 the content, so this is a
@@ -48,7 +48,6 @@ function checkPayloadLength(payloadString) {
     }
 }
 
-
 /**
  * The type of object we use for importing and exporting megolm session data.
  *
@@ -61,7 +60,6 @@ function checkPayloadLength(payloadString) {
  * @property {String} session_id  Unique id for the session
  * @property {String} session_key Base64'ed key data
  */
-
 
 /**
  * Manages the olm cryptography functions. Each OlmDevice has a single
@@ -350,7 +348,7 @@ OlmDevice.prototype._unpickleSession = function(sessionInfo, func) {
     const session = new global.Olm.Session();
     try {
         session.unpickle(this._pickleKey, sessionInfo.session);
-        const unpickledSessInfo = Object.assign({}, sessionInfo, {session});
+        const unpickledSessInfo = Object.assign({}, sessionInfo, { session });
 
         func(unpickledSessInfo);
     } finally {
@@ -376,7 +374,6 @@ OlmDevice.prototype._saveSession = function(deviceKey, sessionInfo, txn) {
     );
 };
 
-
 /**
  * get an OlmUtility and call the given function
  *
@@ -392,7 +389,6 @@ OlmDevice.prototype._getUtility = function(func) {
         utility.free();
     }
 };
-
 
 /**
  * Signs a message with the ed25519 key for this account.
@@ -433,7 +429,6 @@ OlmDevice.prototype.getOneTimeKeys = async function() {
 
     return result;
 };
-
 
 /**
  * Get the maximum number of one-time keys we can store.
@@ -550,7 +545,6 @@ OlmDevice.prototype.createOutboundSession = async function(
     return newSessionId;
 };
 
-
 /**
  * Generate a new inbound session, given an incoming message
  *
@@ -611,7 +605,6 @@ OlmDevice.prototype.createInboundSession = async function(
 
     return result;
 };
-
 
 /**
  * Get a list of known session IDs for the given device
@@ -856,7 +849,6 @@ OlmDevice.prototype.filterOutNotifiedErrorDevices = async function(devices) {
     return await this._cryptoStore.filterOutNotifiedErrorDevices(devices);
 };
 
-
 // Outbound group session
 // ======================
 
@@ -870,7 +862,6 @@ OlmDevice.prototype._saveOutboundGroupSession = function(session) {
     const pickledSession = session.pickle(this._pickleKey);
     this._outboundGroupSessionStore[session.session_id()] = pickledSession;
 };
-
 
 /**
  * extract an OutboundGroupSession from _outboundGroupSessionStore and call the
@@ -896,7 +887,6 @@ OlmDevice.prototype._getOutboundGroupSession = function(sessionId, func) {
     }
 };
 
-
 /**
  * Generate a new outbound group session
  *
@@ -912,7 +902,6 @@ OlmDevice.prototype.createOutboundGroupSession = function() {
         session.free();
     }
 };
-
 
 /**
  * Encrypt an outgoing message with an outbound group session
@@ -952,7 +941,6 @@ OlmDevice.prototype.getOutboundGroupSessionKey = function(sessionId) {
         };
     });
 };
-
 
 // Inbound group session
 // =====================

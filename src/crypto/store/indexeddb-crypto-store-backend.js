@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {logger} from '../../logger';
+import { logger } from '../../logger';
 import * as utils from "../../utils";
 
 export const VERSION = 10;
@@ -230,7 +230,7 @@ export class Backend {
             const cursor = ev.target.result;
             if (cursor) {
                 const keyReq = cursor.value;
-                if (keyReq.recipients.includes({userId, deviceId})) {
+                if (keyReq.recipients.includes({ userId, deviceId })) {
                     results.push(keyReq);
                 }
                 cursor.continue();
@@ -496,7 +496,7 @@ export class Backend {
             const lastProblem = problems[problems.length - 1];
             for (const problem of problems) {
                 if (problem.time > timestamp) {
-                    result = Object.assign({}, problem, {fixed: lastProblem.fixed});
+                    result = Object.assign({}, problem, { fixed: lastProblem.fixed });
                     return;
                 }
             }
@@ -519,11 +519,11 @@ export class Backend {
 
         await Promise.all(devices.map((device) => {
             return new Promise((resolve) => {
-                const {userId, deviceInfo} = device;
+                const { userId, deviceInfo } = device;
                 const getReq = objectStore.get([userId, deviceInfo.deviceId]);
                 getReq.onsuccess = function() {
                     if (!getReq.result) {
-                        objectStore.put({userId, deviceId: deviceInfo.deviceId});
+                        objectStore.put({ userId, deviceId: deviceInfo.deviceId });
                         ret.push(device);
                     }
                     resolve();
@@ -768,9 +768,9 @@ export class Backend {
         const objectStore = txn.objectStore("shared_history_inbound_group_sessions");
         const req = objectStore.get([roomId]);
         req.onsuccess = () => {
-            const {sessions} = req.result || {sessions: []};
+            const { sessions } = req.result || { sessions: [] };
             sessions.push([senderKey, sessionId]);
-            objectStore.put({roomId, sessions});
+            objectStore.put({ roomId, sessions });
         };
     }
 
@@ -784,7 +784,7 @@ export class Backend {
         const req = objectStore.get([roomId]);
         return new Promise((resolve, reject) => {
             req.onsuccess = () => {
-                const {sessions} = req.result || {sessions: []};
+                const { sessions } = req.result || { sessions: [] };
                 resolve(sessions);
             };
             req.onerror = reject;
