@@ -236,6 +236,31 @@ export function deepCompare(x: any, y: any): boolean {
 }
 
 /**
+ * Creates an array of object properties/values (entries) then
+ * sorts the result by key, recursively. The input object must
+ * ensure it does not have loops. If the input is not an object
+ * then it will be returned as-is.
+ * @param {*} obj The object to get entries of
+ * @returns {[string, *][]} The entries, sorted by key.
+ */
+export function deepSortedObjectEntries(obj: any): [string, any][] {
+    if (typeof(obj) !== "object") return obj;
+
+    // Apparently these are object types...
+    if (obj === null || obj === undefined || Array.isArray(obj)) return obj;
+
+    const pairs: [string, any][] = [];
+    for (const [k, v] of Object.entries(obj)) {
+        pairs.push([k, deepSortedObjectEntries(v)]);
+    }
+
+    // lexicographicCompare is faster than localeCompare, so let's use that.
+    pairs.sort((a, b) => lexicographicCompare(a[0], b[0]));
+
+    return pairs;
+}
+
+/**
  * Copy properties from one object to another.
  *
  * All enumerable properties, included inherited ones, are copied.

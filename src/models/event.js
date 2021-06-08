@@ -24,6 +24,7 @@ limitations under the License.
 import { EventEmitter } from 'events';
 import * as utils from '../utils';
 import { logger } from '../logger';
+import { deepSortedObjectEntries } from "../utils";
 
 /**
  * Enum for event statuses.
@@ -1142,6 +1143,41 @@ utils.extend(MatrixEvent.prototype, {
 
     getTxnId() {
         return this._txnId;
+    },
+
+    /**
+     * Get a copy/snapshot of this event. The returned copy will be loosely linked
+     * back to this instance, though will have "frozen" event information. Other
+     * properties may mutate depending on the state of this instance at the time
+     * of snapshotting.
+     *
+     * This is meant to be used to snapshot the event details themselves, not the
+     * features (such as sender) surrounding the event.
+     * @returns {MatrixEvent} A snapshot of this event.
+     */
+    getSnapshotCopy() {
+        const ev = new MatrixEvent(JSON.parse(JSON.stringify(this.event)));
+        for (const [p, v] of Object.entries(this)) {
+            if (p !== "event") { // exclude the thing we just cloned
+                ev[p] = v;
+            }
+        }
+        return ev;
+    },
+
+    /**
+     * Determines if this event is equivalent to the given event. This only checks
+     * the event object itself, not the other properties of the event. Intended for
+     * use with getSnapshotCopy() to identify events changing.
+     * @param {MatrixEvent} otherEvent The other event to check against.
+     * @returns {boolean} True if the events are the same, false otherwise.
+     */
+    isEquivalentTo(otherEvent) {
+        if (!otherEvent) return false;
+        if (otherEvent === this) return true;
+        const myProps = deepSortedObjectEntries(this.event);
+        const theirProps = deepSortedObjectEntries(otherEvent.event);
+        return JSON.stringify(myProps) === JSON.stringify(theirProps);
     },
 });
 
