@@ -289,10 +289,6 @@ export class MatrixCall extends EventEmitter {
     // This flag represents whether we want the other party to be on hold
     private remoteOnHold;
 
-    // and this one we set when we're transitioning out of the hold state because we
-    // can't tell the difference between that and the other party holding us
-    private unholdingRemote;
-
     private micMuted;
     private vidMuted;
 
@@ -344,7 +340,6 @@ export class MatrixCall extends EventEmitter {
         this.makingOffer = false;
 
         this.remoteOnHold = false;
-        this.unholdingRemote = false;
         this.micMuted = false;
         this.vidMuted = false;
 
@@ -728,12 +723,12 @@ export class MatrixCall extends EventEmitter {
     setRemoteOnHold(onHold: boolean) {
         if (this.isRemoteOnHold() === onHold) return;
         this.remoteOnHold = onHold;
-        if (!onHold) this.unholdingRemote = true;
 
         for (const tranceiver of this.peerConn.getTransceivers()) {
-            // We set 'inactive' rather than 'sendonly' because we're not planning on
-            // playing music etc. to the other side.
-            tranceiver.direction = onHold ? 'inactive' : 'sendrecv';
+            // We don't send hold music or anything so we're not actually
+            // sending anything, but sendrecv is fairly standard for hold and
+            // it makes it a lot easier to figure out who's put who on hold.
+            tranceiver.direction = onHold ? 'sendonly' : 'sendrecv';
         }
         this.updateMuteStatus();
 
@@ -742,15 +737,11 @@ export class MatrixCall extends EventEmitter {
 
     /**
      * Indicates whether we are 'on hold' to the remote party (ie. if true,
-     * they cannot hear us). Note that this will return true when we put the
-     * remote on hold too due to the way hold is implemented (since we don't
-     * wish to play hold music when we put a call on hold, we use 'inactive'
-     * rather than 'sendonly')
+     * they cannot hear us).
      * @returns true if the other party has put us on hold
      */
     isLocalOnHold(): boolean {
         if (this.state !== CallState.Connected) return false;
-        if (this.unholdingRemote) return false;
 
         let callOnHold = true;
 
@@ -1095,12 +1086,6 @@ export class MatrixCall extends EventEmitter {
         }
 
         const prevLocalOnHold = this.isLocalOnHold();
-
-        if (description.type === 'answer') {
-            // whenever we get an answer back, clear the flag we set whilst trying to un-hold
-            // the other party: the state of the channels now reflects reality
-            this.unholdingRemote = false;
-        }
 
         try {
             await this.peerConn.setRemoteDescription(description);
