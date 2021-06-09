@@ -71,6 +71,7 @@ interface BackupAlgorithmClass {
 }
 
 interface BackupAlgorithm {
+    untrusted: boolean;
     encryptSession(data: Record<string, any>): Promise<any>;
     decryptSessions(ciphertexts: Record<string, any>): Promise<Record<string, any>[]>;
     authData: AuthData;
@@ -589,6 +590,8 @@ export class Curve25519 implements BackupAlgorithm {
         }
     }
 
+    public get untrusted() { return true; }
+
     public async encryptSession(data: Record<string, any>): Promise<any> {
         const plainText: Record<string, any> = Object.assign({}, data);
         delete plainText.session_id;
@@ -715,6 +718,8 @@ export class Aes256 implements BackupAlgorithm {
 
         return [outKey, authData];
     }
+
+    public get untrusted() { return false; }
 
     async encryptSession(data: Record<string, any>): Promise<any> {
         const plainText: Record<string, any> = Object.assign({}, data);

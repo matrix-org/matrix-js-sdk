@@ -2490,6 +2490,8 @@ export class MatrixClient extends EventEmitter {
 
         const algorithm = await BackupManager.makeAlgorithm(backupInfo, async () => { return privKey; });
 
+        const untrusted = algorithm.untrusted;
+
         try {
             // If the pubkey computed from the private data we've been given
             // doesn't match the one in the auth_data, the user has entered
@@ -2557,7 +2559,7 @@ export class MatrixClient extends EventEmitter {
 
         await this.importRoomKeys(keys, {
             progressCallback,
-            untrusted: true,
+            untrusted,
             source: "backup",
         });
 
