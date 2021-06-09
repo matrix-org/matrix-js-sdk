@@ -192,7 +192,12 @@ export enum CallErrorCode {
     /**
      * The remote party is busy
      */
-    UserBusy = 'user_busy'
+    UserBusy = 'user_busy',
+
+    /**
+     * We transferred the call off to somewhere else
+     */
+    Transfered = 'transferred',
 }
 
 enum ConstraintsType {
@@ -1428,7 +1433,7 @@ export class MatrixCall extends EventEmitter {
 
         await this.sendVoipEvent(EventType.CallReplaces, body);
 
-        await this.terminate(CallParty.Local, CallErrorCode.Replaced, true);
+        await this.terminate(CallParty.Local, CallErrorCode.Transfered, true);
     }
 
     /*
@@ -1468,7 +1473,7 @@ export class MatrixCall extends EventEmitter {
         await this.sendVoipEvent(EventType.CallReplaces, bodyToTransferee);
 
         await this.terminate(CallParty.Local, CallErrorCode.Replaced, true);
-        await transferTargetCall.terminate(CallParty.Local, CallErrorCode.Replaced, true);
+        await transferTargetCall.terminate(CallParty.Local, CallErrorCode.Transfered, true);
     }
 
     private async terminate(hangupParty: CallParty, hangupReason: CallErrorCode, shouldEmit: boolean) {
