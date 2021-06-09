@@ -18,13 +18,11 @@ import { EventEmitter } from 'events';
 import { logger } from '../logger';
 import * as olmlib from './olmlib';
 import { randomString } from '../randomstring';
-import { encryptAES, decryptAES } from './aes';
+import { encryptAES, decryptAES, calculateKeyCheck } from './aes';
 import { encodeBase64 } from "./olmlib";
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES
     = "m.secret_storage.v1.aes-hmac-sha2";
-
-const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
 
 /**
  * Implements Secure Secret Storage and Sharing (MSC1946)
@@ -99,7 +97,7 @@ export class SecretStorage extends EventEmitter {
                 keyInfo.passphrase = opts.passphrase;
             }
             if (opts.key) {
-                const { iv, mac } = await SecretStorage._calculateKeyCheck(opts.key);
+                const { iv, mac } = await calculateKeyCheck(opts.key);
                 keyInfo.iv = iv;
                 keyInfo.mac = mac;
             }
@@ -171,7 +169,7 @@ export class SecretStorage extends EventEmitter {
     async checkKey(key, info) {
         if (info.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             if (info.mac) {
-                const { mac } = await SecretStorage._calculateKeyCheck(key, info.iv);
+                const { mac } = await calculateKeyCheck(key, info.iv);
                 return info.mac.replace(/=+$/g, '') === mac.replace(/=+$/g, '');
             } else {
                 // if we have no information, we have to assume the key is right
@@ -180,10 +178,6 @@ export class SecretStorage extends EventEmitter {
         } else {
             throw new Error("Unknown algorithm");
         }
-    }
-
-    static async _calculateKeyCheck(key, iv) {
-        return await encryptAES(ZERO_STR, key, "", iv);
     }
 
     /**

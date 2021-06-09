@@ -29,6 +29,8 @@ import { keyFromPassphrase } from './key_passphrase';
 import { sleep } from "../utils";
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { encodeRecoveryKey } from './recoverykey';
+import { encryptAES, decryptAES, calculateKeyCheck } from './aes';
+import { getCrypto } from '../utils';
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 
@@ -644,8 +646,119 @@ export class Curve25519 implements BackupAlgorithm {
     }
 }
 
+// FIXME: this should go into ./aes
+interface AesData {
+    iv: string,
+    ciphertext: string,
+    mac: string,
+}
+
+function randomBytes(size: number): Uint8Array {
+    const crypto: {randomBytes: (number) => Uint8Array} | undefined = getCrypto() as any;
+    if (crypto) {
+        // nodejs version
+        return crypto.randomBytes(size);
+    }
+    if (typeof window !== "undefined" && window.crypto) {
+        // browser version
+        const buf = new Uint8Array(size);
+        window.crypto.getRandomValues(buf);
+        return buf;
+    }
+    throw new Error("No usable crypto implementation");
+}
+
+export class Aes256 implements BackupAlgorithm {
+    public static algorithmName = "org.matrix.mscxxxx.v1.aes-hmac-sha2";
+
+    constructor(
+        public authData: AuthData,
+        private key: Uint8Array,
+    ) {}
+
+    public static async init(
+        authData: AuthData,
+        getKey: () => Promise<Uint8Array>,
+    ): Promise<Aes256> {
+        if (!authData) {
+            throw new Error("auth_data missing");
+        }
+        const key = await getKey()
+        if (authData.mac) {
+            const { mac } = await calculateKeyCheck(key, authData.iv);
+            if (authData.mac.replace(/=+$/g, '') !== mac.replace(/=+/g, '')) {
+                throw new Error("Key does not match");
+            }
+        }
+        return new Aes256(authData, key);
+    }
+
+    public static async prepare(
+        key: string | Uint8Array | null,
+    ): Promise<[Uint8Array, AuthData]> {
+        let outKey: Uint8Array;
+        const authData: AuthData = {};
+        if (!key) {
+            outKey = randomBytes(32);
+        } else if (key instanceof Uint8Array) {
+            outKey = new Uint8Array(key);
+        } else {
+            const derivation = await keyFromPassphrase(key);
+            authData.private_key_salt = derivation.salt;
+            authData.private_key_iterations = derivation.iterations;
+            outKey = derivation.key;
+        }
+
+        const { iv, mac } = await calculateKeyCheck(outKey);
+        authData.iv = iv;
+        authData.mac = mac;
+
+        return [outKey, authData];
+    }
+
+    async encryptSession(data: Record<string, any>): Promise<any> {
+        const plainText: Record<string, any> = Object.assign({}, data);
+        delete plainText.session_id;
+        delete plainText.room_id;
+        delete plainText.first_known_index;
+        return await encryptAES(JSON.stringify(plainText), this.key, data.session_id);
+    }
+
+    async decryptSessions(sessions: Record<string, any>): Promise<Record<string, any>[]> {
+        const keys = [];
+
+        for (const [sessionId, sessionData] of Object.entries(sessions)) {
+            try {
+                const decrypted = JSON.parse(decryptAES(
+                    sessionData, this.key, sessionId,
+                ));
+                decrypted.session_id = sessionId;
+                keys.push(decrypted);
+            } catch (e) {
+                logger.log("Failed to decrypt megolm session from backup", e, sessionData);
+            }
+        }
+        return keys;
+    }
+
+    async keyMatches(key: Uint8Array): Promise<boolean> {
+        if (this.authData.mac) {
+            const { mac } = await calculateKeyCheck(key, this.authData.iv);
+            return this.authData.mac.replace(/=+$/g, '') === mac.replace(/=+/g, '');
+        } else {
+            // if we have no information, we have to assume the key is right
+            return true;
+        }
+    }
+
+    public free(): void {
+        this.key.fill(0);
+    }
+}
+
 export const algorithmsByName: Record<string, BackupAlgorithmClass> = {
     [Curve25519.algorithmName]: Curve25519,
+    [Aes256.algorithmName]: Aes256,
 };
 
 export const DefaultAlgorithm: BackupAlgorithmClass = Curve25519;

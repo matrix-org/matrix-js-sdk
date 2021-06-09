@@ -249,3 +249,16 @@ export function decryptAES(...args) {
     return subtleCrypto ? decryptBrowser(...args) : decryptNode(...args);
 }
 
+// string of zeroes, for calculating the key check
+const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+
+/** Calculate the MAC for checking the key.
+ *
+ * @param {Uint8Array} key the key to use
+ * @param {string} [iv] The initialization vector as a base64-encoded string.
+ *     If omitted, a random initialization vector will be created.
+ * @return {Promise<object>} An object that contains, `mac` and `iv` properties.
+ */
+export function calculateKeyCheck(key, iv = undefined) {
+    return encryptAES(ZERO_STR, key, "", iv);
+}

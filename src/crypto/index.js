@@ -54,7 +54,7 @@ import { InRoomChannel, InRoomRequests } from "./verification/request/InRoomChan
 import { ToDeviceChannel, ToDeviceRequests } from "./verification/request/ToDeviceChannel";
 import { IllegalMethod } from "./verification/IllegalMethod";
 import { KeySignatureUploadError } from "../errors";
-import { decryptAES, encryptAES } from './aes';
+import { decryptAES, encryptAES, calculateKeyCheck } from './aes';
 import { DehydrationManager } from './dehydration';
 import { MatrixEvent } from "../models/event";
 import { BackupManager } from "./backup";
@@ -711,7 +711,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             if (key) {
                 const privateKey = key[1];
                 builder.ssssCryptoCallbacks.addPrivateKey(keyId, keyInfo, privateKey);
-                const { iv, mac } = await SecretStorage._calculateKeyCheck(privateKey);
+                const { iv, mac } = await calculateKeyCheck(privateKey);
                 keyInfo.iv = iv;
                 keyInfo.mac = mac;
 
