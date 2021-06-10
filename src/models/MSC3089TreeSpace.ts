@@ -17,6 +17,9 @@ limitations under the License.
 import { MatrixClient } from "../client";
 import { EventType } from "../@types/event";
 import { Room } from "./room";
+import { logger } from "../logger";
+import { MatrixEvent } from "./event";
+import { averageBetweenStrings, DEFAULT_ALPHABET, nextString, prevString } from "../utils";
 
 /**
  * The recommended defaults for a tree space's power levels. Note that this
@@ -47,6 +50,7 @@ export const DEFAULT_TREE_POWER_LEVELS_TEMPLATE = {
         [EventType.RoomMessageEncrypted]: 50,
         [EventType.Sticker]: 50,
     },
+
     users: {}, // defined by calling code
 };
 
@@ -70,6 +74,8 @@ export class MSC3089TreeSpace {
 
     public constructor(private client: MatrixClient, public readonly roomId: string) {
         this.room = this.client.getRoom(this.roomId);
+
+        if (!this.room) throw new Error("Unknown room");
     }
 
     /**
@@ -77,6 +83,15 @@ export class MSC3089TreeSpace {
      */
     public get id(): string {
         return this.roomId;
+    }
+
+    /**
+     * Whether or not this is a top level space.
+     */
+    public get isTopLevel(): boolean {
+        const parentEvents = this.room.currentState.getStateEvents(EventType.SpaceParent);
+        if (!parentEvents?.length) return true;
+        return parentEvents.every(e => !e.getContent()?.['via']);
     }
 
     /**
@@ -134,5 +149,233 @@ export class MSC3089TreeSpace {
         pls['users'] = users;
 
         return this.client.sendStateEvent(this.roomId, EventType.RoomPowerLevels, pls, "");
+    }
+
+    /**
+     * Creates a directory under this tree space, represented as another tree space.
+     * @param {string} name The name for the directory.
+     * @returns {Promise<MSC3089TreeSpace>} Resolves to the created directory.
+     */
+    public async createDirectory(name: string): Promise<MSC3089TreeSpace> {
+        const directory = await this.client.unstableCreateFileTree(name);
+
+        await this.client.sendStateEvent(this.roomId, EventType.SpaceChild, {
+            via: [this.client.getDomain()],
+        }, directory.roomId);
+
+        await this.client.sendStateEvent(directory.roomId, EventType.SpaceParent, {
+            via: [this.client.getDomain()],
+        }, this.roomId);
+
+        return directory;
+    }
+
+    /**
+     * Gets a list of all known immediate subdirectories to this tree space.
+     * @returns {MSC3089TreeSpace[]} The tree spaces (directories). May be empty, but not null.
+     */
+    public getDirectories(): MSC3089TreeSpace[] {
+        const trees: MSC3089TreeSpace[] = [];
+        const children = this.room.currentState.getStateEvents(EventType.SpaceChild);
+        for (const child of children) {
+            try {
+                const tree = this.client.unstableGetFileTreeSpace(child.getStateKey());
+                trees.push(tree);
+            } catch (e) {
+                logger.warn("Unable to create tree space instance for listing. Are we joined?", e);
+            }
+        }
+        return trees;
+    }
+
+    /**
+     * Gets a subdirectory of a given ID under this tree space. Note that this will not recurse
+     * into children and instead only look one level deep.
+     * @param {string} roomId The room ID (directory ID) to find.
+     * @returns {MSC3089TreeSpace} The directory, or falsy if not found.
+     */
+    public getDirectory(roomId: string): MSC3089TreeSpace {
+        return this.getDirectories().find(r => r.roomId === roomId);
+    }
+
+    /**
+     * Deletes the tree, kicking all members and deleting **all subdirectories**.
+     * @returns {Promise<void>} Resolves when complete.
+     */
+    public async delete(): Promise<void> {
+        const subdirectories = this.getDirectories();
+        for (const dir of subdirectories) {
+            await dir.delete();
+        }
+
+        const kickMemberships = ["invite", "knock", "join"];
+        const members = this.room.currentState.getStateEvents(EventType.RoomMember);
+        for (const member of members) {
+            if (member.getStateKey() !== this.client.getUserId() && kickMemberships.includes(member.getContent()['membership'])) {
+                await this.client.kick(this.roomId, member.getStateKey(), "Room deleted");
+            }
+        }
+
+        await this.client.leave(this.roomId);
+    }
+
+    private getOrderedChildren(children: MatrixEvent[]): {roomId: string, order: string}[] {
+        const ordered: {roomId: string, order: string}[] = children
+            .map(c => ({roomId: c.getStateKey(), order: c.getContent()['order']}));
+        ordered.sort((a, b) => {
+            if (a.order && !b.order) {
+                return -1;
+            } else if (!a.order && b.order) {
+                return 1;
+            } else if (!a.order && !b.order) {
+                const roomA = this.client.getRoom(a.roomId);
+                const roomB = this.client.getRoom(b.roomId);
+                if (!roomA || !roomB) { // just don't bother trying to do more partial sorting
+                    return a.roomId.localeCompare(b.roomId);
+                }
+
+                const createTsA = roomA.currentState.getStateEvents(EventType.RoomCreate, "")?.getTs() ?? 0;
+                const createTsB = roomB.currentState.getStateEvents(EventType.RoomCreate, "")?.getTs() ?? 0;
+                if (createTsA === createTsB) {
+                    return a.roomId.localeCompare(b.roomId);
+                }
+                return createTsA - createTsB;
+            } else { // both not-null orders
+                return a.order.localeCompare(b.order);
+            }
+        });
+        return ordered;
+    }
+
+    private getParentRoom(): Room {
+        const parents = this.room.currentState.getStateEvents(EventType.SpaceParent);
+        const parent = parents[0]; // XXX: Wild assumption
+        if (!parent) throw new Error("Expected to have a parent in a non-top level space");
+
+        // XXX: We are assuming the parent is a valid tree space.
+        // We probably don't need to validate the parent room state for this usecase though.
+        const parentRoom = this.client.getRoom(parent.getStateKey());
+        if (!parentRoom) throw new Error("Unable to locate room for parent");
+
+        return parentRoom;
+    }
+
+    /**
+     * Gets the current order index for this directory. Note that if this is the top level space
+     * then -1 will be returned.
+     * @returns {number} The order index of this space.
+     */
+    public getOrder(): number {
+        if (this.isTopLevel) return -1;
+
+        const parentRoom = this.getParentRoom();
+        const children = parentRoom.currentState.getStateEvents(EventType.SpaceChild);
+        const ordered = this.getOrderedChildren(children);
+
+        return ordered.findIndex(c => c.roomId === this.roomId);
+    }
+
+    /**
+     * Sets the order index for this directory within its parent. Note that if this is a top level
+     * space then an error will be thrown. -1 can be used to move the child to the start, and numbers
+     * larger than the number of children can be used to move the child to the end.
+     * @param {number} index The new order index for this space.
+     * @returns {Promise<void>} Resolves when complete.
+     * @throws Throws if this is a top level space.
+     */
+    public async setOrder(index: number): Promise<void> {
+        if (this.isTopLevel) throw new Error("Cannot set order of top level spaces currently");
+
+        const parentRoom = this.getParentRoom();
+        const children = parentRoom.currentState.getStateEvents(EventType.SpaceChild);
+        const ordered = this.getOrderedChildren(children);
+        index = Math.max(Math.min(index, ordered.length - 1), 0);
+
+        const currentIndex = this.getOrder();
+        const movingUp = currentIndex < index;
+        if (movingUp && index === (ordered.length - 1)) {
+            index--;
+        } else if (!movingUp && index === 0) {
+            index++;
+        }
+
+        const prev = ordered[movingUp ? index : (index - 1)];
+        const next = ordered[movingUp ? (index + 1) : index];
+
+        let newOrder = DEFAULT_ALPHABET[0];
+        let ensureBeforeIsSane = false;
+        if (!prev) {
+            // Move to front
+            if (next?.order) {
+                newOrder = prevString(next.order);
+            }
+        } else if (index === (ordered.length - 1)) {
+            // Move to back
+            if (next?.order) {
+                newOrder = nextString(next.order);
+            }
+        } else {
+            // Move somewhere in the middle
+            const startOrder = prev?.order;
+            const endOrder = next?.order;
+            if (startOrder && endOrder) {
+                if (startOrder === endOrder) {
+                    // Error case: just move +1 to break out of awful math
+                    newOrder = nextString(startOrder);
+                } else {
+                    newOrder = averageBetweenStrings(startOrder, endOrder);
+                }
+            } else {
+                if (startOrder) {
+                    // We're at the end (endOrder is null, so no explicit order)
+                    newOrder = nextString(startOrder);
+                } else if (endOrder) {
+                    // We're at the start (startOrder is null, so nothing before us)
+                    newOrder = prevString(endOrder);
+                } else {
+                    // Both points are unknown. We're likely in a range where all the children
+                    // don't have particular order values, so we may need to update them too.
+                    // The other possibility is there's only us as a child, but we should have
+                    // shown up in the other states.
+                    ensureBeforeIsSane = true;
+                }
+            }
+        }
+
+        if (ensureBeforeIsSane) {
+            // We were asked by the order algorithm to prepare the moving space for a landing
+            // in the undefined order part of the order array, which means we need to update the
+            // spaces that come before it with a stable order value.
+            let lastOrder: string;
+            for (let i = 0; i <= index; i++) {
+                const target = ordered[i];
+                if (i === 0) {
+                    lastOrder = target.order;
+                }
+                if (!target.order) {
+                    // XXX: We should be creating gaps to avoid conflicts
+                    lastOrder = lastOrder ? nextString(lastOrder) : DEFAULT_ALPHABET[0];
+                    const currentChild = parentRoom.currentState.getStateEvents(EventType.SpaceChild, target.roomId);
+                    const content = currentChild?.getContent() ?? {via: [this.client.getDomain()]};
+                    await this.client.sendStateEvent(parentRoom.roomId, EventType.SpaceChild, {
+                        ...content,
+                        order: lastOrder,
+                    }, target.roomId);
+                } else {
+                    lastOrder = target.order;
+                }
+            }
+            newOrder = nextString(lastOrder);
+        }
+
+        // TODO: Deal with order conflicts by reordering
+
+        // Now we can finally update our own order state
+        const currentChild = parentRoom.currentState.getStateEvents(EventType.SpaceChild, this.roomId);
+        const content = currentChild?.getContent() ?? {via: [this.client.getDomain()]};
+        await this.client.sendStateEvent(parentRoom.roomId, EventType.SpaceChild, {
+            ...content,
+            order: newOrder,
+        }, this.roomId);
     }
 }

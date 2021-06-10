@@ -456,3 +456,108 @@ export function setCrypto(c: Object) {
 export function getCrypto(): Object {
     return crypto;
 }
+
+// String averaging based upon https://stackoverflow.com/a/2510816
+// Dev note: We make the alphabet a string because it's easier to write syntactically
+// than arrays. Thankfully, strings implement the useful parts of the Array interface
+// anyhow.
+
+/**
+ * The default alphabet used by string averaging in this SDK. This matches
+ * all usefully printable ASCII characters (0x20-0x7E, inclusive).
+ */
+export const DEFAULT_ALPHABET = [""].reduce(() => {
+    let str = "";
+    for (let c = 0x20; c <= 0x7E; c++) {
+        str += String.fromCharCode(c);
+    }
+    return str;
+}, "");
+
+/**
+ * Pads a string using the given alphabet as a base. The returned string will be the
+ * same length as the alphabet, and padded with the first character in the alphabet.
+ *
+ * This is intended for use with string averaging.
+ * @param {string} s The string to pad.
+ * @param {string} alphabet The alphabet to use as a single string.
+ * @returns {string} The padded string.
+ */
+export function alphabetPad(s: string, alphabet = DEFAULT_ALPHABET): string {
+    while (s.length < alphabet.length) {
+        s = alphabet[0] + s;
+    }
+    return s;
+}
+
+/**
+ * Converts a baseN number to a string, where N is the alphabet's length.
+ *
+ * This is intended for use with string averaging.
+ * @param {number} n The baseN number.
+ * @param {string} alphabet The alphabet to use as a single string.
+ * @returns {string} The baseN number encoded as a string from the alphabet.
+ */
+export function baseToString(n: number, alphabet = DEFAULT_ALPHABET): string {
+    const len = alphabet.length;
+    if (n < len) {
+        return alphabet[n];
+    }
+    return baseToString(Math.floor(n / len), alphabet) + alphabet[n % len];
+}
+
+/**
+ * Converts a string to a baseN number, where N is the alphabet's length.
+ *
+ * This is intended for use with string averaging.
+ * @param {string} s The string to convert to a number.
+ * @param {string} alphabet The alphabet to use as a single string.
+ * @returns {number} The baseN number.
+ */
+export function stringToBase(s: string, alphabet = DEFAULT_ALPHABET): number {
+    s = alphabetPad(s, alphabet);
+    const len = alphabet.length;
+    const reversedStr = Array.from(s).reverse();
+    let result = 0;
+    for (let i = 0; i < len; i++) {
+        result += alphabet.indexOf(reversedStr[i]) * (len ** i);
+    }
+    return result;
+}
+
+/**
+ * Averages two strings, returning the midpoint between them. This is accomplished by
+ * converting both to baseN numbers (where N is the alphabet's length) then averaging
+ * those before re-encoding as a string.
+ * @param {string} a The first string.
+ * @param {string} b The second string.
+ * @param {string} alphabet The alphabet to use as a single string.
+ * @returns {string} The midpoint between the strings, as a string.
+ */
+export function averageBetweenStrings(a: string, b: string, alphabet = DEFAULT_ALPHABET): string {
+    return baseToString(Math.floor((stringToBase(a, alphabet) + stringToBase(b, alphabet)) / 2), alphabet);
+}
+
+/**
+ * Finds the next string using the alphabet provided. This is done by converting the
+ * string to a baseN number, where N is the alphabet's length, then adding 1 before
+ * converting back to a string.
+ * @param {string} s The string to start at.
+ * @param {string} alphabet The alphabet to use as a single string.
+ * @returns {string} The string which follows the input string.
+ */
+export function nextString(s: string, alphabet = DEFAULT_ALPHABET): string {
+    return baseToString(stringToBase(s, alphabet) + 1, alphabet);
+}
+
+/**
+ * Finds the previous string using the alphabet provided. This is done by converting the
+ * string to a baseN number, where N is the alphabet's length, then subtracting 1 before
+ * converting back to a string.
+ * @param {string} s The string to start at.
+ * @param {string} alphabet The alphabet to use as a single string.
+ * @returns {string} The string which precedes the input string.
+ */
+export function prevString(s: string, alphabet = DEFAULT_ALPHABET): string {
+    return baseToString(stringToBase(s, alphabet) - 1, alphabet);
+}

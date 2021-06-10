@@ -1,4 +1,12 @@
 import * as utils from "../../src/utils";
+import {
+    alphabetPad,
+    averageBetweenStrings,
+    baseToString,
+    DEFAULT_ALPHABET,
+    nextString, prevString,
+    stringToBase
+} from "../../src/utils";
 
 describe("utils", function() {
     describe("encodeParams", function() {
@@ -257,6 +265,75 @@ describe("utils", function() {
 
             await utils.chunkPromises([fn1, fn2], 1);
             expect(promiseCount).toEqual(2);
+        });
+    });
+
+    describe('DEFAULT_ALPHABET', () => {
+        it('should be usefully printable ASCII in order', () => {
+            expect(DEFAULT_ALPHABET).toEqual(" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
+        });
+    });
+
+    describe('alphabetPad', () => {
+        it('should pad to the alphabet length', () => {
+            const defaultPrefixFor1char = [""].reduce(() => {
+                let s = "";
+                for (let i = 0; i < DEFAULT_ALPHABET.length - 1; i++) {
+                    s += DEFAULT_ALPHABET[0];
+                }
+                return s;
+            }, "");
+            expect(alphabetPad("a")).toEqual(defaultPrefixFor1char + "a");
+            expect(alphabetPad("a", "123")).toEqual("11a");
+        });
+    });
+
+    describe('baseToString', () => {
+        it('should calculate the appropriate string from numbers', () => {
+            expect(baseToString(10)).toEqual(DEFAULT_ALPHABET[10]);
+            expect(baseToString(10, "abcdefghijklmnopqrstuvwxyz")).toEqual('k');
+            expect(baseToString(6241)).toEqual("ab");
+            expect(baseToString(53, "abcdefghijklmnopqrstuvwxyz")).toEqual('cb');
+        });
+    });
+
+    describe('stringToBase', () => {
+        it('should calculate the appropriate number for a string', () => {
+            expect(stringToBase(" ")).toEqual(0);
+            expect(stringToBase("a", "abcdefghijklmnopqrstuvwxyz")).toEqual(0);
+            expect(stringToBase("a")).toEqual(65);
+            expect(stringToBase("c", "abcdefghijklmnopqrstuvwxyz")).toEqual(2);
+            expect(stringToBase("ab")).toEqual(6241);
+            expect(stringToBase("cb", "abcdefghijklmnopqrstuvwxyz")).toEqual(53);
+        });
+    });
+
+    describe('averageBetweenStrings', () => {
+        it('should average appropriately', () => {
+            expect(averageBetweenStrings('A', 'z')).toEqual(']');
+            expect(averageBetweenStrings('a', 'z', "abcdefghijklmnopqrstuvwxyz")).toEqual('m');
+            expect(averageBetweenStrings('AA', 'zz')).toEqual('^.');
+            expect(averageBetweenStrings('aa', 'zz', "abcdefghijklmnopqrstuvwxyz")).toEqual('mz');
+            expect(averageBetweenStrings('cat', 'doggo')).toEqual("BH65B");
+            expect(averageBetweenStrings('cat', 'doggo', "abcdefghijklmnopqrstuvwxyz")).toEqual("buedq");
+        });
+    });
+
+    describe('nextString', () => {
+        it('should find the next string appropriately', () => {
+            expect(nextString('A')).toEqual('B');
+            expect(nextString('b', 'abcdefghijklmnopqrstuvwxyz')).toEqual('c');
+            expect(nextString('cat')).toEqual('cau');
+            expect(nextString('cat', 'abcdefghijklmnopqrstuvwxyz')).toEqual('cau');
+        });
+    });
+
+    describe('prevString', () => {
+        it('should find the next string appropriately', () => {
+            expect(prevString('B')).toEqual('A');
+            expect(prevString('c', 'abcdefghijklmnopqrstuvwxyz')).toEqual('b');
+            expect(prevString('cau')).toEqual('cat');
+            expect(prevString('cau', 'abcdefghijklmnopqrstuvwxyz')).toEqual('cat');
         });
     });
 });
