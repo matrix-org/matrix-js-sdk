@@ -7776,8 +7776,8 @@ export class MatrixClient extends EventEmitter {
             UNSTABLE_MSC3088_PURPOSE.name,
             UNSTABLE_MSC3089_TREE_SUBTYPE.name);
 
-        if (!createEvent || Array.isArray(createEvent)) throw new Error("Expected single room create event");
-        if (!purposeEvent || Array.isArray(purposeEvent)) return null;
+        if (!createEvent) throw new Error("Expected single room create event");
+        if (!purposeEvent) return null;
 
         if (!purposeEvent.getContent()?.[UNSTABLE_MSC3088_ENABLED.name]) return null;
         if (createEvent.getContent()?.[RoomCreateTypeField] !== RoomType.Space) return null;

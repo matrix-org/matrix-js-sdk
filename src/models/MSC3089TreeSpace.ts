@@ -19,7 +19,7 @@ import { EventType, IEncryptedFile, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_M
 import { Room } from "./room";
 import { logger } from "../logger";
 import { MatrixEvent } from "./event";
-import { averageBetweenStrings, DEFAULT_ALPHABET, nextString, prevString } from "../utils";
+import { averageBetweenStrings, DEFAULT_ALPHABET, lexicographicCompare, nextString, prevString } from "../utils";
 import { MSC3089Branch } from "./MSC3089Branch";
 
 /**
@@ -233,17 +233,17 @@ export class MSC3089TreeSpace {
                 const roomA = this.client.getRoom(a.roomId);
                 const roomB = this.client.getRoom(b.roomId);
                 if (!roomA || !roomB) { // just don't bother trying to do more partial sorting
-                    return a.roomId.localeCompare(b.roomId);
+                    return lexicographicCompare(a.roomId, b.roomId);
                 }
 
                 const createTsA = roomA.currentState.getStateEvents(EventType.RoomCreate, "")?.getTs() ?? 0;
                 const createTsB = roomB.currentState.getStateEvents(EventType.RoomCreate, "")?.getTs() ?? 0;
                 if (createTsA === createTsB) {
-                    return a.roomId.localeCompare(b.roomId);
+                    return lexicographicCompare(a.roomId, b.roomId);
                 }
                 return createTsA - createTsB;
             } else { // both not-null orders
-                return a.order.localeCompare(b.order);
+                return lexicographicCompare(a.order, b.order);
             }
         });
         return ordered;

@@ -4,6 +4,7 @@ import {
     averageBetweenStrings,
     baseToString,
     DEFAULT_ALPHABET,
+    lexicographicCompare,
     nextString,
     prevString,
     stringToBase,
@@ -279,15 +280,9 @@ describe("utils", function() {
 
     describe('alphabetPad', () => {
         it('should pad to the alphabet length', () => {
-            const defaultPrefixFor1char = [""].reduce(() => {
-                let s = "";
-                for (let i = 0; i < DEFAULT_ALPHABET.length - 1; i++) {
-                    s += DEFAULT_ALPHABET[0];
-                }
-                return s;
-            }, "");
-            expect(alphabetPad("a")).toEqual(defaultPrefixFor1char + "a");
-            expect(alphabetPad("a", "123")).toEqual("11a");
+            const len = 12;
+            expect(alphabetPad("a", len)).toEqual("a" + ("".padEnd(len - 1, DEFAULT_ALPHABET[0])));
+            expect(alphabetPad("a", len, "123")).toEqual("a" + ("".padEnd(len - 1, '1')));
         });
     });
 
@@ -313,12 +308,12 @@ describe("utils", function() {
 
     describe('averageBetweenStrings', () => {
         it('should average appropriately', () => {
-            expect(averageBetweenStrings('A', 'z')).toEqual(']');
-            expect(averageBetweenStrings('a', 'z', "abcdefghijklmnopqrstuvwxyz")).toEqual('m');
+            expect(averageBetweenStrings('A', 'z')).toEqual('^');
+            expect(averageBetweenStrings('a', 'z', "abcdefghijklmnopqrstuvwxyz")).toEqual('n');
             expect(averageBetweenStrings('AA', 'zz')).toEqual('^.');
-            expect(averageBetweenStrings('aa', 'zz', "abcdefghijklmnopqrstuvwxyz")).toEqual('mz');
-            expect(averageBetweenStrings('cat', 'doggo')).toEqual("BH65B");
-            expect(averageBetweenStrings('cat', 'doggo', "abcdefghijklmnopqrstuvwxyz")).toEqual("buedq");
+            expect(averageBetweenStrings('aa', 'zz', "abcdefghijklmnopqrstuvwxyz")).toEqual('na');
+            expect(averageBetweenStrings('cat', 'doggo')).toEqual("d9>Cw");
+            expect(averageBetweenStrings('cat', 'doggo', "abcdefghijklmnopqrstuvwxyz")).toEqual("cumqh");
         });
     });
 
@@ -337,6 +332,48 @@ describe("utils", function() {
             expect(prevString('c', 'abcdefghijklmnopqrstuvwxyz')).toEqual('b');
             expect(prevString('cau')).toEqual('cat');
             expect(prevString('cau', 'abcdefghijklmnopqrstuvwxyz')).toEqual('cat');
+        });
+    });
+
+    // Let's just ensure the ordering is sensible for lexicographic ordering
+    describe('string averaging unified', () => {
+        it('should be truly previous and next', () => {
+            let midpoint = "cat";
+
+            // We run this test 100 times to ensure we end up with a sane sequence.
+            for (let i = 0; i < 100; i++) {
+                const next = nextString(midpoint);
+                const prev = prevString(midpoint);
+                console.log({i, midpoint, next, prev}); // for test debugging
+
+                expect(lexicographicCompare(midpoint, next) < 0).toBe(true);
+                expect(lexicographicCompare(midpoint, prev) > 0).toBe(true);
+                expect(averageBetweenStrings(prev, next)).toBe(midpoint);
+
+                midpoint = next;
+            }
+        });
+    });
+
+    describe('lexicographicCompare', () => {
+        it('should work', () => {
+            // Simple tests
+            expect(lexicographicCompare('a', 'b') < 0).toBe(true);
+            expect(lexicographicCompare('ab', 'b') < 0).toBe(true);
+            expect(lexicographicCompare('cat', 'dog') < 0).toBe(true);
+
+            // Simple tests (reversed)
+            expect(lexicographicCompare('b', 'a') > 0).toBe(true);
+            expect(lexicographicCompare('b', 'ab') > 0).toBe(true);
+            expect(lexicographicCompare('dog', 'cat') > 0).toBe(true);
+
+            // Simple equality tests
+            expect(lexicographicCompare('a', 'a') === 0).toBe(true);
+            expect(lexicographicCompare('A', 'A') === 0).toBe(true);
+
+            // ASCII rule testing
+            expect(lexicographicCompare('A', 'a') < 0).toBe(true);
+            expect(lexicographicCompare('a', 'A') > 0).toBe(true);
         });
     });
 });

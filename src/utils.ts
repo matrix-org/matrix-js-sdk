@@ -475,16 +475,17 @@ export const DEFAULT_ALPHABET = [""].reduce(() => {
 }, "");
 
 /**
- * Pads a string using the given alphabet as a base. The returned string will be the
- * same length as the alphabet, and padded with the first character in the alphabet.
+ * Pads a string using the given alphabet as a base. The returned string will be
+ * padded at the end with the first character in the alphabet.
  *
  * This is intended for use with string averaging.
  * @param {string} s The string to pad.
+ * @param {number} n The length to pad to.
  * @param {string} alphabet The alphabet to use as a single string.
  * @returns {string} The padded string.
  */
-export function alphabetPad(s: string, alphabet = DEFAULT_ALPHABET): string {
-    return s.padStart(alphabet.length, alphabet[0]);
+export function alphabetPad(s: string, n: number, alphabet = DEFAULT_ALPHABET): string {
+    return s.padEnd(n, alphabet[0]);
 }
 
 /**
@@ -512,12 +513,12 @@ export function baseToString(n: number, alphabet = DEFAULT_ALPHABET): string {
  * @returns {number} The baseN number.
  */
 export function stringToBase(s: string, alphabet = DEFAULT_ALPHABET): number {
-    s = alphabetPad(s, alphabet);
     const len = alphabet.length;
-    const reversedStr = Array.from(s).reverse();
+    const reversedStr = Array.from(s).reverse().join(""); // keep as string
     let result = 0;
-    for (let i = 0; i < len; i++) {
-        result += alphabet.indexOf(reversedStr[i]) * (len ** i);
+    for (let i = 0; i < reversedStr.length; i++) {
+        // Cost effective version of `result += alphabet.indexOf(reversedStr[i]) * (len ** i);`
+        result += (reversedStr.charCodeAt(i) - alphabet.charCodeAt(0)) * (len ** i);
     }
     return result;
 }
@@ -532,7 +533,10 @@ export function stringToBase(s: string, alphabet = DEFAULT_ALPHABET): number {
  * @returns {string} The midpoint between the strings, as a string.
  */
 export function averageBetweenStrings(a: string, b: string, alphabet = DEFAULT_ALPHABET): string {
-    return baseToString(Math.floor((stringToBase(a, alphabet) + stringToBase(b, alphabet)) / 2), alphabet);
+    const padN = Math.max(a.length, b.length);
+    const baseA = stringToBase(alphabetPad(a, padN, alphabet), alphabet);
+    const baseB = stringToBase(alphabetPad(b, padN, alphabet), alphabet);
+    return baseToString(Math.round((baseA + baseB) / 2), alphabet);
 }
 
 /**
@@ -557,4 +561,17 @@ export function nextString(s: string, alphabet = DEFAULT_ALPHABET): string {
  */
 export function prevString(s: string, alphabet = DEFAULT_ALPHABET): string {
     return baseToString(stringToBase(s, alphabet) - 1, alphabet);
+}
+
+/**
+ * Compares strings lexicographically as a sort-safe function.
+ * @param {string} a The first (reference) string.
+ * @param {string} b The second (compare) string.
+ * @returns {number} Negative if the reference string is before the compare string;
+ * positive if the reference string is after; and zero if equal.
+ */
+export function lexicographicCompare(a: string, b: string): number {
+    // Dev note: this exists because I'm sad that you can use math operators on strings, so I've
+    // hidden the operation in this function.
+    return (a < b) ? -1 : ((a === b) ? 0 : 1);
 }
