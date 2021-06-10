@@ -9,6 +9,7 @@ import {
     prevString,
     stringToBase,
 } from "../../src/utils";
+import { logger } from "../../src/logger";
 
 describe("utils", function() {
     describe("encodeParams", function() {
@@ -344,7 +345,7 @@ describe("utils", function() {
             for (let i = 0; i < 100; i++) {
                 const next = nextString(midpoint);
                 const prev = prevString(midpoint);
-                console.log({i, midpoint, next, prev}); // for test debugging
+                logger.log({ i, midpoint, next, prev }); // for test debugging
 
                 expect(lexicographicCompare(midpoint, next) < 0).toBe(true);
                 expect(lexicographicCompare(midpoint, prev) > 0).toBe(true);
