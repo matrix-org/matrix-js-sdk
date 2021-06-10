@@ -1,16 +1,17 @@
 import { logger } from "../../src/logger";
 import { MatrixClient } from "../../src/client";
 import { Filter } from "../../src/filter";
-import {DEFAULT_TREE_POWER_LEVELS_TEMPLATE} from "../../src/models/MSC3089TreeSpace";
+import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE } from "../../src/models/MSC3089TreeSpace";
 import {
     EventType,
-    RoomCreateTypeField, RoomType,
+    RoomCreateTypeField,
+    RoomType,
     UNSTABLE_MSC3088_ENABLED,
     UNSTABLE_MSC3088_PURPOSE,
-    UNSTABLE_MSC3089_TREE_SUBTYPE
+    UNSTABLE_MSC3089_TREE_SUBTYPE,
 } from "../../src/@types/event";
-import {MEGOLM_ALGORITHM} from "../../src/crypto/olmlib";
-import {MatrixEvent} from "../../src/models/event";
+import { MEGOLM_ALGORITHM } from "../../src/crypto/olmlib";
+import { MatrixEvent } from "../../src/models/event";
 
 jest.useFakeTimers();
 
@@ -217,7 +218,7 @@ describe("MatrixClient", function() {
                     },
                 ],
             });
-            return {room_id: roomId};
+            return { room_id: roomId };
         });
         client.getUserId = () => userId;
         client.createRoom = fn;

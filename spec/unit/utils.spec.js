@@ -4,8 +4,9 @@ import {
     averageBetweenStrings,
     baseToString,
     DEFAULT_ALPHABET,
-    nextString, prevString,
-    stringToBase
+    nextString,
+    prevString,
+    stringToBase,
 } from "../../src/utils";
 
 describe("utils", function() {
@@ -270,7 +271,9 @@ describe("utils", function() {
 
     describe('DEFAULT_ALPHABET', () => {
         it('should be usefully printable ASCII in order', () => {
-            expect(DEFAULT_ALPHABET).toEqual(" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
+            expect(DEFAULT_ALPHABET).toEqual(
+                " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~",
+            );
         });
     });
 

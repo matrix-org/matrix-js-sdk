@@ -74,9 +74,9 @@ export interface ICreateRoomOpts {
     name?: string;
     topic?: string;
     preset?: string;
-    power_level_content_override?: any;
-    creation_content?: any;
-    initial_state?: {type: string, state_key: string, content: any}[];
+    power_level_content_override?: any;// eslint-disable-line camelcase
+    creation_content?: any;// eslint-disable-line camelcase
+    initial_state?: {type: string, state_key: string, content: any}[]; // eslint-disable-line camelcase
     // TODO: Types (next line)
     invite_3pid?: any[]; // eslint-disable-line camelcase
 }

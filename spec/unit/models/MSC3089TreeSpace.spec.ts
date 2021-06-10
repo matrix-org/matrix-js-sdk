@@ -83,13 +83,14 @@ describe("MSC3089TreeSpace", () => {
 
     it('should support setting the name of the space', async () => {
         const newName = "NEW NAME";
-        const fn = jest.fn().mockImplementation((stateRoomId: string, eventType: EventType, content: any, stateKey: string) => {
-            expect(stateRoomId).toEqual(roomId);
-            expect(eventType).toEqual(EventType.RoomName);
-            expect(stateKey).toEqual("");
-            expect(content).toMatchObject({ name: newName });
-            return Promise.resolve();
-        });
+        const fn = jest.fn()
+            .mockImplementation((stateRoomId: string, eventType: EventType, content: any, stateKey: string) => {
+                expect(stateRoomId).toEqual(roomId);
+                expect(eventType).toEqual(EventType.RoomName);
+                expect(stateKey).toEqual("");
+                expect(content).toMatchObject({ name: newName });
+                return Promise.resolve();
+            });
         client.sendStateEvent = fn;
         await tree.setName(newName);
         expect(fn.mock.calls.length).toBe(1);
@@ -109,18 +110,19 @@ describe("MSC3089TreeSpace", () => {
 
     async function evaluatePowerLevels(pls: any, role: TreePermissions, expectedPl: number) {
         makePowerLevels(pls);
-        const fn = jest.fn().mockImplementation((stateRoomId: string, eventType: EventType, content: any, stateKey: string) => {
-            expect(stateRoomId).toEqual(roomId);
-            expect(eventType).toEqual(EventType.RoomPowerLevels);
-            expect(stateKey).toEqual("");
-            expect(content).toMatchObject({
-                ...pls,
-                users: {
-                    [targetUser]: expectedPl,
-                },
+        const fn = jest.fn()
+            .mockImplementation((stateRoomId: string, eventType: EventType, content: any, stateKey: string) => {
+                expect(stateRoomId).toEqual(roomId);
+                expect(eventType).toEqual(EventType.RoomPowerLevels);
+                expect(stateKey).toEqual("");
+                expect(content).toMatchObject({
+                    ...pls,
+                    users: {
+                        [targetUser]: expectedPl,
+                    },
+                });
+                return Promise.resolve();
             });
-            return Promise.resolve();
-        });
         client.sendStateEvent = fn;
         await tree.setPermissions(targetUser, role);
         expect(fn.mock.calls.length).toBe(1);
@@ -155,7 +157,7 @@ describe("MSC3089TreeSpace", () => {
             users_default: 1024,
             users: {
                 [targetUser]: 2222,
-            }
+            },
         }, TreePermissions.Viewer, 1024);
     });
 
@@ -165,7 +167,7 @@ describe("MSC3089TreeSpace", () => {
             events_default: 1024,
             users: {
                 [targetUser]: 5,
-            }
+            },
         }, TreePermissions.Editor, 1024);
     });
 
@@ -199,19 +201,20 @@ describe("MSC3089TreeSpace", () => {
             expect(name).toEqual(subspaceName);
             return new MSC3089TreeSpace(client, subspaceId);
         });
-        const sendStateFn = jest.fn().mockImplementation(async (roomId: string, eventType: EventType, content: any, stateKey: string) => {
-            expect([tree.roomId, subspaceId]).toContain(roomId);
-            if (roomId === subspaceId) {
-                expect(eventType).toEqual(EventType.SpaceParent);
-                expect(stateKey).toEqual(tree.roomId);
-            } else {
-                expect(eventType).toEqual(EventType.SpaceChild);
-                expect(stateKey).toEqual(subspaceId);
-            }
-            expect(content).toMatchObject({ via: [domain] });
+        const sendStateFn = jest.fn()
+            .mockImplementation(async (roomId: string, eventType: EventType, content: any, stateKey: string) => {
+                expect([tree.roomId, subspaceId]).toContain(roomId);
+                if (roomId === subspaceId) {
+                    expect(eventType).toEqual(EventType.SpaceParent);
+                    expect(stateKey).toEqual(tree.roomId);
+                } else {
+                    expect(eventType).toEqual(EventType.SpaceChild);
+                    expect(stateKey).toEqual(subspaceId);
+                }
+                expect(content).toMatchObject({ via: [domain] });
 
-            // return value not used
-        });
+                // return value not used
+            });
         client.unstableCreateFileTree = createFn;
         client.sendStateEvent = sendStateFn;
 
@@ -311,7 +314,7 @@ describe("MSC3089TreeSpace", () => {
 
                     // ensure we don't kick ourselves
                     { getContent: () => ({ membership: "join" }), getStateKey: () => selfUserId },
-                ]
+                ];
             },
         };
 
@@ -361,7 +364,7 @@ describe("MSC3089TreeSpace", () => {
                     getType: () => EventType.SpaceParent,
                     getStateKey: () => tree.roomId,
                     getContent: () => ({
-                        via: [staticDomain]
+                        via: [staticDomain],
                     }),
                 },
             ];
@@ -408,7 +411,12 @@ describe("MSC3089TreeSpace", () => {
                 roomId: tree.roomId,
                 currentState: {
                     getStateEvents: (eventType: EventType, stateKey?: string) => {
-                        expect([EventType.SpaceChild, EventType.RoomCreate, EventType.SpaceParent]).toContain(eventType);
+                        expect([
+                            EventType.SpaceChild,
+                            EventType.RoomCreate,
+                            EventType.SpaceParent,
+                        ]).toContain(eventType);
+
                         if (eventType === EventType.RoomCreate) {
                             expect(stateKey).toEqual("");
                             return parentState.filter(e => e.getType() === EventType.RoomCreate)[0];
@@ -429,22 +437,23 @@ describe("MSC3089TreeSpace", () => {
             (<any>tree).room = parentRoom; // override readonly
             client.getRoom = (r) => rooms[r];
 
-            clientSendStateFn = jest.fn().mockImplementation((roomId: string, eventType: EventType, content: any, stateKey: string) => {
-                expect(roomId).toEqual(tree.roomId);
-                expect(eventType).toEqual(EventType.SpaceChild);
-                expect(content).toMatchObject(expect.objectContaining({
-                    via: expect.any(Array),
-                    order: expect.any(String),
-                }));
-                expect(Object.keys(rooms)).toContain(stateKey);
-                expect(stateKey).not.toEqual(tree.roomId);
+            clientSendStateFn = jest.fn()
+                .mockImplementation((roomId: string, eventType: EventType, content: any, stateKey: string) => {
+                    expect(roomId).toEqual(tree.roomId);
+                    expect(eventType).toEqual(EventType.SpaceChild);
+                    expect(content).toMatchObject(expect.objectContaining({
+                        via: expect.any(Array),
+                        order: expect.any(String),
+                    }));
+                    expect(Object.keys(rooms)).toContain(stateKey);
+                    expect(stateKey).not.toEqual(tree.roomId);
 
-                const stateEvent = parentState.find(e => e.getType() === eventType && e.getStateKey() === stateKey);
-                expect(stateEvent).toBeDefined();
-                stateEvent.getContent = () => content;
+                    const stateEvent = parentState.find(e => e.getType() === eventType && e.getStateKey() === stateKey);
+                    expect(stateEvent).toBeDefined();
+                    stateEvent.getContent = () => content;
 
-                return Promise.resolve(); // return value not used
-            });
+                    return Promise.resolve(); // return value not used
+                });
             client.sendStateEvent = clientSendStateFn;
         });
 
@@ -652,7 +661,7 @@ describe("MSC3089TreeSpace", () => {
             const d = "!d:example.org";
 
             // Add in reverse order to make sure it gets ordered correctly
-            addSubspace(d, 4, "Z")
+            addSubspace(d, 4, "Z");
             addSubspace(c, 3, "X");
             addSubspace(b, 2, "V");
             addSubspace(a, 1, "T");
@@ -681,7 +690,7 @@ describe("MSC3089TreeSpace", () => {
             const d = "!d:example.org";
 
             // Add in reverse order to make sure it gets ordered correctly
-            addSubspace(d, 4, "Z")
+            addSubspace(d, 4, "Z");
             addSubspace(c, 3, "X");
             addSubspace(b, 2, "V");
             addSubspace(a, 1, "T");
@@ -710,7 +719,7 @@ describe("MSC3089TreeSpace", () => {
             const d = "!d:example.org";
 
             // Add in reverse order to make sure it gets ordered correctly
-            addSubspace(d, 4)
+            addSubspace(d, 4);
             addSubspace(c, 3);
             addSubspace(b, 2, "V");
             addSubspace(a, 1, "T");
@@ -775,17 +784,18 @@ describe("MSC3089TreeSpace", () => {
         });
         client.sendMessage = sendMsgFn;
 
-        const sendStateFn = jest.fn().mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
-            expect(roomId).toEqual(tree.roomId);
-            expect(eventType).toEqual(UNSTABLE_MSC3089_BRANCH.unstable); // test to ensure we're definitely using unstable
-            expect(stateKey).toEqual(fileEventId);
-            expect(content).toMatchObject({
-                active: true,
-                name: fileName,
-            });
+        const sendStateFn = jest.fn()
+            .mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
+                expect(roomId).toEqual(tree.roomId);
+                expect(eventType).toEqual(UNSTABLE_MSC3089_BRANCH.unstable); // test to ensure we're definitely using unstable
+                expect(stateKey).toEqual(fileEventId);
+                expect(content).toMatchObject({
+                    active: true,
+                    name: fileName,
+                });
 
-            return Promise.resolve(); // return value not used.
-        });
+                return Promise.resolve(); // return value not used.
+            });
         client.sendStateEvent = sendStateFn;
 
         const buf = Uint8Array.from(Array.from(fileContents).map((_, i) => fileContents.charCodeAt(i)));

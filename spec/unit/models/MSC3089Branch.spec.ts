@@ -70,15 +70,16 @@ describe("MSC3089Branch", () => {
     });
 
     it('should be able to delete the file', async () => {
-        const stateFn = jest.fn().mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
-            expect(roomId).toEqual(branchRoomId);
-            expect(eventType).toEqual(UNSTABLE_MSC3089_BRANCH.unstable); // test that we're definitely using the unstable value
-            expect(content).toMatchObject({});
-            expect(content['active']).toBeUndefined();
-            expect(stateKey).toEqual(fileEventId);
+        const stateFn = jest.fn()
+            .mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
+                expect(roomId).toEqual(branchRoomId);
+                expect(eventType).toEqual(UNSTABLE_MSC3089_BRANCH.unstable); // test that we're definitely using the unstable value
+                expect(content).toMatchObject({});
+                expect(content['active']).toBeUndefined();
+                expect(stateKey).toEqual(fileEventId);
 
-            return Promise.resolve(); // return value not used
-        });
+                return Promise.resolve(); // return value not used
+            });
         client.sendStateEvent = stateFn;
 
         const redactFn = jest.fn().mockImplementation((roomId: string, eventId: string) => {
@@ -107,18 +108,19 @@ describe("MSC3089Branch", () => {
     it('should be able to change its name', async () => {
         const name = "My File.txt";
         indexEvent.getContent = () => ({ active: true, retained: true });
-        const stateFn = jest.fn().mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
-            expect(roomId).toEqual(branchRoomId);
-            expect(eventType).toEqual(UNSTABLE_MSC3089_BRANCH.unstable); // test that we're definitely using the unstable value
-            expect(content).toMatchObject({
-                retained: true, // canary for copying state
-                active: true,
-                name: name,
-            });
-            expect(stateKey).toEqual(fileEventId);
+        const stateFn = jest.fn()
+            .mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
+                expect(roomId).toEqual(branchRoomId);
+                expect(eventType).toEqual(UNSTABLE_MSC3089_BRANCH.unstable); // test that we're definitely using the unstable value
+                expect(content).toMatchObject({
+                    retained: true, // canary for copying state
+                    active: true,
+                    name: name,
+                });
+                expect(stateKey).toEqual(fileEventId);
 
-            return Promise.resolve(); // return value not used
-        });
+                return Promise.resolve(); // return value not used
+            });
         client.sendStateEvent = stateFn;
 
         await branch.setName(name);
