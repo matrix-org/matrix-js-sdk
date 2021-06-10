@@ -212,7 +212,8 @@ export class MSC3089TreeSpace {
         const kickMemberships = ["invite", "knock", "join"];
         const members = this.room.currentState.getStateEvents(EventType.RoomMember);
         for (const member of members) {
-            if (member.getStateKey() !== this.client.getUserId() && kickMemberships.includes(member.getContent()['membership'])) {
+            const isNotUs = member.getStateKey() !== this.client.getUserId();
+            if (isNotUs && kickMemberships.includes(member.getContent()['membership'])) {
                 await this.client.kick(this.roomId, member.getStateKey(), "Room deleted");
             }
         }
@@ -387,7 +388,10 @@ export class MSC3089TreeSpace {
      * @param {Partial<IEncryptedFile>} info The encrypted file information.
      * @returns {Promise<void>} Resolves when uploaded.
      */
-    public async createFile(name: string, encryptedContents: ArrayBuffer, info: Partial<IEncryptedFile>): Promise<void> {
+    public async createFile(
+        name: string,
+        encryptedContents: ArrayBuffer, info: Partial<IEncryptedFile>,
+    ): Promise<void> {
         const mxc = await this.client.uploadContent(new Blob([encryptedContents]), {
             includeFilename: false,
             onlyContentUri: true,
