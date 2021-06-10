@@ -484,10 +484,7 @@ export const DEFAULT_ALPHABET = [""].reduce(() => {
  * @returns {string} The padded string.
  */
 export function alphabetPad(s: string, alphabet = DEFAULT_ALPHABET): string {
-    while (s.length < alphabet.length) {
-        s = alphabet[0] + s;
-    }
-    return s;
+    return s.padStart(alphabet.length, alphabet[0]);
 }
 
 /**
