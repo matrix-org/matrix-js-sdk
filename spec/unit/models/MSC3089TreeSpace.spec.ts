@@ -21,7 +21,7 @@ import { EventType, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_MSC3089_LEAF } fr
 import {
     DEFAULT_TREE_POWER_LEVELS_TEMPLATE,
     MSC3089TreeSpace,
-    TreePermissions
+    TreePermissions,
 } from "../../../src/models/MSC3089TreeSpace";
 import { DEFAULT_ALPHABET } from "../../../src/utils";
 import { MockBlob } from "../../MockBlob";
@@ -87,7 +87,7 @@ describe("MSC3089TreeSpace", () => {
             expect(stateRoomId).toEqual(roomId);
             expect(eventType).toEqual(EventType.RoomName);
             expect(stateKey).toEqual("");
-            expect(content).toMatchObject({name: newName});
+            expect(content).toMatchObject({ name: newName });
             return Promise.resolve();
         });
         client.sendStateEvent = fn;
@@ -208,7 +208,7 @@ describe("MSC3089TreeSpace", () => {
                 expect(eventType).toEqual(EventType.SpaceChild);
                 expect(stateKey).toEqual(subspaceId);
             }
-            expect(content).toMatchObject({via: [domain]});
+            expect(content).toMatchObject({ via: [domain] });
 
             // return value not used
         });
@@ -223,7 +223,7 @@ describe("MSC3089TreeSpace", () => {
         expect(createFn).toHaveBeenCalledTimes(1);
         expect(sendStateFn).toHaveBeenCalledTimes(2);
 
-        const content = expect.objectContaining({via: [domain]});
+        const content = expect.objectContaining({ via: [domain] });
         expect(sendStateFn).toHaveBeenCalledWith(subspaceId, EventType.SpaceParent, content, tree.roomId);
         expect(sendStateFn).toHaveBeenCalledWith(tree.roomId, EventType.SpaceChild, content, subspaceId);
     });
@@ -238,9 +238,9 @@ describe("MSC3089TreeSpace", () => {
                 expect(stateKey).toBeUndefined();
                 return [
                     // Partial implementations of Room
-                    {getStateKey: () => firstChildRoom},
-                    {getStateKey: () => secondChildRoom},
-                    {getStateKey: () => thirdChildRoom},
+                    { getStateKey: () => firstChildRoom },
+                    { getStateKey: () => secondChildRoom },
+                    { getStateKey: () => thirdChildRoom },
                 ];
             },
         };
@@ -270,9 +270,9 @@ describe("MSC3089TreeSpace", () => {
         client.getRoom = () => ({} as Room); // to appease the TreeSpace constructor
 
         // Only mocking used API
-        const firstSubdirectory = {roomId: "!first:example.org"} as any as MSC3089TreeSpace;
-        const searchedSubdirectory = {roomId: "!find_me:example.org"} as any as MSC3089TreeSpace;
-        const thirdSubdirectory = {roomId: "!third:example.org"} as any as MSC3089TreeSpace;
+        const firstSubdirectory = { roomId: "!first:example.org" } as any as MSC3089TreeSpace;
+        const searchedSubdirectory = { roomId: "!find_me:example.org" } as any as MSC3089TreeSpace;
+        const thirdSubdirectory = { roomId: "!third:example.org" } as any as MSC3089TreeSpace;
         tree.getDirectories = () => [firstSubdirectory, searchedSubdirectory, thirdSubdirectory];
 
         let result = tree.getDirectory(searchedSubdirectory.roomId);
@@ -284,10 +284,10 @@ describe("MSC3089TreeSpace", () => {
 
     it('should be able to delete itself', async () => {
         const delete1 = jest.fn().mockImplementation(() => Promise.resolve());
-        const subdir1 = {delete: delete1} as any as MSC3089TreeSpace; // mock tested bits
+        const subdir1 = { delete: delete1 } as any as MSC3089TreeSpace; // mock tested bits
 
         const delete2 = jest.fn().mockImplementation(() => Promise.resolve());
-        const subdir2 = {delete: delete2} as any as MSC3089TreeSpace; // mock tested bits
+        const subdir2 = { delete: delete2 } as any as MSC3089TreeSpace; // mock tested bits
 
         const joinMemberId = "@join:example.org";
         const knockMemberId = "@knock:example.org";
@@ -303,14 +303,14 @@ describe("MSC3089TreeSpace", () => {
                 expect(stateKey).toBeUndefined();
                 return [
                     // Partial implementations
-                    {getContent: () => ({membership: "join"}), getStateKey: () => joinMemberId},
-                    {getContent: () => ({membership: "knock"}), getStateKey: () => knockMemberId},
-                    {getContent: () => ({membership: "invite"}), getStateKey: () => inviteMemberId},
-                    {getContent: () => ({membership: "leave"}), getStateKey: () => leaveMemberId},
-                    {getContent: () => ({membership: "ban"}), getStateKey: () => banMemberId},
+                    { getContent: () => ({ membership: "join" }), getStateKey: () => joinMemberId },
+                    { getContent: () => ({ membership: "knock" }), getStateKey: () => knockMemberId },
+                    { getContent: () => ({ membership: "invite" }), getStateKey: () => inviteMemberId },
+                    { getContent: () => ({ membership: "leave" }), getStateKey: () => leaveMemberId },
+                    { getContent: () => ({ membership: "ban" }), getStateKey: () => banMemberId },
 
                     // ensure we don't kick ourselves
-                    {getContent: () => ({membership: "join"}), getStateKey: () => selfUserId},
+                    { getContent: () => ({ membership: "join" }), getStateKey: () => selfUserId },
                 ]
             },
         };
@@ -337,12 +337,12 @@ describe("MSC3089TreeSpace", () => {
         // Danger: these are partial implementations for testing purposes only
 
         // @ts-ignore - "MatrixEvent is a value but used as a type", which is true but not important
-        let childState: {[roomId: string]: MatrixEvent[]} = {};
+        let childState: { [roomId: string]: MatrixEvent[] } = {};
         // @ts-ignore - "MatrixEvent is a value but used as a type", which is true but not important
         let parentState: MatrixEvent[] = [];
         let parentRoom: Room;
         let childTrees: MSC3089TreeSpace[];
-        let rooms: {[roomId: string]: Room};
+        let rooms: { [roomId: string]: Room };
         let clientSendStateFn: jest.MockedFunction<typeof client.sendStateEvent>;
         const staticDomain = "static.example.org";
 
@@ -771,7 +771,7 @@ describe("MSC3089TreeSpace", () => {
                 [UNSTABLE_MSC3089_LEAF.unstable]: {}, // test to ensure we're definitely using unstable
             });
 
-            return Promise.resolve({event_id: fileEventId}); // eslint-disable-line camelcase
+            return Promise.resolve({ event_id: fileEventId }); // eslint-disable-line camelcase
         });
         client.sendMessage = sendMsgFn;
 
@@ -800,7 +800,7 @@ describe("MSC3089TreeSpace", () => {
 
     it('should support getting files', () => {
         const fileEventId = "$file";
-        const fileEvent = {forTest: true}; // MatrixEvent mock
+        const fileEvent = { forTest: true }; // MatrixEvent mock
         room.currentState = {
             getStateEvents: (eventType: string, stateKey?: string) => {
                 expect(eventType).toEqual(UNSTABLE_MSC3089_BRANCH.unstable); // test to ensure we're definitely using unstable
@@ -829,8 +829,8 @@ describe("MSC3089TreeSpace", () => {
     });
 
     it('should list files', () => {
-        const firstFile = {getContent: () => ({active: true})};
-        const secondFile = {getContent: () => ({active: false})}; // deliberately inactive
+        const firstFile = { getContent: () => ({ active: true }) };
+        const secondFile = { getContent: () => ({ active: false }) }; // deliberately inactive
         room.currentState = {
             getStateEvents: (eventType: string, stateKey?: string) => {
                 expect(eventType).toEqual(UNSTABLE_MSC3089_BRANCH.unstable); // test to ensure we're definitely using unstable

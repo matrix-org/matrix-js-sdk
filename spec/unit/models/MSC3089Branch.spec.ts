@@ -128,10 +128,10 @@ describe("MSC3089Branch", () => {
 
     it('should be able to return event information', async () => {
         const mxcLatter = "example.org/file";
-        const fileContent = {isFile: "not quite", url: "mxc://" + mxcLatter};
+        const fileContent = { isFile: "not quite", url: "mxc://" + mxcLatter };
         const eventsArr = [
-            {getId: () => "$not-file", getContent: () => ({})},
-            {getId: () => fileEventId, getContent: () => ({file: fileContent})},
+            { getId: () => "$not-file", getContent: () => ({}) },
+            { getId: () => fileEventId, getContent: () => ({ file: fileContent }) },
         ];
         client.getEventTimeline = () => Promise.resolve({
             getEvents: () => eventsArr,

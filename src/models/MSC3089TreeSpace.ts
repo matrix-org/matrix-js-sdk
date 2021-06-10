@@ -101,7 +101,7 @@ export class MSC3089TreeSpace {
      * @returns {Promise<void>} Resolves when complete.
      */
     public setName(name: string): Promise<void> {
-        return this.client.sendStateEvent(this.roomId, EventType.RoomName, {name}, "");
+        return this.client.sendStateEvent(this.roomId, EventType.RoomName, { name }, "");
     }
 
     /**
@@ -220,9 +220,9 @@ export class MSC3089TreeSpace {
         await this.client.leave(this.roomId);
     }
 
-    private getOrderedChildren(children: MatrixEvent[]): {roomId: string, order: string}[] {
-        const ordered: {roomId: string, order: string}[] = children
-            .map(c => ({roomId: c.getStateKey(), order: c.getContent()['order']}));
+    private getOrderedChildren(children: MatrixEvent[]): { roomId: string, order: string }[] {
+        const ordered: { roomId: string, order: string }[] = children
+            .map(c => ({ roomId: c.getStateKey(), order: c.getContent()['order'] }));
         ordered.sort((a, b) => {
             if (a.order && !b.order) {
                 return -1;
@@ -357,7 +357,7 @@ export class MSC3089TreeSpace {
                     // XXX: We should be creating gaps to avoid conflicts
                     lastOrder = lastOrder ? nextString(lastOrder) : DEFAULT_ALPHABET[0];
                     const currentChild = parentRoom.currentState.getStateEvents(EventType.SpaceChild, target.roomId);
-                    const content = currentChild?.getContent() ?? {via: [this.client.getDomain()]};
+                    const content = currentChild?.getContent() ?? { via: [this.client.getDomain()] };
                     await this.client.sendStateEvent(parentRoom.roomId, EventType.SpaceChild, {
                         ...content,
                         order: lastOrder,
@@ -373,7 +373,7 @@ export class MSC3089TreeSpace {
 
         // Now we can finally update our own order state
         const currentChild = parentRoom.currentState.getStateEvents(EventType.SpaceChild, this.roomId);
-        const content = currentChild?.getContent() ?? {via: [this.client.getDomain()]};
+        const content = currentChild?.getContent() ?? { via: [this.client.getDomain()] };
         await this.client.sendStateEvent(parentRoom.roomId, EventType.SpaceChild, {
             ...content,
             order: newOrder,

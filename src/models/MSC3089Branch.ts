@@ -92,7 +92,7 @@ export class MSC3089Branch {
         if (!event) throw new Error("Failed to find event");
 
         // Sometimes the event context doesn't decrypt for us, so do that.
-        await this.client.decryptEventIfNeeded(event, {emit: false, isRetry: false});
+        await this.client.decryptEventIfNeeded(event, { emit: false, isRetry: false });
 
         const file = event.getContent()['file'];
         const httpUrl = this.client.mxcUrlToHttp(file['url']);
