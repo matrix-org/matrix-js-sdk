@@ -4295,7 +4295,7 @@ export class MatrixClient extends EventEmitter {
      *    {@link module:models/event-timeline~EventTimeline} including the given
      *    event
      */
-    public getEventTimeline(timelineSet: EventTimelineSet, eventId: string): EventTimeline {
+    public getEventTimeline(timelineSet: EventTimelineSet, eventId: string): Promise<EventTimeline> {
         // don't allow any timeline support unless it's been enabled.
         if (!this.timelineSupport) {
             throw new Error("timeline support is disabled. Set the 'timelineSupport'" +

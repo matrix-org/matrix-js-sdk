@@ -130,3 +130,25 @@ export const UNSTABLE_MSC3089_TREE_SUBTYPE = new UnstableValue("m.data_tree", "o
  * eventual removal.
  */
 export const UNSTABLE_MSC3089_LEAF = new UnstableValue("m.leaf", "org.matrix.msc3089.leaf");
+
+/**
+ * Branch (Leaf Reference) type for the index approach in a
+ * [MSC3089](https://github.com/matrix-org/matrix-doc/pull/3089) space-room. Note that this reference is
+ * UNSTABLE and subject to breaking changes, including its eventual removal.
+ */
+export const UNSTABLE_MSC3089_BRANCH = new UnstableValue("m.branch", "org.matrix.msc3089.branch");
+
+export interface IEncryptedFile {
+    url: string;
+    mimetype?: string;
+    key: {
+        alg: string;
+        key_ops: string[]; // eslint-disable-line camelcase
+        kty: string;
+        k: string;
+        ext: boolean;
+    };
+    iv: string;
+    hashes: {[alg: string]: string};
+    v: string;
+}

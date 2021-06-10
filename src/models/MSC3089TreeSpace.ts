@@ -15,11 +15,12 @@ limitations under the License.
 */
 
 import { MatrixClient } from "../client";
-import { EventType } from "../@types/event";
+import { EventType, IEncryptedFile, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_MSC3089_LEAF } from "../@types/event";
 import { Room } from "./room";
 import { logger } from "../logger";
 import { MatrixEvent } from "./event";
 import { averageBetweenStrings, DEFAULT_ALPHABET, nextString, prevString } from "../utils";
+import { MSC3089Branch } from "./MSC3089Branch";
 
 /**
  * The recommended defaults for a tree space's power levels. Note that this
@@ -180,7 +181,7 @@ export class MSC3089TreeSpace {
         for (const child of children) {
             try {
                 const tree = this.client.unstableGetFileTreeSpace(child.getStateKey());
-                trees.push(tree);
+                if (tree) trees.push(tree);
             } catch (e) {
                 logger.warn("Unable to create tree space instance for listing. Are we joined?", e);
             }
@@ -377,5 +378,52 @@ export class MSC3089TreeSpace {
             ...content,
             order: newOrder,
         }, this.roomId);
+    }
+
+    /**
+     * Creates (uploads) a new file to this tree. The file must have already been encrypted for the room.
+     * @param {string} name The name of the file.
+     * @param {ArrayBuffer} encryptedContents The encrypted contents.
+     * @param {Partial<IEncryptedFile>} info The encrypted file information.
+     * @returns {Promise<void>} Resolves when uploaded.
+     */
+    public async createFile(name: string, encryptedContents: ArrayBuffer, info: Partial<IEncryptedFile>): Promise<void> {
+        const mxc = await this.client.uploadContent(new Blob([encryptedContents]), {
+            includeFilename: false,
+            onlyContentUri: true,
+        });
+        info.url = mxc;
+
+        const res = await this.client.sendMessage(this.roomId, {
+            msgtype: MsgType.File,
+            body: name,
+            url: mxc,
+            file: info,
+            [UNSTABLE_MSC3089_LEAF.name]: {},
+        });
+
+        await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {
+            active: true,
+            name: name,
+        }, res['event_id']);
+    }
+
+    /**
+     * Retrieves a file from the tree.
+     * @param {string} fileEventId The event ID of the file.
+     * @returns {MSC3089Branch} The file, or falsy if not found.
+     */
+    public getFile(fileEventId: string): MSC3089Branch {
+        const branch = this.room.currentState.getStateEvents(UNSTABLE_MSC3089_BRANCH.name, fileEventId);
+        return branch ? new MSC3089Branch(this.client, branch) : null;
+    }
+
+    /**
+     * Gets an array of all known files for the tree.
+     * @returns {MSC3089Branch[]} The known files. May be empty, but not null.
+     */
+    public listFiles(): MSC3089Branch[] {
+        const branches = this.room.currentState.getStateEvents(UNSTABLE_MSC3089_BRANCH.name) ?? [];
+        return branches.map(e => new MSC3089Branch(this.client, e)).filter(b => b.isActive);
     }
 }

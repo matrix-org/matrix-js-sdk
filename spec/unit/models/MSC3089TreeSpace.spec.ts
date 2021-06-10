@@ -17,13 +17,14 @@ limitations under the License.
 import { MatrixClient } from "../../../src";
 import { Room } from "../../../src/models/room";
 import { MatrixEvent } from "../../../src/models/event";
-import { EventType } from "../../../src/@types/event";
+import { EventType, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_MSC3089_LEAF } from "../../../src/@types/event";
 import {
     DEFAULT_TREE_POWER_LEVELS_TEMPLATE,
     MSC3089TreeSpace,
     TreePermissions
 } from "../../../src/models/MSC3089TreeSpace";
 import { DEFAULT_ALPHABET } from "../../../src/utils";
+import { MockBlob } from "../../MockBlob";
 
 describe("MSC3089TreeSpace", () => {
     let client: MatrixClient;
@@ -37,8 +38,8 @@ describe("MSC3089TreeSpace", () => {
     beforeEach(() => {
         // TODO: Use utility functions to create test rooms and clients
         client = <MatrixClient>{
-            getRoom: (roomId: string) => {
-                if (roomId === roomId) {
+            getRoom: (fetchRoomId: string) => {
+                if (fetchRoomId === roomId) {
                     return room;
                 } else {
                     throw new Error("Unexpected fetch for unknown room");
@@ -734,5 +735,113 @@ describe("MSC3089TreeSpace", () => {
             expectOrder(c, 1);
             expectOrder(d, 3);
         });
+    });
+
+    it('should upload files', async () => {
+        const mxc = "mxc://example.org/file";
+        const fileInfo = {
+            mimetype: "text/plain",
+            // other fields as required by encryption, but ignored here
+        };
+        const fileEventId = "$file";
+        const fileName = "My File.txt";
+        const fileContents = "This is a test file";
+
+        // Mock out Blob for the test environment
+        (<any>global).Blob = MockBlob;
+
+        const uploadFn = jest.fn().mockImplementation((contents: Blob, opts: any) => {
+            expect(contents).toBeInstanceOf(Blob);
+            expect(contents.size).toEqual(fileContents.length);
+            expect(opts).toMatchObject({
+                includeFilename: false,
+                onlyContentUri: true, // because the tests rely on this - we shouldn't really be testing  for this.
+            });
+            return Promise.resolve(mxc);
+        });
+        client.uploadContent = uploadFn;
+
+        const sendMsgFn = jest.fn().mockImplementation((roomId: string, contents: any) => {
+            expect(roomId).toEqual(tree.roomId);
+            expect(contents).toMatchObject({
+                msgtype: MsgType.File,
+                body: fileName,
+                url: mxc,
+                file: fileInfo,
+                [UNSTABLE_MSC3089_LEAF.unstable]: {}, // test to ensure we're definitely using unstable
+            });
+
+            return Promise.resolve({event_id: fileEventId}); // eslint-disable-line camelcase
+        });
+        client.sendMessage = sendMsgFn;
+
+        const sendStateFn = jest.fn().mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
+            expect(roomId).toEqual(tree.roomId);
+            expect(eventType).toEqual(UNSTABLE_MSC3089_BRANCH.unstable); // test to ensure we're definitely using unstable
+            expect(stateKey).toEqual(fileEventId);
+            expect(content).toMatchObject({
+                active: true,
+                name: fileName,
+            });
+
+            return Promise.resolve(); // return value not used.
+        });
+        client.sendStateEvent = sendStateFn;
+
+        const buf = Uint8Array.from(Array.from(fileContents).map((_, i) => fileContents.charCodeAt(i)));
+
+        // We clone the file info just to make sure it doesn't get mutated for the test.
+        await tree.createFile(fileName, buf, Object.assign({}, fileInfo));
+
+        expect(uploadFn).toHaveBeenCalledTimes(1);
+        expect(sendMsgFn).toHaveBeenCalledTimes(1);
+        expect(sendStateFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('should support getting files', () => {
+        const fileEventId = "$file";
+        const fileEvent = {forTest: true}; // MatrixEvent mock
+        room.currentState = {
+            getStateEvents: (eventType: string, stateKey?: string) => {
+                expect(eventType).toEqual(UNSTABLE_MSC3089_BRANCH.unstable); // test to ensure we're definitely using unstable
+                expect(stateKey).toEqual(fileEventId);
+                return fileEvent;
+            },
+        };
+
+        const file = tree.getFile(fileEventId);
+        expect(file).toBeDefined();
+        expect(file.indexEvent).toBe(fileEvent);
+    });
+
+    it('should return falsy for unknown files', () => {
+        const fileEventId = "$file";
+        room.currentState = {
+            getStateEvents: (eventType: string, stateKey?: string) => {
+                expect(eventType).toEqual(UNSTABLE_MSC3089_BRANCH.unstable); // test to ensure we're definitely using unstable
+                expect(stateKey).toEqual(fileEventId);
+                return null;
+            },
+        };
+
+        const file = tree.getFile(fileEventId);
+        expect(file).toBeFalsy();
+    });
+
+    it('should list files', () => {
+        const firstFile = {getContent: () => ({active: true})};
+        const secondFile = {getContent: () => ({active: false})}; // deliberately inactive
+        room.currentState = {
+            getStateEvents: (eventType: string, stateKey?: string) => {
+                expect(eventType).toEqual(UNSTABLE_MSC3089_BRANCH.unstable); // test to ensure we're definitely using unstable
+                expect(stateKey).toBeUndefined();
+                return [firstFile, secondFile];
+            },
+        };
+
+        const files = tree.listFiles();
+        expect(files).toBeDefined();
+        expect(files.length).toEqual(1);
+        expect(files[0].indexEvent).toBe(firstFile);
     });
 });
