@@ -11,6 +11,8 @@ import {
 } from "../../src/utils";
 import { logger } from "../../src/logger";
 
+// TODO: Fix types throughout
+
 describe("utils", function() {
     describe("encodeParams", function() {
         it("should url encode and concat with &s", function() {
@@ -238,7 +240,8 @@ describe("utils", function() {
                 },
             });
 
-            const target = {};
+            // TODO: Fix type
+            const target: any = {};
             utils.extend(target, source);
             expect(target.enumerableProp).toBe(true);
             expect(target.nonenumerableProp).toBe(undefined);
@@ -254,7 +257,7 @@ describe("utils", function() {
                     await utils.sleep(1);
                     expect(promiseCount).toEqual(0);
                     ++promiseCount;
-                    resolve();
+                    resolve(null);
                 });
             }
 
@@ -262,7 +265,7 @@ describe("utils", function() {
                 return new Promise(function(resolve, reject) {
                     expect(promiseCount).toEqual(1);
                     ++promiseCount;
-                    resolve();
+                    resolve(null);
                 });
             }
 
