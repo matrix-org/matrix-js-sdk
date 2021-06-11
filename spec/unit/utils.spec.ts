@@ -152,10 +152,10 @@ describe("utils", function() {
 
             assert.isTrue(utils.deepCompare({
                 1: { name: "mhc", age: 28 },
-                2: { name: "arb", age: 26 }
+                2: { name: "arb", age: 26 },
             }, {
                 1: { name: "mhc", age: 28 },
-                2: { name: "arb", age: 26 }
+                2: { name: "arb", age: 26 },
             }));
 
             assert.isFalse(utils.deepCompare({
