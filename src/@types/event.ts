@@ -71,6 +71,7 @@ export enum EventType {
     // Room account_data events
     FullyRead = "m.fully_read",
     Tag = "m.tag",
+    SpaceOrder = "org.matrix.msc3230.space_order", // MSC3230
 
     // User account_data events
     PushRules = "m.push_rules",
