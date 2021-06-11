@@ -251,20 +251,15 @@ describe("utils", function() {
         it("should execute promises in chunks", async function() {
             let promiseCount = 0;
 
-            function fn1() {
-                return (async function() {
-                    await utils.sleep(1);
-                    expect(promiseCount).toEqual(0);
-                    ++promiseCount;
-                })();
+            async function fn1() {
+                await utils.sleep(1);
+                expect(promiseCount).toEqual(0);
+                ++promiseCount;
             }
 
-            function fn2() {
-                return new Promise(function(resolve, reject) {
-                    expect(promiseCount).toEqual(1);
-                    ++promiseCount;
-                    resolve(null);
-                });
+            async function fn2() {
+                expect(promiseCount).toEqual(1);
+                ++promiseCount;
             }
 
             await utils.chunkPromises([fn1, fn2], 1);
