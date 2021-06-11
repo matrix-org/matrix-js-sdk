@@ -70,7 +70,7 @@ describe("utils", function() {
         it("should return true for functions", function() {
             expect(utils.isFunction([])).toBe(false);
             expect(utils.isFunction([5, 3, 7])).toBe(false);
-            expect(utils.isFunction()).toBe(false);
+            expect(utils.isFunction(undefined)).toBe(false);
             expect(utils.isFunction(null)).toBe(false);
             expect(utils.isFunction({})).toBe(false);
             expect(utils.isFunction("foo")).toBe(false);
@@ -98,16 +98,11 @@ describe("utils", function() {
     describe("checkObjectHasNoAdditionalKeys", function() {
         it("should throw for extra keys", function() {
             expect(function() {
-                utils.checkObjectHasNoAdditionalKeys({
-                            foo: "bar",
-                            baz: 4,
-                        }, ["foo"]);
+                utils.checkObjectHasNoAdditionalKeys({ foo: "bar", baz: 4 }, ["foo"]);
             }).toThrow();
 
             expect(function() {
-                utils.checkObjectHasNoAdditionalKeys({
-                            foo: "bar",
-                        }, ["foo"]);
+                utils.checkObjectHasNoAdditionalKeys({ foo: "bar" }, ["foo"]);
             }).not.toThrow();
         });
     });
@@ -138,10 +133,8 @@ describe("utils", function() {
         });
 
         it("should handle dates", function() {
-            assert.isTrue(utils.deepCompare(new Date("2011-03-31"),
-                                            new Date("2011-03-31")));
-            assert.isFalse(utils.deepCompare(new Date("2011-03-31"),
-                                             new Date("1970-01-01")));
+            assert.isTrue(utils.deepCompare(new Date("2011-03-31"), new Date("2011-03-31")));
+            assert.isFalse(utils.deepCompare(new Date("2011-03-31"), new Date("1970-01-01")));
         });
 
         it("should handle arrays", function() {
@@ -157,15 +150,21 @@ describe("utils", function() {
             assert.isTrue(utils.deepCompare({ a: 1, b: 2 }, { b: 2, a: 1 }));
             assert.isFalse(utils.deepCompare({ a: 1, b: 2 }, { a: 1, b: 3 }));
 
-            assert.isTrue(utils.deepCompare({ 1: { name: "mhc", age: 28 },
-                                             2: { name: "arb", age: 26 } },
-                                            { 1: { name: "mhc", age: 28 },
-                                             2: { name: "arb", age: 26 } }));
+            assert.isTrue(utils.deepCompare({
+                1: { name: "mhc", age: 28 },
+                2: { name: "arb", age: 26 }
+            }, {
+                1: { name: "mhc", age: 28 },
+                2: { name: "arb", age: 26 }
+            }));
 
-            assert.isFalse(utils.deepCompare({ 1: { name: "mhc", age: 28 },
-                                              2: { name: "arb", age: 26 } },
-                                             { 1: { name: "mhc", age: 28 },
-                                              2: { name: "arb", age: 27 } }));
+            assert.isFalse(utils.deepCompare({
+                1: { name: "mhc", age: 28 },
+                2: { name: "arb", age: 26 },
+            }, {
+                1: { name: "mhc", age: 28 },
+                2: { name: "arb", age: 27 },
+            }));
 
             assert.isFalse(utils.deepCompare({}, null));
             assert.isFalse(utils.deepCompare({}, undefined));
@@ -253,12 +252,11 @@ describe("utils", function() {
             let promiseCount = 0;
 
             function fn1() {
-                return new Promise(async function(resolve, reject) {
+                return (async function() {
                     await utils.sleep(1);
                     expect(promiseCount).toEqual(0);
                     ++promiseCount;
-                    resolve(null);
-                });
+                })();
             }
 
             function fn2() {
