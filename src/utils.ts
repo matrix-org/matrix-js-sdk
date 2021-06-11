@@ -457,7 +457,7 @@ export function getCrypto(): Object {
     return crypto;
 }
 
-// String averaging based upon https://stackoverflow.com/a/2510816
+// String averaging inspired by https://stackoverflow.com/a/2510816
 // Dev note: We make the alphabet a string because it's easier to write syntactically
 // than arrays. Thankfully, strings implement the useful parts of the Array interface
 // anyhow.
@@ -492,16 +492,17 @@ export function alphabetPad(s: string, n: number, alphabet = DEFAULT_ALPHABET): 
  * Converts a baseN number to a string, where N is the alphabet's length.
  *
  * This is intended for use with string averaging.
- * @param {number} n The baseN number.
+ * @param {bigint} n The baseN number.
  * @param {string} alphabet The alphabet to use as a single string.
  * @returns {string} The baseN number encoded as a string from the alphabet.
  */
-export function baseToString(n: number, alphabet = DEFAULT_ALPHABET): string {
-    const len = alphabet.length;
+export function baseToString(n: bigint, alphabet = DEFAULT_ALPHABET): string {
+    const len = BigInt(alphabet.length);
     if (n < len) {
-        return alphabet[n];
+        return alphabet[Number(n)];
     }
-    return baseToString(Math.floor(n / len), alphabet) + alphabet[n % len];
+
+    return baseToString(n / len, alphabet) + alphabet[Number(n % len)];
 }
 
 /**
@@ -510,15 +511,25 @@ export function baseToString(n: number, alphabet = DEFAULT_ALPHABET): string {
  * This is intended for use with string averaging.
  * @param {string} s The string to convert to a number.
  * @param {string} alphabet The alphabet to use as a single string.
- * @returns {number} The baseN number.
+ * @returns {bigint} The baseN number.
  */
-export function stringToBase(s: string, alphabet = DEFAULT_ALPHABET): number {
-    const len = alphabet.length;
-    const reversedStr = Array.from(s).reverse().join(""); // keep as string
-    let result = 0;
-    for (let i = 0; i < reversedStr.length; i++) {
-        // Cost effective version of `result += alphabet.indexOf(reversedStr[i]) * (len ** i);`
-        result += (reversedStr.charCodeAt(i) - alphabet.charCodeAt(0)) * (len ** i);
+export function stringToBase(s: string, alphabet = DEFAULT_ALPHABET): bigint {
+    const len = BigInt(alphabet.length);
+
+    // In our conversion to baseN we do a couple performance optimizations to avoid using
+    // excess CPU and such. To create baseN numbers, the input string needs to be reversed
+    // so the exponents stack up appropriately, as the last character in the unreversed
+    // string has less impact than the first character (in "abc" the A is a lot more important
+    // for lexicographic sorts). We also do a trick with the character codes to optimize the
+    // alphabet lookup, avoiding an index scan of `alphabet.indexOf(reversedStr[i])` - we know
+    // that the alphabet and (theoretically) the input string are constrained on character sets
+    // and thus can do simple subtraction to end up with the same result.
+
+    // Developer caution: we carefully cast to BigInt here to avoid losing precision. We cannot
+    // rely on Math.pow() (for example) to be capable of handling our insane numbers.
+    let result = BigInt(0);
+    for (let i = s.length - 1, j = BigInt(0); i >= 0; i--, j++) {
+        result += BigInt(s.charCodeAt(i) - alphabet.charCodeAt(0)) * (len ** j);
     }
     return result;
 }
@@ -536,7 +547,7 @@ export function averageBetweenStrings(a: string, b: string, alphabet = DEFAULT_A
     const padN = Math.max(a.length, b.length);
     const baseA = stringToBase(alphabetPad(a, padN, alphabet), alphabet);
     const baseB = stringToBase(alphabetPad(b, padN, alphabet), alphabet);
-    return baseToString(Math.round((baseA + baseB) / 2), alphabet);
+    return baseToString((baseA + baseB) / BigInt(2), alphabet);
 }
 
 /**
@@ -548,7 +559,7 @@ export function averageBetweenStrings(a: string, b: string, alphabet = DEFAULT_A
  * @returns {string} The string which follows the input string.
  */
 export function nextString(s: string, alphabet = DEFAULT_ALPHABET): string {
-    return baseToString(stringToBase(s, alphabet) + 1, alphabet);
+    return baseToString(stringToBase(s, alphabet) + BigInt(1), alphabet);
 }
 
 /**
@@ -560,7 +571,7 @@ export function nextString(s: string, alphabet = DEFAULT_ALPHABET): string {
  * @returns {string} The string which precedes the input string.
  */
 export function prevString(s: string, alphabet = DEFAULT_ALPHABET): string {
-    return baseToString(stringToBase(s, alphabet) - 1, alphabet);
+    return baseToString(stringToBase(s, alphabet) - BigInt(1), alphabet);
 }
 
 /**

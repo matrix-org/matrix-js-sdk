@@ -90,6 +90,8 @@ export class MSC3089TreeSpace {
      * Whether or not this is a top level space.
      */
     public get isTopLevel(): boolean {
+        // XXX: This is absolutely not how you find out if the space is top level
+        // but is safe for a managed usecase like we offer in the SDK.
         const parentEvents = this.room.currentState.getStateEvents(EventType.SpaceParent);
         if (!parentEvents?.length) return true;
         return parentEvents.every(e => !e.getContent()?.['via']);
@@ -377,6 +379,8 @@ export class MSC3089TreeSpace {
         const content = currentChild?.getContent() ?? { via: [this.client.getDomain()] };
         await this.client.sendStateEvent(parentRoom.roomId, EventType.SpaceChild, {
             ...content,
+
+            // TODO: Safely constrain to 50 character limit required by spaces.
             order: newOrder,
         }, this.roomId);
     }

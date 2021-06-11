@@ -19,14 +19,12 @@ limitations under the License.
  * is provided that the stable prefix should be used when representing the identifier.
  */
 export class NamespacedValue<S extends string, U extends string> {
-    public constructor(public readonly stable: S, public readonly unstable?: U) {
+    // Stable is optional, but one of the two parameters is required, hence the weird-looking types.
+    // Goal is to to have developers explicitly say there is no stable value (if applicable).
+    public constructor(public readonly stable: S | null | undefined, public readonly unstable?: U) {
         if (!this.unstable && !this.stable) {
             throw new Error("One of stable or unstable values must be supplied");
         }
-    }
-
-    public get tsType(): U | S {
-        return null; // irrelevant return
     }
 
     public get name(): U | S {

@@ -68,18 +68,21 @@ export interface IEventSearchOpts {
     term: string;
 }
 
+// allow camelcase as these are things go onto the wire
+/* eslint-disable camelcase */
 export interface ICreateRoomOpts {
-    room_alias_name?: string; // eslint-disable-line camelcase
+    room_alias_name?: string;
     visibility?: "public" | "private";
     name?: string;
     topic?: string;
     preset?: string;
-    power_level_content_override?: any;// eslint-disable-line camelcase
-    creation_content?: any;// eslint-disable-line camelcase
-    initial_state?: {type: string, state_key: string, content: any}[]; // eslint-disable-line camelcase
+    power_level_content_override?: any;
+    creation_content?: any;
+    initial_state?: {type: string, state_key: string, content: any}[];
     // TODO: Types (next line)
-    invite_3pid?: any[]; // eslint-disable-line camelcase
+    invite_3pid?: any[];
 }
+/* eslint-enable camelcase */
 
 export interface IRoomDirectoryOptions {
     server?: string;
