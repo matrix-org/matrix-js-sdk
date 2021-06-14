@@ -466,13 +466,13 @@ export function getCrypto(): Object {
  * The default alphabet used by string averaging in this SDK. This matches
  * all usefully printable ASCII characters (0x20-0x7E, inclusive).
  */
-export const DEFAULT_ALPHABET = [""].reduce(() => {
+export const DEFAULT_ALPHABET = (() => {
     let str = "";
     for (let c = 0x20; c <= 0x7E; c++) {
         str += String.fromCharCode(c);
     }
     return str;
-}, "");
+})();
 
 /**
  * Pads a string using the given alphabet as a base. The returned string will be
