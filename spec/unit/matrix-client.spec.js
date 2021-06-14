@@ -12,6 +12,7 @@ import {
 } from "../../src/@types/event";
 import { MEGOLM_ALGORITHM } from "../../src/crypto/olmlib";
 import { MatrixEvent } from "../../src/models/event";
+import { Preset } from "../../src/@types/partials";
 
 jest.useFakeTimers();
 
@@ -190,7 +191,7 @@ describe("MatrixClient", function() {
         const fn = jest.fn().mockImplementation((opts) => {
             expect(opts).toMatchObject({
                 name: roomName,
-                preset: "private_chat",
+                preset: Preset.PrivateChat,
                 power_level_content_override: {
                     ...DEFAULT_TREE_POWER_LEVELS_TEMPLATE,
                     users: {
