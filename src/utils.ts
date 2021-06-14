@@ -568,8 +568,16 @@ export function stringToBase(s: string, alphabet = DEFAULT_ALPHABET): bigint {
 export function averageBetweenStrings(a: string, b: string, alphabet = DEFAULT_ALPHABET): string {
     const padN = Math.max(a.length, b.length);
     const baseA = stringToBase(alphabetPad(a, padN, alphabet), alphabet);
-    const baseB = stringToBase(alphabetPad(b, padN, alphabet), alphabet);
-    return baseToString((baseA + baseB) / BigInt(2), alphabet);
+    let baseB = stringToBase(alphabetPad(b, padN, alphabet), alphabet);
+    let avg = (baseA + baseB) / BigInt(2);
+
+    // Detect integer division conflicts. This happens when two numbers are divided too close so
+    // we lose a .5 precision. We need to add a padding character in these cases.
+    if (avg === baseA || avg == baseB) {
+        return baseToString(avg, alphabet) + alphabet[0];
+    }
+
+    return baseToString(avg, alphabet);
 }
 
 /**

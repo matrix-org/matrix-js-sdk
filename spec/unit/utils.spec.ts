@@ -325,9 +325,10 @@ describe("utils", function() {
 
     describe('averageBetweenStrings', () => {
         it('should average appropriately', () => {
-            logger.log(stringToBase("  "));
-            logger.log(stringToBase("!!"));
             expect(averageBetweenStrings("  ", "!!")).toEqual(" P");
+            expect(averageBetweenStrings(" ", "!")).toEqual("  ");
+            expect(averageBetweenStrings('A', 'B')).toEqual('A ');
+            expect(averageBetweenStrings('AA', 'BB')).toEqual('Aq');
             expect(averageBetweenStrings('A', 'z')).toEqual(']');
             expect(averageBetweenStrings('a', 'z', "abcdefghijklmnopqrstuvwxyz")).toEqual('m');
             expect(averageBetweenStrings('AA', 'zz')).toEqual('^.');
