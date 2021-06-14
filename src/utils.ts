@@ -505,7 +505,7 @@ export function baseToString(n: bigint, alphabet = DEFAULT_ALPHABET): string {
 
     const len = BigInt(alphabet.length);
     if (n <= len) {
-        return alphabet[Number(n) - 1];
+        return alphabet[Number(n) - 1] ?? "";
     }
 
     let d = n / len;
