@@ -7735,7 +7735,7 @@ export class MatrixClient extends EventEmitter {
     public async unstableCreateFileTree(name: string): Promise<MSC3089TreeSpace> {
         const { room_id: roomId } = await this.createRoom({
             name: name,
-            preset: "private_chat",
+            preset: Preset.PrivateChat,
             power_level_content_override: {
                 ...DEFAULT_TREE_POWER_LEVELS_TEMPLATE,
                 users: {
