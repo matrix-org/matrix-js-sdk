@@ -107,7 +107,7 @@ import {
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
 } from "./@types/event";
-import { IImageInfo } from "./@types/partials";
+import { IImageInfo, Preset } from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
 import url from "url";
 import { randomString } from "./randomstring";
@@ -5585,15 +5585,21 @@ export class MatrixClient extends EventEmitter {
     /**
      * Query the server to see if it is forcing encryption to be enabled for
      * a given room preset, based on the /versions response.
-     * @param {string} presetName The name of the preset to check.
+     * @param {Preset} presetName The name of the preset to check.
      * @returns {Promise<boolean>} true if the server is forcing encryption
      * for the preset.
      */
-    public async doesServerForceEncryptionForPreset(presetName: string): Promise<boolean> {
+    public async doesServerForceEncryptionForPreset(presetName: Preset): Promise<boolean> {
         const response = await this.getVersions();
         if (!response) return false;
         const unstableFeatures = response["unstable_features"];
-        return unstableFeatures && !!unstableFeatures[`io.element.e2ee_forced.${presetName}`];
+
+        // The preset name in the versions response will be without the _chat suffix.
+        const versionsPresetName = presetName.includes("_chat")
+            ? presetName.substring(0, presetName.indexOf("_chat"))
+            : presetName;
+
+        return unstableFeatures && !!unstableFeatures[`io.element.e2ee_forced.${versionsPresetName}`];
     }
 
     /**
@@ -7729,7 +7735,7 @@ export class MatrixClient extends EventEmitter {
     public async unstableCreateFileTree(name: string): Promise<MSC3089TreeSpace> {
         const { room_id: roomId } = await this.createRoom({
             name: name,
-            preset: "private_chat",
+            preset: Preset.PrivateChat,
             power_level_content_override: {
                 ...DEFAULT_TREE_POWER_LEVELS_TEMPLATE,
                 users: {
