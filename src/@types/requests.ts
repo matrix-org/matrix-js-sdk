@@ -17,6 +17,9 @@ limitations under the License.
 import { Callback } from "../client";
 import { Preset, Visibility } from "./partials";
 
+// allow camelcase as these are things go onto the wire
+/* eslint-disable camelcase */
+
 export interface IJoinRoomOpts {
     /**
      * True to do a room initial sync on the resulting
@@ -41,12 +44,12 @@ export interface IRedactOpts {
 }
 
 export interface ISendEventResponse {
-    event_id: string; // eslint-disable-line camelcase
+    event_id: string;
 }
 
 export interface IPresenceOpts {
     presence: "online" | "offline" | "unavailable";
-    status_msg?: string; // eslint-disable-line camelcase
+    status_msg?: string;
 }
 
 export interface IPaginateOpts {
@@ -82,8 +85,6 @@ export interface ICreateRoomStateEvent {
     content: object;
 }
 
-// allow camelcase as these are things go onto the wire
-/* eslint-disable camelcase */
 export interface ICreateRoomOpts {
     room_alias_name?: string;
     visibility?: Visibility;
@@ -98,7 +99,6 @@ export interface ICreateRoomOpts {
     is_direct?: boolean;
     room_version?: string;
 }
-/* eslint-enable camelcase */
 
 export interface IRoomDirectoryOptions {
     server?: string;
@@ -106,7 +106,7 @@ export interface IRoomDirectoryOptions {
     since?: string;
 
     // TODO: Proper types
-    filter?: any & {generic_search_term: string};  // eslint-disable-line camelcase
+    filter?: any & {generic_search_term: string};
 }
 
 export interface IUploadOpts {
@@ -118,3 +118,5 @@ export interface IUploadOpts {
     callback?: Callback;
     progressHandler?: (state: {loaded: number, total: number}) => void;
 }
+
+/* eslint-enable camelcase */
