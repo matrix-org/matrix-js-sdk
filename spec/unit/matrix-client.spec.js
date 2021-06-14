@@ -12,7 +12,7 @@ import {
 } from "../../src/@types/event";
 import { MEGOLM_ALGORITHM } from "../../src/crypto/olmlib";
 import { MatrixEvent } from "../../src/models/event";
-import {Preset} from "../../src/@types/partials";
+import { Preset } from "../../src/@types/partials";
 
 jest.useFakeTimers();
 
