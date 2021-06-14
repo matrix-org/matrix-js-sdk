@@ -497,12 +497,29 @@ export function alphabetPad(s: string, n: number, alphabet = DEFAULT_ALPHABET): 
  * @returns {string} The baseN number encoded as a string from the alphabet.
  */
 export function baseToString(n: bigint, alphabet = DEFAULT_ALPHABET): string {
+    // Developer note: the stringToBase() function offsets the character set by 1 so that repeated
+    // characters (ie: "aaaaaa" in a..z) don't come out as zero. We have to reverse this here as
+    // otherwise we'll be wrong in our conversion. Undoing a +1 before an exponent isn't very fun
+    // though, so we rely on a lengthy amount of `x - 1` and integer division rules to reach a
+    // sane state. This also means we have to do rollover detection: see below.
+
     const len = BigInt(alphabet.length);
-    if (n < len) {
-        return alphabet[Number(n)];
+    if (n <= len) {
+        return alphabet[Number(n) - 1];
     }
 
-    return baseToString(n / len, alphabet) + alphabet[Number(n % len)];
+    let d = n / len;
+    let r = Number(n % len) - 1;
+
+    // Rollover detection: if the remainder is negative, it means that the string needs
+    // to roll over by 1 character downwards (ie: in a..z, the previous to "aaa" would be
+    // "zz").
+    if (r < 0) {
+        d -= BigInt(Math.abs(r)); // abs() is just to be clear what we're doing. Could also `+= r`.
+        r = Number(len) - 1;
+    }
+
+    return baseToString(d, alphabet) + alphabet[r];
 }
 
 /**
@@ -527,9 +544,14 @@ export function stringToBase(s: string, alphabet = DEFAULT_ALPHABET): bigint {
 
     // Developer caution: we carefully cast to BigInt here to avoid losing precision. We cannot
     // rely on Math.pow() (for example) to be capable of handling our insane numbers.
+
     let result = BigInt(0);
     for (let i = s.length - 1, j = BigInt(0); i >= 0; i--, j++) {
-        result += BigInt(s.charCodeAt(i) - alphabet.charCodeAt(0)) * (len ** j);
+        const charIndex = s.charCodeAt(i) - alphabet.charCodeAt(0);
+
+        // We add 1 to the char index to offset the whole numbering scheme. We unpack this in
+        // the baseToString() function.
+        result += BigInt(1 + charIndex) * (len ** j);
     }
     return result;
 }

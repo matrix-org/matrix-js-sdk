@@ -285,26 +285,49 @@ describe("utils", function() {
 
     describe('baseToString', () => {
         it('should calculate the appropriate string from numbers', () => {
-            expect(baseToString(BigInt(10))).toEqual(DEFAULT_ALPHABET[10]);
-            expect(baseToString(BigInt(10), "abcdefghijklmnopqrstuvwxyz")).toEqual('k');
-            expect(baseToString(BigInt(6241))).toEqual("ab");
-            expect(baseToString(BigInt(53), "abcdefghijklmnopqrstuvwxyz")).toEqual('cb');
+            // Verify the whole alphabet
+            for (let i = BigInt(1); i <= DEFAULT_ALPHABET.length; i++) {
+                console.log({i}); // for debugging
+                expect(baseToString(i)).toEqual(DEFAULT_ALPHABET[Number(i) - 1]);
+            }
+
+            // Just quickly double check that repeated characters aren't treated as padding, particularly
+            // at the beginning of the alphabet where they are most vulnerable to this behaviour.
+            expect(baseToString(BigInt(1))).toEqual(DEFAULT_ALPHABET[0].repeat(1));
+            expect(baseToString(BigInt(96))).toEqual(DEFAULT_ALPHABET[0].repeat(2));
+            expect(baseToString(BigInt(9121))).toEqual(DEFAULT_ALPHABET[0].repeat(3));
+            expect(baseToString(BigInt(866496))).toEqual(DEFAULT_ALPHABET[0].repeat(4));
+            expect(baseToString(BigInt(82317121))).toEqual(DEFAULT_ALPHABET[0].repeat(5));
+            expect(baseToString(BigInt(7820126496))).toEqual(DEFAULT_ALPHABET[0].repeat(6));
+
+            expect(baseToString(BigInt(10))).toEqual(DEFAULT_ALPHABET[9]);
+            expect(baseToString(BigInt(10), "abcdefghijklmnopqrstuvwxyz")).toEqual('j');
+            expect(baseToString(BigInt(6337))).toEqual("ab");
+            expect(baseToString(BigInt(80), "abcdefghijklmnopqrstuvwxyz")).toEqual('cb');
         });
     });
 
     describe('stringToBase', () => {
         it('should calculate the appropriate number for a string', () => {
-            expect(stringToBase(" ")).toEqual(BigInt(0));
-            expect(stringToBase("a", "abcdefghijklmnopqrstuvwxyz")).toEqual(BigInt(0));
-            expect(stringToBase("a")).toEqual(BigInt(65));
-            expect(stringToBase("c", "abcdefghijklmnopqrstuvwxyz")).toEqual(BigInt(2));
-            expect(stringToBase("ab")).toEqual(BigInt(6241));
-            expect(stringToBase("cb", "abcdefghijklmnopqrstuvwxyz")).toEqual(BigInt(53));
+            expect(stringToBase(DEFAULT_ALPHABET[0].repeat(1))).toEqual(BigInt(1));
+            expect(stringToBase(DEFAULT_ALPHABET[0].repeat(2))).toEqual(BigInt(96));
+            expect(stringToBase(DEFAULT_ALPHABET[0].repeat(3))).toEqual(BigInt(9121));
+            expect(stringToBase(DEFAULT_ALPHABET[0].repeat(4))).toEqual(BigInt(866496));
+            expect(stringToBase(DEFAULT_ALPHABET[0].repeat(5))).toEqual(BigInt(82317121));
+            expect(stringToBase(DEFAULT_ALPHABET[0].repeat(6))).toEqual(BigInt(7820126496));
+            expect(stringToBase("a", "abcdefghijklmnopqrstuvwxyz")).toEqual(BigInt(1));
+            expect(stringToBase("a")).toEqual(BigInt(66));
+            expect(stringToBase("c", "abcdefghijklmnopqrstuvwxyz")).toEqual(BigInt(3));
+            expect(stringToBase("ab")).toEqual(BigInt(6337));
+            expect(stringToBase("cb", "abcdefghijklmnopqrstuvwxyz")).toEqual(BigInt(80));
         });
     });
 
     describe('averageBetweenStrings', () => {
         it('should average appropriately', () => {
+            console.log(stringToBase("  "));
+            console.log(stringToBase("!!"));
+            expect(averageBetweenStrings("  ", "!!")).toEqual(" P");
             expect(averageBetweenStrings('A', 'z')).toEqual(']');
             expect(averageBetweenStrings('a', 'z', "abcdefghijklmnopqrstuvwxyz")).toEqual('m');
             expect(averageBetweenStrings('AA', 'zz')).toEqual('^.');
@@ -354,22 +377,8 @@ describe("utils", function() {
         it('should roll over', () => {
             const lastAlpha = DEFAULT_ALPHABET[DEFAULT_ALPHABET.length - 1];
             const firstAlpha = DEFAULT_ALPHABET[0];
-            const secondAlpha = DEFAULT_ALPHABET[1];
 
-            // You may be looking at this and wondering how on this planet we end up with
-            // the next string being +2 on the ASCII table, and this comment is here to tell
-            // you that you're not insane. Due to a property of the baseN conversion, our
-            // +1 (and -1 for prevString) turns into +2 because the first character in the
-            // alphabet is equivalent to zero rather than one. Thus, we're actually adding
-            // the second character of the alphabet (due to adding a numeric 1) to the
-            // input string, thus resulting in a human-understandable +2 jump rather than
-            // a +1 one.
-
-            // Let's validate that +1 behaviour with math
-            expect(stringToBase(DEFAULT_ALPHABET[0])).toEqual(BigInt(0));
-            expect(stringToBase(DEFAULT_ALPHABET[1])).toEqual(BigInt(1));
-
-            const highRoll = secondAlpha + firstAlpha;
+            const highRoll = firstAlpha + firstAlpha;
             const lowRoll = lastAlpha;
 
             expect(nextString(lowRoll)).toEqual(highRoll);
@@ -386,9 +395,8 @@ describe("utils", function() {
         it('should properly handle rolling over at 50 characters', () => {
             // Note: we also test reversibility of large strings here.
 
-            // See rollover test for why we use weird parts of the alphabet
             const maxSpaceValue = DEFAULT_ALPHABET[DEFAULT_ALPHABET.length - 1].repeat(50);
-            const fiftyFirstChar = DEFAULT_ALPHABET[1] + DEFAULT_ALPHABET[0].repeat(50);
+            const fiftyFirstChar = DEFAULT_ALPHABET[0].repeat(51);
 
             expect(nextString(maxSpaceValue)).toBe(fiftyFirstChar);
             expect(prevString(fiftyFirstChar)).toBe(maxSpaceValue);
