@@ -26,3 +26,14 @@ export interface IImageInfo {
     w?: number;
     h?: number;
 }
+
+export enum Visibility {
+    Public = "public",
+    Private = "private",
+}
+
+export enum Preset {
+    PrivateChat = "private_chat",
+    TrustedPrivateChat = "trusted_private_chat",
+    PublicChat = "public_chat",
+}

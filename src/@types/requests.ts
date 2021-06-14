@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { Callback } from "../client";
+import { Preset, Visibility } from "./partials";
 
 export interface IJoinRoomOpts {
     /**
@@ -68,19 +69,34 @@ export interface IEventSearchOpts {
     term: string;
 }
 
+export interface IInvite3PID {
+    id_server: string;
+    id_access_token?: string; // this gets injected by the js-sdk
+    medium: string;
+    address: string;
+}
+
+export interface ICreateRoomStateEvent {
+    type: string;
+    state_key?: string; // defaults to an empty string
+    content: object;
+}
+
 // allow camelcase as these are things go onto the wire
 /* eslint-disable camelcase */
 export interface ICreateRoomOpts {
     room_alias_name?: string;
-    visibility?: "public" | "private";
+    visibility?: Visibility;
     name?: string;
     topic?: string;
-    preset?: string;
-    power_level_content_override?: any;
-    creation_content?: any;
-    initial_state?: {type: string, state_key: string, content: any}[];
-    // TODO: Types (next line)
-    invite_3pid?: any[];
+    preset?: Preset;
+    power_level_content_override?: object;
+    creation_content?: object;
+    initial_state?: ICreateRoomStateEvent[];
+    invite?: string[];
+    invite_3pid?: IInvite3PID[];
+    is_direct?: boolean;
+    room_version?: string;
 }
 /* eslint-enable camelcase */
 
