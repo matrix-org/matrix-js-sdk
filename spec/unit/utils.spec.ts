@@ -287,7 +287,7 @@ describe("utils", function() {
         it('should calculate the appropriate string from numbers', () => {
             // Verify the whole alphabet
             for (let i = BigInt(1); i <= DEFAULT_ALPHABET.length; i++) {
-                console.log({i}); // for debugging
+                logger.log({ i }); // for debugging
                 expect(baseToString(i)).toEqual(DEFAULT_ALPHABET[Number(i) - 1]);
             }
 
@@ -325,8 +325,8 @@ describe("utils", function() {
 
     describe('averageBetweenStrings', () => {
         it('should average appropriately', () => {
-            console.log(stringToBase("  "));
-            console.log(stringToBase("!!"));
+            logger.log(stringToBase("  "));
+            logger.log(stringToBase("!!"));
             expect(averageBetweenStrings("  ", "!!")).toEqual(" P");
             expect(averageBetweenStrings('A', 'z')).toEqual(']');
             expect(averageBetweenStrings('a', 'z', "abcdefghijklmnopqrstuvwxyz")).toEqual('m');
