@@ -99,7 +99,14 @@ import {
     ISendEventResponse,
     IUploadOpts,
 } from "./@types/requests";
-import { EventType } from "./@types/event";
+import {
+    EventType,
+    RoomCreateTypeField,
+    RoomType,
+    UNSTABLE_MSC3088_ENABLED,
+    UNSTABLE_MSC3088_PURPOSE,
+    UNSTABLE_MSC3089_TREE_SUBTYPE,
+} from "./@types/event";
 import { IImageInfo } from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
 import url from "url";
@@ -107,6 +114,7 @@ import { randomString } from "./randomstring";
 import { ReadStream } from "fs";
 import { WebStorageSessionStore } from "./store/session/webstorage";
 import { BackupManager } from "./crypto/backup";
+import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE, MSC3089TreeSpace } from "./models/MSC3089TreeSpace";
 
 export type Store = StubStore | MemoryStore | LocalIndexedDBStoreBackend | RemoteIndexedDBStoreBackend;
 export type SessionStore = WebStorageSessionStore;
@@ -4288,7 +4296,7 @@ export class MatrixClient extends EventEmitter {
      *    {@link module:models/event-timeline~EventTimeline} including the given
      *    event
      */
-    public getEventTimeline(timelineSet: EventTimelineSet, eventId: string): EventTimeline {
+    public getEventTimeline(timelineSet: EventTimelineSet, eventId: string): Promise<EventTimeline> {
         // don't allow any timeline support unless it's been enabled.
         if (!this.timelineSupport) {
             throw new Error("timeline support is disabled. Set the 'timelineSupport'" +
@@ -7707,6 +7715,73 @@ export class MatrixClient extends EventEmitter {
         }, {
             prefix: "/_matrix/client/unstable/org.matrix.msc2946",
         });
+    }
+
+    /**
+     * Creates a new file tree space with the given name. The client will pick
+     * defaults for how it expects to be able to support the remaining API offered
+     * by the returned class.
+     *
+     * Note that this is UNSTABLE and may have breaking changes without notice.
+     * @param {string} name The name of the tree space.
+     * @returns {Promise<MSC3089TreeSpace>} Resolves to the created space.
+     */
+    public async unstableCreateFileTree(name: string): Promise<MSC3089TreeSpace> {
+        const { room_id: roomId } = await this.createRoom({
+            name: name,
+            preset: "private_chat",
+            power_level_content_override: {
+                ...DEFAULT_TREE_POWER_LEVELS_TEMPLATE,
+                users: {
+                    [this.getUserId()]: 100,
+                },
+            },
+            creation_content: {
+                [RoomCreateTypeField]: RoomType.Space,
+            },
+            initial_state: [
+                {
+                    type: UNSTABLE_MSC3088_PURPOSE.name,
+                    state_key: UNSTABLE_MSC3089_TREE_SUBTYPE.name,
+                    content: {
+                        [UNSTABLE_MSC3088_ENABLED.name]: true,
+                    },
+                },
+                {
+                    type: EventType.RoomEncryption,
+                    state_key: "",
+                    content: {
+                        algorithm: olmlib.MEGOLM_ALGORITHM,
+                    },
+                },
+            ],
+        });
+        return new MSC3089TreeSpace(this, roomId);
+    }
+
+    /**
+     * Gets a reference to a tree space, if the room ID given is a tree space. If the room
+     * does not appear to be a tree space then null is returned.
+     *
+     * Note that this is UNSTABLE and may have breaking changes without notice.
+     * @param {string} roomId The room ID to get a tree space reference for.
+     * @returns {MSC3089TreeSpace} The tree space, or null if not a tree space.
+     */
+    public unstableGetFileTreeSpace(roomId: string): MSC3089TreeSpace {
+        const room = this.getRoom(roomId);
+        if (!room) return null;
+
+        const createEvent = room.currentState.getStateEvents(EventType.RoomCreate, "");
+        const purposeEvent = room.currentState.getStateEvents(
+            UNSTABLE_MSC3088_PURPOSE.name,
+            UNSTABLE_MSC3089_TREE_SUBTYPE.name);
+
+        if (!createEvent) throw new Error("Expected single room create event");
+
+        if (!purposeEvent?.getContent()?.[UNSTABLE_MSC3088_ENABLED.name]) return null;
+        if (createEvent.getContent()?.[RoomCreateTypeField] !== RoomType.Space) return null;
+
+        return new MSC3089TreeSpace(this, roomId);
     }
 
     // TODO: Remove this warning, alongside the functions
