@@ -181,7 +181,7 @@ export class StubStore implements IStore {
      * @param {string} filterName The filter name.
      * @return {?string} The filter ID or null.
      */
-    public getFilterIdByName(filterName: string): Filter | null {
+    public getFilterIdByName(filterName: string): string | null {
         return null;
     }
 

@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {EventEmitter} from 'events';
+import { EventEmitter } from 'events';
 
-import {EventStatus, MatrixEvent} from './event';
-import {Room} from './room';
-import {logger} from '../logger';
-import {RelationType} from "../@types/event";
+import { EventStatus, MatrixEvent } from './event';
+import { Room } from './room';
+import { logger } from '../logger';
+import { RelationType } from "../@types/event";
 
 /**
  * A container for relation events that supports easy access to common ways of
@@ -159,7 +159,7 @@ export class Relations extends EventEmitter {
         // Event was cancelled, remove from the collection
         event.removeListener("Event.status", this.onEventStatus);
         this.removeEvent(event);
-    }
+    };
 
     /**
      * Get all relation events in this collection.
@@ -258,7 +258,7 @@ export class Relations extends EventEmitter {
         redactedEvent.removeListener("Event.beforeRedaction", this.onBeforeRedaction);
 
         this.emit("Relations.redaction", redactedEvent);
-    }
+    };
 
     /**
      * Get all events in this collection grouped by key and sorted by descending
