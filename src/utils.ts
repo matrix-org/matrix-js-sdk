@@ -235,13 +235,14 @@ export function deepCompare(x: any, y: any): boolean {
     return true;
 }
 
+// Dev note: This returns a tuple, but jsdoc doesn't like that. https://github.com/jsdoc/jsdoc/issues/1703
 /**
  * Creates an array of object properties/values (entries) then
  * sorts the result by key, recursively. The input object must
  * ensure it does not have loops. If the input is not an object
  * then it will be returned as-is.
  * @param {*} obj The object to get entries of
- * @returns {Array<[string, *]>} The entries, sorted by key.
+ * @returns {Array} The entries, sorted by key.
  */
 export function deepSortedObjectEntries(obj: any): [string, any][] {
     if (typeof(obj) !== "object") return obj;
