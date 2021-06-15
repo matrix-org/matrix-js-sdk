@@ -241,7 +241,7 @@ export function deepCompare(x: any, y: any): boolean {
  * ensure it does not have loops. If the input is not an object
  * then it will be returned as-is.
  * @param {*} obj The object to get entries of
- * @returns {[string, *][]} The entries, sorted by key.
+ * @returns {Array<[string, *]>} The entries, sorted by key.
  */
 export function deepSortedObjectEntries(obj: any): [string, any][] {
     if (typeof(obj) !== "object") return obj;
