@@ -102,25 +102,20 @@ export class FilterComponent {
             const name = Object.keys(literalKeys)[n];
             const matchFunc = literalKeys[name];
             const notName = "not_" + name;
-            const disallowedValues = this[notName];
-            if (disallowedValues.filter(matchFunc).length > 0) {
+            const disallowedValues: string[] = this.filterJson[notName];
+            if (disallowedValues?.some(matchFunc)) {
                 return false;
             }
 
-            const allowedValues = this[name];
-            if (allowedValues && allowedValues.length > 0) {
-                const anyMatch = allowedValues.some(matchFunc);
-                if (!anyMatch) {
-                    return false;
-                }
+            const allowedValues: string[] = this.filterJson[name];
+            if (allowedValues && !allowedValues.some(matchFunc)) {
+                return false;
             }
         }
 
         const containsUrlFilter = this.filterJson.contains_url;
-        if (containsUrlFilter !== undefined) {
-            if (containsUrlFilter !== containsUrl) {
-                return false;
-            }
+        if (containsUrlFilter !== undefined && containsUrlFilter !== containsUrl) {
+            return false;
         }
 
         return true;
