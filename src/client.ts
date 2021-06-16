@@ -3791,10 +3791,10 @@ export class MatrixClient extends EventEmitter {
      * @param {string} roomId The room to invite the user to.
      * @param {string} email The email address to invite.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: {} an empty object.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public inviteByEmail(roomId: string, email: string, callback?: Callback): Promise<void> {
+    public inviteByEmail(roomId: string, email: string, callback?: Callback): Promise<{}> {
         return this.inviteByThreePid(roomId, "email", email, callback);
     }
 
@@ -3804,10 +3804,10 @@ export class MatrixClient extends EventEmitter {
      * @param {string} medium The medium to invite the user e.g. "email".
      * @param {string} address The address for the specified medium.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: {} an empty object.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async inviteByThreePid(roomId: string, medium: string, address: string, callback?: Callback): Promise<void> {
+    public async inviteByThreePid(roomId: string, medium: string, address: string, callback?: Callback): Promise<{}> {
         const path = utils.encodeUri(
             "/rooms/$roomId/invite",
             { $roomId: roomId },
