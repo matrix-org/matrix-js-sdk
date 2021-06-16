@@ -3779,10 +3779,10 @@ export class MatrixClient extends EventEmitter {
      * @param {string} userId
      * @param {module:client.callback} callback Optional.
      * @param {string} reason Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: {} an empty object.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public invite(roomId: string, userId: string, callback?: Callback, reason?: string): Promise<void> {
+    public invite(roomId: string, userId: string, callback?: Callback, reason?: string): Promise<{}> {
         return this.membershipChange(roomId, userId, "invite", reason, callback);
     }
 
@@ -3843,10 +3843,10 @@ export class MatrixClient extends EventEmitter {
     /**
      * @param {string} roomId
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: {} an empty object.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public leave(roomId: string, callback?: Callback): Promise<void> {
+    public leave(roomId: string, callback?: Callback): Promise<{}> {
         return this.membershipChange(roomId, undefined, "leave", undefined, callback);
     }
 
@@ -3914,10 +3914,10 @@ export class MatrixClient extends EventEmitter {
      * @param {boolean} deleteRoom True to delete the room from the store on success.
      * Default: true.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: {} an empty object.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public forget(roomId: string, deleteRoom?: boolean, callback?: Callback): Promise<void> {
+    public forget(roomId: string, deleteRoom?: boolean, callback?: Callback): Promise<{}> {
         if (deleteRoom === undefined) {
             deleteRoom = true;
         }
@@ -3962,10 +3962,10 @@ export class MatrixClient extends EventEmitter {
      * @param {string} userId
      * @param {string} reason Optional.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: {} an empty object.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public kick(roomId: string, userId: string, reason?: string, callback?: Callback): Promise<void> {
+    public kick(roomId: string, userId: string, reason?: string, callback?: Callback): Promise<{}> {
         return this.setMembershipState(roomId, userId, "leave", reason, callback);
     }
 
@@ -4009,7 +4009,7 @@ export class MatrixClient extends EventEmitter {
         membership: string,
         reason?: string,
         callback?: Callback,
-    ): Promise<void> {
+    ): Promise<{}> {
         if (utils.isFunction(reason)) {
             callback = reason as any as Callback; // legacy
             reason = undefined;
