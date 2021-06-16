@@ -112,10 +112,10 @@ export class MSC3089TreeSpace {
      * @param {string} userId The user ID to invite.
      * @returns {Promise<void>} Resolves when complete.
      */
-    public invite(userId: string): Promise<void> {
+    public async invite(userId: string): Promise<void> {
         // TODO: [@@TR] Reliable invites
         // TODO: [@@TR] Share keys
-        return this.client.invite(this.roomId, userId);
+        await this.client.invite(this.roomId, userId);
     }
 
     /**
