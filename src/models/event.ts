@@ -87,7 +87,7 @@ export interface IEvent {
     txn_id?: string;
     state_key?: string;
     membership?: string;
-    unsigned?: IUnsigned;
+    unsigned: IUnsigned;
     redacts?: string;
 
     // v1 legacy fields
@@ -324,11 +324,11 @@ export class MatrixEvent extends EventEmitter {
      *
      * @return {Object} The event content JSON, or an empty object.
      */
-    public getOriginalContent(): IContent {
+    public getOriginalContent<T = IContent>(): T {
         if (this._localRedactionEvent) {
-            return {};
+            return {} as T;
         }
-        return this.clearEvent.content || this.event.content || {};
+        return (this.clearEvent.content || this.event.content || {}) as T;
     }
 
     /**
@@ -338,9 +338,9 @@ export class MatrixEvent extends EventEmitter {
      *
      * @return {Object} The event content JSON, or an empty object.
      */
-    public getContent(): IContent {
+    public getContent<T = IContent>(): T {
         if (this._localRedactionEvent) {
-            return {};
+            return {} as T;
         } else if (this._replacingEvent) {
             return this._replacingEvent.getContent()["m.new_content"] || {};
         } else {
