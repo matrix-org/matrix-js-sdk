@@ -37,7 +37,7 @@ import {
 import { WITHHELD_MESSAGES } from '../OlmDevice';
 
 // determine whether the key can be shared with invitees
-function isRoomSharedHistory(room) {
+export function isRoomSharedHistory(room) {
     const visibilityEvent = room.currentState &&
           room.currentState.getStateEvents("m.room.history_visibility", "");
     // NOTE: if the room visibility is unset, it would normally default to
