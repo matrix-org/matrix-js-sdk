@@ -39,7 +39,7 @@ function isValidFilterId(filterId: string): boolean {
     return isValidStr || typeof filterId === "number";
 }
 
-interface IOpts {
+export interface IOpts {
     localStorage?: Storage;
 }
 
@@ -432,7 +432,7 @@ export class MemoryStore implements IStore {
         return Promise.resolve();
     }
 
-    public clearOutOfBandMembers(): Promise<void> {
+    public clearOutOfBandMembers(roomId: string): Promise<void> {
         this.oobMembers = {};
         return Promise.resolve();
     }
