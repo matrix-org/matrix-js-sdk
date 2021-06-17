@@ -180,7 +180,7 @@ describe("MSC3089TreeSpace", () => {
             // really being tested here.
             expect(eventType).toEqual(EventType.RoomHistoryVisibility);
             expect(stateKey).toEqual("");
-            return {getContent: () => ({history_visibility: historyVis})}; // eslint-disable-line camelcase
+            return { getContent: () => ({ history_visibility: historyVis }) }; // eslint-disable-line camelcase
         });
         room.currentState.getStateEvents = historyFn;
 
@@ -205,7 +205,7 @@ describe("MSC3089TreeSpace", () => {
         const historyFn = jest.fn().mockImplementation((eventType: string, stateKey?: string) => {
             expect(eventType).toEqual(EventType.RoomHistoryVisibility);
             expect(stateKey).toEqual("");
-            return {getContent: () => ({history_visibility: historyVis})}; // eslint-disable-line camelcase
+            return { getContent: () => ({ history_visibility: historyVis }) }; // eslint-disable-line camelcase
         });
         room.currentState.getStateEvents = historyFn;
 
