@@ -39,7 +39,7 @@ function isValidFilterId(filterId: string): boolean {
     return isValidStr || typeof filterId === "number";
 }
 
-interface IOpts {
+export interface IOpts {
     localStorage?: Storage;
 }
 
