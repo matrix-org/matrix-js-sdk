@@ -1,6 +1,5 @@
 /*
-Copyright 2015, 2016 OpenMarket Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2015 - 2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,153 +21,168 @@ limitations under the License.
  */
 
 import { EventEmitter } from 'events';
-import * as utils from '../utils';
+
 import { logger } from '../logger';
+import { VerificationRequest } from "../crypto/verification/request/VerificationRequest";
+import { EventType, RelationType } from "../@types/event";
+import { Crypto } from "../crypto";
 
 /**
  * Enum for event statuses.
  * @readonly
  * @enum {string}
  */
-export const EventStatus = {
+export enum EventStatus {
     /** The event was not sent and will no longer be retried. */
-    NOT_SENT: "not_sent",
+    NOT_SENT = "not_sent",
 
     /** The message is being encrypted */
-    ENCRYPTING: "encrypting",
+    ENCRYPTING = "encrypting",
 
     /** The event is in the process of being sent. */
-    SENDING: "sending",
+    SENDING = "sending",
+
     /** The event is in a queue waiting to be sent. */
-    QUEUED: "queued",
-    /** The event has been sent to the server, but we have not yet received the
-     * echo. */
-    SENT: "sent",
+    QUEUED = "queued",
+
+    /** The event has been sent to the server, but we have not yet received the echo. */
+    SENT = "sent",
 
     /** The event was cancelled before it was successfully sent. */
-    CANCELLED: "cancelled",
-};
+    CANCELLED = "cancelled",
+}
 
-const interns = {};
-function intern(str) {
+const interns: Record<string, string> = {};
+function intern(str: string): string {
     if (!interns[str]) {
         interns[str] = str;
     }
     return interns[str];
 }
 
-/**
- * Construct a Matrix Event object
- * @constructor
- *
- * @param {Object} event The raw event to be wrapped in this DAO
- *
- * @prop {Object} event The raw (possibly encrypted) event. <b>Do not access
- * this property</b> directly unless you absolutely have to. Prefer the getter
- * methods defined on this class. Using the getter methods shields your app
- * from changes to event JSON between Matrix versions.
- *
- * @prop {RoomMember} sender The room member who sent this event, or null e.g.
- * this is a presence event. This is only guaranteed to be set for events that
- * appear in a timeline, ie. do not guarantee that it will be set on state
- * events.
- * @prop {RoomMember} target The room member who is the target of this event, e.g.
- * the invitee, the person being banned, etc.
- * @prop {EventStatus} status The sending status of the event.
- * @prop {Error} error most recent error associated with sending the event, if any
- * @prop {boolean} forwardLooking True if this event is 'forward looking', meaning
- * that getDirectionalContent() will return event.content and not event.prev_content.
- * Default: true. <strong>This property is experimental and may change.</strong>
- */
-export const MatrixEvent = function(
-    event,
-) {
-    // intern the values of matrix events to force share strings and reduce the
-    // amount of needless string duplication. This can save moderate amounts of
-    // memory (~10% on a 350MB heap).
-    // 'membership' at the event level (rather than the content level) is a legacy
-    // field that Element never otherwise looks at, but it will still take up a lot
-    // of space if we don't intern it.
-    ["state_key", "type", "sender", "room_id", "membership"].forEach((prop) => {
-        if (!event[prop]) {
-            return;
-        }
-        event[prop] = intern(event[prop]);
-    });
+/* eslint-disable camelcase */
+interface IContent {
+    [key: string]: any;
+    msgtype?: string;
+    membership?: string;
+    avatar_url?: string;
+    displayname?: string;
+    "m.relates_to"?: IEventRelation;
+}
 
-    ["membership", "avatar_url", "displayname"].forEach((prop) => {
-        if (!event.content || !event.content[prop]) {
-            return;
-        }
-        event.content[prop] = intern(event.content[prop]);
-    });
+interface IUnsigned {
+    age?: number;
+    prev_sender?: string;
+    prev_content?: IContent;
+    redacted_because?: IEvent;
+}
 
-    ["rel_type"].forEach((prop) => {
-        if (
-            !event.content ||
-            !event.content["m.relates_to"] ||
-            !event.content["m.relates_to"][prop]
-        ) {
-            return;
-        }
-        event.content["m.relates_to"][prop] = intern(event.content["m.relates_to"][prop]);
-    });
+interface IEvent {
+    event_id: string;
+    type: string;
+    content: IContent;
+    sender: string;
+    room_id: string;
+    origin_server_ts: number;
+    txn_id?: string;
+    state_key?: string;
+    membership?: string;
+    unsigned?: IUnsigned;
+    redacts?: string;
 
-    this.event = event || {};
+    // v1 legacy fields
+    user_id?: string;
+    prev_content?: IContent;
+    age?: number;
+}
 
-    this.sender = null;
-    this.target = null;
-    this.status = null;
-    this.error = null;
-    this.forwardLooking = true;
-    this._pushActions = null;
-    this._replacingEvent = null;
-    this._localRedactionEvent = null;
-    this._isCancelled = false;
+interface IAggregatedRelation {
+    origin_server_ts: number;
+    event_id?: string;
+    sender?: string;
+    type?: string;
+    count?: number;
+    key?: string;
+}
 
-    this._clearEvent = {};
+interface IEventRelation {
+    rel_type: string;
+    event_id: string;
+    key?: string;
+}
+
+interface IDecryptionResult {
+    clearEvent: {
+        room_id?: string;
+        type: string,
+        content: IContent,
+        unsigned?: IUnsigned,
+    };
+    forwardingCurve25519KeyChain?: string[];
+    senderCurve25519Key?: string;
+    claimedEd25519Key?: string;
+    untrusted?: boolean;
+}
+/* eslint-enable camelcase */
+
+interface IClearEvent {
+    type: string;
+    content: Omit<IContent, "membership" | "avatar_url" | "displayname" | "m.relates_to">;
+    unsigned?: IUnsigned;
+}
+
+interface IKeyRequestRecipient {
+    userId: string;
+    deviceId: "*" | string;
+}
+
+export interface IDecryptOptions {
+    emit?: boolean;
+    isRetry?: boolean;
+}
+
+export class MatrixEvent extends EventEmitter {
+    private pushActions: object = null;
+    private _replacingEvent: MatrixEvent = null;
+    private _localRedactionEvent: MatrixEvent = null;
+    private _isCancelled = false;
+    private clearEvent: Partial<IClearEvent> = {};
 
     /* curve25519 key which we believe belongs to the sender of the event. See
      * getSenderKey()
      */
-    this._senderCurve25519Key = null;
+    private senderCurve25519Key: string = null;
 
     /* ed25519 key which the sender of this event (for olm) or the creator of
      * the megolm session (for megolm) claims to own. See getClaimedEd25519Key()
      */
-    this._claimedEd25519Key = null;
+    private claimedEd25519Key: string = null;
 
     /* curve25519 keys of devices involved in telling us about the
-     * _senderCurve25519Key and _claimedEd25519Key.
+     * senderCurve25519Key and claimedEd25519Key.
      * See getForwardingCurve25519KeyChain().
      */
-    this._forwardingCurve25519KeyChain = [];
+    private forwardingCurve25519KeyChain: string[] = [];
 
     /* where the decryption key is untrusted
      */
-    this._untrusted = null;
+    private untrusted: boolean = null;
 
     /* if we have a process decrypting this event, a Promise which resolves
      * when it is finished. Normally null.
      */
-    this._decryptionPromise = null;
+    private _decryptionPromise: Promise<void> = null;
 
     /* flag to indicate if we should retry decrypting this event after the
      * first attempt (eg, we have received new data which means that a second
      * attempt may succeed)
      */
-    this._retryDecryption = false;
-
-    /* If the event is a `m.key.verification.request` (or to_device `m.key.verification.start`) event,
-     * `Crypto` will set this the `VerificationRequest` for the event
-     * so it can be easily accessed from the timeline.
-     */
-    this.verificationRequest = null;
+    private retryDecryption = false;
 
     /* The txnId with which this event was sent if it was during this session,
-       allows for a unique ID which does not change when the event comes back down sync.
+     * allows for a unique ID which does not change when the event comes back down sync.
      */
-    this._txnId = event.txn_id || null;
+    private txnId: string = null;
 
     /* Set an approximate timestamp for the event relative the local clock.
      * This will inherently be approximate because it doesn't take into account
@@ -176,36 +190,97 @@ export const MatrixEvent = function(
      * it to us and the time we're now constructing this event, but that's better
      * than assuming the local clock is in sync with the origin HS's clock.
      */
-    this._localTimestamp = Date.now() - this.getAge();
-};
-utils.inherits(MatrixEvent, EventEmitter);
+    private readonly localTimestamp: number;
 
-utils.extend(MatrixEvent.prototype, {
+    // XXX: these should be read-only
+    public sender = null;
+    public target = null;
+    public status: EventStatus = null;
+    public error = null;
+    public forwardLooking = true;
+
+    /* If the event is a `m.key.verification.request` (or to_device `m.key.verification.start`) event,
+     * `Crypto` will set this the `VerificationRequest` for the event
+     * so it can be easily accessed from the timeline.
+     */
+    public verificationRequest = null;
+
+    /**
+     * Construct a Matrix Event object
+     * @constructor
+     *
+     * @param {Object} event The raw event to be wrapped in this DAO
+     *
+     * @prop {Object} event The raw (possibly encrypted) event. <b>Do not access
+     * this property</b> directly unless you absolutely have to. Prefer the getter
+     * methods defined on this class. Using the getter methods shields your app
+     * from changes to event JSON between Matrix versions.
+     *
+     * @prop {RoomMember} sender The room member who sent this event, or null e.g.
+     * this is a presence event. This is only guaranteed to be set for events that
+     * appear in a timeline, ie. do not guarantee that it will be set on state
+     * events.
+     * @prop {RoomMember} target The room member who is the target of this event, e.g.
+     * the invitee, the person being banned, etc.
+     * @prop {EventStatus} status The sending status of the event.
+     * @prop {Error} error most recent error associated with sending the event, if any
+     * @prop {boolean} forwardLooking True if this event is 'forward looking', meaning
+     * that getDirectionalContent() will return event.content and not event.prev_content.
+     * Default: true. <strong>This property is experimental and may change.</strong>
+     */
+    constructor(public event: Partial<IEvent> = {}) {
+        super();
+
+        // intern the values of matrix events to force share strings and reduce the
+        // amount of needless string duplication. This can save moderate amounts of
+        // memory (~10% on a 350MB heap).
+        // 'membership' at the event level (rather than the content level) is a legacy
+        // field that Element never otherwise looks at, but it will still take up a lot
+        // of space if we don't intern it.
+        ["state_key", "type", "sender", "room_id", "membership"].forEach((prop) => {
+            if (typeof event[prop] !== "string") return;
+            event[prop] = intern(event[prop]);
+        });
+
+        ["membership", "avatar_url", "displayname"].forEach((prop) => {
+            if (typeof event.content?.[prop] !== "string") return;
+            event.content[prop] = intern(event.content[prop]);
+        });
+
+        ["rel_type"].forEach((prop) => {
+            if (typeof event.content?.["m.relates_to"]?.[prop] !== "string") return;
+            event.content["m.relates_to"][prop] = intern(event.content["m.relates_to"][prop]);
+        });
+
+        this.txnId = event.txn_id || null;
+        this.localTimestamp = Date.now() - this.getAge();
+    }
+
     /**
      * Get the event_id for this event.
      * @return {string} The event ID, e.g. <code>$143350589368169JsLZx:localhost
      * </code>
      */
-    getId: function() {
+    public getId(): string {
         return this.event.event_id;
-    },
+    }
 
     /**
      * Get the user_id for this event.
      * @return {string} The user ID, e.g. <code>@alice:matrix.org</code>
      */
-    getSender: function() {
+    public getSender(): string {
         return this.event.sender || this.event.user_id; // v2 / v1
-    },
+    }
 
     /**
      * Get the (decrypted, if necessary) type of event.
      *
      * @return {string} The event type, e.g. <code>m.room.message</code>
      */
-    getType: function() {
-        return this._clearEvent.type || this.event.type;
-    },
+    public getType(): EventType | string {
+        return this.clearEvent.type || this.event.type;
+    }
 
     /**
      * Get the (possibly encrypted) type of the event that will be sent to the
@@ -213,9 +288,9 @@ utils.extend(MatrixEvent.prototype, {
      *
      * @return {string} The event type.
      */
-    getWireType: function() {
+    public getWireType(): EventType | string {
         return this.event.type;
-    },
+    }
 
     /**
      * Get the room_id for this event. This will return <code>undefined</code>
@@ -223,25 +298,25 @@ utils.extend(MatrixEvent.prototype, {
      * @return {string} The room ID, e.g. <code>!cURbafjkfsMDVwdRDQ:matrix.org
      * </code>
      */
-    getRoomId: function() {
+    public getRoomId(): string {
         return this.event.room_id;
-    },
+    }
 
     /**
      * Get the timestamp of this event.
      * @return {Number} The event timestamp, e.g. <code>1433502692297</code>
      */
-    getTs: function() {
+    public getTs(): number {
         return this.event.origin_server_ts;
-    },
+    }
 
     /**
      * Get the timestamp of this event, as a Date object.
      * @return {Date} The event date, e.g. <code>new Date(1433502692297)</code>
      */
-    getDate: function() {
+    public getDate(): Date | null {
         return this.event.origin_server_ts ? new Date(this.event.origin_server_ts) : null;
-    },
+    }
 
     /**
      * Get the (decrypted, if necessary) event content JSON, even if the event
@@ -249,12 +324,12 @@ utils.extend(MatrixEvent.prototype, {
      *
      * @return {Object} The event content JSON, or an empty object.
      */
-    getOriginalContent: function() {
+    public getOriginalContent(): IContent {
         if (this._localRedactionEvent) {
             return {};
         }
-        return this._clearEvent.content || this.event.content || {};
-    },
+        return this.clearEvent.content || this.event.content || {};
+    }
 
     /**
      * Get the (decrypted, if necessary) event content JSON,
@@ -263,7 +338,7 @@ utils.extend(MatrixEvent.prototype, {
      *
      * @return {Object} The event content JSON, or an empty object.
      */
-    getContent: function() {
+    public getContent(): IContent {
         if (this._localRedactionEvent) {
             return {};
         } else if (this._replacingEvent) {
@@ -271,7 +346,7 @@ utils.extend(MatrixEvent.prototype, {
         } else {
             return this.getOriginalContent();
         }
-    },
+    }
 
     /**
      * Get the (possibly encrypted) event content JSON that will be sent to the
@@ -279,19 +354,19 @@ utils.extend(MatrixEvent.prototype, {
      *
      * @return {Object} The event content JSON, or an empty object.
      */
-    getWireContent: function() {
+    public getWireContent(): IContent {
         return this.event.content || {};
-    },
+    }
 
     /**
      * Get the previous event content JSON. This will only return something for
      * state events which exist in the timeline.
      * @return {Object} The previous event content JSON, or an empty object.
      */
-    getPrevContent: function() {
+    public getPrevContent(): IContent {
         // v2 then v1 then default
         return this.getUnsigned().prev_content || this.event.prev_content || {};
-    },
+    }
 
     /**
      * Get either 'content' or 'prev_content' depending on if this event is
@@ -302,9 +377,9 @@ utils.extend(MatrixEvent.prototype, {
      * @return {Object} event.content if this event is forward-looking, else
      * event.prev_content.
      */
-    getDirectionalContent: function() {
+    public getDirectionalContent(): IContent {
         return this.forwardLooking ? this.getContent() : this.getPrevContent();
-    },
+    }
 
     /**
      * Get the age of this event. This represents the age of the event when the
@@ -312,9 +387,9 @@ utils.extend(MatrixEvent.prototype, {
      * function was called.
      * @return {Number} The age of this event in milliseconds.
      */
-    getAge: function() {
+    public getAge(): number {
         return this.getUnsigned().age || this.event.age; // v2 / v1
-    },
+    }
 
     /**
      * Get the age of the event when this function was called.
@@ -322,26 +397,26 @@ utils.extend(MatrixEvent.prototype, {
      * had the event.
      * @return {Number} The age of this event in milliseconds.
      */
-    getLocalAge: function() {
-        return Date.now() - this._localTimestamp;
-    },
+    public getLocalAge(): number {
+        return Date.now() - this.localTimestamp;
+    }
 
     /**
      * Get the event state_key if it has one. This will return <code>undefined
      * </code> for message events.
      * @return {string} The event's <code>state_key</code>.
      */
-    getStateKey: function() {
+    public getStateKey(): string | undefined {
         return this.event.state_key;
-    },
+    }
 
     /**
      * Check if this event is a state event.
      * @return {boolean} True if this is a state event.
      */
-    isState: function() {
+    public isState(): boolean {
         return this.event.state_key !== undefined;
-    },
+    }
 
     /**
      * Replace the content of this event with encrypted versions.
@@ -349,10 +424,10 @@ utils.extend(MatrixEvent.prototype, {
      *
      * @internal
      *
-     * @param {string} crypto_type type of the encrypted event - typically
+     * @param {string} cryptoType type of the encrypted event - typically
      * <tt>"m.room.encrypted"</tt>
      *
-     * @param {object} crypto_content raw 'content' for the encrypted event.
+     * @param {object} cryptoContent raw 'content' for the encrypted event.
      *
      * @param {string} senderCurve25519Key curve25519 key to record for the
      *   sender of this event.
@@ -362,28 +437,35 @@ utils.extend(MatrixEvent.prototype, {
      *   sender if this event.
      *   See {@link module:models/event.MatrixEvent#getClaimedEd25519Key}
      */
-    makeEncrypted: function(
-        crypto_type, crypto_content, senderCurve25519Key, claimedEd25519Key,
-    ) {
+    public makeEncrypted(
+        cryptoType: string,
+        cryptoContent: object,
+        senderCurve25519Key: string,
+        claimedEd25519Key: string,
+    ): void {
         // keep the plain-text data for 'view source'
-        this._clearEvent = {
+        this.clearEvent = {
             type: this.event.type,
             content: this.event.content,
         };
-        this.event.type = crypto_type;
-        this.event.content = crypto_content;
-        this._senderCurve25519Key = senderCurve25519Key;
-        this._claimedEd25519Key = claimedEd25519Key;
-    },
+        this.event.type = cryptoType;
+        this.event.content = cryptoContent;
+        this.senderCurve25519Key = senderCurve25519Key;
+        this.claimedEd25519Key = claimedEd25519Key;
+    }
 
     /**
      * Check if this event is currently being decrypted.
      *
      * @return {boolean} True if this event is currently being decrypted, else false.
      */
-    isBeingDecrypted: function() {
+    public isBeingDecrypted(): boolean {
         return this._decryptionPromise != null;
-    },
+    }
+
+    public getDecryptionPromise(): Promise<void> {
+        return this._decryptionPromise;
+    }
 
     /**
      * Check if this event is an encrypted event which we failed to decrypt
@@ -393,16 +475,13 @@ utils.extend(MatrixEvent.prototype, {
      * @return {boolean} True if this event is an encrypted event which we
      *     couldn't decrypt.
      */
-    isDecryptionFailure: function() {
-        return this._clearEvent && this._clearEvent.content &&
-            this._clearEvent.content.msgtype === "m.bad.encrypted";
-    },
+    public isDecryptionFailure(): boolean {
+        return this.clearEvent?.content?.msgtype === "m.bad.encrypted";
+    }
 
-    shouldAttemptDecryption: function() {
-        return this.isEncrypted()
-            && !this.isBeingDecrypted()
-            && this.getClearContent() === null;
-    },
+    public shouldAttemptDecryption() {
+        return this.isEncrypted() && !this.isBeingDecrypted() && this.getClearContent() === null;
+    }
 
     /**
      * Start the process of trying to decrypt this event.
@@ -419,7 +498,7 @@ utils.extend(MatrixEvent.prototype, {
      * @returns {Promise} promise which resolves (to undefined) when the decryption
      * attempt is completed.
      */
-    attemptDecryption: async function(crypto, options = {}) {
+    public async attemptDecryption(crypto: Crypto, options: IDecryptOptions = {}): Promise<void> {
         // For backwards compatibility purposes
         // The function signature used to be attemptDecryption(crypto, isRetry)
         if (typeof options === "boolean") {
@@ -434,8 +513,8 @@ utils.extend(MatrixEvent.prototype, {
         }
 
         if (
-            this._clearEvent && this._clearEvent.content &&
-            this._clearEvent.content.msgtype !== "m.bad.encrypted"
+            this.clearEvent && this.clearEvent.content &&
+            this.clearEvent.content.msgtype !== "m.bad.encrypted"
         ) {
             // we may want to just ignore this? let's start with rejecting it.
             throw new Error(
@@ -453,13 +532,13 @@ utils.extend(MatrixEvent.prototype, {
             logger.log(
                 `Event ${this.getId()} already being decrypted; queueing a retry`,
             );
-            this._retryDecryption = true;
+            this.retryDecryption = true;
             return this._decryptionPromise;
         }
 
-        this._decryptionPromise = this._decryptionLoop(crypto, options);
+        this._decryptionPromise = this.decryptionLoop(crypto, options);
         return this._decryptionPromise;
-    },
+    }
 
     /**
      * Cancel any room key request for this event and resend another.
@@ -469,7 +548,7 @@ utils.extend(MatrixEvent.prototype, {
      *
      * @returns {Promise} a promise that resolves when the request is queued
      */
-    cancelAndResendKeyRequest: function(crypto, userId) {
+    public cancelAndResendKeyRequest(crypto: Crypto, userId: string): Promise<void> {
         const wireContent = this.getWireContent();
         return crypto.requestRoomKey({
             algorithm: wireContent.algorithm,
@@ -477,7 +556,7 @@ utils.extend(MatrixEvent.prototype, {
             session_id: wireContent.session_id,
             sender_key: wireContent.sender_key,
         }, this.getKeyRequestRecipients(userId), true);
-    },
+    }
 
     /**
      * Calculate the recipients for keyshare requests.
@@ -486,7 +565,7 @@ utils.extend(MatrixEvent.prototype, {
      *
      * @returns {Array} array of recipients
      */
-    getKeyRequestRecipients: function(userId) {
+    public getKeyRequestRecipients(userId: string): IKeyRequestRecipient[] {
         // send the request to all of our own devices, and the
         // original sending device if it wasn't us.
         const wireContent = this.getWireContent();
@@ -500,23 +579,24 @@ utils.extend(MatrixEvent.prototype, {
             });
         }
         return recipients;
-    },
+    }
 
-    _decryptionLoop: async function(crypto, options = {}) {
+    private async decryptionLoop(crypto: Crypto, options: IDecryptOptions = {}): Promise<void> {
         // make sure that this method never runs completely synchronously.
         // (doing so would mean that we would clear _decryptionPromise *before*
         // it is set in attemptDecryption - and hence end up with a stuck
         // `_decryptionPromise`).
         await Promise.resolve();
 
+        // eslint-disable-next-line no-constant-condition
         while (true) {
-            this._retryDecryption = false;
+            this.retryDecryption = false;
 
             let res;
             let err;
             try {
                 if (!crypto) {
-                    res = this._badEncryptedMessage("Encryption not enabled");
+                    res = this.badEncryptedMessage("Encryption not enabled");
                 } else {
                     res = await crypto.decryptEvent(this);
                     if (options.isRetry === true) {
@@ -533,7 +613,7 @@ utils.extend(MatrixEvent.prototype, {
                         `(id=${this.getId()}): ${e.stack || e}`,
                     );
                     this._decryptionPromise = null;
-                    this._retryDecryption = false;
+                    this.retryDecryption = false;
                     return;
                 }
 
@@ -545,15 +625,15 @@ utils.extend(MatrixEvent.prototype, {
                 //   event loop as `_decryptionPromise = null` below - otherwise we
                 //   risk a race:
                 //
-                //   * A: we check _retryDecryption here and see that it is
+                //   * A: we check retryDecryption here and see that it is
                 //        false
                 //   * B: we get a second call to attemptDecryption, which sees
                 //        that _decryptionPromise is set so sets
-                //        _retryDecryption
+                //        retryDecryption
                 //   * A: we continue below, clear _decryptionPromise, and
                 //        never do the retry.
                 //
-                if (this._retryDecryption) {
+                if (this.retryDecryption) {
                     // decryption error, but we have a retry queued.
                     logger.log(
                         `Got error decrypting event (id=${this.getId()}: ` +
@@ -568,7 +648,7 @@ utils.extend(MatrixEvent.prototype, {
                     `Error decrypting event (id=${this.getId()}): ${e.detailedString}`,
                 );
 
-                res = this._badEncryptedMessage(e.message);
+                res = this.badEncryptedMessage(e.message);
             }
 
             // at this point, we've either successfully decrypted the event, or have given up
@@ -579,11 +659,11 @@ utils.extend(MatrixEvent.prototype, {
             // otherwise the app will be confused to see `isBeingDecrypted` still set when
             // there isn't an `Event.decrypted` on the way.
             //
-            // see also notes on _retryDecryption above.
+            // see also notes on retryDecryption above.
             //
             this._decryptionPromise = null;
-            this._retryDecryption = false;
-            this._setClearData(res);
+            this.retryDecryption = false;
+            this.setClearData(res);
 
             // Before we emit the event, clear the push actions so that they can be recalculated
             // by relevant code. We do this because the clear event has now changed, making it
@@ -599,9 +679,9 @@ utils.extend(MatrixEvent.prototype, {
 
             return;
         }
-    },
+    }
 
-    _badEncryptedMessage: function(reason) {
+    private badEncryptedMessage(reason: string): IDecryptionResult {
         return {
             clearEvent: {
                 type: "m.room.message",
@@ -611,7 +691,7 @@ utils.extend(MatrixEvent.prototype, {
                 },
             },
         };
-    },
+    }
 
     /**
      * Update the cleartext data on this event.
@@ -625,16 +705,16 @@ utils.extend(MatrixEvent.prototype, {
      * @param {module:crypto~EventDecryptionResult} decryptionResult
      *     the decryption result, including the plaintext and some key info
      */
-    _setClearData: function(decryptionResult) {
-        this._clearEvent = decryptionResult.clearEvent;
-        this._senderCurve25519Key =
+    private setClearData(decryptionResult: IDecryptionResult): void {
+        this.clearEvent = decryptionResult.clearEvent;
+        this.senderCurve25519Key =
             decryptionResult.senderCurve25519Key || null;
-        this._claimedEd25519Key =
+        this.claimedEd25519Key =
             decryptionResult.claimedEd25519Key || null;
-        this._forwardingCurve25519KeyChain =
+        this.forwardingCurve25519KeyChain =
             decryptionResult.forwardingCurve25519KeyChain || [];
-        this._untrusted = decryptionResult.untrusted || false;
-    },
+        this.untrusted = decryptionResult.untrusted || false;
+    }
 
     /**
      * Gets the cleartext content for this event. If the event is not encrypted,
@@ -642,18 +722,18 @@ utils.extend(MatrixEvent.prototype, {
      *
      * @returns {Object} The cleartext (decrypted) content for the event
      */
-    getClearContent: function() {
-        const ev = this._clearEvent;
+    public getClearContent(): IContent | null {
+        const ev = this.clearEvent;
         return ev && ev.content ? ev.content : null;
-    },
+    }
 
     /**
      * Check if the event is encrypted.
      * @return {boolean} True if this event is encrypted.
      */
-    isEncrypted: function() {
+    public isEncrypted(): boolean {
         return !this.isState() && this.event.type === "m.room.encrypted";
-    },
+    }
 
     /**
      * The curve25519 key for the device that we think sent this event
@@ -668,9 +748,9 @@ utils.extend(MatrixEvent.prototype, {
      *
      * @return {string}
      */
-    getSenderKey: function() {
-        return this._senderCurve25519Key;
-    },
+    public getSenderKey(): string | null {
+        return this.senderCurve25519Key;
+    }
 
     /**
      * The additional keys the sender of this encrypted event claims to possess.
@@ -679,11 +759,11 @@ utils.extend(MatrixEvent.prototype, {
      *
      * @return {Object<string, string>}
      */
-    getKeysClaimed: function() {
+    public getKeysClaimed(): Record<"ed25519", string> {
         return {
-            ed25519: this._claimedEd25519Key,
+            ed25519: this.claimedEd25519Key,
         };
-    },
+    }
 
     /**
      * Get the ed25519 the sender of this event claims to own.
@@ -702,9 +782,9 @@ utils.extend(MatrixEvent.prototype, {
      *
      * @return {string}
      */
-    getClaimedEd25519Key: function() {
-        return this._claimedEd25519Key;
-    },
+    public getClaimedEd25519Key(): string | null {
+        return this.claimedEd25519Key;
+    }
 
     /**
      * Get the curve25519 keys of the devices which were involved in telling us
@@ -720,9 +800,9 @@ utils.extend(MatrixEvent.prototype, {
      *
      * @return {string[]} base64-encoded curve25519 keys, from oldest to newest.
      */
-    getForwardingCurve25519KeyChain: function() {
-        return this._forwardingCurve25519KeyChain;
-    },
+    public getForwardingCurve25519KeyChain(): string[] {
+        return this.forwardingCurve25519KeyChain;
+    }
 
     /**
      * Whether the decryption key was obtained from an untrusted source. If so,
@@ -730,51 +810,49 @@ utils.extend(MatrixEvent.prototype, {
      *
      * @return {boolean}
      */
-    isKeySourceUntrusted: function() {
-        return this._untrusted;
-    },
+    public isKeySourceUntrusted(): boolean {
+        return this.untrusted;
+    }
 
-    getUnsigned: function() {
+    public getUnsigned(): IUnsigned {
         return this.event.unsigned || {};
-    },
+    }
 
-    unmarkLocallyRedacted: function() {
+    public unmarkLocallyRedacted(): boolean {
         const value = this._localRedactionEvent;
         this._localRedactionEvent = null;
         if (this.event.unsigned) {
             this.event.unsigned.redacted_because = null;
         }
         return !!value;
-    },
+    }
 
-    markLocallyRedacted: function(redactionEvent) {
-        if (this._localRedactionEvent) {
-            return;
-        }
+    public markLocallyRedacted(redactionEvent: MatrixEvent): void {
+        if (this._localRedactionEvent) return;
         this.emit("Event.beforeRedaction", this, redactionEvent);
         this._localRedactionEvent = redactionEvent;
         if (!this.event.unsigned) {
             this.event.unsigned = {};
         }
-        this.event.unsigned.redacted_because = redactionEvent.event;
-    },
+        this.event.unsigned.redacted_because = redactionEvent.event as IEvent;
+    }
 
     /**
      * Update the content of an event in the same way it would be by the server
      * if it were redacted before it was sent to us
      *
-     * @param {module:models/event.MatrixEvent} redaction_event
+     * @param {module:models/event.MatrixEvent} redactionEvent
      *     event causing the redaction
      */
-    makeRedacted: function(redaction_event) {
+    public makeRedacted(redactionEvent: MatrixEvent): void {
         // quick sanity-check
-        if (!redaction_event.event) {
-            throw new Error("invalid redaction_event in makeRedacted");
+        if (!redactionEvent.event) {
+            throw new Error("invalid redactionEvent in makeRedacted");
         }
 
         this._localRedactionEvent = null;
 
-        this.emit("Event.beforeRedaction", this, redaction_event);
+        this.emit("Event.beforeRedaction", this, redactionEvent);
 
         this._replacingEvent = null;
         // we attempt to replicate what we would see from the server if
@@ -786,19 +864,19 @@ utils.extend(MatrixEvent.prototype, {
         if (!this.event.unsigned) {
             this.event.unsigned = {};
         }
-        this.event.unsigned.redacted_because = redaction_event.event;
+        this.event.unsigned.redacted_because = redactionEvent.event as IEvent;
 
         let key;
         for (key in this.event) {
             if (!this.event.hasOwnProperty(key)) {
                 continue;
             }
-            if (!_REDACT_KEEP_KEY_MAP[key]) {
+            if (!REDACT_KEEP_KEYS.has(key)) {
                 delete this.event[key];
             }
         }
 
-        const keeps = _REDACT_KEEP_CONTENT_MAP[this.getType()] || {};
+        const keeps = REDACT_KEEP_CONTENT_MAP[this.getType()] || {};
         const content = this.getContent();
         for (key in content) {
             if (!content.hasOwnProperty(key)) {
@@ -808,25 +886,25 @@ utils.extend(MatrixEvent.prototype, {
                 delete content[key];
             }
         }
-    },
+    }
 
     /**
      * Check if this event has been redacted
      *
      * @return {boolean} True if this event has been redacted
      */
-    isRedacted: function() {
+    public isRedacted(): boolean {
         return Boolean(this.getUnsigned().redacted_because);
-    },
+    }
 
     /**
      * Check if this event is a redaction of another event
      *
      * @return {boolean} True if this event is a redaction
      */
-    isRedaction: function() {
+    public isRedaction(): boolean {
         return this.getType() === "m.room.redaction";
-    },
+    }
 
     /**
      * Get the (decrypted, if necessary) redaction event JSON
@@ -834,41 +912,41 @@ utils.extend(MatrixEvent.prototype, {
      *
      * @returns {object} The redaction event JSON, or an empty object
      */
-    getRedactionEvent: function() {
+    public getRedactionEvent(): object | null {
         if (!this.isRedacted()) return null;
 
-        if (this._clearEvent.unsigned) {
-            return this._clearEvent.unsigned.redacted_because;
+        if (this.clearEvent.unsigned) {
+            return this.clearEvent.unsigned.redacted_because;
         } else if (this.event.unsigned.redacted_because) {
             return this.event.unsigned.redacted_because;
         } else {
             return {};
         }
-    },
+    }
 
     /**
      * Get the push actions, if known, for this event
      *
      * @return {?Object} push actions
      */
-    getPushActions: function() {
-        return this._pushActions;
-    },
+    public getPushActions(): object | null {
+        return this.pushActions;
+    }
 
     /**
      * Set the push actions for this event.
      *
      * @param {Object} pushActions push actions
      */
-    setPushActions: function(pushActions) {
-        this._pushActions = pushActions;
-    },
+    public setPushActions(pushActions: object): void {
+        this.pushActions = pushActions;
+    }
 
     /**
      * Replace the `event` property and recalculate any properties based on it.
      * @param {Object} event the object to assign to the `event` property
      */
-    handleRemoteEcho: function(event) {
+    public handleRemoteEcho(event: object): void {
         const oldUnsigned = this.getUnsigned();
         const oldId = this.getId();
         this.event = event;
@@ -889,7 +967,7 @@ utils.extend(MatrixEvent.prototype, {
             // emit the event if it changed
             this.emit("Event.localEventIdReplaced", this);
         }
-    },
+    }
 
     /**
      * Whether the event is in any phase of sending, send failure, waiting for
@@ -897,24 +975,24 @@ utils.extend(MatrixEvent.prototype, {
      *
      * @return {boolean}
      */
-    isSending() {
+    public isSending(): boolean {
         return !!this.status;
-    },
+    }
 
     /**
      * Update the event's sending status and emit an event as well.
      *
      * @param {String} status The new status
      */
-    setStatus(status) {
+    public setStatus(status: EventStatus): void {
         this.status = status;
         this.emit("Event.status", this, status);
-    },
+    }
 
-    replaceLocalEventId(eventId) {
+    public replaceLocalEventId(eventId: string): void {
         this.event.event_id = eventId;
         this.emit("Event.localEventIdReplaced", this);
-    },
+    }
 
     /**
      * Get whether the event is a relation event, and of a given type if
@@ -924,26 +1002,26 @@ utils.extend(MatrixEvent.prototype, {
      * given type
      * @return {boolean}
      */
-    isRelation(relType = undefined) {
+    public isRelation(relType: string = undefined): boolean {
         // Relation info is lifted out of the encrypted content when sent to
         // encrypted rooms, so we have to check `getWireContent` for this.
         const content = this.getWireContent();
         const relation = content && content["m.relates_to"];
         return relation && relation.rel_type && relation.event_id &&
             ((relType && relation.rel_type === relType) || !relType);
-    },
+    }
 
     /**
      * Get relation info for the event, if any.
      *
      * @return {Object}
      */
-    getRelation() {
+    public getRelation(): IEventRelation | null {
         if (!this.isRelation()) {
             return null;
         }
         return this.getWireContent()["m.relates_to"];
-    },
+    }
 
     /**
      * Set an event that replaces the content of this event, through an m.replace relation.
@@ -952,7 +1030,7 @@ utils.extend(MatrixEvent.prototype, {
      *
      * @param {MatrixEvent?} newEvent the event with the replacing content, if any.
      */
-    makeReplaced(newEvent) {
+    public makeReplaced(newEvent?: MatrixEvent): void {
         // don't allow redacted events to be replaced.
         // if newEvent is null we allow to go through though,
         // as with local redaction, the replacing event might get
@@ -964,44 +1042,44 @@ utils.extend(MatrixEvent.prototype, {
             this._replacingEvent = newEvent;
             this.emit("Event.replaced", this);
         }
-    },
+    }
 
     /**
      * Returns the status of any associated edit or redaction
-     * (not for reactions/annotations as their local echo doesn't affect the orignal event),
+     * (not for reactions/annotations as their local echo doesn't affect the original event),
      * or else the status of the event.
      *
      * @return {EventStatus}
      */
-    getAssociatedStatus() {
+    public getAssociatedStatus(): EventStatus | undefined {
         if (this._replacingEvent) {
             return this._replacingEvent.status;
         } else if (this._localRedactionEvent) {
             return this._localRedactionEvent.status;
         }
         return this.status;
-    },
+    }
 
-    getServerAggregatedRelation(relType) {
+    public getServerAggregatedRelation(relType: RelationType): IAggregatedRelation {
         const relations = this.getUnsigned()["m.relations"];
         if (relations) {
             return relations[relType];
         }
-    },
+    }
 
     /**
      * Returns the event ID of the event replacing the content of this event, if any.
      *
      * @return {string?}
      */
-    replacingEventId() {
-        const replaceRelation = this.getServerAggregatedRelation("m.replace");
+    public replacingEventId(): string | undefined {
+        const replaceRelation = this.getServerAggregatedRelation(RelationType.Replace);
         if (replaceRelation) {
             return replaceRelation.event_id;
         } else if (this._replacingEvent) {
             return this._replacingEvent.getId();
         }
-    },
+    }
 
     /**
      * Returns the event replacing the content of this event, if any.
@@ -1010,17 +1088,17 @@ utils.extend(MatrixEvent.prototype, {
      *
      * @return {MatrixEvent?}
      */
-    replacingEvent() {
+    public replacingEvent(): MatrixEvent | undefined {
         return this._replacingEvent;
-    },
+    }
 
     /**
      * Returns the origin_server_ts of the event replacing the content of this event, if any.
      *
      * @return {Date?}
      */
-    replacingEventDate() {
-        const replaceRelation = this.getServerAggregatedRelation("m.replace");
+    public replacingEventDate(): Date | undefined {
+        const replaceRelation = this.getServerAggregatedRelation(RelationType.Replace);
         if (replaceRelation) {
             const ts = replaceRelation.origin_server_ts;
             if (Number.isFinite(ts)) {
@@ -1029,38 +1107,38 @@ utils.extend(MatrixEvent.prototype, {
         } else if (this._replacingEvent) {
             return this._replacingEvent.getDate();
         }
-    },
+    }
 
     /**
      * Returns the event that wants to redact this event, but hasn't been sent yet.
      * @return {MatrixEvent} the event
      */
-    localRedactionEvent() {
+    public localRedactionEvent(): MatrixEvent | undefined {
         return this._localRedactionEvent;
-    },
+    }
 
     /**
      * For relations and redactions, returns the event_id this event is referring to.
      *
      * @return {string?}
      */
-    getAssociatedId() {
+    public getAssociatedId(): string | undefined {
         const relation = this.getRelation();
         if (relation) {
             return relation.event_id;
         } else if (this.isRedaction()) {
             return this.event.redacts;
         }
-    },
+    }
 
     /**
      * Checks if this event is associated with another event. See `getAssociatedId`.
      *
-     * @return {bool}
+     * @return {boolean}
      */
-    hasAssocation() {
+    public hasAssocation(): boolean {
         return !!this.getAssociatedId();
-    },
+    }
 
     /**
      * Update the related id with a new one.
@@ -1070,14 +1148,14 @@ utils.extend(MatrixEvent.prototype, {
      *
      * @param {string} eventId the new event id
      */
-    updateAssociatedId(eventId) {
+    public updateAssociatedId(eventId: string): void {
         const relation = this.getRelation();
         if (relation) {
             relation.event_id = eventId;
         } else if (this.isRedaction()) {
             this.event.redacts = eventId;
         }
-    },
+    }
 
     /**
      * Flags an event as cancelled due to future conditions. For example, a verification
@@ -1085,18 +1163,18 @@ utils.extend(MatrixEvent.prototype, {
      * listeners that a cancellation event is coming down the same pipe shortly.
      * @param {boolean} cancelled Whether the event is to be cancelled or not.
      */
-    flagCancelled(cancelled = true) {
+    public flagCancelled(cancelled = true): void {
         this._isCancelled = cancelled;
-    },
+    }
 
     /**
      * Gets whether or not the event is flagged as cancelled. See flagCancelled() for
      * more information.
      * @returns {boolean} True if the event is cancelled, false otherwise.
      */
-    isCancelled() {
+    isCancelled(): boolean {
         return this._isCancelled;
-    },
+    }
 
     /**
      * Summarise the event as JSON for debugging. If encrypted, include both the
@@ -1106,8 +1184,8 @@ utils.extend(MatrixEvent.prototype, {
      *
      * @return {Object}
      */
-    toJSON() {
-        const event = {
+    public toJSON(): object {
+        const event: any = {
             type: this.getType(),
             sender: this.getSender(),
             content: this.getContent(),
@@ -1130,22 +1208,22 @@ utils.extend(MatrixEvent.prototype, {
             decrypted: event,
             encrypted: this.event,
         };
-    },
+    }
 
-    setVerificationRequest: function(request) {
+    public setVerificationRequest(request: VerificationRequest): void {
         this.verificationRequest = request;
-    },
+    }
 
-    setTxnId(txnId) {
-        this._txnId = txnId;
-    },
+    public setTxnId(txnId: string): void {
+        this.txnId = txnId;
+    }
 
-    getTxnId() {
-        return this._txnId;
-    },
-});
+    public getTxnId(): string | undefined {
+        return this.txnId;
+    }
+}
 
-/* _REDACT_KEEP_KEY_MAP gives the keys we keep when an event is redacted
+/* REDACT_KEEP_KEYS gives the keys we keep when an event is redacted
  *
  * This is specified here:
  *  http://matrix.org/speculator/spec/HEAD/client_server/latest.html#redactions
@@ -1154,22 +1232,21 @@ utils.extend(MatrixEvent.prototype, {
  *  - We keep 'unsigned' since that is created by the local server
  *  - We keep user_id for backwards-compat with v1
  */
-const _REDACT_KEEP_KEY_MAP = [
+const REDACT_KEEP_KEYS = new Set([
     'event_id', 'type', 'room_id', 'user_id', 'sender', 'state_key', 'prev_state',
     'content', 'unsigned', 'origin_server_ts',
-].reduce(function(ret, val) {
-    ret[val] = 1; return ret;
-}, {});
+]);
 
 // a map from event type to the .content keys we keep when an event is redacted
-const _REDACT_KEEP_CONTENT_MAP = {
+const REDACT_KEEP_CONTENT_MAP = {
     'm.room.member': { 'membership': 1 },
     'm.room.create': { 'creator': 1 },
     'm.room.join_rules': { 'join_rule': 1 },
-    'm.room.power_levels': { 'ban': 1, 'events': 1, 'events_default': 1,
-                            'kick': 1, 'redact': 1, 'state_default': 1,
-                            'users': 1, 'users_default': 1,
-                           },
+    'm.room.power_levels': {
+        'ban': 1, 'events': 1, 'events_default': 1,
+        'kick': 1, 'redact': 1, 'state_default': 1,
+        'users': 1, 'users_default': 1,
+    },
     'm.room.aliases': { 'aliases': 1 },
 };
 
