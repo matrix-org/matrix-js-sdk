@@ -154,9 +154,9 @@ describe("MSC3089TreeSpace", () => {
             // Bare minimum overrides. We proxy to our mock function manually so we can
             // count the calls, not to ensure accuracy. The invite function behaving correctly
             // is covered by another test.
-            {invite: (userId) => fn(tree.roomId, userId)} as MSC3089TreeSpace,
-            {invite: (userId) => fn(tree.roomId, userId)} as MSC3089TreeSpace,
-            {invite: (userId) => fn(tree.roomId, userId)} as MSC3089TreeSpace,
+            { invite: (userId) => fn(tree.roomId, userId) } as MSC3089TreeSpace,
+            { invite: (userId) => fn(tree.roomId, userId) } as MSC3089TreeSpace,
+            { invite: (userId) => fn(tree.roomId, userId) } as MSC3089TreeSpace,
         ];
 
         await tree.invite(target, true);
