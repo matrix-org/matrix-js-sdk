@@ -2,7 +2,8 @@ import * as utils from "../../src/utils";
 import {
     alphabetPad,
     averageBetweenStrings,
-    baseToString, deepSortedObjectEntries,
+    baseToString,
+    deepSortedObjectEntries,
     DEFAULT_ALPHABET,
     lexicographicCompare,
     nextString,

@@ -1148,14 +1148,15 @@ utils.extend(MatrixEvent.prototype, {
     /**
      * Get a copy/snapshot of this event. The returned copy will be loosely linked
      * back to this instance, though will have "frozen" event information. Other
-     * properties may mutate depending on the state of this instance at the time
-     * of snapshotting.
+     * properties of this MatrixEvent instance will be copied verbatim, which can
+     * mean they are in reference to this instance despite being on the copy too.
+     * Consumers should be wary of using fields which may mutate over time.
      *
      * This is meant to be used to snapshot the event details themselves, not the
      * features (such as sender) surrounding the event.
      * @returns {MatrixEvent} A snapshot of this event.
      */
-    getSnapshotCopy() {
+    toSnapshot() {
         const ev = new MatrixEvent(JSON.parse(JSON.stringify(this.event)));
         for (const [p, v] of Object.entries(this)) {
             if (p !== "event") { // exclude the thing we just cloned
@@ -1168,7 +1169,7 @@ utils.extend(MatrixEvent.prototype, {
     /**
      * Determines if this event is equivalent to the given event. This only checks
      * the event object itself, not the other properties of the event. Intended for
-     * use with getSnapshotCopy() to identify events changing.
+     * use with toSnapshot() to identify events changing.
      * @param {MatrixEvent} otherEvent The other event to check against.
      * @returns {boolean} True if the events are the same, false otherwise.
      */

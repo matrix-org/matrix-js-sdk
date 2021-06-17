@@ -26,7 +26,7 @@ describe('MatrixEvent', () => {
             },
         });
 
-        const clone = a.getSnapshotCopy();
+        const clone = a.toSnapshot();
         expect(clone).toBeDefined();
         expect(clone).not.toBe(a);
         expect(clone.event).not.toBe(a.event);
@@ -54,7 +54,7 @@ describe('MatrixEvent', () => {
         expect(a.isEquivalentTo(a)).toBe(true);
         expect(b.isEquivalentTo(a)).toBe(false);
         expect(b.isEquivalentTo(b)).toBe(true);
-        expect(a.getSnapshotCopy().isEquivalentTo(a)).toBe(true);
-        expect(a.getSnapshotCopy().isEquivalentTo(b)).toBe(false);
+        expect(a.toSnapshot().isEquivalentTo(a)).toBe(true);
+        expect(a.toSnapshot().isEquivalentTo(b)).toBe(false);
     });
 });
