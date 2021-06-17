@@ -25,6 +25,7 @@ import {
 } from "../../../src/models/MSC3089TreeSpace";
 import { DEFAULT_ALPHABET } from "../../../src/utils";
 import { MockBlob } from "../../MockBlob";
+import { MatrixError } from "../../../src/http-api";
 
 describe("MSC3089TreeSpace", () => {
     let client: MatrixClient;
@@ -93,7 +94,7 @@ describe("MSC3089TreeSpace", () => {
             });
         client.sendStateEvent = fn;
         await tree.setName(newName);
-        expect(fn.mock.calls.length).toBe(1);
+        expect(fn).toHaveBeenCalledTimes(1);
     });
 
     it('should support inviting users to the space', async () => {
@@ -104,8 +105,62 @@ describe("MSC3089TreeSpace", () => {
             return Promise.resolve();
         });
         client.invite = fn;
-        await tree.invite(target);
-        expect(fn.mock.calls.length).toBe(1);
+        await tree.invite(target, false);
+        expect(fn).toHaveBeenCalledTimes(1);
+    });
+
+    it('should retry invites to the space', async () => {
+        const target = targetUser;
+        const fn = jest.fn().mockImplementation((inviteRoomId: string, userId: string) => {
+            expect(inviteRoomId).toEqual(roomId);
+            expect(userId).toEqual(target);
+            if (fn.mock.calls.length === 1) return Promise.reject(new Error("Sample Failure"));
+            return Promise.resolve();
+        });
+        client.invite = fn;
+        await tree.invite(target, false);
+        expect(fn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should not retry invite permission errors', async () => {
+        const target = targetUser;
+        const fn = jest.fn().mockImplementation((inviteRoomId: string, userId: string) => {
+            expect(inviteRoomId).toEqual(roomId);
+            expect(userId).toEqual(target);
+            return Promise.reject(new MatrixError({ errcode: "M_FORBIDDEN", error: "Sample Failure" }));
+        });
+        client.invite = fn;
+        try {
+            await tree.invite(target, false);
+
+            // noinspection ExceptionCaughtLocallyJS
+            throw new Error("Failed to fail");
+        } catch (e) {
+            expect(e.errcode).toEqual("M_FORBIDDEN");
+        }
+
+        expect(fn).toHaveBeenCalledTimes(1);
+    });
+
+    it('should invite to subspaces', async () => {
+        const target = targetUser;
+        const fn = jest.fn().mockImplementation((inviteRoomId: string, userId: string) => {
+            expect(inviteRoomId).toEqual(roomId);
+            expect(userId).toEqual(target);
+            return Promise.resolve();
+        });
+        client.invite = fn;
+        tree.getDirectories = () => [
+            // Bare minimum overrides. We proxy to our mock function manually so we can
+            // count the calls, not to ensure accuracy. The invite function behaving correctly
+            // is covered by another test.
+            { invite: (userId) => fn(tree.roomId, userId) } as MSC3089TreeSpace,
+            { invite: (userId) => fn(tree.roomId, userId) } as MSC3089TreeSpace,
+            { invite: (userId) => fn(tree.roomId, userId) } as MSC3089TreeSpace,
+        ];
+
+        await tree.invite(target, true);
+        expect(fn).toHaveBeenCalledTimes(4);
     });
 
     async function evaluatePowerLevels(pls: any, role: TreePermissions, expectedPl: number) {
