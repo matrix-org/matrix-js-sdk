@@ -34,7 +34,7 @@ export class Relations extends EventEmitter {
     private relations = new Set<MatrixEvent>();
     private annotationsByKey: Record<string, Set<MatrixEvent>> = {};
     private annotationsBySender: Record<string, Set<MatrixEvent>> = {};
-    private sortedAnnotationsByKey: [string, MatrixEvent][] = [];
+    private sortedAnnotationsByKey: [string, Set<MatrixEvent>][] = [];
     private targetEvent: MatrixEvent = null;
     private creationEmitted = false;
 
