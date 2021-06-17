@@ -21,7 +21,7 @@ limitations under the License.
 
 import { EventEmitter } from "events";
 import { SyncApi } from "./sync";
-import { EventStatus, MatrixEvent } from "./models/event";
+import { EventStatus, IDecryptOptions, MatrixEvent } from "./models/event";
 import { StubStore } from "./store/stub";
 import { createNewMatrixCall, MatrixCall } from "./webrtc/call";
 import { Filter } from "./filter";
@@ -3042,7 +3042,7 @@ export class MatrixClient extends EventEmitter {
         if (event && event.getType() === "m.room.power_levels") {
             // take a copy of the content to ensure we don't corrupt
             // existing client state with a failed power level change
-            content = utils.deepCopy(event.getContent());
+            content = utils.deepCopy(event.getContent()) as typeof content;
         }
         content.users[userId] = powerLevel;
         const path = utils.encodeUri("/rooms/$roomId/state/m.room.power_levels", {
@@ -5707,13 +5707,13 @@ export class MatrixClient extends EventEmitter {
      * @param {boolean} options.isRetry True if this is a retry (enables more logging)
      * @param {boolean} options.emit Emits "event.decrypted" if set to true
      */
-    public decryptEventIfNeeded(event: MatrixEvent, options?: { emit: boolean, isRetry: boolean }): Promise<void> {
+    public decryptEventIfNeeded(event: MatrixEvent, options?: IDecryptOptions): Promise<void> {
         if (event.shouldAttemptDecryption()) {
             event.attemptDecryption(this.crypto, options);
         }
 
         if (event.isBeingDecrypted()) {
-            return event._decryptionPromise;
+            return event.getDecryptionPromise();
         } else {
             return Promise.resolve();
         }
