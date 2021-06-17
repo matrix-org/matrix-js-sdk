@@ -42,6 +42,7 @@ export class User extends EventEmitter {
         presence: null,
         profile: null,
     };
+    // eslint-disable-next-line camelcase
     public unstable_statusMessage = "";
 
     /**
@@ -208,7 +209,7 @@ export class User extends EventEmitter {
      * @fires module:client~MatrixClient#event:"User.unstable_statusMessage"
      */
     // eslint-disable-next-line camelcase
-    public _unstable_updateStatusMessage(event: MatrixEvent): void {
+    public unstable_updateStatusMessage(event: MatrixEvent): void {
         if (!event.getContent()) this.unstable_statusMessage = "";
         else this.unstable_statusMessage = event.getContent()["status"];
         this.updateModifiedTime();

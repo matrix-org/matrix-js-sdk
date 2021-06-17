@@ -77,7 +77,7 @@ interface IUnsigned {
     redacted_because?: IEvent;
 }
 
-interface IEvent {
+export interface IEvent {
     event_id: string;
     type: string;
     content: IContent;

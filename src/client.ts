@@ -2730,7 +2730,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setAccountData(eventType: string, content: any, callback?: Callback): Promise<void> {
+    public setAccountData(eventType: EventType | string, content: any, callback?: Callback): Promise<void> {
         const path = utils.encodeUri("/user/$userId/account_data/$type", {
             $userId: this.credentials.userId,
             $type: eventType,
@@ -2749,7 +2749,7 @@ export class MatrixClient extends EventEmitter {
      * @param {string} eventType The event type
      * @return {?object} The contents of the given account data event
      */
-    public getAccountData(eventType: string): any {
+    public getAccountData(eventType: string): MatrixEvent {
         return this.store.getAccountData(eventType);
     }
 
