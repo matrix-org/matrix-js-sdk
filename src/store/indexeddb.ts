@@ -157,12 +157,12 @@ export class IndexedDBStore extends MemoryStore {
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
-    public getSavedSync = this.degradable(() => {
+    public getSavedSync = this.degradable((): Promise<object> => {
         return this.backend.getSavedSync();
     }, "getSavedSync");
 
     /** @return {Promise<boolean>} whether or not the database was newly created in this session. */
-    public isNewlyCreated = this.degradable(() => {
+    public isNewlyCreated = this.degradable((): Promise<boolean> => {
         return this.backend.isNewlyCreated();
     }, "isNewlyCreated");
 
@@ -170,7 +170,7 @@ export class IndexedDBStore extends MemoryStore {
      * @return {Promise} If there is a saved sync, the nextBatch token
      * for this sync, otherwise null.
      */
-    public getSavedSyncToken = this.degradable(() => {
+    public getSavedSyncToken = this.degradable((): Promise<string | null> => {
         return this.backend.getNextBatchToken();
     }, "getSavedSyncToken");
 
@@ -178,7 +178,7 @@ export class IndexedDBStore extends MemoryStore {
      * Delete all data from this store.
      * @return {Promise} Resolves if the data was deleted from the database.
      */
-    public deleteAllData = this.degradable(() => {
+    public deleteAllData = this.degradable((): Promise<void> => {
         super.deleteAllData();
         return this.backend.clearDatabase().then(() => {
             logger.log("Deleted indexeddb data.");
@@ -216,7 +216,7 @@ export class IndexedDBStore extends MemoryStore {
         return Promise.resolve();
     }
 
-    private reallySave = this.degradable((): void => {
+    private reallySave = this.degradable((): Promise<void> => {
         this.syncTs = Date.now(); // set now to guard against multi-writes
 
         // work out changed users (this doesn't handle deletions but you
@@ -235,7 +235,7 @@ export class IndexedDBStore extends MemoryStore {
         return this.backend.syncToDatabase(userTuples);
     });
 
-    public setSyncData = this.degradable((syncData: object) => {
+    public setSyncData = this.degradable((syncData: object): Promise<void> => {
         return this.backend.setSyncData(syncData);
     }, "setSyncData");
 
@@ -246,7 +246,7 @@ export class IndexedDBStore extends MemoryStore {
      * @returns {event[]} the events, potentially an empty array if OOB loading didn't yield any new members
      * @returns {null} in case the members for this room haven't been stored yet
      */
-    public getOutOfBandMembers = this.degradable((roomId: string) => {
+    public getOutOfBandMembers = this.degradable((roomId: string): Promise<MatrixEvent[]> => {
         return this.backend.getOutOfBandMembers(roomId);
     }, "getOutOfBandMembers");
 
@@ -258,21 +258,21 @@ export class IndexedDBStore extends MemoryStore {
      * @param {event[]} membershipEvents the membership events to store
      * @returns {Promise} when all members have been stored
      */
-    public setOutOfBandMembers = this.degradable((roomId: string, membershipEvents: MatrixEvent[]) => {
+    public setOutOfBandMembers = this.degradable((roomId: string, membershipEvents: MatrixEvent[]): Promise<void> => {
         super.setOutOfBandMembers(roomId, membershipEvents);
         return this.backend.setOutOfBandMembers(roomId, membershipEvents);
     }, "setOutOfBandMembers");
 
     public clearOutOfBandMembers = this.degradable((roomId: string) => {
-        super.clearOutOfBandMembers();
+        super.clearOutOfBandMembers(roomId);
         return this.backend.clearOutOfBandMembers(roomId);
     }, "clearOutOfBandMembers");
 
-    public getClientOptions = this.degradable(() => {
+    public getClientOptions = this.degradable((): Promise<object> => {
         return this.backend.getClientOptions();
     }, "getClientOptions");
 
-    public storeClientOptions = this.degradable((options) => {
+    public storeClientOptions = this.degradable((options: object): Promise<void> => {
         super.storeClientOptions(options);
         return this.backend.storeClientOptions(options);
     }, "storeClientOptions");
@@ -289,10 +289,15 @@ export class IndexedDBStore extends MemoryStore {
      * @param {String} fallback The method name for fallback.
      * @returns {Function} A wrapped member function.
      */
-    private degradable(func, fallback?: string) {
+    private degradable<A extends Array<any>, R = void>(
+        func: DegradableFn<A, R>,
+        fallback?: string,
+    ): DegradableFn<A, R> {
+        const fallbackFn = super[fallback];
+
         return async (...args) => {
             try {
-                return await func.call(this, ...args);
+                return func.call(this, ...args);
             } catch (e) {
                 logger.error("IndexedDBStore failure, degrading to MemoryStore", e);
                 this.emitter.emit("degraded", e);
@@ -314,10 +319,12 @@ export class IndexedDBStore extends MemoryStore {
                 // store become its parent type in a way. The mutator methods of
                 // `IndexedDBStore` also maintain the state that `MemoryStore` uses (many are
                 // not overridden at all).
-                if (fallback) {
-                    return await super[fallback](...args);
+                if (fallbackFn) {
+                    return fallbackFn(...args);
                 }
             }
         };
     }
 }
+
+type DegradableFn<A extends Array<any>, T> = (...args: A) => Promise<T>;

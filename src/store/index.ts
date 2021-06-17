@@ -218,7 +218,7 @@ export interface IStore {
 
     setOutOfBandMembers(roomId: string, membershipEvents: MatrixEvent[]): Promise<void>;
 
-    clearOutOfBandMembers(): Promise<void>;
+    clearOutOfBandMembers(roomId: string): Promise<void>;
 
     getClientOptions(): Promise<object>;
 
