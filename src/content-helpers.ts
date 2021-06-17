@@ -1,6 +1,6 @@
 /*
 Copyright 2018 New Vector Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2018 - 2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ limitations under the License.
  * @param {string} htmlBody the HTML representation of the message
  * @returns {{msgtype: string, format: string, body: string, formatted_body: string}}
  */
-export function makeHtmlMessage(body, htmlBody) {
+export function makeHtmlMessage(body: string, htmlBody: string) {
     return {
         msgtype: "m.text",
         format: "org.matrix.custom.html",
@@ -38,7 +38,7 @@ export function makeHtmlMessage(body, htmlBody) {
  * @param {string} htmlBody the HTML representation of the notice
  * @returns {{msgtype: string, format: string, body: string, formatted_body: string}}
  */
-export function makeHtmlNotice(body, htmlBody) {
+export function makeHtmlNotice(body: string, htmlBody: string) {
     return {
         msgtype: "m.notice",
         format: "org.matrix.custom.html",
@@ -53,7 +53,7 @@ export function makeHtmlNotice(body, htmlBody) {
  * @param {string} htmlBody the HTML representation of the emote
  * @returns {{msgtype: string, format: string, body: string, formatted_body: string}}
  */
-export function makeHtmlEmote(body, htmlBody) {
+export function makeHtmlEmote(body: string, htmlBody: string) {
     return {
         msgtype: "m.emote",
         format: "org.matrix.custom.html",
@@ -67,7 +67,7 @@ export function makeHtmlEmote(body, htmlBody) {
  * @param {string} body the plaintext body of the emote
  * @returns {{msgtype: string, body: string}}
  */
-export function makeTextMessage(body) {
+export function makeTextMessage(body: string) {
     return {
         msgtype: "m.text",
         body: body,
@@ -79,7 +79,7 @@ export function makeTextMessage(body) {
  * @param {string} body the plaintext body of the notice
  * @returns {{msgtype: string, body: string}}
  */
-export function makeNotice(body) {
+export function makeNotice(body: string) {
     return {
         msgtype: "m.notice",
         body: body,
@@ -91,7 +91,7 @@ export function makeNotice(body) {
  * @param {string} body the plaintext body of the emote
  * @returns {{msgtype: string, body: string}}
  */
-export function makeEmoteMessage(body) {
+export function makeEmoteMessage(body: string) {
     return {
         msgtype: "m.emote",
         body: body,

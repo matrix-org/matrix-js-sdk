@@ -1,6 +1,5 @@
 /*
-Copyright 2015, 2016 OpenMarket Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2015 - 2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +18,14 @@ limitations under the License.
  * @module models/room-summary
  */
 
+interface IInfo {
+    title: string;
+    desc: string;
+    numMembers: number;
+    aliases: string[];
+    timestamp: number;
+}
+
 /**
  * Construct a new Room Summary. A summary can be used for display on a recent
  * list, without having to load the entire room list into memory.
@@ -32,8 +39,7 @@ limitations under the License.
  * @param {string[]} info.aliases The list of aliases for this room.
  * @param {Number} info.timestamp The timestamp for this room.
  */
-export function RoomSummary(roomId, info) {
-    this.roomId = roomId;
-    this.info = info;
+export class RoomSummary {
+    constructor(public readonly roomId: string, info?: IInfo) {}
 }
 
