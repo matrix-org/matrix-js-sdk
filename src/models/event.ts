@@ -492,8 +492,8 @@ export class MatrixEvent extends EventEmitter {
      *
      * @param {module:crypto} crypto crypto module
      * @param {object} options
-     * @param {bool} options.isRetry True if this is a retry (enables more logging)
-     * @param {bool} options.emit Emits "event.decrypted" if set to true
+     * @param {boolean} options.isRetry True if this is a retry (enables more logging)
+     * @param {boolean} options.emit Emits "event.decrypted" if set to true
      *
      * @returns {Promise} promise which resolves (to undefined) when the decryption
      * attempt is completed.
@@ -1258,6 +1258,6 @@ const REDACT_KEEP_CONTENT_MAP = {
  * @param {module:models/event.MatrixEvent} event
  *    The matrix event which has been decrypted
  * @param {module:crypto/algorithms/base.DecryptionError?} err
- *    The error that occured during decryption, or `undefined` if no
- *    error occured.
+ *    The error that occurred during decryption, or `undefined` if no
+ *    error occurred.
  */
