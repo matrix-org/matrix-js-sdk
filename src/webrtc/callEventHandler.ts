@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import MatrixEvent from '../models/event';
+import { MatrixEvent } from '../models/event';
 import { logger } from '../logger';
 import { createNewMatrixCall, MatrixCall, CallErrorCode, CallState, CallDirection } from './call';
 import { EventType } from '../@types/event';
@@ -244,7 +244,7 @@ export class CallEventHandler {
             } else {
                 call.onRemoteIceCandidatesReceived(event);
             }
-        } else if ([EventType.CallHangup, EventType.CallReject].includes(event.getType())) {
+        } else if ([EventType.CallHangup, EventType.CallReject].includes(event.getType() as EventType)) {
             // Note that we also observe our own hangups here so we can see
             // if we've already rejected a call that would otherwise be valid
             if (!call) {

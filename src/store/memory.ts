@@ -59,7 +59,7 @@ export class MemoryStore implements IStore {
     //    filterId: Filter
     // }
     private filters: Record<string, Record<string, Filter>> = {};
-    private accountData: Record<string, object> = {}; // type : content
+    private accountData: Record<string, MatrixEvent> = {}; // type : content
     private readonly localStorage: Storage;
     private oobMembers: Record<string, MatrixEvent[]> = {}; // roomId: [member events]
     private clientOptions = {};
@@ -330,7 +330,7 @@ export class MemoryStore implements IStore {
      * @param {string} eventType The event type being queried
      * @return {?MatrixEvent} the user account_data event of given type, if any
      */
-    public getAccountData(eventType: EventType | string): MatrixEvent | null {
+    public getAccountData(eventType: EventType | string): MatrixEvent | undefined {
         return this.accountData[eventType];
     }
 
