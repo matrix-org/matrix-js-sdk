@@ -208,7 +208,7 @@ export class Room extends EventEmitter {
      */
     constructor(
         public readonly roomId: string,
-        private readonly client: MatrixClient,
+        public readonly client: MatrixClient,
         public readonly myUserId: string,
         private readonly opts: IOpts = {},
     ) {
