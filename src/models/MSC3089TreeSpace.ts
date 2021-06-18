@@ -19,8 +19,16 @@ import { EventType, IEncryptedFile, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_M
 import { Room } from "./room";
 import { logger } from "../logger";
 import { MatrixEvent } from "./event";
-import { averageBetweenStrings, DEFAULT_ALPHABET, lexicographicCompare, nextString, prevString } from "../utils";
+import {
+    averageBetweenStrings,
+    DEFAULT_ALPHABET,
+    lexicographicCompare,
+    nextString,
+    prevString,
+    simpleRetryOperation,
+} from "../utils";
 import { MSC3089Branch } from "./MSC3089Branch";
+import promiseRetry from "p-retry";
 
 /**
  * The recommended defaults for a tree space's power levels. Note that this
@@ -110,12 +118,29 @@ export class MSC3089TreeSpace {
      * Invites a user to the tree space. They will be given the default Viewer
      * permission level unless specified elsewhere.
      * @param {string} userId The user ID to invite.
+     * @param {boolean} andSubspaces True (default) to invite the user to all
+     * directories/subspaces too, recursively.
      * @returns {Promise<void>} Resolves when complete.
      */
-    public invite(userId: string): Promise<void> {
-        // TODO: [@@TR] Reliable invites
+    public invite(userId: string, andSubspaces = true): Promise<void> {
         // TODO: [@@TR] Share keys
-        return this.client.invite(this.roomId, userId);
+        const promises: Promise<void>[] = [this.retryInvite(userId)];
+        if (andSubspaces) {
+            promises.push(...this.getDirectories().map(d => d.invite(userId, andSubspaces)));
+        }
+        return Promise.all(promises).then(); // .then() to coerce types
+    }
+
+    private retryInvite(userId: string): Promise<void> {
+        return simpleRetryOperation(() => {
+            return this.client.invite(this.roomId, userId).catch(e => {
+                // We don't want to retry permission errors forever...
+                if (e?.errcode === "M_FORBIDDEN") {
+                    throw new promiseRetry.AbortError(e);
+                }
+                throw e;
+            });
+        });
     }
 
     /**

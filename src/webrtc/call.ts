@@ -24,7 +24,7 @@ limitations under the License.
 import { logger } from '../logger';
 import { EventEmitter } from 'events';
 import * as utils from '../utils';
-import MatrixEvent from '../models/event';
+import { MatrixEvent } from '../models/event';
 import { EventType } from '../@types/event';
 import { RoomMember } from '../models/room-member';
 import { randomString } from '../randomstring';

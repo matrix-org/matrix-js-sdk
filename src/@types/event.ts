@@ -87,6 +87,11 @@ export enum EventType {
     Dummy = "m.dummy",
 }
 
+export enum RelationType {
+    Annotation = "m.annotation",
+    Replace = "m.replace",
+}
+
 export enum MsgType {
     Text = "m.text",
     Emote = "m.emote",

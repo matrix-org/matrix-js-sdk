@@ -8,6 +8,7 @@ import {
     lexicographicCompare,
     nextString,
     prevString,
+    simpleRetryOperation,
     stringToBase,
 } from "../../src/utils";
 import { logger } from "../../src/logger";
@@ -266,6 +267,34 @@ describe("utils", function() {
             await utils.chunkPromises([fn1, fn2], 1);
             expect(promiseCount).toEqual(2);
         });
+    });
+
+    describe('simpleRetryOperation', () => {
+        it('should retry', async () => {
+            let count = 0;
+            const val = {};
+            const fn = (attempt) => {
+                count++;
+
+                // If this expectation fails then it can appear as a Jest Timeout due to
+                // the retry running beyond the test limit.
+                expect(attempt).toEqual(count);
+
+                if (count > 1) {
+                    return Promise.resolve(val);
+                } else {
+                    return Promise.reject(new Error("Iterative failure"));
+                }
+            };
+
+            const ret = await simpleRetryOperation(fn);
+            expect(ret).toBe(val);
+            expect(count).toEqual(2);
+        });
+
+        // We don't test much else of the function because then we're just testing that the
+        // underlying library behaves, which should be tested on its own. Our API surface is
+        // all that concerns us.
     });
 
     describe('DEFAULT_ALPHABET', () => {

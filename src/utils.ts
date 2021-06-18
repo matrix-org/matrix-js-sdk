@@ -20,7 +20,8 @@ limitations under the License.
  * @module utils
  */
 
-import unhomoglyph from 'unhomoglyph';
+import unhomoglyph from "unhomoglyph";
+import promiseRetry from "p-retry";
 
 /**
  * Encode a dictionary of query parameters.
@@ -467,6 +468,26 @@ export async function chunkPromises<T>(fns: (() => Promise<T>)[], chunkSize: num
         results.push(...(await Promise.all(fns.slice(i, i + chunkSize).map(fn => fn()))));
     }
     return results;
+}
+
+/**
+ * Retries the function until it succeeds or is interrupted. The given function must return
+ * a promise which throws/rejects on error, otherwise the retry will assume the request
+ * succeeded. The promise chain returned will contain the successful promise. The given function
+ * should always return a new promise.
+ * @param {Function} promiseFn The function to call to get a fresh promise instance. Takes an
+ * attempt count as an argument, for logging/debugging purposes.
+ * @returns {Promise<T>} The promise for the retried operation.
+ */
+export function simpleRetryOperation<T>(promiseFn: (attempt: number) => Promise<T>): Promise<T> {
+    return promiseRetry((attempt: number) => {
+        return promiseFn(attempt);
+    }, {
+        forever: true,
+        factor: 2,
+        minTimeout: 3000, // ms
+        maxTimeout: 15000, // ms
+    });
 }
 
 // We need to be able to access the Node.js crypto library from within the
