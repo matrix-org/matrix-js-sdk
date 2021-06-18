@@ -227,7 +227,6 @@ export class Room extends EventEmitter {
         }
 
         this.name = roomId;
-        this.normalizedName = normalize(this.name);
 
         // all our per-room timeline sets. the first one is the unfiltered ones;
         // the subsequent ones are the filtered ones in no particular order.
@@ -284,7 +283,7 @@ export class Room extends EventEmitter {
             .reverse()
             .map(event => event.attemptDecryption(this.client.crypto, { isRetry: true }));
 
-        return Promise.allSettled(decryptionPromises) as Promise<void>;
+        return Promise.allSettled(decryptionPromises) as unknown as Promise<void>;
     }
 
     /**
@@ -301,7 +300,7 @@ export class Room extends EventEmitter {
             .reverse()
             .map(event => event.attemptDecryption(this.client.crypto, { isRetry: true }));
 
-        return Promise.allSettled(decryptionPromises) as Promise<void>;
+        return Promise.allSettled(decryptionPromises) as unknown as Promise<void>;
     }
 
     /**
