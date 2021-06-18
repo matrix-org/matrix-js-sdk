@@ -319,8 +319,7 @@ export class Relations extends EventEmitter {
 
         // the all-knowning server tells us that the event at some point had
         // this timestamp for its replacement, so any following replacement should definitely not be less
-        const replaceRelation =
-            this.targetEvent.getServerAggregatedRelation(RelationType.Replace);
+        const replaceRelation = this.targetEvent.getServerAggregatedRelation(RelationType.Replace);
         const minTs = replaceRelation && replaceRelation.origin_server_ts;
 
         const lastReplacement = this.getRelations().reduce((last, event) => {
@@ -339,7 +338,7 @@ export class Relations extends EventEmitter {
         if (lastReplacement?.shouldAttemptDecryption()) {
             await lastReplacement.attemptDecryption(this.room._client.crypto);
         } else if (lastReplacement?.isBeingDecrypted()) {
-            await lastReplacement._decryptionPromise;
+            await lastReplacement.getDecryptionPromise();
         }
 
         return lastReplacement;

@@ -234,7 +234,7 @@ describe("Crypto", function() {
                         },
                     });
                     // make onRoomKeyEvent think this was an encrypted event
-                    ksEvent._senderCurve25519Key = "akey";
+                    ksEvent.senderCurve25519Key = "akey";
                     return ksEvent;
                 }
 
@@ -274,9 +274,9 @@ describe("Crypto", function() {
                     // alice encrypts each event, and then bob tries to decrypt
                     // them without any keys, so that they'll be in pending
                     await aliceClient.crypto.encryptEvent(event, aliceRoom);
-                    event._clearEvent = {};
-                    event._senderCurve25519Key = null;
-                    event._claimedEd25519Key = null;
+                    event.clearEvent = {};
+                    event.senderCurve25519Key = null;
+                    event.claimedEd25519Key = null;
                     try {
                         await bobClient.crypto.decryptEvent(event);
                     } catch (e) {

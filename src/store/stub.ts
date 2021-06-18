@@ -202,7 +202,9 @@ export class StubStore implements IStore {
      * Get account data event by event type
      * @param {string} eventType The event type being queried
      */
-    public getAccountData(eventType: EventType | string): MatrixEvent {}
+    public getAccountData(eventType: EventType | string): MatrixEvent | undefined {
+        return undefined;
+    }
 
     /**
      * setSyncData does nothing as there is no backing data store.
