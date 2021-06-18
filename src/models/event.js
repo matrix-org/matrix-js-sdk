@@ -1150,7 +1150,10 @@ utils.extend(MatrixEvent.prototype, {
      * back to this instance, though will have "frozen" event information. Other
      * properties of this MatrixEvent instance will be copied verbatim, which can
      * mean they are in reference to this instance despite being on the copy too.
-     * Consumers should be wary of using fields which may mutate over time.
+     * The reference the snapshot uses does not change, however members aside from
+     * the underlying event will not be deeply cloned, thus may be mutated internally.
+     * For example, the sender profile will be copied over at snapshot time, and
+     * the sender profile internally may mutate without notice to the consumer.
      *
      * This is meant to be used to snapshot the event details themselves, not the
      * features (such as sender) surrounding the event.
