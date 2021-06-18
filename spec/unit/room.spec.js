@@ -1,8 +1,8 @@
 import * as utils from "../test-utils";
-import { EventStatus, MatrixEvent } from "../../src/models/event";
+import { EventStatus, MatrixEvent } from "../../src";
 import { EventTimeline } from "../../src/models/event-timeline";
-import { RoomState } from "../../src/models/room-state";
-import { Room } from "../../src/models/room";
+import { RoomState } from "../../src";
+import { Room } from "../../src";
 import { TestClient } from "../TestClient";
 
 describe("Room", function() {
@@ -86,9 +86,11 @@ describe("Room", function() {
         ];
 
         it("should call RoomState.setTypingEvent on m.typing events", function() {
-            room.currentState = utils.mock(RoomState);
             const typing = utils.mkEvent({
-                room: roomId, type: "m.typing", event: true, content: {
+                room: roomId,
+                type: "m.typing",
+                event: true,
+                content: {
                     user_ids: [userA],
                 },
             });
@@ -140,8 +142,8 @@ describe("Room", function() {
             expect(callCount).toEqual(2);
         });
 
-        it("should call setStateEvents on the right RoomState with the right " +
-        "forwardLooking value for new events", function() {
+        it("should call setStateEvents on the right RoomState with the right forwardLooking value for new events",
+        function() {
             const events = [
                 utils.mkMembership({
                     room: roomId, mship: "invite", user: userB, skey: userA, event: true,
@@ -652,6 +654,7 @@ describe("Room", function() {
                 const roomName = "flibble";
 
                 const event = addMember(userA, "invite");
+                event.event.unsigned = {};
                 event.event.unsigned.invite_room_state = [
                     {
                         type: "m.room.name",
@@ -671,6 +674,7 @@ describe("Room", function() {
                 const roomName = "flibble";
                 setRoomName(roomName);
                 const roomNameToIgnore = "ignoreme";
+                event.event.unsigned = {};
                 event.event.unsigned.invite_room_state = [
                     {
                         type: "m.room.name",

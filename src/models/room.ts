@@ -284,7 +284,7 @@ export class Room extends EventEmitter {
             .reverse()
             .map(event => event.attemptDecryption(this.client.crypto, { isRetry: true }));
 
-        return Promise.allSettled(decryptionPromises);
+        return Promise.allSettled(decryptionPromises) as Promise<void>;
     }
 
     /**
@@ -301,7 +301,7 @@ export class Room extends EventEmitter {
             .reverse()
             .map(event => event.attemptDecryption(this.client.crypto, { isRetry: true }));
 
-        return Promise.allSettled(decryptionPromises);
+        return Promise.allSettled(decryptionPromises) as Promise<void>;
     }
 
     /**
@@ -1237,7 +1237,7 @@ export class Room extends EventEmitter {
      * @fires module:client~MatrixClient#event:"Room.timeline"
      * @private
      */
-    private addLiveEvent(event: MatrixEvent, duplicateStrategy: "ignore" | "replace", fromCache: boolean): void {
+    private addLiveEvent(event: MatrixEvent, duplicateStrategy?: "ignore" | "replace", fromCache = false): void {
         if (event.isRedaction()) {
             const redactId = event.event.redacts;
 
@@ -1336,11 +1336,7 @@ export class Room extends EventEmitter {
         // call setEventMetadata to set up event.sender etc
         // as event is shared over all timelineSets, we set up its metadata based
         // on the unfiltered timelineSet.
-        EventTimeline.setEventMetadata(
-            event,
-            this.getLiveTimeline().getState(EventTimeline.FORWARDS),
-            false,
-        );
+        EventTimeline.setEventMetadata(event, this.getLiveTimeline().getState(EventTimeline.FORWARDS), false);
 
         this.txnToEvent[txnId] = event;
 
@@ -1612,7 +1608,7 @@ export class Room extends EventEmitter {
      * @param {boolean} fromCache whether the sync response came from cache
      * @throws If <code>duplicateStrategy</code> is not falsey, 'replace' or 'ignore'.
      */
-    public addLiveEvents(events: MatrixEvent[], duplicateStrategy: "replace" | "ignore", fromCache: boolean): void {
+    public addLiveEvents(events: MatrixEvent[], duplicateStrategy?: "replace" | "ignore", fromCache = false): void {
         let i;
         if (duplicateStrategy && ["replace", "ignore"].indexOf(duplicateStrategy) === -1) {
             throw new Error("duplicateStrategy MUST be either 'replace' or 'ignore'");
