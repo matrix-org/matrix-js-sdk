@@ -18,12 +18,18 @@ limitations under the License.
  * @module models/room-summary
  */
 
+export interface IRoomSummary {
+    "m.heroes": string[];
+    "m.joined_member_count": number;
+    "m.invited_member_count": number;
+}
+
 interface IInfo {
     title: string;
-    desc: string;
-    numMembers: number;
-    aliases: string[];
-    timestamp: number;
+    desc?: string;
+    numMembers?: number;
+    aliases?: string[];
+    timestamp?: number;
 }
 
 /**

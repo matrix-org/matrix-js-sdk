@@ -70,11 +70,15 @@ interface IContent {
     "m.relates_to"?: IEventRelation;
 }
 
+type StrippedState = Required<Pick<IEvent, "content" | "state_key" | "type" | "sender">>;
+
 interface IUnsigned {
     age?: number;
     prev_sender?: string;
     prev_content?: IContent;
     redacted_because?: IEvent;
+    transaction_id?: string;
+    invite_room_state?: StrippedState[];
 }
 
 export interface IEvent {

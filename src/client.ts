@@ -32,7 +32,6 @@ import { Group } from "./models/group";
 import { EventTimeline } from "./models/event-timeline";
 import { PushAction, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery } from "./autodiscovery";
-import { MatrixError } from "./http-api";
 import * as olmlib from "./crypto/olmlib";
 import { decodeBase64, encodeBase64 } from "./crypto/olmlib";
 import { ReEmitter } from './ReEmitter';
@@ -40,6 +39,7 @@ import { RoomList } from './crypto/RoomList';
 import { logger } from './logger';
 import { SERVICE_TYPES } from './service-types';
 import {
+    MatrixError,
     MatrixHttpApi,
     PREFIX_IDENTITY_V2,
     PREFIX_MEDIA_R0,
@@ -64,7 +64,7 @@ import {
 import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
 import type Request from "request";
 import { MatrixScheduler } from "./scheduler";
-import { ICryptoCallbacks, IDeviceTrustLevel, ISecretStorageKeyInfo } from "./matrix";
+import { ICryptoCallbacks, IDeviceTrustLevel, ISecretStorageKeyInfo, NotificationCountType } from "./matrix";
 import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store";
 import { LocalStorageCryptoStore } from "./crypto/store/localStorage-crypto-store";
 import { IndexedDBCryptoStore } from "./crypto/store/indexeddb-crypto-store";
@@ -94,7 +94,8 @@ import {
     IJoinRoomOpts,
     IPaginateOpts,
     IPresenceOpts,
-    IRedactOpts, IRoomDirectoryOptions,
+    IRedactOpts,
+    IRoomDirectoryOptions,
     ISearchOpts,
     ISendEventResponse,
     IUploadOpts,
@@ -348,6 +349,26 @@ export interface IStoredClientOpts extends IStartClientOpts {
     canResetEntireTimeline: ResetTimelineCallback;
 }
 
+export enum RoomVersionStability {
+    Stable = "stable",
+    Unstable = "unstable",
+}
+
+export interface IRoomVersionsCapability {
+    default: string;
+    available: Record<string, RoomVersionStability>;
+}
+
+export interface IChangePasswordCapability {
+    enabled: boolean;
+}
+
+interface ICapabilities {
+    [key: string]: any;
+    "m.change_password"?: IChangePasswordCapability;
+    "m.room_versions"?: IRoomVersionsCapability;
+}
+
 /**
  * Represents a Matrix Client. Only directly construct this if you want to use
  * custom modules. Normally, {@link createClient} should be used
@@ -408,7 +429,7 @@ export class MatrixClient extends EventEmitter {
     protected serverVersionsPromise: Promise<any>;
 
     protected cachedCapabilities: {
-        capabilities: Record<string, any>;
+        capabilities: ICapabilities;
         expiration: number;
     };
     protected clientWellKnown: any;
@@ -529,7 +550,7 @@ export class MatrixClient extends EventEmitter {
             const room = this.getRoom(event.getRoomId());
             if (!room) return;
 
-            const currentCount = room.getUnreadNotificationCount("highlight");
+            const currentCount = room.getUnreadNotificationCount(NotificationCountType.Highlight);
 
             // Ensure the unread counts are kept up to date if the event is encrypted
             // We also want to make sure that the notification count goes up if we already
@@ -545,12 +566,12 @@ export class MatrixClient extends EventEmitter {
                     let newCount = currentCount;
                     if (newHighlight && !oldHighlight) newCount++;
                     if (!newHighlight && oldHighlight) newCount--;
-                    room.setUnreadNotificationCount("highlight", newCount);
+                    room.setUnreadNotificationCount(NotificationCountType.Highlight, newCount);
 
                     // Fix 'Mentions Only' rooms from not having the right badge count
-                    const totalCount = room.getUnreadNotificationCount('total');
+                    const totalCount = room.getUnreadNotificationCount(NotificationCountType.Total);
                     if (totalCount < newCount) {
-                        room.setUnreadNotificationCount('total', newCount);
+                        room.setUnreadNotificationCount(NotificationCountType.Total, newCount);
                     }
                 }
             }
@@ -1058,7 +1079,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves to the capabilities of the homeserver
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getCapabilities(fresh = false): Promise<Record<string, any>> {
+    public getCapabilities(fresh = false): Promise<ICapabilities> {
         const now = new Date().getTime();
 
         if (this.cachedCapabilities && !fresh) {
@@ -1076,7 +1097,7 @@ export class MatrixClient extends EventEmitter {
             return null; // otherwise consume the error
         }).then((r) => {
             if (!r) r = {};
-            const capabilities = r["capabilities"] || {};
+            const capabilities: ICapabilities = r["capabilities"] || {};
 
             // If the capabilities missed the cache, cache it for a shorter amount
             // of time to try and refresh them later.
@@ -1085,7 +1106,7 @@ export class MatrixClient extends EventEmitter {
                 : 60000 + (Math.random() * 5000);
 
             this.cachedCapabilities = {
-                capabilities: capabilities,
+                capabilities,
                 expiration: now + cacheMs,
             };
 
@@ -3544,7 +3565,7 @@ export class MatrixClient extends EventEmitter {
 
         const room = this.getRoom(event.getRoomId());
         if (room) {
-            room._addLocalEchoReceipt(this.credentials.userId, event, receiptType);
+            room.addLocalEchoReceipt(this.credentials.userId, event, receiptType);
         }
         return promise;
     }
@@ -3614,7 +3635,7 @@ export class MatrixClient extends EventEmitter {
                 throw new Error(`Cannot set read receipt to a pending event (${rrEventId})`);
             }
             if (room) {
-                room._addLocalEchoReceipt(this.credentials.userId, rrEvent, "m.read");
+                room.addLocalEchoReceipt(this.credentials.userId, rrEvent, "m.read");
             }
         }
 
@@ -4230,7 +4251,7 @@ export class MatrixClient extends EventEmitter {
         // reduce the required number of events appropriately
         limit = limit - numAdded;
 
-        const prom = new Promise((resolve, reject) => {
+        const prom = new Promise<Room>((resolve, reject) => {
             // wait for a time before doing this request
             // (which may be 0 in order not to special case the code paths)
             sleep(timeToWaitMs).then(() => {
