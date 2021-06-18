@@ -348,6 +348,30 @@ export interface IStoredClientOpts extends IStartClientOpts {
     canResetEntireTimeline: ResetTimelineCallback;
 }
 
+export enum RoomVersionStability {
+    Stable = "stable",
+    Unstable = "unstable",
+}
+
+export interface IRoomVersionsCapability {
+    default: string;
+    available: Record<string, RoomVersionStability>;
+    "org.matrix.msc3244.room_capabilities"?: Record<string, {
+        preferred: string;
+        support: string[];
+    }>; // MSC3244
+}
+
+export interface IChangePasswordCapability {
+    enabled: boolean;
+}
+
+interface ICapabilities {
+    [key: string]: any;
+    "m.change_password"?: IChangePasswordCapability;
+    "m.room_versions"?: IRoomVersionsCapability;
+}
+
 /**
  * Represents a Matrix Client. Only directly construct this if you want to use
  * custom modules. Normally, {@link createClient} should be used
@@ -408,7 +432,7 @@ export class MatrixClient extends EventEmitter {
     protected serverVersionsPromise: Promise<any>;
 
     protected cachedCapabilities: {
-        capabilities: Record<string, any>;
+        capabilities: ICapabilities;
         expiration: number;
     };
     protected clientWellKnown: any;
@@ -1058,7 +1082,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves to the capabilities of the homeserver
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getCapabilities(fresh = false): Promise<Record<string, any>> {
+    public getCapabilities(fresh = false): Promise<ICapabilities> {
         const now = new Date().getTime();
 
         if (this.cachedCapabilities && !fresh) {
@@ -1076,7 +1100,7 @@ export class MatrixClient extends EventEmitter {
             return null; // otherwise consume the error
         }).then((r) => {
             if (!r) r = {};
-            const capabilities = r["capabilities"] || {};
+            const capabilities: ICapabilities = r["capabilities"] || {};
 
             // If the capabilities missed the cache, cache it for a shorter amount
             // of time to try and refresh them later.
@@ -1085,7 +1109,7 @@ export class MatrixClient extends EventEmitter {
                 : 60000 + (Math.random() * 5000);
 
             this.cachedCapabilities = {
-                capabilities: capabilities,
+                capabilities,
                 expiration: now + cacheMs,
             };
 
