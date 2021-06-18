@@ -1698,7 +1698,7 @@ export class Room extends EventEmitter {
         // consistent elsewhere.
         const membershipEvent = this.currentState.getStateEvents(EventType.RoomMember, this.myUserId);
         if (membershipEvent && membershipEvent.getContent().membership === "invite") {
-            const strippedStateEvents = membershipEvent.event.invite_room_state || [];
+            const strippedStateEvents = membershipEvent.getUnsigned().invite_room_state || [];
             strippedStateEvents.forEach((strippedEvent) => {
                 const existingEvent = this.currentState.getStateEvents(strippedEvent.type, strippedEvent.state_key);
                 if (!existingEvent) {
