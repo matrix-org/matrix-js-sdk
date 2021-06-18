@@ -1749,7 +1749,7 @@ export class Room extends EventEmitter {
      *                                    by the JS SDK.
      * @return {String} ID of the latest event that the given user has read, or null.
      */
-    public getEventReadUpTo(userId: string, ignoreSynthesized: boolean): string | null {
+    public getEventReadUpTo(userId: string, ignoreSynthesized = false): string | null {
         let receipts = this.receipts;
         if (ignoreSynthesized) {
             receipts = this.realReceipts;
