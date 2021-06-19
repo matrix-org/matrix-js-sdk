@@ -567,7 +567,7 @@ export class Crypto extends EventEmitter {
         );
         const sessionBackupInStorage = (
             !this.backupManager.getKeyBackupEnabled() ||
-            this.baseApis.isKeyBackupKeyStored()
+            await this.baseApis.isKeyBackupKeyStored()
         );
 
         return !!(
@@ -2661,7 +2661,7 @@ export class Crypto extends EventEmitter {
             }
 
             const alg = this.getRoomDecryptor(key.room_id, key.algorithm);
-            return alg.importRoomKey(key, opts).finally((r) => {
+            return alg.importRoomKey(key, opts).finally(() => {
                 successes++;
                 if (opts.progressCallback) { updateProgress(); }
             });
