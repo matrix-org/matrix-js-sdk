@@ -292,7 +292,7 @@ export class DehydrationManager {
         }
     }
 
-    private stop() {
+    public stop() {
         if (this.timeoutId) {
             global.clearTimeout(this.timeoutId);
             this.timeoutId = undefined;

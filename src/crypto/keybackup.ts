@@ -41,18 +41,7 @@ export interface IKeyBackupVersion {
     count: number;
     etag: string;
     version: string; // number contained within
-}
-
-// TODO: Verify types
-export interface IKeyBackupTrustInfo {
-    /**
-     * is the backup trusted, true if there is a sig that is valid & from a trusted device
-     */
-    usable: boolean[];
-    sigs: {
-        valid: boolean[];
-        device: DeviceInfo[];
-    }[];
+    recovery_key: string; // eslint-disable-line camelcase
 }
 
 export interface IKeyBackupPrepareOpts {

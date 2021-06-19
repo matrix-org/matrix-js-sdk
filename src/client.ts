@@ -47,7 +47,8 @@ import {
     PREFIX_UNSTABLE,
     retryNetworkOperation,
 } from "./http-api";
-import { Crypto, DeviceInfo, fixBackupKey, isCryptoAvailable } from './crypto';
+import { Crypto, fixBackupKey, IBootstrapCrossSigningOpts, isCryptoAvailable } from './crypto';
+import { DeviceInfo } from "./crypto/DeviceInfo";
 import { decodeRecoveryKey } from './crypto/recoverykey';
 import { keyFromAuthData } from './crypto/key_passphrase';
 import { User } from "./models/user";
@@ -58,7 +59,6 @@ import {
     IKeyBackupPrepareOpts,
     IKeyBackupRestoreOpts,
     IKeyBackupRestoreResult,
-    IKeyBackupTrustInfo,
     IKeyBackupVersion,
 } from "./crypto/keybackup";
 import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
@@ -114,7 +114,7 @@ import url from "url";
 import { randomString } from "./randomstring";
 import { ReadStream } from "fs";
 import { WebStorageSessionStore } from "./store/session/webstorage";
-import { BackupManager } from "./crypto/backup";
+import { BackupManager, IKeyBackupCheck, TrustInfo } from "./crypto/backup";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE, MSC3089TreeSpace } from "./models/MSC3089TreeSpace";
 
 export type Store = StubStore | MemoryStore | LocalIndexedDBStoreBackend | RemoteIndexedDBStoreBackend;
@@ -139,6 +139,12 @@ interface IExportedDevice {
     olmDevice: IOlmDevice;
     userId: string;
     deviceId: string;
+}
+
+export interface IKeysUploadResponse {
+    one_time_key_counts: { // eslint-disable-line camelcase
+        [algorithm: string]: number;
+    };
 }
 
 export interface ICreateClientOpts {
@@ -836,7 +842,7 @@ export class MatrixClient extends EventEmitter {
             return;
         }
         // XXX: Private member access.
-        return await this.crypto._dehydrationManager.setKeyAndQueueDehydration(
+        return await this.crypto.dehydrationManager.setKeyAndQueueDehydration(
             key, keyInfo, deviceDisplayName,
         );
     }
@@ -859,11 +865,11 @@ export class MatrixClient extends EventEmitter {
             logger.warn('not dehydrating device if crypto is not enabled');
             return;
         }
-        await this.crypto._dehydrationManager.setKey(
+        await this.crypto.dehydrationManager.setKey(
             key, keyInfo, deviceDisplayName,
         );
         // XXX: Private member access.
-        return await this.crypto._dehydrationManager.dehydrateDevice();
+        return await this.crypto.dehydrationManager.dehydrateDevice();
     }
 
     public async exportDevice(): Promise<IExportedDevice> {
@@ -875,7 +881,7 @@ export class MatrixClient extends EventEmitter {
             userId: this.credentials.userId,
             deviceId: this.deviceId,
             // XXX: Private member access.
-            olmDevice: await this.crypto._olmDevice.export(),
+            olmDevice: await this.crypto.olmDevice.export(),
         };
     }
 
@@ -1239,12 +1245,12 @@ export class MatrixClient extends EventEmitter {
      * Upload the device keys to the homeserver.
      * @return {Promise<void>} A promise that will resolve when the keys are uploaded.
      */
-    public uploadKeys(): Promise<void> {
+    public async uploadKeys(): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
 
-        return this.crypto.uploadDeviceKeys();
+        await this.crypto.uploadDeviceKeys();
     }
 
     /**
@@ -1631,7 +1637,7 @@ export class MatrixClient extends EventEmitter {
      * return true.
      * @return {boolean} True if cross-signing is ready to be used on this device
      */
-    public isCrossSigningReady(): boolean {
+    public isCrossSigningReady(): Promise<boolean> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -1658,10 +1664,7 @@ export class MatrixClient extends EventEmitter {
      *     auth data as an object. Can be called multiple times, first with an empty
      *     authDict, to obtain the flows.
      */
-    public bootstrapCrossSigning(opts: {
-        authUploadDeviceSigningKeys: (makeRequest: (authData: any) => void) => Promise<void>,
-        setupNewCrossSigning?: boolean,
-    }) {
+    public bootstrapCrossSigning(opts: IBootstrapCrossSigningOpts) {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -1756,7 +1759,7 @@ export class MatrixClient extends EventEmitter {
      *
      * @return {boolean} True if secret storage is ready to be used on this device
      */
-    public isSecretStorageReady(): boolean {
+    public isSecretStorageReady(): Promise<boolean> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -1848,7 +1851,7 @@ export class MatrixClient extends EventEmitter {
      *
      * @return {string} the contents of the secret
      */
-    public getSecret(name: string): string {
+    public getSecret(name: string): Promise<string> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -1885,7 +1888,7 @@ export class MatrixClient extends EventEmitter {
      *
      * @return {string} the contents of the secret
      */
-    public requestSecret(name: string, devices: string[]): string {
+    public requestSecret(name: string, devices: string[]): any { // TODO types
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -1899,7 +1902,7 @@ export class MatrixClient extends EventEmitter {
      *
      * @return {string} The default key ID or null if no default key ID is set
      */
-    public getDefaultSecretStorageKeyId(): string {
+    public getDefaultSecretStorageKeyId(): Promise<string> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2075,8 +2078,8 @@ export class MatrixClient extends EventEmitter {
      *     trust information (as returned by isKeyBackupTrusted)
      *     in trustInfo.
      */
-    public checkKeyBackup(): IKeyBackupVersion {
-        return this.crypto._backupManager.checkKeyBackup();
+    public checkKeyBackup(): Promise<IKeyBackupCheck> {
+        return this.crypto.backupManager.checkKeyBackup();
     }
 
     /**
@@ -2117,8 +2120,8 @@ export class MatrixClient extends EventEmitter {
      *     ]
      * }
      */
-    public isKeyBackupTrusted(info: IKeyBackupVersion): IKeyBackupTrustInfo {
-        return this.crypto._backupManager.isKeyBackupTrusted(info);
+    public isKeyBackupTrusted(info: IKeyBackupVersion): Promise<TrustInfo> {
+        return this.crypto.backupManager.isKeyBackupTrusted(info);
     }
 
     /**
@@ -2130,7 +2133,7 @@ export class MatrixClient extends EventEmitter {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto._backupManager.getKeyBackupEnabled();
+        return this.crypto.backupManager.getKeyBackupEnabled();
     }
 
     /**
@@ -2145,7 +2148,7 @@ export class MatrixClient extends EventEmitter {
             throw new Error("End-to-end encryption disabled");
         }
 
-        return this.crypto._backupManager.enableKeyBackup(info);
+        return this.crypto.backupManager.enableKeyBackup(info);
     }
 
     /**
@@ -2156,7 +2159,7 @@ export class MatrixClient extends EventEmitter {
             throw new Error("End-to-end encryption disabled");
         }
 
-        this.crypto._backupManager.disableKeyBackup();
+        this.crypto.backupManager.disableKeyBackup();
     }
 
     /**
@@ -2184,7 +2187,7 @@ export class MatrixClient extends EventEmitter {
 
         // eslint-disable-next-line camelcase
         const { algorithm, auth_data, recovery_key, privateKey } =
-            await this.crypto._backupManager.prepareKeyBackupVersion(password);
+            await this.crypto.backupManager.prepareKeyBackupVersion(password);
 
         if (opts.secureSecretStorage) {
             await this.storeSecret("m.megolm_backup.v1", encodeBase64(privateKey));
@@ -2221,7 +2224,7 @@ export class MatrixClient extends EventEmitter {
             throw new Error("End-to-end encryption disabled");
         }
 
-        await this.crypto._backupManager.createKeyBackupVersion(info);
+        await this.crypto.backupManager.createKeyBackupVersion(info);
 
         const data = {
             algorithm: info.algorithm,
@@ -2232,19 +2235,19 @@ export class MatrixClient extends EventEmitter {
         // older devices with cross-signing. This can probably go away very soon in
         // favour of just signing with the cross-singing master key.
         // XXX: Private member access
-        await this.crypto._signObject(data.auth_data);
+        await this.crypto.signObject(data.auth_data);
 
         if (
             this.cryptoCallbacks.getCrossSigningKey &&
             // XXX: Private member access
-            this.crypto._crossSigningInfo.getId()
+            this.crypto.crossSigningInfo.getId()
         ) {
             // now also sign the auth data with the cross-signing master key
             // we check for the callback explicitly here because we still want to be able
             // to create an un-cross-signed key backup if there is a cross-signing key but
             // no callback supplied.
             // XXX: Private member access
-            await this.crypto._crossSigningInfo.signObject(data.auth_data, "master");
+            await this.crypto.crossSigningInfo.signObject(data.auth_data, "master");
         }
 
         const res = await this.http.authedRequest(
@@ -2271,8 +2274,8 @@ export class MatrixClient extends EventEmitter {
         // If we're currently backing up to this backup... stop.
         // (We start using it automatically in createKeyBackupVersion
         // so this is symmetrical).
-        if (this.crypto._backupManager.version) {
-            this.crypto._backupManager.disableKeyBackup();
+        if (this.crypto.backupManager.version) {
+            this.crypto.backupManager.disableKeyBackup();
         }
 
         const path = utils.encodeUri("/room_keys/version/$version", {
@@ -2337,7 +2340,7 @@ export class MatrixClient extends EventEmitter {
             throw new Error("End-to-end encryption disabled");
         }
 
-        await this.crypto._backupManager.scheduleAllGroupSessionsForBackup();
+        await this.crypto.backupManager.scheduleAllGroupSessionsForBackup();
     }
 
     /**
@@ -2350,7 +2353,7 @@ export class MatrixClient extends EventEmitter {
             throw new Error("End-to-end encryption disabled");
         }
 
-        return this.crypto._backupManager.flagAllGroupSessionsForBackup();
+        return this.crypto.backupManager.flagAllGroupSessionsForBackup();
     }
 
     public isValidRecoveryKey(recoveryKey: string): boolean {
@@ -2633,7 +2636,7 @@ export class MatrixClient extends EventEmitter {
         }
 
         // XXX: Private member access
-        const alg = this.crypto._getRoomDecryptor(roomId, roomEncryption.algorithm);
+        const alg = this.crypto.getRoomDecryptor(roomId, roomEncryption.algorithm);
         if (alg.sendSharedHistoryInboundSessions) {
             await alg.sendSharedHistoryInboundSessions(devicesByUser);
         } else {
@@ -5708,7 +5711,7 @@ export class MatrixClient extends EventEmitter {
      */
     public getCrossSigningCacheCallbacks(): any { // TODO: Types
         // XXX: Private member access
-        return this.crypto?._crossSigningInfo.getCacheCallbacks();
+        return this.crypto?.crossSigningInfo.getCacheCallbacks();
     }
 
     /**
@@ -7087,7 +7090,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: result object. Rejects: with
      *     an error response ({@link module:http-api.MatrixError}).
      */
-    public uploadKeysRequest(content: any, opts?: any, callback?: Callback): Promise<any> { // TODO: Types
+    public uploadKeysRequest(content: any, opts?: any, callback?: Callback): Promise<IKeysUploadResponse> {
         return this.http.authedRequest(callback, "POST", "/keys/upload", undefined, content);
     }
 
