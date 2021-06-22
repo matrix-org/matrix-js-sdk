@@ -46,6 +46,10 @@ export enum JoinRule {
     Restricted = "restricted", // MSC3083 - only valid inside experimental room versions at this time.
 }
 
+export enum RestrictedAllowType {
+    RoomMembership = "m.room_membership", // MSC3083 - only valid inside experimental room versions at this time.
+}
+
 export enum GuestAccess {
     CanJoin = "can_join",
     Forbidden = "forbidden",
