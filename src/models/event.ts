@@ -24,7 +24,7 @@ import { EventEmitter } from 'events';
 
 import { logger } from '../logger';
 import { VerificationRequest } from "../crypto/verification/request/VerificationRequest";
-import { EventType, RelationType } from "../@types/event";
+import { EventType, MsgType, RelationType } from "../@types/event";
 import { Crypto } from "../crypto";
 import { deepSortedObjectEntries } from "../utils";
 
@@ -62,9 +62,9 @@ function intern(str: string): string {
 }
 
 /* eslint-disable camelcase */
-interface IContent {
+export interface IContent {
     [key: string]: any;
-    msgtype?: string;
+    msgtype?: MsgType | string;
     membership?: string;
     avatar_url?: string;
     displayname?: string;
