@@ -27,6 +27,7 @@ import { VerificationRequest } from "../crypto/verification/request/Verification
 import { EventType, MsgType, RelationType } from "../@types/event";
 import { Crypto } from "../crypto";
 import { deepSortedObjectEntries } from "../utils";
+import { RoomMember } from "./room-member";
 
 /**
  * Enum for event statuses.
@@ -198,8 +199,8 @@ export class MatrixEvent extends EventEmitter {
     private readonly localTimestamp: number;
 
     // XXX: these should be read-only
-    public sender = null;
-    public target = null;
+    public sender: RoomMember = null;
+    public target: RoomMember = null;
     public status: EventStatus = null;
     public error = null;
     public forwardLooking = true;
