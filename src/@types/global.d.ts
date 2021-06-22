@@ -84,4 +84,17 @@ declare global {
         // on webkit: we should check if we still need to do this
         webkitGetUserMedia: DummyInterfaceWeShouldntBeUsingThis;
     }
+
+    export interface ISettledFulfilled<T> {
+        status: "fulfilled";
+        value: T;
+    }
+    export interface ISettledRejected {
+        status: "rejected";
+        reason: any;
+    }
+
+    interface PromiseConstructor {
+        allSettled<T>(promises: Promise<T>[]): Promise<Array<ISettledFulfilled<T> | ISettledRejected>>;
+    }
 }

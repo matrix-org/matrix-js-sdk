@@ -37,3 +37,5 @@ export enum Preset {
     TrustedPrivateChat = "trusted_private_chat",
     PublicChat = "public_chat",
 }
+
+export type ResizeMethod = "crop" | "scale";

@@ -19,8 +19,17 @@ import { EventType, IEncryptedFile, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_M
 import { Room } from "./room";
 import { logger } from "../logger";
 import { MatrixEvent } from "./event";
-import { averageBetweenStrings, DEFAULT_ALPHABET, lexicographicCompare, nextString, prevString } from "../utils";
+import {
+    averageBetweenStrings,
+    DEFAULT_ALPHABET,
+    lexicographicCompare,
+    nextString,
+    prevString,
+    simpleRetryOperation,
+} from "../utils";
 import { MSC3089Branch } from "./MSC3089Branch";
+import promiseRetry from "p-retry";
+import { isRoomSharedHistory } from "../crypto/algorithms/megolm";
 
 /**
  * The recommended defaults for a tree space's power levels. Note that this
@@ -110,12 +119,42 @@ export class MSC3089TreeSpace {
      * Invites a user to the tree space. They will be given the default Viewer
      * permission level unless specified elsewhere.
      * @param {string} userId The user ID to invite.
+     * @param {boolean} andSubspaces True (default) to invite the user to all
+     * directories/subspaces too, recursively.
+     * @param {boolean} shareHistoryKeys True (default) to share encryption keys
+     * with the invited user. This will allow them to decrypt the events (files)
+     * in the tree. Keys will not be shared if the room is lacking appropriate
+     * history visibility (by default, history visibility is "shared" in trees,
+     * which is an appropriate visibility for these purposes).
      * @returns {Promise<void>} Resolves when complete.
      */
-    public async invite(userId: string): Promise<void> {
-        // TODO: [@@TR] Reliable invites
-        // TODO: [@@TR] Share keys
-        await this.client.invite(this.roomId, userId);
+    public async invite(userId: string, andSubspaces = true, shareHistoryKeys = true): Promise<void> {
+        const promises: Promise<void>[] = [this.retryInvite(userId)];
+        if (andSubspaces) {
+            promises.push(...this.getDirectories().map(d => d.invite(userId, andSubspaces, shareHistoryKeys)));
+        }
+        return Promise.all(promises).then(() => {
+            // Note: key sharing is default on because for file trees it is relatively important that the invite
+            // target can actually decrypt the files. The implied use case is that by inviting a user to the tree
+            // it means the sender would like the receiver to view/download the files contained within, much like
+            // sharing a folder in other circles.
+            if (shareHistoryKeys && isRoomSharedHistory(this.room)) {
+                // noinspection JSIgnoredPromiseFromCall - we aren't concerned as much if this fails.
+                this.client.sendSharedHistoryKeys(this.roomId, [userId]);
+            }
+        });
+    }
+
+    private retryInvite(userId: string): Promise<void> {
+        return simpleRetryOperation(async () => {
+            await this.client.invite(this.roomId, userId).catch(e => {
+                // We don't want to retry permission errors forever...
+                if (e?.errcode === "M_FORBIDDEN") {
+                    throw new promiseRetry.AbortError(e);
+                }
+                throw e;
+            });
+        });
     }
 
     /**

@@ -1,6 +1,5 @@
 /*
-Copyright 2015, 2016 OpenMarket Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2015 - 2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,8 +33,14 @@ import * as utils from "./utils";
  * for such URLs.
  * @return {string} The complete URL to the content.
  */
-export function getHttpUriForMxc(baseUrl, mxc, width, height,
-                           resizeMethod, allowDirectLinks) {
+export function getHttpUriForMxc(
+    baseUrl: string,
+    mxc: string,
+    width: number,
+    height: number,
+    resizeMethod: string,
+    allowDirectLinks = false,
+): string {
     if (typeof mxc !== "string" || !mxc) {
         return '';
     }
@@ -51,13 +56,13 @@ export function getHttpUriForMxc(baseUrl, mxc, width, height,
     const params = {};
 
     if (width) {
-        params.width = Math.round(width);
+        params["width"] = Math.round(width);
     }
     if (height) {
-        params.height = Math.round(height);
+        params["height"] = Math.round(height);
     }
     if (resizeMethod) {
-        params.method = resizeMethod;
+        params["method"] = resizeMethod;
     }
     if (Object.keys(params).length > 0) {
         // these are thumbnailing params so they probably want the
@@ -71,7 +76,7 @@ export function getHttpUriForMxc(baseUrl, mxc, width, height,
         fragment = serverAndMediaId.substr(fragmentOffset);
         serverAndMediaId = serverAndMediaId.substr(0, fragmentOffset);
     }
-    return baseUrl + prefix + serverAndMediaId +
-        (Object.keys(params).length === 0 ? "" :
-        ("?" + utils.encodeParams(params))) + fragment;
+
+    const urlParams = (Object.keys(params).length === 0 ? "" : ("?" + utils.encodeParams(params)));
+    return baseUrl + prefix + serverAndMediaId + urlParams + fragment;
 }

@@ -20,7 +20,8 @@ limitations under the License.
  * @module utils
  */
 
-import unhomoglyph from 'unhomoglyph';
+import unhomoglyph from "unhomoglyph";
+import promiseRetry from "p-retry";
 
 /**
  * Encode a dictionary of query parameters.
@@ -235,6 +236,32 @@ export function deepCompare(x: any, y: any): boolean {
     return true;
 }
 
+// Dev note: This returns a tuple, but jsdoc doesn't like that. https://github.com/jsdoc/jsdoc/issues/1703
+/**
+ * Creates an array of object properties/values (entries) then
+ * sorts the result by key, recursively. The input object must
+ * ensure it does not have loops. If the input is not an object
+ * then it will be returned as-is.
+ * @param {*} obj The object to get entries of
+ * @returns {Array} The entries, sorted by key.
+ */
+export function deepSortedObjectEntries(obj: any): [string, any][] {
+    if (typeof(obj) !== "object") return obj;
+
+    // Apparently these are object types...
+    if (obj === null || obj === undefined || Array.isArray(obj)) return obj;
+
+    const pairs: [string, any][] = [];
+    for (const [k, v] of Object.entries(obj)) {
+        pairs.push([k, deepSortedObjectEntries(v)]);
+    }
+
+    // lexicographicCompare is faster than localeCompare, so let's use that.
+    pairs.sort((a, b) => lexicographicCompare(a[0], b[0]));
+
+    return pairs;
+}
+
 /**
  * Copy properties from one object to another.
  *
@@ -441,6 +468,26 @@ export async function chunkPromises<T>(fns: (() => Promise<T>)[], chunkSize: num
         results.push(...(await Promise.all(fns.slice(i, i + chunkSize).map(fn => fn()))));
     }
     return results;
+}
+
+/**
+ * Retries the function until it succeeds or is interrupted. The given function must return
+ * a promise which throws/rejects on error, otherwise the retry will assume the request
+ * succeeded. The promise chain returned will contain the successful promise. The given function
+ * should always return a new promise.
+ * @param {Function} promiseFn The function to call to get a fresh promise instance. Takes an
+ * attempt count as an argument, for logging/debugging purposes.
+ * @returns {Promise<T>} The promise for the retried operation.
+ */
+export function simpleRetryOperation<T>(promiseFn: (attempt: number) => Promise<T>): Promise<T> {
+    return promiseRetry((attempt: number) => {
+        return promiseFn(attempt);
+    }, {
+        forever: true,
+        factor: 2,
+        minTimeout: 3000, // ms
+        maxTimeout: 15000, // ms
+    });
 }
 
 // We need to be able to access the Node.js crypto library from within the
