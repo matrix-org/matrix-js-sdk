@@ -139,7 +139,7 @@ describe("MegolmBackup", function() {
     let megolmDecryption;
     beforeEach(async function() {
         mockCrypto = testUtils.mock(Crypto, 'Crypto');
-        mockCrypto._backupManager = testUtils.mock(BackupManager, "BackupManager");
+        mockCrypto.backupManager = testUtils.mock(BackupManager, "BackupManager");
         mockCrypto.backupKey = new Olm.PkEncryption();
         mockCrypto.backupKey.set_recipient_key(
             "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
@@ -217,14 +217,14 @@ describe("MegolmBackup", function() {
             };
             mockCrypto.cancelRoomKeyRequest = function() {};
 
-            mockCrypto._backupManager = {
+            mockCrypto.backupManager = {
                 backupGroupSession: jest.fn(),
             };
 
             return event.attemptDecryption(mockCrypto).then(() => {
                 return megolmDecryption.onRoomKeyEvent(event);
             }).then(() => {
-                expect(mockCrypto._backupManager.backupGroupSession).toHaveBeenCalled();
+                expect(mockCrypto.backupManager.backupGroupSession).toHaveBeenCalled();
             });
         });
 

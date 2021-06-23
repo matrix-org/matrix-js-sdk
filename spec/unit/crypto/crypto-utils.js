@@ -11,12 +11,12 @@ export async function resetCrossSigningKeys(client, {
     const oldKeys = Object.assign({}, crypto.crossSigningInfo.keys);
     try {
         await crypto.crossSigningInfo.resetKeys(level);
-        await crypto._signObject(crypto.crossSigningInfo.keys.master);
+        await crypto.signObject(crypto.crossSigningInfo.keys.master);
         // write a copy locally so we know these are trusted keys
-        await crypto._cryptoStore.doTxn(
+        await crypto.cryptoStore.doTxn(
             'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
-                crypto._cryptoStore.storeCrossSigningKeys(
+                crypto.cryptoStore.storeCrossSigningKeys(
                     txn, crypto.crossSigningInfo.keys);
             },
         );
@@ -26,8 +26,8 @@ export async function resetCrossSigningKeys(client, {
         crypto.crossSigningInfo.keys = oldKeys;
         throw e;
     }
-    crypto._baseApis.emit("crossSigning.keysChanged", {});
-    await crypto._afterCrossSigningLocalKeyChange();
+    crypto.baseApis.emit("crossSigning.keysChanged", {});
+    await crypto.afterCrossSigningLocalKeyChange();
 }
 
 export async function createSecretStorageKey() {
