@@ -2903,8 +2903,6 @@ export class Crypto extends EventEmitter {
      * @param {Object} syncData  the data from the 'MatrixClient.sync' event
      */
     public async onSyncCompleted(syncData: ISyncData): Promise<void> {
-        const nextSyncToken = syncData.nextSyncToken;
-
         this.deviceList.setSyncToken(syncData.nextSyncToken);
         this.deviceList.saveIfDirty();
 
