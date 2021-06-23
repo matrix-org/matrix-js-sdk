@@ -49,7 +49,10 @@ import { decryptAES, encryptAES } from './aes';
 import { DehydrationManager } from './dehydration';
 import { BackupManager } from "./backup";
 import { IStore } from "../store";
-import { Room, RoomMember, MatrixEvent, MatrixClient, IKeysUploadResponse } from "..";
+import { Room } from "../models/room";
+import { RoomMember } from "../models/room-member";
+import { MatrixEvent } from "../models/event";
+import { MatrixClient, IKeysUploadResponse } from "../client";
 import type { EncryptionAlgorithm, DecryptionAlgorithm } from "./algorithms/base";
 import type { RoomList } from "./RoomList";
 import { IRecoveryKey, IEncryptedEventInfo } from "./api";
@@ -65,7 +68,7 @@ const defaultVerificationMethods = {
     // to start.
     [SHOW_QR_CODE_METHOD]: IllegalMethod,
     [SCAN_QR_CODE_METHOD]: IllegalMethod,
-}
+};
 
 /**
  * verification method names
@@ -73,7 +76,7 @@ const defaultVerificationMethods = {
 export const verificationMethods = {
     RECIPROCATE_QR_CODE: ReciprocateQRCode.NAME,
     SAS: SAS.NAME,
-}
+};
 
 export function isCryptoAvailable(): boolean {
     return Boolean(global.Olm);
