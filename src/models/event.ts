@@ -24,8 +24,10 @@ import { EventEmitter } from 'events';
 
 import { logger } from '../logger';
 import { VerificationRequest } from "../crypto/verification/request/VerificationRequest";
-import { EventType, RelationType } from "../@types/event";
+import { EventType, MsgType, RelationType } from "../@types/event";
 import { Crypto } from "../crypto";
+import { deepSortedObjectEntries } from "../utils";
+import { RoomMember } from "./room-member";
 
 /**
  * Enum for event statuses.
@@ -61,9 +63,9 @@ function intern(str: string): string {
 }
 
 /* eslint-disable camelcase */
-interface IContent {
+export interface IContent {
     [key: string]: any;
-    msgtype?: string;
+    msgtype?: MsgType | string;
     membership?: string;
     avatar_url?: string;
     displayname?: string;
@@ -197,8 +199,8 @@ export class MatrixEvent extends EventEmitter {
     private readonly localTimestamp: number;
 
     // XXX: these should be read-only
-    public sender = null;
-    public target = null;
+    public sender: RoomMember = null;
+    public target: RoomMember = null;
     public status: EventStatus = null;
     public error = null;
     public forwardLooking = true;
@@ -1178,6 +1180,45 @@ export class MatrixEvent extends EventEmitter {
      */
     isCancelled(): boolean {
         return this._isCancelled;
+    }
+
+    /**
+     * Get a copy/snapshot of this event. The returned copy will be loosely linked
+     * back to this instance, though will have "frozen" event information. Other
+     * properties of this MatrixEvent instance will be copied verbatim, which can
+     * mean they are in reference to this instance despite being on the copy too.
+     * The reference the snapshot uses does not change, however members aside from
+     * the underlying event will not be deeply cloned, thus may be mutated internally.
+     * For example, the sender profile will be copied over at snapshot time, and
+     * the sender profile internally may mutate without notice to the consumer.
+     *
+     * This is meant to be used to snapshot the event details themselves, not the
+     * features (such as sender) surrounding the event.
+     * @returns {MatrixEvent} A snapshot of this event.
+     */
+    toSnapshot(): MatrixEvent {
+        const ev = new MatrixEvent(JSON.parse(JSON.stringify(this.event)));
+        for (const [p, v] of Object.entries(this)) {
+            if (p !== "event") { // exclude the thing we just cloned
+                ev[p] = v;
+            }
+        }
+        return ev;
+    }
+
+    /**
+     * Determines if this event is equivalent to the given event. This only checks
+     * the event object itself, not the other properties of the event. Intended for
+     * use with toSnapshot() to identify events changing.
+     * @param {MatrixEvent} otherEvent The other event to check against.
+     * @returns {boolean} True if the events are the same, false otherwise.
+     */
+    isEquivalentTo(otherEvent: MatrixEvent): boolean {
+        if (!otherEvent) return false;
+        if (otherEvent === this) return true;
+        const myProps = deepSortedObjectEntries(this.event);
+        const theirProps = deepSortedObjectEntries(otherEvent.event);
+        return JSON.stringify(myProps) === JSON.stringify(theirProps);
     }
 
     /**

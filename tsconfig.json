@@ -5,7 +5,7 @@
     "esModuleInterop": true,
     "module": "commonjs",
     "moduleResolution": "node",
-    "target": "es2020",
+    "target": "es2016",
     "noImplicitAny": false,
     "sourceMap": true,
     "outDir": "./lib",
