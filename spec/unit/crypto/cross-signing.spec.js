@@ -64,8 +64,8 @@ describe("Cross Signing", function() {
         );
         alice.uploadDeviceSigningKeys = jest.fn(async (auth, keys) => {
             await olmlib.verifySignature(
-                alice.crypto._olmDevice, keys.master_key, "@alice:example.com",
-                "Osborne2", alice.crypto._olmDevice.deviceEd25519Key,
+                alice.crypto.olmDevice, keys.master_key, "@alice:example.com",
+                "Osborne2", alice.crypto.olmDevice.deviceEd25519Key,
             );
         });
         alice.uploadKeySignatures = async () => {};
@@ -138,7 +138,7 @@ describe("Cross Signing", function() {
         // set Alice's cross-signing key
         await resetCrossSigningKeys(alice);
         // Alice downloads Bob's device key
-        alice.crypto._deviceList.storeCrossSigningForUser("@bob:example.com", {
+        alice.crypto.deviceList.storeCrossSigningForUser("@bob:example.com", {
             keys: {
                 master: {
                     user_id: "@bob:example.com",
@@ -203,12 +203,12 @@ describe("Cross Signing", function() {
             alice.uploadKeySignatures = jest.fn(async (content) => {
                 try {
                     await olmlib.verifySignature(
-                        alice.crypto._olmDevice,
+                        alice.crypto.olmDevice,
                         content["@alice:example.com"][
                             "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk"
                             ],
                         "@alice:example.com",
-                        "Osborne2", alice.crypto._olmDevice.deviceEd25519Key,
+                        "Osborne2", alice.crypto.olmDevice.deviceEd25519Key,
                     );
                     olmlib.pkVerify(
                         content["@alice:example.com"]["Osborne2"],
@@ -222,7 +222,7 @@ describe("Cross Signing", function() {
             });
         });
 
-        const deviceInfo = alice.crypto._deviceList._devices["@alice:example.com"]
+        const deviceInfo = alice.crypto.deviceList._devices["@alice:example.com"]
             .Osborne2;
         const aliceDevice = {
             user_id: "@alice:example.com",
@@ -230,7 +230,7 @@ describe("Cross Signing", function() {
         };
         aliceDevice.keys = deviceInfo.keys;
         aliceDevice.algorithms = deviceInfo.algorithms;
-        await alice.crypto._signObject(aliceDevice);
+        await alice.crypto.signObject(aliceDevice);
         olmlib.pkSign(aliceDevice, selfSigningKey, "@alice:example.com");
 
         // feed sync result that includes master key, ssk, device key
@@ -358,7 +358,7 @@ describe("Cross Signing", function() {
                 ["ed25519:" + bobMasterPubkey]: sskSig,
             },
         };
-        alice.crypto._deviceList.storeCrossSigningForUser("@bob:example.com", {
+        alice.crypto.deviceList.storeCrossSigningForUser("@bob:example.com", {
             keys: {
                 master: {
                     user_id: "@bob:example.com",
@@ -387,7 +387,7 @@ describe("Cross Signing", function() {
                 ["ed25519:" + bobPubkey]: sig,
             },
         };
-        alice.crypto._deviceList.storeDevicesForUser("@bob:example.com", {
+        alice.crypto.deviceList.storeDevicesForUser("@bob:example.com", {
             Dynabook: bobDevice,
         });
         // Bob's device key should be TOFU
@@ -421,8 +421,8 @@ describe("Cross Signing", function() {
             null,
             aliceKeys,
         );
-        alice.crypto._deviceList.startTrackingDeviceList("@bob:example.com");
-        alice.crypto._deviceList.stopTrackingAllDeviceLists = () => {};
+        alice.crypto.deviceList.startTrackingDeviceList("@bob:example.com");
+        alice.crypto.deviceList.stopTrackingAllDeviceLists = () => {};
         alice.uploadDeviceSigningKeys = async () => {};
         alice.uploadKeySignatures = async () => {};
 
@@ -437,14 +437,14 @@ describe("Cross Signing", function() {
         ]);
 
         const keyChangePromise = new Promise((resolve, reject) => {
-            alice.crypto._deviceList.once("userCrossSigningUpdated", (userId) => {
+            alice.crypto.deviceList.once("userCrossSigningUpdated", (userId) => {
                 if (userId === "@bob:example.com") {
                     resolve();
                 }
             });
         });
 
-        const deviceInfo = alice.crypto._deviceList._devices["@alice:example.com"]
+        const deviceInfo = alice.crypto.deviceList._devices["@alice:example.com"]
             .Osborne2;
         const aliceDevice = {
             user_id: "@alice:example.com",
@@ -452,7 +452,7 @@ describe("Cross Signing", function() {
         };
         aliceDevice.keys = deviceInfo.keys;
         aliceDevice.algorithms = deviceInfo.algorithms;
-        await alice.crypto._signObject(aliceDevice);
+        await alice.crypto.signObject(aliceDevice);
 
         const bobOlmAccount = new global.Olm.Account();
         bobOlmAccount.create();
@@ -606,7 +606,7 @@ describe("Cross Signing", function() {
                 ["ed25519:" + bobMasterPubkey]: sskSig,
             },
         };
-        alice.crypto._deviceList.storeCrossSigningForUser("@bob:example.com", {
+        alice.crypto.deviceList.storeCrossSigningForUser("@bob:example.com", {
             keys: {
                 master: {
                     user_id: "@bob:example.com",
@@ -629,7 +629,7 @@ describe("Cross Signing", function() {
                 "ed25519:Dynabook": "someOtherPubkey",
             },
         };
-        alice.crypto._deviceList.storeDevicesForUser("@bob:example.com", {
+        alice.crypto.deviceList.storeDevicesForUser("@bob:example.com", {
             Dynabook: bobDevice,
         });
         // Bob's device key should be untrusted
@@ -673,7 +673,7 @@ describe("Cross Signing", function() {
                 ["ed25519:" + bobMasterPubkey]: sskSig,
             },
         };
-        alice.crypto._deviceList.storeCrossSigningForUser("@bob:example.com", {
+        alice.crypto.deviceList.storeCrossSigningForUser("@bob:example.com", {
             keys: {
                 master: {
                     user_id: "@bob:example.com",
@@ -701,7 +701,7 @@ describe("Cross Signing", function() {
         bobDevice.signatures = {};
         bobDevice.signatures["@bob:example.com"] = {};
         bobDevice.signatures["@bob:example.com"]["ed25519:" + bobPubkey] = sig;
-        alice.crypto._deviceList.storeDevicesForUser("@bob:example.com", {
+        alice.crypto.deviceList.storeDevicesForUser("@bob:example.com", {
             Dynabook: bobDevice,
         });
         // Alice verifies Bob's SSK
@@ -733,7 +733,7 @@ describe("Cross Signing", function() {
                 ["ed25519:" + bobMasterPubkey2]: sskSig2,
             },
         };
-        alice.crypto._deviceList.storeCrossSigningForUser("@bob:example.com", {
+        alice.crypto.deviceList.storeCrossSigningForUser("@bob:example.com", {
             keys: {
                 master: {
                     user_id: "@bob:example.com",
@@ -770,7 +770,7 @@ describe("Cross Signing", function() {
         // Alice gets new signature for device
         const sig2 = bobSigning2.sign(bobDeviceString);
         bobDevice.signatures["@bob:example.com"]["ed25519:" + bobPubkey2] = sig2;
-        alice.crypto._deviceList.storeDevicesForUser("@bob:example.com", {
+        alice.crypto.deviceList.storeDevicesForUser("@bob:example.com", {
             Dynabook: bobDevice,
         });
 
@@ -805,20 +805,20 @@ describe("Cross Signing", function() {
         bob.uploadKeySignatures = async () => {};
         // set Bob's cross-signing key
         await resetCrossSigningKeys(bob);
-        alice.crypto._deviceList.storeDevicesForUser("@bob:example.com", {
+        alice.crypto.deviceList.storeDevicesForUser("@bob:example.com", {
             Dynabook: {
                 algorithms: ["m.olm.curve25519-aes-sha256", "m.megolm.v1.aes-sha"],
                 keys: {
-                    "curve25519:Dynabook": bob.crypto._olmDevice.deviceCurve25519Key,
-                    "ed25519:Dynabook": bob.crypto._olmDevice.deviceEd25519Key,
+                    "curve25519:Dynabook": bob.crypto.olmDevice.deviceCurve25519Key,
+                    "ed25519:Dynabook": bob.crypto.olmDevice.deviceEd25519Key,
                 },
                 verified: 1,
                 known: true,
             },
         });
-        alice.crypto._deviceList.storeCrossSigningForUser(
+        alice.crypto.deviceList.storeCrossSigningForUser(
             "@bob:example.com",
-            bob.crypto._crossSigningInfo.toStorage(),
+            bob.crypto.crossSigningInfo.toStorage(),
         );
 
         alice.uploadDeviceSigningKeys = async () => {};
@@ -838,7 +838,7 @@ describe("Cross Signing", function() {
         expect(bobTrust.isTofu()).toBeTruthy();
 
         // "forget" that Bob is trusted
-        delete alice.crypto._deviceList._crossSigningInfo["@bob:example.com"]
+        delete alice.crypto.deviceList.crossSigningInfo["@bob:example.com"]
             .keys.master.signatures["@alice:example.com"];
 
         const bobTrust2 = alice.checkUserTrust("@bob:example.com");
@@ -848,7 +848,7 @@ describe("Cross Signing", function() {
         upgradePromise = new Promise((resolve) => {
             upgradeResolveFunc = resolve;
         });
-        alice.crypto._deviceList.emit("userCrossSigningUpdated", "@bob:example.com");
+        alice.crypto.deviceList.emit("userCrossSigningUpdated", "@bob:example.com");
         await new Promise((resolve) => {
             alice.crypto.on("userTrustStatusChanged", resolve);
         });

@@ -31,17 +31,22 @@ export interface IKeyBackupRoomSessions {
     [sessionId: string]: IKeyBackupSession;
 }
 
+/* eslint-disable camelcase */
 export interface IKeyBackupVersion {
     algorithm: string;
-    auth_data: { // eslint-disable-line camelcase
-        public_key: string; // eslint-disable-line camelcase
+    auth_data: {
+        public_key: string;
         signatures: ISignatures;
+        private_key_salt: string;
+        private_key_iterations: number;
+        private_key_bits?: number;
     };
     count: number;
     etag: string;
     version: string; // number contained within
-    recovery_key: string; // eslint-disable-line camelcase
+    recovery_key: string;
 }
+/* eslint-enable camelcase */
 
 export interface IKeyBackupPrepareOpts {
     secureSecretStorage: boolean;

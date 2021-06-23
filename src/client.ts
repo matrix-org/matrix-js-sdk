@@ -48,7 +48,7 @@ import {
     retryNetworkOperation,
 } from "./http-api";
 import { Crypto, fixBackupKey, IBootstrapCrossSigningOpts, isCryptoAvailable } from './crypto';
-import { DeviceInfo } from "./crypto/deviceinfo";
+import { DeviceInfo, IDevice } from "./crypto/deviceinfo";
 import { decodeRecoveryKey } from './crypto/recoverykey';
 import { keyFromAuthData } from './crypto/key_passphrase';
 import { User } from "./models/user";
@@ -64,7 +64,7 @@ import {
 import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
 import type Request from "request";
 import { MatrixScheduler } from "./scheduler";
-import { ICryptoCallbacks, IDeviceTrustLevel, ISecretStorageKeyInfo, NotificationCountType } from "./matrix";
+import { ICryptoCallbacks, ISecretStorageKeyInfo, NotificationCountType } from "./matrix";
 import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store";
 import { LocalStorageCryptoStore } from "./crypto/store/localStorage-crypto-store";
 import { IndexedDBCryptoStore } from "./crypto/store/indexeddb-crypto-store";
@@ -85,7 +85,7 @@ import {
     IRecoveryKey,
     ISecretStorageKey,
 } from "./crypto/api";
-import { CrossSigningInfo, UserTrustLevel } from "./crypto/CrossSigning";
+import { CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from "./crypto/CrossSigning";
 import { Room } from "./models/room";
 import {
     ICreateRoomOpts,
@@ -1265,7 +1265,7 @@ export class MatrixClient extends EventEmitter {
     public downloadKeys(
         userIds: string[],
         forceDownload?: boolean,
-    ): Promise<Record<string, Record<string, DeviceInfo>>> {
+    ): Promise<Record<string, Record<string, IDevice>>> {
         if (!this.crypto) {
             return Promise.reject(new Error("End-to-end encryption disabled"));
         }
@@ -1571,9 +1571,9 @@ export class MatrixClient extends EventEmitter {
      * @param {string} userId The ID of the user whose devices is to be checked.
      * @param {string} deviceId The ID of the device to check
      *
-     * @returns {IDeviceTrustLevel}
+     * @returns {DeviceTrustLevel}
      */
-    public checkDeviceTrust(userId: string, deviceId: string): IDeviceTrustLevel {
+    public checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -1948,7 +1948,7 @@ export class MatrixClient extends EventEmitter {
      *
      * @return {Promise<module:crypto/deviceinfo?>}
      */
-    public getEventSenderDeviceInfo(event: MatrixEvent): Promise<DeviceInfo> {
+    public async getEventSenderDeviceInfo(event: MatrixEvent): Promise<DeviceInfo> {
         if (!this.crypto) {
             return null;
         }
@@ -2488,15 +2488,13 @@ export class MatrixClient extends EventEmitter {
         targetRoomId: string,
         targetSessionId: string,
         backupInfo: IKeyBackupVersion,
-        opts: IKeyBackupRestoreOpts,
+        opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult> {
         const privKey = await this.crypto.getSessionBackupPrivateKey();
         if (!privKey) {
             throw new Error("Couldn't get key");
         }
-        return this.restoreKeyBackup(
-            privKey, targetRoomId, targetSessionId, backupInfo, opts,
-        );
+        return this.restoreKeyBackup(privKey, targetRoomId, targetSessionId, backupInfo, opts);
     }
 
     private async restoreKeyBackup(

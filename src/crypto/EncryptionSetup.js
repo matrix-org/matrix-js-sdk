@@ -184,7 +184,7 @@ export class EncryptionSetupOperation {
             });
 
             // pass the new keys to the main instance of our own CrossSigningInfo.
-            crypto._crossSigningInfo.setKeys(this._crossSigningKeys.keys);
+            crypto.crossSigningInfo.setKeys(this._crossSigningKeys.keys);
         }
         // set account data
         if (this._accountData) {

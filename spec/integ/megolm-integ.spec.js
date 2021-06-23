@@ -1013,7 +1013,7 @@ describe("megolm", function() {
                 event: true,
             });
             event.senderCurve25519Key = testSenderKey;
-            return testClient.client.crypto._onRoomKeyEvent(event);
+            return testClient.client.crypto.onRoomKeyEvent(event);
         }).then(() => {
             const event = testUtils.mkEvent({
                 event: true,

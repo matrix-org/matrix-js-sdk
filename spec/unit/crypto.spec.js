@@ -65,7 +65,7 @@ describe("Crypto", function() {
                 'YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI';
             device.keys["ed25519:FLIBBLE"] =
                 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
-            client.crypto._deviceList.getDeviceByIdentityKey = () => device;
+            client.crypto.deviceList.getDeviceByIdentityKey = () => device;
 
             encryptionInfo = client.getEventEncryptionInfo(event);
             expect(encryptionInfo.encrypted).toBeTruthy();
@@ -213,7 +213,7 @@ describe("Crypto", function() {
 
                 async function keyshareEventForEvent(event, index) {
                     const eventContent = event.getWireContent();
-                    const key = await aliceClient.crypto._olmDevice
+                    const key = await aliceClient.crypto.olmDevice
                         .getInboundGroupSessionKey(
                             roomId, eventContent.sender_key, eventContent.session_id,
                             index,
@@ -285,7 +285,7 @@ describe("Crypto", function() {
                     }
                 }));
 
-                const bobDecryptor = bobClient.crypto._getRoomDecryptor(
+                const bobDecryptor = bobClient.crypto.getRoomDecryptor(
                     roomId, olmlib.MEGOLM_ALGORITHM,
                 );
 
@@ -377,7 +377,7 @@ describe("Crypto", function() {
             // key requests get queued until the sync has finished, but we don't
             // let the client set up enough for that to happen, so gut-wrench a bit
             // to force it to send now.
-            aliceClient.crypto._outgoingRoomKeyRequestManager.sendQueuedRequests();
+            aliceClient.crypto.outgoingRoomKeyRequestManager.sendQueuedRequests();
             jest.runAllTimers();
             await Promise.resolve();
             expect(aliceClient.sendToDevice).toBeCalledTimes(1);

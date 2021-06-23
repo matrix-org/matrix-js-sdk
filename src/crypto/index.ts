@@ -29,7 +29,7 @@ import { logger } from '../logger';
 import { OlmDevice } from "./OlmDevice";
 import * as olmlib from "./olmlib";
 import { DeviceList } from "./DeviceList";
-import { DeviceInfo } from "./deviceinfo";
+import { DeviceInfo, IDevice } from "./deviceinfo";
 import * as algorithms from "./algorithms";
 import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from './CrossSigning';
 import { EncryptionSetupBuilder } from "./EncryptionSetup";
@@ -420,9 +420,7 @@ export class Crypto extends EventEmitter {
             };
 
             myDevices[this.deviceId] = deviceInfo;
-            this.deviceList.storeDevicesForUser(
-                this.userId, myDevices,
-            );
+            this.deviceList.storeDevicesForUser(this.userId, myDevices);
             this.deviceList.saveIfDirty();
         }
 
@@ -922,10 +920,7 @@ export class Crypto extends EventEmitter {
                 await this.crossSigningInfo.getCrossSigningKeysFromCache();
             // This is writing to in-memory account data in
             // builder.accountDataClientAdapter so won't fail
-            await CrossSigningInfo.storeInSecretStorage(
-                crossSigningPrivateKeys,
-                secretStorage,
-            );
+            await CrossSigningInfo.storeInSecretStorage(crossSigningPrivateKeys, secretStorage);
         }
 
         if (setupNewKeyBackup && !keyBackupInfo) {
@@ -1172,7 +1167,7 @@ export class Crypto extends EventEmitter {
             // FIXME: do this in batches
             const users = {};
             for (const [userId, crossSigningInfo]
-                of Object.entries(this.deviceList._crossSigningInfo)) {
+                of Object.entries(this.deviceList.crossSigningInfo)) {
                 const upgradeInfo = await this.checkForDeviceVerificationUpgrade(
                     userId, CrossSigningInfo.fromStorage(crossSigningInfo, userId),
                 );
@@ -1248,7 +1243,7 @@ export class Crypto extends EventEmitter {
     private async checkForValidDeviceSignature(
         userId: string,
         key: any, // TODO types
-        devices: Record<string, DeviceInfo>,
+        devices: Record<string, IDevice>,
     ): Promise<string[]> {
         const deviceIds: string[] = [];
         if (devices && key.signatures && key.signatures[userId]) {
@@ -1934,7 +1929,7 @@ export class Crypto extends EventEmitter {
     public downloadKeys(
         userIds: string[],
         forceDownload?: boolean,
-    ): Promise<Record<string, Record<string, DeviceInfo>>> {
+    ): Promise<Record<string, Record<string, IDevice>>> {
         return this.deviceList.downloadKeys(userIds, forceDownload);
     }
 
@@ -2003,7 +1998,7 @@ export class Crypto extends EventEmitter {
         verified?: boolean,
         blocked?: boolean,
         known?: boolean,
-    ): Promise<DeviceInfo> {
+    ): Promise<DeviceInfo | CrossSigningInfo> {
         // get rid of any `undefined`s here so we can just check
         // for null rather than null or undefined
         if (verified === undefined) verified = null;
@@ -2068,7 +2063,7 @@ export class Crypto extends EventEmitter {
                     // This will emit events when it comes back down the sync
                     // (we could do local echo to speed things up)
                 }
-                return device;
+                return device as any; // TODO types
             } else {
                 return xsk;
             }

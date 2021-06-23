@@ -296,7 +296,7 @@ describe("MegolmBackup", function() {
                             resolve();
                             return Promise.resolve({});
                         };
-                        client.crypto._backupManager.backupGroupSession(
+                        client.crypto.backupManager.backupGroupSession(
                             "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
                             groupSession.session_id(),
                         );
@@ -478,7 +478,7 @@ describe("MegolmBackup", function() {
                                 );
                             }
                         };
-                        client.crypto._backupManager.backupGroupSession(
+                        client.crypto.backupManager.backupGroupSession(
                             "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
                             groupSession.session_id(),
                         );
