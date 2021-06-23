@@ -1216,7 +1216,7 @@ export class Crypto extends EventEmitter {
         // only upgrade if this is the first cross-signing key that we've seen for
         // them, and if their cross-signing key isn't already verified
         const trustLevel = this.crossSigningInfo.checkUserTrust(crossSigningInfo);
-        if (crossSigningInfo.firstUse && !trustLevel.verified) {
+        if (crossSigningInfo.firstUse && !trustLevel.isVerified()) {
             const devices = this.deviceList.getRawStoredDevicesForUser(userId);
             const deviceIds = await this.checkForValidDeviceSignature(
                 userId, crossSigningInfo.keys.master, devices,
@@ -2907,9 +2907,6 @@ export class Crypto extends EventEmitter {
 
         this.deviceList.setSyncToken(syncData.nextSyncToken);
         this.deviceList.saveIfDirty();
-
-        // catch up on any new devices we got told about during the sync.
-        this.deviceList.lastKnownSyncToken = nextSyncToken;
 
         // we always track our own device list (for key backups etc)
         this.deviceList.startTrackingDeviceList(this.userId);

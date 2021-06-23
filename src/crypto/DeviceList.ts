@@ -184,7 +184,7 @@ export class DeviceList extends EventEmitter {
         // Delay saves for a bit so we can aggregate multiple saves that happen
         // in quick succession (eg. when a whole room's devices are marked as known)
 
-        const targetTime = Date.now + delay;
+        const targetTime = Date.now() + delay;
         if (this.savePromiseTime && targetTime < this.savePromiseTime) {
             // There's a save scheduled but for after we would like: cancel
             // it & schedule one for the time we want
