@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import { ISignatures } from "../@types/signed";
-import { DeviceInfo } from "./deviceinfo";
 
 export interface IKeyBackupSession {
     first_message_index: number; // eslint-disable-line camelcase

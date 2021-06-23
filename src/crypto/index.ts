@@ -52,7 +52,7 @@ import { IStore } from "../store";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
 import { MatrixEvent } from "../models/event";
-import { MatrixClient, IKeysUploadResponse } from "../client";
+import { MatrixClient, IKeysUploadResponse, SessionStore, CryptoStore } from "../client";
 import type { EncryptionAlgorithm, DecryptionAlgorithm } from "./algorithms/base";
 import type { RoomList } from "./RoomList";
 import { IRecoveryKey, IEncryptedEventInfo } from "./api";
@@ -282,11 +282,11 @@ export class Crypto extends EventEmitter {
      */
     constructor(
         private readonly baseApis: MatrixClient,
-        public readonly sessionStore: any, // TODO types
+        public readonly sessionStore: SessionStore,
         private readonly userId: string,
         private readonly deviceId: string,
         private readonly clientStore: IStore,
-        public readonly cryptoStore: any, // TODO types
+        public readonly cryptoStore: CryptoStore,
         private readonly roomList: RoomList,
         verificationMethods: any[], // TODO types
     ) {

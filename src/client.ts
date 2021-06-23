@@ -48,7 +48,7 @@ import {
     retryNetworkOperation,
 } from "./http-api";
 import { Crypto, fixBackupKey, IBootstrapCrossSigningOpts, isCryptoAvailable } from './crypto';
-import { DeviceInfo } from "./crypto/DeviceInfo";
+import { DeviceInfo } from "./crypto/deviceinfo";
 import { decodeRecoveryKey } from './crypto/recoverykey';
 import { keyFromAuthData } from './crypto/key_passphrase';
 import { User } from "./models/user";
