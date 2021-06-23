@@ -408,7 +408,7 @@ describe("MegolmDecryption", function() {
             "@bob:example.com", BOB_DEVICES,
         );
         aliceClient.crypto.deviceList.downloadKeys = async function(userIds) {
-            return this._getDevicesFromStore(userIds);
+            return this.getDevicesFromStore(userIds);
         };
 
         let run = false;
@@ -512,7 +512,7 @@ describe("MegolmDecryption", function() {
             "@bob:example.com", BOB_DEVICES,
         );
         aliceClient.crypto.deviceList.downloadKeys = async function(userIds) {
-            return this._getDevicesFromStore(userIds);
+            return this.getDevicesFromStore(userIds);
         };
 
         aliceClient.claimOneTimeKeys = async () => {

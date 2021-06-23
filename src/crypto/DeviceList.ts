@@ -31,7 +31,7 @@ import { chunkPromises, defer, IDeferred, sleep } from '../utils';
 import { MatrixClient, CryptoStore } from "../client";
 import { OlmDevice } from "./OlmDevice";
 
-/* State transition diagram for DeviceList._deviceTrackingStatus
+/* State transition diagram for DeviceList.deviceTrackingStatus
  *
  *                                |
  *     stopTrackingDeviceList     V
@@ -51,7 +51,7 @@ import { OlmDevice } from "./OlmDevice";
  *   +----------------------- UP_TO_DATE ------------------------+
  */
 
-// constants for DeviceList._deviceTrackingStatus
+// constants for DeviceList.deviceTrackingStatus
 enum TrackingStatus {
     NotTracked,
     PendingDownload,

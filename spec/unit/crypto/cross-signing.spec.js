@@ -222,7 +222,7 @@ describe("Cross Signing", function() {
             });
         });
 
-        const deviceInfo = alice.crypto.deviceList._devices["@alice:example.com"]
+        const deviceInfo = alice.crypto.deviceList.devices["@alice:example.com"]
             .Osborne2;
         const aliceDevice = {
             user_id: "@alice:example.com",
@@ -444,7 +444,7 @@ describe("Cross Signing", function() {
             });
         });
 
-        const deviceInfo = alice.crypto.deviceList._devices["@alice:example.com"]
+        const deviceInfo = alice.crypto.deviceList.devices["@alice:example.com"]
             .Osborne2;
         const aliceDevice = {
             user_id: "@alice:example.com",
