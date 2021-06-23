@@ -734,8 +734,8 @@ export class Aes256 implements BackupAlgorithm {
 
         for (const [sessionId, sessionData] of Object.entries(sessions)) {
             try {
-                const decrypted = JSON.parse(decryptAES(
-                    sessionData, this.key, sessionId,
+                const decrypted = JSON.parse(await decryptAES(
+                    sessionData.session_data, this.key, sessionId,
                 ));
                 decrypted.session_id = sessionId;
                 keys.push(decrypted);
