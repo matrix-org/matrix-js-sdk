@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { DeviceInfo } from "./deviceinfo";
-import { IKeyBackupVersion } from "./keybackup";
+import { IKeyBackupInfo } from "./keybackup";
 import { ISecretStorageKeyInfo } from "../matrix";
 
 // TODO: Merge this with crypto.js once converted
@@ -85,7 +85,7 @@ export interface ICreateSecretStorageOpts {
      * The current key backup object. If passed,
      * the passphrase and recovery key from this backup will be used.
      */
-    keyBackupInfo?: IKeyBackupVersion;
+    keyBackupInfo?: IKeyBackupInfo;
 
     /**
      * If true, a new key backup version will be

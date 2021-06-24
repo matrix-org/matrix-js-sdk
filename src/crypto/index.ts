@@ -52,10 +52,11 @@ import { IStore } from "../store";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
 import { MatrixEvent } from "../models/event";
-import { MatrixClient, IKeysUploadResponse, SessionStore, CryptoStore } from "../client";
+import { MatrixClient, IKeysUploadResponse, SessionStore, CryptoStore, ISignedKey } from "../client";
 import type { EncryptionAlgorithm, DecryptionAlgorithm } from "./algorithms/base";
 import type { RoomList } from "./RoomList";
 import { IRecoveryKey, IEncryptedEventInfo } from "./api";
+import { IKeyBackupInfo } from "./keybackup";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -91,7 +92,7 @@ interface IInitOpts {
 
 export interface IBootstrapCrossSigningOpts {
     setupNewCrossSigning?: boolean;
-    authUploadDeviceSigningKeys?(makeRequest: (authData: any) => void): Promise<void>;
+    authUploadDeviceSigningKeys?(makeRequest: (authData: any) => void): Promise<{}>;
 }
 
 interface IBootstrapSecretStorageOpts {
@@ -111,7 +112,7 @@ interface IRoomKey {
     algorithm: string;
 }
 
-interface IRoomKeyRequestBody extends IRoomKey {
+export interface IRoomKeyRequestBody extends IRoomKey {
     session_id: string;
     sender_key: string
 }
@@ -157,7 +158,7 @@ interface ISyncDeviceLists {
     left: string[];
 }
 
-interface IRoomKeyRequestRecipient {
+export interface IRoomKeyRequestRecipient {
     userId: string;
     deviceId: string;
 }
@@ -276,7 +277,7 @@ export class Crypto extends EventEmitter {
      *    or a class that implements a verification method.
      */
     constructor(
-        private readonly baseApis: MatrixClient,
+        public readonly baseApis: MatrixClient,
         public readonly sessionStore: SessionStore,
         private readonly userId: string,
         private readonly deviceId: string,
@@ -622,7 +623,7 @@ export class Crypto extends EventEmitter {
 
             // Cross-sign own device
             const device = this.deviceList.getStoredDevice(this.userId, this.deviceId);
-            const deviceSignature = await crossSigningInfo.signDevice(this.userId, device);
+            const deviceSignature = await crossSigningInfo.signDevice(this.userId, device) as ISignedKey;
             builder.addKeySignature(this.userId, this.deviceId, deviceSignature);
 
             // Sign message key backup with cross-signing master key
@@ -932,7 +933,7 @@ export class Crypto extends EventEmitter {
             await secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(privateKey));
 
             // create keyBackupInfo object to add to builder
-            const data = {
+            const data: IKeyBackupInfo = {
                 algorithm: info.algorithm,
                 auth_data: info.auth_data,
             };
@@ -2843,8 +2844,8 @@ export class Crypto extends EventEmitter {
      * Re-send any outgoing key requests, eg after verification
      * @returns {Promise}
      */
-    public cancelAndResendAllOutgoingKeyRequests(): Promise<void> {
-        return this.outgoingRoomKeyRequestManager.cancelAndResendAllOutgoingRequests();
+    public async cancelAndResendAllOutgoingKeyRequests(): Promise<void> {
+        await this.outgoingRoomKeyRequestManager.cancelAndResendAllOutgoingRequests();
     }
 
     /**
@@ -3291,9 +3292,7 @@ export class Crypto extends EventEmitter {
         // it. This won't always be the case though so we need to re-send any that have already been sent
         // to avoid races.
         const requestsToResend =
-            await this.outgoingRoomKeyRequestManager.getOutgoingSentRoomKeyRequest(
-                sender, device.deviceId,
-            );
+            await this.outgoingRoomKeyRequestManager.getOutgoingSentRoomKeyRequest(sender, device.deviceId);
         for (const keyReq of requestsToResend) {
             this.requestRoomKey(keyReq.requestBody, keyReq.recipients, true);
         }

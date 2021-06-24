@@ -32,7 +32,7 @@ export interface IKeyBackupRoomSessions {
 }
 
 /* eslint-disable camelcase */
-export interface IKeyBackupVersion {
+export interface IKeyBackupInfo {
     algorithm: string;
     auth_data: {
         public_key: string;
@@ -41,9 +41,9 @@ export interface IKeyBackupVersion {
         private_key_iterations: number;
         private_key_bits?: number;
     };
-    count: number;
-    etag: string;
-    version: string; // number contained within
+    count?: number;
+    etag?: string;
+    version?: string; // number contained within
 }
 /* eslint-enable camelcase */
 

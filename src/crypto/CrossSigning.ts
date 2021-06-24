@@ -28,26 +28,27 @@ import { decryptAES, encryptAES } from './aes';
 import { PkSigning } from "@matrix-org/olm";
 import { DeviceInfo } from "./deviceinfo";
 import { SecretStorage } from "./SecretStorage";
-import { CryptoStore, MatrixClient } from "../client";
+import { CryptoStore, ICrossSigningKey, ISignedKey, MatrixClient } from "../client";
 import { OlmDevice } from "./OlmDevice";
 import { ICryptoCallbacks } from "../matrix";
+import { ISignatures } from "../@types/signed";
 
 const KEY_REQUEST_TIMEOUT_MS = 1000 * 60;
 
-function publicKeyFromKeyInfo(keyInfo: any): any { // TODO types
+function publicKeyFromKeyInfo(keyInfo: ICrossSigningKey): string {
     // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
     // We assume only a single key, and we want the bare form without type
     // prefix, so we select the values.
     return Object.values(keyInfo.keys)[0];
 }
 
-interface ICacheCallbacks {
+export interface ICacheCallbacks {
     getCrossSigningKeyCache?(type: string, expectedPublicKey?: string): Promise<Uint8Array>;
     storeCrossSigningKeyCache?(type: string, key: Uint8Array): Promise<void>;
 }
 
 export class CrossSigningInfo extends EventEmitter {
-    public keys: Record<string, any> = {}; // TODO types
+    public keys: Record<string, ICrossSigningKey> = {};
     public firstUse = true;
     // This tracks whether we've ever verified this user with any identity.
     // When you verify a user, any devices online at the time that receive
@@ -368,8 +369,8 @@ export class CrossSigningInfo extends EventEmitter {
         this.keys = {};
     }
 
-    public setKeys(keys: Record<string, any>): void {
-        const signingKeys: Record<string, object> = {};
+    public setKeys(keys: Record<string, ICrossSigningKey>): void {
+        const signingKeys: Record<string, ICrossSigningKey> = {};
         if (keys.master) {
             if (keys.master.user_id !== this.userId) {
                 const error = "Mismatched user ID " + keys.master.user_id +
@@ -448,7 +449,7 @@ export class CrossSigningInfo extends EventEmitter {
         }
     }
 
-    public async signObject<T extends object>(data: T, type: string): Promise<T> {
+    public async signObject<T extends object>(data: T, type: string): Promise<T & { signatures: ISignatures }> {
         if (!this.keys[type]) {
             throw new Error(
                 "Attempted to sign with " + type + " key but no such key present",
@@ -457,13 +458,13 @@ export class CrossSigningInfo extends EventEmitter {
         const [pubkey, signing] = await this.getCrossSigningKey(type);
         try {
             pkSign(data, signing, this.userId, pubkey);
-            return data;
+            return data as T & { signatures: ISignatures };
         } finally {
             signing.free();
         }
     }
 
-    public async signUser(key: CrossSigningInfo): Promise<object> {
+    public async signUser(key: CrossSigningInfo): Promise<ICrossSigningKey> {
         if (!this.keys.user_signing) {
             logger.info("No user signing key: not signing user");
             return;
@@ -471,7 +472,7 @@ export class CrossSigningInfo extends EventEmitter {
         return this.signObject(key.keys.master, "user_signing");
     }
 
-    public async signDevice(userId: string, device: DeviceInfo): Promise<object> {
+    public async signDevice(userId: string, device: DeviceInfo): Promise<ISignedKey> {
         if (userId !== this.userId) {
             throw new Error(
                 `Trying to sign ${userId}'s device; can only sign our own device`,
@@ -481,7 +482,7 @@ export class CrossSigningInfo extends EventEmitter {
             logger.info("No self signing key: not signing device");
             return;
         }
-        return this.signObject(
+        return this.signObject<Omit<ISignedKey, "signatures">>(
             {
                 algorithms: device.algorithms,
                 keys: device.keys,

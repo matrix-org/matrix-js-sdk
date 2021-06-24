@@ -566,7 +566,7 @@ export function encodeBase64(uint8Array: ArrayBuffer | Uint8Array): string {
  * @param {Uint8Array} uint8Array The data to encode.
  * @return {string} The unpadded base64.
  */
-export function encodeUnpaddedBase64(uint8Array: Uint8Array): string {
+export function encodeUnpaddedBase64(uint8Array: ArrayBuffer | Uint8Array): string {
     return encodeBase64(uint8Array).replace(/=+$/g, '');
 }
 

@@ -29,11 +29,11 @@ import { keyFromPassphrase } from './key_passphrase';
 import { sleep } from "../utils";
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { encodeRecoveryKey } from './recoverykey';
-import { IKeyBackupVersion } from "./keybackup";
+import { IKeyBackupInfo } from "./keybackup";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 
-type AuthData = IKeyBackupVersion["auth_data"];
+type AuthData = IKeyBackupInfo["auth_data"];
 
 type SigInfo = {
     deviceId: string,
@@ -49,7 +49,7 @@ export type TrustInfo = {
 };
 
 export interface IKeyBackupCheck {
-    backupInfo: IKeyBackupVersion;
+    backupInfo: IKeyBackupInfo;
     trustInfo: TrustInfo;
 }
 
@@ -90,7 +90,7 @@ interface BackupAlgorithm {
  */
 export class BackupManager {
     private algorithm: BackupAlgorithm | undefined;
-    public backupInfo: IKeyBackupVersion | undefined; // The info dict from /room_keys/version
+    public backupInfo: IKeyBackupInfo | undefined; // The info dict from /room_keys/version
     public checkedForBackup: boolean; // Have we checked the server for a backup we can use?
     private sendingBackups: boolean; // Are we currently sending backups?
     constructor(private readonly baseApis: MatrixClient, public readonly getKey: GetKey) {
@@ -102,7 +102,7 @@ export class BackupManager {
         return this.backupInfo && this.backupInfo.version;
     }
 
-    public static async makeAlgorithm(info: IKeyBackupVersion, getKey: GetKey): Promise<BackupAlgorithm> {
+    public static async makeAlgorithm(info: IKeyBackupInfo, getKey: GetKey): Promise<BackupAlgorithm> {
         const Algorithm = algorithmsByName[info.algorithm];
         if (!Algorithm) {
             throw new Error("Unknown backup algorithm");
@@ -110,7 +110,7 @@ export class BackupManager {
         return await Algorithm.init(info.auth_data, getKey);
     }
 
-    public async enableKeyBackup(info: IKeyBackupVersion): Promise<void> {
+    public async enableKeyBackup(info: IKeyBackupInfo): Promise<void> {
         this.backupInfo = info;
         if (this.algorithm) {
             this.algorithm.free();
@@ -166,7 +166,7 @@ export class BackupManager {
         };
     }
 
-    public async createKeyBackupVersion(info: IKeyBackupVersion): Promise<void> {
+    public async createKeyBackupVersion(info: IKeyBackupInfo): Promise<void> {
         this.algorithm = await BackupManager.makeAlgorithm(info, this.getKey);
     }
 
@@ -183,7 +183,7 @@ export class BackupManager {
             this.checkedForBackup = true;
             return null;
         }
-        let backupInfo: IKeyBackupVersion;
+        let backupInfo: IKeyBackupInfo;
         try {
             backupInfo = await this.baseApis.getKeyBackupVersion();
         } catch (e) {
@@ -260,7 +260,7 @@ export class BackupManager {
      *     ]
      * }
      */
-    public async isKeyBackupTrusted(backupInfo: IKeyBackupVersion): Promise<TrustInfo> {
+    public async isKeyBackupTrusted(backupInfo: IKeyBackupInfo): Promise<TrustInfo> {
         const ret = {
             usable: false,
             trusted_locally: false,

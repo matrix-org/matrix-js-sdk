@@ -25,7 +25,7 @@ const subtleCrypto = (typeof window !== "undefined" && window.crypto) ?
 // salt for HKDF, with 8 bytes of zeros
 const zeroSalt = new Uint8Array(8);
 
-interface IEncryptedPayload {
+export interface IEncryptedPayload {
     iv: string;
     ciphertext: string;
     mac: string;

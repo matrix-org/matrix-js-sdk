@@ -1,11 +1,24 @@
 import { logger } from "../logger";
 import { MatrixEvent } from "../models/event";
 import { EventEmitter } from "events";
-import { createCryptoStoreCacheCallbacks } from "./CrossSigning";
+import { createCryptoStoreCacheCallbacks, ICacheCallbacks } from "./CrossSigning";
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
+import { PREFIX_UNSTABLE } from "../http-api";
+import { Crypto } from "./index";
 import {
-    PREFIX_UNSTABLE,
-} from "../http-api";
+    CrossSigningKeys,
+    ICrossSigningKey,
+    ICryptoCallbacks,
+    ISecretStorageKeyInfo,
+    ISignedKey,
+    KeySignatures,
+} from "../matrix";
+import { IKeyBackupInfo } from "./keybackup";
+
+interface ICrossSigningKeys {
+    authUpload(authData: any): Promise<{}>;
+    keys: Record<string, ICrossSigningKey>;
+}
 
 /**
  * Builds an EncryptionSetupOperation by calling any of the add.. methods.
@@ -17,18 +30,23 @@ import {
  * more than once.
  */
 export class EncryptionSetupBuilder {
+    public readonly accountDataClientAdapter: AccountDataClientAdapter;
+    public readonly crossSigningCallbacks: CrossSigningCallbacks;
+    public readonly ssssCryptoCallbacks: SSSSCryptoCallbacks;
+
+    private crossSigningKeys: ICrossSigningKeys = null;
+    private keySignatures: KeySignatures = null;
+    private keyBackupInfo: IKeyBackupInfo = null;
+    private sessionBackupPrivateKey: Uint8Array;
+
     /**
      * @param {Object.<String, MatrixEvent>} accountData pre-existing account data, will only be read, not written.
      * @param {CryptoCallbacks} delegateCryptoCallbacks crypto callbacks to delegate to if the key isn't in cache yet
      */
-    constructor(accountData, delegateCryptoCallbacks) {
+    constructor(accountData: Record<string, MatrixEvent>, delegateCryptoCallbacks: ICryptoCallbacks) {
         this.accountDataClientAdapter = new AccountDataClientAdapter(accountData);
         this.crossSigningCallbacks = new CrossSigningCallbacks();
         this.ssssCryptoCallbacks = new SSSSCryptoCallbacks(delegateCryptoCallbacks);
-
-        this._crossSigningKeys = null;
-        this._keySignatures = null;
-        this._keyBackupInfo = null;
     }
 
     /**
@@ -42,8 +60,8 @@ export class EncryptionSetupBuilder {
      *     an empty authDict, to obtain the flows.
      * @param {Object} keys the new keys
      */
-    addCrossSigningKeys(authUpload, keys) {
-        this._crossSigningKeys = { authUpload, keys };
+    public addCrossSigningKeys(authUpload: ICrossSigningKeys["authUpload"], keys: ICrossSigningKeys["keys"]): void {
+        this.crossSigningKeys = { authUpload, keys };
     }
 
     /**
@@ -54,8 +72,8 @@ export class EncryptionSetupBuilder {
      *
      * @param {Object} keyBackupInfo as received from/sent to the server
      */
-    addSessionBackup(keyBackupInfo) {
-        this._keyBackupInfo = keyBackupInfo;
+    public addSessionBackup(keyBackupInfo: IKeyBackupInfo): void {
+        this.keyBackupInfo = keyBackupInfo;
     }
 
     /**
@@ -65,8 +83,8 @@ export class EncryptionSetupBuilder {
      *
      * @param {Uint8Array} privateKey
      */
-    addSessionBackupPrivateKeyToCache(privateKey) {
-        this._sessionBackupPrivateKey = privateKey;
+    public addSessionBackupPrivateKeyToCache(privateKey: Uint8Array): void {
+        this.sessionBackupPrivateKey = privateKey;
     }
 
     /**
@@ -75,14 +93,14 @@ export class EncryptionSetupBuilder {
      *
      * @param {String} userId
      * @param {String} deviceId
-     * @param {String} signature
+     * @param {Object} signature
      */
-    addKeySignature(userId, deviceId, signature) {
-        if (!this._keySignatures) {
-            this._keySignatures = {};
+    public addKeySignature(userId: string, deviceId: string, signature: ISignedKey): void {
+        if (!this.keySignatures) {
+            this.keySignatures = {};
         }
-        const userSignatures = this._keySignatures[userId] || {};
-        this._keySignatures[userId] = userSignatures;
+        const userSignatures = this.keySignatures[userId] || {};
+        this.keySignatures[userId] = userSignatures;
         userSignatures[deviceId] = signature;
     }
 
@@ -91,7 +109,7 @@ export class EncryptionSetupBuilder {
      * @param {Object} content
      * @return {Promise}
      */
-    setAccountData(type, content) {
+    public setAccountData(type: string, content: object): Promise<void> {
         return this.accountDataClientAdapter.setAccountData(type, content);
     }
 
@@ -99,13 +117,13 @@ export class EncryptionSetupBuilder {
      * builds the operation containing all the parts that have been added to the builder
      * @return {EncryptionSetupOperation}
      */
-    buildOperation() {
-        const accountData = this.accountDataClientAdapter._values;
+    public buildOperation(): EncryptionSetupOperation {
+        const accountData = this.accountDataClientAdapter.values;
         return new EncryptionSetupOperation(
             accountData,
-            this._crossSigningKeys,
-            this._keyBackupInfo,
-            this._keySignatures,
+            this.crossSigningKeys,
+            this.keyBackupInfo,
+            this.keySignatures,
         );
     }
 
@@ -118,9 +136,9 @@ export class EncryptionSetupBuilder {
      * @param  {Crypto} crypto
      * @return {Promise}
      */
-    async persist(crypto) {
+    public async persist(crypto: Crypto): Promise<void> {
         // store private keys in cache
-        if (this._crossSigningKeys) {
+        if (this.crossSigningKeys) {
             const cacheCallbacks = createCryptoStoreCacheCallbacks(crypto.cryptoStore, crypto.olmDevice);
             for (const type of ["master", "self_signing", "user_signing"]) {
                 logger.log(`Cache ${type} cross-signing private key locally`);
@@ -132,13 +150,13 @@ export class EncryptionSetupBuilder {
                 'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
                 (txn) => {
                     crypto.cryptoStore.storeCrossSigningKeys(
-                        txn, this._crossSigningKeys.keys);
+                        txn, this.crossSigningKeys.keys);
                 },
             );
         }
         // store session backup key in cache
-        if (this._sessionBackupPrivateKey) {
-            await crypto.storeSessionBackupPrivateKey(this._sessionBackupPrivateKey);
+        if (this.sessionBackupPrivateKey) {
+            await crypto.storeSessionBackupPrivateKey(this.sessionBackupPrivateKey);
         }
     }
 }
@@ -156,58 +174,58 @@ export class EncryptionSetupOperation {
      * @param  {Object} keyBackupInfo
      * @param  {Object} keySignatures
      */
-    constructor(accountData, crossSigningKeys, keyBackupInfo, keySignatures) {
-        this._accountData = accountData;
-        this._crossSigningKeys = crossSigningKeys;
-        this._keyBackupInfo = keyBackupInfo;
-        this._keySignatures = keySignatures;
-    }
+    constructor(
+        private readonly accountData: Map<string, object>,
+        private readonly crossSigningKeys: ICrossSigningKeys,
+        private readonly keyBackupInfo: IKeyBackupInfo,
+        private readonly keySignatures: KeySignatures,
+    ) {}
 
     /**
      * Runs the (remaining part of, in the future) operation by sending requests to the server.
-     * @param  {Crypto} crypto
+     * @param {Crypto} crypto
      */
-    async apply(crypto) {
+    public async apply(crypto: Crypto): Promise<void> {
         const baseApis = crypto.baseApis;
         // upload cross-signing keys
-        if (this._crossSigningKeys) {
-            const keys = {};
-            for (const [name, key] of Object.entries(this._crossSigningKeys.keys)) {
+        if (this.crossSigningKeys) {
+            const keys: Partial<CrossSigningKeys> = {};
+            for (const [name, key] of Object.entries(this.crossSigningKeys.keys)) {
                 keys[name + "_key"] = key;
             }
 
             // We must only call `uploadDeviceSigningKeys` from inside this auth
             // helper to ensure we properly handle auth errors.
-            await this._crossSigningKeys.authUpload(authDict => {
-                return baseApis.uploadDeviceSigningKeys(authDict, keys);
+            await this.crossSigningKeys.authUpload(authDict => {
+                return baseApis.uploadDeviceSigningKeys(authDict, keys as CrossSigningKeys);
             });
 
             // pass the new keys to the main instance of our own CrossSigningInfo.
-            crypto.crossSigningInfo.setKeys(this._crossSigningKeys.keys);
+            crypto.crossSigningInfo.setKeys(this.crossSigningKeys.keys);
         }
         // set account data
-        if (this._accountData) {
-            for (const [type, content] of this._accountData) {
+        if (this.accountData) {
+            for (const [type, content] of this.accountData) {
                 await baseApis.setAccountData(type, content);
             }
         }
         // upload first cross-signing signatures with the new key
         // (e.g. signing our own device)
-        if (this._keySignatures) {
-            await baseApis.uploadKeySignatures(this._keySignatures);
+        if (this.keySignatures) {
+            await baseApis.uploadKeySignatures(this.keySignatures);
         }
         // need to create/update key backup info
-        if (this._keyBackupInfo) {
-            if (this._keyBackupInfo.version) {
+        if (this.keyBackupInfo) {
+            if (this.keyBackupInfo.version) {
                 // session backup signature
                 // The backup is trusted because the user provided the private key.
                 // Sign the backup with the cross signing key so the key backup can
                 // be trusted via cross-signing.
                 await baseApis.http.authedRequest(
-                    undefined, "PUT", "/room_keys/version/" + this._keyBackupInfo.version,
+                    undefined, "PUT", "/room_keys/version/" + this.keyBackupInfo.version,
                     undefined, {
-                        algorithm: this._keyBackupInfo.algorithm,
-                        auth_data: this._keyBackupInfo.auth_data,
+                        algorithm: this.keyBackupInfo.algorithm,
+                        auth_data: this.keyBackupInfo.auth_data,
                     },
                     { prefix: PREFIX_UNSTABLE },
                 );
@@ -215,7 +233,7 @@ export class EncryptionSetupOperation {
                 // add new key backup
                 await baseApis.http.authedRequest(
                     undefined, "POST", "/room_keys/version",
-                    undefined, this._keyBackupInfo,
+                    undefined, this.keyBackupInfo,
                     { prefix: PREFIX_UNSTABLE },
                 );
             }
@@ -228,20 +246,20 @@ export class EncryptionSetupOperation {
  * implementing the methods related to account data in MatrixClient
  */
 class AccountDataClientAdapter extends EventEmitter {
+    public readonly values = new Map<string, object>();
+
     /**
-     * @param  {Object.<String, MatrixEvent>} accountData existing account data
+     * @param  {Object.<String, MatrixEvent>} existingValues existing account data
      */
-    constructor(accountData) {
+    constructor(private readonly existingValues: Record<string, MatrixEvent>) {
         super();
-        this._existingValues = accountData;
-        this._values = new Map();
     }
 
     /**
      * @param  {String} type
      * @return {Promise<Object>} the content of the account data
      */
-    getAccountDataFromServer(type) {
+    public getAccountDataFromServer(type: string): Promise<object> {
         return Promise.resolve(this.getAccountData(type));
     }
 
@@ -249,12 +267,12 @@ class AccountDataClientAdapter extends EventEmitter {
      * @param  {String} type
      * @return {Object} the content of the account data
      */
-    getAccountData(type) {
-        const modifiedValue = this._values.get(type);
+    public getAccountData(type: string): object {
+        const modifiedValue = this.values.get(type);
         if (modifiedValue) {
             return modifiedValue;
         }
-        const existingValue = this._existingValues[type];
+        const existingValue = this.existingValues[type];
         if (existingValue) {
             return existingValue.getContent();
         }
@@ -266,9 +284,9 @@ class AccountDataClientAdapter extends EventEmitter {
      * @param {Object} content
      * @return {Promise}
      */
-    setAccountData(type, content) {
-        const lastEvent = this._values.get(type);
-        this._values.set(type, content);
+    public setAccountData(type: string, content: object): Promise<void> {
+        const lastEvent = this.values.get(type);
+        this.values.set(type, content);
         // ensure accountData is emitted on the next tick,
         // as SecretStorage listens for it while calling this method
         // and it seems to rely on this.
@@ -284,27 +302,25 @@ class AccountDataClientAdapter extends EventEmitter {
  * by both cache callbacks (see createCryptoStoreCacheCallbacks) as non-cache callbacks.
  * See CrossSigningInfo constructor
  */
-class CrossSigningCallbacks {
-    constructor() {
-        this.privateKeys = new Map();
-    }
+class CrossSigningCallbacks implements ICryptoCallbacks, ICacheCallbacks {
+    public readonly privateKeys = new Map<string, Uint8Array>();
 
     // cache callbacks
-    getCrossSigningKeyCache(type, expectedPublicKey) {
+    public getCrossSigningKeyCache(type: string, expectedPublicKey: string): Promise<Uint8Array> {
         return this.getCrossSigningKey(type, expectedPublicKey);
     }
 
-    storeCrossSigningKeyCache(type, key) {
+    public storeCrossSigningKeyCache(type: string, key: Uint8Array): Promise<void> {
         this.privateKeys.set(type, key);
         return Promise.resolve();
     }
 
     // non-cache callbacks
-    getCrossSigningKey(type, _expectedPubkey) {
+    public getCrossSigningKey(type: string, expectedPubkey: string): Promise<Uint8Array> {
         return Promise.resolve(this.privateKeys.get(type));
     }
 
-    saveCrossSigningKeys(privateKeys) {
+    public saveCrossSigningKeys(privateKeys: Record<string, Uint8Array>) {
         for (const [type, privateKey] of Object.entries(privateKeys)) {
             this.privateKeys.set(type, privateKey);
         }
@@ -316,39 +332,36 @@ class CrossSigningCallbacks {
  * the SecretStorage crypto callbacks
  */
 class SSSSCryptoCallbacks {
-    constructor(delegateCryptoCallbacks) {
-        this._privateKeys = new Map();
-        this._delegateCryptoCallbacks = delegateCryptoCallbacks;
-    }
+    private readonly privateKeys = new Map<string, Uint8Array>();
 
-    async getSecretStorageKey({ keys }, name) {
+    constructor(private readonly delegateCryptoCallbacks: ICryptoCallbacks) {}
+
+    public async getSecretStorageKey(
+        { keys }: { keys: Record<string, object> },
+        name: string,
+    ): Promise<[string, Uint8Array]> {
         for (const keyId of Object.keys(keys)) {
-            const privateKey = this._privateKeys.get(keyId);
+            const privateKey = this.privateKeys.get(keyId);
             if (privateKey) {
                 return [keyId, privateKey];
             }
         }
         // if we don't have the key cached yet, ask
         // for it to the general crypto callbacks and cache it
-        if (this._delegateCryptoCallbacks) {
-            const result = await this._delegateCryptoCallbacks.
+        if (this.delegateCryptoCallbacks) {
+            const result = await this.delegateCryptoCallbacks.
                 getSecretStorageKey({ keys }, name);
             if (result) {
                 const [keyId, privateKey] = result;
-                this._privateKeys.set(keyId, privateKey);
+                this.privateKeys.set(keyId, privateKey);
             }
             return result;
         }
     }
 
-    addPrivateKey(keyId, keyInfo, privKey) {
-        this._privateKeys.set(keyId, privKey);
+    public addPrivateKey(keyId: string, keyInfo: ISecretStorageKeyInfo, privKey: Uint8Array): void {
+        this.privateKeys.set(keyId, privKey);
         // Also pass along to application to cache if it wishes
-        if (
-            this._delegateCryptoCallbacks &&
-            this._delegateCryptoCallbacks.cacheSecretStorageKey
-        ) {
-            this._delegateCryptoCallbacks.cacheSecretStorageKey(keyId, keyInfo, privKey);
-        }
+        this.delegateCryptoCallbacks?.cacheSecretStorageKey?.(keyId, keyInfo, privKey);
     }
 }
