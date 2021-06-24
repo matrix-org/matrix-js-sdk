@@ -16,10 +16,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {logger} from '../../logger';
+import { logger } from '../../logger';
 import * as utils from "../../utils";
 
-export const VERSION = 9;
+export const VERSION = 10;
+const PROFILE_TRANSACTIONS = false;
 
 /**
  * Implementation of a CryptoStore which is backed by an existing
@@ -34,6 +35,7 @@ export class Backend {
      */
     constructor(db) {
         this._db = db;
+        this._nextTxnId = 0;
 
         // make sure we close the db on `onversionchange` - otherwise
         // attempts to delete the database will block (and subsequent
@@ -228,7 +230,7 @@ export class Backend {
             const cursor = ev.target.result;
             if (cursor) {
                 const keyReq = cursor.value;
-                if (keyReq.recipients.includes({userId, deviceId})) {
+                if (keyReq.recipients.includes({ userId, deviceId })) {
                     results.push(keyReq);
                 }
                 cursor.continue();
@@ -494,7 +496,7 @@ export class Backend {
             const lastProblem = problems[problems.length - 1];
             for (const problem of problems) {
                 if (problem.time > timestamp) {
-                    result = Object.assign({}, problem, {fixed: lastProblem.fixed});
+                    result = Object.assign({}, problem, { fixed: lastProblem.fixed });
                     return;
                 }
             }
@@ -517,11 +519,11 @@ export class Backend {
 
         await Promise.all(devices.map((device) => {
             return new Promise((resolve) => {
-                const {userId, deviceInfo} = device;
+                const { userId, deviceInfo } = device;
                 const getReq = objectStore.get([userId, deviceInfo.deviceId]);
                 getReq.onsuccess = function() {
                     if (!getReq.result) {
-                        objectStore.put({userId, deviceId: deviceInfo.deviceId});
+                        objectStore.put({ userId, deviceId: deviceInfo.deviceId });
                         ret.push(device);
                     }
                     resolve();
@@ -757,10 +759,59 @@ export class Backend {
         }));
     }
 
-    doTxn(mode, stores, func) {
+    addSharedHistoryInboundGroupSession(roomId, senderKey, sessionId, txn) {
+        if (!txn) {
+            txn = this._db.transaction(
+                "shared_history_inbound_group_sessions", "readwrite",
+            );
+        }
+        const objectStore = txn.objectStore("shared_history_inbound_group_sessions");
+        const req = objectStore.get([roomId]);
+        req.onsuccess = () => {
+            const { sessions } = req.result || { sessions: [] };
+            sessions.push([senderKey, sessionId]);
+            objectStore.put({ roomId, sessions });
+        };
+    }
+
+    getSharedHistoryInboundGroupSessions(roomId, txn) {
+        if (!txn) {
+            txn = this._db.transaction(
+                "shared_history_inbound_group_sessions", "readonly",
+            );
+        }
+        const objectStore = txn.objectStore("shared_history_inbound_group_sessions");
+        const req = objectStore.get([roomId]);
+        return new Promise((resolve, reject) => {
+            req.onsuccess = () => {
+                const { sessions } = req.result || { sessions: [] };
+                resolve(sessions);
+            };
+            req.onerror = reject;
+        });
+    }
+
+    doTxn(mode, stores, func, log = logger) {
+        let startTime;
+        let description;
+        if (PROFILE_TRANSACTIONS) {
+            const txnId = this._nextTxnId++;
+            startTime = Date.now();
+            description = `${mode} crypto store transaction ${txnId} in ${stores}`;
+            log.debug(`Starting ${description}`);
+        }
         const txn = this._db.transaction(stores, mode);
         const promise = promiseifyTxn(txn);
         const result = func(txn);
+        if (PROFILE_TRANSACTIONS) {
+            promise.then(() => {
+                const elapsedTime = Date.now() - startTime;
+                log.debug(`Finished ${description}, took ${elapsedTime} ms`);
+            }, () => {
+                const elapsedTime = Date.now() - startTime;
+                log.error(`Failed ${description}, took ${elapsedTime} ms`);
+            });
+        }
         return promise.then(() => {
             return result;
         });
@@ -813,6 +864,11 @@ export function upgradeDatabase(db, oldVersion) {
 
         db.createObjectStore("notified_error_devices", {
             keyPath: ["userId", "deviceId"],
+        });
+    }
+    if (oldVersion < 10) {
+        db.createObjectStore("shared_history_inbound_group_sessions", {
+            keyPath: ["roomId"],
         });
     }
     // Expand as needed.

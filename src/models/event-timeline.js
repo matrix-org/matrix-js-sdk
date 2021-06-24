@@ -19,7 +19,7 @@ limitations under the License.
  * @module models/event-timeline
  */
 
-import {RoomState} from "./room-state";
+import { RoomState } from "./room-state";
 
 /**
  * Construct a new EventTimeline
@@ -55,7 +55,7 @@ export function EventTimeline(eventTimelineSet) {
     this._nextTimeline = null;
 
     // this is used by client.js
-    this._paginationRequests = {'b': null, 'f': null};
+    this._paginationRequests = { 'b': null, 'f': null };
 
     this._name = this._roomId + ":" + new Date().toISOString();
 }

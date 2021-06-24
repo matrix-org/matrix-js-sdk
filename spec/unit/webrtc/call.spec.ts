@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {TestClient} from '../../TestClient';
-import {MatrixCall, CallErrorCode} from '../../../src/webrtc/call';
+import { TestClient } from '../../TestClient';
+import { MatrixCall, CallErrorCode, CallEvent } from '../../../src/webrtc/call';
 
 const DUMMY_SDP = (
     "v=0\r\n" +
@@ -79,6 +79,7 @@ class MockRTCPeerConnection {
         return Promise.resolve();
     }
     close() {}
+    getStats() { return []; }
 }
 
 describe('Call', function() {
@@ -122,6 +123,7 @@ describe('Call', function() {
         // We just stub out sendEvent: we're not interested in testing the client's
         // event sending code here
         client.client.sendEvent = () => {};
+        client.httpBackend.when("GET", "/voip/turnServer").respond(200, {});
         call = new MatrixCall({
             client: client.client,
             roomId: '!foo:bar',
@@ -138,11 +140,13 @@ describe('Call', function() {
     });
 
     it('should ignore candidate events from non-matching party ID', async function() {
-        await call.placeVoiceCall();
+        const callPromise = call.placeVoiceCall();
+        await client.httpBackend.flush();
+        await callPromise;
         await call.onAnswerReceived({
             getContent: () => {
                 return {
-                    version: 0,
+                    version: 1,
                     call_id: call.callId,
                     party_id: 'the_correct_party_id',
                     answer: {
@@ -156,7 +160,7 @@ describe('Call', function() {
         call.onRemoteIceCandidatesReceived({
             getContent: () => {
                 return {
-                    version: 0,
+                    version: 1,
                     call_id: call.callId,
                     party_id: 'the_correct_party_id',
                     candidates: [
@@ -173,7 +177,7 @@ describe('Call', function() {
         call.onRemoteIceCandidatesReceived({
             getContent: () => {
                 return {
-                    version: 0,
+                    version: 1,
                     call_id: call.callId,
                     party_id: 'some_other_party_id',
                     candidates: [
@@ -186,6 +190,110 @@ describe('Call', function() {
             },
         });
         expect(call.peerConn.addIceCandidate.mock.calls.length).toBe(1);
+
+        // Hangup to stop timers
+        call.hangup(CallErrorCode.UserHangup, true);
+    });
+
+    it('should add candidates received before answer if party ID is correct', async function() {
+        const callPromise = call.placeVoiceCall();
+        await client.httpBackend.flush();
+        await callPromise;
+        call.peerConn.addIceCandidate = jest.fn();
+
+        call.onRemoteIceCandidatesReceived({
+            getContent: () => {
+                return {
+                    version: 1,
+                    call_id: call.callId,
+                    party_id: 'the_correct_party_id',
+                    candidates: [
+                        {
+                            candidate: 'the_correct_candidate',
+                            sdpMid: '',
+                        },
+                    ],
+                };
+            },
+        });
+
+        call.onRemoteIceCandidatesReceived({
+            getContent: () => {
+                return {
+                    version: 1,
+                    call_id: call.callId,
+                    party_id: 'some_other_party_id',
+                    candidates: [
+                        {
+                            candidate: 'the_wrong_candidate',
+                            sdpMid: '',
+                        },
+                    ],
+                };
+            },
+        });
+
+        expect(call.peerConn.addIceCandidate.mock.calls.length).toBe(0);
+
+        await call.onAnswerReceived({
+            getContent: () => {
+                return {
+                    version: 1,
+                    call_id: call.callId,
+                    party_id: 'the_correct_party_id',
+                    answer: {
+                        sdp: DUMMY_SDP,
+                    },
+                };
+            },
+        });
+
+        expect(call.peerConn.addIceCandidate.mock.calls.length).toBe(1);
+        expect(call.peerConn.addIceCandidate).toHaveBeenCalledWith({
+            candidate: 'the_correct_candidate',
+            sdpMid: '',
+        });
+    });
+
+    it('should map asserted identity messages to remoteAssertedIdentity', async function() {
+        const callPromise = call.placeVoiceCall();
+        await client.httpBackend.flush();
+        await callPromise;
+        await call.onAnswerReceived({
+            getContent: () => {
+                return {
+                    version: 1,
+                    call_id: call.callId,
+                    party_id: 'party_id',
+                    answer: {
+                        sdp: DUMMY_SDP,
+                    },
+                };
+            },
+        });
+
+        const identChangedCallback = jest.fn();
+        call.on(CallEvent.AssertedIdentityChanged, identChangedCallback);
+
+        await call.onAssertedIdentityReceived({
+            getContent: () => {
+                return {
+                    version: 1,
+                    call_id: call.callId,
+                    party_id: 'party_id',
+                    asserted_identity: {
+                        id: "@steve:example.com",
+                        display_name: "Steve Gibbons",
+                    },
+                };
+            },
+        });
+
+        expect(identChangedCallback).toHaveBeenCalled();
+
+        const ident = call.getRemoteAssertedIdentity();
+        expect(ident.id).toEqual("@steve:example.com");
+        expect(ident.displayName).toEqual("Steve Gibbons");
 
         // Hangup to stop timers
         call.hangup(CallErrorCode.UserHangup, true);

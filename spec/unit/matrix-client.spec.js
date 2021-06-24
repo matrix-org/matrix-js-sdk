@@ -1,6 +1,18 @@
-import {logger} from "../../src/logger";
-import {MatrixClient} from "../../src/client";
-import {Filter} from "../../src/filter";
+import { logger } from "../../src/logger";
+import { MatrixClient } from "../../src/client";
+import { Filter } from "../../src/filter";
+import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE } from "../../src/models/MSC3089TreeSpace";
+import {
+    EventType,
+    RoomCreateTypeField,
+    RoomType,
+    UNSTABLE_MSC3088_ENABLED,
+    UNSTABLE_MSC3088_PURPOSE,
+    UNSTABLE_MSC3089_TREE_SUBTYPE,
+} from "../../src/@types/event";
+import { MEGOLM_ALGORITHM } from "../../src/crypto/olmlib";
+import { MatrixEvent } from "../../src/models/event";
+import { Preset } from "../../src/@types/partials";
 
 jest.useFakeTimers();
 
@@ -144,12 +156,12 @@ describe("MatrixClient", function() {
             scheduler: scheduler,
             userId: userId,
         });
-        // FIXME: We shouldn't be yanking _http like this.
-        client._http = [
+        // FIXME: We shouldn't be yanking http like this.
+        client.http = [
             "authedRequest", "getContentUri", "request", "uploadContent",
         ].reduce((r, k) => { r[k] = jest.fn(); return r; }, {});
-        client._http.authedRequest.mockImplementation(httpReq);
-        client._http.request.mockImplementation(httpReq);
+        client.http.authedRequest.mockImplementation(httpReq);
+        client.http.request.mockImplementation(httpReq);
 
         // set reasonable working defaults
         acceptKeepalives = true;
@@ -166,9 +178,163 @@ describe("MatrixClient", function() {
         // means they may call /events and then fail an expect() which will fail
         // a DIFFERENT test (pollution between tests!) - we return unresolved
         // promises to stop the client from continuing to run.
-        client._http.authedRequest.mockImplementation(function() {
+        client.http.authedRequest.mockImplementation(function() {
             return new Promise(() => {});
         });
+    });
+
+    it("should create (unstable) file trees", async () => {
+        const userId = "@test:example.org";
+        const roomId = "!room:example.org";
+        const roomName = "Test Tree";
+        const mockRoom = {};
+        const fn = jest.fn().mockImplementation((opts) => {
+            expect(opts).toMatchObject({
+                name: roomName,
+                preset: Preset.PrivateChat,
+                power_level_content_override: {
+                    ...DEFAULT_TREE_POWER_LEVELS_TEMPLATE,
+                    users: {
+                        [userId]: 100,
+                    },
+                },
+                creation_content: {
+                    [RoomCreateTypeField]: RoomType.Space,
+                },
+                initial_state: [
+                    {
+                        // We use `unstable` to ensure that the code is actually using the right identifier
+                        type: UNSTABLE_MSC3088_PURPOSE.unstable,
+                        state_key: UNSTABLE_MSC3089_TREE_SUBTYPE.unstable,
+                        content: {
+                            [UNSTABLE_MSC3088_ENABLED.unstable]: true,
+                        },
+                    },
+                    {
+                        type: EventType.RoomEncryption,
+                        state_key: "",
+                        content: {
+                            algorithm: MEGOLM_ALGORITHM,
+                        },
+                    },
+                ],
+            });
+            return { room_id: roomId };
+        });
+        client.getUserId = () => userId;
+        client.createRoom = fn;
+        client.getRoom = (getRoomId) => {
+            expect(getRoomId).toEqual(roomId);
+            return mockRoom;
+        };
+        const tree = await client.unstableCreateFileTree(roomName);
+        expect(tree).toBeDefined();
+        expect(tree.roomId).toEqual(roomId);
+        expect(tree.room).toBe(mockRoom);
+        expect(fn.mock.calls.length).toBe(1);
+    });
+
+    it("should get (unstable) file trees with valid state", async () => {
+        const roomId = "!room:example.org";
+        const mockRoom = {
+            currentState: {
+                getStateEvents: (eventType, stateKey) => {
+                    if (eventType === EventType.RoomCreate) {
+                        expect(stateKey).toEqual("");
+                        return new MatrixEvent({
+                            content: {
+                                [RoomCreateTypeField]: RoomType.Space,
+                            },
+                        });
+                    } else if (eventType === UNSTABLE_MSC3088_PURPOSE.unstable) {
+                        // We use `unstable` to ensure that the code is actually using the right identifier
+                        expect(stateKey).toEqual(UNSTABLE_MSC3089_TREE_SUBTYPE.unstable);
+                        return new MatrixEvent({
+                            content: {
+                                [UNSTABLE_MSC3088_ENABLED.unstable]: true,
+                            },
+                        });
+                    } else {
+                        throw new Error("Unexpected event type or state key");
+                    }
+                },
+            },
+        };
+        client.getRoom = (getRoomId) => {
+            expect(getRoomId).toEqual(roomId);
+            return mockRoom;
+        };
+        const tree = client.unstableGetFileTreeSpace(roomId);
+        expect(tree).toBeDefined();
+        expect(tree.roomId).toEqual(roomId);
+        expect(tree.room).toBe(mockRoom);
+    });
+
+    it("should not get (unstable) file trees with invalid create contents", async () => {
+        const roomId = "!room:example.org";
+        const mockRoom = {
+            currentState: {
+                getStateEvents: (eventType, stateKey) => {
+                    if (eventType === EventType.RoomCreate) {
+                        expect(stateKey).toEqual("");
+                        return new MatrixEvent({
+                            content: {
+                                [RoomCreateTypeField]: "org.example.not_space",
+                            },
+                        });
+                    } else if (eventType === UNSTABLE_MSC3088_PURPOSE.unstable) {
+                        // We use `unstable` to ensure that the code is actually using the right identifier
+                        expect(stateKey).toEqual(UNSTABLE_MSC3089_TREE_SUBTYPE.unstable);
+                        return new MatrixEvent({
+                            content: {
+                                [UNSTABLE_MSC3088_ENABLED.unstable]: true,
+                            },
+                        });
+                    } else {
+                        throw new Error("Unexpected event type or state key");
+                    }
+                },
+            },
+        };
+        client.getRoom = (getRoomId) => {
+            expect(getRoomId).toEqual(roomId);
+            return mockRoom;
+        };
+        const tree = client.unstableGetFileTreeSpace(roomId);
+        expect(tree).toBeFalsy();
+    });
+
+    it("should not get (unstable) file trees with invalid purpose/subtype contents", async () => {
+        const roomId = "!room:example.org";
+        const mockRoom = {
+            currentState: {
+                getStateEvents: (eventType, stateKey) => {
+                    if (eventType === EventType.RoomCreate) {
+                        expect(stateKey).toEqual("");
+                        return new MatrixEvent({
+                            content: {
+                                [RoomCreateTypeField]: RoomType.Space,
+                            },
+                        });
+                    } else if (eventType === UNSTABLE_MSC3088_PURPOSE.unstable) {
+                        expect(stateKey).toEqual(UNSTABLE_MSC3089_TREE_SUBTYPE.unstable);
+                        return new MatrixEvent({
+                            content: {
+                                [UNSTABLE_MSC3088_ENABLED.unstable]: false,
+                            },
+                        });
+                    } else {
+                        throw new Error("Unexpected event type or state key");
+                    }
+                },
+            },
+        };
+        client.getRoom = (getRoomId) => {
+            expect(getRoomId).toEqual(roomId);
+            return mockRoom;
+        };
+        const tree = client.unstableGetFileTreeSpace(roomId);
+        expect(tree).toBeFalsy();
     });
 
     it("should not POST /filter if a matching filter already exists", async function() {
@@ -178,7 +344,7 @@ describe("MatrixClient", function() {
         const filterId = "ehfewf";
         store.getFilterIdByName.mockReturnValue(filterId);
         const filter = new Filter(0, filterId);
-        filter.setDefinition({"room": {"timeline": {"limit": 8}}});
+        filter.setDefinition({ "room": { "timeline": { "limit": 8 } } });
         store.getFilter.mockReturnValue(filter);
         const syncPromise = new Promise((resolve, reject) => {
             client.on("sync", function syncListener(state) {
@@ -519,6 +685,21 @@ describe("MatrixClient", function() {
         });
 
         xit("should be able to peek into a room using peekInRoom", function(done) {
+        });
+    });
+
+    describe("getPresence", function() {
+        it("should send a presence HTTP GET", function() {
+            httpLookups = [{
+                method: "GET",
+                path: `/presence/${encodeURIComponent(userId)}/status`,
+                data: {
+                    "presence": "unavailable",
+                    "last_active_ago": 420845,
+                },
+            }];
+            client.getPresence(userId);
+            expect(httpLookups.length).toEqual(0);
         });
     });
 });

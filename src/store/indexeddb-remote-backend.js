@@ -16,8 +16,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {logger} from '../logger';
-import {defer} from '../utils';
+import { logger } from '../logger';
+import { defer } from '../utils';
 
 /**
  * An IndexedDB store backend where the actual backend sits in a web
@@ -47,7 +47,6 @@ export function RemoteIndexedDBStoreBackend(
     // if we try to connect again
     this._startPromise = null;
 }
-
 
 RemoteIndexedDBStoreBackend.prototype = {
     /**

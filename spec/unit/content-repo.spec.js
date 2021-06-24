@@ -1,4 +1,4 @@
-import {getHttpUriForMxc} from "../../src/content-repo";
+import { getHttpUriForMxc } from "../../src/content-repo";
 
 describe("ContentRepo", function() {
     const baseUrl = "https://my.home.server";

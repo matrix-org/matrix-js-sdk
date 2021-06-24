@@ -1,6 +1,6 @@
 /*
 Copyright 2018 André Jaenisch
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2019, 2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ limitations under the License.
  * @module logger
  */
 
-import log from "loglevel";
+import log, { Logger } from "loglevel";
 
 // This is to demonstrate, that you can use any namespace you want.
 // Namespaces allow you to turn on/off the logging for specific parts of the
@@ -36,6 +36,11 @@ const DEFAULT_NAMESPACE = "matrix";
 // when logging so we always get the current value of console methods.
 log.methodFactory = function(methodName, logLevel, loggerName) {
     return function(...args) {
+        /* eslint-disable @typescript-eslint/no-invalid-this */
+        if (this.prefix) {
+            args.unshift(this.prefix);
+        }
+        /* eslint-enable @typescript-eslint/no-invalid-this */
         const supportedByConsole = methodName === "error" ||
             methodName === "warn" ||
             methodName === "trace" ||
@@ -54,6 +59,30 @@ log.methodFactory = function(methodName, logLevel, loggerName) {
  * Drop-in replacement for <code>console</code> using {@link https://www.npmjs.com/package/loglevel|loglevel}.
  * Can be tailored down to specific use cases if needed.
  */
-export const logger = log.getLogger(DEFAULT_NAMESPACE);
+export const logger: PrefixedLogger = log.getLogger(DEFAULT_NAMESPACE);
 logger.setLevel(log.levels.DEBUG);
 
+interface PrefixedLogger extends Logger {
+    withPrefix?: (prefix: string) => PrefixedLogger;
+    prefix?: string;
+}
+
+function extendLogger(logger: PrefixedLogger) {
+    logger.withPrefix = function(prefix: string): PrefixedLogger {
+        const existingPrefix = this.prefix || "";
+        return getPrefixedLogger(existingPrefix + prefix);
+    };
+}
+
+extendLogger(logger);
+
+function getPrefixedLogger(prefix): PrefixedLogger {
+    const prefixLogger: PrefixedLogger = log.getLogger(`${DEFAULT_NAMESPACE}-${prefix}`);
+    if (prefixLogger.prefix !== prefix) {
+        // Only do this setup work the first time through, as loggers are saved by name.
+        extendLogger(prefixLogger);
+        prefixLogger.prefix = prefix;
+        prefixLogger.setLevel(log.levels.DEBUG);
+    }
+    return prefixLogger;
+}

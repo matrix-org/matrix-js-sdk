@@ -15,10 +15,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import "../../../olm-loader";
-import {verificationMethods} from "../../../../src/crypto";
-import {logger} from "../../../../src/logger";
-import {SAS} from "../../../../src/crypto/verification/SAS";
-import {makeTestClients, setupWebcrypto, teardownWebcrypto} from './util';
+import { verificationMethods } from "../../../../src/crypto";
+import { logger } from "../../../../src/logger";
+import { SAS } from "../../../../src/crypto/verification/SAS";
+import { makeTestClients, setupWebcrypto, teardownWebcrypto } from './util';
 
 const Olm = global.Olm;
 
@@ -42,14 +42,14 @@ describe("verification request integration tests with crypto layer", function() 
     it("should request and accept a verification", async function() {
         const [alice, bob] = await makeTestClients(
             [
-                {userId: "@alice:example.com", deviceId: "Osborne2"},
-                {userId: "@bob:example.com", deviceId: "Dynabook"},
+                { userId: "@alice:example.com", deviceId: "Osborne2" },
+                { userId: "@bob:example.com", deviceId: "Dynabook" },
             ],
             {
                 verificationMethods: [verificationMethods.SAS],
             },
         );
-        alice.client._crypto._deviceList.getRawStoredDevicesForUser = function() {
+        alice.client.crypto.deviceList.getRawStoredDevicesForUser = function() {
             return {
                 Dynabook: {
                     keys: {

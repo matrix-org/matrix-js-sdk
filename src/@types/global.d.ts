@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // this is needed to tell TS about global.Olm
-import "olm";
+import "@matrix-org/olm";
 
 export {};
 
@@ -26,6 +26,14 @@ declare global {
         }
     }
 
+    interface Window {
+        electron?: Electron;
+    }
+
+    interface Electron {
+        getDesktopCapturerSources(options: GetSourcesOptions): Promise<Array<DesktopCapturerSource>>;
+    }
+
     interface Crypto {
         webkitSubtle?: Window["crypto"]["subtle"];
     }
@@ -33,7 +41,38 @@ declare global {
     interface MediaDevices {
         // This is experimental and types don't know about it yet
         // https://github.com/microsoft/TypeScript/issues/33232
-        getDisplayMedia(constraints: MediaStreamConstraints): Promise<MediaStream>;
+        getDisplayMedia(constraints: MediaStreamConstraints | DesktopCapturerConstraints): Promise<MediaStream>;
+        getUserMedia(constraints: MediaStreamConstraints | DesktopCapturerConstraints): Promise<MediaStream>;
+    }
+
+    interface DesktopCapturerConstraints {
+        audio: boolean | {
+            mandatory: {
+                chromeMediaSource: string;
+                chromeMediaSourceId: string;
+            };
+        };
+        video: boolean | {
+            mandatory: {
+                chromeMediaSource: string;
+                chromeMediaSourceId: string;
+            };
+        };
+    }
+
+    interface DesktopCapturerSource {
+        id: string;
+        name: string;
+        thumbnailURL: string;
+    }
+
+    interface GetSourcesOptions {
+        types: Array<string>;
+        thumbnailSize?: {
+            height: number;
+            width: number;
+        };
+        fetchWindowIcons?: boolean;
     }
 
     interface HTMLAudioElement {
@@ -48,5 +87,18 @@ declare global {
         // We check for the webkit-prefixed getUserMedia to detect if we're
         // on webkit: we should check if we still need to do this
         webkitGetUserMedia: DummyInterfaceWeShouldntBeUsingThis;
+    }
+
+    export interface ISettledFulfilled<T> {
+        status: "fulfilled";
+        value: T;
+    }
+    export interface ISettledRejected {
+        status: "rejected";
+        reason: any;
+    }
+
+    interface PromiseConstructor {
+        allSettled<T>(promises: Promise<T>[]): Promise<Array<ISettledFulfilled<T> | ISettledRejected>>;
     }
 }

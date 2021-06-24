@@ -21,8 +21,8 @@ limitations under the License.
  * @module sync-accumulator
  */
 
-import {logger} from './logger';
-import {deepCopy} from "./utils";
+import { logger } from './logger';
+import { deepCopy } from "./utils";
 
 /**
  * The purpose of this class is to accumulate /sync responses such that a

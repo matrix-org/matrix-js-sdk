@@ -1,7 +1,7 @@
-import {EventStatus} from "../../src/matrix";
-import {MatrixScheduler} from "../../src/scheduler";
-import {Room} from "../../src/models/room";
-import {TestClient} from "../TestClient";
+import { EventStatus } from "../../src/matrix";
+import { MatrixScheduler } from "../../src/scheduler";
+import { Room } from "../../src/models/room";
+import { TestClient } from "../TestClient";
 
 describe("MatrixClient retrying", function() {
     let client = null;
@@ -19,7 +19,7 @@ describe("MatrixClient retrying", function() {
             "DEVICE",
             accessToken,
             undefined,
-            {scheduler},
+            { scheduler },
         );
         httpBackend = testClient.httpBackend;
         client = testClient.client;

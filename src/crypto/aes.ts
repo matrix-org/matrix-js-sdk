@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {getCrypto} from '../utils';
-import {decodeBase64, encodeBase64} from './olmlib';
+import { getCrypto } from '../utils';
+import { decodeBase64, encodeBase64 } from './olmlib';
 
 const subtleCrypto = (typeof window !== "undefined" && window.crypto) ?
     (window.crypto.subtle || window.crypto.webkitSubtle) : null;
@@ -151,7 +151,7 @@ async function encryptBrowser(data: string, key: Uint8Array, name: string, ivStr
     );
 
     const hmac = await subtleCrypto.sign(
-        {name: 'HMAC'},
+        { name: 'HMAC' },
         hmacKey,
         ciphertext,
     );
@@ -185,7 +185,7 @@ async function decryptBrowser(data: IData, key: Uint8Array, name: string) {
     const ciphertext = decodeBase64(data.ciphertext);
 
     if (!await subtleCrypto.verify(
-        {name: "HMAC"},
+        { name: "HMAC" },
         hmacKey,
         decodeBase64(data.mac),
         ciphertext,
@@ -210,7 +210,7 @@ async function deriveKeysBrowser(key, name) {
     const hkdfkey = await subtleCrypto.importKey(
         'raw',
         key,
-        {name: "HKDF"},
+        { name: "HKDF" },
         false,
         ["deriveBits"],
     );
@@ -233,7 +233,7 @@ async function deriveKeysBrowser(key, name) {
     const aesProm = subtleCrypto.importKey(
         'raw',
         aesKey,
-        {name: 'AES-CTR'},
+        { name: 'AES-CTR' },
         false,
         ['encrypt', 'decrypt'],
     );
@@ -243,7 +243,7 @@ async function deriveKeysBrowser(key, name) {
         hmacKey,
         {
             name: 'HMAC',
-            hash: {name: 'SHA-256'},
+            hash: { name: 'SHA-256' },
         },
         false,
         ['sign', 'verify'],

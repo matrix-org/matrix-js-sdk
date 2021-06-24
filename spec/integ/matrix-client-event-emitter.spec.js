@@ -1,5 +1,5 @@
 import * as utils from "../test-utils";
-import {TestClient} from "../TestClient";
+import { TestClient } from "../TestClient";
 
 describe("MatrixClient events", function() {
     let client;

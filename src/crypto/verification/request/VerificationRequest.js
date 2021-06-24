@@ -15,15 +15,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {logger} from '../../../logger';
-import {EventEmitter} from 'events';
+import { logger } from '../../../logger';
+import { EventEmitter } from 'events';
 import {
     errorFactory,
     errorFromEvent,
     newUnexpectedMessageError,
     newUnknownMethodError,
 } from "../Error";
-import {QRCodeData, SCAN_QR_CODE_METHOD} from "../QRCode";
+import { QRCodeData, SCAN_QR_CODE_METHOD } from "../QRCode";
 
 // How long after the event's timestamp that the request times out
 const TIMEOUT_FROM_EVENT_TS = 10 * 60 * 1000; // 10 minutes
@@ -36,7 +36,6 @@ const TIMEOUT_FROM_EVENT_RECEIPT = 2 * 60 * 1000; // 2 minutes
 // disappearing, also ignore verification requests that
 // are this amount of time away from expiring.
 const VERIFICATION_REQUEST_MARGIN = 3 * 1000; // 3 seconds
-
 
 export const EVENT_PREFIX = "m.key.verification.";
 export const REQUEST_TYPE = EVENT_PREFIX + "request";
@@ -51,7 +50,6 @@ export const PHASE_READY = 3;
 export const PHASE_STARTED = 4;
 export const PHASE_CANCELLED = 5;
 export const PHASE_DONE = 6;
-
 
 /**
  * State machine for verification requests.
@@ -97,7 +95,6 @@ export class VerificationRequest extends EventEmitter {
      */
     static validateEvent(type, event, client) {
         const content = event.getContent();
-
 
         if (!type || !type.startsWith(EVENT_PREFIX)) {
             return false;
@@ -265,7 +262,7 @@ export class VerificationRequest extends EventEmitter {
         if (!content) {
             return false;
         }
-        const {methods} = content;
+        const { methods } = content;
         if (!Array.isArray(methods)) {
             return false;
         }
@@ -355,7 +352,6 @@ export class VerificationRequest extends EventEmitter {
         return this._observeOnly;
     }
 
-
     /**
      * Gets which device the verification should be started with
      * given the events sent so far in the verification. This is the
@@ -414,7 +410,7 @@ export class VerificationRequest extends EventEmitter {
     async sendRequest() {
         if (!this.observeOnly && this._phase === PHASE_UNSENT) {
             const methods = [...this._verificationMethods.keys()];
-            await this.channel.send(REQUEST_TYPE, {methods});
+            await this.channel.send(REQUEST_TYPE, { methods });
         }
     }
 
@@ -424,7 +420,7 @@ export class VerificationRequest extends EventEmitter {
      * @param {string?} error.code the error code to send the cancellation with
      * @returns {Promise} resolves when the event has been sent.
      */
-    async cancel({reason = "User declined", code = "m.user"} = {}) {
+    async cancel({ reason = "User declined", code = "m.user" } = {}) {
         if (!this.observeOnly && this._phase !== PHASE_CANCELLED) {
             this._declining = true;
             this.emit("change");
@@ -432,7 +428,7 @@ export class VerificationRequest extends EventEmitter {
                 return this._verifier.cancel(errorFactory(code, reason)());
             } else {
                 this._cancellingUserId = this._client.getUserId();
-                await this.channel.send(CANCEL_TYPE, {code, reason});
+                await this.channel.send(CANCEL_TYPE, { code, reason });
             }
         }
     }
@@ -446,7 +442,7 @@ export class VerificationRequest extends EventEmitter {
             const methods = [...this._verificationMethods.keys()];
             this._accepting = true;
             this.emit("change");
-            await this.channel.send(READY_TYPE, {methods});
+            await this.channel.send(READY_TYPE, { methods });
         }
     }
 
@@ -499,20 +495,20 @@ export class VerificationRequest extends EventEmitter {
     }
 
     _calculatePhaseTransitions() {
-        const transitions = [{phase: PHASE_UNSENT}];
+        const transitions = [{ phase: PHASE_UNSENT }];
         const phase = () => transitions[transitions.length - 1].phase;
 
         // always pass by .request first to be sure channel.userId has been set
         const hasRequestByThem = this._eventsByThem.has(REQUEST_TYPE);
         const requestEvent = this._getEventBy(REQUEST_TYPE, hasRequestByThem);
         if (requestEvent) {
-            transitions.push({phase: PHASE_REQUESTED, event: requestEvent});
+            transitions.push({ phase: PHASE_REQUESTED, event: requestEvent });
         }
 
         const readyEvent =
             requestEvent && this._getEventBy(READY_TYPE, !hasRequestByThem);
         if (readyEvent && phase() === PHASE_REQUESTED) {
-            transitions.push({phase: PHASE_READY, event: readyEvent});
+            transitions.push({ phase: PHASE_READY, event: readyEvent });
         }
 
         let startEvent;
@@ -535,18 +531,18 @@ export class VerificationRequest extends EventEmitter {
             const fromUnsentPhase = phase() === PHASE_UNSENT &&
                 this.channel.constructor.canCreateRequest(START_TYPE);
             if (fromRequestPhase || phase() === PHASE_READY || fromUnsentPhase) {
-                transitions.push({phase: PHASE_STARTED, event: startEvent});
+                transitions.push({ phase: PHASE_STARTED, event: startEvent });
             }
         }
 
         const ourDoneEvent = this._eventsByUs.get(DONE_TYPE);
         if (this._verifierHasFinished || (ourDoneEvent && phase() === PHASE_STARTED)) {
-            transitions.push({phase: PHASE_DONE});
+            transitions.push({ phase: PHASE_DONE });
         }
 
         const cancelEvent = this._getEventByEither(CANCEL_TYPE);
         if ((this._cancelled || cancelEvent) && phase() !== PHASE_DONE) {
-            transitions.push({phase: PHASE_CANCELLED, event: cancelEvent});
+            transitions.push({ phase: PHASE_CANCELLED, event: cancelEvent });
             return transitions;
         }
 
@@ -554,7 +550,7 @@ export class VerificationRequest extends EventEmitter {
     }
 
     _transitionToPhase(transition) {
-        const {phase, event} = transition;
+        const { phase, event } = transition;
         // get common methods
         if (phase === PHASE_REQUESTED || phase === PHASE_READY) {
             if (!this._wasSentByOwnDevice(event)) {
@@ -581,7 +577,7 @@ export class VerificationRequest extends EventEmitter {
         }
         // create verifier
         if (phase === PHASE_STARTED) {
-            const {method} = event.getContent();
+            const { method } = event.getContent();
             if (!this._verifier && !this.observeOnly) {
                 this._verifier = this._createVerifier(method, event);
                 if (!this._verifier) {
@@ -731,7 +727,7 @@ export class VerificationRequest extends EventEmitter {
                 }
 
                 const lastTransition = newTransitions[newTransitions.length - 1];
-                const {phase} = lastTransition;
+                const { phase } = lastTransition;
 
                 this._setupTimeout(phase);
                 // set phase as last thing as this emits the "change" event
@@ -809,7 +805,7 @@ export class VerificationRequest extends EventEmitter {
             logger.warn(`Cancelling, unexpected ${type} verification ` +
                 `event from ${event.getSender()}`);
             const reason = `Unexpected ${type} event in phase ${this.phase}`;
-            await this.cancel(errorFromEvent(newUnexpectedMessageError({reason})));
+            await this.cancel(errorFromEvent(newUnexpectedMessageError({ reason })));
             return true;
         }
         return false;
@@ -849,7 +845,7 @@ export class VerificationRequest extends EventEmitter {
         if (!targetDevice) {
             targetDevice = this.targetDevice;
         }
-        const {userId, deviceId} = targetDevice;
+        const { userId, deviceId } = targetDevice;
 
         const VerifierCtor = this._verificationMethods.get(method);
         if (!VerifierCtor) {

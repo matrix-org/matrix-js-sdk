@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {EventEmitter} from 'events';
-import {logger} from '../logger';
+import { EventEmitter } from 'events';
+import { logger } from '../logger';
 import * as olmlib from './olmlib';
-import {randomString} from '../randomstring';
-import {encryptAES, decryptAES} from './aes';
-import {encodeBase64} from "./olmlib";
+import { randomString } from '../randomstring';
+import { encryptAES, decryptAES } from './aes';
+import { encodeBase64 } from "./olmlib";
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES
     = "m.secret_storage.v1.aes-hmac-sha2";
@@ -86,7 +86,7 @@ export class SecretStorage extends EventEmitter {
      *     keyInfo: {object} details about the key (iv, mac, passphrase)
      */
     async addKey(algorithm, opts, keyId) {
-        const keyInfo = {algorithm};
+        const keyInfo = { algorithm };
 
         if (!opts) opts = {};
 
@@ -99,7 +99,7 @@ export class SecretStorage extends EventEmitter {
                 keyInfo.passphrase = opts.passphrase;
             }
             if (opts.key) {
-                const {iv, mac} = await SecretStorage._calculateKeyCheck(opts.key);
+                const { iv, mac } = await SecretStorage._calculateKeyCheck(opts.key);
                 keyInfo.iv = iv;
                 keyInfo.mac = mac;
             }
@@ -171,7 +171,7 @@ export class SecretStorage extends EventEmitter {
     async checkKey(key, info) {
         if (info.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             if (info.mac) {
-                const {mac} = await SecretStorage._calculateKeyCheck(key, info.iv);
+                const { mac } = await SecretStorage._calculateKeyCheck(key, info.iv);
                 return info.mac.replace(/=+$/g, '') === mac.replace(/=+$/g, '');
             } else {
                 // if we have no information, we have to assume the key is right
@@ -220,7 +220,7 @@ export class SecretStorage extends EventEmitter {
 
             // encrypt secret, based on the algorithm
             if (keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
-                const keys = {[keyId]: keyInfo};
+                const keys = { [keyId]: keyInfo };
                 const [, encryption] = await this._getSecretStorageKey(keys, name);
                 encrypted[keyId] = await encryption.encrypt(secret);
             } else {
@@ -231,7 +231,7 @@ export class SecretStorage extends EventEmitter {
         }
 
         // save encrypted secret
-        await this._baseApis.setAccountData(name, {encrypted});
+        await this._baseApis.setAccountData(name, { encrypted });
     }
 
     /**
@@ -444,7 +444,7 @@ export class SecretStorage extends EventEmitter {
                 && this._incomingRequests[deviceId][content.request_id]) {
                 logger.info("received request cancellation for secret (" + sender
                             + ", " + deviceId + ", " + content.request_id + ")");
-                this.baseApis.emit("crypto.secrets.requestCancelled", {
+                this._baseApis.emit("crypto.secrets.requestCancelled", {
                     user_id: sender,
                     device_id: deviceId,
                     request_id: content.request_id,
@@ -480,11 +480,11 @@ export class SecretStorage extends EventEmitter {
                 };
                 const encryptedContent = {
                     algorithm: olmlib.OLM_ALGORITHM,
-                    sender_key: this._baseApis._crypto._olmDevice.deviceCurve25519Key,
+                    sender_key: this._baseApis.crypto.olmDevice.deviceCurve25519Key,
                     ciphertext: {},
                 };
                 await olmlib.ensureOlmSessionsForDevices(
-                    this._baseApis._crypto._olmDevice,
+                    this._baseApis.crypto.olmDevice,
                     this._baseApis,
                     {
                         [sender]: [
@@ -496,7 +496,7 @@ export class SecretStorage extends EventEmitter {
                     encryptedContent.ciphertext,
                     this._baseApis.getUserId(),
                     this._baseApis.deviceId,
-                    this._baseApis._crypto._olmDevice,
+                    this._baseApis.crypto.olmDevice,
                     sender,
                     this._baseApis.getStoredDevice(sender, deviceId),
                     payload,
@@ -527,7 +527,7 @@ export class SecretStorage extends EventEmitter {
         if (requestControl) {
             // make sure that the device that sent it is one of the devices that
             // we requested from
-            const deviceInfo = this._baseApis._crypto._deviceList.getDeviceByIdentityKey(
+            const deviceInfo = this._baseApis.crypto.deviceList.getDeviceByIdentityKey(
                 olmlib.OLM_ALGORITHM,
                 event.getSenderKey(),
             );

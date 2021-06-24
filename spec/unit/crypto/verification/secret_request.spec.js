@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {VerificationBase} from '../../../../src/crypto/verification/Base';
-import {CrossSigningInfo} from '../../../../src/crypto/CrossSigning';
-import {encodeBase64} from "../../../../src/crypto/olmlib";
-import {setupWebcrypto, teardownWebcrypto} from './util';
+import { VerificationBase } from '../../../../src/crypto/verification/Base';
+import { CrossSigningInfo } from '../../../../src/crypto/CrossSigning';
+import { encodeBase64 } from "../../../../src/crypto/olmlib";
+import { setupWebcrypto, teardownWebcrypto } from './util';
 
 jest.useFakeTimers();
 
@@ -48,18 +48,18 @@ describe("self-verifications", () => {
             storeCrossSigningKeyCache: jest.fn(),
         };
 
-        const _crossSigningInfo = new CrossSigningInfo(
+        const crossSigningInfo = new CrossSigningInfo(
             userId,
             {},
             cacheCallbacks,
         );
-        _crossSigningInfo.keys = {
+        crossSigningInfo.keys = {
             master: { keys: { X: testKeyPub } },
             self_signing: { keys: { X: testKeyPub } },
             user_signing: { keys: { X: testKeyPub } },
         };
 
-        const _secretStorage = {
+        const secretStorage = {
             request: jest.fn().mockReturnValue({
                 promise: Promise.resolve(encodeBase64(testKey)),
             }),
@@ -69,13 +69,13 @@ describe("self-verifications", () => {
         const restoreKeyBackupWithCache = jest.fn(() => Promise.resolve());
 
         const client = {
-            _crypto: {
-                _crossSigningInfo,
-                _secretStorage,
+            crypto: {
+                crossSigningInfo,
+                secretStorage,
                 storeSessionBackupPrivateKey,
                 getSessionBackupPrivateKey: () => null,
             },
-            requestSecret: _secretStorage.request.bind(_secretStorage),
+            requestSecret: secretStorage.request.bind(secretStorage),
             getUserId: () => userId,
             getKeyBackupVersion: () => Promise.resolve({}),
             restoreKeyBackupWithCache,
@@ -99,7 +99,7 @@ describe("self-verifications", () => {
 
         /* We should request, and store, 3 cross signing keys and the key backup key */
         expect(cacheCallbacks.storeCrossSigningKeyCache.mock.calls.length).toBe(3);
-        expect(_secretStorage.request.mock.calls.length).toBe(4);
+        expect(secretStorage.request.mock.calls.length).toBe(4);
 
         expect(cacheCallbacks.storeCrossSigningKeyCache.mock.calls[0][1])
           .toEqual(testKey);

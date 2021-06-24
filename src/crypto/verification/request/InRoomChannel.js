@@ -21,7 +21,7 @@ import {
     READY_TYPE,
     START_TYPE,
 } from "./VerificationRequest";
-import {logger} from '../../../logger';
+import { logger } from '../../../logger';
 
 const MESSAGE_TYPE = "m.room.message";
 const M_REFERENCE = "m.reference";
@@ -157,7 +157,7 @@ export class InRoomChannel {
         if (type === MESSAGE_TYPE) {
             const content = event.getContent();
             if (content) {
-                const {msgtype} = content;
+                const { msgtype } = content;
                 if (msgtype === REQUEST_TYPE) {
                     return REQUEST_TYPE;
                 }

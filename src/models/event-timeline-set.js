@@ -19,12 +19,12 @@ limitations under the License.
  * @module models/event-timeline-set
  */
 
-import {EventEmitter} from "events";
-import {EventTimeline} from "./event-timeline";
-import {EventStatus} from "./event";
+import { EventEmitter } from "events";
+import { EventTimeline } from "./event-timeline";
+import { EventStatus } from "./event";
 import * as utils from "../utils";
-import {logger} from '../logger';
-import {Relations} from './relations';
+import { logger } from '../logger';
+import { Relations } from './relations';
 
 // var DEBUG = false;
 const DEBUG = true;
@@ -249,7 +249,7 @@ EventTimelineSet.prototype.findEventById = function(eventId) {
     if (!tl) {
         return undefined;
     }
-    return utils.findElement(tl.getEvents(), function(ev) {
+    return tl.getEvents().find(function(ev) {
         return ev.getId() == eventId;
     });
 };
@@ -270,7 +270,6 @@ EventTimelineSet.prototype.addTimeline = function() {
     this._timelines.push(timeline);
     return timeline;
 };
-
 
 /**
  * Add events to a timeline
@@ -474,7 +473,7 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
     // timeline we ended up on.
     if (lastEventWasNew || !didUpdate) {
         if (direction === EventTimeline.FORWARDS && timeline === this._liveTimeline) {
-            logger.warn({lastEventWasNew, didUpdate}); // for debugging
+            logger.warn({ lastEventWasNew, didUpdate }); // for debugging
             logger.warn(
                 `Refusing to set forwards pagination token of live timeline ` +
                 `${timeline} to ${paginationToken}`,
@@ -740,16 +739,11 @@ EventTimelineSet.prototype.setRelationsTarget = function(event) {
     if (!relationsForEvent) {
         return;
     }
-    // don't need it for non m.replace relations for now
-    const relationsWithRelType = relationsForEvent["m.replace"];
-    if (!relationsWithRelType) {
-        return;
-    }
-    // only doing replacements for messages for now (e.g. edits)
-    const relationsWithEventType = relationsWithRelType["m.room.message"];
 
-    if (relationsWithEventType) {
-        relationsWithEventType.setTargetEvent(event);
+    for (const relationsWithRelType of Object.values(relationsForEvent)) {
+        for (const relationsWithEventType of Object.values(relationsWithRelType)) {
+            relationsWithEventType.setTargetEvent(event);
+        }
     }
 };
 
@@ -769,7 +763,7 @@ EventTimelineSet.prototype.aggregateRelations = function(event) {
     }
 
     // If the event is currently encrypted, wait until it has been decrypted.
-    if (event.isBeingDecrypted()) {
+    if (event.isBeingDecrypted() || event.shouldAttemptDecryption()) {
         event.once("Event.decrypted", () => {
             this.aggregateRelations(event);
         });
@@ -797,7 +791,6 @@ EventTimelineSet.prototype.aggregateRelations = function(event) {
     }
     let relationsWithEventType = relationsWithRelType[eventType];
 
-    let isNewRelations = false;
     let relatesToEvent;
     if (!relationsWithEventType) {
         relationsWithEventType = relationsWithRelType[eventType] = new Relations(
@@ -805,7 +798,6 @@ EventTimelineSet.prototype.aggregateRelations = function(event) {
             eventType,
             this.room,
         );
-        isNewRelations = true;
         relatesToEvent = this.findEventById(relatesToEventId) || this.room.getPendingEvent(relatesToEventId);
         if (relatesToEvent) {
             relationsWithEventType.setTargetEvent(relatesToEvent);
@@ -813,11 +805,6 @@ EventTimelineSet.prototype.aggregateRelations = function(event) {
     }
 
     relationsWithEventType.addEvent(event);
-
-    // only emit once event has been added to relations
-    if (isNewRelations && relatesToEvent) {
-        relatesToEvent.emit("Event.relationsCreated", relationType, eventType);
-    }
 };
 
 /**

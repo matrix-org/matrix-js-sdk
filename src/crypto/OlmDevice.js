@@ -16,8 +16,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {logger} from '../logger';
-import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
+import { logger } from '../logger';
+import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import * as algorithms from './algorithms';
 
 // The maximum size of an event is 65K, and we base64 the content, so this is a
@@ -48,7 +48,6 @@ function checkPayloadLength(payloadString) {
     }
 }
 
-
 /**
  * The type of object we use for importing and exporting megolm session data.
  *
@@ -61,7 +60,6 @@ function checkPayloadLength(payloadString) {
  * @property {String} session_id  Unique id for the session
  * @property {String} session_key Base64'ed key data
  */
-
 
 /**
  * Manages the olm cryptography functions. Each OlmDevice has a single
@@ -350,7 +348,7 @@ OlmDevice.prototype._unpickleSession = function(sessionInfo, func) {
     const session = new global.Olm.Session();
     try {
         session.unpickle(this._pickleKey, sessionInfo.session);
-        const unpickledSessInfo = Object.assign({}, sessionInfo, {session});
+        const unpickledSessInfo = Object.assign({}, sessionInfo, { session });
 
         func(unpickledSessInfo);
     } finally {
@@ -376,7 +374,6 @@ OlmDevice.prototype._saveSession = function(deviceKey, sessionInfo, txn) {
     );
 };
 
-
 /**
  * get an OlmUtility and call the given function
  *
@@ -392,7 +389,6 @@ OlmDevice.prototype._getUtility = function(func) {
         utility.free();
     }
 };
-
 
 /**
  * Signs a message with the ed25519 key for this account.
@@ -433,7 +429,6 @@ OlmDevice.prototype.getOneTimeKeys = async function() {
 
     return result;
 };
-
 
 /**
  * Get the maximum number of one-time keys we can store.
@@ -545,10 +540,10 @@ OlmDevice.prototype.createOutboundSession = async function(
                 }
             });
         },
+        logger.withPrefix("[createOutboundSession]"),
     );
     return newSessionId;
 };
-
 
 /**
  * Generate a new inbound session, given an incoming message
@@ -605,11 +600,11 @@ OlmDevice.prototype.createInboundSession = async function(
                 }
             });
         },
+        logger.withPrefix("[createInboundSession]"),
     );
 
     return result;
 };
-
 
 /**
  * Get a list of known session IDs for the given device
@@ -619,8 +614,10 @@ OlmDevice.prototype.createInboundSession = async function(
  * @return {Promise<string[]>}  a list of known session ids for the device
  */
 OlmDevice.prototype.getSessionIdsForDevice = async function(theirDeviceIdentityKey) {
+    const log = logger.withPrefix("[getSessionIdsForDevice]");
+
     if (this._sessionsInProgress[theirDeviceIdentityKey]) {
-        logger.log("waiting for olm session to be created");
+        log.debug(`Waiting for Olm session for ${theirDeviceIdentityKey} to be created`);
         try {
             await this._sessionsInProgress[theirDeviceIdentityKey];
         } catch (e) {
@@ -638,6 +635,7 @@ OlmDevice.prototype.getSessionIdsForDevice = async function(theirDeviceIdentityK
                 },
             );
         },
+        log,
     );
 
     return sessionIds;
@@ -651,13 +649,14 @@ OlmDevice.prototype.getSessionIdsForDevice = async function(theirDeviceIdentityK
  * @param {boolean} nowait Don't wait for an in-progress session to complete.
  *     This should only be set to true of the calling function is the function
  *     that marked the session as being in-progress.
+ * @param {Logger} [log] A possibly customised log
  * @return {Promise<?string>}  session id, or null if no established session
  */
 OlmDevice.prototype.getSessionIdForDevice = async function(
-    theirDeviceIdentityKey, nowait,
+    theirDeviceIdentityKey, nowait, log,
 ) {
     const sessionInfos = await this.getSessionInfoForDevice(
-        theirDeviceIdentityKey, nowait,
+        theirDeviceIdentityKey, nowait, log,
     );
 
     if (sessionInfos.length === 0) {
@@ -697,11 +696,16 @@ OlmDevice.prototype.getSessionIdForDevice = async function(
  * @param {boolean} nowait Don't wait for an in-progress session to complete.
  *     This should only be set to true of the calling function is the function
  *     that marked the session as being in-progress.
+ * @param {Logger} [log] A possibly customised log
  * @return {Array.<{sessionId: string, hasReceivedMessage: Boolean}>}
  */
-OlmDevice.prototype.getSessionInfoForDevice = async function(deviceIdentityKey, nowait) {
+OlmDevice.prototype.getSessionInfoForDevice = async function(
+    deviceIdentityKey, nowait, log = logger,
+) {
+    log = log.withPrefix("[getSessionInfoForDevice]");
+
     if (this._sessionsInProgress[deviceIdentityKey] && !nowait) {
-        logger.log("waiting for olm session to be created");
+        log.debug(`Waiting for Olm session for ${deviceIdentityKey} to be created`);
         try {
             await this._sessionsInProgress[deviceIdentityKey];
         } catch (e) {
@@ -727,6 +731,7 @@ OlmDevice.prototype.getSessionInfoForDevice = async function(deviceIdentityKey, 
                 }
             });
         },
+        log,
     );
 
     return info;
@@ -761,6 +766,7 @@ OlmDevice.prototype.encryptMessage = async function(
                 this._saveSession(theirDeviceIdentityKey, sessionInfo, txn);
             });
         },
+        logger.withPrefix("[encryptMessage]"),
     );
     return res;
 };
@@ -794,6 +800,7 @@ OlmDevice.prototype.decryptMessage = async function(
                 this._saveSession(theirDeviceIdentityKey, sessionInfo, txn);
             });
         },
+        logger.withPrefix("[decryptMessage]"),
     );
     return payloadString;
 };
@@ -825,6 +832,7 @@ OlmDevice.prototype.matchesSession = async function(
                 matches = sessionInfo.session.matches_inbound(ciphertext);
             });
         },
+        logger.withPrefix("[matchesSession]"),
     );
     return matches;
 };
@@ -841,7 +849,6 @@ OlmDevice.prototype.filterOutNotifiedErrorDevices = async function(devices) {
     return await this._cryptoStore.filterOutNotifiedErrorDevices(devices);
 };
 
-
 // Outbound group session
 // ======================
 
@@ -855,7 +862,6 @@ OlmDevice.prototype._saveOutboundGroupSession = function(session) {
     const pickledSession = session.pickle(this._pickleKey);
     this._outboundGroupSessionStore[session.session_id()] = pickledSession;
 };
-
 
 /**
  * extract an OutboundGroupSession from _outboundGroupSessionStore and call the
@@ -881,7 +887,6 @@ OlmDevice.prototype._getOutboundGroupSession = function(sessionId, func) {
     }
 };
 
-
 /**
  * Generate a new outbound group session
  *
@@ -897,7 +902,6 @@ OlmDevice.prototype.createOutboundGroupSession = function() {
         session.free();
     }
 };
-
 
 /**
  * Encrypt an outgoing message with an outbound group session
@@ -937,7 +941,6 @@ OlmDevice.prototype.getOutboundGroupSessionKey = function(sessionId) {
         };
     });
 };
-
 
 // Inbound group session
 // =====================
@@ -1033,6 +1036,7 @@ OlmDevice.prototype.addInboundGroupSession = async function(
         'readwrite', [
             IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
             IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
+            IndexedDBCryptoStore.STORE_SHARED_HISTORY_INBOUND_GROUP_SESSIONS,
         ], (txn) => {
             /* if we already have this session, consider updating it */
             this._getInboundGroupSession(
@@ -1059,9 +1063,14 @@ OlmDevice.prototype.addInboundGroupSession = async function(
                                     + senderKey + "/" + sessionId,
                             );
                             if (existingSession.first_known_index()
-                                <= session.first_known_index()) {
+                                <= session.first_known_index()
+                                && !(existingSession.first_known_index() == session.first_known_index()
+                                    && !extraSessionData.untrusted
+                                    && existingSessionData.untrusted)) {
                                 // existing session has lower index (i.e. can
-                                // decrypt more), so keep it
+                                // decrypt more), or they have the same index and
+                                // the new sessions trust does not win over the old
+                                // sessions trust, so keep it
                                 logger.log(
                                     `Keeping existing megolm session ${sessionId}`,
                                 );
@@ -1084,12 +1093,19 @@ OlmDevice.prototype.addInboundGroupSession = async function(
                         this._cryptoStore.storeEndToEndInboundGroupSession(
                             senderKey, sessionId, sessionData, txn,
                         );
+
+                        if (!existingSession && extraSessionData.sharedHistory) {
+                            this._cryptoStore.addSharedHistoryInboundGroupSession(
+                                roomId, senderKey, sessionId, txn,
+                            );
+                        }
                     } finally {
                         session.free();
                     }
                 },
             );
         },
+        logger.withPrefix("[addInboundGroupSession]"),
     );
 };
 
@@ -1260,6 +1276,7 @@ OlmDevice.prototype.decryptGroupMessage = async function(
                 },
             );
         },
+        logger.withPrefix("[decryptGroupMessage]"),
     );
 
     if (error) {
@@ -1305,6 +1322,7 @@ OlmDevice.prototype.hasInboundSessionKeys = async function(roomId, senderKey, se
                 },
             );
         },
+        logger.withPrefix("[hasInboundSessionKeys]"),
     );
 
     return result;
@@ -1360,10 +1378,12 @@ OlmDevice.prototype.getInboundGroupSessionKey = async function(
                         "forwarding_curve25519_key_chain":
                             sessionData.forwardingCurve25519KeyChain || [],
                         "sender_claimed_ed25519_key": senderEd25519Key,
+                        "shared_history": sessionData.sharedHistory || false,
                     };
                 },
             );
         },
+        logger.withPrefix("[getInboundGroupSessionKey]"),
     );
 
     return result;
@@ -1391,8 +1411,22 @@ OlmDevice.prototype.exportInboundGroupSession = function(
             "session_key": session.export_session(messageIndex),
             "forwarding_curve25519_key_chain": session.forwardingCurve25519KeyChain || [],
             "first_known_index": session.first_known_index(),
+            "org.matrix.msc3061.shared_history": sessionData.sharedHistory || false,
         };
     });
+};
+
+OlmDevice.prototype.getSharedHistoryInboundGroupSessions = async function(roomId) {
+    let result;
+    await this._cryptoStore.doTxn(
+        'readonly', [
+            IndexedDBCryptoStore.STORE_SHARED_HISTORY_INBOUND_GROUP_SESSIONS,
+        ], (txn) => {
+            result = this._cryptoStore.getSharedHistoryInboundGroupSessions(roomId, txn);
+        },
+        logger.withPrefix("[getSharedHistoryInboundGroupSessionsForRoom]"),
+    );
+    return result;
 };
 
 // Utilities

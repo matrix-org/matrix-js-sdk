@@ -16,11 +16,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {logger} from '../../logger';
-import {LocalStorageCryptoStore} from './localStorage-crypto-store';
-import {MemoryCryptoStore} from './memory-crypto-store';
+import { logger } from '../../logger';
+import { LocalStorageCryptoStore } from './localStorage-crypto-store';
+import { MemoryCryptoStore } from './memory-crypto-store';
 import * as IndexedDBCryptoStoreBackend from './indexeddb-crypto-store-backend';
-import {InvalidCryptoStoreError} from '../../errors';
+import { InvalidCryptoStoreError } from '../../errors';
 import * as IndexedDBHelpers from "../../indexeddb-helpers";
 
 /**
@@ -583,6 +583,29 @@ export class IndexedDBCryptoStore {
     }
 
     /**
+     * Add a shared-history group session for a room.
+     * @param {string} roomId The room that the key belongs to
+     * @param {string} senderKey The sender's curve 25519 key
+     * @param {string} sessionId The ID of the session
+     * @param {*} txn An active transaction. See doTxn(). (optional)
+     */
+    addSharedHistoryInboundGroupSession(roomId, senderKey, sessionId, txn) {
+        this._backend.addSharedHistoryInboundGroupSession(
+            roomId, senderKey, sessionId, txn,
+        );
+    }
+
+    /**
+     * Get the shared-history group session for a room.
+     * @param {string} roomId The room that the key belongs to
+     * @param {*} txn An active transaction. See doTxn(). (optional)
+     * @returns {Promise} Resolves to an array of [senderKey, sessionId]
+     */
+    getSharedHistoryInboundGroupSessions(roomId, txn) {
+        return this._backend.getSharedHistoryInboundGroupSessions(roomId, txn);
+    }
+
+    /**
      * Perform a transaction on the crypto store. Any store methods
      * that require a transaction (txn) object to be passed in may
      * only be called within a callback of either this function or
@@ -596,6 +619,7 @@ export class IndexedDBCryptoStore {
      * @param {function(*)} func Function called with the
      *     transaction object: an opaque object that should be passed
      *     to store functions.
+     * @param {Logger} [log] A possibly customised log
      * @return {Promise} Promise that resolves with the result of the `func`
      *     when the transaction is complete. If the backend is
      *     async (ie. the indexeddb backend) any of the callback
@@ -603,8 +627,8 @@ export class IndexedDBCryptoStore {
      *     reject with that exception. On synchronous backends, the
      *     exception will propagate to the caller of the getFoo method.
      */
-    doTxn(mode, stores, func) {
-        return this._backend.doTxn(mode, stores, func);
+    doTxn(mode, stores, func, log) {
+        return this._backend.doTxn(mode, stores, func, log);
     }
 }
 
@@ -613,6 +637,8 @@ IndexedDBCryptoStore.STORE_SESSIONS = 'sessions';
 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS = 'inbound_group_sessions';
 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD
     = 'inbound_group_sessions_withheld';
+IndexedDBCryptoStore.STORE_SHARED_HISTORY_INBOUND_GROUP_SESSIONS
+    = 'shared_history_inbound_group_sessions';
 IndexedDBCryptoStore.STORE_DEVICE_DATA = 'device_data';
 IndexedDBCryptoStore.STORE_ROOMS = 'rooms';
 IndexedDBCryptoStore.STORE_BACKUP = 'sessions_needing_backup';

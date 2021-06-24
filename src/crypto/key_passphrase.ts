@@ -1,6 +1,5 @@
 /*
-Copyright 2018 New Vector Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2018 - 2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,21 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {randomString} from '../randomstring';
+import { randomString } from '../randomstring';
 
 const DEFAULT_ITERATIONS = 500000;
 
 const DEFAULT_BITSIZE = 256;
 
+/* eslint-disable camelcase */
 interface IAuthData {
-    /* eslint-disable camelcase */
     private_key_salt: string;
     private_key_iterations: number;
     private_key_bits?: number;
-    /* eslint-enable camelcase */
+}
+/* eslint-enable camelcase */
+
+interface IKey {
+    key: Uint8Array;
+    salt: string;
+    iterations: number
 }
 
-export async function keyFromAuthData(authData: IAuthData, password: string) {
+export async function keyFromAuthData(authData: IAuthData, password: string): Promise<Uint8Array> {
     if (!global.Olm) {
         throw new Error("Olm is not available");
     }
@@ -48,7 +53,7 @@ export async function keyFromAuthData(authData: IAuthData, password: string) {
     );
 }
 
-export async function keyFromPassphrase(password: string) {
+export async function keyFromPassphrase(password: string): Promise<IKey> {
     if (!global.Olm) {
         throw new Error("Olm is not available");
     }
@@ -60,7 +65,12 @@ export async function keyFromPassphrase(password: string) {
     return { key, salt, iterations: DEFAULT_ITERATIONS };
 }
 
-export async function deriveKey(password: string, salt: string, iterations: number, numBits = DEFAULT_BITSIZE) {
+export async function deriveKey(
+    password: string,
+    salt: string,
+    iterations: number,
+    numBits = DEFAULT_BITSIZE,
+): Promise<Uint8Array> {
     const subtleCrypto = global.crypto.subtle;
     const TextEncoder = global.TextEncoder;
     if (!subtleCrypto || !TextEncoder) {
@@ -71,7 +81,7 @@ export async function deriveKey(password: string, salt: string, iterations: numb
     const key = await subtleCrypto.importKey(
         'raw',
         new TextEncoder().encode(password),
-        {name: 'PBKDF2'},
+        { name: 'PBKDF2' },
         false,
         ['deriveBits'],
     );

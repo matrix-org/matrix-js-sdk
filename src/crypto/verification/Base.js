@@ -20,12 +20,12 @@ limitations under the License.
  * @module crypto/verification/Base
  */
 
-import {MatrixEvent} from '../../models/event';
-import {EventEmitter} from 'events';
-import {logger} from '../../logger';
-import {DeviceInfo} from '../deviceinfo';
-import {newTimeoutError} from "./Error";
-import {requestKeysDuringVerification} from "../CrossSigning";
+import { MatrixEvent } from '../../models/event';
+import { EventEmitter } from 'events';
+import { logger } from '../../logger';
+import { DeviceInfo } from '../deviceinfo';
+import { newTimeoutError } from "./Error";
+import { requestKeysDuringVerification } from "../CrossSigning";
 
 const timeoutException = new Error("Verification timed out");
 
@@ -49,9 +49,10 @@ export class VerificationBase extends EventEmitter {
      *
      * @class
      *
-     * @param {module:base-apis~Channel} channel the verification channel to send verification messages over.
+     * @param {Object} channel the verification channel to send verification messages over.
+     * TODO: Channel types
      *
-     * @param {module:base-apis~MatrixBaseApis} baseApis base matrix api interface
+     * @param {MatrixClient} baseApis base matrix api interface
      *
      * @param {string} userId the user ID that is being verified
      *
@@ -138,7 +139,7 @@ export class VerificationBase extends EventEmitter {
     switchStartEvent(event) {
         if (this.canSwitchStartEvent(event)) {
             logger.log("Verification Base: switching verification start event",
-                {restartingFlow: !!this._rejectEvent});
+                { restartingFlow: !!this._rejectEvent });
             if (this._rejectEvent) {
                 const reject = this._rejectEvent;
                 this._rejectEvent = undefined;
@@ -167,7 +168,7 @@ export class VerificationBase extends EventEmitter {
             // there is only promise to reject if verify has been called
             if (reject) {
                 const content = e.getContent();
-                const {reason, code} = content;
+                const { reason, code } = content;
                 reject(new Error(`Other side cancelled verification ` +
                     `because ${reason} (${code})`));
             }
@@ -291,7 +292,7 @@ export class VerificationBase extends EventEmitter {
                 await verifier(keyId, device, keyInfo);
                 verifiedDevices.push(deviceId);
             } else {
-                const crossSigningInfo = this._baseApis._crypto._deviceList
+                const crossSigningInfo = this._baseApis.crypto.deviceList
                       .getStoredCrossSigningForUser(userId);
                 if (crossSigningInfo && crossSigningInfo.getId() === deviceId) {
                     await verifier(keyId, DeviceInfo.fromStorage({

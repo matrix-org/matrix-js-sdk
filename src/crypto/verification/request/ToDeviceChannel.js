@@ -15,8 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {randomString} from '../../../randomstring';
-import {logger} from '../../../logger';
+import { randomString } from '../../../randomstring';
+import { logger } from '../../../logger';
 import {
     CANCEL_TYPE,
     PHASE_STARTED,
@@ -26,8 +26,8 @@ import {
     START_TYPE,
     VerificationRequest,
 } from "./VerificationRequest";
-import {errorFromEvent, newUnexpectedMessageError} from "../Error";
-import {MatrixEvent} from "../../../models/event";
+import { errorFromEvent, newUnexpectedMessageError } from "../Error";
+import { MatrixEvent } from "../../../models/event";
 
 /**
  * A key verification channel that sends verification events over to_device messages.
@@ -179,7 +179,9 @@ export class ToDeviceChannel {
         const isAcceptingEvent = type === START_TYPE || type === READY_TYPE;
         // the request has picked a ready or start event, tell the other devices about it
         if (isAcceptingEvent && !wasStarted && isStarted && this._deviceId) {
-            const nonChosenDevices = this._devices.filter(d => d !== this._deviceId);
+            const nonChosenDevices = this._devices.filter(
+                d => d !== this._deviceId && d !== this._client.getDeviceId(),
+            );
             if (nonChosenDevices.length) {
                 const message = this.completeContent({
                     code: "m.accepted",
@@ -275,7 +277,7 @@ export class ToDeviceChannel {
                 msgMap[deviceId] = content;
             }
 
-            return this._client.sendToDevice(type, {[this.userId]: msgMap});
+            return this._client.sendToDevice(type, { [this.userId]: msgMap });
         } else {
             return Promise.resolve();
         }
@@ -289,7 +291,6 @@ export class ToDeviceChannel {
         return randomString(32);
     }
 }
-
 
 export class ToDeviceRequests {
     constructor() {

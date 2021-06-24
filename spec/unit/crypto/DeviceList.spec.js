@@ -16,10 +16,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {logger} from "../../../src/logger";
+import { logger } from "../../../src/logger";
 import * as utils from "../../../src/utils";
-import {MemoryCryptoStore} from "../../../src/crypto/store/memory-crypto-store";
-import {DeviceList} from "../../../src/crypto/DeviceList";
+import { MemoryCryptoStore } from "../../../src/crypto/store/memory-crypto-store";
+import { DeviceList } from "../../../src/crypto/DeviceList";
 
 const signedDeviceList = {
     "failures": {},
@@ -51,6 +51,36 @@ const signedDeviceList = {
     },
 };
 
+const signedDeviceList2 = {
+    "failures": {},
+    "device_keys": {
+        "@test2:sw1v.org": {
+            "QJVRHWAKGH": {
+                "signatures": {
+                    "@test2:sw1v.org": {
+                        "ed25519:QJVRHWAKGH":
+                            "w1xxdLe1iIqzEFHLRVYQeuiM6t2N2ZRiI8s5nDKxf054BP8" +
+                            "1CPEX/AQXh5BhkKAVMlKnwg4T9zU1/wBALeajk3",
+                    },
+                },
+                "user_id": "@test2:sw1v.org",
+                "keys": {
+                    "ed25519:QJVRHWAKGH":
+                        "Ig0/C6T+bBII1l2By2Wnnvtjp1nm/iXBlLU5/QESFXL",
+                    "curve25519:QJVRHWAKGH":
+                        "YR3eQnUvTQzGlWih4rsmJkKxpDxzgkgIgsBd1DEZIbm",
+                },
+                "algorithms": [
+                    "m.olm.v1.curve25519-aes-sha2",
+                    "m.megolm.v1.aes-sha2",
+                ],
+                "device_id": "QJVRHWAKGH",
+                "unsigned": {},
+            },
+        },
+    },
+};
+
 describe('DeviceList', function() {
     let downloadSpy;
     let cryptoStore;
@@ -69,7 +99,7 @@ describe('DeviceList', function() {
         }
     });
 
-    function createTestDeviceList() {
+    function createTestDeviceList(keyDownloadChunkSize = 250) {
         const baseApis = {
             downloadKeysForUsers: downloadSpy,
             getUserId: () => '@test1:sw1v.org',
@@ -78,7 +108,7 @@ describe('DeviceList', function() {
         const mockOlm = {
             verifySignature: function(key, message, signature) {},
         };
-        const dl = new DeviceList(baseApis, cryptoStore, mockOlm);
+        const dl = new DeviceList(baseApis, cryptoStore, mockOlm, keyDownloadChunkSize);
         deviceLists.push(dl);
         return dl;
     }
@@ -148,6 +178,32 @@ describe('DeviceList', function() {
         }).then(() => {
             const storedKeys = dl.getRawStoredDevicesForUser('@test1:sw1v.org');
             expect(Object.keys(storedKeys)).toEqual(['HGKAWHRVJQ']);
+        });
+    });
+
+    it("should download device keys in batches", function() {
+        const dl = createTestDeviceList(1);
+
+        dl.startTrackingDeviceList('@test1:sw1v.org');
+        dl.startTrackingDeviceList('@test2:sw1v.org');
+
+        const queryDefer1 = utils.defer();
+        downloadSpy.mockReturnValueOnce(queryDefer1.promise);
+        const queryDefer2 = utils.defer();
+        downloadSpy.mockReturnValueOnce(queryDefer2.promise);
+
+        const prom1 = dl.refreshOutdatedDeviceLists();
+        expect(downloadSpy).toBeCalledTimes(2);
+        expect(downloadSpy).toHaveBeenNthCalledWith(1, ['@test1:sw1v.org'], {});
+        expect(downloadSpy).toHaveBeenNthCalledWith(2, ['@test2:sw1v.org'], {});
+        queryDefer1.resolve(utils.deepCopy(signedDeviceList));
+        queryDefer2.resolve(utils.deepCopy(signedDeviceList2));
+
+        return prom1.then(() => {
+            const storedKeys1 = dl.getRawStoredDevicesForUser('@test1:sw1v.org');
+            expect(Object.keys(storedKeys1)).toEqual(['HGKAWHRVJQ']);
+            const storedKeys2 = dl.getRawStoredDevicesForUser('@test2:sw1v.org');
+            expect(Object.keys(storedKeys2)).toEqual(['QJVRHWAKGH']);
         });
     });
 });
