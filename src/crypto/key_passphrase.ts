@@ -1,6 +1,5 @@
 /*
-Copyright 2018 New Vector Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2018 - 2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +20,21 @@ const DEFAULT_ITERATIONS = 500000;
 
 const DEFAULT_BITSIZE = 256;
 
-export async function keyFromAuthData(authData, password) {
+/* eslint-disable camelcase */
+interface IAuthData {
+    private_key_salt: string;
+    private_key_iterations: number;
+    private_key_bits?: number;
+}
+/* eslint-enable camelcase */
+
+interface IKey {
+    key: Uint8Array;
+    salt: string;
+    iterations: number
+}
+
+export async function keyFromAuthData(authData: IAuthData, password: string): Promise<Uint8Array> {
     if (!global.Olm) {
         throw new Error("Olm is not available");
     }
@@ -40,7 +53,7 @@ export async function keyFromAuthData(authData, password) {
     );
 }
 
-export async function keyFromPassphrase(password) {
+export async function keyFromPassphrase(password: string): Promise<IKey> {
     if (!global.Olm) {
         throw new Error("Olm is not available");
     }
@@ -52,7 +65,12 @@ export async function keyFromPassphrase(password) {
     return { key, salt, iterations: DEFAULT_ITERATIONS };
 }
 
-export async function deriveKey(password, salt, iterations, numBits = DEFAULT_BITSIZE) {
+export async function deriveKey(
+    password: string,
+    salt: string,
+    iterations: number,
+    numBits = DEFAULT_BITSIZE,
+): Promise<Uint8Array> {
     const subtleCrypto = global.crypto.subtle;
     const TextEncoder = global.TextEncoder;
     if (!subtleCrypto || !TextEncoder) {

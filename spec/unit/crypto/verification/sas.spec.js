@@ -87,8 +87,8 @@ describe("SAS verification", function() {
                 },
             );
 
-            const aliceDevice = alice.client.crypto._olmDevice;
-            const bobDevice = bob.client.crypto._olmDevice;
+            const aliceDevice = alice.client.crypto.olmDevice;
+            const bobDevice = bob.client.crypto.olmDevice;
 
             ALICE_DEVICES = {
                 Osborne2: {
@@ -114,14 +114,14 @@ describe("SAS verification", function() {
                 },
             };
 
-            alice.client.crypto._deviceList.storeDevicesForUser(
+            alice.client.crypto.deviceList.storeDevicesForUser(
                 "@bob:example.com", BOB_DEVICES,
             );
             alice.client.downloadKeys = () => {
                 return Promise.resolve();
             };
 
-            bob.client.crypto._deviceList.storeDevicesForUser(
+            bob.client.crypto.deviceList.storeDevicesForUser(
                 "@alice:example.com", ALICE_DEVICES,
             );
             bob.client.downloadKeys = () => {
@@ -296,9 +296,9 @@ describe("SAS verification", function() {
 
             await resetCrossSigningKeys(bob.client);
 
-            bob.client.crypto._deviceList.storeCrossSigningForUser(
+            bob.client.crypto.deviceList.storeCrossSigningForUser(
                 "@alice:example.com", {
-                    keys: alice.client.crypto._crossSigningInfo.keys,
+                    keys: alice.client.crypto.crossSigningInfo.keys,
                 },
             );
 
