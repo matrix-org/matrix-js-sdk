@@ -4,7 +4,7 @@ import { EventEmitter } from "events";
 import { createCryptoStoreCacheCallbacks, ICacheCallbacks } from "./CrossSigning";
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { PREFIX_UNSTABLE } from "../http-api";
-import { Crypto } from "./index";
+import { Crypto, IBootstrapCrossSigningOpts } from "./index";
 import {
     CrossSigningKeys,
     ICrossSigningKey,
@@ -16,7 +16,7 @@ import {
 import { IKeyBackupInfo } from "./keybackup";
 
 interface ICrossSigningKeys {
-    authUpload(authData: any): Promise<{}>;
+    authUpload: IBootstrapCrossSigningOpts["authUploadDeviceSigningKeys"];
     keys: Record<string, ICrossSigningKey>;
 }
 

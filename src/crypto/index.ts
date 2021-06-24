@@ -92,7 +92,7 @@ interface IInitOpts {
 
 export interface IBootstrapCrossSigningOpts {
     setupNewCrossSigning?: boolean;
-    authUploadDeviceSigningKeys?(makeRequest: (authData: any) => void): Promise<{}>;
+    authUploadDeviceSigningKeys?(makeRequest: (authData: any) => {}): Promise<void>;
 }
 
 interface IBootstrapSecretStorageOpts {
