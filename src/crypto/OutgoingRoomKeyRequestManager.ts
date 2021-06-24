@@ -15,10 +15,10 @@ limitations under the License.
 */
 
 import { logger } from '../logger';
-import {CryptoStore, MatrixClient} from "../client";
-import {IRoomKeyRequestBody, IRoomKeyRequestRecipient} from "./index";
+import { CryptoStore, MatrixClient } from "../client";
+import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "./index";
 import { OutgoingRoomKeyRequest } from './store/base';
-import {EventType} from "../@types/event";
+import { EventType } from "../@types/event";
 
 /**
  * Internal module. Management of outgoing room key requests.
