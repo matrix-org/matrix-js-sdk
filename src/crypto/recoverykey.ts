@@ -35,7 +35,7 @@ export function encodeRecoveryKey(key: ArrayLike<number>): string {
     return base58key.match(/.{1,4}/g).join(" ");
 }
 
-export function decodeRecoveryKey(recoveryKey: string): ArrayLike<number> {
+export function decodeRecoveryKey(recoveryKey: string): Uint8Array {
     const result = bs58.decode(recoveryKey.replace(/ /g, ''));
 
     let parity = 0;

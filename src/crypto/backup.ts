@@ -29,16 +29,11 @@ import { keyFromPassphrase } from './key_passphrase';
 import { sleep } from "../utils";
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { encodeRecoveryKey } from './recoverykey';
+import { IKeyBackupVersion } from "./keybackup";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 
-type AuthData = Record<string, any>;
-
-type BackupInfo = {
-    algorithm: string,
-    auth_data: AuthData, // eslint-disable-line camelcase
-    [properties: string]: any,
-};
+type AuthData = IKeyBackupVersion["auth_data"];
 
 type SigInfo = {
     deviceId: string,
@@ -54,13 +49,22 @@ export type TrustInfo = {
 };
 
 export interface IKeyBackupCheck {
-    backupInfo: BackupInfo;
+    backupInfo: IKeyBackupVersion;
     trustInfo: TrustInfo;
 }
 
+/* eslint-disable camelcase */
+export interface IPreparedKeyBackupVersion {
+    algorithm: string;
+    auth_data: AuthData;
+    recovery_key: string;
+    privateKey: Uint8Array;
+}
+/* eslint-enable camelcase */
+
 /** A function used to get the secret key for a backup.
  */
-type GetKey = () => Promise<Uint8Array>;
+type GetKey = () => Promise<ArrayLike<number>>;
 
 interface BackupAlgorithmClass {
     algorithmName: string;
@@ -77,7 +81,7 @@ interface BackupAlgorithm {
     encryptSession(data: Record<string, any>): Promise<any>;
     decryptSessions(ciphertexts: Record<string, any>): Promise<Record<string, any>[]>;
     authData: AuthData;
-    keyMatches(key: Uint8Array): Promise<boolean>;
+    keyMatches(key: ArrayLike<number>): Promise<boolean>;
     free(): void;
 }
 
@@ -86,7 +90,7 @@ interface BackupAlgorithm {
  */
 export class BackupManager {
     private algorithm: BackupAlgorithm | undefined;
-    public backupInfo: BackupInfo | undefined; // The info dict from /room_keys/version
+    public backupInfo: IKeyBackupVersion | undefined; // The info dict from /room_keys/version
     public checkedForBackup: boolean; // Have we checked the server for a backup we can use?
     private sendingBackups: boolean; // Are we currently sending backups?
     constructor(private readonly baseApis: MatrixClient, public readonly getKey: GetKey) {
@@ -98,7 +102,7 @@ export class BackupManager {
         return this.backupInfo && this.backupInfo.version;
     }
 
-    public static async makeAlgorithm(info: BackupInfo, getKey: GetKey): Promise<BackupAlgorithm> {
+    public static async makeAlgorithm(info: IKeyBackupVersion, getKey: GetKey): Promise<BackupAlgorithm> {
         const Algorithm = algorithmsByName[info.algorithm];
         if (!Algorithm) {
             throw new Error("Unknown backup algorithm");
@@ -106,7 +110,7 @@ export class BackupManager {
         return await Algorithm.init(info.auth_data, getKey);
     }
 
-    public async enableKeyBackup(info: BackupInfo): Promise<void> {
+    public async enableKeyBackup(info: IKeyBackupVersion): Promise<void> {
         this.backupInfo = info;
         if (this.algorithm) {
             this.algorithm.free();
@@ -145,7 +149,8 @@ export class BackupManager {
     public async prepareKeyBackupVersion(
         key?: string | Uint8Array | null,
         algorithm?: string | undefined,
-    ): Promise<BackupInfo> {
+        // eslint-disable-next-line camelcase
+    ): Promise<IPreparedKeyBackupVersion> {
         const Algorithm = algorithm ? algorithmsByName[algorithm] : DefaultAlgorithm;
         if (!Algorithm) {
             throw new Error("Unknown backup algorithm");
@@ -161,7 +166,7 @@ export class BackupManager {
         };
     }
 
-    public async createKeyBackupVersion(info: BackupInfo): Promise<void> {
+    public async createKeyBackupVersion(info: IKeyBackupVersion): Promise<void> {
         this.algorithm = await BackupManager.makeAlgorithm(info, this.getKey);
     }
 
@@ -171,14 +176,14 @@ export class BackupManager {
      * one of the user's verified devices, start backing up
      * to it.
      */
-    public async checkAndStart(): Promise<{backupInfo: BackupInfo, trustInfo: TrustInfo}> {
+    public async checkAndStart(): Promise<IKeyBackupCheck> {
         logger.log("Checking key backup status...");
         if (this.baseApis.isGuest()) {
             logger.log("Skipping key backup check since user is guest");
             this.checkedForBackup = true;
             return null;
         }
-        let backupInfo: BackupInfo;
+        let backupInfo: IKeyBackupVersion;
         try {
             backupInfo = await this.baseApis.getKeyBackupVersion();
         } catch (e) {
@@ -255,7 +260,7 @@ export class BackupManager {
      *     ]
      * }
      */
-    public async isKeyBackupTrusted(backupInfo: BackupInfo): Promise<TrustInfo> {
+    public async isKeyBackupTrusted(backupInfo: IKeyBackupVersion): Promise<TrustInfo> {
         const ret = {
             usable: false,
             trusted_locally: false,
@@ -569,7 +574,7 @@ export class Curve25519 implements BackupAlgorithm {
     ): Promise<[Uint8Array, AuthData]> {
         const decryption = new global.Olm.PkDecryption();
         try {
-            const authData: AuthData = {};
+            const authData: Partial<AuthData> = {};
             if (!key) {
                 authData.public_key = decryption.generate_key();
             } else if (key instanceof Uint8Array) {
@@ -585,7 +590,7 @@ export class Curve25519 implements BackupAlgorithm {
 
             return [
                 decryption.get_private_key(),
-                authData,
+                authData as AuthData,
             ];
         } finally {
             decryption.free();

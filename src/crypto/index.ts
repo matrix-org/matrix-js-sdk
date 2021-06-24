@@ -138,11 +138,6 @@ interface IDeviceVerificationUpgrade {
  *    could be established
  */
 
-interface IOlmSessionResult {
-    device: DeviceInfo;
-    sessionId?: string;
-}
-
 interface IUserOlmSession {
     deviceIdKey: string;
     sessions: {
@@ -1079,17 +1074,17 @@ export class Crypto extends EventEmitter {
      * @param {Uint8Array} key the private key
      * @returns {Promise} so you can catch failures
      */
-    public async storeSessionBackupPrivateKey(key: Uint8Array): Promise<void> {
+    public async storeSessionBackupPrivateKey(key: ArrayLike<number>): Promise<void> {
         if (!(key instanceof Uint8Array)) {
             throw new Error(`storeSessionBackupPrivateKey expects Uint8Array, got ${key}`);
         }
         const pickleKey = Buffer.from(this.olmDevice._pickleKey);
-        key = await encryptAES(olmlib.encodeBase64(key), pickleKey, "m.megolm_backup.v1");
+        const encryptedKey = await encryptAES(olmlib.encodeBase64(key), pickleKey, "m.megolm_backup.v1");
         return this.cryptoStore.doTxn(
             'readwrite',
             [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
-                this.cryptoStore.storeSecretStorePrivateKey(txn, "m.megolm_backup.v1", key);
+                this.cryptoStore.storeSecretStorePrivateKey(txn, "m.megolm_backup.v1", encryptedKey);
             },
         );
     }
@@ -2573,7 +2568,7 @@ export class Crypto extends EventEmitter {
      *    an Object mapping from userId to deviceId to
      *    {@link module:crypto~OlmSessionResult}
      */
-    ensureOlmSessionsForUsers(users: string[]): Promise<IOlmSessionResult> {
+    ensureOlmSessionsForUsers(users: string[]): Promise<Record<string, Record<string, olmlib.IOlmSessionResult>>> {
         const devicesByUser = {};
 
         for (let i = 0; i < users.length; ++i) {
@@ -2598,9 +2593,7 @@ export class Crypto extends EventEmitter {
             }
         }
 
-        return olmlib.ensureOlmSessionsForDevices(
-            this.olmDevice, this.baseApis, devicesByUser,
-        );
+        return olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, devicesByUser);
     }
 
     /**
@@ -3259,9 +3252,7 @@ export class Crypto extends EventEmitter {
         }
         const devicesByUser = {};
         devicesByUser[sender] = [device];
-        await olmlib.ensureOlmSessionsForDevices(
-            this.olmDevice, this.baseApis, devicesByUser, true,
-        );
+        await olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, devicesByUser, true);
 
         this.lastNewSessionForced[sender][deviceKey] = Date.now();
 

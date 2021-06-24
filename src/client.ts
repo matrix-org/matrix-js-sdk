@@ -114,7 +114,7 @@ import url from "url";
 import { randomString } from "./randomstring";
 import { ReadStream } from "fs";
 import { WebStorageSessionStore } from "./store/session/webstorage";
-import { BackupManager, IKeyBackupCheck, TrustInfo } from "./crypto/backup";
+import { BackupManager, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE, MSC3089TreeSpace } from "./models/MSC3089TreeSpace";
 
 export type Store = StubStore | MemoryStore | LocalIndexedDBStoreBackend | RemoteIndexedDBStoreBackend;
@@ -2180,7 +2180,7 @@ export class MatrixClient extends EventEmitter {
     public async prepareKeyBackupVersion(
         password: string,
         opts: IKeyBackupPrepareOpts = { secureSecretStorage: false },
-    ): Promise<IKeyBackupVersion> {
+    ): Promise<Pick<IPreparedKeyBackupVersion, "algorithm" | "auth_data" | "recovery_key">> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2198,7 +2198,7 @@ export class MatrixClient extends EventEmitter {
             algorithm,
             auth_data,
             recovery_key,
-        } as any; // TODO: Types
+        };
     }
 
     /**
@@ -2313,7 +2313,7 @@ export class MatrixClient extends EventEmitter {
      * Back up session keys to the homeserver.
      * @param {string} roomId ID of the room that the keys are for Optional.
      * @param {string} sessionId ID of the session that the keys are for Optional.
-     * @param {integer} version backup version Optional.
+     * @param {number} version backup version Optional.
      * @param {object} data Object keys to send
      * @return {Promise} a promise that will resolve when the keys
      * are uploaded
@@ -2388,7 +2388,7 @@ export class MatrixClient extends EventEmitter {
      * @param {string} recoveryKey The recovery key
      * @return {Uint8Array} key backup key
      */
-    public keyBackupKeyFromRecoveryKey(recoveryKey: string): Uint8Array {
+    public keyBackupKeyFromRecoveryKey(recoveryKey: string): ArrayLike<number> {
         return decodeRecoveryKey(recoveryKey);
     }
 
@@ -2478,9 +2478,7 @@ export class MatrixClient extends EventEmitter {
         opts: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult> {
         const privKey = decodeRecoveryKey(recoveryKey);
-        return this.restoreKeyBackup(
-            privKey, targetRoomId, targetSessionId, backupInfo, opts,
-        );
+        return this.restoreKeyBackup(privKey, targetRoomId, targetSessionId, backupInfo, opts);
     }
 
     // TODO: Types
@@ -2498,7 +2496,7 @@ export class MatrixClient extends EventEmitter {
     }
 
     private async restoreKeyBackup(
-        privKey: Uint8Array,
+        privKey: ArrayLike<number>,
         targetRoomId: string,
         targetSessionId: string,
         backupInfo: IKeyBackupVersion,

@@ -52,6 +52,11 @@ export const MEGOLM_ALGORITHM = Algorithm.Megolm;
  */
 export const MEGOLM_BACKUP_ALGORITHM = Algorithm.MegolmBackup;
 
+export interface IOlmSessionResult {
+    device: DeviceInfo;
+    sessionId?: string;
+}
+
 /**
  * Encrypt an event payload for an Olm device
  *
@@ -209,11 +214,11 @@ export async function ensureOlmSessionsForDevices(
     olmDevice: OlmDevice,
     baseApis: MatrixClient,
     devicesByUser: Record<string, DeviceInfo[]>,
-    force: boolean,
-    otkTimeout: number,
-    failedServers: string[],
-    log: Logger,
-) {
+    force = false,
+    otkTimeout?: number,
+    failedServers?: string[],
+    log: Logger = logger,
+): Promise<Record<string, Record<string, IOlmSessionResult>>> {
     if (typeof force === "number") {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore - backwards compatibility
@@ -223,9 +228,6 @@ export async function ensureOlmSessionsForDevices(
         failedServers = otkTimeout;
         otkTimeout = force;
         force = false;
-    }
-    if (!log) {
-        log = logger;
     }
 
     const devicesWithoutSession = [
@@ -439,9 +441,9 @@ async function _verifyKeyAndStartSession(
     return sid;
 }
 
-interface IObject {
-    unsigned: object;
-    signatures: object;
+export interface IObject {
+    unsigned?: object;
+    signatures?: object;
 }
 
 /**
@@ -555,7 +557,7 @@ export function pkVerify(obj: IObject, pubKey: string, userId: string) {
  * @param {Uint8Array} uint8Array The data to encode.
  * @return {string} The base64.
  */
-export function encodeBase64(uint8Array: ArrayBuffer): string {
+export function encodeBase64(uint8Array: ArrayBuffer | Uint8Array): string {
     return Buffer.from(uint8Array).toString("base64");
 }
 

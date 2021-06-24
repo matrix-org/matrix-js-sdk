@@ -296,7 +296,7 @@ export class CrossSigningInfo extends EventEmitter {
         }
 
         const privateKeys: Record<string, Uint8Array> = {};
-        const keys: Record<string, object> = {};
+        const keys: Record<string, any> = {}; // TODO types
         let masterSigning;
         let masterPub;
 
@@ -719,12 +719,12 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
                 );
             }
             const pickleKey = Buffer.from(olmDevice._pickleKey);
-            key = await encryptAES(encodeBase64(key), pickleKey, type);
+            const encryptedKey = await encryptAES(encodeBase64(key), pickleKey, type);
             return store.doTxn(
                 'readwrite',
                 [IndexedDBCryptoStore.STORE_ACCOUNT],
                 (txn) => {
-                    store.storeSecretStorePrivateKey(txn, type, key);
+                    store.storeSecretStorePrivateKey(txn, type, encryptedKey);
                 },
             );
         },

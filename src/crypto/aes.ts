@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Matrix.org Foundation C.I.C.
+Copyright 2020 - 2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import type { BinaryLike } from "crypto";
+
 import { getCrypto } from '../utils';
 import { decodeBase64, encodeBase64 } from './olmlib';
 
@@ -23,6 +25,12 @@ const subtleCrypto = (typeof window !== "undefined" && window.crypto) ?
 // salt for HKDF, with 8 bytes of zeros
 const zeroSalt = new Uint8Array(8);
 
+interface IEncryptedPayload {
+    iv: string;
+    ciphertext: string;
+    mac: string;
+}
+
 /**
  * encrypt a string in Node.js
  *
@@ -31,7 +39,7 @@ const zeroSalt = new Uint8Array(8);
  * @param {string} name the name of the secret
  * @param {string} ivStr the initialization vector to use
  */
-async function encryptNode(data: string, key: Uint8Array, name: string, ivStr?: string) {
+async function encryptNode(data: string, key: Uint8Array, name: string, ivStr?: string): Promise<IEncryptedPayload> {
     const crypto = getCrypto();
     if (!crypto) {
         throw new Error("No usable crypto implementation");
@@ -77,7 +85,7 @@ async function encryptNode(data: string, key: Uint8Array, name: string, ivStr?: 
  * @param {Uint8Array} key the encryption key to use
  * @param {string} name the name of the secret
  */
-async function decryptNode(data: IData, key: Uint8Array, name: string) {
+async function decryptNode(data: IEncryptedPayload, key: Uint8Array, name: string): Promise<string> {
     const crypto = getCrypto();
     if (!crypto) {
         throw new Error("No usable crypto implementation");
@@ -100,10 +108,9 @@ async function decryptNode(data: IData, key: Uint8Array, name: string) {
           + decipher.final("utf8");
 }
 
-function deriveKeysNode(key, name) {
+function deriveKeysNode(key: BinaryLike, name: string): [Buffer, Buffer] {
     const crypto = getCrypto();
-    const prk = crypto.createHmac("sha256", zeroSalt)
-        .update(key).digest();
+    const prk = crypto.createHmac("sha256", zeroSalt).update(key).digest();
 
     const b = Buffer.alloc(1, 1);
     const aesKey = crypto.createHmac("sha256", prk)
@@ -123,7 +130,7 @@ function deriveKeysNode(key, name) {
  * @param {string} name the name of the secret
  * @param {string} ivStr the initialization vector to use
  */
-async function encryptBrowser(data: string, key: Uint8Array, name: string, ivStr?: string) {
+async function encryptBrowser(data: string, key: Uint8Array, name: string, ivStr?: string): Promise<IEncryptedPayload> {
     let iv;
     if (ivStr) {
         iv = decodeBase64(ivStr);
@@ -163,12 +170,6 @@ async function encryptBrowser(data: string, key: Uint8Array, name: string, ivStr
     };
 }
 
-interface IData {
-    ciphertext: string;
-    iv: string;
-    mac: string;
-}
-
 /**
  * decrypt a string in the browser
  *
@@ -179,7 +180,7 @@ interface IData {
  * @param {Uint8Array} key the encryption key to use
  * @param {string} name the name of the secret
  */
-async function decryptBrowser(data: IData, key: Uint8Array, name: string) {
+async function decryptBrowser(data: IEncryptedPayload, key: Uint8Array, name: string): Promise<string> {
     const [aesKey, hmacKey] = await deriveKeysBrowser(key, name);
 
     const ciphertext = decodeBase64(data.ciphertext);
@@ -206,7 +207,7 @@ async function decryptBrowser(data: IData, key: Uint8Array, name: string) {
     return new TextDecoder().decode(new Uint8Array(plaintext));
 }
 
-async function deriveKeysBrowser(key, name) {
+async function deriveKeysBrowser(key: Uint8Array, name: string): Promise<[CryptoKey, CryptoKey]> {
     const hkdfkey = await subtleCrypto.importKey(
         'raw',
         key,
@@ -252,11 +253,11 @@ async function deriveKeysBrowser(key, name) {
     return await Promise.all([aesProm, hmacProm]);
 }
 
-export function encryptAES(data: string, key: Uint8Array, name: string, ivStr?: string) {
+export function encryptAES(data: string, key: Uint8Array, name: string, ivStr?: string): Promise<IEncryptedPayload> {
     return subtleCrypto ? encryptBrowser(data, key, name, ivStr) : encryptNode(data, key, name, ivStr);
 }
 
-export function decryptAES(data: IData, key: Uint8Array, name: string) {
+export function decryptAES(data: IEncryptedPayload, key: Uint8Array, name: string): Promise<string> {
     return subtleCrypto ? decryptBrowser(data, key, name) : decryptNode(data, key, name);
 }
 

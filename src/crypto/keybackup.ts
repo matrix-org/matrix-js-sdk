@@ -44,7 +44,6 @@ export interface IKeyBackupVersion {
     count: number;
     etag: string;
     version: string; // number contained within
-    recovery_key: string;
 }
 /* eslint-enable camelcase */
 
