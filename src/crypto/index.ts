@@ -117,13 +117,14 @@ export interface IRoomKeyRequestBody extends IRoomKey {
     sender_key: string
 }
 
-interface IMegolmSessionData {
+export interface IMegolmSessionData {
     sender_key: string;
     forwarding_curve25519_key_chain: string[];
     sender_claimed_keys: Record<string, string>;
     room_id: string;
     session_id: string;
     session_key: string;
+    algorithm: string;
 }
 /* eslint-enable camelcase */
 
@@ -168,7 +169,7 @@ interface ISignableObject {
     unsigned?: object
 }
 
-interface IEventDecryptionResult {
+export interface IEventDecryptionResult {
     clearEvent: object;
     senderCurve25519Key?: string;
     claimedEd25519Key?: string;
@@ -193,7 +194,7 @@ export class Crypto extends EventEmitter {
 
     private readonly reEmitter: ReEmitter;
     private readonly verificationMethods: any; // TODO types
-    private readonly supportedAlgorithms: DecryptionAlgorithm[];
+    private readonly supportedAlgorithms: string[];
     private readonly outgoingRoomKeyRequestManager: OutgoingRoomKeyRequestManager;
     private readonly toDeviceVerificationRequests: ToDeviceRequests;
     private readonly inRoomVerificationRequests: InRoomRequests;
@@ -2630,7 +2631,7 @@ export class Crypto extends EventEmitter {
      * @param {Function} opts.progressCallback called with an object which has a stage param
      * @return {Promise} a promise which resolves once the keys have been imported
      */
-    public importRoomKeys(keys: IRoomKey[], opts: any = {}): Promise<any> { // TODO types
+    public importRoomKeys(keys: IMegolmSessionData[], opts: any = {}): Promise<any> { // TODO types
         let successes = 0;
         let failures = 0;
         const total = keys.length;
@@ -3430,9 +3431,7 @@ export class Crypto extends EventEmitter {
             }
 
             try {
-                await encryptor.reshareKeyWithDevice(
-                    body.sender_key, body.session_id, userId, device,
-                );
+                await encryptor.reshareKeyWithDevice(body.sender_key, body.session_id, userId, device);
             } catch (e) {
                 logger.warn(
                     "Failed to re-share keys for session " + body.session_id +
@@ -3643,7 +3642,7 @@ export function fixBackupKey(key: string): string | null {
  *    the relevant crypto algorithm implementation to share the keys for
  *    this request.
  */
-class IncomingRoomKeyRequest {
+export class IncomingRoomKeyRequest {
     public readonly userId: string;
     public readonly deviceId: string;
     public readonly requestId: string;
