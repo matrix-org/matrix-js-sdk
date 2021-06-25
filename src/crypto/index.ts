@@ -28,7 +28,7 @@ import { ReEmitter } from '../ReEmitter';
 import { logger } from '../logger';
 import { OlmDevice } from "./OlmDevice";
 import * as olmlib from "./olmlib";
-import {DeviceInfoMap, DeviceList } from "./DeviceList";
+import { DeviceInfoMap, DeviceList } from "./DeviceList";
 import { DeviceInfo, IDevice } from "./deviceinfo";
 import * as algorithms from "./algorithms";
 import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from './CrossSigning';
