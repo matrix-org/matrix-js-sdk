@@ -1539,7 +1539,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
             await olmlib.encryptMessageForDevice(
                 encryptedContent.ciphertext,
                 this.userId,
-                this.deviceId,
+                undefined,
                 this.olmDevice,
                 sender,
                 device,
@@ -1619,7 +1619,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
             return this.olmlib.encryptMessageForDevice(
                 encryptedContent.ciphertext,
                 this.userId,
-                this.deviceId,
+                undefined,
                 this.olmDevice,
                 userId,
                 deviceInfo,
@@ -1782,7 +1782,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
                         olmlib.encryptMessageForDevice(
                             encryptedContent.ciphertext,
                             this.userId,
-                            this.deviceId,
+                            undefined,
                             this.olmDevice,
                             userId,
                             deviceInfo,

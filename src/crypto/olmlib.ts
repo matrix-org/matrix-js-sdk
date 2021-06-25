@@ -97,6 +97,7 @@ export async function encryptMessageForDevice(
 
     const payload = {
         sender: ourUserId,
+        // TODO this appears to no longer be used whatsoever
         sender_device: ourDeviceId,
 
         // Include the Ed25519 key so that the recipient knows what
