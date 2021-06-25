@@ -24,7 +24,7 @@ import { MatrixClient } from "../../client";
 import { Room } from "../../models/room";
 import { OlmDevice } from "../OlmDevice";
 import { MatrixEvent, RoomMember } from "../..";
-import { IEventDecryptionResult, IMegolmSessionData, IncomingRoomKeyRequest } from "..";
+import { Crypto, IEventDecryptionResult, IMegolmSessionData, IncomingRoomKeyRequest } from "..";
 import { DeviceInfo } from "../deviceinfo";
 
 /**
@@ -33,7 +33,9 @@ import { DeviceInfo } from "../deviceinfo";
  *
  * @type {Object.<string, function(new: module:crypto/algorithms/base.EncryptionAlgorithm)>}
  */
-export const ENCRYPTION_CLASSES: Record<string, EncryptionAlgorithm> = {};
+export const ENCRYPTION_CLASSES: Record<string, new (params: IParams) => EncryptionAlgorithm> = {};
+
+type DecryptionClassParams = Omit<IParams, "deviceId" | "config">;
 
 /**
  * map of registered encryption algorithm classes. Map from string to {@link
@@ -41,7 +43,7 @@ export const ENCRYPTION_CLASSES: Record<string, EncryptionAlgorithm> = {};
  *
  * @type {Object.<string, function(new: module:crypto/algorithms/base.DecryptionAlgorithm)>}
  */
-export const DECRYPTION_CLASSES: Record<string, DecryptionAlgorithm> = {};
+export const DECRYPTION_CLASSES: Record<string, new (params: DecryptionClassParams) => DecryptionAlgorithm> = {};
 
 interface IParams {
     userId: string;
@@ -50,6 +52,7 @@ interface IParams {
     olmDevice: OlmDevice;
     baseApis: MatrixClient;
     roomId: string;
+    config: object;
 }
 
 /**
@@ -89,7 +92,7 @@ export abstract class EncryptionAlgorithm {
      *
      * @param {module:models/room} room the room the event is in
      */
-    public abstract prepareToEncrypt(room: Room): void;
+    public prepareToEncrypt(room: Room): void {}
 
     /**
      * Encrypt a message event
@@ -115,16 +118,16 @@ export abstract class EncryptionAlgorithm {
      * @public
      * @abstract
      */
-    public abstract onRoomMembership(event: MatrixEvent, member: RoomMember, oldMembership?: string);
+    public onRoomMembership(event: MatrixEvent, member: RoomMember, oldMembership?: string): void {}
 
-    public abstract reshareKeyWithDevice(
+    public reshareKeyWithDevice?(
         senderKey: string,
         sessionId: string,
         userId: string,
         device: DeviceInfo,
     ): Promise<void>;
 
-    public forceDiscardSession?: () => void;
+    public forceDiscardSession?(): void;
 }
 
 /**
@@ -140,13 +143,13 @@ export abstract class EncryptionAlgorithm {
  *     from. Null for to-device events.
  */
 export abstract class DecryptionAlgorithm {
-    private readonly userId: string;
-    private readonly crypto: Crypto;
-    private readonly olmDevice: OlmDevice;
-    private readonly baseApis: MatrixClient;
-    private readonly roomId: string;
+    protected readonly userId: string;
+    protected readonly crypto: Crypto;
+    protected readonly olmDevice: OlmDevice;
+    protected readonly baseApis: MatrixClient;
+    protected readonly roomId: string;
 
-    constructor(params: Omit<IParams, "deviceId">) {
+    constructor(params: DecryptionClassParams) {
         this.userId = params.userId;
         this.crypto = params.crypto;
         this.olmDevice = params.olmDevice;
@@ -205,7 +208,7 @@ export abstract class DecryptionAlgorithm {
      *
      * @param {module:crypto~IncomingRoomKeyRequest} keyRequest
      */
-    public shareKeysWithDevice(keyRequest: IncomingRoomKeyRequest) {
+    public shareKeysWithDevice(keyRequest: IncomingRoomKeyRequest): void {
         throw new Error("shareKeysWithDevice not supported for this DecryptionAlgorithm");
     }
 
@@ -215,12 +218,13 @@ export abstract class DecryptionAlgorithm {
      *
      * @param {string} senderKey the sender's key
      */
-    public async retryDecryptionFromSender(senderKey: string): Promise<void> {
+    public async retryDecryptionFromSender(senderKey: string): Promise<boolean> {
         // ignore by default
+        return false;
     }
 
-    public onRoomKeyWithheldEvent?: (event: MatrixEvent) => Promise<void>;
-    public sendSharedHistoryInboundSessions?: (devicesByUser: Record<string, DeviceInfo[]>) => Promise<void>;
+    public onRoomKeyWithheldEvent?(event: MatrixEvent): Promise<void>;
+    public sendSharedHistoryInboundSessions?(devicesByUser: Record<string, DeviceInfo[]>): Promise<void>;
 }
 
 /**
@@ -237,7 +241,7 @@ export abstract class DecryptionAlgorithm {
 export class DecryptionError extends Error {
     public readonly detailedString: string;
 
-    constructor(public readonly code: string, msg: string, details: Record<string, string>) {
+    constructor(public readonly code: string, msg: string, details?: Record<string, string>) {
         super(msg);
         this.code = code;
         this.name = 'DecryptionError';
@@ -245,7 +249,7 @@ export class DecryptionError extends Error {
     }
 }
 
-function detailedStringForDecryptionError(err: DecryptionError, details: Record<string, string>): string {
+function detailedStringForDecryptionError(err: DecryptionError, details?: Record<string, string>): string {
     let result = err.name + '[msg: ' + err.message;
 
     if (details) {
@@ -289,8 +293,8 @@ export class UnknownDeviceError extends Error {
  */
 export function registerAlgorithm(
     algorithm: string,
-    encryptor: EncryptionAlgorithm,
-    decryptor: DecryptionAlgorithm,
+    encryptor: new (params: IParams) => EncryptionAlgorithm,
+    decryptor: new (params: Omit<IParams, "deviceId">) => DecryptionAlgorithm,
 ): void {
     ENCRYPTION_CLASSES[algorithm] = encryptor;
     DECRYPTION_CLASSES[algorithm] = decryptor;

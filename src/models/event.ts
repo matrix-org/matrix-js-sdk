@@ -131,7 +131,7 @@ interface IDecryptionResult {
 }
 /* eslint-enable camelcase */
 
-interface IClearEvent {
+export interface IClearEvent {
     type: string;
     content: Omit<IContent, "membership" | "avatar_url" | "displayname" | "m.relates_to">;
     unsigned?: IUnsigned;

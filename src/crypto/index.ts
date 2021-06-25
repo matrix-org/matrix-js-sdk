@@ -28,7 +28,7 @@ import { ReEmitter } from '../ReEmitter';
 import { logger } from '../logger';
 import { OlmDevice } from "./OlmDevice";
 import * as olmlib from "./olmlib";
-import { DeviceList } from "./DeviceList";
+import {DeviceInfoMap, DeviceList } from "./DeviceList";
 import { DeviceInfo, IDevice } from "./deviceinfo";
 import * as algorithms from "./algorithms";
 import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from './CrossSigning';
@@ -1923,10 +1923,7 @@ export class Crypto extends EventEmitter {
      * @return {Promise} A promise which resolves to a map userId->deviceId->{@link
         * module:crypto/deviceinfo|DeviceInfo}.
      */
-    public downloadKeys(
-        userIds: string[],
-        forceDownload?: boolean,
-    ): Promise<Record<string, Record<string, IDevice>>> {
+    public downloadKeys(userIds: string[], forceDownload?: boolean): Promise<DeviceInfoMap> {
         return this.deviceList.downloadKeys(userIds, forceDownload);
     }
 
