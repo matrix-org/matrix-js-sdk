@@ -37,11 +37,17 @@ export enum Preset {
     TrustedPrivateChat = "trusted_private_chat",
     PublicChat = "public_chat",
 }
+
+export type ResizeMethod = "crop" | "scale";
+
 // Knock and private are reserved keywords which are not yet implemented.
 export enum JoinRule {
     Public = "public",
     Invite = "invite",
-    Private = "private", // reserved keyword, not yet implemented.
+    /**
+     * @deprecated Reserved keyword. Should not be used. Not yet implemented.
+     */
+    Private = "private",
     Knock = "knock", // MSC2403 - only valid inside experimental room versions at this time.
     Restricted = "restricted", // MSC3083 - only valid inside experimental room versions at this time.
 }

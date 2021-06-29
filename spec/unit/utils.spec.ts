@@ -3,6 +3,7 @@ import {
     alphabetPad,
     averageBetweenStrings,
     baseToString,
+    deepSortedObjectEntries,
     DEFAULT_ALPHABET,
     lexicographicCompare,
     nextString,
@@ -456,6 +457,40 @@ describe("utils", function() {
             // ASCII rule testing
             expect(lexicographicCompare('A', 'a') < 0).toBe(true);
             expect(lexicographicCompare('a', 'A') > 0).toBe(true);
+        });
+    });
+
+    describe('deepSortedObjectEntries', () => {
+        it('should auto-return non-objects', () => {
+            expect(deepSortedObjectEntries(42)).toEqual(42);
+            expect(deepSortedObjectEntries("not object")).toEqual("not object");
+            expect(deepSortedObjectEntries(true)).toEqual(true);
+            expect(deepSortedObjectEntries([42])).toEqual([42]);
+            expect(deepSortedObjectEntries(null)).toEqual(null);
+            expect(deepSortedObjectEntries(undefined)).toEqual(undefined);
+        });
+
+        it('should sort objects appropriately', () => {
+            const input = {
+                a: 42,
+                b: {
+                    d: {},
+                    a: "test",
+                    b: "alpha",
+                },
+                [72]: "test",
+            };
+            const output = [
+                ["72", "test"],
+                ["a", 42],
+                ["b", [
+                    ["a", "test"],
+                    ["b", "alpha"],
+                    ["d", []],
+                ]],
+            ];
+
+            expect(deepSortedObjectEntries(input)).toMatchObject(output);
         });
     });
 });

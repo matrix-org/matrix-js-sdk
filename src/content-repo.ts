@@ -39,7 +39,7 @@ export function getHttpUriForMxc(
     width: number,
     height: number,
     resizeMethod: string,
-    allowDirectLinks: boolean,
+    allowDirectLinks = false,
 ): string {
     if (typeof mxc !== "string" || !mxc) {
         return '';

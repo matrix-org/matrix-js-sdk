@@ -37,7 +37,7 @@ import {
 import { WITHHELD_MESSAGES } from '../OlmDevice';
 
 // determine whether the key can be shared with invitees
-function isRoomSharedHistory(room) {
+export function isRoomSharedHistory(room) {
     const visibilityEvent = room.currentState &&
           room.currentState.getStateEvents("m.room.history_visibility", "");
     // NOTE: if the room visibility is unset, it would normally default to
@@ -413,7 +413,7 @@ MegolmEncryption.prototype._prepareNewSession = async function(sharedHistory) {
     );
 
     // don't wait for it to complete
-    this._crypto._backupManager.backupGroupSession(
+    this._crypto.backupManager.backupGroupSession(
         this._olmDevice.deviceCurve25519Key, sessionId,
     );
 
@@ -1424,7 +1424,7 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
             });
     }).then(() => {
         // don't wait for the keys to be backed up for the server
-        this._crypto._backupManager.backupGroupSession(senderKey, content.session_id);
+        this._crypto.backupManager.backupGroupSession(senderKey, content.session_id);
     }).catch((e) => {
         logger.error(`Error handling m.room_key_event: ${e}`);
     });
@@ -1460,14 +1460,14 @@ MegolmDecryption.prototype.onRoomKeyWithheldEvent = async function(event) {
             this.retryDecryptionFromSender(senderKey);
             return;
         }
-        let device = this._crypto._deviceList.getDeviceByIdentityKey(
+        let device = this._crypto.deviceList.getDeviceByIdentityKey(
             content.algorithm, senderKey,
         );
         if (!device) {
             // if we don't know about the device, fetch the user's devices again
             // and retry before giving up
             await this._crypto.downloadKeys([sender], false);
-            device = this._crypto._deviceList.getDeviceByIdentityKey(
+            device = this._crypto.deviceList.getDeviceByIdentityKey(
                 content.algorithm, senderKey,
             );
             if (!device) {
@@ -1640,7 +1640,7 @@ MegolmDecryption.prototype.importRoomKey = function(session, opts = {}) {
     ).then(() => {
         if (opts.source !== "backup") {
             // don't wait for it to complete
-            this._crypto._backupManager.backupGroupSession(
+            this._crypto.backupManager.backupGroupSession(
                 session.sender_key, session.session_id,
             ).catch((e) => {
                 // This throws if the upload failed, but this is fine

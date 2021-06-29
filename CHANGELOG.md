@@ -1,3 +1,41 @@
+Changes in [12.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v12.0.0) (2021-06-21)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v12.0.0-rc.1...v12.0.0)
+
+ * No changes since rc.1
+
+Changes in [12.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v12.0.0-rc.1) (2021-06-15)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v11.2.0...v12.0.0-rc.1)
+
+ * Rework how disambiguation is handled
+   [\#1730](https://github.com/matrix-org/matrix-js-sdk/pull/1730)
+ * Fix baseToString for n=0 edge case to match inverse stringToBase
+   [\#1735](https://github.com/matrix-org/matrix-js-sdk/pull/1735)
+ * Move various types from the react-sdk to the js-sdk
+   [\#1734](https://github.com/matrix-org/matrix-js-sdk/pull/1734)
+ * Unstable implementation of MSC3089: File Trees
+   [\#1732](https://github.com/matrix-org/matrix-js-sdk/pull/1732)
+ * Add MSC3230 event type to enum
+   [\#1729](https://github.com/matrix-org/matrix-js-sdk/pull/1729)
+ * Add separate reason code for transferred calls
+   [\#1731](https://github.com/matrix-org/matrix-js-sdk/pull/1731)
+ * Use sendonly for call hold
+   [\#1728](https://github.com/matrix-org/matrix-js-sdk/pull/1728)
+ * Stop breeding sync listeners
+   [\#1727](https://github.com/matrix-org/matrix-js-sdk/pull/1727)
+ * Fix semicolons in TS files
+   [\#1724](https://github.com/matrix-org/matrix-js-sdk/pull/1724)
+ * [BREAKING] Convert MatrixClient to TypeScript
+   [\#1718](https://github.com/matrix-org/matrix-js-sdk/pull/1718)
+ * Factor out backup management to a separate module
+   [\#1697](https://github.com/matrix-org/matrix-js-sdk/pull/1697)
+ * Ignore power_levels events with unknown state_key on room-state
+   initialization
+   [\#1723](https://github.com/matrix-org/matrix-js-sdk/pull/1723)
+ * Revert 1579 (Fix extra negotiate message in Firefox)
+   [\#1725](https://github.com/matrix-org/matrix-js-sdk/pull/1725)
+
 Changes in [11.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v11.2.0) (2021-06-07)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v11.2.0-rc.1...v11.2.0)
