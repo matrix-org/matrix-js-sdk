@@ -1,5 +1,5 @@
 /*
-Copyright 2018, 2019 New Vector Ltd
+Copyright 2018 - 2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,44 +21,51 @@ limitations under the License.
  */
 
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
+import { CryptoStore } from "../client";
+
+/* eslint-disable camelcase */
+interface IRoomEncryption {
+    algorithm: string;
+    rotation_period_ms: number;
+    rotation_period_msgs: number;
+}
+/* eslint-enable camelcase */
 
 /**
  * @alias module:crypto/RoomList
  */
 export class RoomList {
-    constructor(cryptoStore) {
-        this._cryptoStore = cryptoStore;
+    // Object of roomId -> room e2e info object (body of the m.room.encryption event)
+    private roomEncryption: Record<string, IRoomEncryption> = {};
 
-        // Object of roomId -> room e2e info object (body of the m.room.encryption event)
-        this._roomEncryption = {};
-    }
+    constructor(private readonly cryptoStore: CryptoStore) {}
 
-    async init() {
-        await this._cryptoStore.doTxn(
+    public async init(): Promise<void> {
+        await this.cryptoStore.doTxn(
             'readwrite', [IndexedDBCryptoStore.STORE_ROOMS], (txn) => {
-                this._cryptoStore.getEndToEndRooms(txn, (result) => {
-                    this._roomEncryption = result;
+                this.cryptoStore.getEndToEndRooms(txn, (result) => {
+                    this.roomEncryption = result;
                 });
             },
         );
     }
 
-    getRoomEncryption(roomId) {
-        return this._roomEncryption[roomId] || null;
+    public getRoomEncryption(roomId: string): IRoomEncryption {
+        return this.roomEncryption[roomId] || null;
     }
 
-    isRoomEncrypted(roomId) {
+    public isRoomEncrypted(roomId: string): boolean {
         return Boolean(this.getRoomEncryption(roomId));
     }
 
-    async setRoomEncryption(roomId, roomInfo) {
+    public async setRoomEncryption(roomId: string, roomInfo: IRoomEncryption): Promise<void> {
         // important that this happens before calling into the store
         // as it prevents the Crypto::setRoomEncryption from calling
         // this twice for consecutive m.room.encryption events
-        this._roomEncryption[roomId] = roomInfo;
-        await this._cryptoStore.doTxn(
+        this.roomEncryption[roomId] = roomInfo;
+        await this.cryptoStore.doTxn(
             'readwrite', [IndexedDBCryptoStore.STORE_ROOMS], (txn) => {
-                this._cryptoStore.storeEndToEndRoom(roomId, roomInfo, txn);
+                this.cryptoStore.storeEndToEndRoom(roomId, roomInfo, txn);
             },
         );
     }

@@ -435,12 +435,18 @@ export function isNullOrUndefined(val: any): boolean {
     return val === null || val === undefined;
 }
 
+export interface IDeferred<T> {
+    resolve: (value: T) => void;
+    reject: (any) => void;
+    promise: Promise<T>;
+}
+
 // Returns a Deferred
-export function defer() {
+export function defer<T>(): IDeferred<T> {
     let resolve;
     let reject;
 
-    const promise = new Promise((_resolve, _reject) => {
+    const promise = new Promise<T>((_resolve, _reject) => {
         resolve = _resolve;
         reject = _reject;
     });

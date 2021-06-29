@@ -60,7 +60,7 @@ export interface IEncryptedEventInfo {
 
 export interface IRecoveryKey {
     keyInfo: {
-        pubkey: Uint8Array;
+        pubkey: string;
         passphrase?: {
             algorithm: string;
             iterations: number;

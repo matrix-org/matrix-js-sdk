@@ -121,18 +121,17 @@ export class EncryptionSetupBuilder {
     async persist(crypto) {
         // store private keys in cache
         if (this._crossSigningKeys) {
-            const cacheCallbacks = createCryptoStoreCacheCallbacks(
-                crypto._cryptoStore, crypto._olmDevice);
+            const cacheCallbacks = createCryptoStoreCacheCallbacks(crypto.cryptoStore, crypto.olmDevice);
             for (const type of ["master", "self_signing", "user_signing"]) {
                 logger.log(`Cache ${type} cross-signing private key locally`);
                 const privateKey = this.crossSigningCallbacks.privateKeys.get(type);
                 await cacheCallbacks.storeCrossSigningKeyCache(type, privateKey);
             }
             // store own cross-sign pubkeys as trusted
-            await crypto._cryptoStore.doTxn(
+            await crypto.cryptoStore.doTxn(
                 'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
                 (txn) => {
-                    crypto._cryptoStore.storeCrossSigningKeys(
+                    crypto.cryptoStore.storeCrossSigningKeys(
                         txn, this._crossSigningKeys.keys);
                 },
             );
@@ -169,7 +168,7 @@ export class EncryptionSetupOperation {
      * @param  {Crypto} crypto
      */
     async apply(crypto) {
-        const baseApis = crypto._baseApis;
+        const baseApis = crypto.baseApis;
         // upload cross-signing keys
         if (this._crossSigningKeys) {
             const keys = {};
@@ -184,7 +183,7 @@ export class EncryptionSetupOperation {
             });
 
             // pass the new keys to the main instance of our own CrossSigningInfo.
-            crypto._crossSigningInfo.setKeys(this._crossSigningKeys.keys);
+            crypto.crossSigningInfo.setKeys(this._crossSigningKeys.keys);
         }
         // set account data
         if (this._accountData) {

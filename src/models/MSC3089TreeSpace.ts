@@ -128,7 +128,7 @@ export class MSC3089TreeSpace {
      * which is an appropriate visibility for these purposes).
      * @returns {Promise<void>} Resolves when complete.
      */
-    public invite(userId: string, andSubspaces = true, shareHistoryKeys = true): Promise<void> {
+    public async invite(userId: string, andSubspaces = true, shareHistoryKeys = true): Promise<void> {
         const promises: Promise<void>[] = [this.retryInvite(userId)];
         if (andSubspaces) {
             promises.push(...this.getDirectories().map(d => d.invite(userId, andSubspaces, shareHistoryKeys)));
@@ -146,8 +146,8 @@ export class MSC3089TreeSpace {
     }
 
     private retryInvite(userId: string): Promise<void> {
-        return simpleRetryOperation(() => {
-            return this.client.invite(this.roomId, userId).catch(e => {
+        return simpleRetryOperation(async () => {
+            await this.client.invite(this.roomId, userId).catch(e => {
                 // We don't want to retry permission errors forever...
                 if (e?.errcode === "M_FORBIDDEN") {
                     throw new promiseRetry.AbortError(e);

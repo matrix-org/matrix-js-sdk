@@ -48,18 +48,18 @@ describe("self-verifications", () => {
             storeCrossSigningKeyCache: jest.fn(),
         };
 
-        const _crossSigningInfo = new CrossSigningInfo(
+        const crossSigningInfo = new CrossSigningInfo(
             userId,
             {},
             cacheCallbacks,
         );
-        _crossSigningInfo.keys = {
+        crossSigningInfo.keys = {
             master: { keys: { X: testKeyPub } },
             self_signing: { keys: { X: testKeyPub } },
             user_signing: { keys: { X: testKeyPub } },
         };
 
-        const _secretStorage = {
+        const secretStorage = {
             request: jest.fn().mockReturnValue({
                 promise: Promise.resolve(encodeBase64(testKey)),
             }),
@@ -70,12 +70,12 @@ describe("self-verifications", () => {
 
         const client = {
             crypto: {
-                _crossSigningInfo,
-                _secretStorage,
+                crossSigningInfo,
+                secretStorage,
                 storeSessionBackupPrivateKey,
                 getSessionBackupPrivateKey: () => null,
             },
-            requestSecret: _secretStorage.request.bind(_secretStorage),
+            requestSecret: secretStorage.request.bind(secretStorage),
             getUserId: () => userId,
             getKeyBackupVersion: () => Promise.resolve({}),
             restoreKeyBackupWithCache,
@@ -99,7 +99,7 @@ describe("self-verifications", () => {
 
         /* We should request, and store, 3 cross signing keys and the key backup key */
         expect(cacheCallbacks.storeCrossSigningKeyCache.mock.calls.length).toBe(3);
-        expect(_secretStorage.request.mock.calls.length).toBe(4);
+        expect(secretStorage.request.mock.calls.length).toBe(4);
 
         expect(cacheCallbacks.storeCrossSigningKeyCache.mock.calls[0][1])
           .toEqual(testKey);
