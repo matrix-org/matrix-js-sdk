@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { ISignatures } from "../@types/signed";
+
 /**
  * @module crypto/deviceinfo
  */
@@ -24,7 +26,7 @@ export interface IDevice {
     verified: DeviceVerification;
     known: boolean;
     unsigned?: Record<string, any>;
-    signatures?: Record<string, string>;
+    signatures?: ISignatures;
 }
 
 enum DeviceVerification {
@@ -90,7 +92,7 @@ export class DeviceInfo {
     public verified = DeviceVerification.Unverified;
     public known = false;
     public unsigned: Record<string, any> = {};
-    public signatures: Record<string, string> = {};
+    public signatures: ISignatures = {};
 
     constructor(public readonly deviceId: string) {}
 
