@@ -96,7 +96,7 @@ export class Filter {
     private roomFilter: FilterComponent;
     private roomTimelineFilter: FilterComponent;
 
-    constructor(public readonly userId: string, public readonly filterId: string) {}
+    constructor(public readonly userId: string, public filterId?: string) {}
 
     /**
      * Get the ID of this filter on your homeserver (if known)
