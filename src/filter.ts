@@ -168,9 +168,7 @@ export class Filter {
         }
 
         this.roomFilter = new FilterComponent(roomFilterFields);
-        this.roomTimelineFilter = new FilterComponent(
-            roomFilterJson ? (roomFilterJson.timeline || {}) : {},
-        );
+        this.roomTimelineFilter = new FilterComponent(roomFilterJson?.timeline || {});
 
         // don't bother porting this from synapse yet:
         // this._room_state_filter =

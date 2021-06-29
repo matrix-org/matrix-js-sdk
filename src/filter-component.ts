@@ -25,7 +25,7 @@ import { MatrixEvent } from "./models/event";
  * wildcard pattern.
  * @param {String} actualValue  The value to be compared
  * @param {String} filterValue  The filter pattern to be compared
- * @return {bool} true if the actualValue matches the filterValue
+ * @return {boolean} true if the actualValue matches the filterValue
  */
 function matchesWildcard(actualValue: string, filterValue: string): boolean {
     if (filterValue.endsWith("*")) {
@@ -66,15 +66,30 @@ export class FilterComponent {
     /**
      * Checks with the filter component matches the given event
      * @param {MatrixEvent} event event to be checked against the filter
-     * @return {bool} true if the event matches the filter
+     * @return {boolean} true if the event matches the filter
      */
-    check(event: MatrixEvent): boolean {
+    public check(event: MatrixEvent): boolean {
         return this.checkFields(
             event.getRoomId(),
             event.getSender(),
             event.getType(),
             event.getContent() ? event.getContent().url !== undefined : false,
         );
+    }
+
+    /**
+     * Converts the filter component into the form expected over the wire
+     */
+    public toJSON(): object {
+        return {
+            types: this.filterJson.types || null,
+            not_types: this.filterJson.not_types || [],
+            rooms: this.filterJson.rooms || null,
+            not_rooms: this.filterJson.not_rooms || [],
+            senders: this.filterJson.senders || null,
+            not_senders: this.filterJson.not_senders || [],
+            contains_url: this.filterJson.contains_url || null,
+        };
     }
 
     /**
@@ -123,7 +138,7 @@ export class FilterComponent {
 
     /**
      * Filters a list of events down to those which match this filter component
-     * @param {MatrixEvent[]} events  Events to be checked againt the filter component
+     * @param {MatrixEvent[]} events  Events to be checked against the filter component
      * @return {MatrixEvent[]} events which matched the filter component
      */
     filter(events: MatrixEvent[]): MatrixEvent[] {
@@ -132,7 +147,7 @@ export class FilterComponent {
 
     /**
      * Returns the limit field for a given filter component, providing a default of
-     * 10 if none is otherwise specified.  Cargo-culted from Synapse.
+     * 10 if none is otherwise specified. Cargo-culted from Synapse.
      * @return {Number} the limit for this filter component.
      */
     limit(): number {

@@ -4427,7 +4427,7 @@ export class MatrixClient extends EventEmitter {
             // XXX: it's horrific that /messages' filter parameter doesn't match
             // /sync's one - see https://matrix.org/jira/browse/SPEC-451
             filter = filter || {};
-            Object.assign(filter, timelineFilter.getRoomTimelineFilterComponent());
+            Object.assign(filter, timelineFilter.getRoomTimelineFilterComponent()?.toJSON());
         }
         if (filter) {
             params.filter = JSON.stringify(filter);
