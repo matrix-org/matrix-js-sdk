@@ -163,7 +163,7 @@ export class RoomMember extends EventEmitter {
         const oldPowerLevel = this.powerLevel;
         const oldPowerLevelNorm = this.powerLevelNorm;
 
-        if (users[this.userId] !== undefined) {
+        if (users[this.userId] !== undefined && Number.isInteger(users[this.userId])) {
             this.powerLevel = users[this.userId];
         } else if (evContent.users_default !== undefined) {
             this.powerLevel = evContent.users_default;
