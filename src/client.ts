@@ -7637,7 +7637,7 @@ export class MatrixClient extends EventEmitter {
      */
     public sendToDevice(
         eventType: string,
-        contentMap: { [userId: string]: { [deviceId: string]: Record<string, any>; } },
+        contentMap: { [userId: string]: { [deviceId: string]: Record<string, any> } },
         txnId?: string,
     ): Promise<{}> {
         const path = utils.encodeUri("/sendToDevice/$eventType/$txnId", {

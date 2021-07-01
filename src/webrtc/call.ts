@@ -56,22 +56,22 @@ import { CallFeed } from './callFeed';
  */
 
 interface CallOpts {
-    roomId?: string,
-    client?: any, // Fix when client is TSified
-    forceTURN?: boolean,
-    turnServers?: Array<TurnServer>,
+    roomId?: string;
+    client?: any; // Fix when client is TSified
+    forceTURN?: boolean;
+    turnServers?: Array<TurnServer>;
 }
 
 interface TurnServer {
-    urls: Array<string>,
-    username?: string,
-    password?: string,
-    ttl?: number,
+    urls: Array<string>;
+    username?: string;
+    password?: string;
+    ttl?: number;
 }
 
 interface AssertedIdentity {
-    id: string,
-    displayName: string,
+    id: string;
+    displayName: string;
 }
 
 export enum CallState {

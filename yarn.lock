@@ -1132,7 +1132,6 @@
 
 "@matrix-org/olm@https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.3.tgz":
   version "3.2.3"
-  uid cc332fdd25c08ef0e40f4d33fc3f822a0f98b6f4
   resolved "https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.3.tgz#cc332fdd25c08ef0e40f4d33fc3f822a0f98b6f4"
 
 "@nicolo-ribaudo/chokidar-2@2.1.8-no-fsevents":
@@ -2859,7 +2858,7 @@ eslint-config-google@^0.14.0:
 
 "eslint-plugin-matrix-org@github:matrix-org/eslint-plugin-matrix-org#main":
   version "0.3.2"
-  resolved "https://codeload.github.com/matrix-org/eslint-plugin-matrix-org/tar.gz/28d392822533a7468be0dd806d0a4ba573a45d74"
+  resolved "https://codeload.github.com/matrix-org/eslint-plugin-matrix-org/tar.gz/e8197938dca66849ffdac4baca7c05275df12835"
 
 eslint-rule-composer@^0.3.0:
   version "0.3.0"
