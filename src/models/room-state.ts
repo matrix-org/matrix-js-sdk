@@ -670,26 +670,26 @@ export class RoomState extends EventEmitter {
             powerLevels = powerLevelsEvent.getContent();
             eventsLevels = powerLevels.events || {};
 
-            if (Number.isFinite(powerLevels.state_default)) {
+            if (Number.isSafeInteger(powerLevels.state_default)) {
                 stateDefault = powerLevels.state_default;
             } else {
                 stateDefault = 50;
             }
 
             const userPowerLevel = powerLevels.users && powerLevels.users[userId];
-            if (Number.isFinite(userPowerLevel)) {
+            if (Number.isSafeInteger(userPowerLevel)) {
                 powerLevel = userPowerLevel;
-            } else if (Number.isFinite(powerLevels.users_default)) {
+            } else if (Number.isSafeInteger(powerLevels.users_default)) {
                 powerLevel = powerLevels.users_default;
             }
 
-            if (Number.isFinite(powerLevels.events_default)) {
+            if (Number.isSafeInteger(powerLevels.events_default)) {
                 eventsDefault = powerLevels.events_default;
             }
         }
 
         let requiredLevel = state ? stateDefault : eventsDefault;
-        if (Number.isFinite(eventsLevels[eventType])) {
+        if (Number.isSafeInteger(eventsLevels[eventType])) {
             requiredLevel = eventsLevels[eventType];
         }
         return powerLevel >= requiredLevel;

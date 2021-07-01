@@ -28,7 +28,7 @@ import { ReEmitter } from '../ReEmitter';
 import { logger } from '../logger';
 import { OlmDevice } from "./OlmDevice";
 import * as olmlib from "./olmlib";
-import { DeviceList } from "./DeviceList";
+import { DeviceInfoMap, DeviceList } from "./DeviceList";
 import { DeviceInfo, IDevice } from "./deviceinfo";
 import * as algorithms from "./algorithms";
 import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from './CrossSigning';
@@ -52,10 +52,11 @@ import { IStore } from "../store";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
 import { MatrixEvent } from "../models/event";
-import { MatrixClient, IKeysUploadResponse, SessionStore, CryptoStore } from "../client";
+import { MatrixClient, IKeysUploadResponse, SessionStore, CryptoStore, ISignedKey } from "../client";
 import type { EncryptionAlgorithm, DecryptionAlgorithm } from "./algorithms/base";
 import type { RoomList } from "./RoomList";
 import { IRecoveryKey, IEncryptedEventInfo } from "./api";
+import { IKeyBackupInfo } from "./keybackup";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -91,7 +92,7 @@ interface IInitOpts {
 
 export interface IBootstrapCrossSigningOpts {
     setupNewCrossSigning?: boolean;
-    authUploadDeviceSigningKeys?(makeRequest: (authData: any) => void): Promise<void>;
+    authUploadDeviceSigningKeys?(makeRequest: (authData: any) => {}): Promise<void>;
 }
 
 interface IBootstrapSecretStorageOpts {
@@ -111,18 +112,19 @@ interface IRoomKey {
     algorithm: string;
 }
 
-interface IRoomKeyRequestBody extends IRoomKey {
+export interface IRoomKeyRequestBody extends IRoomKey {
     session_id: string;
     sender_key: string
 }
 
-interface IMegolmSessionData {
+export interface IMegolmSessionData {
     sender_key: string;
     forwarding_curve25519_key_chain: string[];
     sender_claimed_keys: Record<string, string>;
     room_id: string;
     session_id: string;
     session_key: string;
+    algorithm: string;
 }
 /* eslint-enable camelcase */
 
@@ -137,11 +139,6 @@ interface IDeviceVerificationUpgrade {
  * @property {string?} sessionId base64 olm session id; null if no session
  *    could be established
  */
-
-interface IOlmSessionResult {
-    device: DeviceInfo;
-    sessionId?: string;
-}
 
 interface IUserOlmSession {
     deviceIdKey: string;
@@ -162,7 +159,7 @@ interface ISyncDeviceLists {
     left: string[];
 }
 
-interface IRoomKeyRequestRecipient {
+export interface IRoomKeyRequestRecipient {
     userId: string;
     deviceId: string;
 }
@@ -172,7 +169,7 @@ interface ISignableObject {
     unsigned?: object
 }
 
-interface IEventDecryptionResult {
+export interface IEventDecryptionResult {
     clearEvent: object;
     senderCurve25519Key?: string;
     claimedEd25519Key?: string;
@@ -197,7 +194,7 @@ export class Crypto extends EventEmitter {
 
     private readonly reEmitter: ReEmitter;
     private readonly verificationMethods: any; // TODO types
-    private readonly supportedAlgorithms: DecryptionAlgorithm[];
+    private readonly supportedAlgorithms: string[];
     private readonly outgoingRoomKeyRequestManager: OutgoingRoomKeyRequestManager;
     private readonly toDeviceVerificationRequests: ToDeviceRequests;
     private readonly inRoomVerificationRequests: InRoomRequests;
@@ -281,7 +278,7 @@ export class Crypto extends EventEmitter {
      *    or a class that implements a verification method.
      */
     constructor(
-        private readonly baseApis: MatrixClient,
+        public readonly baseApis: MatrixClient,
         public readonly sessionStore: SessionStore,
         private readonly userId: string,
         private readonly deviceId: string,
@@ -627,7 +624,7 @@ export class Crypto extends EventEmitter {
 
             // Cross-sign own device
             const device = this.deviceList.getStoredDevice(this.userId, this.deviceId);
-            const deviceSignature = await crossSigningInfo.signDevice(this.userId, device);
+            const deviceSignature = await crossSigningInfo.signDevice(this.userId, device) as ISignedKey;
             builder.addKeySignature(this.userId, this.deviceId, deviceSignature);
 
             // Sign message key backup with cross-signing master key
@@ -937,7 +934,7 @@ export class Crypto extends EventEmitter {
             await secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(privateKey));
 
             // create keyBackupInfo object to add to builder
-            const data = {
+            const data: IKeyBackupInfo = {
                 algorithm: info.algorithm,
                 auth_data: info.auth_data,
             };
@@ -1079,17 +1076,17 @@ export class Crypto extends EventEmitter {
      * @param {Uint8Array} key the private key
      * @returns {Promise} so you can catch failures
      */
-    public async storeSessionBackupPrivateKey(key: Uint8Array): Promise<void> {
+    public async storeSessionBackupPrivateKey(key: ArrayLike<number>): Promise<void> {
         if (!(key instanceof Uint8Array)) {
             throw new Error(`storeSessionBackupPrivateKey expects Uint8Array, got ${key}`);
         }
         const pickleKey = Buffer.from(this.olmDevice._pickleKey);
-        key = await encryptAES(olmlib.encodeBase64(key), pickleKey, "m.megolm_backup.v1");
+        const encryptedKey = await encryptAES(olmlib.encodeBase64(key), pickleKey, "m.megolm_backup.v1");
         return this.cryptoStore.doTxn(
             'readwrite',
             [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
-                this.cryptoStore.storeSecretStorePrivateKey(txn, "m.megolm_backup.v1", key);
+                this.cryptoStore.storeSecretStorePrivateKey(txn, "m.megolm_backup.v1", encryptedKey);
             },
         );
     }
@@ -1926,10 +1923,7 @@ export class Crypto extends EventEmitter {
      * @return {Promise} A promise which resolves to a map userId->deviceId->{@link
         * module:crypto/deviceinfo|DeviceInfo}.
      */
-    public downloadKeys(
-        userIds: string[],
-        forceDownload?: boolean,
-    ): Promise<Record<string, Record<string, IDevice>>> {
+    public downloadKeys(userIds: string[], forceDownload?: boolean): Promise<DeviceInfoMap> {
         return this.deviceList.downloadKeys(userIds, forceDownload);
     }
 
@@ -2573,7 +2567,7 @@ export class Crypto extends EventEmitter {
      *    an Object mapping from userId to deviceId to
      *    {@link module:crypto~OlmSessionResult}
      */
-    ensureOlmSessionsForUsers(users: string[]): Promise<IOlmSessionResult> {
+    ensureOlmSessionsForUsers(users: string[]): Promise<Record<string, Record<string, olmlib.IOlmSessionResult>>> {
         const devicesByUser = {};
 
         for (let i = 0; i < users.length; ++i) {
@@ -2598,9 +2592,7 @@ export class Crypto extends EventEmitter {
             }
         }
 
-        return olmlib.ensureOlmSessionsForDevices(
-            this.olmDevice, this.baseApis, devicesByUser,
-        );
+        return olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, devicesByUser);
     }
 
     /**
@@ -2636,7 +2628,7 @@ export class Crypto extends EventEmitter {
      * @param {Function} opts.progressCallback called with an object which has a stage param
      * @return {Promise} a promise which resolves once the keys have been imported
      */
-    public importRoomKeys(keys: IRoomKey[], opts: any = {}): Promise<any> { // TODO types
+    public importRoomKeys(keys: IMegolmSessionData[], opts: any = {}): Promise<any> { // TODO types
         let successes = 0;
         let failures = 0;
         const total = keys.length;
@@ -2850,8 +2842,8 @@ export class Crypto extends EventEmitter {
      * Re-send any outgoing key requests, eg after verification
      * @returns {Promise}
      */
-    public cancelAndResendAllOutgoingKeyRequests(): Promise<void> {
-        return this.outgoingRoomKeyRequestManager.cancelAndResendAllOutgoingRequests();
+    public async cancelAndResendAllOutgoingKeyRequests(): Promise<void> {
+        await this.outgoingRoomKeyRequestManager.cancelAndResendAllOutgoingRequests();
     }
 
     /**
@@ -3259,9 +3251,7 @@ export class Crypto extends EventEmitter {
         }
         const devicesByUser = {};
         devicesByUser[sender] = [device];
-        await olmlib.ensureOlmSessionsForDevices(
-            this.olmDevice, this.baseApis, devicesByUser, true,
-        );
+        await olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, devicesByUser, true);
 
         this.lastNewSessionForced[sender][deviceKey] = Date.now();
 
@@ -3300,9 +3290,7 @@ export class Crypto extends EventEmitter {
         // it. This won't always be the case though so we need to re-send any that have already been sent
         // to avoid races.
         const requestsToResend =
-            await this.outgoingRoomKeyRequestManager.getOutgoingSentRoomKeyRequest(
-                sender, device.deviceId,
-            );
+            await this.outgoingRoomKeyRequestManager.getOutgoingSentRoomKeyRequest(sender, device.deviceId);
         for (const keyReq of requestsToResend) {
             this.requestRoomKey(keyReq.requestBody, keyReq.recipients, true);
         }
@@ -3440,9 +3428,7 @@ export class Crypto extends EventEmitter {
             }
 
             try {
-                await encryptor.reshareKeyWithDevice(
-                    body.sender_key, body.session_id, userId, device,
-                );
+                await encryptor.reshareKeyWithDevice(body.sender_key, body.session_id, userId, device);
             } catch (e) {
                 logger.warn(
                     "Failed to re-share keys for session " + body.session_id +
@@ -3653,7 +3639,7 @@ export function fixBackupKey(key: string): string | null {
  *    the relevant crypto algorithm implementation to share the keys for
  *    this request.
  */
-class IncomingRoomKeyRequest {
+export class IncomingRoomKeyRequest {
     public readonly userId: string;
     public readonly deviceId: string;
     public readonly requestId: string;

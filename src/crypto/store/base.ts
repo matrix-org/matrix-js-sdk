@@ -10,6 +10,9 @@
  * @interface CryptoStore
  */
 
+import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index";
+import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager";
+
 /**
  * Represents an outgoing room key request
  *
@@ -32,3 +35,11 @@
  * @property {Number} state   current state of this request (states are defined
  *    in {@link module:crypto/OutgoingRoomKeyRequestManager~ROOM_KEY_REQUEST_STATES})
  */
+export interface OutgoingRoomKeyRequest {
+    requestId: string;
+    requestTxnId?: string;
+    cancellationTxnId?: string;
+    recipients: IRoomKeyRequestRecipient[];
+    requestBody: IRoomKeyRequestBody;
+    state: RoomKeyRequestState;
+}

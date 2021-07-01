@@ -59,7 +59,7 @@ enum TrackingStatus {
     UpToDate,
 }
 
-type DeviceInfoMap = Record<string, Record<string, IDevice>>;
+export type DeviceInfoMap = Record<string, Record<string, DeviceInfo>>;
 
 /**
  * @alias module:crypto/DeviceList
@@ -70,7 +70,7 @@ export class DeviceList extends EventEmitter {
     //         [device info]
     //     }
     // }
-    private devices: DeviceInfoMap = {};
+    private devices: Record<string, Record<string, IDevice>> = {};
 
     // userId -> {
     //     [key info]
@@ -315,7 +315,7 @@ export class DeviceList extends EventEmitter {
      * @return {Object} userId->deviceId->{@link module:crypto/deviceinfo|DeviceInfo}.
      */
     private getDevicesFromStore(userIds: string[]): DeviceInfoMap {
-        const stored = {};
+        const stored: DeviceInfoMap = {};
         userIds.map((u) => {
             stored[u] = {};
             const devices = this.getStoredDevicesForUser(u) || [];
@@ -463,27 +463,11 @@ export class DeviceList extends EventEmitter {
     /**
      * Replaces the list of devices for a user with the given device list
      *
-     * @param {string} u The user ID
-     * @param {Object} devs New device info for user
+     * @param {string} userId The user ID
+     * @param {Object} devices New device info for user
      */
-    public storeDevicesForUser(u: string, devs: Record<string, IDevice>): void {
-        // remove previous devices from userByIdentityKey
-        if (this.devices[u] !== undefined) {
-            for (const [deviceId, dev] of Object.entries(this.devices[u])) {
-                const identityKey = dev.keys['curve25519:'+deviceId];
-
-                delete this.userByIdentityKey[identityKey];
-            }
-        }
-
-        this.devices[u] = devs;
-
-        // add new ones
-        for (const [deviceId, dev] of Object.entries(devs)) {
-            const identityKey = dev.keys['curve25519:'+deviceId];
-
-            this.userByIdentityKey[identityKey] = u;
-        }
+    public storeDevicesForUser(userId: string, devices: Record<string, IDevice>): void {
+        this.setRawStoredDevicesForUser(userId, devices);
         this.dirty = true;
     }
 
@@ -859,7 +843,7 @@ class DeviceListUpdateSerialiser {
             );
 
             // put the updates into the object that will be returned as our results
-            const storage = {};
+            const storage: Record<string, IDevice> = {};
             Object.keys(userStore).forEach((deviceId) => {
                 storage[deviceId] = userStore[deviceId].toStorage();
             });

@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // this is needed to tell TS about global.Olm
-import * as Olm from "@matrix-org/olm"; // eslint-disable-line @typescript-eslint/no-unused-vars
+import "@matrix-org/olm";
 
 export {};
 
@@ -32,6 +32,10 @@ declare global {
 
     interface Electron {
         getDesktopCapturerSources(options: GetSourcesOptions): Promise<Array<DesktopCapturerSource>>;
+    }
+
+    interface Crypto {
+        webkitSubtle?: Window["crypto"]["subtle"];
     }
 
     interface MediaDevices {

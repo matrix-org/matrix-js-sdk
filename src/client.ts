@@ -47,7 +47,7 @@ import {
     PREFIX_UNSTABLE,
     retryNetworkOperation,
 } from "./http-api";
-import { Crypto, fixBackupKey, IBootstrapCrossSigningOpts, isCryptoAvailable } from './crypto';
+import { Crypto, fixBackupKey, IBootstrapCrossSigningOpts, IMegolmSessionData, isCryptoAvailable } from './crypto';
 import { DeviceInfo, IDevice } from "./crypto/deviceinfo";
 import { decodeRecoveryKey } from './crypto/recoverykey';
 import { keyFromAuthData } from './crypto/key_passphrase';
@@ -59,7 +59,7 @@ import {
     IKeyBackupPrepareOpts,
     IKeyBackupRestoreOpts,
     IKeyBackupRestoreResult,
-    IKeyBackupVersion,
+    IKeyBackupInfo,
 } from "./crypto/keybackup";
 import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
 import type Request from "request";
@@ -114,8 +114,9 @@ import url from "url";
 import { randomString } from "./randomstring";
 import { ReadStream } from "fs";
 import { WebStorageSessionStore } from "./store/session/webstorage";
-import { BackupManager, IKeyBackupCheck, TrustInfo } from "./crypto/backup";
+import { BackupManager, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE, MSC3089TreeSpace } from "./models/MSC3089TreeSpace";
+import { ISignatures } from "./@types/signed";
 
 export type Store = StubStore | MemoryStore | LocalIndexedDBStoreBackend | RemoteIndexedDBStoreBackend;
 export type SessionStore = WebStorageSessionStore;
@@ -377,6 +378,39 @@ interface ICapabilities {
     [key: string]: any;
     "m.change_password"?: IChangePasswordCapability;
     "m.room_versions"?: IRoomVersionsCapability;
+}
+
+/* eslint-disable camelcase */
+export interface ICrossSigningKey {
+    keys: { [algorithm: string]: string };
+    signatures?: ISignatures;
+    usage: string[];
+    user_id: string;
+}
+
+enum CrossSigningKeyType {
+    MasterKey = "master_key",
+    SelfSigningKey = "self_signing_key",
+    UserSigningKey = "user_signing_key",
+}
+
+export type CrossSigningKeys = Record<CrossSigningKeyType, ICrossSigningKey>;
+
+export interface ISignedKey {
+    keys: Record<string, string>;
+    signatures: ISignatures;
+    user_id: string;
+    algorithms: string[];
+    device_id: string;
+}
+/* eslint-enable camelcase */
+
+export type KeySignatures = Record<string, Record<string, ICrossSigningKey | ISignedKey>>;
+interface IUploadKeySignaturesResponse {
+    failures: Record<string, Record<string, {
+        errcode: string;
+        error: string;
+    }>>;
 }
 
 /**
@@ -2066,7 +2100,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} a promise which resolves when the keys
      *    have been imported
      */
-    public importRoomKeys(keys: any[], opts: IImportRoomKeysOpts): Promise<void> {
+    public importRoomKeys(keys: IMegolmSessionData[], opts: IImportRoomKeysOpts): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2090,7 +2124,7 @@ export class MatrixClient extends EventEmitter {
      * Get information about the current key backup.
      * @returns {Promise} Information object from API or null
      */
-    public getKeyBackupVersion(): Promise<IKeyBackupVersion> {
+    public getKeyBackupVersion(): Promise<IKeyBackupInfo> {
         return this.http.authedRequest(
             undefined, "GET", "/room_keys/version", undefined, undefined,
             { prefix: PREFIX_UNSTABLE },
@@ -2124,7 +2158,7 @@ export class MatrixClient extends EventEmitter {
      *     ]
      * }
      */
-    public isKeyBackupTrusted(info: IKeyBackupVersion): Promise<TrustInfo> {
+    public isKeyBackupTrusted(info: IKeyBackupInfo): Promise<TrustInfo> {
         return this.crypto.backupManager.isKeyBackupTrusted(info);
     }
 
@@ -2147,7 +2181,7 @@ export class MatrixClient extends EventEmitter {
      * @param {object} info Backup information object as returned by getKeyBackupVersion
      * @returns {Promise<void>} Resolves when complete.
      */
-    public enableKeyBackup(info: IKeyBackupVersion): Promise<void> {
+    public enableKeyBackup(info: IKeyBackupInfo): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2184,7 +2218,7 @@ export class MatrixClient extends EventEmitter {
     public async prepareKeyBackupVersion(
         password: string,
         opts: IKeyBackupPrepareOpts = { secureSecretStorage: false },
-    ): Promise<IKeyBackupVersion> {
+    ): Promise<Pick<IPreparedKeyBackupVersion, "algorithm" | "auth_data" | "recovery_key">> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2202,7 +2236,7 @@ export class MatrixClient extends EventEmitter {
             algorithm,
             auth_data,
             recovery_key,
-        } as any; // TODO: Types
+        };
     }
 
     /**
@@ -2223,7 +2257,7 @@ export class MatrixClient extends EventEmitter {
      * @returns {Promise<object>} Object with 'version' param indicating the version created
      */
     // TODO: Fix types
-    public async createKeyBackupVersion(info: IKeyBackupVersion): Promise<IKeyBackupVersion> {
+    public async createKeyBackupVersion(info: IKeyBackupInfo): Promise<IKeyBackupInfo> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2317,7 +2351,7 @@ export class MatrixClient extends EventEmitter {
      * Back up session keys to the homeserver.
      * @param {string} roomId ID of the room that the keys are for Optional.
      * @param {string} sessionId ID of the session that the keys are for Optional.
-     * @param {integer} version backup version Optional.
+     * @param {number} version backup version Optional.
      * @param {object} data Object keys to send
      * @return {Promise} a promise that will resolve when the keys
      * are uploaded
@@ -2379,7 +2413,7 @@ export class MatrixClient extends EventEmitter {
      * @param {object} backupInfo Backup metadata from `checkKeyBackup`
      * @return {Promise<Uint8Array>} key backup key
      */
-    public keyBackupKeyFromPassword(password: string, backupInfo: IKeyBackupVersion): Promise<Uint8Array> {
+    public keyBackupKeyFromPassword(password: string, backupInfo: IKeyBackupInfo): Promise<Uint8Array> {
         return keyFromAuthData(backupInfo.auth_data, password);
     }
 
@@ -2414,7 +2448,7 @@ export class MatrixClient extends EventEmitter {
         password: string,
         targetRoomId: string,
         targetSessionId: string,
-        backupInfo: IKeyBackupVersion,
+        backupInfo: IKeyBackupInfo,
         opts: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult> {
         const privKey = await keyFromAuthData(backupInfo.auth_data, password);
@@ -2438,7 +2472,7 @@ export class MatrixClient extends EventEmitter {
      */
     // TODO: Types
     public async restoreKeyBackupWithSecretStorage(
-        backupInfo: IKeyBackupVersion,
+        backupInfo: IKeyBackupInfo,
         targetRoomId?: string,
         targetSessionId?: string,
         opts?: IKeyBackupRestoreOpts,
@@ -2478,20 +2512,18 @@ export class MatrixClient extends EventEmitter {
         recoveryKey: string,
         targetRoomId: string,
         targetSessionId: string,
-        backupInfo: IKeyBackupVersion,
+        backupInfo: IKeyBackupInfo,
         opts: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult> {
         const privKey = decodeRecoveryKey(recoveryKey);
-        return this.restoreKeyBackup(
-            privKey, targetRoomId, targetSessionId, backupInfo, opts,
-        );
+        return this.restoreKeyBackup(privKey, targetRoomId, targetSessionId, backupInfo, opts);
     }
 
     // TODO: Types
     public async restoreKeyBackupWithCache(
         targetRoomId: string,
         targetSessionId: string,
-        backupInfo: IKeyBackupVersion,
+        backupInfo: IKeyBackupInfo,
         opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult> {
         const privKey = await this.crypto.getSessionBackupPrivateKey();
@@ -2502,10 +2534,10 @@ export class MatrixClient extends EventEmitter {
     }
 
     private async restoreKeyBackup(
-        privKey: Uint8Array,
+        privKey: ArrayLike<number>,
         targetRoomId: string,
         targetSessionId: string,
-        backupInfo: IKeyBackupVersion,
+        backupInfo: IKeyBackupInfo,
         opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult> {
         const cacheCompleteCallback = opts?.cacheCompleteCallback;
@@ -7096,7 +7128,7 @@ export class MatrixClient extends EventEmitter {
         return this.http.authedRequest(callback, "POST", "/keys/upload", undefined, content);
     }
 
-    public uploadKeySignatures(content: any): Promise<any> { // TODO: Types
+    public uploadKeySignatures(content: KeySignatures): Promise<IUploadKeySignaturesResponse> {
         return this.http.authedRequest(
             undefined, "POST", '/keys/signatures/upload', undefined,
             content, {
@@ -7195,7 +7227,7 @@ export class MatrixClient extends EventEmitter {
         return this.http.authedRequest(undefined, "GET", path, qps, undefined);
     }
 
-    public uploadDeviceSigningKeys(auth: any, keys: any): Promise<any> { // TODO: Lots of types
+    public uploadDeviceSigningKeys(auth: any, keys: CrossSigningKeys): Promise<{}> { // TODO: types
         const data = Object.assign({}, keys);
         if (auth) Object.assign(data, { auth });
         return this.http.authedRequest(
@@ -7607,7 +7639,11 @@ export class MatrixClient extends EventEmitter {
      *    supplied.
      * @return {Promise} Resolves to the result object
      */
-    public sendToDevice(eventType: string, contentMap: any, txnId?: string): Promise<any> { // TODO: Types
+    public sendToDevice(
+        eventType: string,
+        contentMap: { [userId: string]: { [deviceId: string]: Record<string, any>; } },
+        txnId?: string,
+    ): Promise<{}> {
         const path = utils.encodeUri("/sendToDevice/$eventType/$txnId", {
             $eventType: eventType,
             $txnId: txnId ? txnId : this.makeTxnId(),

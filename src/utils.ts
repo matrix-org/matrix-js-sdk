@@ -22,6 +22,7 @@ limitations under the License.
 
 import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
+import type NodeCrypto from "crypto";
 
 /**
  * Encode a dictionary of query parameters.
@@ -500,13 +501,13 @@ export function simpleRetryOperation<T>(promiseFn: (attempt: number) => Promise<
 // Matrix SDK without needing to `require("crypto")`, which will fail in
 // browsers.  So `index.ts` will call `setCrypto` to store it, and when we need
 // it, we can call `getCrypto`.
-let crypto: Object;
+let crypto: typeof NodeCrypto;
 
-export function setCrypto(c: Object) {
+export function setCrypto(c: typeof NodeCrypto) {
     crypto = c;
 }
 
-export function getCrypto(): Object {
+export function getCrypto(): typeof NodeCrypto {
     return crypto;
 }
 

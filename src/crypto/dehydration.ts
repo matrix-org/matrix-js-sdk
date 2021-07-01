@@ -44,7 +44,7 @@ interface DeviceKeys {
     signatures?: Signatures;
 }
 
-interface OneTimeKey {
+export interface OneTimeKey {
     key: string;
     fallback?: boolean;
     signatures?: Signatures;
