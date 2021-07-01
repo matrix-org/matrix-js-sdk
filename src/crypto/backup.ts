@@ -68,6 +68,8 @@ interface BackupAlgorithmClass {
     prepare(
         key: string | Uint8Array | null,
     ): Promise<[Uint8Array, AuthData]>;
+
+    checkBackupVersion(info: BackupInfo): void;
 }
 
 interface BackupAlgorithm {
@@ -94,6 +96,24 @@ export class BackupManager {
 
     public get version(): string | undefined {
         return this.backupInfo && this.backupInfo.version;
+    }
+
+    /**
+     * Performs a quick check to ensure that the backup info looks sane.
+     *
+     * Throws an error if a problem is detected.
+     *
+     * @param {BackupInfo} info the key backup info
+     */
+    public static checkBackupVersion(info: BackupInfo): void {
+        const Algorithm = algorithmsByName[info.algorithm];
+        if (!Algorithm) {
+            throw new Error("Unknown backup algorithm: " + info.algorithm);
+        }
+        if (!(typeof info.auth_data === "object")) {
+            throw new Error("Invalid backup data returned");
+        }
+        return Algorithm.checkBackupVersion(info);
     }
 
     public static async makeAlgorithm(info: BackupInfo, getKey: GetKey): Promise<BackupAlgorithm> {
@@ -264,7 +284,6 @@ export class BackupManager {
             !backupInfo ||
                 !backupInfo.algorithm ||
                 !backupInfo.auth_data ||
-                !backupInfo.auth_data.public_key ||
                 !backupInfo.auth_data.signatures
         ) {
             logger.info("Key backup is absent or missing required data");
@@ -590,6 +609,12 @@ export class Curve25519 implements BackupAlgorithm {
         }
     }
 
+    public static checkBackupVersion(info: BackupInfo): void {
+        if (!info.auth_data.public_key) {
+            throw new Error("Invalid backup data returned");
+        }
+    }
+
     public get untrusted() { return true; }
 
     public async encryptSession(data: Record<string, any>): Promise<any> {
@@ -717,6 +742,12 @@ export class Aes256 implements BackupAlgorithm {
         authData.mac = mac;
 
         return [outKey, authData];
+    }
+
+    public static checkBackupVersion(info: BackupInfo): void {
+        if (!info.auth_data.iv || !info.auth_data.mac) {
+            throw new Error("Invalid backup data returned");
+        }
     }
 
     public get untrusted() { return false; }

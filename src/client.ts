@@ -33,7 +33,6 @@ import { EventTimeline } from "./models/event-timeline";
 import { PushAction, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery } from "./autodiscovery";
 import { MatrixError } from "./http-api";
-import * as olmlib from "./crypto/olmlib";
 import { decodeBase64, encodeBase64 } from "./crypto/olmlib";
 import { ReEmitter } from './ReEmitter';
 import { RoomList } from './crypto/RoomList';
@@ -2054,28 +2053,26 @@ export class MatrixClient extends EventEmitter {
      * Get information about the current key backup.
      * @returns {Promise} Information object from API or null
      */
-    public getKeyBackupVersion(): Promise<IKeyBackupVersion> {
-        return this.http.authedRequest(
-            undefined, "GET", "/room_keys/version", undefined, undefined,
-            { prefix: PREFIX_UNSTABLE },
-        ).then((res) => {
-            if (res.algorithm !== olmlib.MEGOLM_BACKUP_ALGORITHM) {
-                const err = "Unknown backup algorithm: " + res.algorithm;
-                return Promise.reject(err);
-            } else if (!(typeof res.auth_data === "object")
-                || !res.auth_data.public_key) {
-                const err = "Invalid backup data returned";
-                return Promise.reject(err);
-            } else {
-                return res;
-            }
-        }).catch((e) => {
+    public async getKeyBackupVersion(): Promise<IKeyBackupVersion> {
+        let res;
+        try {
+            res = await this.http.authedRequest(
+                undefined, "GET", "/room_keys/version", undefined, undefined,
+                { prefix: PREFIX_UNSTABLE },
+            );
+        } catch (e) {
             if (e.errcode === 'M_NOT_FOUND') {
                 return null;
             } else {
                 throw e;
             }
-        });
+        }
+        try {
+            BackupManager.checkBackupVersion(res);
+        } catch (e) {
+            throw e;
+        }
+        return res;
     }
 
     /**
