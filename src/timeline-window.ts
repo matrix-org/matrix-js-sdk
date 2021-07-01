@@ -265,7 +265,7 @@ export class TimelineWindow {
      * @return {Promise} Resolves to a boolean which is true if more events
      *    were successfully retrieved.
      */
-    public paginate(direction: Direction, size: number, makeRequest: boolean, requestLimit: number): Promise<boolean> {
+    public paginate(direction: Direction, size: number, makeRequest = false, requestLimit = 5): Promise<boolean> {
         // Either wind back the message cap (if there are enough events in the
         // timeline to do so), or fire off a pagination request.
 
