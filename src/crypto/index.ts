@@ -114,7 +114,7 @@ interface IRoomKey {
 
 export interface IRoomKeyRequestBody extends IRoomKey {
     session_id: string;
-    sender_key: string
+    sender_key: string;
 }
 
 export interface IMegolmSessionData {
@@ -166,7 +166,7 @@ export interface IRoomKeyRequestRecipient {
 
 interface ISignableObject {
     signatures?: object;
-    unsigned?: object
+    unsigned?: object;
 }
 
 export interface IEventDecryptionResult {

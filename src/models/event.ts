@@ -120,9 +120,9 @@ interface IEventRelation {
 interface IDecryptionResult {
     clearEvent: {
         room_id?: string;
-        type: string,
-        content: IContent,
-        unsigned?: IUnsigned,
+        type: string;
+        content: IContent;
+        unsigned?: IUnsigned;
     };
     forwardingCurve25519KeyChain?: string[];
     senderCurve25519Key?: string;

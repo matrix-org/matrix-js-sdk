@@ -31,7 +31,7 @@ interface IAuthData {
 interface IKey {
     key: Uint8Array;
     salt: string;
-    iterations: number
+    iterations: number;
 }
 
 export async function keyFromAuthData(authData: IAuthData, password: string): Promise<Uint8Array> {
