@@ -3,8 +3,8 @@ import { EventTimeline } from "../../src/models/event-timeline";
 import { RoomState } from "../../src/models/room-state";
 
 function mockRoomStates(timeline) {
-    timeline._startState = utils.mock(RoomState, "startState");
-    timeline._endState = utils.mock(RoomState, "endState");
+    timeline.startState = utils.mock(RoomState, "startState");
+    timeline.endState = utils.mock(RoomState, "endState");
 }
 
 describe("EventTimeline", function() {
@@ -48,10 +48,10 @@ describe("EventTimeline", function() {
                 }),
             ];
             timeline.initialiseState(events);
-            expect(timeline._startState.setStateEvents).toHaveBeenCalledWith(
+            expect(timeline.startState.setStateEvents).toHaveBeenCalledWith(
                 events,
             );
-            expect(timeline._endState.setStateEvents).toHaveBeenCalledWith(
+            expect(timeline.endState.setStateEvents).toHaveBeenCalledWith(
                 events,
             );
         });
