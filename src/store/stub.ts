@@ -25,7 +25,7 @@ import { Room } from "../models/room";
 import { User } from "../models/user";
 import { MatrixEvent } from "../models/event";
 import { Filter } from "../filter";
-import { IStore } from "./index";
+import { ISavedSync, IStore } from "./index";
 import { RoomSummary } from "../models/room-summary";
 
 /**
@@ -243,7 +243,7 @@ export class StubStore implements IStore {
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
-    public getSavedSync(): Promise<object> {
+    public getSavedSync(): Promise<ISavedSync> {
         return Promise.resolve(null);
     }
 

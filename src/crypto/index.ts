@@ -57,6 +57,7 @@ import type { EncryptionAlgorithm, DecryptionAlgorithm } from "./algorithms/base
 import type { RoomList } from "./RoomList";
 import { IRecoveryKey, IEncryptedEventInfo } from "./api";
 import { IKeyBackupInfo } from "./keybackup";
+import { ISyncStateData } from "../sync";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -146,12 +147,6 @@ interface IUserOlmSession {
         sessionId: string;
         hasReceivedMessage: boolean;
     }[];
-}
-
-interface ISyncData {
-    oldSyncToken?: string;
-    nextSyncToken: string;
-    catchingUp?: boolean;
 }
 
 interface ISyncDeviceLists {
@@ -2780,7 +2775,7 @@ export class Crypto extends EventEmitter {
      * @param {Object} syncDeviceLists device_lists field from /sync, or response from
      * /keys/changes
      */
-    public async handleDeviceListChanges(syncData: ISyncData, syncDeviceLists: ISyncDeviceLists): Promise<void> {
+    public async handleDeviceListChanges(syncData: ISyncStateData, syncDeviceLists: ISyncDeviceLists): Promise<void> {
         // Initial syncs don't have device change lists. We'll either get the complete list
         // of changes for the interval or will have invalidated everything in willProcessSync
         if (!syncData.oldSyncToken) return;
@@ -2870,7 +2865,7 @@ export class Crypto extends EventEmitter {
      *
      * @param {Object} syncData  the data from the 'MatrixClient.sync' event
      */
-    public async onSyncWillProcess(syncData: ISyncData): Promise<void> {
+    public async onSyncWillProcess(syncData: ISyncStateData): Promise<void> {
         if (!syncData.oldSyncToken) {
             // If there is no old sync token, we start all our tracking from
             // scratch, so mark everything as untracked. onCryptoEvent will
@@ -2894,7 +2889,7 @@ export class Crypto extends EventEmitter {
      *
      * @param {Object} syncData  the data from the 'MatrixClient.sync' event
      */
-    public async onSyncCompleted(syncData: ISyncData): Promise<void> {
+    public async onSyncCompleted(syncData: ISyncStateData): Promise<void> {
         this.deviceList.setSyncToken(syncData.nextSyncToken);
         this.deviceList.saveIfDirty();
 

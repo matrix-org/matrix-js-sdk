@@ -438,7 +438,7 @@ export function isNullOrUndefined(val: any): boolean {
 
 export interface IDeferred<T> {
     resolve: (value: T) => void;
-    reject: (any) => void;
+    reject: (reason?: any) => void;
     promise: Promise<T>;
 }
 
@@ -456,10 +456,10 @@ export function defer<T>(): IDeferred<T> {
 }
 
 export async function promiseMapSeries<T>(
-    promises: Promise<T>[],
+    promises: T[],
     fn: (t: T) => void,
 ): Promise<void> {
-    for (const o of await promises) {
+    for (const o of promises) {
         await fn(await o);
     }
 }

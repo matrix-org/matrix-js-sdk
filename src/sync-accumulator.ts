@@ -1,7 +1,5 @@
 /*
-Copyright 2017 Vector Creations Ltd
-Copyright 2018 New Vector Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2017 - 2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +21,153 @@ limitations under the License.
 
 import { logger } from './logger';
 import { deepCopy } from "./utils";
+import { IContent, IUnsigned } from "./models/event";
+import { IRoomSummary } from "./models/room-summary";
+import { EventType } from "./@types/event";
+
+interface IOpts {
+    maxTimelineEntries?: number;
+}
+
+export interface IMinimalEvent {
+    content: IContent;
+    type: EventType | string;
+}
+
+export interface IEphemeral {
+    events: IMinimalEvent[];
+}
+
+/* eslint-disable camelcase */
+interface IUnreadNotificationCounts {
+    highlight_count: number;
+    notification_count: number;
+}
+
+export interface IRoomEvent extends IMinimalEvent {
+    event_id: string;
+    sender: string;
+    origin_server_ts: number;
+    unsigned?: IUnsigned;
+    /** @deprecated - legacy field */
+    age?: number;
+}
+
+export interface IStateEvent extends IRoomEvent {
+    prev_content?: IContent;
+    state_key: string;
+}
+
+interface IState {
+    events: IStateEvent[];
+}
+
+export interface ITimeline {
+    events: Array<IRoomEvent | IStateEvent>;
+    limited: boolean;
+    prev_batch: string;
+}
+
+export interface IJoinedRoom {
+    summary: IRoomSummary;
+    state: IState;
+    timeline: ITimeline;
+    ephemeral: IEphemeral;
+    account_data: IAccountData;
+    unread_notifications: IUnreadNotificationCounts;
+}
+
+export interface IStrippedState {
+    content: IContent;
+    state_key: string;
+    type: EventType | string;
+    sender: string;
+}
+
+export interface IInviteState {
+    events: IStrippedState[];
+}
+
+export interface IInvitedRoom {
+    invite_state: IInviteState;
+}
+
+export interface ILeftRoom {
+    state: IState;
+    timeline: ITimeline;
+    account_data: IAccountData;
+}
+
+export interface IRooms {
+    [Category.Join]: Record<string, IJoinedRoom>;
+    [Category.Invite]: Record<string, IInvitedRoom>;
+    [Category.Leave]: Record<string, ILeftRoom>;
+}
+
+interface IPresence {
+    events: IMinimalEvent[];
+}
+
+interface IAccountData {
+    events: IMinimalEvent[];
+}
+
+interface IToDeviceEvent {
+    content: IContent;
+    sender: string;
+    type: string;
+}
+
+interface IToDevice {
+    events: IToDeviceEvent[];
+}
+
+interface IDeviceLists {
+    changed: string[];
+    left: string[];
+}
+
+export interface IGroups {
+    [Category.Join]: object;
+    [Category.Invite]: object;
+    [Category.Leave]: object;
+}
+
+export interface ISyncResponse {
+    next_batch: string;
+    rooms: IRooms;
+    presence?: IPresence;
+    account_data: IAccountData;
+    to_device?: IToDevice;
+    device_lists?: IDeviceLists;
+    device_one_time_keys_count?: Record<string, number>;
+
+    groups: IGroups; // unspecced
+}
+/* eslint-enable camelcase */
+
+export enum Category {
+    Invite = "invite",
+    Leave = "leave",
+    Join = "join",
+}
+
+interface IRoom {
+    _currentState: { [eventType: string]: { [stateKey: string]: IStateEvent } };
+    _timeline: {
+        event: IRoomEvent | IStateEvent;
+        token: string | null;
+    }[];
+    _summary: Partial<IRoomSummary>;
+    _accountData: { [eventType: string]: IMinimalEvent };
+    _unreadNotifications: Partial<IUnreadNotificationCounts>;
+    _readReceipts: {
+        [userId: string]: {
+            data: IMinimalEvent;
+            eventId: string;
+        };
+    };
+}
 
 /**
  * The purpose of this class is to accumulate /sync responses such that a
@@ -35,6 +180,22 @@ import { deepCopy } from "./utils";
  * rather than asking the server to do an initial sync on startup.
  */
 export class SyncAccumulator {
+    private accountData: Record<string, IMinimalEvent> = {}; // $event_type: Object
+    private inviteRooms: Record<string, IInvitedRoom> = {}; // $roomId: { ... sync 'invite' json data ... }
+    private joinRooms: { [roomId: string]: IRoom } = {};
+    // the /sync token which corresponds to the last time rooms were
+    // accumulated. We remember this so that any caller can obtain a
+    // coherent /sync response and know at what point they should be
+    // streaming from without losing events.
+    private nextBatch: string = null;
+
+    // { ('invite'|'join'|'leave'): $groupId: { ... sync 'group' data } }
+    private groups: Record<Category, object> = {
+        invite: {},
+        join: {},
+        leave: {},
+    };
+
     /**
      * @param {Object} opts
      * @param {Number=} opts.maxTimelineEntries The ideal maximum number of
@@ -44,57 +205,18 @@ export class SyncAccumulator {
      * never be more. This cannot be 0 or else it makes it impossible to scroll
      * back in a room. Default: 50.
      */
-    constructor(opts) {
-        opts = opts || {};
-        opts.maxTimelineEntries = opts.maxTimelineEntries || 50;
-        this.opts = opts;
-        this.accountData = {
-            //$event_type: Object
-        };
-        this.inviteRooms = {
-            //$roomId: { ... sync 'invite' json data ... }
-        };
-        this.joinRooms = {
-            //$roomId: {
-            //    _currentState: { $event_type: { $state_key: json } },
-            //    _timeline: [
-            //       { event: $event, token: null|token },
-            //       { event: $event, token: null|token },
-            //       { event: $event, token: null|token },
-            //       ...
-            //    ],
-            //    _summary: {
-            //       m.heroes: [ $user_id ],
-            //       m.joined_member_count: $count,
-            //       m.invited_member_count: $count
-            //    },
-            //    _accountData: { $event_type: json },
-            //    _unreadNotifications: { ... unread_notifications JSON ... },
-            //    _readReceipts: { $user_id: { data: $json, eventId: $event_id }}
-            //}
-        };
-        // the /sync token which corresponds to the last time rooms were
-        // accumulated. We remember this so that any caller can obtain a
-        // coherent /sync response and know at what point they should be
-        // streaming from without losing events.
-        this.nextBatch = null;
-
-        // { ('invite'|'join'|'leave'): $groupId: { ... sync 'group' data } }
-        this.groups = {
-            invite: {},
-            join: {},
-            leave: {},
-        };
+    constructor(private readonly opts: IOpts = {}) {
+        this.opts.maxTimelineEntries = this.opts.maxTimelineEntries || 50;
     }
 
-    accumulate(syncResponse, fromDatabase) {
-        this._accumulateRooms(syncResponse, fromDatabase);
-        this._accumulateGroups(syncResponse);
-        this._accumulateAccountData(syncResponse);
+    public accumulate(syncResponse: ISyncResponse, fromDatabase = false): void {
+        this.accumulateRooms(syncResponse, fromDatabase);
+        this.accumulateGroups(syncResponse);
+        this.accumulateAccountData(syncResponse);
         this.nextBatch = syncResponse.next_batch;
     }
 
-    _accumulateAccountData(syncResponse) {
+    private accumulateAccountData(syncResponse: ISyncResponse): void {
         if (!syncResponse.account_data || !syncResponse.account_data.events) {
             return;
         }
@@ -109,34 +231,31 @@ export class SyncAccumulator {
      * @param {Object} syncResponse the complete /sync JSON
      * @param {boolean} fromDatabase True if the sync response is one saved to the database
      */
-    _accumulateRooms(syncResponse, fromDatabase) {
+    private accumulateRooms(syncResponse: ISyncResponse, fromDatabase = false): void {
         if (!syncResponse.rooms) {
             return;
         }
         if (syncResponse.rooms.invite) {
             Object.keys(syncResponse.rooms.invite).forEach((roomId) => {
-                this._accumulateRoom(
-                    roomId, "invite", syncResponse.rooms.invite[roomId], fromDatabase,
-                );
+                this.accumulateRoom(roomId, Category.Invite, syncResponse.rooms.invite[roomId], fromDatabase);
             });
         }
         if (syncResponse.rooms.join) {
             Object.keys(syncResponse.rooms.join).forEach((roomId) => {
-                this._accumulateRoom(
-                    roomId, "join", syncResponse.rooms.join[roomId], fromDatabase,
-                );
+                this.accumulateRoom(roomId, Category.Join, syncResponse.rooms.join[roomId], fromDatabase);
             });
         }
         if (syncResponse.rooms.leave) {
             Object.keys(syncResponse.rooms.leave).forEach((roomId) => {
-                this._accumulateRoom(
-                    roomId, "leave", syncResponse.rooms.leave[roomId], fromDatabase,
-                );
+                this.accumulateRoom(roomId, Category.Leave, syncResponse.rooms.leave[roomId], fromDatabase);
             });
         }
     }
 
-    _accumulateRoom(roomId, category, data, fromDatabase) {
+    private accumulateRoom(roomId: string, category: Category.Invite, data: IInvitedRoom, fromDatabase: boolean): void;
+    private accumulateRoom(roomId: string, category: Category.Join, data: IJoinedRoom, fromDatabase: boolean): void;
+    private accumulateRoom(roomId: string, category: Category.Leave, data: ILeftRoom, fromDatabase: boolean): void;
+    private accumulateRoom(roomId: string, category: Category, data: any, fromDatabase = false): void {
         // Valid /sync state transitions
         //       +--------+ <======+            1: Accept an invite
         //   +== | INVITE |        | (5)        2: Leave a room
@@ -149,10 +268,11 @@ export class SyncAccumulator {
         //
         // * equivalent to "no state"
         switch (category) {
-            case "invite": // (5)
-                this._accumulateInviteState(roomId, data);
+            case Category.Invite: // (5)
+                this.accumulateInviteState(roomId, data as IInvitedRoom);
                 break;
-            case "join":
+
+            case Category.Join:
                 if (this.inviteRooms[roomId]) { // (1)
                     // was previously invite, now join. We expect /sync to give
                     // the entire state and timeline on 'join', so delete previous
@@ -160,21 +280,23 @@ export class SyncAccumulator {
                     delete this.inviteRooms[roomId];
                 }
                 // (3)
-                this._accumulateJoinState(roomId, data, fromDatabase);
+                this.accumulateJoinState(roomId, data as IJoinedRoom, fromDatabase);
                 break;
-            case "leave":
+
+            case Category.Leave:
                 if (this.inviteRooms[roomId]) { // (4)
                     delete this.inviteRooms[roomId];
                 } else { // (2)
                     delete this.joinRooms[roomId];
                 }
                 break;
+
             default:
                 logger.error("Unknown cateogory: ", category);
         }
     }
 
-    _accumulateInviteState(roomId, data) {
+    private accumulateInviteState(roomId: string, data: IInvitedRoom): void {
         if (!data.invite_state || !data.invite_state.events) { // no new data
             return;
         }
@@ -204,7 +326,7 @@ export class SyncAccumulator {
     }
 
     // Accumulate timeline and state events in a room.
-    _accumulateJoinState(roomId, data, fromDatabase) {
+    private accumulateJoinState(roomId: string, data: IJoinedRoom, fromDatabase = false): void {
         // We expect this function to be called a lot (every /sync) so we want
         // this to be fast. /sync stores events in an array but we often want
         // to clobber based on type/state_key. Rather than convert arrays to
@@ -338,7 +460,7 @@ export class SyncAccumulator {
                 setState(currentData._currentState, e);
                 // append the event to the timeline. The back-pagination token
                 // corresponds to the first event in the timeline
-                let transformedEvent;
+                let transformedEvent: IRoomEvent & { _localTs?: number };
                 if (!fromDatabase) {
                     transformedEvent = Object.assign({}, e);
                     if (transformedEvent.unsigned !== undefined) {
@@ -379,35 +501,29 @@ export class SyncAccumulator {
      * Accumulate incremental /sync group data.
      * @param {Object} syncResponse the complete /sync JSON
      */
-    _accumulateGroups(syncResponse) {
+    private accumulateGroups(syncResponse: ISyncResponse): void {
         if (!syncResponse.groups) {
             return;
         }
         if (syncResponse.groups.invite) {
             Object.keys(syncResponse.groups.invite).forEach((groupId) => {
-                this._accumulateGroup(
-                    groupId, "invite", syncResponse.groups.invite[groupId],
-                );
+                this.accumulateGroup(groupId, Category.Invite, syncResponse.groups.invite[groupId]);
             });
         }
         if (syncResponse.groups.join) {
             Object.keys(syncResponse.groups.join).forEach((groupId) => {
-                this._accumulateGroup(
-                    groupId, "join", syncResponse.groups.join[groupId],
-                );
+                this.accumulateGroup(groupId, Category.Join, syncResponse.groups.join[groupId]);
             });
         }
         if (syncResponse.groups.leave) {
             Object.keys(syncResponse.groups.leave).forEach((groupId) => {
-                this._accumulateGroup(
-                    groupId, "leave", syncResponse.groups.leave[groupId],
-                );
+                this.accumulateGroup(groupId, Category.Leave, syncResponse.groups.leave[groupId]);
             });
         }
     }
 
-    _accumulateGroup(groupId, category, data) {
-        for (const cat of ['invite', 'join', 'leave']) {
+    private accumulateGroup(groupId: string, category: Category, data: object): void {
+        for (const cat of [Category.Invite, Category.Leave, Category.Join]) {
             delete this.groups[cat][groupId];
         }
         this.groups[category][groupId] = data;
@@ -428,7 +544,7 @@ export class SyncAccumulator {
      * /sync response from the 'rooms' key onwards. The "accountData" key is
      * a list of raw events which represent global account data.
      */
-    getJSON(forDatabase) {
+    public getJSON(forDatabase = false): object {
         const data = {
             join: {},
             invite: {},
@@ -501,14 +617,14 @@ export class SyncAccumulator {
                     roomJson.timeline.prev_batch = msgData.token;
                 }
 
-                let transformedEvent;
-                if (!forDatabase && msgData.event._localTs) {
+                let transformedEvent: (IRoomEvent | IStateEvent) & { _localTs?: number };
+                if (!forDatabase && msgData.event["_localTs"]) {
                     // This means we have to copy each event so we can fix it up to
                     // set a correct 'age' parameter whilst keeping the local timestamp
                     // on our stored event. If this turns out to be a bottleneck, it could
                     // be optimised either by doing this in the main process after the data
                     // has been structured-cloned to go between the worker & main process,
-                    // or special-casing data from saved syncs to read the local timstamp
+                    // or special-casing data from saved syncs to read the local timestamp
                     // directly rather than turning it into age to then immediately be
                     // transformed back again into a local timestamp.
                     transformedEvent = Object.assign({}, msgData.event);
@@ -517,7 +633,7 @@ export class SyncAccumulator {
                     }
                     delete transformedEvent._localTs;
                     transformedEvent.unsigned = transformedEvent.unsigned || {};
-                    transformedEvent.unsigned.age = Date.now() - msgData.event._localTs;
+                    transformedEvent.unsigned.age = Date.now() - msgData.event["_localTs"];
                 } else {
                     transformedEvent = msgData.event;
                 }
@@ -575,17 +691,17 @@ export class SyncAccumulator {
         };
     }
 
-    getNextBatchToken() {
+    public getNextBatchToken(): string {
         return this.nextBatch;
     }
 }
 
-function setState(eventMap, event) {
-    if (event.state_key === null || event.state_key === undefined || !event.type) {
+function setState(eventMap: Record<string, Record<string, IStateEvent>>, event: IRoomEvent | IStateEvent): void {
+    if ((event as IStateEvent).state_key === null || (event as IStateEvent).state_key === undefined || !event.type) {
         return;
     }
     if (!eventMap[event.type]) {
         eventMap[event.type] = Object.create(null);
     }
-    eventMap[event.type][event.state_key] = event;
+    eventMap[event.type][(event as IStateEvent).state_key] = event as IStateEvent;
 }

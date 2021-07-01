@@ -74,7 +74,7 @@ export interface IContent {
 
 type StrippedState = Required<Pick<IEvent, "content" | "state_key" | "type" | "sender">>;
 
-interface IUnsigned {
+export interface IUnsigned {
     age?: number;
     prev_sender?: string;
     prev_content?: IContent;
