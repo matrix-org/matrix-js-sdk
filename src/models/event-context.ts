@@ -15,11 +15,7 @@ limitations under the License.
 */
 
 import { MatrixEvent } from "./event";
-
-enum Direction {
-    Backward = "b",
-    Forward = "f",
-}
+import { Direction } from "./event-timeline";
 
 /**
  * @module models/event-context

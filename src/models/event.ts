@@ -112,7 +112,7 @@ interface IAggregatedRelation {
 }
 
 interface IEventRelation {
-    rel_type: string;
+    rel_type: RelationType | string;
     event_id: string;
     key?: string;
 }
