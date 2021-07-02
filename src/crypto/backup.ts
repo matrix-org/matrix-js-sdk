@@ -36,16 +36,16 @@ const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 type AuthData = IKeyBackupInfo["auth_data"];
 
 type SigInfo = {
-    deviceId: string,
-    valid?: boolean | null, // true: valid, false: invalid, null: cannot attempt validation
-    device?: DeviceInfo | null,
-    crossSigningId?: boolean,
-    deviceTrust?: DeviceTrustLevel,
+    deviceId: string;
+    valid?: boolean | null; // true: valid, false: invalid, null: cannot attempt validation
+    device?: DeviceInfo | null;
+    crossSigningId?: boolean;
+    deviceTrust?: DeviceTrustLevel;
 };
 
 export type TrustInfo = {
-    usable: boolean, // is the backup trusted, true iff there is a sig that is valid & from a trusted device
-    sigs: SigInfo[],
+    usable: boolean; // is the backup trusted, true iff there is a sig that is valid & from a trusted device
+    sigs: SigInfo[];
 };
 
 export interface IKeyBackupCheck {
