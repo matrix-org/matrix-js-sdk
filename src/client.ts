@@ -298,6 +298,11 @@ export interface IMatrixClientCreateOpts extends ICreateClientOpts {
     usingExternalCrypto?: boolean;
 }
 
+export enum PendingEventOrdering {
+    Chronological = "chronological",
+    Detached = "detached",
+}
+
 export interface IStartClientOpts {
     /**
      * The event <code>limit=</code> to apply to initial sync. Default: 8.
@@ -320,7 +325,7 @@ export interface IStartClientOpts {
      * pending messages will appear in a separate list, accessbile via {@link module:models/room#getPendingEvents}.
      * Default: "chronological".
      */
-    pendingEventOrdering?: "chronological" | "detached";
+    pendingEventOrdering?: PendingEventOrdering;
 
     /**
      * The number of milliseconds to wait on /sync. Default: 30000 (30 seconds).
@@ -454,7 +459,7 @@ export class MatrixClient extends EventEmitter {
     protected fallbackICEServerAllowed = false;
     protected roomList: RoomList;
     protected syncApi: SyncApi;
-    protected pushRules: any; // TODO: Types
+    public pushRules: any; // TODO: Types
     protected syncLeftRoomsPromise: Promise<Room[]>;
     protected syncedLeftRooms = false;
     protected clientOpts: IStoredClientOpts;

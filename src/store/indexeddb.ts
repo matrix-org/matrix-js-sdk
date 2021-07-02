@@ -24,6 +24,7 @@ import { RemoteIndexedDBStoreBackend } from "./indexeddb-remote-backend.js";
 import { User } from "../models/user";
 import { MatrixEvent } from "../models/event";
 import { logger } from '../logger';
+import { ISavedSync } from "./index";
 
 /**
  * This is an internal module. See {@link IndexedDBStore} for the public class.
@@ -157,7 +158,7 @@ export class IndexedDBStore extends MemoryStore {
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
-    public getSavedSync = this.degradable((): Promise<object> => {
+    public getSavedSync = this.degradable((): Promise<ISavedSync> => {
         return this.backend.getSavedSync();
     }, "getSavedSync");
 
