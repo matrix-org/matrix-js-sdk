@@ -783,8 +783,7 @@ export async function requestKeysDuringVerification(baseApis: MatrixClient, user
         });
 
         // also request and cache the key backup key
-        // eslint-disable-next-line no-async-promise-executor
-        const backupKeyPromise = new Promise<void>(async resolve => {
+        const backupKeyPromise = (async () => {
             const cachedKey = await client.crypto.getSessionBackupPrivateKey();
             if (!cachedKey) {
                 logger.info("No cached backup key found. Requesting...");
@@ -805,8 +804,7 @@ export async function requestKeysDuringVerification(baseApis: MatrixClient, user
                     logger.info("Backup restored.");
                 });
             }
-            resolve();
-        });
+        })();
 
         // We call getCrossSigningKey() for its side-effects
         return Promise.race([
