@@ -306,7 +306,7 @@ EventTimeline.prototype.addEvent = function(event, atStart) {
 
         // modify state but only on unfiltered timelineSets
         if (
-            event.isState() && 
+            event.isState() &&
             timelineSet.room.getUnfilteredTimelineSet() === timelineSet
         ) {
             stateContext.setStateEvents([event]);
