@@ -403,6 +403,10 @@ export interface ISignedKey {
     algorithms: string[];
     device_id: string;
 }
+
+export interface IEventIdResponse {
+    event_id: string;
+}
 /* eslint-enable camelcase */
 
 export type KeySignatures = Record<string, Record<string, ICrossSigningKey | ISignedKey>>;
@@ -2990,7 +2994,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setRoomName(roomId: string, name: string, callback?: Callback): Promise<void> {
+    public setRoomName(roomId: string, name: string, callback?: Callback): Promise<IEventIdResponse> {
         return this.sendStateEvent(roomId, "m.room.name", { name: name }, undefined, callback);
     }
 
@@ -3001,7 +3005,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setRoomTopic(roomId: string, topic: string, callback?: Callback): Promise<void> {
+    public setRoomTopic(roomId: string, topic: string, callback?: Callback): Promise<IEventIdResponse> {
         return this.sendStateEvent(roomId, "m.room.topic", { topic: topic }, undefined, callback);
     }
 
@@ -4185,7 +4189,7 @@ export class MatrixClient extends EventEmitter {
      */
     public _unstable_setStatusMessage(newMessage: string): Promise<void> { // eslint-disable-line camelcase
         const type = "im.vector.user_status";
-        return Promise.all(this.getRooms().map((room) => {
+        return Promise.all(this.getRooms().map((room): Promise<any> => {
             const isJoined = room.getMyMembership() === "join";
             const looksLikeDm = room.getInvitedAndJoinedMemberCount() === 2;
             if (!isJoined || !looksLikeDm) {
@@ -4673,7 +4677,7 @@ export class MatrixClient extends EventEmitter {
             guest_access: opts.allowJoin ? "can_join" : "forbidden",
         }, "");
 
-        let readPromise = Promise.resolve();
+        let readPromise = Promise.resolve<any>(undefined);
         if (opts.allowRead) {
             readPromise = this.sendStateEvent(roomId, "m.room.history_visibility", {
                 history_visibility: "world_readable",
@@ -6341,7 +6345,7 @@ export class MatrixClient extends EventEmitter {
         content: any,
         stateKey = "",
         callback?: Callback,
-    ): Promise<any> { // TODO: Types
+    ): Promise<IEventIdResponse> {
         const pathParams = {
             $roomId: roomId,
             $eventType: eventType,

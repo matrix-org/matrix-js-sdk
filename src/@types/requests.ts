@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { Callback } from "../client";
+import { IContent } from "../models/event";
 import { Preset, Visibility } from "./partials";
 
 // allow camelcase as these are things go onto the wire
@@ -82,7 +83,7 @@ export interface IInvite3PID {
 export interface ICreateRoomStateEvent {
     type: string;
     state_key?: string; // defaults to an empty string
-    content: object;
+    content: IContent;
 }
 
 export interface ICreateRoomOpts {
