@@ -299,15 +299,16 @@ EventTimeline.prototype.setNeighbouringTimeline = function(neighbour, direction)
  */
 EventTimeline.prototype.addEvent = function(event, atStart) {
     const stateContext = atStart ? this._startState : this._endState;
-
-    // only call setEventMetadata on the unfiltered timelineSets
     const timelineSet = this.getTimelineSet();
-    if (timelineSet.room &&
-        timelineSet.room.getUnfilteredTimelineSet() === timelineSet) {
+
+    if (timelineSet.room) {
         EventTimeline.setEventMetadata(event, stateContext, atStart);
 
-        // modify state
-        if (event.isState()) {
+        // modify state but only on unfiltered timelineSets
+        if (
+            event.isState() && 
+            timelineSet.room.getUnfilteredTimelineSet() === timelineSet
+        ) {
             stateContext.setStateEvents([event]);
             // it is possible that the act of setting the state event means we
             // can set more metadata (specifically sender/target props), so try
@@ -347,15 +348,16 @@ EventTimeline.prototype.addEvent = function(event, atStart) {
  * @param {bool} toStartOfTimeline  if true the event's forwardLooking flag is set false
  */
 EventTimeline.setEventMetadata = function(event, stateContext, toStartOfTimeline) {
-    // set sender and target properties
-    event.sender = stateContext.getSentinelMember(
-        event.getSender(),
-    );
-    if (event.getType() === "m.room.member") {
-        event.target = stateContext.getSentinelMember(
-            event.getStateKey(),
-        );
+    // We always check if the event doesn't already have the property. We do
+    // this to avoid overriding non-sentinel members by sentinel ones when
+    // adding the event to a filtered timeline
+    if (!event.sender) {
+        event.sender = stateContext.getSentinelMember(event.getSender());
     }
+    if (!event.target && event.getType() === "m.room.member") {
+        event.target = stateContext.getSentinelMember(event.getStateKey());
+    }
+
     if (event.isState()) {
         // room state has no concept of 'old' or 'current', but we want the
         // room state to regress back to previous values if toStartOfTimeline
