@@ -354,7 +354,7 @@ export class EventTimeline {
             // modify state but only on unfiltered timelineSets
             if (
                 event.isState() &&
-            timelineSet.room.getUnfilteredTimelineSet() === timelineSet
+                timelineSet.room.getUnfilteredTimelineSet() === timelineSet
             ) {
                 stateContext.setStateEvents([event]);
                 // it is possible that the act of setting the state event means we
