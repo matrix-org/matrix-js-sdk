@@ -4502,7 +4502,7 @@ export class MatrixClient extends EventEmitter {
             return Promise.resolve(false);
         }
 
-        const pendingRequest = eventTimeline._paginationRequests[dir];
+        const pendingRequest = eventTimeline.paginationRequests[dir];
 
         if (pendingRequest) {
             // already a request in progress - return the existing promise
@@ -4551,9 +4551,9 @@ export class MatrixClient extends EventEmitter {
                 }
                 return res.next_token ? true : false;
             }).finally(() => {
-                eventTimeline._paginationRequests[dir] = null;
+                eventTimeline.paginationRequests[dir] = null;
             });
-            eventTimeline._paginationRequests[dir] = promise;
+            eventTimeline.paginationRequests[dir] = promise;
         } else {
             const room = this.getRoom(eventTimeline.getRoomId());
             if (!room) {
@@ -4585,9 +4585,9 @@ export class MatrixClient extends EventEmitter {
                 }
                 return res.end != res.start;
             }).finally(() => {
-                eventTimeline._paginationRequests[dir] = null;
+                eventTimeline.paginationRequests[dir] = null;
             });
-            eventTimeline._paginationRequests[dir] = promise;
+            eventTimeline.paginationRequests[dir] = promise;
         }
 
         return promise;

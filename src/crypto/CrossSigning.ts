@@ -292,7 +292,7 @@ export class CrossSigningInfo extends EventEmitter {
                 CrossSigningLevel.USER_SIGNING |
                 CrossSigningLevel.SELF_SIGNING
             );
-        } else if (level === 0) {
+        } else if (level === 0 as CrossSigningLevel) {
             return;
         }
 
