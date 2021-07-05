@@ -1,3 +1,9 @@
+Changes in [12.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v12.0.1) (2021-07-05)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v12.0.1-rc.1...v12.0.1)
+
+ * No changes from rc.1
+
 Changes in [12.0.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v12.0.1-rc.1) (2021-06-29)
 ============================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v12.0.0...v12.0.1-rc.1)
