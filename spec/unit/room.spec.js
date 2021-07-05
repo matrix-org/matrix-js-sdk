@@ -16,9 +16,9 @@ describe("Room", function() {
     beforeEach(function() {
         room = new Room(roomId);
         // mock RoomStates
-        room.oldState = room.getLiveTimeline()._startState =
+        room.oldState = room.getLiveTimeline().startState =
             utils.mock(RoomState, "oldState");
-        room.currentState = room.getLiveTimeline()._endState =
+        room.currentState = room.getLiveTimeline().endState =
             utils.mock(RoomState, "currentState");
     });
 

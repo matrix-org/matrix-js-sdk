@@ -29,6 +29,7 @@ import { RoomState } from "./room-state";
 export class RoomMember extends EventEmitter {
     private _isOutOfBand = false;
     private _modified: number;
+    public _requestedProfileInfo: boolean; // used by sync.ts
 
     // XXX these should be read-only
     public typing = false;

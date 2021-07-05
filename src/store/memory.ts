@@ -27,7 +27,7 @@ import { MatrixEvent } from "../models/event";
 import { RoomState } from "../models/room-state";
 import { RoomMember } from "../models/room-member";
 import { Filter } from "../filter";
-import { IStore } from "./index";
+import { ISavedSync, IStore } from "./index";
 import { RoomSummary } from "../models/room-summary";
 
 function isValidFilterId(filterId: string): boolean {
@@ -373,7 +373,7 @@ export class MemoryStore implements IStore {
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
-    public getSavedSync(): Promise<object> {
+    public getSavedSync(): Promise<ISavedSync> {
         return Promise.resolve(null);
     }
 

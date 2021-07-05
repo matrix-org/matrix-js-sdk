@@ -74,7 +74,7 @@ export interface IContent {
 
 type StrippedState = Required<Pick<IEvent, "content" | "state_key" | "type" | "sender">>;
 
-interface IUnsigned {
+export interface IUnsigned {
     age?: number;
     prev_sender?: string;
     prev_content?: IContent;
@@ -112,7 +112,7 @@ interface IAggregatedRelation {
 }
 
 interface IEventRelation {
-    rel_type: string;
+    rel_type: RelationType | string;
     event_id: string;
     key?: string;
 }

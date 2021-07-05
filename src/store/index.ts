@@ -21,6 +21,14 @@ import { User } from "../models/user";
 import { MatrixEvent } from "../models/event";
 import { Filter } from "../filter";
 import { RoomSummary } from "../models/room-summary";
+import { IMinimalEvent, IGroups, IRooms } from "../sync-accumulator";
+
+export interface ISavedSync {
+    nextBatch: string;
+    roomsData: IRooms;
+    groupsData: IGroups;
+    accountData: IMinimalEvent[];
+}
 
 /**
  * Construct a stub store. This does no-ops on most store methods.
@@ -199,7 +207,7 @@ export interface IStore {
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
-    getSavedSync(): Promise<object>;
+    getSavedSync(): Promise<ISavedSync>;
 
     /**
      * @return {Promise} If there is a saved sync, the nextBatch token
