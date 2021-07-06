@@ -2042,7 +2042,7 @@ export class Room extends EventEmitter {
         // get service members (e.g. helper bots) for exclusion
         let excludedUserIds: string[] = [];
         const mFunctionalMembers = this.currentState.getStateEvents(EventType.RoomFunctionalMembers, "");
-        if (mFunctionalMembers && mFunctionalMembers.getContent() && Array.isArray(mFunctionalMembers.getContent().service_members)) {
+        if (Array.isArray(mFunctionalMembers?.getContent().service_members)) {
             excludedUserIds = mRoomName.getContent().service_members;
         }
         
