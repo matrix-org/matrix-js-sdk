@@ -30,7 +30,7 @@ import { RoomMember } from "./room-member";
 import { IRoomSummary, RoomSummary } from "./room-summary";
 import { logger } from '../logger';
 import { ReEmitter } from '../ReEmitter';
-import { EventType, RoomCreateTypeField, RoomType } from "../@types/event";
+import { EventType, RoomCreateTypeField, RoomType, UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../@types/event";
 import { IRoomVersionsCapability, MatrixClient, RoomVersionStability } from "../client";
 import { ResizeMethod } from "../@types/partials";
 import { Filter } from "../filter";
@@ -2041,7 +2041,7 @@ export class Room extends EventEmitter {
 
         // get service members (e.g. helper bots) for exclusion
         let excludedUserIds: string[] = [];
-        const mFunctionalMembers = this.currentState.getStateEvents(EventType.RoomFunctionalMembers, "");
+        const mFunctionalMembers = this.currentState.getStateEvents(UNSTABLE_ELEMENT_FUNCTIONAL_USERS, "");
         if (Array.isArray(mFunctionalMembers?.getContent().service_members)) {
             excludedUserIds = mFunctionalMembers.getContent().service_members;
         }
