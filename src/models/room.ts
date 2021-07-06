@@ -2066,7 +2066,7 @@ export class Room extends EventEmitter {
                 return m.userId !== userId &&
                     (m.membership === "invite" || m.membership === "join");
             });
-            otherMembers = otherMembers.filter(({userId}) => {
+            otherMembers = otherMembers.filter(({ userId }) => {
                 // filter service members
                 if (excludedUserIds.includes(userId)) {
                     inviteJoinCount--;
