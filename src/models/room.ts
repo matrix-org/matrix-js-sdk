@@ -2045,7 +2045,7 @@ export class Room extends EventEmitter {
         if (Array.isArray(mFunctionalMembers?.getContent().service_members)) {
             excludedUserIds = mRoomName.getContent().service_members;
         }
-        
+
         // get members that are NOT ourselves and are actually in the room.
         let otherNames = null;
         if (this.summaryHeroes) {
