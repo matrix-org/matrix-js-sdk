@@ -1,3 +1,43 @@
+Changes in [12.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v12.0.1) (2021-07-05)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v12.0.1-rc.1...v12.0.1)
+
+ * No changes from rc.1
+
+Changes in [12.0.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v12.0.1-rc.1) (2021-06-29)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v12.0.0...v12.0.1-rc.1)
+
+ * Fix broken /messages filtering due to internal field changes in
+   FilterComponent
+   [\#1759](https://github.com/matrix-org/matrix-js-sdk/pull/1759)
+ * Convert crypto index to TS
+   [\#1749](https://github.com/matrix-org/matrix-js-sdk/pull/1749)
+ * Fix typescript return types for membership update events
+   [\#1739](https://github.com/matrix-org/matrix-js-sdk/pull/1739)
+ * Fix types of MatrixEvent sender & target
+   [\#1753](https://github.com/matrix-org/matrix-js-sdk/pull/1753)
+ * Add keysharing on invites to File Tree Spaces
+   [\#1744](https://github.com/matrix-org/matrix-js-sdk/pull/1744)
+ * Convert Room and RoomState to Typescript
+   [\#1746](https://github.com/matrix-org/matrix-js-sdk/pull/1746)
+ * Improve type of IContent msgtype
+   [\#1752](https://github.com/matrix-org/matrix-js-sdk/pull/1752)
+ * Add PR template
+   [\#1747](https://github.com/matrix-org/matrix-js-sdk/pull/1747)
+ * Add functions to assist in immutability of Event objects
+   [\#1738](https://github.com/matrix-org/matrix-js-sdk/pull/1738)
+ * Convert Event Context to TS
+   [\#1742](https://github.com/matrix-org/matrix-js-sdk/pull/1742)
+ * Bump lodash from 4.17.20 to 4.17.21
+   [\#1743](https://github.com/matrix-org/matrix-js-sdk/pull/1743)
+ * Add invite retries to file trees
+   [\#1740](https://github.com/matrix-org/matrix-js-sdk/pull/1740)
+ * Convert IndexedDBStore to TS
+   [\#1741](https://github.com/matrix-org/matrix-js-sdk/pull/1741)
+ * Convert additional files to typescript
+   [\#1736](https://github.com/matrix-org/matrix-js-sdk/pull/1736)
+
 Changes in [12.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v12.0.0) (2021-06-21)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v12.0.0-rc.1...v12.0.0)
