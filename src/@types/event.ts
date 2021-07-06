@@ -33,7 +33,6 @@ export enum EventType {
     RoomGuestAccess = "m.room.guest_access",
     RoomServerAcl = "m.room.server_acl",
     RoomTombstone = "m.room.tombstone",
-    RoomFunctionalMembers = "io.element.functional_members",
     /**
      * @deprecated Should not be used.
      */
@@ -144,6 +143,13 @@ export const UNSTABLE_MSC3089_LEAF = new UnstableValue("m.leaf", "org.matrix.msc
  * UNSTABLE and subject to breaking changes, including its eventual removal.
  */
 export const UNSTABLE_MSC3089_BRANCH = new UnstableValue("m.branch", "org.matrix.msc3089.branch");
+
+/**
+ * Functional members type for declaring a purpose of room members (e.g. helpful bots).
+ * Note that this reference is UNSTABLE and subject to breaking changes, including its
+ * eventual removal.
+ */
+export const UNSTABLE_ELEMENT_FUNCTIONAL_USERS = "io.element.functional_members");
 
 export interface IEncryptedFile {
     url: string;
