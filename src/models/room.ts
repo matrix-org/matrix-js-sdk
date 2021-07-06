@@ -2039,19 +2039,40 @@ export class Room extends EventEmitter {
         // -1 because these numbers include the syncing user
         const inviteJoinCount = joinedMemberCount + invitedMemberCount - 1;
 
+        // get service members (e.g. helper bots) for exclusion
+        let excludedUserIds: string[] = [];
+        const mFunctionalMembers = this.currentState.getStateEvents(EventType.RoomFunctionalMembers, "");
+        if (mFunctionalMembers && mFunctionalMembers.getContent() && Array.isArray(mFunctionalMembers.getContent().service_members)) {
+            excludedUserIds = mRoomName.getContent().service_members;
+        }
+        
         // get members that are NOT ourselves and are actually in the room.
         let otherNames = null;
         if (this.summaryHeroes) {
             // if we have a summary, the member state events
             // should be in the room state
-            otherNames = this.summaryHeroes.map((userId) => {
+            otherNames = [];
+            this.summaryHeroes.forEach((userId) => {
+                // filter service members
+                if (excludedUserIds.includes(userId)) {
+                    inviteJoinCount--;
+                    return;
+                }
                 const member = this.getMember(userId);
-                return member ? member.name : userId;
+                otherNames.push(member ? member.name : userId);
             });
         } else {
             let otherMembers = this.currentState.getMembers().filter((m) => {
                 return m.userId !== userId &&
                     (m.membership === "invite" || m.membership === "join");
+            });
+            otherMembers = otherMembers.filter((userId) => {
+                // filter service members
+                if (excludedUserIds.includes(userId)) {
+                    inviteJoinCount--;
+                    return false;
+                }
+                return true;
             });
             // make sure members have stable order
             otherMembers.sort((a, b) => a.userId.localeCompare(b.userId));
@@ -2065,7 +2086,7 @@ export class Room extends EventEmitter {
         }
 
         const myMembership = this.getMyMembership();
-        // if I have created a room and invited people throuh
+        // if I have created a room and invited people through
         // 3rd party invites
         if (myMembership == 'join') {
             const thirdPartyInvites =
