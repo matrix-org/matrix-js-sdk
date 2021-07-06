@@ -2037,13 +2037,13 @@ export class Room extends EventEmitter {
         const joinedMemberCount = this.currentState.getJoinedMemberCount();
         const invitedMemberCount = this.currentState.getInvitedMemberCount();
         // -1 because these numbers include the syncing user
-        const inviteJoinCount = joinedMemberCount + invitedMemberCount - 1;
+        let inviteJoinCount = joinedMemberCount + invitedMemberCount - 1;
 
         // get service members (e.g. helper bots) for exclusion
         let excludedUserIds: string[] = [];
         const mFunctionalMembers = this.currentState.getStateEvents(EventType.RoomFunctionalMembers, "");
         if (Array.isArray(mFunctionalMembers?.getContent().service_members)) {
-            excludedUserIds = mRoomName.getContent().service_members;
+            excludedUserIds = mFunctionalMembers.getContent().service_members;
         }
 
         // get members that are NOT ourselves and are actually in the room.
@@ -2066,7 +2066,7 @@ export class Room extends EventEmitter {
                 return m.userId !== userId &&
                     (m.membership === "invite" || m.membership === "join");
             });
-            otherMembers = otherMembers.filter((userId) => {
+            otherMembers = otherMembers.filter(({userId}) => {
                 // filter service members
                 if (excludedUserIds.includes(userId)) {
                     inviteJoinCount--;
