@@ -43,7 +43,7 @@ export interface IAccountDataClient extends EventEmitter {
 
 interface ISecretRequestInternal {
     name: string;
-    devices: Array<string>;
+    devices: string[];
     resolve: (string) => void;
     reject: (Error) => void;
 }
@@ -235,7 +235,7 @@ export class SecretStorage {
      * @param {Array} keys The IDs of the keys to use to encrypt the secret
      *     or null/undefined to use the default key.
      */
-    public async store(name: string, secret: string, keys?: Array<string>): Promise<void> {
+    public async store(name: string, secret: string, keys?: string[]): Promise<void> {
         const encrypted = {};
 
         if (!keys) {
