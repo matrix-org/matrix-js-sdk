@@ -85,7 +85,7 @@ export class SecretStorage {
         return defaultKey.key;
     }
 
-    public setDefaultKeyId(keyId: string) {
+    public setDefaultKeyId(keyId: string): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             const listener = (ev) => {
                 if (
