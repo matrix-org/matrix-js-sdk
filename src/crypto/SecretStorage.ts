@@ -71,11 +71,11 @@ export class SecretStorage {
     // as you don't request any secrets.
     // A better solution would probably be to split this class up into secret storage and
     // secret sharing which are really two separate things, even though they share an MSC.
-    constructor(accountDataClient: IAccountDataClient, cryptoCallbacks: ICryptoCallbacks, matrixClient?: MatrixClient) {
-        this.accountDataAdapter = accountDataClient;
-        this.baseApis = matrixClient;
-        this.cryptoCallbacks = cryptoCallbacks;
-    }
+    constructor(
+        private readonly accountDataClient: IAccountDataClient,
+        private readonly cryptoCallbacks: ICryptoCallbacks,
+        private readonly matrixClient?: MatrixClient,
+    ) {}
 
     public async getDefaultKeyId(): Promise<string> {
         const defaultKey = await this.accountDataAdapter.getAccountDataFromServer(
