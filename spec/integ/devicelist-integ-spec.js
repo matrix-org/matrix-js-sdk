@@ -165,7 +165,7 @@ describe("DeviceList management:", function() {
                    aliceTestClient.httpBackend.flush('/keys/query', 1).then(
                        () => aliceTestClient.httpBackend.flush('/send/', 1),
                    ),
-                   aliceTestClient.client.crypto._deviceList.saveIfDirty(),
+                   aliceTestClient.client.crypto.deviceList.saveIfDirty(),
                ]);
            }).then(() => {
                aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
@@ -202,7 +202,7 @@ describe("DeviceList management:", function() {
                return aliceTestClient.httpBackend.flush('/keys/query', 1);
            }).then((flushed) => {
                expect(flushed).toEqual(0);
-               return aliceTestClient.client.crypto._deviceList.saveIfDirty();
+               return aliceTestClient.client.crypto.deviceList.saveIfDirty();
            }).then(() => {
                aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
                    const bobStat = data.trackingStatus['@bob:xyz'];
@@ -235,7 +235,7 @@ describe("DeviceList management:", function() {
                // wait for the client to stop processing the response
                return aliceTestClient.client.downloadKeys(['@bob:xyz']);
            }).then(() => {
-               return aliceTestClient.client.crypto._deviceList.saveIfDirty();
+               return aliceTestClient.client.crypto.deviceList.saveIfDirty();
            }).then(() => {
                aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
                    const bobStat = data.trackingStatus['@bob:xyz'];
@@ -256,7 +256,7 @@ describe("DeviceList management:", function() {
                // wait for the client to stop processing the response
                return aliceTestClient.client.downloadKeys(['@chris:abc']);
            }).then(() => {
-               return aliceTestClient.client.crypto._deviceList.saveIfDirty();
+               return aliceTestClient.client.crypto.deviceList.saveIfDirty();
            }).then(() => {
                aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
                    const bobStat = data.trackingStatus['@bob:xyz'];
@@ -286,7 +286,7 @@ describe("DeviceList management:", function() {
                 },
             );
             await aliceTestClient.httpBackend.flush('/keys/query', 1);
-            await aliceTestClient.client.crypto._deviceList.saveIfDirty();
+            await aliceTestClient.client.crypto.deviceList.saveIfDirty();
 
             aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
                 const bobStat = data.trackingStatus['@bob:xyz'];
@@ -322,7 +322,7 @@ describe("DeviceList management:", function() {
             );
 
             await aliceTestClient.flushSync();
-            await aliceTestClient.client.crypto._deviceList.saveIfDirty();
+            await aliceTestClient.client.crypto.deviceList.saveIfDirty();
 
             aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
                 const bobStat = data.trackingStatus['@bob:xyz'];
@@ -358,7 +358,7 @@ describe("DeviceList management:", function() {
             );
 
             await aliceTestClient.flushSync();
-            await aliceTestClient.client.crypto._deviceList.saveIfDirty();
+            await aliceTestClient.client.crypto.deviceList.saveIfDirty();
 
             aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
                 const bobStat = data.trackingStatus['@bob:xyz'];
@@ -379,7 +379,7 @@ describe("DeviceList management:", function() {
                 anotherTestClient.httpBackend.when('GET', '/sync').respond(
                     200, getSyncResponse([]));
                 await anotherTestClient.flushSync();
-                await anotherTestClient.client.crypto._deviceList.saveIfDirty();
+                await anotherTestClient.client.crypto.deviceList.saveIfDirty();
 
                 anotherTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
                     const bobStat = data.trackingStatus['@bob:xyz'];

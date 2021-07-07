@@ -31,33 +31,42 @@ import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { encodeRecoveryKey } from './recoverykey';
 import { encryptAES, decryptAES, calculateKeyCheck } from './aes';
 import { getCrypto } from '../utils';
+import { IKeyBackupInfo } from "./keybackup";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 
-type AuthData = Record<string, any>;
-
-type BackupInfo = {
-    algorithm: string,
-    auth_data: AuthData, // eslint-disable-line camelcase
-    [properties: string]: any,
-};
+type AuthData = IKeyBackupInfo["auth_data"];
 
 type SigInfo = {
-    deviceId: string,
-    valid?: boolean | null, // true: valid, false: invalid, null: cannot attempt validation
-    device?: DeviceInfo | null,
-    crossSigningId?: boolean,
-    deviceTrust?: DeviceTrustLevel,
+    deviceId: string;
+    valid?: boolean | null; // true: valid, false: invalid, null: cannot attempt validation
+    device?: DeviceInfo | null;
+    crossSigningId?: boolean;
+    deviceTrust?: DeviceTrustLevel;
 };
 
-type TrustInfo = {
-    usable: boolean, // is the backup trusted, true iff there is a sig that is valid & from a trusted device
-    sigs: SigInfo[],
+export type TrustInfo = {
+    usable: boolean; // is the backup trusted, true iff there is a sig that is valid & from a trusted device
+    sigs: SigInfo[];
 };
+
+export interface IKeyBackupCheck {
+    backupInfo: IKeyBackupInfo;
+    trustInfo: TrustInfo;
+}
+
+/* eslint-disable camelcase */
+export interface IPreparedKeyBackupVersion {
+    algorithm: string;
+    auth_data: AuthData;
+    recovery_key: string;
+    privateKey: Uint8Array;
+}
+/* eslint-enable camelcase */
 
 /** A function used to get the secret key for a backup.
  */
-type GetKey = () => Promise<Uint8Array>;
+type GetKey = () => Promise<ArrayLike<number>>;
 
 interface BackupAlgorithmClass {
     algorithmName: string;
@@ -77,7 +86,7 @@ interface BackupAlgorithm {
     encryptSession(data: Record<string, any>): Promise<any>;
     decryptSessions(ciphertexts: Record<string, any>): Promise<Record<string, any>[]>;
     authData: AuthData;
-    keyMatches(key: Uint8Array): Promise<boolean>;
+    keyMatches(key: ArrayLike<number>): Promise<boolean>;
     free(): void;
 }
 
@@ -86,7 +95,7 @@ interface BackupAlgorithm {
  */
 export class BackupManager {
     private algorithm: BackupAlgorithm | undefined;
-    private backupInfo: BackupInfo | undefined; // The info dict from /room_keys/version
+    public backupInfo: IKeyBackupInfo | undefined; // The info dict from /room_keys/version
     public checkedForBackup: boolean; // Have we checked the server for a backup we can use?
     private sendingBackups: boolean; // Are we currently sending backups?
     constructor(private readonly baseApis: MatrixClient, public readonly getKey: GetKey) {
@@ -116,7 +125,7 @@ export class BackupManager {
         return Algorithm.checkBackupVersion(info);
     }
 
-    public static async makeAlgorithm(info: BackupInfo, getKey: GetKey): Promise<BackupAlgorithm> {
+    public static async makeAlgorithm(info: IKeyBackupInfo, getKey: GetKey): Promise<BackupAlgorithm> {
         const Algorithm = algorithmsByName[info.algorithm];
         if (!Algorithm) {
             throw new Error("Unknown backup algorithm");
@@ -124,7 +133,7 @@ export class BackupManager {
         return await Algorithm.init(info.auth_data, getKey);
     }
 
-    public async enableKeyBackup(info: BackupInfo): Promise<void> {
+    public async enableKeyBackup(info: IKeyBackupInfo): Promise<void> {
         this.backupInfo = info;
         if (this.algorithm) {
             this.algorithm.free();
@@ -163,7 +172,8 @@ export class BackupManager {
     public async prepareKeyBackupVersion(
         key?: string | Uint8Array | null,
         algorithm?: string | undefined,
-    ): Promise<BackupInfo> {
+        // eslint-disable-next-line camelcase
+    ): Promise<IPreparedKeyBackupVersion> {
         const Algorithm = algorithm ? algorithmsByName[algorithm] : DefaultAlgorithm;
         if (!Algorithm) {
             throw new Error("Unknown backup algorithm");
@@ -179,7 +189,7 @@ export class BackupManager {
         };
     }
 
-    public async createKeyBackupVersion(info: BackupInfo): Promise<void> {
+    public async createKeyBackupVersion(info: IKeyBackupInfo): Promise<void> {
         this.algorithm = await BackupManager.makeAlgorithm(info, this.getKey);
     }
 
@@ -189,14 +199,14 @@ export class BackupManager {
      * one of the user's verified devices, start backing up
      * to it.
      */
-    public async checkAndStart(): Promise<{backupInfo: BackupInfo, trustInfo: TrustInfo}> {
+    public async checkAndStart(): Promise<IKeyBackupCheck> {
         logger.log("Checking key backup status...");
         if (this.baseApis.isGuest()) {
             logger.log("Skipping key backup check since user is guest");
             this.checkedForBackup = true;
             return null;
         }
-        let backupInfo: BackupInfo;
+        let backupInfo: IKeyBackupInfo;
         try {
             backupInfo = await this.baseApis.getKeyBackupVersion();
         } catch (e) {
@@ -255,7 +265,7 @@ export class BackupManager {
      *     trust information (as returned by isKeyBackupTrusted)
      *     in trustInfo.
      */
-    public async checkKeyBackup(): Promise<{backupInfo: BackupInfo, trustInfo: TrustInfo}> {
+    public async checkKeyBackup(): Promise<IKeyBackupCheck> {
         this.checkedForBackup = false;
         return this.checkAndStart();
     }
@@ -273,7 +283,7 @@ export class BackupManager {
      *     ]
      * }
      */
-    public async isKeyBackupTrusted(backupInfo: BackupInfo): Promise<TrustInfo> {
+    public async isKeyBackupTrusted(backupInfo: IKeyBackupInfo): Promise<TrustInfo> {
         const ret = {
             usable: false,
             trusted_locally: false,
@@ -290,7 +300,7 @@ export class BackupManager {
             return ret;
         }
 
-        const trustedPubkey = this.baseApis.crypto._sessionStore.getLocalTrustedBackupPubKey();
+        const trustedPubkey = this.baseApis.crypto.sessionStore.getLocalTrustedBackupPubKey();
 
         if (backupInfo.auth_data.public_key === trustedPubkey) {
             logger.info("Backup public key " + trustedPubkey + " is trusted locally");
@@ -310,12 +320,12 @@ export class BackupManager {
             const sigInfo: SigInfo = { deviceId: keyIdParts[1] };
 
             // first check to see if it's from our cross-signing key
-            const crossSigningId = this.baseApis.crypto._crossSigningInfo.getId();
+            const crossSigningId = this.baseApis.crypto.crossSigningInfo.getId();
             if (crossSigningId === sigInfo.deviceId) {
                 sigInfo.crossSigningId = true;
                 try {
                     await verifySignature(
-                        this.baseApis.crypto._olmDevice,
+                        this.baseApis.crypto.olmDevice,
                         backupInfo.auth_data,
                         this.baseApis.getUserId(),
                         sigInfo.deviceId,
@@ -335,7 +345,7 @@ export class BackupManager {
             // Now look for a sig from a device
             // At some point this can probably go away and we'll just support
             // it being signed by the cross-signing master key
-            const device = this.baseApis.crypto._deviceList.getStoredDevice(
+            const device = this.baseApis.crypto.deviceList.getStoredDevice(
                 this.baseApis.getUserId(), sigInfo.deviceId,
             );
             if (device) {
@@ -345,7 +355,7 @@ export class BackupManager {
                 );
                 try {
                     await verifySignature(
-                        this.baseApis.crypto._olmDevice,
+                        this.baseApis.crypto.olmDevice,
                         backupInfo.auth_data,
                         this.baseApis.getUserId(),
                         device.deviceId,
@@ -445,12 +455,12 @@ export class BackupManager {
      * @returns {integer} Number of sessions backed up
      */
     private async backupPendingKeys(limit: number): Promise<number> {
-        const sessions = await this.baseApis.crypto._cryptoStore.getSessionsNeedingBackup(limit);
+        const sessions = await this.baseApis.crypto.cryptoStore.getSessionsNeedingBackup(limit);
         if (!sessions.length) {
             return 0;
         }
 
-        let remaining = await this.baseApis.crypto._cryptoStore.countSessionsNeedingBackup();
+        let remaining = await this.baseApis.crypto.cryptoStore.countSessionsNeedingBackup();
         this.baseApis.crypto.emit("crypto.keyBackupSessionsRemaining", remaining);
 
         const data = {};
@@ -460,7 +470,7 @@ export class BackupManager {
                 data[roomId] = { sessions: {} };
             }
 
-            const sessionData = await this.baseApis.crypto._olmDevice.exportInboundGroupSession(
+            const sessionData = await this.baseApis.crypto.olmDevice.exportInboundGroupSession(
                 session.senderKey, session.sessionId, session.sessionData,
             );
             sessionData.algorithm = MEGOLM_ALGORITHM;
@@ -468,13 +478,13 @@ export class BackupManager {
             const forwardedCount =
                 (sessionData.forwarding_curve25519_key_chain || []).length;
 
-            const userId = this.baseApis.crypto._deviceList.getUserByIdentityKey(
+            const userId = this.baseApis.crypto.deviceList.getUserByIdentityKey(
                 MEGOLM_ALGORITHM, session.senderKey,
             );
-            const device = this.baseApis.crypto._deviceList.getDeviceByIdentityKey(
+            const device = this.baseApis.crypto.deviceList.getDeviceByIdentityKey(
                 MEGOLM_ALGORITHM, session.senderKey,
             );
-            const verified = this.baseApis.crypto._checkDeviceInfoTrust(userId, device).isVerified();
+            const verified = this.baseApis.crypto.checkDeviceInfoTrust(userId, device).isVerified();
 
             data[roomId]['sessions'][session.sessionId] = {
                 first_message_index: sessionData.first_known_index,
@@ -489,8 +499,8 @@ export class BackupManager {
             { rooms: data },
         );
 
-        await this.baseApis.crypto._cryptoStore.unmarkSessionsNeedingBackup(sessions);
-        remaining = await this.baseApis.crypto._cryptoStore.countSessionsNeedingBackup();
+        await this.baseApis.crypto.cryptoStore.unmarkSessionsNeedingBackup(sessions);
+        remaining = await this.baseApis.crypto.cryptoStore.countSessionsNeedingBackup();
         this.baseApis.crypto.emit("crypto.keyBackupSessionsRemaining", remaining);
 
         return sessions.length;
@@ -499,7 +509,7 @@ export class BackupManager {
     public async backupGroupSession(
         senderKey: string, sessionId: string,
     ): Promise<void> {
-        await this.baseApis.crypto._cryptoStore.markSessionsNeedingBackup([{
+        await this.baseApis.crypto.cryptoStore.markSessionsNeedingBackup([{
             senderKey: senderKey,
             sessionId: sessionId,
         }]);
@@ -531,22 +541,22 @@ export class BackupManager {
      *     (which will be equal to the number of sessions in the store).
      */
     public async flagAllGroupSessionsForBackup(): Promise<number> {
-        await this.baseApis.crypto._cryptoStore.doTxn(
+        await this.baseApis.crypto.cryptoStore.doTxn(
             'readwrite',
             [
                 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
                 IndexedDBCryptoStore.STORE_BACKUP,
             ],
             (txn) => {
-                this.baseApis.crypto._cryptoStore.getAllEndToEndInboundGroupSessions(txn, (session) => {
+                this.baseApis.crypto.cryptoStore.getAllEndToEndInboundGroupSessions(txn, (session) => {
                     if (session !== null) {
-                        this.baseApis.crypto._cryptoStore.markSessionsNeedingBackup([session], txn);
+                        this.baseApis.crypto.cryptoStore.markSessionsNeedingBackup([session], txn);
                     }
                 });
             },
         );
 
-        const remaining = await this.baseApis.crypto._cryptoStore.countSessionsNeedingBackup();
+        const remaining = await this.baseApis.crypto.cryptoStore.countSessionsNeedingBackup();
         this.baseApis.emit("crypto.keyBackupSessionsRemaining", remaining);
         return remaining;
     }
@@ -556,7 +566,7 @@ export class BackupManager {
      * @returns {Promise<int>} Resolves to the number of sessions requiring backup
      */
     public countSessionsNeedingBackup(): Promise<number> {
-        return this.baseApis.crypto._cryptoStore.countSessionsNeedingBackup();
+        return this.baseApis.crypto.cryptoStore.countSessionsNeedingBackup();
     }
 }
 
@@ -586,7 +596,7 @@ export class Curve25519 implements BackupAlgorithm {
     ): Promise<[Uint8Array, AuthData]> {
         const decryption = new global.Olm.PkDecryption();
         try {
-            const authData: AuthData = {};
+            const authData: Partial<AuthData> = {};
             if (!key) {
                 authData.public_key = decryption.generate_key();
             } else if (key instanceof Uint8Array) {
@@ -602,7 +612,7 @@ export class Curve25519 implements BackupAlgorithm {
 
             return [
                 decryption.get_private_key(),
-                authData,
+                authData as AuthData,
             ];
         } finally {
             decryption.free();

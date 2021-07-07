@@ -292,7 +292,7 @@ export class VerificationBase extends EventEmitter {
                 await verifier(keyId, device, keyInfo);
                 verifiedDevices.push(deviceId);
             } else {
-                const crossSigningInfo = this._baseApis.crypto._deviceList
+                const crossSigningInfo = this._baseApis.crypto.deviceList
                       .getStoredCrossSigningForUser(userId);
                 if (crossSigningInfo && crossSigningInfo.getId() === deviceId) {
                     await verifier(keyId, DeviceInfo.fromStorage({
