@@ -282,7 +282,7 @@ export class SecretStorage {
      *
      * @return {string} the contents of the secret
      */
-    async get(name: string): Promise<string> {
+    public async get(name: string): Promise<string> {
         const secretInfo = await this.accountDataAdapter.getAccountDataFromServer(name);
         if (!secretInfo) {
             return;
@@ -341,7 +341,7 @@ export class SecretStorage {
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    async isStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo>> {
+    public async isStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo>> {
         // check if secret exists
         const secretInfo = await this.accountDataAdapter.getAccountDataFromServer(name);
         if (!secretInfo) return null;
@@ -378,7 +378,7 @@ export class SecretStorage {
      * @param {string} name the name of the secret to request
      * @param {string[]} devices the devices to request the secret from
      */
-    request(name: string, devices: string[]): ISecretRequest {
+    public request(name: string, devices: string[]): ISecretRequest {
         const requestId = this.baseApis.makeTxnId();
 
         let resolve: (string) => void;
