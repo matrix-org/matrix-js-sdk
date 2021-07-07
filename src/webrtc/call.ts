@@ -24,7 +24,7 @@ limitations under the License.
 import { logger } from '../logger';
 import { EventEmitter } from 'events';
 import * as utils from '../utils';
-import MatrixEvent from '../models/event';
+import { MatrixEvent } from '../models/event';
 import { EventType } from '../@types/event';
 import { RoomMember } from '../models/room-member';
 import { randomString } from '../randomstring';
@@ -58,22 +58,22 @@ import { CallFeed } from './callFeed';
  */
 
 interface CallOpts {
-    roomId?: string,
-    client?: any, // Fix when client is TSified
-    forceTURN?: boolean,
-    turnServers?: Array<TurnServer>,
+    roomId?: string;
+    client?: any; // Fix when client is TSified
+    forceTURN?: boolean;
+    turnServers?: Array<TurnServer>;
 }
 
 interface TurnServer {
-    urls: Array<string>,
-    username?: string,
-    password?: string,
-    ttl?: number,
+    urls: Array<string>;
+    username?: string;
+    password?: string;
+    ttl?: number;
 }
 
 interface AssertedIdentity {
-    id: string,
-    displayName: string,
+    id: string;
+    displayName: string;
 }
 
 export enum CallState {
@@ -194,7 +194,12 @@ export enum CallErrorCode {
     /**
      * The remote party is busy
      */
-    UserBusy = 'user_busy'
+    UserBusy = 'user_busy',
+
+    /**
+     * We transferred the call off to somewhere else
+     */
+    Transfered = 'transferred',
 }
 
 enum ConstraintsType {
@@ -1653,7 +1658,7 @@ export class MatrixCall extends EventEmitter {
 
         await this.sendVoipEvent(EventType.CallReplaces, body);
 
-        await this.terminate(CallParty.Local, CallErrorCode.Replaced, true);
+        await this.terminate(CallParty.Local, CallErrorCode.Transfered, true);
     }
 
     /*
@@ -1693,7 +1698,7 @@ export class MatrixCall extends EventEmitter {
         await this.sendVoipEvent(EventType.CallReplaces, bodyToTransferee);
 
         await this.terminate(CallParty.Local, CallErrorCode.Replaced, true);
-        await transferTargetCall.terminate(CallParty.Local, CallErrorCode.Replaced, true);
+        await transferTargetCall.terminate(CallParty.Local, CallErrorCode.Transfered, true);
     }
 
     private async terminate(hangupParty: CallParty, hangupReason: CallErrorCode, shouldEmit: boolean) {

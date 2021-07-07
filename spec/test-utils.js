@@ -51,7 +51,7 @@ export function mock(constr, name) {
     result.toString = function() {
         return "mock" + (name ? " of " + name : "");
     };
-    for (const key in constr.prototype) { // eslint-disable-line guard-for-in
+    for (const key of Object.getOwnPropertyNames(constr.prototype)) { // eslint-disable-line guard-for-in
         try {
             if (constr.prototype[key] instanceof Function) {
                 result[key] = jest.fn();

@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import { ISignatures } from "../@types/signed";
-import { DeviceInfo } from "./deviceinfo";
 
 export interface IKeyBackupSession {
     first_message_index: number; // eslint-disable-line camelcase
@@ -32,28 +31,21 @@ export interface IKeyBackupRoomSessions {
     [sessionId: string]: IKeyBackupSession;
 }
 
-export interface IKeyBackupVersion {
+/* eslint-disable camelcase */
+export interface IKeyBackupInfo {
     algorithm: string;
-    auth_data: { // eslint-disable-line camelcase
-        public_key: string; // eslint-disable-line camelcase
+    auth_data: {
+        public_key: string;
         signatures: ISignatures;
+        private_key_salt: string;
+        private_key_iterations: number;
+        private_key_bits?: number;
     };
-    count: number;
-    etag: string;
-    version: string; // number contained within
+    count?: number;
+    etag?: string;
+    version?: string; // number contained within
 }
-
-// TODO: Verify types
-export interface IKeyBackupTrustInfo {
-    /**
-     * is the backup trusted, true if there is a sig that is valid & from a trusted device
-     */
-    usable: boolean[];
-    sigs: {
-        valid: boolean[];
-        device: DeviceInfo[];
-    }[];
-}
+/* eslint-enable camelcase */
 
 export interface IKeyBackupPrepareOpts {
     secureSecretStorage: boolean;

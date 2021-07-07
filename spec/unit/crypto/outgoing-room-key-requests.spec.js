@@ -21,25 +21,23 @@ import { MemoryCryptoStore } from '../../../src/crypto/store/memory-crypto-store
 import 'fake-indexeddb/auto';
 import 'jest-localstorage-mock';
 
-import {
-    ROOM_KEY_REQUEST_STATES,
-} from '../../../src/crypto/OutgoingRoomKeyRequestManager';
+import { RoomKeyRequestState } from '../../../src/crypto/OutgoingRoomKeyRequestManager';
 
 const requests = [
     {
         requestId: "A",
         requestBody: { session_id: "A", room_id: "A" },
-        state: ROOM_KEY_REQUEST_STATES.SENT,
+        state: RoomKeyRequestState.Sent,
     },
     {
         requestId: "B",
         requestBody: { session_id: "B", room_id: "B" },
-        state: ROOM_KEY_REQUEST_STATES.SENT,
+        state: RoomKeyRequestState.Sent,
     },
     {
         requestId: "C",
         requestBody: { session_id: "C", room_id: "C" },
-        state: ROOM_KEY_REQUEST_STATES.UNSENT,
+        state: RoomKeyRequestState.Unsent,
     },
 ];
 
@@ -68,9 +66,9 @@ describe.each([
     it("getAllOutgoingRoomKeyRequestsByState retrieves all entries in a given state",
     async () => {
         const r = await
-            store.getAllOutgoingRoomKeyRequestsByState(ROOM_KEY_REQUEST_STATES.SENT);
+            store.getAllOutgoingRoomKeyRequestsByState(RoomKeyRequestState.Sent);
         expect(r).toHaveLength(2);
-        requests.filter((e) => e.state == ROOM_KEY_REQUEST_STATES.SENT).forEach((e) => {
+        requests.filter((e) => e.state === RoomKeyRequestState.Sent).forEach((e) => {
             expect(r).toContainEqual(e);
         });
     });
@@ -78,10 +76,10 @@ describe.each([
     test("getOutgoingRoomKeyRequestByState retrieves any entry in a given state",
     async () => {
         const r =
-            await store.getOutgoingRoomKeyRequestByState([ROOM_KEY_REQUEST_STATES.SENT]);
+            await store.getOutgoingRoomKeyRequestByState([RoomKeyRequestState.Sent]);
         expect(r).not.toBeNull();
         expect(r).not.toBeUndefined();
-        expect(r.state).toEqual(ROOM_KEY_REQUEST_STATES.SENT);
+        expect(r.state).toEqual(RoomKeyRequestState.Sent);
         expect(requests).toContainEqual(r);
     });
 });

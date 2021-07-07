@@ -19,6 +19,7 @@ import { MemoryStore } from "./store/memory";
 import { MatrixScheduler } from "./scheduler";
 import { MatrixClient } from "./client";
 import { ICreateClientOpts } from "./client";
+import { DeviceTrustLevel } from "./crypto/CrossSigning";
 
 export * from "./client";
 export * from "./http-api";
@@ -99,7 +100,7 @@ export function setCryptoStoreFactory(fac) {
 }
 
 export interface ICryptoCallbacks {
-    getCrossSigningKey?: (keyType: string, pubKey: Uint8Array) => Promise<Uint8Array>;
+    getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array>;
     saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
     shouldUpgradeDeviceVerifications?: (
         users: Record<string, any>
@@ -112,7 +113,7 @@ export interface ICryptoCallbacks {
     ) => void;
     onSecretRequested?: (
         userId: string, deviceId: string,
-        requestId: string, secretName: string, deviceTrust: IDeviceTrustLevel
+        requestId: string, secretName: string, deviceTrust: DeviceTrustLevel
     ) => Promise<string>;
     getDehydrationKey?: (
         keyInfo: ISecretStorageKeyInfo,
@@ -130,14 +131,6 @@ export interface ISecretStorageKeyInfo {
     };
     iv?: string;
     mac?: string;
-}
-
-// TODO: Move this to `CrossSigning` once converted
-export interface IDeviceTrustLevel {
-    isVerified(): boolean;
-    isCrossSigningVerified(): boolean;
-    isLocallyVerified(): boolean;
-    isTofu(): boolean;
 }
 
 /**
