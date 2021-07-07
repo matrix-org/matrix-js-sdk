@@ -394,7 +394,7 @@ export class SecretStorage {
             reject,
         });
 
-        const cancel = (reason) => {
+        const cancel = (reason: string) => {
             // send cancellation event
             const cancelData = {
                 action: "request_cancellation",
