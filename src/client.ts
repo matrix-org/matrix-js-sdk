@@ -1842,7 +1842,9 @@ export class MatrixClient extends EventEmitter {
      *     keyInfo: {object} details about the key (iv, mac, passphrase)
      */
     public addSecretStorageKey(
-        algorithm: string, opts: IAddSecretStorageKeyOpts, keyName?: string,
+        algorithm: string,
+        opts: IAddSecretStorageKeyOpts,
+        keyName?: string,
     ): Promise<{keyId: string, keyInfo: ISecretStorageKeyInfo}> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");

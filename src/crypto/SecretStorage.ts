@@ -122,7 +122,9 @@ export class SecretStorage {
      *     keyInfo: {object} details about the key (iv, mac, passphrase)
      */
     public async addKey(
-        algorithm: string, opts: IAddSecretStorageKeyOpts, keyId?: string,
+        algorithm: string,
+        opts: IAddSecretStorageKeyOpts,
+        keyId?: string,
     ): Promise<{keyId: string, keyInfo: ISecretStorageKeyInfo}> {
         const keyInfo = { algorithm } as ISecretStorageKeyInfo;
 
