@@ -65,7 +65,7 @@ import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
 import type Request from "request";
 import { MatrixScheduler } from "./scheduler";
 import { ICryptoCallbacks, NotificationCountType } from "./matrix";
-import { ISecretStorageKeyInfo } from "./crypto/SecretStorage";
+import { ISecretStorageKeyInfo } from "./crypto/api";
 import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store";
 import { LocalStorageCryptoStore } from "./crypto/store/localStorage-crypto-store";
 import { IndexedDBCryptoStore } from "./crypto/store/indexeddb-crypto-store";

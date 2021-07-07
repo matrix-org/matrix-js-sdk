@@ -19,7 +19,7 @@ import { IndexedDBCryptoStore } from '../crypto/store/indexeddb-crypto-store';
 import { decryptAES, encryptAES } from './aes';
 import anotherjson from "another-json";
 import { logger } from '../logger';
-import { ISecretStorageKeyInfo } from "./SecretStorage";
+import { ISecretStorageKeyInfo } from "./api";
 
 // FIXME: these types should eventually go in a different file
 type Signatures = Record<string, Record<string, string>>;

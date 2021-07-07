@@ -20,22 +20,12 @@ import { randomString } from '../randomstring';
 import { encryptAES, decryptAES, IEncryptedPayload } from './aes';
 import { encodeBase64 } from "./olmlib";
 import { ICryptoCallbacks, MatrixClient, MatrixEvent } from '../matrix';
-import { IAddSecretStorageKeyOpts, IPassphraseInfo } from './api';
+import { IAddSecretStorageKeyOpts, ISecretStorageKeyInfo } from './api';
 import { EventEmitter } from 'stream';
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
 
 const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
-
-export interface ISecretStorageKeyInfo {
-    name: string;
-    algorithm: string;
-    // technically the below are specific to AES keys. If we ever introduce another type,
-    // we can split into separate interfaces.
-    iv: string;
-    mac: string;
-    passphrase: IPassphraseInfo;
-}
 
 export type SecretStorageKeyTuple = [keyId: string, keyInfo: ISecretStorageKeyInfo];
 

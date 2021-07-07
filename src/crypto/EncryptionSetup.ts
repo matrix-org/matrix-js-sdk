@@ -12,7 +12,7 @@ import {
     ISignedKey,
     KeySignatures,
 } from "../matrix";
-import { ISecretStorageKeyInfo } from "./SecretStorage";
+import { ISecretStorageKeyInfo } from "./api";
 import { IKeyBackupInfo } from "./keybackup";
 
 interface ICrossSigningKeys {

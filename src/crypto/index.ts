@@ -36,11 +36,10 @@ import { EncryptionSetupBuilder } from "./EncryptionSetup";
 import {
     SECRET_STORAGE_ALGORITHM_V1_AES,
     SecretStorage,
-    ISecretStorageKeyInfo,
     SecretStorageKeyTuple,
     ISecretRequest,
 } from './SecretStorage';
-import { IAddSecretStorageKeyOpts } from "./api";
+import { IAddSecretStorageKeyOpts, ISecretStorageKeyInfo } from "./api";
 import { OutgoingRoomKeyRequestManager } from './OutgoingRoomKeyRequestManager';
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { ReciprocateQRCode, SCAN_QR_CODE_METHOD, SHOW_QR_CODE_METHOD } from './verification/QRCode';

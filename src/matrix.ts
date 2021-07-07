@@ -20,7 +20,7 @@ import { MatrixScheduler } from "./scheduler";
 import { MatrixClient } from "./client";
 import { ICreateClientOpts } from "./client";
 import { DeviceTrustLevel } from "./crypto/CrossSigning";
-import { ISecretStorageKeyInfo } from "./crypto/SecretStorage";
+import { ISecretStorageKeyInfo } from "./crypto/api";
 
 export * from "./client";
 export * from "./http-api";
