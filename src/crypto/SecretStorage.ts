@@ -87,7 +87,7 @@ export class SecretStorage {
 
     public setDefaultKeyId(keyId: string): Promise<void> {
         return new Promise<void>((resolve, reject) => {
-            const listener = (ev) => {
+            const listener = (ev: MatrixEvent): void => {
                 if (
                     ev.getType() === 'm.secret_storage.default_key' &&
                     ev.getContent().key === keyId
