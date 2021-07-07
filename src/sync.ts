@@ -30,7 +30,7 @@ import * as utils from "./utils";
 import { IDeferred } from "./utils";
 import { Filter } from "./filter";
 import { EventTimeline } from "./models/event-timeline";
-import { PushProcessor } from "./pushprocessor";
+import { IRulesets, PushProcessor } from "./pushprocessor";
 import { logger } from './logger';
 import { InvalidStoreError } from './errors';
 import { IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
@@ -52,6 +52,7 @@ import {
 import { MatrixEvent } from "./models/event";
 import { MatrixError } from "./http-api";
 import { ISavedSync } from "./store";
+import { EventType } from "./@types/event";
 
 const DEBUG = true;
 
@@ -1066,9 +1067,9 @@ export class SyncApi {
                     // honour push rules that were previously cached. Base rules
                     // will be updated when we receive push rules via getPushRules
                     // (see sync) before syncing over the network.
-                    if (accountDataEvent.getType() === 'm.push_rules') {
+                    if (accountDataEvent.getType() === EventType.PushRules) {
                         const rules = accountDataEvent.getContent();
-                        client.pushRules = PushProcessor.rewriteDefaultRules(rules);
+                        client.pushRules = PushProcessor.rewriteDefaultRules(rules as IRulesets);
                     }
                     const prevEvent = prevEventsMap[accountDataEvent.getId()];
                     client.emit("accountData", accountDataEvent, prevEvent);
