@@ -797,7 +797,7 @@ export class Crypto extends EventEmitter {
                 if (key) {
                     const privateKey = key[1];
                     builder.ssssCryptoCallbacks.addPrivateKey(keyId, keyInfo, privateKey);
-                    const { iv, mac } = await SecretStorage._calculateKeyCheck(privateKey);
+                    const { iv, mac } = await SecretStorage.calculateKeyCheck(privateKey);
                     keyInfo.iv = iv;
                     keyInfo.mac = mac;
 

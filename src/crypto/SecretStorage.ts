@@ -139,7 +139,7 @@ export class SecretStorage {
                 keyInfo.passphrase = opts.passphrase;
             }
             if (opts.key) {
-                const { iv, mac } = await SecretStorage._calculateKeyCheck(opts.key);
+                const { iv, mac } = await SecretStorage.calculateKeyCheck(opts.key);
                 keyInfo.iv = iv;
                 keyInfo.mac = mac;
             }
@@ -212,7 +212,7 @@ export class SecretStorage {
     public async checkKey(key: Uint8Array, info: ISecretStorageKeyInfo): Promise<boolean> {
         if (info.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             if (info.mac) {
-                const { mac } = await SecretStorage._calculateKeyCheck(key, info.iv);
+                const { mac } = await SecretStorage.calculateKeyCheck(key, info.iv);
                 return info.mac.replace(/=+$/g, '') === mac.replace(/=+$/g, '');
             } else {
                 // if we have no information, we have to assume the key is right
@@ -223,7 +223,7 @@ export class SecretStorage {
         }
     }
 
-    public static async _calculateKeyCheck(key: Uint8Array, iv?: string): Promise<IEncryptedPayload> {
+    public static async calculateKeyCheck(key: Uint8Array, iv?: string): Promise<IEncryptedPayload> {
         return await encryptAES(ZERO_STR, key, "", iv);
     }
 
