@@ -100,7 +100,7 @@ fi
 # global cache here to ensure we get the right thing.
 yarn cache clean
 # Ensure all dependencies are updated
-yarn install --ignore-scripts
+yarn install --ignore-scripts --pure-lockfile
 
 if [ -z "$skip_changelog" ]; then
     # update_changelog doesn't have a --version flag
@@ -225,7 +225,7 @@ if [ $dodist -eq 0 ]; then
     pushd "$builddir"
     git clone "$projdir" .
     git checkout "$rel_branch"
-    yarn install
+    yarn install --pure-lockfile
     # We haven't tagged yet, so tell the dist script what version
     # it's building
     DIST_VERSION="$tag" yarn dist
