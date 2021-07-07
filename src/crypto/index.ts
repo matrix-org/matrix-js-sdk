@@ -38,6 +38,7 @@ import {
     SecretStorage,
     SecretStorageKeyTuple,
     ISecretRequest,
+    SecretStorageKeyObject,
 } from './SecretStorage';
 import { IAddSecretStorageKeyOpts, ISecretStorageKeyInfo } from "./api";
 import { OutgoingRoomKeyRequestManager } from './OutgoingRoomKeyRequestManager';
@@ -981,7 +982,7 @@ export class Crypto extends EventEmitter {
         algorithm: string,
         opts: IAddSecretStorageKeyOpts,
         keyID: string,
-    ): Promise<{keyId: string, keyInfo: ISecretStorageKeyInfo}> {
+    ): Promise<SecretStorageKeyObject> {
         return this.secretStorage.addKey(algorithm, opts, keyID);
     }
 

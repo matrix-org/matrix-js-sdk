@@ -27,7 +27,9 @@ export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha
 
 const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
 
+// Some of the key functions use a tuple and some use an object...
 export type SecretStorageKeyTuple = [keyId: string, keyInfo: ISecretStorageKeyInfo];
+export type SecretStorageKeyObject = {keyId: string, keyInfo: ISecretStorageKeyInfo};
 
 export interface ISecretRequest {
     requestId: string;
@@ -123,7 +125,7 @@ export class SecretStorage {
         algorithm: string,
         opts: IAddSecretStorageKeyOpts,
         keyId?: string,
-    ): Promise<{keyId: string, keyInfo: ISecretStorageKeyInfo}> {
+    ): Promise<SecretStorageKeyObject> {
         const keyInfo = { algorithm } as ISecretStorageKeyInfo;
 
         if (!opts) opts = {} as IAddSecretStorageKeyOpts;
