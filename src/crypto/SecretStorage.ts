@@ -50,8 +50,8 @@ interface ISecretRequestInternal {
 }
 
 interface IDecryptors {
-    encrypt: (string) => Promise<IEncryptedPayload>;
-    decrypt: (IEncryptedPayload) => Promise<string>;
+    encrypt: (plaintext: string) => Promise<IEncryptedPayload>;
+    decrypt: (ciphertext: IEncryptedPayload) => Promise<string>;
 }
 
 /**
