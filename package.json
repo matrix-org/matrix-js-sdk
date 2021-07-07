@@ -1,6 +1,6 @@
 {
   "name": "matrix-js-sdk",
-  "version": "11.1.0",
+  "version": "12.0.1",
   "description": "Matrix Client-Server SDK for Javascript",
   "scripts": {
     "prepublishOnly": "yarn build",
@@ -15,7 +15,7 @@
     "build:minify-browser": "terser dist/browser-matrix.js --compress --mangle --source-map --output dist/browser-matrix.min.js",
     "gendoc": "jsdoc -c jsdoc.json -P package.json",
     "lint": "yarn lint:types && yarn lint:js",
-    "lint:js": "eslint --max-warnings 72 src spec",
+    "lint:js": "eslint --max-warnings 57 src spec",
     "lint:types": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -55,6 +55,7 @@
     "bs58": "^4.0.1",
     "content-type": "^1.0.4",
     "loglevel": "^1.7.1",
+    "p-retry": "^4.5.0",
     "qs": "^6.9.6",
     "request": "^2.88.2",
     "unhomoglyph": "^1.0.6"
@@ -73,6 +74,7 @@
     "@babel/preset-typescript": "^7.12.7",
     "@babel/register": "^7.12.10",
     "@matrix-org/olm": "https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.3.tgz",
+    "@types/bs58": "^4.0.1",
     "@types/jest": "^26.0.20",
     "@types/node": "12",
     "@types/request": "^2.48.5",

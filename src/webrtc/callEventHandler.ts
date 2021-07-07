@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import MatrixEvent from '../models/event';
+import { MatrixEvent } from '../models/event';
 import { logger } from '../logger';
 import { createNewMatrixCall, MatrixCall, CallErrorCode, CallState, CallDirection } from './call';
 import { EventType } from '../@types/event';
@@ -87,7 +87,7 @@ export class CallEventHandler {
             }
             this.callEventBuffer = [];
         }
-    }
+    };
 
     private onEvent = (event: MatrixEvent) => {
         this.client.decryptEventIfNeeded(event);
@@ -117,7 +117,7 @@ export class CallEventHandler {
                 }
             });
         }
-    }
+    };
 
     private eventIsACall(event: MatrixEvent): boolean {
         const type = event.getType();
@@ -155,7 +155,7 @@ export class CallEventHandler {
             const timeUntilTurnCresExpire = this.client.getTurnServersExpiry() - Date.now();
             logger.info("Current turn creds expire in " + timeUntilTurnCresExpire + " ms");
             call = createNewMatrixCall(this.client, event.getRoomId(), {
-                forceTURN: this.client._forceTURN,
+                forceTURN: this.client.forceTURN,
             });
             if (!call) {
                 logger.log(
@@ -244,7 +244,7 @@ export class CallEventHandler {
             } else {
                 call.onRemoteIceCandidatesReceived(event);
             }
-        } else if ([EventType.CallHangup, EventType.CallReject].includes(event.getType())) {
+        } else if ([EventType.CallHangup, EventType.CallReject].includes(event.getType() as EventType)) {
             // Note that we also observe our own hangups here so we can see
             // if we've already rejected a call that would otherwise be valid
             if (!call) {

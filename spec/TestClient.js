@@ -69,7 +69,7 @@ export function TestClient(
 
     this.deviceKeys = null;
     this.oneTimeKeys = {};
-    this._callEventHandler = {
+    this.callEventHandler = {
         calls: new Map(),
     };
 }

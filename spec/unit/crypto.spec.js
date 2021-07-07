@@ -65,7 +65,7 @@ describe("Crypto", function() {
                 'YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI';
             device.keys["ed25519:FLIBBLE"] =
                 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
-            client._crypto._deviceList.getDeviceByIdentityKey = () => device;
+            client.crypto.deviceList.getDeviceByIdentityKey = () => device;
 
             encryptionInfo = client.getEventEncryptionInfo(event);
             expect(encryptionInfo.encrypted).toBeTruthy();
@@ -213,7 +213,7 @@ describe("Crypto", function() {
 
                 async function keyshareEventForEvent(event, index) {
                     const eventContent = event.getWireContent();
-                    const key = await aliceClient._crypto._olmDevice
+                    const key = await aliceClient.crypto.olmDevice
                         .getInboundGroupSessionKey(
                             roomId, eventContent.sender_key, eventContent.session_id,
                             index,
@@ -234,7 +234,7 @@ describe("Crypto", function() {
                         },
                     });
                     // make onRoomKeyEvent think this was an encrypted event
-                    ksEvent._senderCurve25519Key = "akey";
+                    ksEvent.senderCurve25519Key = "akey";
                     return ksEvent;
                 }
 
@@ -273,19 +273,19 @@ describe("Crypto", function() {
                 await Promise.all(events.map(async (event) => {
                     // alice encrypts each event, and then bob tries to decrypt
                     // them without any keys, so that they'll be in pending
-                    await aliceClient._crypto.encryptEvent(event, aliceRoom);
-                    event._clearEvent = {};
-                    event._senderCurve25519Key = null;
-                    event._claimedEd25519Key = null;
+                    await aliceClient.crypto.encryptEvent(event, aliceRoom);
+                    event.clearEvent = {};
+                    event.senderCurve25519Key = null;
+                    event.claimedEd25519Key = null;
                     try {
-                        await bobClient._crypto.decryptEvent(event);
+                        await bobClient.crypto.decryptEvent(event);
                     } catch (e) {
                         // we expect this to fail because we don't have the
                         // decryption keys yet
                     }
                 }));
 
-                const bobDecryptor = bobClient._crypto._getRoomDecryptor(
+                const bobDecryptor = bobClient.crypto.getRoomDecryptor(
                     roomId, olmlib.MEGOLM_ALGORITHM,
                 );
 
@@ -302,7 +302,7 @@ describe("Crypto", function() {
                 expect(events[0].getContent().msgtype).toBe("m.bad.encrypted");
                 expect(events[1].getContent().msgtype).not.toBe("m.bad.encrypted");
 
-                const cryptoStore = bobClient._cryptoStore;
+                const cryptoStore = bobClient.cryptoStore;
                 const eventContent = events[0].getWireContent();
                 const senderKey = eventContent.sender_key;
                 const sessionId = eventContent.session_id;
@@ -344,7 +344,7 @@ describe("Crypto", function() {
                 },
             });
             await aliceClient.cancelAndResendEventRoomKeyRequest(event);
-            const cryptoStore = aliceClient._cryptoStore;
+            const cryptoStore = aliceClient.cryptoStore;
             const roomKeyRequestBody = {
                 algorithm: olmlib.MEGOLM_ALGORITHM,
                 room_id: "!someroom",
@@ -377,7 +377,7 @@ describe("Crypto", function() {
             // key requests get queued until the sync has finished, but we don't
             // let the client set up enough for that to happen, so gut-wrench a bit
             // to force it to send now.
-            aliceClient._crypto._outgoingRoomKeyRequestManager.sendQueuedRequests();
+            aliceClient.crypto.outgoingRoomKeyRequestManager.sendQueuedRequests();
             jest.runAllTimers();
             await Promise.resolve();
             expect(aliceClient.sendToDevice).toBeCalledTimes(1);

@@ -444,7 +444,7 @@ export class SecretStorage extends EventEmitter {
                 && this._incomingRequests[deviceId][content.request_id]) {
                 logger.info("received request cancellation for secret (" + sender
                             + ", " + deviceId + ", " + content.request_id + ")");
-                this.baseApis.emit("crypto.secrets.requestCancelled", {
+                this._baseApis.emit("crypto.secrets.requestCancelled", {
                     user_id: sender,
                     device_id: deviceId,
                     request_id: content.request_id,
@@ -480,11 +480,11 @@ export class SecretStorage extends EventEmitter {
                 };
                 const encryptedContent = {
                     algorithm: olmlib.OLM_ALGORITHM,
-                    sender_key: this._baseApis._crypto._olmDevice.deviceCurve25519Key,
+                    sender_key: this._baseApis.crypto.olmDevice.deviceCurve25519Key,
                     ciphertext: {},
                 };
                 await olmlib.ensureOlmSessionsForDevices(
-                    this._baseApis._crypto._olmDevice,
+                    this._baseApis.crypto.olmDevice,
                     this._baseApis,
                     {
                         [sender]: [
@@ -496,7 +496,7 @@ export class SecretStorage extends EventEmitter {
                     encryptedContent.ciphertext,
                     this._baseApis.getUserId(),
                     this._baseApis.deviceId,
-                    this._baseApis._crypto._olmDevice,
+                    this._baseApis.crypto.olmDevice,
                     sender,
                     this._baseApis.getStoredDevice(sender, deviceId),
                     payload,
@@ -527,7 +527,7 @@ export class SecretStorage extends EventEmitter {
         if (requestControl) {
             // make sure that the device that sent it is one of the devices that
             // we requested from
-            const deviceInfo = this._baseApis._crypto._deviceList.getDeviceByIdentityKey(
+            const deviceInfo = this._baseApis.crypto.deviceList.getDeviceByIdentityKey(
                 olmlib.OLM_ALGORITHM,
                 event.getSenderKey(),
             );

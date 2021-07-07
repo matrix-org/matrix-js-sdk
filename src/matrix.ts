@@ -1,7 +1,5 @@
 /*
-Copyright 2015, 2016 OpenMarket Ltd
-Copyright 2017 Vector Creations Ltd
-Copyright 2019, 2020 The Matrix.org Foundation C.I.C.
+Copyright 2015-2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,17 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type Request from "request";
-
 import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store";
-import { LocalStorageCryptoStore } from "./crypto/store/localStorage-crypto-store";
-import { IndexedDBCryptoStore } from "./crypto/store/indexeddb-crypto-store";
 import { MemoryStore } from "./store/memory";
-import { StubStore } from "./store/stub";
-import { LocalIndexedDBStoreBackend } from "./store/indexeddb-local-backend";
-import { RemoteIndexedDBStoreBackend } from "./store/indexeddb-remote-backend";
 import { MatrixScheduler } from "./scheduler";
 import { MatrixClient } from "./client";
+import { ICreateClientOpts } from "./client";
+import { DeviceTrustLevel } from "./crypto/CrossSigning";
 
 export * from "./client";
 export * from "./http-api";
@@ -94,11 +87,6 @@ export function wrapRequest(wrapper) {
     };
 }
 
-type Store =
-    StubStore | MemoryStore | LocalIndexedDBStoreBackend | RemoteIndexedDBStoreBackend;
-
-type CryptoStore = MemoryCryptoStore | LocalStorageCryptoStore | IndexedDBCryptoStore;
-
 let cryptoStoreFactory = () => new MemoryCryptoStore;
 
 /**
@@ -111,43 +99,8 @@ export function setCryptoStoreFactory(fac) {
     cryptoStoreFactory = fac;
 }
 
-export interface ICreateClientOpts {
-    baseUrl: string;
-    idBaseUrl?: string;
-    store?: Store;
-    cryptoStore?: CryptoStore;
-    scheduler?: MatrixScheduler;
-    request?: Request;
-    userId?: string;
-    deviceId?: string;
-    accessToken?: string;
-    identityServer?: any;
-    localTimeoutMs?: number;
-    useAuthorizationHeader?: boolean;
-    timelineSupport?: boolean;
-    queryParams?: Record<string, unknown>;
-    deviceToImport?: {
-        olmDevice: {
-            pickledAccount: string;
-            sessions: Array<Record<string, any>>;
-            pickleKey: string;
-        };
-        userId: string;
-        deviceId: string;
-    };
-    pickleKey?: string;
-    sessionStore?: any;
-    unstableClientRelationAggregation?: boolean;
-    verificationMethods?: Array<any>;
-    forceTURN?: boolean;
-    iceCandidatePoolSize?: number,
-    supportsCallTransfer?: boolean,
-    fallbackICEServerAllowed?: boolean;
-    cryptoCallbacks?: ICryptoCallbacks;
-}
-
 export interface ICryptoCallbacks {
-    getCrossSigningKey?: (keyType: string, pubKey: Uint8Array) => Promise<Uint8Array>;
+    getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array>;
     saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
     shouldUpgradeDeviceVerifications?: (
         users: Record<string, any>
@@ -160,12 +113,13 @@ export interface ICryptoCallbacks {
     ) => void;
     onSecretRequested?: (
         userId: string, deviceId: string,
-        requestId: string, secretName: string, deviceTrust: IDeviceTrustLevel
+        requestId: string, secretName: string, deviceTrust: DeviceTrustLevel
     ) => Promise<string>;
     getDehydrationKey?: (
         keyInfo: ISecretStorageKeyInfo,
         checkFunc: (Uint8Array) => void,
     ) => Promise<Uint8Array>;
+    getBackupKey?: () => Promise<Uint8Array>;
 }
 
 // TODO: Move this to `SecretStorage` once converted
@@ -177,14 +131,6 @@ export interface ISecretStorageKeyInfo {
     };
     iv?: string;
     mac?: string;
-}
-
-// TODO: Move this to `CrossSigning` once converted
-export interface IDeviceTrustLevel {
-    isVerified(): boolean;
-    isCrossSigningVerified(): boolean;
-    isLocallyVerified(): boolean;
-    isTofu(): boolean;
 }
 
 /**

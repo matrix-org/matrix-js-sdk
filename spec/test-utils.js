@@ -51,7 +51,7 @@ export function mock(constr, name) {
     result.toString = function() {
         return "mock" + (name ? " of " + name : "");
     };
-    for (const key in constr.prototype) { // eslint-disable-line guard-for-in
+    for (const key of Object.getOwnPropertyNames(constr.prototype)) { // eslint-disable-line guard-for-in
         try {
             if (constr.prototype[key] instanceof Function) {
                 result[key] = jest.fn();
@@ -357,12 +357,12 @@ export function setHttpResponses(
     );
 
     const httpReq = httpResponseObj.request.bind(httpResponseObj);
-    client._http = [
+    client.http = [
         "authedRequest", "authedRequestWithPrefix", "getContentUri",
         "request", "requestWithPrefix", "uploadContent",
     ].reduce((r, k) => {r[k] = jest.fn(); return r;}, {});
-    client._http.authedRequest.mockImplementation(httpReq);
-    client._http.authedRequestWithPrefix.mockImplementation(httpReq);
-    client._http.requestWithPrefix.mockImplementation(httpReq);
-    client._http.request.mockImplementation(httpReq);
+    client.http.authedRequest.mockImplementation(httpReq);
+    client.http.authedRequestWithPrefix.mockImplementation(httpReq);
+    client.http.requestWithPrefix.mockImplementation(httpReq);
+    client.http.request.mockImplementation(httpReq);
 }

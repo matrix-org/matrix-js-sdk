@@ -159,7 +159,7 @@ function aliDownloadsKeys() {
     // check that the localStorage is updated as we expect (not sure this is
     // an integration test, but meh)
     return Promise.all([p1, p2]).then(() => {
-        return aliTestClient.client._crypto._deviceList.saveIfDirty();
+        return aliTestClient.client.crypto.deviceList.saveIfDirty();
     }).then(() => {
         aliTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
             const devices = data.devices[bobUserId];

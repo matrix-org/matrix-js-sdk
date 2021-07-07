@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { UnstableValue } from "../NamespacedValue";
+
 export enum EventType {
     // Room state events
     RoomCanonicalAlias = "m.room.canonical_alias",
@@ -71,6 +73,7 @@ export enum EventType {
     // Room account_data events
     FullyRead = "m.fully_read",
     Tag = "m.tag",
+    SpaceOrder = "org.matrix.msc3230.space_order", // MSC3230
 
     // User account_data events
     PushRules = "m.push_rules",
@@ -82,6 +85,11 @@ export enum EventType {
     RoomKeyRequest = "m.room_key_request",
     ForwardedRoomKey = "m.forwarded_room_key",
     Dummy = "m.dummy",
+}
+
+export enum RelationType {
+    Annotation = "m.annotation",
+    Replace = "m.replace",
 }
 
 export enum MsgType {
@@ -99,4 +107,54 @@ export const RoomCreateTypeField = "type";
 
 export enum RoomType {
     Space = "m.space",
+}
+
+/**
+ * Identifier for an [MSC3088](https://github.com/matrix-org/matrix-doc/pull/3088)
+ * room purpose. Note that this reference is UNSTABLE and subject to breaking changes,
+ * including its eventual removal.
+ */
+export const UNSTABLE_MSC3088_PURPOSE = new UnstableValue("m.room.purpose", "org.matrix.msc3088.purpose");
+
+/**
+ * Enabled flag for an [MSC3088](https://github.com/matrix-org/matrix-doc/pull/3088)
+ * room purpose. Note that this reference is UNSTABLE and subject to breaking changes,
+ * including its eventual removal.
+ */
+export const UNSTABLE_MSC3088_ENABLED = new UnstableValue("m.enabled", "org.matrix.msc3088.enabled");
+
+/**
+ * Subtype for an [MSC3089](https://github.com/matrix-org/matrix-doc/pull/3089) space-room.
+ * Note that this reference is UNSTABLE and subject to breaking changes, including its
+ * eventual removal.
+ */
+export const UNSTABLE_MSC3089_TREE_SUBTYPE = new UnstableValue("m.data_tree", "org.matrix.msc3089.data_tree");
+
+/**
+ * Leaf type for an event in a [MSC3089](https://github.com/matrix-org/matrix-doc/pull/3089) space-room.
+ * Note that this reference is UNSTABLE and subject to breaking changes, including its
+ * eventual removal.
+ */
+export const UNSTABLE_MSC3089_LEAF = new UnstableValue("m.leaf", "org.matrix.msc3089.leaf");
+
+/**
+ * Branch (Leaf Reference) type for the index approach in a
+ * [MSC3089](https://github.com/matrix-org/matrix-doc/pull/3089) space-room. Note that this reference is
+ * UNSTABLE and subject to breaking changes, including its eventual removal.
+ */
+export const UNSTABLE_MSC3089_BRANCH = new UnstableValue("m.branch", "org.matrix.msc3089.branch");
+
+export interface IEncryptedFile {
+    url: string;
+    mimetype?: string;
+    key: {
+        alg: string;
+        key_ops: string[]; // eslint-disable-line camelcase
+        kty: string;
+        k: string;
+        ext: boolean;
+    };
+    iv: string;
+    hashes: {[alg: string]: string};
+    v: string;
 }

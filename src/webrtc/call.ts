@@ -24,7 +24,7 @@ limitations under the License.
 import { logger } from '../logger';
 import { EventEmitter } from 'events';
 import * as utils from '../utils';
-import MatrixEvent from '../models/event';
+import { MatrixEvent } from '../models/event';
 import { EventType } from '../@types/event';
 import { RoomMember } from '../models/room-member';
 import { randomString } from '../randomstring';
@@ -56,22 +56,22 @@ import { CallFeed } from './callFeed';
  */
 
 interface CallOpts {
-    roomId?: string,
-    client?: any, // Fix when client is TSified
-    forceTURN?: boolean,
-    turnServers?: Array<TurnServer>,
+    roomId?: string;
+    client?: any; // Fix when client is TSified
+    forceTURN?: boolean;
+    turnServers?: Array<TurnServer>;
 }
 
 interface TurnServer {
-    urls: Array<string>,
-    username?: string,
-    password?: string,
-    ttl?: number,
+    urls: Array<string>;
+    username?: string;
+    password?: string;
+    ttl?: number;
 }
 
 interface AssertedIdentity {
-    id: string,
-    displayName: string,
+    id: string;
+    displayName: string;
 }
 
 export enum CallState {
@@ -192,7 +192,12 @@ export enum CallErrorCode {
     /**
      * The remote party is busy
      */
-    UserBusy = 'user_busy'
+    UserBusy = 'user_busy',
+
+    /**
+     * We transferred the call off to somewhere else
+     */
+    Transfered = 'transferred',
 }
 
 enum ConstraintsType {
@@ -289,10 +294,6 @@ export class MatrixCall extends EventEmitter {
     // This flag represents whether we want the other party to be on hold
     private remoteOnHold;
 
-    // and this one we set when we're transitioning out of the hold state because we
-    // can't tell the difference between that and the other party holding us
-    private unholdingRemote;
-
     private micMuted;
     private vidMuted;
 
@@ -344,7 +345,6 @@ export class MatrixCall extends EventEmitter {
         this.makingOffer = false;
 
         this.remoteOnHold = false;
-        this.unholdingRemote = false;
         this.micMuted = false;
         this.vidMuted = false;
 
@@ -441,7 +441,7 @@ export class MatrixCall extends EventEmitter {
      * @returns {Array<CallFeed>} local CallFeeds
      */
     public getLocalFeeds(): Array<CallFeed> {
-        return this.feeds.filter((feed) => {return feed.isLocal()});
+        return this.feeds.filter((feed) => feed.isLocal());
     }
 
     /**
@@ -449,7 +449,7 @@ export class MatrixCall extends EventEmitter {
      * @returns {Array<CallFeed>} remote CallFeeds
      */
     public getRemoteFeeds(): Array<CallFeed> {
-        return this.feeds.filter((feed) => {return !feed.isLocal()});
+        return this.feeds.filter((feed) => !feed.isLocal());
     }
 
     /**
@@ -511,7 +511,7 @@ export class MatrixCall extends EventEmitter {
 
         // make sure we have valid turn creds. Unless something's gone wrong, it should
         // poll and keep the credentials valid so this should be instant.
-        const haveTurnCreds = await this.client._checkTurnServers();
+        const haveTurnCreds = await this.client.checkTurnServers();
         if (!haveTurnCreds) {
             logger.warn("Failed to get TURN credentials! Proceeding with call anyway...");
         }
@@ -530,7 +530,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        const remoteStream = this.feeds.find((feed) => {return !feed.isLocal()})?.stream;
+        const remoteStream = this.feeds.find((feed) => !feed.isLocal())?.stream;
 
         // According to previous comments in this file, firefox at some point did not
         // add streams until media started ariving on them. Testing latest firefox
@@ -598,7 +598,7 @@ export class MatrixCall extends EventEmitter {
                 this.gotUserMediaForAnswer(mediaStream);
             } catch (e) {
                 this.getUserMediaFailed(e);
-                return
+                return;
             }
         } else if (this.localAVStream) {
             this.gotUserMediaForAnswer(this.localAVStream);
@@ -728,12 +728,12 @@ export class MatrixCall extends EventEmitter {
     setRemoteOnHold(onHold: boolean) {
         if (this.isRemoteOnHold() === onHold) return;
         this.remoteOnHold = onHold;
-        if (!onHold) this.unholdingRemote = true;
 
         for (const tranceiver of this.peerConn.getTransceivers()) {
-            // We set 'inactive' rather than 'sendonly' because we're not planning on
-            // playing music etc. to the other side.
-            tranceiver.direction = onHold ? 'inactive' : 'sendrecv';
+            // We don't send hold music or anything so we're not actually
+            // sending anything, but sendrecv is fairly standard for hold and
+            // it makes it a lot easier to figure out who's put who on hold.
+            tranceiver.direction = onHold ? 'sendonly' : 'sendrecv';
         }
         this.updateMuteStatus();
 
@@ -742,15 +742,11 @@ export class MatrixCall extends EventEmitter {
 
     /**
      * Indicates whether we are 'on hold' to the remote party (ie. if true,
-     * they cannot hear us). Note that this will return true when we put the
-     * remote on hold too due to the way hold is implemented (since we don't
-     * wish to play hold music when we put a call on hold, we use 'inactive'
-     * rather than 'sendonly')
+     * they cannot hear us).
      * @returns true if the other party has put us on hold
      */
     isLocalOnHold(): boolean {
         if (this.state !== CallState.Connected) return false;
-        if (this.unholdingRemote) return false;
 
         let callOnHold = true;
 
@@ -846,10 +842,10 @@ export class MatrixCall extends EventEmitter {
             },
         } as MCallAnswer;
 
-        if (this.client._supportsCallTransfer) {
+        if (this.client.supportsCallTransfer) {
             answerContent.capabilities = {
                 'm.call.transferee': true,
-            }
+            };
         }
 
         // We have just taken the local description from the peerconnection which will
@@ -1096,31 +1092,12 @@ export class MatrixCall extends EventEmitter {
 
         const prevLocalOnHold = this.isLocalOnHold();
 
-        if (description.type === 'answer') {
-            // whenever we get an answer back, clear the flag we set whilst trying to un-hold
-            // the other party: the state of the channels now reflects reality
-            this.unholdingRemote = false;
-        }
-
         try {
             await this.peerConn.setRemoteDescription(description);
 
             if (description.type === 'offer') {
-                // First we sent the direction of the tranciever to what we'd like it to be,
-                // irresepective of whether the other side has us on hold - so just whether we
-                // want the call to be on hold or not. This is necessary because in a few lines,
-                // we'll adjust the direction and unless we do this too, we'll never come off hold.
-                for (const tranceiver of this.peerConn.getTransceivers()) {
-                    tranceiver.direction = this.isRemoteOnHold() ? 'inactive' : 'sendrecv';
-                }
                 const localDescription = await this.peerConn.createAnswer();
                 await this.peerConn.setLocalDescription(localDescription);
-                // Now we've got our answer, set the direction to the outcome of the negotiation.
-                // We need to do this otherwise Firefox will notice that the direction is not the
-                // currentDirection and try to negotiate itself off hold again.
-                for (const tranceiver of this.peerConn.getTransceivers()) {
-                    tranceiver.direction = tranceiver.currentDirection;
-                }
 
                 this.sendVoipEvent(EventType.CallNegotiate, {
                     description: this.peerConn.localDescription,
@@ -1169,7 +1146,7 @@ export class MatrixCall extends EventEmitter {
         } catch (err) {
             logger.debug("Error setting local description!", err);
             this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);
-            return
+            return;
         }
 
         if (this.peerConn.iceGatheringState === 'gathering') {
@@ -1194,10 +1171,10 @@ export class MatrixCall extends EventEmitter {
             content.description = this.peerConn.localDescription;
         }
 
-        if (this.client._supportsCallTransfer) {
+        if (this.client.supportsCallTransfer) {
             content.capabilities = {
                 'm.call.transferee': true,
-            }
+            };
         }
 
         // Get rid of any candidates waiting to be sent: they'll be included in the local
@@ -1304,7 +1281,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        const oldRemoteStream = this.feeds.find((feed) => {return !feed.isLocal()})?.stream;
+        const oldRemoteStream = this.feeds.find((feed) => !feed.isLocal())?.stream;
 
         // If we already have a stream, check this track is from the same one
         // Note that we check by ID and always set the remote stream: Chrome appears
@@ -1325,7 +1302,7 @@ export class MatrixCall extends EventEmitter {
 
         logger.debug(`Track id ${ev.track.id} of kind ${ev.track.kind} added`);
 
-        this.pushNewFeed(newRemoteStream, this.getOpponentMember().userId, SDPStreamMetadataPurpose.Usermedia)
+        this.pushNewFeed(newRemoteStream, this.getOpponentMember().userId, SDPStreamMetadataPurpose.Usermedia);
 
         logger.info("playing remote. stream active? " + newRemoteStream.active);
     };
@@ -1456,7 +1433,7 @@ export class MatrixCall extends EventEmitter {
 
         await this.sendVoipEvent(EventType.CallReplaces, body);
 
-        await this.terminate(CallParty.Local, CallErrorCode.Replaced, true);
+        await this.terminate(CallParty.Local, CallErrorCode.Transfered, true);
     }
 
     /*
@@ -1496,7 +1473,7 @@ export class MatrixCall extends EventEmitter {
         await this.sendVoipEvent(EventType.CallReplaces, bodyToTransferee);
 
         await this.terminate(CallParty.Local, CallErrorCode.Replaced, true);
-        await transferTargetCall.terminate(CallParty.Local, CallErrorCode.Replaced, true);
+        await transferTargetCall.terminate(CallParty.Local, CallErrorCode.Transfered, true);
     }
 
     private async terminate(hangupParty: CallParty, hangupReason: CallErrorCode, shouldEmit: boolean) {
@@ -1592,14 +1569,14 @@ export class MatrixCall extends EventEmitter {
     private async placeCallWithConstraints(constraints: MediaStreamConstraints) {
         logger.log("Getting user media with constraints", constraints);
         // XXX Find a better way to do this
-        this.client._callEventHandler.calls.set(this.callId, this);
+        this.client.callEventHandler.calls.set(this.callId, this);
         this.setState(CallState.WaitLocalMedia);
         this.direction = CallDirection.Outbound;
         this.config = constraints;
 
         // make sure we have valid turn creds. Unless something's gone wrong, it should
         // poll and keep the credentials valid so this should be instant.
-        const haveTurnCreds = await this.client._checkTurnServers();
+        const haveTurnCreds = await this.client.checkTurnServers();
         if (!haveTurnCreds) {
             logger.warn("Failed to get TURN credentials! Proceeding with call anyway...");
         }
@@ -1621,7 +1598,7 @@ export class MatrixCall extends EventEmitter {
         const pc = new window.RTCPeerConnection({
             iceTransportPolicy: this.forceTURN ? 'relay' : undefined,
             iceServers: this.turnServers,
-            iceCandidatePoolSize: this.client._iceCandidatePoolSize,
+            iceCandidatePoolSize: this.client.iceCandidatePoolSize,
         });
 
         // 'connectionstatechange' would be better, but firefox doesn't implement that.
@@ -1826,7 +1803,7 @@ export function createNewMatrixCall(client: any, roomId: string, options?: CallO
         roomId: roomId,
         turnServers: client.getTurnServers(),
         // call level options
-        forceTURN: client._forceTURN || optionsForceTURN,
+        forceTURN: client.forceTURN || optionsForceTURN,
     };
     const call = new MatrixCall(opts);
 
