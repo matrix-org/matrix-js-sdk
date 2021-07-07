@@ -35,11 +35,13 @@ export interface IKeyBackupRoomSessions {
 export interface IKeyBackupInfo {
     algorithm: string;
     auth_data: {
-        public_key: string;
-        signatures: ISignatures;
-        private_key_salt: string;
-        private_key_iterations: number;
+        public_key?: string;
+        signatures?: ISignatures;
+        private_key_salt?: string;
+        private_key_iterations?: number;
         private_key_bits?: number;
+        iv?: string;
+        mac?: string;
     };
     count?: number;
     etag?: string;

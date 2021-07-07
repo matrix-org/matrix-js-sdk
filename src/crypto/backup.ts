@@ -78,7 +78,7 @@ interface BackupAlgorithmClass {
         key: string | Uint8Array | null,
     ): Promise<[Uint8Array, AuthData]>;
 
-    checkBackupVersion(info: BackupInfo): void;
+    checkBackupVersion(info: IKeyBackupInfo): void;
 }
 
 interface BackupAlgorithm {
@@ -112,9 +112,9 @@ export class BackupManager {
      *
      * Throws an error if a problem is detected.
      *
-     * @param {BackupInfo} info the key backup info
+     * @param {IKeyBackupInfo} info the key backup info
      */
-    public static checkBackupVersion(info: BackupInfo): void {
+    public static checkBackupVersion(info: IKeyBackupInfo): void {
         const Algorithm = algorithmsByName[info.algorithm];
         if (!Algorithm) {
             throw new Error("Unknown backup algorithm: " + info.algorithm);
@@ -273,7 +273,7 @@ export class BackupManager {
     /**
      * Check if the given backup info is trusted.
      *
-     * @param {object} backupInfo key backup info dict from /room_keys/version
+     * @param {IKeyBackupInfo} backupInfo key backup info dict from /room_keys/version
      * @return {object} {
      *     usable: [bool], // is the backup trusted, true iff there is a sig that is valid & from a trusted device
      *     sigs: [
@@ -619,7 +619,7 @@ export class Curve25519 implements BackupAlgorithm {
         }
     }
 
-    public static checkBackupVersion(info: BackupInfo): void {
+    public static checkBackupVersion(info: IKeyBackupInfo): void {
         if (!info.auth_data.public_key) {
             throw new Error("Invalid backup data returned");
         }
@@ -754,7 +754,7 @@ export class Aes256 implements BackupAlgorithm {
         return [outKey, authData];
     }
 
-    public static checkBackupVersion(info: BackupInfo): void {
+    public static checkBackupVersion(info: IKeyBackupInfo): void {
         if (!info.auth_data.iv || !info.auth_data.mac) {
             throw new Error("Invalid backup data returned");
         }

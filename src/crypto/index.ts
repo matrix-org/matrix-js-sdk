@@ -126,6 +126,7 @@ export interface IMegolmSessionData {
     session_id: string;
     session_key: string;
     algorithm: string;
+    untrusted?: boolean;
 }
 /* eslint-enable camelcase */
 
