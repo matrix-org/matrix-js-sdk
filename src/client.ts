@@ -414,6 +414,19 @@ interface IUploadKeySignaturesResponse {
     }>>;
 }
 
+export interface IPreviewUrlResponse {
+    [key: string]: string | number;
+    "og:title": string;
+    "og:type": string;
+    "og:url": string;
+    "og:image"?: string;
+    "og:image:type"?: string;
+    "og:image:height"?: number;
+    "og:image:width"?: number;
+    "og:description"?: string;
+    "matrix:image:size"?: number;
+}
+
 /**
  * Represents a Matrix Client. Only directly construct this if you want to use
  * custom modules. Normally, {@link createClient} should be used
@@ -3695,10 +3708,14 @@ export class MatrixClient extends EventEmitter {
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      * May return synthesized attributes if the URL lacked OG meta.
      */
-    public getUrlPreview(url: string, ts: number, callback?: Callback): Promise<any> {
+    public getUrlPreview(url: string, ts: number, callback?: Callback): Promise<IPreviewUrlResponse> {
         // bucket the timestamp to the nearest minute to prevent excessive spam to the server
         // Surely 60-second accuracy is enough for anyone.
         ts = Math.floor(ts / 60000) * 60000;
+
+        const parsed = new URL(url);
+        parsed.hash = ""; // strip the hash as it won't affect the preview
+        url = parsed.toString();
 
         const key = ts + "_" + url;
 
