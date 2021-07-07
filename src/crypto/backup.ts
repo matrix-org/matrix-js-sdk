@@ -684,13 +684,6 @@ export class Curve25519 implements BackupAlgorithm {
     }
 }
 
-// FIXME: this should go into ./aes
-interface AesData {
-    iv: string,
-    ciphertext: string,
-    mac: string,
-}
-
 function randomBytes(size: number): Uint8Array {
     const crypto: {randomBytes: (number) => Uint8Array} | undefined = getCrypto() as any;
     if (crypto) {
@@ -721,7 +714,7 @@ export class Aes256 implements BackupAlgorithm {
         if (!authData) {
             throw new Error("auth_data missing");
         }
-        const key = await getKey()
+        const key = await getKey();
         if (authData.mac) {
             const { mac } = await calculateKeyCheck(key, authData.iv);
             if (authData.mac.replace(/=+$/g, '') !== mac.replace(/=+/g, '')) {
