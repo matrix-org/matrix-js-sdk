@@ -978,7 +978,9 @@ export class Crypto extends EventEmitter {
     }
 
     public addSecretStorageKey(
-        algorithm: string, opts: IAddSecretStorageKeyOpts, keyID: string,
+        algorithm: string,
+        opts: IAddSecretStorageKeyOpts,
+        keyID: string,
     ): Promise<{keyId: string, keyInfo: ISecretStorageKeyInfo}> {
         return this.secretStorage.addKey(algorithm, opts, keyID);
     }
