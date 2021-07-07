@@ -378,7 +378,7 @@ export class SecretStorage {
      * @param {string} name the name of the secret to request
      * @param {string[]} devices the devices to request the secret from
      */
-    request(name: string, devices: Array<string>): ISecretRequest {
+    request(name: string, devices: string[]): ISecretRequest {
         const requestId = this.baseApis.makeTxnId();
 
         let resolve: (string) => void;
