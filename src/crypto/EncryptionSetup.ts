@@ -9,10 +9,10 @@ import {
     CrossSigningKeys,
     ICrossSigningKey,
     ICryptoCallbacks,
-    ISecretStorageKeyInfo,
     ISignedKey,
     KeySignatures,
 } from "../matrix";
+import { ISecretStorageKeyInfo } from "./SecretStorage";
 import { IKeyBackupInfo } from "./keybackup";
 
 interface ICrossSigningKeys {
@@ -337,7 +337,7 @@ class SSSSCryptoCallbacks {
     constructor(private readonly delegateCryptoCallbacks: ICryptoCallbacks) {}
 
     public async getSecretStorageKey(
-        { keys }: { keys: Record<string, object> },
+        { keys }: { keys: Record<string, ISecretStorageKeyInfo> },
         name: string,
     ): Promise<[string, Uint8Array]> {
         for (const keyId of Object.keys(keys)) {

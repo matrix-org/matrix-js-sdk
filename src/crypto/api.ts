@@ -16,7 +16,7 @@ limitations under the License.
 
 import { DeviceInfo } from "./deviceinfo";
 import { IKeyBackupInfo } from "./keybackup";
-import { ISecretStorageKeyInfo } from "../matrix";
+import { ISecretStorageKeyInfo } from "./SecretStorage";
 
 // TODO: Merge this with crypto.js once converted
 
@@ -112,9 +112,17 @@ export interface ISecretStorageKey {
     keyInfo: ISecretStorageKeyInfo;
 }
 
+export interface IPassphraseInfo {
+    algorithm: "m.pbkdf2";
+    iterations: number;
+    salt: string;
+    bits: number;
+}
+
 export interface IAddSecretStorageKeyOpts {
-    // depends on algorithm
-    // TODO: Types
+    name: string;
+    passphrase: IPassphraseInfo;
+    key: Uint8Array;
 }
 
 export interface IImportOpts {
