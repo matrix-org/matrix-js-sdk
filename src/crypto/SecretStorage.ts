@@ -45,8 +45,8 @@ export interface IAccountDataClient extends EventEmitter {
 interface ISecretRequestInternal {
     name: string;
     devices: string[];
-    resolve: (string) => void;
-    reject: (Error) => void;
+    resolve: (reason: string) => void;
+    reject: (error: Error) => void;
 }
 
 interface IDecryptors {
