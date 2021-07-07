@@ -571,7 +571,8 @@ export class SecretStorage {
     }
 
     private async getSecretStorageKey(
-        keys: Record<string, ISecretStorageKeyInfo>, name: string,
+        keys: Record<string, ISecretStorageKeyInfo>,
+        name: string,
     ): Promise<[string, IDecryptors]> {
         if (!this.cryptoCallbacks.getSecretStorageKey) {
             throw new Error("No getSecretStorageKey callback supplied");
