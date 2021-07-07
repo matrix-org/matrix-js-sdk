@@ -1000,7 +1000,8 @@ export class Crypto extends EventEmitter {
     }
 
     public isSecretStored(
-        name: string, checkKey?: boolean,
+        name: string,
+        checkKey?: boolean,
     ): Promise<Record<string, ISecretStorageKeyInfo>> {
         return this.secretStorage.isStored(name, checkKey);
     }
