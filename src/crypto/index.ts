@@ -1008,7 +1008,7 @@ export class Crypto extends EventEmitter {
         return this.secretStorage.isStored(name, checkKey);
     }
 
-    public requestSecret(name: string, devices: string[]): ISecretRequest { // TODO types
+    public requestSecret(name: string, devices: string[]): ISecretRequest {
         if (!devices) {
             devices = Object.keys(this.deviceList.getRawStoredDevicesForUser(this.userId));
         }
