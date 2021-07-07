@@ -58,9 +58,6 @@ interface IDecryptors {
  * @module crypto/SecretStorage
  */
 export class SecretStorage {
-    private accountDataAdapter: IAccountDataClient;
-    private baseApis: MatrixClient;
-    private cryptoCallbacks: ICryptoCallbacks;
     private requests = new Map<string, ISecretRequestInternal>();
 
     // In it's pure javascript days, this was relying on some proper Javascript-style
@@ -72,9 +69,9 @@ export class SecretStorage {
     // A better solution would probably be to split this class up into secret storage and
     // secret sharing which are really two separate things, even though they share an MSC.
     constructor(
-        private readonly accountDataClient: IAccountDataClient,
+        private readonly accountDataAdapter: IAccountDataClient,
         private readonly cryptoCallbacks: ICryptoCallbacks,
-        private readonly matrixClient?: MatrixClient,
+        private readonly baseApis?: MatrixClient,
     ) {}
 
     public async getDefaultKeyId(): Promise<string> {
