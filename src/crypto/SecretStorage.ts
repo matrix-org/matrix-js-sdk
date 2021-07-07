@@ -36,9 +36,10 @@ export interface ISecretRequest {
 }
 
 export interface IAccountDataClient extends EventEmitter {
-    getAccountDataFromServer: (string) => Promise<any>;
-    getAccountData: (string) => object;
-    setAccountData: (string, object) => Promise<void>;
+    // Subset of MatrixClient (which also uses any for the event content)
+    getAccountDataFromServer: (eventType: string) => Promise<any>;
+    getAccountData: (eventType: string) => MatrixEvent;
+    setAccountData: (eventType: string, content: any) => Promise<void>;
 }
 
 interface ISecretRequestInternal {
