@@ -1622,7 +1622,7 @@ MegolmDecryption.prototype._buildKeyForwardingMessage = async function(
  */
 MegolmDecryption.prototype.importRoomKey = function(session, opts = {}) {
     const extraSessionData = {};
-    if (opts.untrusted) {
+    if (opts.untrusted || session.untrusted) {
         extraSessionData.untrusted = true;
     }
     if (session["org.matrix.msc3061.shared_history"]) {
