@@ -951,38 +951,36 @@ export class Crypto extends EventEmitter {
             builder.addSessionBackup(data);
         }
 
-        if (this.backupManager.getKeyBackupEnabled()) {
-            // Cache the session backup key
-            const sessionBackupKey = await secretStorage.get('m.megolm_backup.v1');
-            if (sessionBackupKey) {
-                logger.info("Got session backup key from secret storage: caching");
-                // fix up the backup key if it's in the wrong format, and replace
-                // in secret storage
-                const fixedBackupKey = fixBackupKey(sessionBackupKey);
-                if (fixedBackupKey) {
-                    await secretStorage.store("m.megolm_backup.v1",
-                        fixedBackupKey, [newKeyId || oldKeyId],
-                    );
-                }
-                const decodedBackupKey = new Uint8Array(olmlib.decodeBase64(
-                    fixedBackupKey || sessionBackupKey,
-                ));
-                await builder.addSessionBackupPrivateKeyToCache(decodedBackupKey);
-            } else {
-                // key backup is enabled but we don't have a session backup key in SSSS: see if we have one in
-                // the cache or the user can provide one, and if so, write it to SSSS
-                const backupKey = await this.getSessionBackupPrivateKey() || await getKeyBackupPassphrase();
-                if (!backupKey) {
-                    // This will require user intervention to recover from since we don't have the key
-                    // backup key anywhere. The user should probably just set up a new key backup and
-                    // the key for the new backup will be stored. If we hit this scenario in the wild
-                    // with any frequency, we should do more than just log an error.
-                    logger.error("Key backup is enabled but couldn't get key backup key!");
-                    return;
-                }
-                logger.info("Got session backup key from cache/user that wasn't in SSSS: saving to SSSS");
-                await secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(backupKey));
+        // Cache the session backup key
+        const sessionBackupKey = await secretStorage.get('m.megolm_backup.v1');
+        if (sessionBackupKey) {
+            logger.info("Got session backup key from secret storage: caching");
+            // fix up the backup key if it's in the wrong format, and replace
+            // in secret storage
+            const fixedBackupKey = fixBackupKey(sessionBackupKey);
+            if (fixedBackupKey) {
+                await secretStorage.store("m.megolm_backup.v1",
+                    fixedBackupKey, [newKeyId || oldKeyId],
+                );
             }
+            const decodedBackupKey = new Uint8Array(olmlib.decodeBase64(
+                fixedBackupKey || sessionBackupKey,
+            ));
+            await builder.addSessionBackupPrivateKeyToCache(decodedBackupKey);
+        } else if (this.backupManager.getKeyBackupEnabled()) {
+            // key backup is enabled but we don't have a session backup key in SSSS: see if we have one in
+            // the cache or the user can provide one, and if so, write it to SSSS
+            const backupKey = await this.getSessionBackupPrivateKey() || await getKeyBackupPassphrase();
+            if (!backupKey) {
+                // This will require user intervention to recover from since we don't have the key
+                // backup key anywhere. The user should probably just set up a new key backup and
+                // the key for the new backup will be stored. If we hit this scenario in the wild
+                // with any frequency, we should do more than just log an error.
+                logger.error("Key backup is enabled but couldn't get key backup key!");
+                return;
+            }
+            logger.info("Got session backup key from cache/user that wasn't in SSSS: saving to SSSS");
+            await secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(backupKey));
         }
 
         const operation = builder.buildOperation();
