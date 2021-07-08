@@ -700,7 +700,7 @@ function randomBytes(size: number): Uint8Array {
 }
 
 export class Aes256 implements BackupAlgorithm {
-    public static algorithmName = "org.matrix.mscxxxx.v1.aes-hmac-sha2";
+    public static algorithmName = "org.matrix.msc3270.v1.aes-hmac-sha2";
 
     constructor(
         public authData: AuthData,
