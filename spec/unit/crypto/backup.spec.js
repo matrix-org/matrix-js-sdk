@@ -101,7 +101,7 @@ const CURVE25519_BACKUP_INFO = {
 };
 
 const AES256_BACKUP_INFO = {
-    algorithm: "org.matrix.mscxxxx.v1.aes-hmac-sha2",
+    algorithm: "org.matrix.msc3270.v1.aes-hmac-sha2",
     version: 1,
     auth_data: {
         // FIXME: add iv and mac
@@ -376,7 +376,7 @@ describe("MegolmBackup", function() {
                 })
                 .then(() => {
                     client.enableKeyBackup({
-                        algorithm: "org.matrix.mscxxxx.v1.aes-hmac-sha2",
+                        algorithm: "org.matrix.msc3270.v1.aes-hmac-sha2",
                         version: 1,
                         auth_data: {
                             iv: "PsCAtR7gMc4xBd9YS3A9Ow",
