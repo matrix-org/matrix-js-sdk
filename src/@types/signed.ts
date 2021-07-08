@@ -19,3 +19,7 @@ export interface ISignatures {
         [keyId: string]: string;
     };
 }
+
+export interface ISigned {
+    signatures?: ISignatures;
+}

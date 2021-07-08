@@ -15,13 +15,18 @@ limitations under the License.
 */
 
 import { randomString } from '../randomstring';
-import { IKeyBackupInfo } from "./keybackup";
 
 const DEFAULT_ITERATIONS = 500000;
 
 const DEFAULT_BITSIZE = 256;
 
-type IAuthData = IKeyBackupInfo["auth_data"];
+/* eslint-disable camelcase */
+interface IAuthData {
+    private_key_salt?: string;
+    private_key_iterations?: number;
+    private_key_bits?: number;
+}
+/* eslint-enable camelcase */
 
 interface IKey {
     key: Uint8Array;

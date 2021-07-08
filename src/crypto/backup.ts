@@ -31,7 +31,8 @@ import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { encodeRecoveryKey } from './recoverykey';
 import { encryptAES, decryptAES, calculateKeyCheck } from './aes';
 import { getCrypto } from '../utils';
-import { IKeyBackupInfo } from "./keybackup";
+import { ICurve25519AuthData, IAes256AuthData, IKeyBackupInfo } from "./keybackup";
+import { UnstableValue } from "../NamespacedValue";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 
@@ -302,7 +303,7 @@ export class BackupManager {
 
         const trustedPubkey = this.baseApis.crypto.sessionStore.getLocalTrustedBackupPubKey();
 
-        if (backupInfo.auth_data.public_key === trustedPubkey) {
+        if ("public_key" in backupInfo.auth_data && backupInfo.auth_data.public_key === trustedPubkey) {
             logger.info("Backup public key " + trustedPubkey + " is trusted locally");
             ret.trusted_locally = true;
         }
@@ -572,23 +573,26 @@ export class BackupManager {
 
 export class Curve25519 implements BackupAlgorithm {
     public static algorithmName = "m.megolm_backup.v1.curve25519-aes-sha2";
+    public authData: ICurve25519AuthData;
 
     constructor(
-        public authData: AuthData,
+        authData: AuthData,
         private publicKey: any, // FIXME: PkEncryption
         private getKey: () => Promise<Uint8Array>,
-    ) {}
+    ) {
+        this.authData = authData as ICurve25519AuthData;
+    }
 
     public static async init(
         authData: AuthData,
         getKey: () => Promise<Uint8Array>,
     ): Promise<Curve25519> {
-        if (!authData || !authData.public_key) {
+        if (!authData || !("public_key" in authData)) {
             throw new Error("auth_data missing required information");
         }
         const publicKey = new global.Olm.PkEncryption();
         publicKey.set_recipient_key(authData.public_key);
-        return new Curve25519(authData, publicKey, getKey);
+        return new Curve25519(authData as ICurve25519AuthData, publicKey, getKey);
     }
 
     public static async prepare(
@@ -596,7 +600,7 @@ export class Curve25519 implements BackupAlgorithm {
     ): Promise<[Uint8Array, AuthData]> {
         const decryption = new global.Olm.PkDecryption();
         try {
-            const authData: Partial<AuthData> = {};
+            const authData: Partial<ICurve25519AuthData> = {};
             if (!key) {
                 authData.public_key = decryption.generate_key();
             } else if (key instanceof Uint8Array) {
@@ -620,7 +624,7 @@ export class Curve25519 implements BackupAlgorithm {
     }
 
     public static checkBackupVersion(info: IKeyBackupInfo): void {
-        if (!info.auth_data.public_key) {
+        if (!("public_key" in info.auth_data)) {
             throw new Error("Invalid backup data returned");
         }
     }
@@ -685,12 +689,12 @@ export class Curve25519 implements BackupAlgorithm {
 }
 
 function randomBytes(size: number): Uint8Array {
-    const crypto: {randomBytes: (number) => Uint8Array} | undefined = getCrypto() as any;
+    const crypto: {randomBytes: (n: number) => Uint8Array} | undefined = getCrypto() as any;
     if (crypto) {
         // nodejs version
         return crypto.randomBytes(size);
     }
-    if (typeof window !== "undefined" && window.crypto) {
+    if (window?.crypto) {
         // browser version
         const buf = new Uint8Array(size);
         window.crypto.getRandomValues(buf);
@@ -699,16 +703,21 @@ function randomBytes(size: number): Uint8Array {
     throw new Error("No usable crypto implementation");
 }
 
+const UNSTABLE_MSC3270_NAME = new UnstableValue(null, "org.matrix.msc3270.v1.aes-hmac-sha2");
+
 export class Aes256 implements BackupAlgorithm {
-    public static algorithmName = "org.matrix.msc3270.v1.aes-hmac-sha2";
+    public static algorithmName = UNSTABLE_MSC3270_NAME.name;
+    public readonly authData: IAes256AuthData;
 
     constructor(
-        public authData: AuthData,
-        private key: Uint8Array,
-    ) {}
+        authData: AuthData,
+        private readonly key: Uint8Array,
+    ) {
+        this.authData = authData as IAes256AuthData;
+    }
 
     public static async init(
-        authData: AuthData,
+        authData: IAes256AuthData,
         getKey: () => Promise<Uint8Array>,
     ): Promise<Aes256> {
         if (!authData) {
@@ -728,7 +737,7 @@ export class Aes256 implements BackupAlgorithm {
         key: string | Uint8Array | null,
     ): Promise<[Uint8Array, AuthData]> {
         let outKey: Uint8Array;
-        const authData: AuthData = {};
+        const authData: Partial<IAes256AuthData> = {};
         if (!key) {
             outKey = randomBytes(32);
         } else if (key instanceof Uint8Array) {
@@ -744,11 +753,11 @@ export class Aes256 implements BackupAlgorithm {
         authData.iv = iv;
         authData.mac = mac;
 
-        return [outKey, authData];
+        return [outKey, authData as AuthData];
     }
 
     public static checkBackupVersion(info: IKeyBackupInfo): void {
-        if (!info.auth_data.iv || !info.auth_data.mac) {
+        if (!("iv" in info.auth_data && "mac" in info.auth_data)) {
             throw new Error("Invalid backup data returned");
         }
     }
