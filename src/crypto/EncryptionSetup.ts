@@ -9,10 +9,10 @@ import {
     CrossSigningKeys,
     ICrossSigningKey,
     ICryptoCallbacks,
-    ISecretStorageKeyInfo,
     ISignedKey,
     KeySignatures,
 } from "../matrix";
+import { ISecretStorageKeyInfo } from "./api";
 import { IKeyBackupInfo } from "./keybackup";
 
 interface ICrossSigningKeys {
@@ -246,7 +246,7 @@ export class EncryptionSetupOperation {
  * implementing the methods related to account data in MatrixClient
  */
 class AccountDataClientAdapter extends EventEmitter {
-    public readonly values = new Map<string, object>();
+    public readonly values = new Map<string, MatrixEvent>();
 
     /**
      * @param  {Object.<String, MatrixEvent>} existingValues existing account data
@@ -259,7 +259,7 @@ class AccountDataClientAdapter extends EventEmitter {
      * @param  {String} type
      * @return {Promise<Object>} the content of the account data
      */
-    public getAccountDataFromServer(type: string): Promise<object> {
+    public getAccountDataFromServer(type: string): Promise<any> {
         return Promise.resolve(this.getAccountData(type));
     }
 
@@ -267,7 +267,7 @@ class AccountDataClientAdapter extends EventEmitter {
      * @param  {String} type
      * @return {Object} the content of the account data
      */
-    public getAccountData(type: string): object {
+    public getAccountData(type: string): MatrixEvent {
         const modifiedValue = this.values.get(type);
         if (modifiedValue) {
             return modifiedValue;
@@ -284,7 +284,7 @@ class AccountDataClientAdapter extends EventEmitter {
      * @param {Object} content
      * @return {Promise}
      */
-    public setAccountData(type: string, content: object): Promise<void> {
+    public setAccountData(type: string, content: any): Promise<void> {
         const lastEvent = this.values.get(type);
         this.values.set(type, content);
         // ensure accountData is emitted on the next tick,
@@ -337,7 +337,7 @@ class SSSSCryptoCallbacks {
     constructor(private readonly delegateCryptoCallbacks: ICryptoCallbacks) {}
 
     public async getSecretStorageKey(
-        { keys }: { keys: Record<string, object> },
+        { keys }: { keys: Record<string, ISecretStorageKeyInfo> },
         name: string,
     ): Promise<[string, Uint8Array]> {
         for (const keyId of Object.keys(keys)) {

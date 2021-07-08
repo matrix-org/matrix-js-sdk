@@ -33,7 +33,14 @@ import { DeviceInfo, IDevice } from "./deviceinfo";
 import * as algorithms from "./algorithms";
 import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from './CrossSigning';
 import { EncryptionSetupBuilder } from "./EncryptionSetup";
-import { SECRET_STORAGE_ALGORITHM_V1_AES, SecretStorage } from './SecretStorage';
+import {
+    SECRET_STORAGE_ALGORITHM_V1_AES,
+    SecretStorage,
+    SecretStorageKeyTuple,
+    ISecretRequest,
+    SecretStorageKeyObject,
+} from './SecretStorage';
+import { IAddSecretStorageKeyOpts, ISecretStorageKeyInfo } from "./api";
 import { OutgoingRoomKeyRequestManager } from './OutgoingRoomKeyRequestManager';
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { ReciprocateQRCode, SCAN_QR_CODE_METHOD, SHOW_QR_CODE_METHOD } from './verification/QRCode';
@@ -360,7 +367,8 @@ export class Crypto extends EventEmitter {
         const cacheCallbacks = createCryptoStoreCacheCallbacks(cryptoStore, this.olmDevice);
 
         this.crossSigningInfo = new CrossSigningInfo(userId, cryptoCallbacks, cacheCallbacks);
-        this.secretStorage = new SecretStorage(baseApis, cryptoCallbacks);
+        // Yes, we pass the client twice here: see SecretStorage
+        this.secretStorage = new SecretStorage(baseApis, cryptoCallbacks, baseApis);
         this.dehydrationManager = new DehydrationManager(this);
 
         // Assuming no app-supplied callback, default to getting from SSSS.
@@ -971,15 +979,19 @@ export class Crypto extends EventEmitter {
         logger.log("Secure Secret Storage ready");
     }
 
-    public addSecretStorageKey(algorithm: string, opts: any, keyID: string): any { // TODO types
+    public addSecretStorageKey(
+        algorithm: string,
+        opts: IAddSecretStorageKeyOpts,
+        keyID: string,
+    ): Promise<SecretStorageKeyObject> {
         return this.secretStorage.addKey(algorithm, opts, keyID);
     }
 
-    public hasSecretStorageKey(keyID: string): boolean {
+    public hasSecretStorageKey(keyID: string): Promise<boolean> {
         return this.secretStorage.hasKey(keyID);
     }
 
-    public getSecretStorageKey(keyID?: string): any { // TODO types
+    public getSecretStorageKey(keyID?: string): Promise<SecretStorageKeyTuple> {
         return this.secretStorage.getKey(keyID);
     }
 
@@ -991,11 +1003,14 @@ export class Crypto extends EventEmitter {
         return this.secretStorage.get(name);
     }
 
-    public isSecretStored(name: string, checkKey?: boolean): any { // TODO types
+    public isSecretStored(
+        name: string,
+        checkKey?: boolean,
+    ): Promise<Record<string, ISecretStorageKeyInfo>> {
         return this.secretStorage.isStored(name, checkKey);
     }
 
-    public requestSecret(name: string, devices: string[]): Promise<any> { // TODO types
+    public requestSecret(name: string, devices: string[]): ISecretRequest {
         if (!devices) {
             devices = Object.keys(this.deviceList.getRawStoredDevicesForUser(this.userId));
         }
@@ -1010,7 +1025,7 @@ export class Crypto extends EventEmitter {
         return this.secretStorage.setDefaultKeyId(k);
     }
 
-    public checkSecretStorageKey(key: string, info: any): Promise<boolean> { // TODO types
+    public checkSecretStorageKey(key: Uint8Array, info: ISecretStorageKeyInfo): Promise<boolean> {
         return this.secretStorage.checkKey(key, info);
     }
 
@@ -2997,9 +3012,9 @@ export class Crypto extends EventEmitter {
             } else if (event.getType() == "m.room_key_request") {
                 this.onRoomKeyRequestEvent(event);
             } else if (event.getType() === "m.secret.request") {
-                this.secretStorage._onRequestReceived(event);
+                this.secretStorage.onRequestReceived(event);
             } else if (event.getType() === "m.secret.send") {
-                this.secretStorage._onSecretReceived(event);
+                this.secretStorage.onSecretReceived(event);
             } else if (event.getType() === "org.matrix.room_key.withheld") {
                 this.onRoomKeyWithheldEvent(event);
             } else if (event.getContent().transaction_id) {

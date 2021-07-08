@@ -271,6 +271,6 @@ const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
  *     If omitted, a random initialization vector will be created.
  * @return {Promise<object>} An object that contains, `mac` and `iv` properties.
  */
-export function calculateKeyCheck(key, iv = undefined) {
+export function calculateKeyCheck(key: Uint8Array, iv?: string): Promise<IEncryptedPayload> {
     return encryptAES(ZERO_STR, key, "", iv);
 }
