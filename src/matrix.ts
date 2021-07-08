@@ -20,6 +20,7 @@ import { MatrixScheduler } from "./scheduler";
 import { MatrixClient } from "./client";
 import { ICreateClientOpts } from "./client";
 import { DeviceTrustLevel } from "./crypto/CrossSigning";
+import { ISecretStorageKeyInfo } from "./crypto/api";
 
 export * from "./client";
 export * from "./http-api";
@@ -120,17 +121,6 @@ export interface ICryptoCallbacks {
         checkFunc: (Uint8Array) => void,
     ) => Promise<Uint8Array>;
     getBackupKey?: () => Promise<Uint8Array>;
-}
-
-// TODO: Move this to `SecretStorage` once converted
-export interface ISecretStorageKeyInfo {
-    passphrase?: {
-        algorithm: "m.pbkdf2";
-        iterations: number;
-        salt: string;
-    };
-    iv?: string;
-    mac?: string;
 }
 
 /**
