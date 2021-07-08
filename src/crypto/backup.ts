@@ -573,15 +573,12 @@ export class BackupManager {
 
 export class Curve25519 implements BackupAlgorithm {
     public static algorithmName = "m.megolm_backup.v1.curve25519-aes-sha2";
-    public authData: ICurve25519AuthData;
 
     constructor(
-        authData: AuthData,
+        public authData: ICurve25519AuthData,
         private publicKey: any, // FIXME: PkEncryption
         private getKey: () => Promise<Uint8Array>,
-    ) {
-        this.authData = authData as ICurve25519AuthData;
-    }
+    ) {}
 
     public static async init(
         authData: AuthData,
@@ -707,14 +704,11 @@ const UNSTABLE_MSC3270_NAME = new UnstableValue(null, "org.matrix.msc3270.v1.aes
 
 export class Aes256 implements BackupAlgorithm {
     public static algorithmName = UNSTABLE_MSC3270_NAME.name;
-    public readonly authData: IAes256AuthData;
 
     constructor(
-        authData: AuthData,
+        public readonly authData: IAes256AuthData,
         private readonly key: Uint8Array,
-    ) {
-        this.authData = authData as IAes256AuthData;
-    }
+    ) {}
 
     public static async init(
         authData: IAes256AuthData,
