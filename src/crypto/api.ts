@@ -16,7 +16,6 @@ limitations under the License.
 
 import { DeviceInfo } from "./deviceinfo";
 import { IKeyBackupInfo } from "./keybackup";
-import { ISecretStorageKeyInfo } from "../matrix";
 
 // TODO: Merge this with crypto.js once converted
 
@@ -107,14 +106,32 @@ export interface ICreateSecretStorageOpts {
     getKeyBackupPassphrase?: () => Promise<Uint8Array>;
 }
 
+export interface ISecretStorageKeyInfo {
+    name: string;
+    algorithm: string;
+    // technically the below are specific to AES keys. If we ever introduce another type,
+    // we can split into separate interfaces.
+    iv: string;
+    mac: string;
+    passphrase: IPassphraseInfo;
+}
+
 export interface ISecretStorageKey {
     keyId: string;
     keyInfo: ISecretStorageKeyInfo;
 }
 
+export interface IPassphraseInfo {
+    algorithm: "m.pbkdf2";
+    iterations: number;
+    salt: string;
+    bits: number;
+}
+
 export interface IAddSecretStorageKeyOpts {
-    // depends on algorithm
-    // TODO: Types
+    name: string;
+    passphrase: IPassphraseInfo;
+    key: Uint8Array;
 }
 
 export interface IImportOpts {

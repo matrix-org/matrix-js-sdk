@@ -64,7 +64,8 @@ import {
 import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
 import type Request from "request";
 import { MatrixScheduler } from "./scheduler";
-import { ICryptoCallbacks, ISecretStorageKeyInfo, NotificationCountType } from "./matrix";
+import { ICryptoCallbacks, NotificationCountType } from "./matrix";
+import { ISecretStorageKeyInfo } from "./crypto/api";
 import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store";
 import { LocalStorageCryptoStore } from "./crypto/store/localStorage-crypto-store";
 import { IndexedDBCryptoStore } from "./crypto/store/indexeddb-crypto-store";
@@ -83,7 +84,6 @@ import {
     IEncryptedEventInfo,
     IImportRoomKeysOpts,
     IRecoveryKey,
-    ISecretStorageKey,
 } from "./crypto/api";
 import { CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from "./crypto/CrossSigning";
 import { Room } from "./models/room";
@@ -422,6 +422,19 @@ interface IUploadKeySignaturesResponse {
         errcode: string;
         error: string;
     }>>;
+}
+
+export interface IPreviewUrlResponse {
+    [key: string]: string | number;
+    "og:title": string;
+    "og:type": string;
+    "og:url": string;
+    "og:image"?: string;
+    "og:image:type"?: string;
+    "og:image:height"?: number;
+    "og:image:width"?: number;
+    "og:description"?: string;
+    "matrix:image:size"?: number;
 }
 
 /**
@@ -1851,7 +1864,11 @@ export class MatrixClient extends EventEmitter {
      *     keyId: {string} the ID of the key
      *     keyInfo: {object} details about the key (iv, mac, passphrase)
      */
-    public addSecretStorageKey(algorithm: string, opts: IAddSecretStorageKeyOpts, keyName?: string): ISecretStorageKey {
+    public addSecretStorageKey(
+        algorithm: string,
+        opts: IAddSecretStorageKeyOpts,
+        keyName?: string,
+    ): Promise<{keyId: string, keyInfo: ISecretStorageKeyInfo}> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -1867,7 +1884,7 @@ export class MatrixClient extends EventEmitter {
      *     for. Defaults to the default key ID if not provided.
      * @return {boolean} Whether we have the key.
      */
-    public hasSecretStorageKey(keyId?: string): boolean {
+    public hasSecretStorageKey(keyId?: string): Promise<boolean> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -1920,7 +1937,7 @@ export class MatrixClient extends EventEmitter {
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    public isSecretStored(name: string, checkKey: boolean): Record<string, ISecretStorageKeyInfo> {
+    public isSecretStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo>> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -3705,10 +3722,14 @@ export class MatrixClient extends EventEmitter {
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      * May return synthesized attributes if the URL lacked OG meta.
      */
-    public getUrlPreview(url: string, ts: number, callback?: Callback): Promise<any> {
+    public getUrlPreview(url: string, ts: number, callback?: Callback): Promise<IPreviewUrlResponse> {
         // bucket the timestamp to the nearest minute to prevent excessive spam to the server
         // Surely 60-second accuracy is enough for anyone.
         ts = Math.floor(ts / 60000) * 60000;
+
+        const parsed = new URL(url);
+        parsed.hash = ""; // strip the hash as it won't affect the preview
+        url = parsed.toString();
 
         const key = ts + "_" + url;
 
