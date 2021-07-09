@@ -1670,7 +1670,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
      */
     public importRoomKey(session: IMegolmSessionData, opts: any = {}): Promise<void> {
         const extraSessionData: any = {};
-        if (opts.untrusted) {
+        if (opts.untrusted || session.untrusted) {
             extraSessionData.untrusted = true;
         }
         if (session["org.matrix.msc3061.shared_history"]) {

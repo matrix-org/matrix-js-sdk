@@ -2142,28 +2142,26 @@ export class MatrixClient extends EventEmitter {
      * Get information about the current key backup.
      * @returns {Promise} Information object from API or null
      */
-    public getKeyBackupVersion(): Promise<IKeyBackupInfo> {
-        return this.http.authedRequest(
-            undefined, "GET", "/room_keys/version", undefined, undefined,
-            { prefix: PREFIX_UNSTABLE },
-        ).then((res) => {
-            if (res.algorithm !== olmlib.MEGOLM_BACKUP_ALGORITHM) {
-                const err = "Unknown backup algorithm: " + res.algorithm;
-                return Promise.reject(err);
-            } else if (!(typeof res.auth_data === "object")
-                || !res.auth_data.public_key) {
-                const err = "Invalid backup data returned";
-                return Promise.reject(err);
-            } else {
-                return res;
-            }
-        }).catch((e) => {
+    public async getKeyBackupVersion(): Promise<IKeyBackupInfo> {
+        let res;
+        try {
+            res = await this.http.authedRequest(
+                undefined, "GET", "/room_keys/version", undefined, undefined,
+                { prefix: PREFIX_UNSTABLE },
+            );
+        } catch (e) {
             if (e.errcode === 'M_NOT_FOUND') {
                 return null;
             } else {
                 throw e;
             }
-        });
+        }
+        try {
+            BackupManager.checkBackupVersion(res);
+        } catch (e) {
+            throw e;
+        }
+        return res;
     }
 
     /**
@@ -2574,6 +2572,8 @@ export class MatrixClient extends EventEmitter {
 
         const algorithm = await BackupManager.makeAlgorithm(backupInfo, async () => { return privKey; });
 
+        const untrusted = algorithm.untrusted;
+
         try {
             // If the pubkey computed from the private data we've been given
             // doesn't match the one in the auth_data, the user has entered
@@ -2641,7 +2641,7 @@ export class MatrixClient extends EventEmitter {
 
         await this.importRoomKeys(keys, {
             progressCallback,
-            untrusted: true,
+            untrusted,
             source: "backup",
         });
 

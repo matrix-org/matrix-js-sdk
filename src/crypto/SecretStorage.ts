@@ -17,15 +17,13 @@ limitations under the License.
 import { logger } from '../logger';
 import * as olmlib from './olmlib';
 import { randomString } from '../randomstring';
-import { encryptAES, decryptAES, IEncryptedPayload } from './aes';
+import { encryptAES, decryptAES, IEncryptedPayload, calculateKeyCheck } from './aes';
 import { encodeBase64 } from "./olmlib";
 import { ICryptoCallbacks, MatrixClient, MatrixEvent } from '../matrix';
 import { IAddSecretStorageKeyOpts, ISecretStorageKeyInfo } from './api';
 import { EventEmitter } from 'stream';
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
-
-const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
 
 // Some of the key functions use a tuple and some use an object...
 export type SecretStorageKeyTuple = [keyId: string, keyInfo: ISecretStorageKeyInfo];
@@ -139,7 +137,7 @@ export class SecretStorage {
                 keyInfo.passphrase = opts.passphrase;
             }
             if (opts.key) {
-                const { iv, mac } = await SecretStorage.calculateKeyCheck(opts.key);
+                const { iv, mac } = await calculateKeyCheck(opts.key);
                 keyInfo.iv = iv;
                 keyInfo.mac = mac;
             }
@@ -212,7 +210,7 @@ export class SecretStorage {
     public async checkKey(key: Uint8Array, info: ISecretStorageKeyInfo): Promise<boolean> {
         if (info.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             if (info.mac) {
-                const { mac } = await SecretStorage.calculateKeyCheck(key, info.iv);
+                const { mac } = await calculateKeyCheck(key, info.iv);
                 return info.mac.replace(/=+$/g, '') === mac.replace(/=+$/g, '');
             } else {
                 // if we have no information, we have to assume the key is right
@@ -221,10 +219,6 @@ export class SecretStorage {
         } else {
             throw new Error("Unknown algorithm");
         }
-    }
-
-    public static async calculateKeyCheck(key: Uint8Array, iv?: string): Promise<IEncryptedPayload> {
-        return await encryptAES(ZERO_STR, key, "", iv);
     }
 
     /**

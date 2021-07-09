@@ -52,7 +52,7 @@ import { InRoomChannel, InRoomRequests } from "./verification/request/InRoomChan
 import { ToDeviceChannel, ToDeviceRequests } from "./verification/request/ToDeviceChannel";
 import { IllegalMethod } from "./verification/IllegalMethod";
 import { KeySignatureUploadError } from "../errors";
-import { decryptAES, encryptAES } from './aes';
+import { decryptAES, encryptAES, calculateKeyCheck } from './aes';
 import { DehydrationManager } from './dehydration';
 import { BackupManager } from "./backup";
 import { IStore } from "../store";
@@ -133,6 +133,7 @@ export interface IMegolmSessionData {
     session_id: string;
     session_key: string;
     algorithm: string;
+    untrusted?: boolean;
 }
 /* eslint-enable camelcase */
 
@@ -797,7 +798,7 @@ export class Crypto extends EventEmitter {
                 if (key) {
                     const privateKey = key[1];
                     builder.ssssCryptoCallbacks.addPrivateKey(keyId, keyInfo, privateKey);
-                    const { iv, mac } = await SecretStorage.calculateKeyCheck(privateKey);
+                    const { iv, mac } = await calculateKeyCheck(privateKey);
                     keyInfo.iv = iv;
                     keyInfo.mac = mac;
 
