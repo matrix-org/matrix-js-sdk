@@ -546,7 +546,7 @@ interface IOpenIDToken {
 
 interface IRoomInitialSyncResponse {
     room_id: string;
-    membership: "invite" | "join" | "leave" | "ban",
+    membership: "invite" | "join" | "leave" | "ban";
     messages?: {
         start?: string;
         end?: string;
@@ -633,7 +633,7 @@ interface IDownloadKeyResult {
                     device_display_name: string;
                 };
             };
-        }
+        };
     };
 }
 
@@ -6796,6 +6796,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: Object with room_id and servers.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
+    // eslint-disable-next-line camelcase
     public resolveRoomAlias(roomAlias: string, callback?: Callback): Promise<{ room_id: string, servers: string[] }> {
         // TODO: deprecate this or getRoomIdForAlias
         const path = utils.encodeUri("/directory/room/$alias", { $alias: roomAlias });
@@ -6961,6 +6962,7 @@ export class MatrixClient extends EventEmitter {
         userId: string,
         info?: string,
         callback?: Callback,
+        // eslint-disable-next-line camelcase
     ): Promise<{ avatar_url?: string, displayname?: string }> {
         if (utils.isFunction(info)) {
             callback = info as any as Callback; // legacy

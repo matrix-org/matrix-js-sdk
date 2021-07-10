@@ -98,7 +98,7 @@ export interface IKeyBackup {
                 [sessionId: string]: IKeyBackupSession;
             };
         };
-    }
+    };
 }
 
 /**

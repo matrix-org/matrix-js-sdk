@@ -64,9 +64,9 @@ export interface IResultRoomEvents {
                 next_batch?: string;
                 order: number;
                 results: string[];
-            }
+            };
         };
-    }
+    };
     next_batch?: string;
 }
 
@@ -98,7 +98,7 @@ export interface ISearchRequestBody {
                 group_by: {
                     key: GroupKey;
                 }[];
-            }
+            };
         };
     };
 }
