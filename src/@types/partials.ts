@@ -39,3 +39,10 @@ export enum Preset {
 }
 
 export type ResizeMethod = "crop" | "scale";
+
+// TODO move to http-api after TSification
+export interface IAbortablePromise<T> extends Promise<T> {
+    abort(): void;
+}
+
+export type IdServerUnbindResult = "no-support" | "success";

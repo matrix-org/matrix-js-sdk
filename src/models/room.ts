@@ -31,7 +31,7 @@ import { IRoomSummary, RoomSummary } from "./room-summary";
 import { logger } from '../logger';
 import { ReEmitter } from '../ReEmitter';
 import { EventType, RoomCreateTypeField, RoomType } from "../@types/event";
-import { IRoomVersionsCapability, MatrixClient, RoomVersionStability } from "../client";
+import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
 import { ResizeMethod } from "../@types/partials";
 import { Filter } from "../filter";
 import { RoomState } from "./room-state";
@@ -64,7 +64,7 @@ function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: stri
 
 interface IOpts {
     storageToken?: string;
-    pendingEventOrdering?: "chronological" | "detached";
+    pendingEventOrdering?: PendingEventOrdering;
     timelineSupport?: boolean;
     unstableClientRelationAggregation?: boolean;
     lazyLoadMembers?: boolean;
@@ -218,7 +218,7 @@ export class Room extends EventEmitter {
         this.setMaxListeners(100);
         this.reEmitter = new ReEmitter(this);
 
-        opts.pendingEventOrdering = opts.pendingEventOrdering || "chronological";
+        opts.pendingEventOrdering = opts.pendingEventOrdering || PendingEventOrdering.Chronological;
         if (["chronological", "detached"].indexOf(opts.pendingEventOrdering) === -1) {
             throw new Error(
                 "opts.pendingEventOrdering MUST be either 'chronological' or " +
@@ -665,8 +665,7 @@ export class Room extends EventEmitter {
     private async loadMembers(): Promise<{ memberEvents: MatrixEvent[], fromServer: boolean }> {
         // were the members loaded from the server?
         let fromServer = false;
-        let rawMembersEvents =
-            await this.client.store.getOutOfBandMembers(this.roomId);
+        let rawMembersEvents = await this.client.store.getOutOfBandMembers(this.roomId);
         if (rawMembersEvents === null) {
             fromServer = true;
             rawMembersEvents = await this.loadMembersFromServer();

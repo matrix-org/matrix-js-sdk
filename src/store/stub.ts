@@ -33,9 +33,10 @@ import { RoomSummary } from "../models/room-summary";
  * @constructor
  */
 export class StubStore implements IStore {
+    public readonly accountData = {}; // stub
     private fromToken: string = null;
 
-    /** @return {Promise<bool>} whether or not the database was newly created in this session. */
+    /** @return {Promise<boolean>} whether or not the database was newly created in this session. */
     public isNewlyCreated(): Promise<boolean> {
         return Promise.resolve(true);
     }

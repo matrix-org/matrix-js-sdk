@@ -109,8 +109,8 @@ export class EncryptionSetupBuilder {
      * @param {Object} content
      * @return {Promise}
      */
-    public setAccountData(type: string, content: object): Promise<void> {
-        return this.accountDataClientAdapter.setAccountData(type, content);
+    public async setAccountData(type: string, content: object): Promise<void> {
+        await this.accountDataClientAdapter.setAccountData(type, content);
     }
 
     /**
@@ -284,7 +284,7 @@ class AccountDataClientAdapter extends EventEmitter {
      * @param {Object} content
      * @return {Promise}
      */
-    public setAccountData(type: string, content: any): Promise<void> {
+    public setAccountData(type: string, content: any): Promise<{}> {
         const lastEvent = this.values.get(type);
         this.values.set(type, content);
         // ensure accountData is emitted on the next tick,
@@ -293,6 +293,7 @@ class AccountDataClientAdapter extends EventEmitter {
         return Promise.resolve().then(() => {
             const event = new MatrixEvent({ type, content });
             this.emit("accountData", event, lastEvent);
+            return {};
         });
     }
 }

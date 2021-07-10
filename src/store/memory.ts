@@ -59,7 +59,7 @@ export class MemoryStore implements IStore {
     //    filterId: Filter
     // }
     private filters: Record<string, Record<string, Filter>> = {};
-    private accountData: Record<string, MatrixEvent> = {}; // type : content
+    public accountData: Record<string, MatrixEvent> = {}; // type : content
     private readonly localStorage: Storage;
     private oobMembers: Record<string, MatrixEvent[]> = {}; // roomId: [member events]
     private clientOptions = {};

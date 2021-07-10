@@ -318,7 +318,7 @@ export class SyncApi {
         this._peekRoom = this.createRoom(roomId);
         return this.client.roomInitialSync(roomId, 20).then((response) => {
             // make sure things are init'd
-            response.messages = response.messages || {};
+            response.messages = response.messages || { chunk: [] };
             response.messages.chunk = response.messages.chunk || [];
             response.state = response.state || [];
 

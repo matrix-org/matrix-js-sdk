@@ -111,8 +111,8 @@ export class MSC3089TreeSpace {
      * @param {string} name The new name for the space.
      * @returns {Promise<void>} Resolves when complete.
      */
-    public setName(name: string): Promise<void> {
-        return this.client.sendStateEvent(this.roomId, EventType.RoomName, { name }, "");
+    public async setName(name: string): Promise<void> {
+        await this.client.sendStateEvent(this.roomId, EventType.RoomName, { name }, "");
     }
 
     /**
@@ -190,7 +190,7 @@ export class MSC3089TreeSpace {
         }
         pls['users'] = users;
 
-        return this.client.sendStateEvent(this.roomId, EventType.RoomPowerLevels, pls, "");
+        await this.client.sendStateEvent(this.roomId, EventType.RoomPowerLevels, pls, "");
     }
 
     /**
