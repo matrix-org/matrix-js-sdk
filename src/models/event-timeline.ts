@@ -22,6 +22,7 @@ import { RoomState } from "./room-state";
 import { EventTimelineSet } from "./event-timeline-set";
 import { MatrixEvent } from "./event";
 import { Filter } from "../filter";
+import { EventType } from "../@types/event";
 
 export enum Direction {
     Backward = "b",
@@ -55,7 +56,7 @@ export class EventTimeline {
         if (!event.sender) {
             event.sender = stateContext.getSentinelMember(event.getSender());
         }
-        if (!event.target && event.getType() === "m.room.member") {
+        if (!event.target && event.getType() === EventType.RoomMember) {
             event.target = stateContext.getSentinelMember(event.getStateKey());
         }
 
