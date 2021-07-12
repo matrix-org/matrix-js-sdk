@@ -29,7 +29,6 @@ import { RoomMember } from "../models/room-member";
 import { Filter } from "../filter";
 import { ISavedSync, IStore } from "./index";
 import { RoomSummary } from "../models/room-summary";
-import { IMinimalEvent } from "../sync-accumulator";
 
 function isValidFilterId(filterId: string): boolean {
     const isValidStr = typeof filterId === "string" &&

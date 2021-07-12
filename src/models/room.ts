@@ -35,7 +35,6 @@ import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersio
 import { ResizeMethod } from "../@types/partials";
 import { Filter } from "../filter";
 import { RoomState } from "./room-state";
-import { IMinimalEvent } from "../sync-accumulator";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
