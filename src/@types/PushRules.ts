@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// allow camelcase as these are things that go onto the wire
+/* eslint-disable camelcase */
+
 export enum PushRuleActionName {
     DontNotify = "dont_notify",
     Notify = "notify",
@@ -26,9 +29,9 @@ export enum TweakName {
 }
 
 export type Tweak<N extends TweakName, V> = {
-    set_tweak: N; // eslint-disable-line camel-case
+    set_tweak: N;
     value: V;
-}
+};
 
 export type TweakHighlight = Tweak<TweakName.Highlight, boolean>;
 export type TweakSound = Tweak<TweakName.Sound, string>;
@@ -49,7 +52,7 @@ export type MemberCountCondition
     <N extends number, Op extends ConditionOperator = ConditionOperator.ExactEquals>
     = `${Op}${N}` | (Op extends ConditionOperator.ExactEquals ? `${N}` : never);
 
-export type AnyMemberCountCondition = MemberCountCondition<number,  ConditionOperator>;
+export type AnyMemberCountCondition = MemberCountCondition<number, ConditionOperator>;
 
 export const DMMemberCountCondition: MemberCountCondition<2> = "2";
 
@@ -93,7 +96,6 @@ export type PushRuleCondition = IPushRuleCondition<string>
     | IRoomMemberCountCondition
     | ISenderNotificationPermissionCondition;
 
-
 export enum PushRuleKind {
     Override = "override",
     ContentSpecific = "content",
@@ -128,7 +130,7 @@ export interface IPushRule {
     default: boolean;
     enabled: boolean;
     pattern?: string;
-    rule_id: RuleId | string; // eslint-disable-line camel-case
+    rule_id: RuleId | string;
 }
 
 export interface IAnnotatedPushRule extends IPushRule {
@@ -141,15 +143,17 @@ export interface IPushRules {
 }
 
 export interface IPusher {
-    app_display_name: string; // eslint-disable-line camel-case
-    app_id: string; // eslint-disable-line camel-case
+    app_display_name: string;
+    app_id: string;
     data: {
         format?: string; // TODO: Types
         url?: string; // TODO: Required if kind==http
-    },
-    device_display_name: string; // eslint-disable-line camel-case
+    };
+    device_display_name: string;
     kind: string; // TODO: Types
     lang: string;
-    profile_tag?: string; // eslint-disable-line camel-case
+    profile_tag?: string;
     pushkey: string;
 }
+
+/* eslint-enable camelcase */
