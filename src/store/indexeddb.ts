@@ -43,8 +43,7 @@ const WRITE_DELAY_MS = 1000 * 60 * 5; // once every 5 minutes
 interface IOpts extends IBaseOpts {
     indexedDB: IDBFactory;
     dbName?: string;
-    workerScript?: string;
-    workerApi?: typeof Worker;
+    workerFactory?: () => Worker;
 }
 
 export class IndexedDBStore extends MemoryStore {
@@ -111,16 +110,8 @@ export class IndexedDBStore extends MemoryStore {
             throw new Error('Missing required option: indexedDB');
         }
 
-        if (opts.workerScript) {
-            // try & find a webworker-compatible API
-            let workerApi = opts.workerApi;
-            if (!workerApi) {
-                // default to the global Worker object (which is where it in a browser)
-                workerApi = global.Worker;
-            }
-            this.backend = new RemoteIndexedDBStoreBackend(
-                opts.workerScript, opts.dbName, workerApi,
-            );
+        if (opts.workerFactory) {
+            this.backend = new RemoteIndexedDBStoreBackend(opts.workerFactory, opts.dbName);
         } else {
             this.backend = new LocalIndexedDBStoreBackend(opts.indexedDB, opts.dbName);
         }
