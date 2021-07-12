@@ -117,6 +117,8 @@ import { WebStorageSessionStore } from "./store/session/webstorage";
 import { BackupManager, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE, MSC3089TreeSpace } from "./models/MSC3089TreeSpace";
 import { ISignatures } from "./@types/signed";
+import { IPusher, IPushRules } from "./@types/PushRules";
+import { IThirdPartyIdentifier } from "./@types/threepids";
 
 export type Store = StubStore | MemoryStore | LocalIndexedDBStoreBackend | RemoteIndexedDBStoreBackend;
 export type SessionStore = WebStorageSessionStore;
@@ -3636,7 +3638,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async sendReadReceipt(event: MatrixEvent, opts: { hidden?: boolean }, callback?: Callback): Promise<any> {
+    public async sendReadReceipt(event: MatrixEvent, opts?: { hidden?: boolean }, callback?: Callback): Promise<any> {
         if (typeof (opts) === 'function') {
             callback = opts as any as Callback; // legacy
             opts = {};
@@ -6759,10 +6761,10 @@ export class MatrixClient extends EventEmitter {
 
     /**
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves to a list of the user's threepids.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getThreePids(callback?: Callback): Promise<any> { // TODO: Types
+    public getThreePids(callback?: Callback): Promise<{ threepids: IThirdPartyIdentifier[] }> {
         const path = "/account/3pid";
         return this.http.authedRequest(
             callback, "GET", path, undefined, undefined,
@@ -6989,7 +6991,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: Array of objects representing pushers
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getPushers(callback?: Callback): Promise<any> { // TODO: Types
+    public getPushers(callback?: Callback): Promise<{ pushers: IPusher[] }> { // TODO: Types
         const path = "/pushers";
         return this.http.authedRequest(
             callback, "GET", path, undefined, undefined,
@@ -7004,7 +7006,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: Empty json object on success
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setPusher(pusher: any, callback?: Callback): Promise<any> { // TODO: Types
+    public setPusher(pusher: any, callback?: Callback): Promise<{}> {
         const path = "/pushers/set";
         return this.http.authedRequest(
             callback, "POST", path, null, pusher,
@@ -7012,11 +7014,12 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
+     * Get the push rules for the account from the server.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves to the push rules.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getPushRules(callback?: Callback): Promise<any> { // TODO: Types
+    public getPushRules(callback?: Callback): Promise<IPushRules> {
         return this.http.authedRequest(callback, "GET", "/pushrules/").then(rules => {
             return PushProcessor.rewriteDefaultRules(rules);
         });
