@@ -135,7 +135,7 @@ export class SyncApi {
     private syncStateData: ISyncStateData = null; // additional data (eg. error object for failed sync)
     private catchingUp = false;
     private running = false;
-    private keepAliveTimer: NodeJS.Timeout = null;
+    private keepAliveTimer: number = null;
     private connectionReturnedDefer: IDeferred<boolean> = null;
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
     private failedSyncCount = 0; // Number of consecutive failed /sync requests

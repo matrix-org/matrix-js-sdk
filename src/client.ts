@@ -731,7 +731,7 @@ export class MatrixClient extends EventEmitter {
     protected syncLeftRoomsPromise: Promise<Room[]>;
     protected syncedLeftRooms = false;
     protected clientOpts: IStoredClientOpts;
-    protected clientWellKnownIntervalID: NodeJS.Timeout;
+    protected clientWellKnownIntervalID: number;
     protected canResetTimelineCallback: ResetTimelineCallback;
 
     // The pushprocessor caches useful things, so keep one and re-use it
@@ -749,7 +749,7 @@ export class MatrixClient extends EventEmitter {
     protected clientWellKnownPromise: Promise<IClientWellKnown>;
     protected turnServers: ITurnServer[] = [];
     protected turnServersExpiry = 0;
-    protected checkTurnServersIntervalID: NodeJS.Timeout;
+    protected checkTurnServersIntervalID: number;
     protected exportedOlmDeviceToImport: IOlmDevice;
     protected txnCtr = 0;
 
