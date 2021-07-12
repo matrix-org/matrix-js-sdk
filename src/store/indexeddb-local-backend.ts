@@ -377,9 +377,7 @@ export class LocalIndexedDBStoreBackend implements IIndexeddbBackend {
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
-    public getSavedSync(copy: boolean): Promise<ISavedSync> {
-        if (copy === undefined) copy = true;
-
+    public getSavedSync(copy = true): Promise<ISavedSync> {
         const data = this.syncAccumulator.getJSON();
         if (!data.nextBatch) return Promise.resolve(null);
         if (copy) {
