@@ -25,7 +25,7 @@ import { EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
 import { normalize } from "../utils";
-import { EventStatus, MatrixEvent } from "./event";
+import { EventStatus, IEvent, MatrixEvent } from "./event";
 import { RoomMember } from "./room-member";
 import { IRoomSummary, RoomSummary } from "./room-summary";
 import { logger } from '../logger';
@@ -35,6 +35,7 @@ import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersio
 import { ResizeMethod } from "../@types/partials";
 import { Filter } from "../filter";
 import { RoomState } from "./room-state";
+import { IMinimalEvent } from "../sync-accumulator";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -649,7 +650,7 @@ export class Room extends EventEmitter {
         }
     }
 
-    private async loadMembersFromServer(): Promise<object[]> {
+    private async loadMembersFromServer(): Promise<IEvent[]> {
         const lastSyncToken = this.client.store.getSyncToken();
         const queryString = utils.encodeParams({
             not_membership: "leave",
@@ -712,7 +713,7 @@ export class Room extends EventEmitter {
             if (fromServer) {
                 const oobMembers = this.currentState.getMembers()
                     .filter((m) => m.isOutOfBand())
-                    .map((m) => m.events.member.event);
+                    .map((m) => m.events.member.event as IEvent);
                 logger.log(`LL: telling store to write ${oobMembers.length}`
                     + ` members for room ${this.roomId}`);
                 const store = this.client.store;

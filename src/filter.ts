@@ -86,7 +86,7 @@ export class Filter {
      * @param {Object} jsonObj
      * @return {Filter}
      */
-    static fromJson(userId: string, filterId: string, jsonObj: IFilterDefinition): Filter {
+    public static fromJson(userId: string, filterId: string, jsonObj: IFilterDefinition): Filter {
         const filter = new Filter(userId, filterId);
         filter.setDefinition(jsonObj);
         return filter;

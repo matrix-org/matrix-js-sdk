@@ -18,7 +18,7 @@ import { EventType } from "../@types/event";
 import { Group } from "../models/group";
 import { Room } from "../models/room";
 import { User } from "../models/user";
-import { MatrixEvent } from "../models/event";
+import { IEvent, MatrixEvent } from "../models/event";
 import { Filter } from "../filter";
 import { RoomSummary } from "../models/room-summary";
 import { IMinimalEvent, IGroups, IRooms } from "../sync-accumulator";
@@ -225,9 +225,9 @@ export interface IStore {
      */
     deleteAllData(): Promise<void>;
 
-    getOutOfBandMembers(roomId: string): Promise<object[] | null>;
+    getOutOfBandMembers(roomId: string): Promise<IEvent[] | null>;
 
-    setOutOfBandMembers(roomId: string, membershipEvents: object[]): Promise<void>;
+    setOutOfBandMembers(roomId: string, membershipEvents: IEvent[]): Promise<void>;
 
     clearOutOfBandMembers(roomId: string): Promise<void>;
 

@@ -490,6 +490,7 @@ interface IKeyBackupPath {
 }
 
 interface IMediaConfig {
+    [key: string]: any; // extensible
     "m.upload.size"?: number;
 }
 
@@ -4374,14 +4375,12 @@ export class MatrixClient extends EventEmitter {
     // eslint-disable-next-line camelcase
     public setProfileInfo(info: "avatar_url", data: { avatar_url: string }, callback?: Callback): Promise<{}>;
     public setProfileInfo(info: "displayname", data: { displayname: string }, callback?: Callback): Promise<{}>;
-    public setProfileInfo(info: string, data: object, callback?: Callback): Promise<{}> {
+    public setProfileInfo(info: "avatar_url" | "displayname", data: object, callback?: Callback): Promise<{}> {
         const path = utils.encodeUri("/profile/$userId/$info", {
             $userId: this.credentials.userId,
             $info: info,
         });
-        return this.http.authedRequest(
-            callback, "PUT", path, undefined, data,
-        );
+        return this.http.authedRequest(callback, "PUT", path, undefined, data);
     }
 
     /**

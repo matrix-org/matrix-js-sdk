@@ -23,7 +23,7 @@ import { EventType } from "../@types/event";
 import { Group } from "../models/group";
 import { Room } from "../models/room";
 import { User } from "../models/user";
-import { MatrixEvent } from "../models/event";
+import { IEvent, MatrixEvent } from "../models/event";
 import { Filter } from "../filter";
 import { ISavedSync, IStore } from "./index";
 import { RoomSummary } from "../models/room-summary";
@@ -265,11 +265,11 @@ export class StubStore implements IStore {
         return Promise.resolve();
     }
 
-    public getOutOfBandMembers(): Promise<MatrixEvent[]> {
+    public getOutOfBandMembers(): Promise<IEvent[]> {
         return Promise.resolve(null);
     }
 
-    public setOutOfBandMembers(roomId: string, membershipEvents: MatrixEvent[]): Promise<void> {
+    public setOutOfBandMembers(roomId: string, membershipEvents: IEvent[]): Promise<void> {
         return Promise.resolve();
     }
 
