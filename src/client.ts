@@ -4778,7 +4778,7 @@ export class MatrixClient extends EventEmitter {
      * If an account with the given email address already exists and is
      * associated with an account other than the one the user is authed as,
      * it will either send an email to the address informing them of this
-     * or return M_THREEPID_IN_USE (which one is up to the Home Server).
+     * or return M_THREEPID_IN_USE (which one is up to the homeserver).
      *
      * @param {string} email As requestEmailToken
      * @param {string} clientSecret As requestEmailToken
@@ -4843,7 +4843,7 @@ export class MatrixClient extends EventEmitter {
      * adding specific behaviour for the password resetting. Specifically,
      * if no account with the given email address exists, it may either
      * return M_THREEPID_NOT_FOUND or send an email
-     * to the address informing them of this (which one is up to the Home Server).
+     * to the address informing them of this (which one is up to the homeserver).
      *
      * requestEmailToken calls the equivalent API directly on the ID server,
      * therefore bypassing the password reset specific logic.
@@ -5316,7 +5316,7 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
-     * Gets a bearer token from the Home Server that the user can
+     * Gets a bearer token from the homeserver that the user can
      * present to a third party in order to prove their ownership
      * of the Matrix account they are logged into.
      * @return {Promise} Resolves: Token object
@@ -5349,7 +5349,7 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
-     * Get the TURN servers for this home server.
+     * Get the TURN servers for this homeserver.
      * @return {Array<Object>} The servers or an empty list.
      */
     public getTurnServers(): any[] { // TODO: Types
@@ -6668,7 +6668,7 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
-     * Upload a file to the media repository on the home server.
+     * Upload a file to the media repository on the homeserver.
      *
      * @param {object} file The object to upload. On a browser, something that
      *   can be sent to XMLHttpRequest.send (typically a File).  Under node.js,

@@ -121,7 +121,7 @@ MatrixHttpApi.prototype = {
     },
 
     /**
-     * Upload content to the Home Server
+     * Upload content to the homeserver
      *
      * @param {object} file The object to upload. On a browser, something that
      *   can be sent to XMLHttpRequest.send (typically a File).  Under node.js,
