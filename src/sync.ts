@@ -329,8 +329,7 @@ export class SyncApi {
             const stateEvents = response.state.map(client.getEventMapper());
             const messages = response.messages.chunk.map(client.getEventMapper());
 
-            // XXX: copypasted from /sync until we kill off this
-            // minging v1 API stuff)
+            // XXX: copypasted from /sync until we kill off this minging v1 API stuff)
             // handle presence events (User objects)
             if (response.presence && Array.isArray(response.presence)) {
                 response.presence.map(client.getEventMapper()).forEach(

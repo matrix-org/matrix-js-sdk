@@ -21,7 +21,7 @@ limitations under the License.
 
 import { EventEmitter } from "events";
 import { ISyncStateData, SyncApi } from "./sync";
-import { EventStatus, IContent, IDecryptOptions, MatrixEvent } from "./models/event";
+import { EventStatus, IContent, IDecryptOptions, IEvent, MatrixEvent } from "./models/event";
 import { StubStore } from "./store/stub";
 import { createNewMatrixCall, MatrixCall } from "./webrtc/call";
 import { Filter, IFilterDefinition } from "./filter";
@@ -556,7 +556,7 @@ interface IRoomInitialSyncResponse {
     state?: IStateEventWithRoomId[];
     visibility: Visibility;
     account_data?: IMinimalEvent[];
-    presence: any; // undocumented
+    presence: Partial<IEvent>; // legacy and undocumented, api is deprecated so this won't get attention
 }
 
 interface IJoinedMembersResponse {
@@ -568,7 +568,7 @@ interface IJoinedMembersResponse {
     };
 }
 
-export interface IPublicRoomsChunk {
+export interface IPublicRoomsChunkRoom {
     room_id: string;
     name?: string;
     avatar_url?: string;
@@ -581,7 +581,7 @@ export interface IPublicRoomsChunk {
 }
 
 interface IPublicRoomsResponse {
-    chunk: IPublicRoomsChunk[];
+    chunk: IPublicRoomsChunkRoom[];
     next_batch?: string;
     prev_batch?: string;
     total_room_count_estimate?: number;
@@ -657,7 +657,7 @@ export interface IInstance {
     icon?: string;
     fields: object;
     network_id: string;
-    // XXX: this is undocumented but we rely on it.
+    // XXX: this is undocumented but we rely on it: https://github.com/matrix-org/matrix-doc/issues/3203
     instance_id: string;
 }
 

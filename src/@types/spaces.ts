@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IPublicRoomsChunk } from "../client";
+import { IPublicRoomsChunkRoom } from "../client";
 
 // Types relating to Rooms of type `m.space` and related APIs
 
 /* eslint-disable camelcase */
-export interface ISpaceSummaryRoom extends IPublicRoomsChunk {
+export interface ISpaceSummaryRoom extends IPublicRoomsChunkRoom {
     num_refs: number;
     room_type: string;
 }
