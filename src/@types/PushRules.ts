@@ -64,31 +64,6 @@ export enum ConditionKind {
     SenderNotificationPermission = "sender_notification_permission",
 }
 
-export enum PushRuleKind {
-    Override = "override",
-    ContentSpecific = "content",
-    RoomSpecific = "room",
-    SenderSpecific = "sender",
-    Underride = "underride",
-}
-
-export type PushRuleSet = {
-    [k in PushRuleKind]?: IPushRule[];
-};
-
-export interface IPushRule {
-    actions: PushRuleAction[];
-    conditions?: PushRuleCondition[];
-    default: boolean;
-    enabled: boolean;
-    pattern?: string;
-    rule_id: RuleId | string; // eslint-disable-line camel-case
-}
-
-export interface IAnnotatedPushRule extends IPushRule {
-    kind: PushRuleKind;
-}
-
 export interface IPushRuleCondition<N extends ConditionKind | string> {
     [k: string]: any; // for custom conditions, there can be other fields here
     kind: N;
@@ -118,9 +93,13 @@ export type PushRuleCondition = IPushRuleCondition<string>
     | IRoomMemberCountCondition
     | ISenderNotificationPermissionCondition;
 
-export interface IPushRules {
-    global: PushRuleSet;
-    device?: PushRuleSet;
+
+export enum PushRuleKind {
+    Override = "override",
+    ContentSpecific = "content",
+    RoomSpecific = "room",
+    SenderSpecific = "sender",
+    Underride = "underride",
 }
 
 export enum RuleId {
@@ -137,6 +116,28 @@ export enum RuleId {
     IncomingCall = ".m.rule.call",
     SuppressNotices = ".m.rule.suppress_notices",
     Tombstone = ".m.rule.tombstone",
+}
+
+export type PushRuleSet = {
+    [k in PushRuleKind]?: IPushRule[];
+};
+
+export interface IPushRule {
+    actions: PushRuleAction[];
+    conditions?: PushRuleCondition[];
+    default: boolean;
+    enabled: boolean;
+    pattern?: string;
+    rule_id: RuleId | string; // eslint-disable-line camel-case
+}
+
+export interface IAnnotatedPushRule extends IPushRule {
+    kind: PushRuleKind;
+}
+
+export interface IPushRules {
+    global: PushRuleSet;
+    device?: PushRuleSet;
 }
 
 export interface IPusher {
