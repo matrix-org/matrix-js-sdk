@@ -21,7 +21,7 @@ import { User } from "../models/user";
 import { IEvent, MatrixEvent } from "../models/event";
 import { Filter } from "../filter";
 import { RoomSummary } from "../models/room-summary";
-import { IMinimalEvent, IGroups, IRooms } from "../sync-accumulator";
+import { IMinimalEvent, IGroups, IRooms, ISyncResponse } from "../sync-accumulator";
 import { IStartClientOpts } from "../client";
 
 export interface ISavedSync {
@@ -185,7 +185,7 @@ export interface IStore {
      * @param {Object} syncData The sync data
      * @return {Promise} An immediately resolved promise.
      */
-    setSyncData(syncData: object): Promise<void>;
+    setSyncData(syncData: ISyncResponse): Promise<void>;
 
     /**
      * We never want to save because we have nothing to save to.
@@ -233,5 +233,5 @@ export interface IStore {
 
     getClientOptions(): Promise<IStartClientOpts>;
 
-    storeClientOptions(options: object): Promise<void>;
+    storeClientOptions(options: IStartClientOpts): Promise<void>;
 }
