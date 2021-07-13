@@ -200,7 +200,7 @@ export class Crypto extends EventEmitter {
     private readonly supportedAlgorithms: string[];
     private readonly outgoingRoomKeyRequestManager: OutgoingRoomKeyRequestManager;
     private readonly toDeviceVerificationRequests: ToDeviceRequests;
-    private readonly inRoomVerificationRequests: InRoomRequests;
+    public readonly inRoomVerificationRequests: InRoomRequests;
 
     private trustCrossSignedDevices = true;
     // the last time we did a check for the number of one-time-keys on the server.
