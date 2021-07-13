@@ -117,7 +117,7 @@ import { WebStorageSessionStore } from "./store/session/webstorage";
 import { BackupManager, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE, MSC3089TreeSpace } from "./models/MSC3089TreeSpace";
 import { ISignatures } from "./@types/signed";
-import { IPusher, IPushRules } from "./@types/PushRules";
+import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, RuleId } from "./@types/PushRules";
 import { IThirdPartyIdentifier } from "./@types/threepids";
 
 export type Store = StubStore | MemoryStore | LocalIndexedDBStoreBackend | RemoteIndexedDBStoreBackend;
@@ -4991,20 +4991,20 @@ export class MatrixClient extends EventEmitter {
         if (!mute) {
             // Remove the rule only if it is a muting rule
             if (hasDontNotifyRule) {
-                deferred = this.deletePushRule(scope, "room", roomPushRule.rule_id);
+                deferred = this.deletePushRule(scope, PushRuleKind.RoomSpecific, roomPushRule.rule_id);
             }
         } else {
             if (!roomPushRule) {
-                deferred = this.addPushRule(scope, "room", roomId, {
+                deferred = this.addPushRule(scope, PushRuleKind.RoomSpecific, roomId, {
                     actions: ["dont_notify"],
                 });
             } else if (!hasDontNotifyRule) {
                 // Remove the existing one before setting the mute push rule
                 // This is a workaround to SYN-590 (Push rule update fails)
                 deferred = utils.defer();
-                this.deletePushRule(scope, "room", roomPushRule.rule_id)
+                this.deletePushRule(scope, PushRuleKind.RoomSpecific, roomPushRule.rule_id)
                     .then(() => {
-                        this.addPushRule(scope, "room", roomId, {
+                        this.addPushRule(scope, PushRuleKind.RoomSpecific, roomId, {
                             actions: ["dont_notify"],
                         }).then(() => {
                             deferred.resolve();
@@ -7001,12 +7001,12 @@ export class MatrixClient extends EventEmitter {
     /**
      * Adds a new pusher or updates an existing pusher
      *
-     * @param {Object} pusher Object representing a pusher
+     * @param {IPusherRequest} pusher Object representing a pusher
      * @param {module:client.callback} callback Optional.
      * @return {Promise} Resolves: Empty json object on success
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setPusher(pusher: any, callback?: Callback): Promise<{}> {
+    public setPusher(pusher: IPusherRequest, callback?: Callback): Promise<{}> {
         const path = "/pushers/set";
         return this.http.authedRequest(
             callback, "POST", path, null, pusher,
@@ -7034,7 +7034,13 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public addPushRule(scope: string, kind: string, ruleId: string, body: any, callback?: Callback): Promise<any> { // TODO: Types
+    public addPushRule(
+        scope: string,
+        kind: PushRuleKind,
+        ruleId: RuleId | string,
+        body: any,
+        callback?: Callback,
+    ): Promise<any> { // TODO: Types
         // NB. Scope not uri encoded because devices need the '/'
         const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
             $kind: kind,
@@ -7053,7 +7059,12 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public deletePushRule(scope: string, kind: string, ruleId: string, callback?: Callback): Promise<any> { // TODO: Types
+    public deletePushRule(
+        scope: string,
+        kind: PushRuleKind,
+        ruleId: RuleId | string,
+        callback?: Callback,
+    ): Promise<any> { // TODO: Types
         // NB. Scope not uri encoded because devices need the '/'
         const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
             $kind: kind,
@@ -7074,8 +7085,8 @@ export class MatrixClient extends EventEmitter {
      */
     public setPushRuleEnabled(
         scope: string,
-        kind: string,
-        ruleId: string,
+        kind: PushRuleKind,
+        ruleId: RuleId | string,
         enabled: boolean,
         callback?: Callback,
     ): Promise<any> { // TODO: Types
@@ -7100,9 +7111,9 @@ export class MatrixClient extends EventEmitter {
      */
     public setPushRuleActions(
         scope: string,
-        kind: string,
-        ruleId: string,
-        actions: string[],
+        kind: PushRuleKind,
+        ruleId: RuleId | string,
+        actions: PushRuleAction[],
         callback?: Callback,
     ): Promise<any> { // TODO: Types
         const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId/actions", {

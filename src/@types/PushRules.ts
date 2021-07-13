@@ -148,12 +148,17 @@ export interface IPusher {
     data: {
         format?: string; // TODO: Types
         url?: string; // TODO: Required if kind==http
+        brand?: string; // TODO: For email notifications only?
     };
     device_display_name: string;
     kind: string; // TODO: Types
     lang: string;
     profile_tag?: string;
     pushkey: string;
+}
+
+export interface IPusherRequest extends IPusher {
+    append?: boolean;
 }
 
 /* eslint-enable camelcase */
