@@ -16,5 +16,5 @@ limitations under the License.
 
 export enum SERVICE_TYPES {
     IS = 'SERVICE_TYPE_IS', // An Identity Service
-    IM = 'SERVICE_TYPE_IM', // An Integration Manager
+    IM = 'SERVICE_TYPE_IM', // An integration manager
 }
