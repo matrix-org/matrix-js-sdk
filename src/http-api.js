@@ -393,7 +393,7 @@ MatrixHttpApi.prototype = {
         accessToken,
     ) {
         if (!this.opts.idBaseUrl) {
-            throw new Error("No Identity Server base URL set");
+            throw new Error("No identity server base URL set");
         }
 
         const fullUri = this.opts.idBaseUrl + prefix + path;

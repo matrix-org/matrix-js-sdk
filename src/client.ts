@@ -4806,7 +4806,7 @@ export class MatrixClient extends EventEmitter {
     /**
      * Requests a text message verification token for the purposes of adding a
      * third party identifier to an account.
-     * This API proxies the Identity Server /validate/email/requestToken API,
+     * This API proxies the identity server /validate/email/requestToken API,
      * adding specific behaviour for the addition of phone numbers to an
      * account, as requestAdd3pidEmailToken.
      *
@@ -4839,7 +4839,7 @@ export class MatrixClient extends EventEmitter {
     /**
      * Requests an email verification token for the purposes of resetting
      * the password on an account.
-     * This API proxies the Identity Server /validate/email/requestToken API,
+     * This API proxies the identity server /validate/email/requestToken API,
      * adding specific behaviour for the password resetting. Specifically,
      * if no account with the given email address exists, it may either
      * return M_THREEPID_NOT_FOUND or send an email
@@ -4875,7 +4875,7 @@ export class MatrixClient extends EventEmitter {
     /**
      * Requests a text message verification token for the purposes of resetting
      * the password on an account.
-     * This API proxies the Identity Server /validate/email/requestToken API,
+     * This API proxies the identity server /validate/email/requestToken API,
      * adding specific behaviour for the password resetting, as requestPasswordEmailToken.
      *
      * @param {string} phoneCountry As requestRegisterMsisdnToken
@@ -5819,9 +5819,9 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
-     * Get the Identity Server URL of this client
+     * Get the identity server URL of this client
      * @param {boolean} stripProto whether or not to strip the protocol from the URL
-     * @return {string} Identity Server URL of this client
+     * @return {string} Identity server URL of this client
      */
     public getIdentityServerUrl(stripProto = false): string {
         if (stripProto && (this.idBaseUrl.startsWith("http://") ||
@@ -5832,8 +5832,8 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
-     * Set the Identity Server URL of this client
-     * @param {string} url New Identity Server URL
+     * Set the identity server URL of this client
+     * @param {string} url New identity server URL
      */
     public setIdentityServerUrl(url: string) {
         this.idBaseUrl = utils.ensureNoTrailingSlash(url);
@@ -7260,7 +7260,7 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
-     * Register with an Identity Server using the OpenID token from the user's
+     * Register with an identity server using the OpenID token from the user's
      * Homeserver, which can be retrieved via
      * {@link module:client~MatrixClient#getOpenIdToken}.
      *
@@ -7274,7 +7274,7 @@ export class MatrixClient extends EventEmitter {
      */
     public registerWithIdentityServer(hsOpenIdToken: any): Promise<any> { // TODO: Types
         if (!this.idBaseUrl) {
-            throw new Error("No Identity Server base URL set");
+            throw new Error("No identity server base URL set");
         }
 
         const uri = this.idBaseUrl + PREFIX_IDENTITY_V2 + "/account/register";
@@ -7549,7 +7549,7 @@ export class MatrixClient extends EventEmitter {
 
     /**
      * Looks up the public Matrix ID mapping for a given 3rd party
-     * identifier from the Identity Server
+     * identifier from the identity server
      *
      * @param {string} medium The medium of the threepid, eg. 'email'
      * @param {string} address The textual address of the threepid
@@ -7634,7 +7634,7 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
-     * Get account info from the Identity Server. This is useful as a neutral check
+     * Get account info from the identity server. This is useful as a neutral check
      * to verify that other APIs are likely to approve access by testing that the
      * token is valid, terms have been agreed, etc.
      *

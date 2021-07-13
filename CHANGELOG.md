@@ -1749,7 +1749,7 @@ Changes in [2.4.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag
    [\#1011](https://github.com/matrix-org/matrix-js-sdk/pull/1011)
  * Fix POST body for v2 IS requests
    [\#1010](https://github.com/matrix-org/matrix-js-sdk/pull/1010)
- * Add API for bulk lookup on the Identity Server
+ * Add API for bulk lookup on the identity server
    [\#1009](https://github.com/matrix-org/matrix-js-sdk/pull/1009)
  * Remove deprecated authedRequestWithPrefix and requestWithPrefix
    [\#1000](https://github.com/matrix-org/matrix-js-sdk/pull/1000)
