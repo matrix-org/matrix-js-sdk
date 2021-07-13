@@ -20,7 +20,7 @@ import * as IndexedDBHelpers from "../indexeddb-helpers";
 import { logger } from '../logger';
 import { IEvent, IStartClientOpts } from "..";
 import { ISavedSync } from "./index";
-import { IIndexeddbBackend, UserTuple } from "./indexeddb-backend";
+import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend";
 
 const VERSION = 3;
 
@@ -116,7 +116,7 @@ function reqAsCursorPromise(req: IDBRequest<IDBCursor | null>): Promise<IDBCurso
     return reqAsEventPromise(req).then((event) => req.result);
 }
 
-export class LocalIndexedDBStoreBackend implements IIndexeddbBackend {
+export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     public static exists(indexedDB: IDBFactory, dbName: string): boolean {
         dbName = "matrix-js-sdk:" + (dbName || "default");
         return IndexedDBHelpers.exists(indexedDB, dbName);

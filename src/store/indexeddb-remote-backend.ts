@@ -19,9 +19,9 @@ import { defer, IDeferred } from "../utils";
 import { ISavedSync } from "./index";
 import { IStartClientOpts } from "../client";
 import { IEvent, ISyncResponse } from "..";
-import { IIndexeddbBackend, UserTuple } from "./indexeddb-backend";
+import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend";
 
-export class RemoteIndexedDBStoreBackend implements IIndexeddbBackend {
+export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     private worker: Worker;
     private nextSeq = 0;
     // The currently in-flight requests to the actual backend

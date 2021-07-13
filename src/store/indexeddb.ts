@@ -25,7 +25,7 @@ import { User } from "../models/user";
 import { IEvent, MatrixEvent } from "../models/event";
 import { logger } from '../logger';
 import { ISavedSync } from "./index";
-import { IIndexeddbBackend } from "./indexeddb-backend";
+import { IIndexedDBBackend } from "./indexeddb-backend";
 import { ISyncResponse } from "../sync-accumulator";
 
 /**
@@ -52,7 +52,7 @@ export class IndexedDBStore extends MemoryStore {
         return LocalIndexedDBStoreBackend.exists(indexedDB, dbName);
     }
 
-    public readonly backend: IIndexeddbBackend;
+    public readonly backend: IIndexedDBBackend;
 
     private startedUp = false;
     private syncTs = 0;
