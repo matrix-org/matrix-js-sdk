@@ -1735,13 +1735,13 @@ Changes in [2.4.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag
    [\#1021](https://github.com/matrix-org/matrix-js-sdk/pull/1021)
  * Add getIdServer() & doesServerRequireIdServerParam()
    [\#1018](https://github.com/matrix-org/matrix-js-sdk/pull/1018)
- * Make requestToken endpoints work without an identity server
+ * Make requestToken endpoints work without ID Server
    [\#1019](https://github.com/matrix-org/matrix-js-sdk/pull/1019)
  * Fix setIdentityServer
    [\#1016](https://github.com/matrix-org/matrix-js-sdk/pull/1016)
  * Change ICE fallback server and make fallback opt-in
    [\#1015](https://github.com/matrix-org/matrix-js-sdk/pull/1015)
- * Throw an exception if trying to do an identity server request with no identity server
+ * Throw an exception if trying to do an ID server request with no ID server
    [\#1014](https://github.com/matrix-org/matrix-js-sdk/pull/1014)
  * Add setIdentityServerUrl
    [\#1013](https://github.com/matrix-org/matrix-js-sdk/pull/1013)
@@ -1749,7 +1749,7 @@ Changes in [2.4.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag
    [\#1011](https://github.com/matrix-org/matrix-js-sdk/pull/1011)
  * Fix POST body for v2 IS requests
    [\#1010](https://github.com/matrix-org/matrix-js-sdk/pull/1010)
- * Add API for bulk lookup on the identity server
+ * Add API for bulk lookup on the Identity Server
    [\#1009](https://github.com/matrix-org/matrix-js-sdk/pull/1009)
  * Remove deprecated authedRequestWithPrefix and requestWithPrefix
    [\#1000](https://github.com/matrix-org/matrix-js-sdk/pull/1000)
@@ -3767,7 +3767,7 @@ Other improvements:
    [\#109](https://github.com/matrix-org/matrix-js-sdk/pull/109)
  * Refactor transmitted-messages code
    [\#110](https://github.com/matrix-org/matrix-js-sdk/pull/110)
- * Add a method to the js sdk to look up 3pids on the identity server.
+ * Add a method to the js sdk to look up 3pids on the ID server.
    [\#113](https://github.com/matrix-org/matrix-js-sdk/pull/113)
  * Support for cancelling pending events
    [\#112](https://github.com/matrix-org/matrix-js-sdk/pull/112)
