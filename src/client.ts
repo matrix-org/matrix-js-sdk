@@ -4845,7 +4845,7 @@ export class MatrixClient extends EventEmitter {
      * return M_THREEPID_NOT_FOUND or send an email
      * to the address informing them of this (which one is up to the homeserver).
      *
-     * requestEmailToken calls the equivalent API directly on the ID server,
+     * requestEmailToken calls the equivalent API directly on the identity server,
      * therefore bypassing the password reset specific logic.
      *
      * @param {string} email As requestEmailToken
@@ -4920,7 +4920,7 @@ export class MatrixClient extends EventEmitter {
         if (!await this.doesServerSupportSeparateAddAndBind() && this.idBaseUrl) {
             const idServerUrl = url.parse(this.idBaseUrl);
             if (!idServerUrl.host) {
-                throw new Error("Invalid ID server URL: " + this.idBaseUrl);
+                throw new Error("Invalid identity server URL: " + this.idBaseUrl);
             }
             postParams.id_server = idServerUrl.host;
 
@@ -5884,7 +5884,7 @@ export class MatrixClient extends EventEmitter {
      * @param {string} sessionId
      * @param {Object} auth
      * @param {Object} bindThreepids Set key 'email' to true to bind any email
-     *     threepid uses during registration in the ID server. Set 'msisdn' to
+     *     threepid uses during registration in the identity server. Set 'msisdn' to
      *     true to bind msisdn.
      * @param {string} guestAccessToken
      * @param {string} inhibitLogin
@@ -7383,7 +7383,7 @@ export class MatrixClient extends EventEmitter {
      * Submits a MSISDN token to the identity server
      *
      * This is used when submitting the code sent by SMS to a phone number.
-     * The ID server has an equivalent API for email but the js-sdk does
+     * The identity server has an equivalent API for email but the js-sdk does
      * not expose this, since email is normally validated by the user clicking
      * a link rather than entering a code.
      *
@@ -7396,7 +7396,7 @@ export class MatrixClient extends EventEmitter {
      *
      * @return {Promise} Resolves: Object, currently with no parameters.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @throws Error if No ID server is set
+     * @throws Error if No identity server is set
      */
     public async submitMsisdnToken(
         sid: string,
