@@ -45,7 +45,8 @@ To add a longer, more detailed description of the change for the changelog:
 Notes: Fix a bug (https://github.com/matrix-org/notaproject/issues/123) where the 'Herd' button would not herd more than 8 Llamas if the moon was in the waxing gibbous phase
 ```
 
-For some PRs, it's not useful to have an entry in the user-facing changelog:
+For some PRs, it's not useful to have an entry in the user-facing changelog (this is
+the default for PRs tagged with `pr-internal`):
 
 *Remove outdated comment from `Ungulates.ts`*
 ```
@@ -82,7 +83,7 @@ Other metadata can be added using tags.
  * `pr-breaking`: A breaking change - adding this tag will mean the change causes a *major* version bump.
  * `pr-feature`: A new feature - adding this tag will mean the change causes a *minor* version bump.
  * `pr-bugfix`: A bugfix (in either code or docs).
- * `pr-internal`: No user-facing changes, eg. code comments, CI fixes, refactors or tests.
+ * `pr-internal`: No user-facing changes, eg. code comments, CI fixes, refactors or tests. Won't have a changelog entry unless you specify one.
 
 If you don't have permission to add tags, your PR reviewer(s) can work with you
 to add them: ask in the PR description or comments.
