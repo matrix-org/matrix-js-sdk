@@ -59,10 +59,10 @@ an entry in that project's changelog. You can do that too:
 *Fix another herding bug*
 ```
 Notes: Fix a bug where the `herd()` function would only work on Tuesdays
-other-project notes: Fix a bug where the 'Herd' button only worked on Tuesdays
+element-web notes: Fix a bug where the 'Herd' button only worked on Tuesdays
 ```
 
-Projects that you can specify here are:
+This example is for Element Web. You can specify:
  * matrix-react-sdk
  * element-web
  * element-desktop
