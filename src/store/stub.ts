@@ -27,6 +27,7 @@ import { IEvent, MatrixEvent } from "../models/event";
 import { Filter } from "../filter";
 import { ISavedSync, IStore } from "./index";
 import { RoomSummary } from "../models/room-summary";
+import { ISyncResponse } from "../sync-accumulator";
 
 /**
  * Construct a stub store. This does no-ops on most store methods.
@@ -213,7 +214,7 @@ export class StubStore implements IStore {
      * @param {Object} syncData The sync data
      * @return {Promise} An immediately resolved promise.
      */
-    public setSyncData(syncData: object): Promise<void> {
+    public setSyncData(syncData: ISyncResponse): Promise<void> {
         return Promise.resolve();
     }
 

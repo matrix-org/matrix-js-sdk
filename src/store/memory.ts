@@ -29,6 +29,7 @@ import { RoomMember } from "../models/room-member";
 import { Filter } from "../filter";
 import { ISavedSync, IStore } from "./index";
 import { RoomSummary } from "../models/room-summary";
+import { ISyncResponse } from "../sync-accumulator";
 
 function isValidFilterId(filterId: string): boolean {
     const isValidStr = typeof filterId === "string" &&
@@ -340,7 +341,7 @@ export class MemoryStore implements IStore {
      * @param {Object} syncData The sync data
      * @return {Promise} An immediately resolved promise.
      */
-    public setSyncData(syncData: object): Promise<void> {
+    public setSyncData(syncData: ISyncResponse): Promise<void> {
         return Promise.resolve();
     }
 
