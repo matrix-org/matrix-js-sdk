@@ -46,7 +46,7 @@ Notes: Fix a bug (https://github.com/matrix-org/notaproject/issues/123) where th
 ```
 
 For some PRs, it's not useful to have an entry in the user-facing changelog (this is
-the default for PRs labelled with `pr-internal`):
+the default for PRs labelled with `T-Task`):
 
 *Remove outdated comment from `Ungulates.ts`*
 ```
@@ -68,7 +68,7 @@ This example is for Element Web. You can specify:
  * element-desktop
 
 If your PR introduces a breaking change, use the `Notes` section in the same
-way, additionally adding the `pr-breaking` label (see below). There's no need
+way, additionally adding the `X-Breaking` label (see below). There's no need
 to specify in the notes that it's a breaking change - this will be added
 automatically based on the label - but remember to tell the developer how to
 migrate:
