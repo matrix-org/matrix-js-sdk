@@ -21,7 +21,7 @@ ask you to make any refinements needed or merge it and make them ourselves.
 
 Things that should go into your PR description:
  * A changelog entry in the `Notes` section (see below)
- * References to any bugs fixed by the change (in Github's `Fixes` notation)
+ * References to any bugs fixed by the change (in GitHub's `Fixes` notation)
  * Notes for the reviewer that might help them to understand why the change is
    necessary or how they might better review it.
 
