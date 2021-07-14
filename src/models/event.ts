@@ -1242,11 +1242,6 @@ export class MatrixEvent extends EventEmitter {
     public toJSON(): object {
         const event = this.getEffectiveEvent();
 
-        // if this is a redaction then attach the redacts key
-        if (this.isRedaction()) {
-            event.redacts = this.event.redacts;
-        }
-
         if (!this.isEncrypted()) {
             return event;
         }
