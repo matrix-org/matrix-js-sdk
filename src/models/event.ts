@@ -263,11 +263,11 @@ export class MatrixEvent extends EventEmitter {
     }
 
     /**
-     * Gets the clear event as it would be received over the wire. If the event
-     * is not encrypted, this simply returns the event as-is.
-     * @returns {IEvent} The clear event, as known by the SDK.
+     * Gets the event as though it would appear unencrypted. If the event is already not
+     * encrypted, it is simply returned as-is.
+     * @returns {IEvent} The event in wire format.
      */
-    public getClearEvent(): IEvent {
+    public getEffectiveEvent(): IEvent {
         // clearEvent doesn't have all the fields, so we'll copy what we can from this.event
         return Object.assign({}, this.event, this.clearEvent) as IEvent;
     }
@@ -1240,15 +1240,7 @@ export class MatrixEvent extends EventEmitter {
      * @return {Object}
      */
     public toJSON(): object {
-        const event: any = {
-            type: this.getType(),
-            sender: this.getSender(),
-            content: this.getContent(),
-            event_id: this.getId(),
-            origin_server_ts: this.getTs(),
-            unsigned: this.getUnsigned(),
-            room_id: this.getRoomId(),
-        };
+        const event = this.getEffectiveEvent();
 
         // if this is a redaction then attach the redacts key
         if (this.isRedaction()) {
