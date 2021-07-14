@@ -16,18 +16,76 @@ The preferred and easiest way to contribute changes to the project is to fork
 it on github, and then create a pull request to ask us to pull your changes
 into our repo (https://help.github.com/articles/using-pull-requests/)
 
-**The single biggest thing you need to know is: please base your changes on
-the develop branch - /not/ master.**
+We use GitHub's pull request workflow to review the contribution, and either
+ask you to make any refinements needed or merge it and make them ourselves.
 
-We use the master branch to track the most recent release, so that folks who
-blindly clone the repo and automatically check out master get something that
-works. Develop is the unstable branch where all the development actually
-happens: the workflow is that contributors should fork the develop branch to
-make a 'feature' branch for a particular contribution, and then make a pull
-request to merge this back into the matrix.org 'official' develop branch. We
-use GitHub's pull request workflow to review the contribution, and either ask
-you to make any refinements needed or merge it and make them ourselves. The
-changes will then land on master when we next do a release.
+Things that should go into your PR description:
+ * A changelog entry in the `Notes` section (see below)
+ * References to any bugs fixed by the change (in Github's `Fixes` notation)
+ * Notes for the reviewer that might help them to understand why the change is
+   necessary or how they might better review it.
+
+Things that should *not* go into your PR description:
+ * Any information on how the code works or why you chose to do it the way
+   you did. If this isn't obvious from your code, you haven't written enough
+   comments.
+
+We rely on information in pull request to populate the information that goes
+into the changelogs our users see, both for the js-sdk itself and also for some
+projects based on it. This is picked up from both tags on the pull request and
+the `Notes: ` annotation in the description. By default, the PR title will be
+used for the changelog entry, but you can specify more options, as follows.
+
+To add a longer, more detailed description of the change for the changelog:
+
+
+*Fix llama herding bug*
+
+```
+Notes: Fix a bug (https://github.com/matrix-org/notaproject/issues/123) where the 'Herd' button would not herd more than 8 Llamas if the moon was in the waxing gibbous phase
+```
+
+For some PRs, it's not useful to have an entry in the user-facing changelog:
+
+*Remove outdated comment from `Ungulates.ts`*
+```
+Notes: none
+```
+
+Sometimes, you're fixing a bug in a downstream project, in which case you want
+an entry in that project's changelog. You can do that too:
+
+*Fix another herding bug*
+```
+Notes: Fix a bug where the `herd()` function would only work on Tuesdays
+other-project notes: Fix a bug where the 'Herd' button only worked on Tuesdays
+```
+
+Projects that you can specify here are:
+ * matrix-react-sdk
+ * element-web
+ * element-desktop
+
+If your PR introduces a breaking change, you should indicate that in the same
+`Notes` section, additionally adding the `pr-breaking` tag (see below).
+There's no need to specify in the notes that it's a breaking change - this will
+be added automatically based on the tag - but remember to tell the developer how
+to migrate:
+
+*Remove legacy class*
+
+```
+Notes: Remove legacy `Camelopard` class. `Giraffe` should be used instead.
+```
+
+Other metadata can be added using tags.
+ * `pr-breaking`: A breaking change - adding this tag will mean the change causes a *major* version bump.
+ * `pr-feature`: A new feature - adding this tag will mean the change causes a *minor* version bump.
+ * `pr-bugfix`: A bugfix (in either code or docs).
+ * `pr-internal`: No user-facing changes, eg. code comments, CI fixes, refactors or tests.
+
+If you don't have permission to add tags, your PR reviewer(s) can work with you
+to add them: ask in the PR description or comments.
 
 We use continuous integration, and all pull requests get automatically tested:
 if your change breaks the build, then the PR will show that there are failed
