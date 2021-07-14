@@ -32,7 +32,7 @@ Things that should *not* go into your PR description:
 
 We rely on information in pull request to populate the information that goes
 into the changelogs our users see, both for the js-sdk itself and also for some
-projects based on it. This is picked up from both tags on the pull request and
+projects based on it. This is picked up from both labels on the pull request and
 the `Notes: ` annotation in the description. By default, the PR title will be
 used for the changelog entry, but you can specify more options, as follows.
 
@@ -46,7 +46,7 @@ Notes: Fix a bug (https://github.com/matrix-org/notaproject/issues/123) where th
 ```
 
 For some PRs, it's not useful to have an entry in the user-facing changelog (this is
-the default for PRs tagged with `pr-internal`):
+the default for PRs labelled with `pr-internal`):
 
 *Remove outdated comment from `Ungulates.ts`*
 ```
@@ -67,11 +67,11 @@ Projects that you can specify here are:
  * element-web
  * element-desktop
 
-If your PR introduces a breaking change, you should indicate that in the same
-`Notes` section, additionally adding the `pr-breaking` tag (see below).
-There's no need to specify in the notes that it's a breaking change - this will
-be added automatically based on the tag - but remember to tell the developer how
-to migrate:
+If your PR introduces a breaking change, use the `Notes` section in the same
+way, additionally adding the `pr-breaking` label (see below). There's no need
+to specify in the notes that it's a breaking change - this will be added
+automatically based on the label - but remember to tell the developer how to
+migrate:
 
 *Remove legacy class*
 
@@ -79,13 +79,13 @@ to migrate:
 Notes: Remove legacy `Camelopard` class. `Giraffe` should be used instead.
 ```
 
-Other metadata can be added using tags.
- * `pr-breaking`: A breaking change - adding this tag will mean the change causes a *major* version bump.
- * `pr-feature`: A new feature - adding this tag will mean the change causes a *minor* version bump.
+Other metadata can be added using labels.
+ * `pr-breaking`: A breaking change - adding this label will mean the change causes a *major* version bump.
+ * `pr-feature`: A new feature - adding this label will mean the change causes a *minor* version bump.
  * `pr-bugfix`: A bugfix (in either code or docs).
  * `pr-internal`: No user-facing changes, eg. code comments, CI fixes, refactors or tests. Won't have a changelog entry unless you specify one.
 
-If you don't have permission to add tags, your PR reviewer(s) can work with you
+If you don't have permission to add labels, your PR reviewer(s) can work with you
 to add them: ask in the PR description or comments.
 
 We use continuous integration, and all pull requests get automatically tested:
