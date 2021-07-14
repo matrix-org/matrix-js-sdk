@@ -80,10 +80,10 @@ Notes: Remove legacy `Camelopard` class. `Giraffe` should be used instead.
 ```
 
 Other metadata can be added using labels.
- * `pr-breaking`: A breaking change - adding this label will mean the change causes a *major* version bump.
- * `pr-feature`: A new feature - adding this label will mean the change causes a *minor* version bump.
- * `pr-bugfix`: A bugfix (in either code or docs).
- * `pr-internal`: No user-facing changes, eg. code comments, CI fixes, refactors or tests. Won't have a changelog entry unless you specify one.
+ * `X-Breaking`: A breaking change - adding this label will mean the change causes a *major* version bump.
+ * `T-Enhancement`: A new feature - adding this label will mean the change causes a *minor* version bump.
+ * `T-Defect`: A bug fix (in either code or docs).
+ * `T-Task`: No user-facing changes, eg. code comments, CI fixes, refactors or tests. Won't have a changelog entry unless you specify one.
 
 If you don't have permission to add labels, your PR reviewer(s) can work with you
 to add them: ask in the PR description or comments.
