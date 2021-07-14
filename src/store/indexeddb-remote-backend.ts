@@ -37,15 +37,13 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
      * Construct a new Indexed Database store backend. This requires a call to
      * <code>connect()</code> before this store can be used.
      * @constructor
-     * @param {string} workerScript URL to the worker script
+     * @param {Function} workerFactory Factory which produces a Worker
      * @param {string=} dbName Optional database name. The same name must be used
      * to open the same database.
-     * @param {Object} WorkerApi The web worker compatible interface object
      */
     constructor(
-        private readonly workerScript: string,
+        private readonly workerFactory: () => Worker,
         private readonly dbName: string,
-        private readonly WorkerApi: typeof Worker,
     ) {}
 
     /**
@@ -137,7 +135,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
 
     private ensureStarted(): Promise<void> {
         if (this.startPromise === null) {
-            this.worker = new this.WorkerApi(this.workerScript);
+            this.worker = this.workerFactory();
             this.worker.onmessage = this.onWorkerMessage;
 
             // tell the worker the db name.
