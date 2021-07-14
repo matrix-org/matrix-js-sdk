@@ -68,7 +68,7 @@ This example is for Element Web. You can specify:
  * element-desktop
 
 If your PR introduces a breaking change, use the `Notes` section in the same
-way, additionally adding the `X-Breaking` label (see below). There's no need
+way, additionally adding the `X-Breaking-Change` label (see below). There's no need
 to specify in the notes that it's a breaking change - this will be added
 automatically based on the label - but remember to tell the developer how to
 migrate:
@@ -80,7 +80,7 @@ Notes: Remove legacy `Camelopard` class. `Giraffe` should be used instead.
 ```
 
 Other metadata can be added using labels.
- * `X-Breaking`: A breaking change - adding this label will mean the change causes a *major* version bump.
+ * `X-Breaking-Change`: A breaking change - adding this label will mean the change causes a *major* version bump.
  * `T-Enhancement`: A new feature - adding this label will mean the change causes a *minor* version bump.
  * `T-Defect`: A bug fix (in either code or docs).
  * `T-Task`: No user-facing changes, eg. code comments, CI fixes, refactors or tests. Won't have a changelog entry unless you specify one.
