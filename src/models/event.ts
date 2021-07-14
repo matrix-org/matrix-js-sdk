@@ -265,11 +265,11 @@ export class MatrixEvent extends EventEmitter {
     /**
      * Gets the clear event as it would be received over the wire. If the event
      * is not encrypted, this simply returns the event as-is.
-     * @returns {Partial<IEvent>} The clear event, as known by the SDK.
+     * @returns {IEvent} The clear event, as known by the SDK.
      */
-    public getClearEvent(): Partial<IEvent> {
+    public getClearEvent(): IEvent {
         // clearEvent doesn't have all the fields, so we'll copy what we can from this.event
-        return Object.assign({}, this.event, this.clearEvent);
+        return Object.assign({}, this.event, this.clearEvent) as IEvent;
     }
 
     /**
