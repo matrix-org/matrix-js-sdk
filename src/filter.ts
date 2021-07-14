@@ -39,7 +39,7 @@ function setProp(obj: object, keyNesting: string, val: any) {
 }
 
 /* eslint-disable camelcase */
-interface IFilterDefinition {
+export interface IFilterDefinition {
     event_fields?: string[];
     event_format?: "client" | "federation";
     presence?: IFilterComponent;
@@ -47,7 +47,7 @@ interface IFilterDefinition {
     room?: IRoomFilter;
 }
 
-interface IRoomEventFilter extends IFilterComponent {
+export interface IRoomEventFilter extends IFilterComponent {
     lazy_load_members?: boolean;
     include_redundant_members?: boolean;
 }
@@ -86,7 +86,7 @@ export class Filter {
      * @param {Object} jsonObj
      * @return {Filter}
      */
-    static fromJson(userId: string, filterId: string, jsonObj: IFilterDefinition): Filter {
+    public static fromJson(userId: string, filterId: string, jsonObj: IFilterDefinition): Filter {
         const filter = new Filter(userId, filterId);
         filter.setDefinition(jsonObj);
         return filter;

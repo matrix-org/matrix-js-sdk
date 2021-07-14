@@ -44,7 +44,7 @@ import { IAddSecretStorageKeyOpts, ISecretStorageKeyInfo } from "./api";
 import { OutgoingRoomKeyRequestManager } from './OutgoingRoomKeyRequestManager';
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { ReciprocateQRCode, SCAN_QR_CODE_METHOD, SHOW_QR_CODE_METHOD } from './verification/QRCode';
-import { SAS } from './verification/SAS';
+import { SAS as SASVerification } from './verification/SAS';
 import { keyFromPassphrase } from './key_passphrase';
 import { decodeRecoveryKey, encodeRecoveryKey } from './recoverykey';
 import { VerificationRequest } from "./verification/request/VerificationRequest";
@@ -53,7 +53,7 @@ import { ToDeviceChannel, ToDeviceRequests } from "./verification/request/ToDevi
 import { IllegalMethod } from "./verification/IllegalMethod";
 import { KeySignatureUploadError } from "../errors";
 import { decryptAES, encryptAES, calculateKeyCheck } from './aes';
-import { DehydrationManager } from './dehydration';
+import { DehydrationManager, IDeviceKeys, IOneTimeKey } from './dehydration';
 import { BackupManager } from "./backup";
 import { IStore } from "../store";
 import { Room } from "../models/room";
@@ -61,7 +61,7 @@ import { RoomMember } from "../models/room-member";
 import { MatrixEvent } from "../models/event";
 import { MatrixClient, IKeysUploadResponse, SessionStore, CryptoStore, ISignedKey } from "../client";
 import type { EncryptionAlgorithm, DecryptionAlgorithm } from "./algorithms/base";
-import type { RoomList } from "./RoomList";
+import type { IRoomEncryption, RoomList } from "./RoomList";
 import { IRecoveryKey, IEncryptedEventInfo } from "./api";
 import { IKeyBackupInfo } from "./keybackup";
 import { ISyncStateData } from "../sync";
@@ -70,7 +70,7 @@ const DeviceVerification = DeviceInfo.DeviceVerification;
 
 const defaultVerificationMethods = {
     [ReciprocateQRCode.NAME]: ReciprocateQRCode,
-    [SAS.NAME]: SAS,
+    [SASVerification.NAME]: SASVerification,
 
     // These two can't be used for actual verification, but we do
     // need to be able to define them here for the verification flows
@@ -82,10 +82,13 @@ const defaultVerificationMethods = {
 /**
  * verification method names
  */
-export const verificationMethods = {
-    RECIPROCATE_QR_CODE: ReciprocateQRCode.NAME,
-    SAS: SAS.NAME,
-};
+// legacy export identifier
+export enum verificationMethods {
+    RECIPROCATE_QR_CODE = ReciprocateQRCode.NAME,
+    SAS = SASVerification.NAME,
+}
+
+export type VerificationMethod = verificationMethods;
 
 export function isCryptoAvailable(): boolean {
     return Boolean(global.Olm);
@@ -140,6 +143,10 @@ export interface IMegolmSessionData {
 interface IDeviceVerificationUpgrade {
     devices: DeviceInfo[];
     crossSigningInfo: CrossSigningInfo;
+}
+
+export interface ICheckOwnCrossSigningTrustOpts {
+    allowPrivateKeyRequests?: boolean;
 }
 
 /**
@@ -1418,7 +1425,7 @@ export class Crypto extends EventEmitter {
      */
     async checkOwnCrossSigningTrust({
         allowPrivateKeyRequests = false,
-    } = {}) {
+    }: ICheckOwnCrossSigningTrustOpts = {}): Promise<void> {
         const userId = this.userId;
 
         // Before proceeding, ensure our cross-signing public keys have been
@@ -1772,7 +1779,7 @@ export class Crypto extends EventEmitter {
 
         return this.signObject(deviceKeys).then(() => {
             return this.baseApis.uploadKeysRequest({
-                device_keys: deviceKeys,
+                device_keys: deviceKeys as Required<IDeviceKeys>,
             });
         });
     }
@@ -1904,9 +1911,9 @@ export class Crypto extends EventEmitter {
     private async uploadOneTimeKeys() {
         const promises = [];
 
-        const fallbackJson = {};
+        const fallbackJson: Record<string, IOneTimeKey> = {};
         if (this.getNeedsNewFallback()) {
-            const fallbackKeys = await this.olmDevice.getFallbackKey();
+            const fallbackKeys = await this.olmDevice.getFallbackKey() as Record<string, Record<string, string>>;
             for (const [keyId, key] of Object.entries(fallbackKeys.curve25519)) {
                 const k = { key, fallback: true };
                 fallbackJson["signed_curve25519:" + keyId] = k;
@@ -2252,7 +2259,7 @@ export class Crypto extends EventEmitter {
     public async legacyDeviceVerification(
         userId: string,
         deviceId: string,
-        method: string,
+        method: VerificationMethod,
     ): VerificationRequest {
         const transactionId = ToDeviceChannel.makeTransactionId();
         const channel = new ToDeviceChannel(
@@ -2465,7 +2472,7 @@ export class Crypto extends EventEmitter {
      */
     public async setRoomEncryption(
         roomId: string,
-        config: any, // TODO types
+        config: IRoomEncryption,
         inhibitDeviceQuery?: boolean,
     ): Promise<void> {
         // ignore crypto events with no algorithm defined
@@ -2522,8 +2529,8 @@ export class Crypto extends EventEmitter {
             crypto: this,
             olmDevice: this.olmDevice,
             baseApis: this.baseApis,
-            roomId: roomId,
-            config: config,
+            roomId,
+            config,
         });
         this.roomEncryptors[roomId] = alg;
 
@@ -2878,7 +2885,7 @@ export class Crypto extends EventEmitter {
      */
     public async onCryptoEvent(event: MatrixEvent): Promise<void> {
         const roomId = event.getRoomId();
-        const content = event.getContent();
+        const content = event.getContent<IRoomEncryption>();
 
         try {
             // inhibit the device list refresh for now - it will happen once we've

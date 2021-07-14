@@ -22,7 +22,7 @@ import { MemoryStore, IOpts as IBaseOpts } from "./memory";
 import { LocalIndexedDBStoreBackend } from "./indexeddb-local-backend.js";
 import { RemoteIndexedDBStoreBackend } from "./indexeddb-remote-backend.js";
 import { User } from "../models/user";
-import { MatrixEvent } from "../models/event";
+import { IEvent, MatrixEvent } from "../models/event";
 import { logger } from '../logger';
 import { ISavedSync } from "./index";
 
@@ -247,7 +247,7 @@ export class IndexedDBStore extends MemoryStore {
      * @returns {event[]} the events, potentially an empty array if OOB loading didn't yield any new members
      * @returns {null} in case the members for this room haven't been stored yet
      */
-    public getOutOfBandMembers = this.degradable((roomId: string): Promise<MatrixEvent[]> => {
+    public getOutOfBandMembers = this.degradable((roomId: string): Promise<IEvent[]> => {
         return this.backend.getOutOfBandMembers(roomId);
     }, "getOutOfBandMembers");
 
@@ -259,7 +259,7 @@ export class IndexedDBStore extends MemoryStore {
      * @param {event[]} membershipEvents the membership events to store
      * @returns {Promise} when all members have been stored
      */
-    public setOutOfBandMembers = this.degradable((roomId: string, membershipEvents: MatrixEvent[]): Promise<void> => {
+    public setOutOfBandMembers = this.degradable((roomId: string, membershipEvents: IEvent[]): Promise<void> => {
         super.setOutOfBandMembers(roomId, membershipEvents);
         return this.backend.setOutOfBandMembers(roomId, membershipEvents);
     }, "setOutOfBandMembers");
