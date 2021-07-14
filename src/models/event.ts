@@ -268,7 +268,8 @@ export class MatrixEvent extends EventEmitter {
      * @returns {Partial<IEvent>} The clear event, as known by the SDK.
      */
     public getClearEvent(): Partial<IEvent> {
-        return this.clearEvent ?? this.event;
+        // clearEvent doesn't have all the fields, so we'll copy what we can from this.event
+        return Object.assign({}, this.event, this.clearEvent);
     }
 
     /**
