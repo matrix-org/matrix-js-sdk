@@ -263,6 +263,15 @@ export class MatrixEvent extends EventEmitter {
     }
 
     /**
+     * Gets the clear event as it would be received over the wire. If the event
+     * is not encrypted, this simply returns the event as-is.
+     * @returns {Partial<IEvent>} The clear event, as known by the SDK.
+     */
+    public getClearEvent(): Partial<IEvent> {
+        return this.clearEvent ?? this.event;
+    }
+
+    /**
      * Get the event_id for this event.
      * @return {string} The event ID, e.g. <code>$143350589368169JsLZx:localhost
      * </code>
