@@ -17,7 +17,7 @@ limitations under the License.
 import { ISavedSync } from "./index";
 import { IEvent, IStartClientOpts, ISyncResponse } from "..";
 
-export interface IIndexeddbBackend {
+export interface IIndexedDBBackend {
     connect(): Promise<void>;
     syncToDatabase(userTuples: UserTuple[]): Promise<void>;
     isNewlyCreated(): Promise<boolean>;
