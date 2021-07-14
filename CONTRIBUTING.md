@@ -33,7 +33,7 @@ Things that should *not* go into your PR description:
 We rely on information in pull request to populate the information that goes
 into the changelogs our users see, both for the js-sdk itself and also for some
 projects based on it. This is picked up from both labels on the pull request and
-the `Notes: ` annotation in the description. By default, the PR title will be
+the `Notes:` annotation in the description. By default, the PR title will be
 used for the changelog entry, but you can specify more options, as follows.
 
 To add a longer, more detailed description of the change for the changelog:
