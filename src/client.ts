@@ -3650,7 +3650,7 @@ export class MatrixClient extends EventEmitter {
         }
 
         const addlContent = {
-            "org.matrix.msc2885.hidden": Boolean(opts.hidden),
+            "org.matrix.msc2285.hidden": Boolean(opts.hidden),
         };
 
         return this.sendReceipt(event, "m.read", addlContent, callback);
