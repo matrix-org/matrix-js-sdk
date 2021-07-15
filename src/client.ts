@@ -3898,7 +3898,7 @@ export class MatrixClient extends EventEmitter {
         }
 
         const addlContent = {
-            "m.hidden": Boolean(opts.hidden),
+            "org.matrix.msc2285.hidden": Boolean(opts.hidden),
         };
 
         return this.sendReceipt(event, "m.read", addlContent, callback);
@@ -5013,7 +5013,7 @@ export class MatrixClient extends EventEmitter {
      * If an account with the given email address already exists and is
      * associated with an account other than the one the user is authed as,
      * it will either send an email to the address informing them of this
-     * or return M_THREEPID_IN_USE (which one is up to the Home Server).
+     * or return M_THREEPID_IN_USE (which one is up to the homeserver).
      *
      * @param {string} email As requestEmailToken
      * @param {string} clientSecret As requestEmailToken
@@ -5041,7 +5041,7 @@ export class MatrixClient extends EventEmitter {
     /**
      * Requests a text message verification token for the purposes of adding a
      * third party identifier to an account.
-     * This API proxies the Identity Server /validate/email/requestToken API,
+     * This API proxies the identity server /validate/email/requestToken API,
      * adding specific behaviour for the addition of phone numbers to an
      * account, as requestAdd3pidEmailToken.
      *
@@ -5074,13 +5074,13 @@ export class MatrixClient extends EventEmitter {
     /**
      * Requests an email verification token for the purposes of resetting
      * the password on an account.
-     * This API proxies the Identity Server /validate/email/requestToken API,
+     * This API proxies the identity server /validate/email/requestToken API,
      * adding specific behaviour for the password resetting. Specifically,
      * if no account with the given email address exists, it may either
      * return M_THREEPID_NOT_FOUND or send an email
-     * to the address informing them of this (which one is up to the Home Server).
+     * to the address informing them of this (which one is up to the homeserver).
      *
-     * requestEmailToken calls the equivalent API directly on the ID server,
+     * requestEmailToken calls the equivalent API directly on the identity server,
      * therefore bypassing the password reset specific logic.
      *
      * @param {string} email As requestEmailToken
@@ -5110,7 +5110,7 @@ export class MatrixClient extends EventEmitter {
     /**
      * Requests a text message verification token for the purposes of resetting
      * the password on an account.
-     * This API proxies the Identity Server /validate/email/requestToken API,
+     * This API proxies the identity server /validate/email/requestToken API,
      * adding specific behaviour for the password resetting, as requestPasswordEmailToken.
      *
      * @param {string} phoneCountry As requestRegisterMsisdnToken
@@ -5158,7 +5158,7 @@ export class MatrixClient extends EventEmitter {
         if (!await this.doesServerSupportSeparateAddAndBind() && this.idBaseUrl) {
             const idServerUrl = url.parse(this.idBaseUrl);
             if (!idServerUrl.host) {
-                throw new Error("Invalid ID server URL: " + this.idBaseUrl);
+                throw new Error("Invalid identity server URL: " + this.idBaseUrl);
             }
             postParams.id_server = idServerUrl.host;
 
@@ -5552,7 +5552,7 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
-     * Gets a bearer token from the Home Server that the user can
+     * Gets a bearer token from the homeserver that the user can
      * present to a third party in order to prove their ownership
      * of the Matrix account they are logged into.
      * @return {Promise} Resolves: Token object
@@ -5585,7 +5585,7 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
-     * Get the TURN servers for this home server.
+     * Get the TURN servers for this homeserver.
      * @return {Array<Object>} The servers or an empty list.
      */
     public getTurnServers(): ITurnServer[] {
@@ -6051,9 +6051,9 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
-     * Get the Identity Server URL of this client
+     * Get the identity server URL of this client
      * @param {boolean} stripProto whether or not to strip the protocol from the URL
-     * @return {string} Identity Server URL of this client
+     * @return {string} Identity server URL of this client
      */
     public getIdentityServerUrl(stripProto = false): string {
         if (stripProto && (this.idBaseUrl.startsWith("http://") ||
@@ -6064,8 +6064,8 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
-     * Set the Identity Server URL of this client
-     * @param {string} url New Identity Server URL
+     * Set the identity server URL of this client
+     * @param {string} url New identity server URL
      */
     public setIdentityServerUrl(url: string) {
         this.idBaseUrl = utils.ensureNoTrailingSlash(url);
@@ -6116,7 +6116,7 @@ export class MatrixClient extends EventEmitter {
      * @param {string} sessionId
      * @param {Object} auth
      * @param {Object} bindThreepids Set key 'email' to true to bind any email
-     *     threepid uses during registration in the ID server. Set 'msisdn' to
+     *     threepid uses during registration in the identity server. Set 'msisdn' to
      *     true to bind msisdn.
      * @param {string} guestAccessToken
      * @param {string} inhibitLogin
@@ -6661,7 +6661,7 @@ export class MatrixClient extends EventEmitter {
         const content = {
             "m.fully_read": rmEventId,
             "m.read": rrEventId,
-            "m.hidden": Boolean(opts ? opts.hidden : false),
+            "org.matrix.msc2285.hidden": Boolean(opts ? opts.hidden : false),
         };
 
         return this.http.authedRequest(undefined, "POST", path, undefined, content);
@@ -6882,7 +6882,7 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
-     * Upload a file to the media repository on the home server.
+     * Upload a file to the media repository on the homeserver.
      *
      * @param {object} file The object to upload. On a browser, something that
      *   can be sent to XMLHttpRequest.send (typically a File).  Under node.js,
@@ -7470,7 +7470,7 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
-     * Register with an Identity Server using the OpenID token from the user's
+     * Register with an identity server using the OpenID token from the user's
      * Homeserver, which can be retrieved via
      * {@link module:client~MatrixClient#getOpenIdToken}.
      *
@@ -7484,7 +7484,7 @@ export class MatrixClient extends EventEmitter {
      */
     public registerWithIdentityServer(hsOpenIdToken: any): Promise<any> { // TODO: Types
         if (!this.idBaseUrl) {
-            throw new Error("No Identity Server base URL set");
+            throw new Error("No identity server base URL set");
         }
 
         const uri = this.idBaseUrl + PREFIX_IDENTITY_V2 + "/account/register";
@@ -7593,7 +7593,7 @@ export class MatrixClient extends EventEmitter {
      * Submits a MSISDN token to the identity server
      *
      * This is used when submitting the code sent by SMS to a phone number.
-     * The ID server has an equivalent API for email but the js-sdk does
+     * The identity server has an equivalent API for email but the js-sdk does
      * not expose this, since email is normally validated by the user clicking
      * a link rather than entering a code.
      *
@@ -7606,7 +7606,7 @@ export class MatrixClient extends EventEmitter {
      *
      * @return {Promise} Resolves: Object, currently with no parameters.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @throws Error if No ID server is set
+     * @throws Error if No identity server is set
      */
     public async submitMsisdnToken(
         sid: string,
@@ -7759,7 +7759,7 @@ export class MatrixClient extends EventEmitter {
 
     /**
      * Looks up the public Matrix ID mapping for a given 3rd party
-     * identifier from the Identity Server
+     * identifier from the identity server
      *
      * @param {string} medium The medium of the threepid, eg. 'email'
      * @param {string} address The textual address of the threepid
@@ -7844,7 +7844,7 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
-     * Get account info from the Identity Server. This is useful as a neutral check
+     * Get account info from the identity server. This is useful as a neutral check
      * to verify that other APIs are likely to approve access by testing that the
      * token is valid, terms have been agreed, etc.
      *
