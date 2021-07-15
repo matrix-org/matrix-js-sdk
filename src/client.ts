@@ -6429,7 +6429,7 @@ export class MatrixClient extends EventEmitter {
         const content = {
             "m.fully_read": rmEventId,
             "m.read": rrEventId,
-            "org.matrix.msc2885.hidden": Boolean(opts ? opts.hidden : false),
+            "org.matrix.msc2285.hidden": Boolean(opts ? opts.hidden : false),
         };
 
         return this.http.authedRequest(
