@@ -261,3 +261,16 @@ export function decryptAES(data: IEncryptedPayload, key: Uint8Array, name: strin
     return subtleCrypto ? decryptBrowser(data, key, name) : decryptNode(data, key, name);
 }
 
+// string of zeroes, for calculating the key check
+const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+
+/** Calculate the MAC for checking the key.
+ *
+ * @param {Uint8Array} key the key to use
+ * @param {string} [iv] The initialization vector as a base64-encoded string.
+ *     If omitted, a random initialization vector will be created.
+ * @return {Promise<object>} An object that contains, `mac` and `iv` properties.
+ */
+export function calculateKeyCheck(key: Uint8Array, iv?: string): Promise<IEncryptedPayload> {
+    return encryptAES(ZERO_STR, key, "", iv);
+}

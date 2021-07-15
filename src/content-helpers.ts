@@ -17,6 +17,8 @@ limitations under the License.
 
 /** @module ContentHelpers */
 
+import { MsgType } from "./@types/event";
+
 /**
  * Generates the content for a HTML Message event
  * @param {string} body the plaintext body of the message
@@ -25,7 +27,7 @@ limitations under the License.
  */
 export function makeHtmlMessage(body: string, htmlBody: string) {
     return {
-        msgtype: "m.text",
+        msgtype: MsgType.Text,
         format: "org.matrix.custom.html",
         body: body,
         formatted_body: htmlBody,
@@ -40,7 +42,7 @@ export function makeHtmlMessage(body: string, htmlBody: string) {
  */
 export function makeHtmlNotice(body: string, htmlBody: string) {
     return {
-        msgtype: "m.notice",
+        msgtype: MsgType.Notice,
         format: "org.matrix.custom.html",
         body: body,
         formatted_body: htmlBody,
@@ -55,7 +57,7 @@ export function makeHtmlNotice(body: string, htmlBody: string) {
  */
 export function makeHtmlEmote(body: string, htmlBody: string) {
     return {
-        msgtype: "m.emote",
+        msgtype: MsgType.Emote,
         format: "org.matrix.custom.html",
         body: body,
         formatted_body: htmlBody,
@@ -69,7 +71,7 @@ export function makeHtmlEmote(body: string, htmlBody: string) {
  */
 export function makeTextMessage(body: string) {
     return {
-        msgtype: "m.text",
+        msgtype: MsgType.Text,
         body: body,
     };
 }
@@ -81,7 +83,7 @@ export function makeTextMessage(body: string) {
  */
 export function makeNotice(body: string) {
     return {
-        msgtype: "m.notice",
+        msgtype: MsgType.Notice,
         body: body,
     };
 }
@@ -93,7 +95,7 @@ export function makeNotice(body: string) {
  */
 export function makeEmoteMessage(body: string) {
     return {
-        msgtype: "m.emote",
+        msgtype: MsgType.Emote,
         body: body,
     };
 }

@@ -23,12 +23,13 @@ import { EventType } from "../@types/event";
 import { Group } from "../models/group";
 import { Room } from "../models/room";
 import { User } from "../models/user";
-import { MatrixEvent } from "../models/event";
+import { IEvent, MatrixEvent } from "../models/event";
 import { RoomState } from "../models/room-state";
 import { RoomMember } from "../models/room-member";
 import { Filter } from "../filter";
 import { ISavedSync, IStore } from "./index";
 import { RoomSummary } from "../models/room-summary";
+import { ISyncResponse } from "../sync-accumulator";
 
 function isValidFilterId(filterId: string): boolean {
     const isValidStr = typeof filterId === "string" &&
@@ -59,9 +60,9 @@ export class MemoryStore implements IStore {
     //    filterId: Filter
     // }
     private filters: Record<string, Record<string, Filter>> = {};
-    private accountData: Record<string, MatrixEvent> = {}; // type : content
+    public accountData: Record<string, MatrixEvent> = {}; // type : content
     private readonly localStorage: Storage;
-    private oobMembers: Record<string, MatrixEvent[]> = {}; // roomId: [member events]
+    private oobMembers: Record<string, IEvent[]> = {}; // roomId: [member events]
     private clientOptions = {};
 
     constructor(opts: IOpts = {}) {
@@ -340,7 +341,7 @@ export class MemoryStore implements IStore {
      * @param {Object} syncData The sync data
      * @return {Promise} An immediately resolved promise.
      */
-    public setSyncData(syncData: object): Promise<void> {
+    public setSyncData(syncData: ISyncResponse): Promise<void> {
         return Promise.resolve();
     }
 
@@ -415,7 +416,7 @@ export class MemoryStore implements IStore {
      * @returns {event[]} the events, potentially an empty array if OOB loading didn't yield any new members
      * @returns {null} in case the members for this room haven't been stored yet
      */
-    public getOutOfBandMembers(roomId: string): Promise<MatrixEvent[] | null> {
+    public getOutOfBandMembers(roomId: string): Promise<IEvent[] | null> {
         return Promise.resolve(this.oobMembers[roomId] || null);
     }
 
@@ -427,7 +428,7 @@ export class MemoryStore implements IStore {
      * @param {event[]} membershipEvents the membership events to store
      * @returns {Promise} when all members have been stored
      */
-    public setOutOfBandMembers(roomId: string, membershipEvents: MatrixEvent[]): Promise<void> {
+    public setOutOfBandMembers(roomId: string, membershipEvents: IEvent[]): Promise<void> {
         this.oobMembers[roomId] = membershipEvents;
         return Promise.resolve();
     }

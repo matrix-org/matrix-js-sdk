@@ -26,6 +26,7 @@ import { OlmDevice } from "../OlmDevice";
 import { MatrixEvent, RoomMember } from "../..";
 import { Crypto, IEventDecryptionResult, IMegolmSessionData, IncomingRoomKeyRequest } from "..";
 import { DeviceInfo } from "../deviceinfo";
+import { IRoomEncryption } from "../RoomList";
 
 /**
  * map of registered encryption algorithm classes. A map from string to {@link
@@ -52,7 +53,7 @@ interface IParams {
     olmDevice: OlmDevice;
     baseApis: MatrixClient;
     roomId: string;
-    config: object;
+    config: IRoomEncryption & object;
 }
 
 /**

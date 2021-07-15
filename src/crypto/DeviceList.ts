@@ -102,7 +102,7 @@ export class DeviceList extends EventEmitter {
     // The time the save is scheduled for
     private savePromiseTime: number = null;
     // The timer used to delay the save
-    private saveTimer: NodeJS.Timeout = null;
+    private saveTimer: number = null;
     // True if we have fetched data from the server or loaded a non-empty
     // set of device data from the store
     private hasFetched: boolean = null;

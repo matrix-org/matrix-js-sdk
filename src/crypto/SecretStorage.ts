@@ -17,15 +17,13 @@ limitations under the License.
 import { logger } from '../logger';
 import * as olmlib from './olmlib';
 import { randomString } from '../randomstring';
-import { encryptAES, decryptAES, IEncryptedPayload } from './aes';
+import { encryptAES, decryptAES, IEncryptedPayload, calculateKeyCheck } from './aes';
 import { encodeBase64 } from "./olmlib";
 import { ICryptoCallbacks, MatrixClient, MatrixEvent } from '../matrix';
 import { IAddSecretStorageKeyOpts, ISecretStorageKeyInfo } from './api';
 import { EventEmitter } from 'stream';
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
-
-const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
 
 // Some of the key functions use a tuple and some use an object...
 export type SecretStorageKeyTuple = [keyId: string, keyInfo: ISecretStorageKeyInfo];
@@ -39,9 +37,9 @@ export interface ISecretRequest {
 
 export interface IAccountDataClient extends EventEmitter {
     // Subset of MatrixClient (which also uses any for the event content)
-    getAccountDataFromServer: (eventType: string) => Promise<any>;
+    getAccountDataFromServer: (eventType: string) => Promise<Record<string, any>>;
     getAccountData: (eventType: string) => MatrixEvent;
-    setAccountData: (eventType: string, content: any) => Promise<void>;
+    setAccountData: (eventType: string, content: any) => Promise<{}>;
 }
 
 interface ISecretRequestInternal {
@@ -139,7 +137,7 @@ export class SecretStorage {
                 keyInfo.passphrase = opts.passphrase;
             }
             if (opts.key) {
-                const { iv, mac } = await SecretStorage.calculateKeyCheck(opts.key);
+                const { iv, mac } = await calculateKeyCheck(opts.key);
                 keyInfo.iv = iv;
                 keyInfo.mac = mac;
             }
@@ -176,7 +174,7 @@ export class SecretStorage {
      *     the form [keyId, keyInfo].  Otherwise, null is returned.
      *     XXX: why is this an array when addKey returns an object?
      */
-    public async getKey(keyId: string): Promise<SecretStorageKeyTuple> {
+    public async getKey(keyId: string): Promise<SecretStorageKeyTuple | null> {
         if (!keyId) {
             keyId = await this.getDefaultKeyId();
         }
@@ -186,7 +184,7 @@ export class SecretStorage {
 
         const keyInfo = await this.accountDataAdapter.getAccountDataFromServer(
             "m.secret_storage.key." + keyId,
-        );
+        ) as ISecretStorageKeyInfo;
         return keyInfo ? [keyId, keyInfo] : null;
     }
 
@@ -212,7 +210,7 @@ export class SecretStorage {
     public async checkKey(key: Uint8Array, info: ISecretStorageKeyInfo): Promise<boolean> {
         if (info.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             if (info.mac) {
-                const { mac } = await SecretStorage.calculateKeyCheck(key, info.iv);
+                const { mac } = await calculateKeyCheck(key, info.iv);
                 return info.mac.replace(/=+$/g, '') === mac.replace(/=+$/g, '');
             } else {
                 // if we have no information, we have to assume the key is right
@@ -221,10 +219,6 @@ export class SecretStorage {
         } else {
             throw new Error("Unknown algorithm");
         }
-    }
-
-    public static async calculateKeyCheck(key: Uint8Array, iv?: string): Promise<IEncryptedPayload> {
-        return await encryptAES(ZERO_STR, key, "", iv);
     }
 
     /**
@@ -254,7 +248,7 @@ export class SecretStorage {
             // get key information from key storage
             const keyInfo = await this.accountDataAdapter.getAccountDataFromServer(
                 "m.secret_storage.key." + keyId,
-            );
+            ) as ISecretStorageKeyInfo;
             if (!keyInfo) {
                 throw new Error("Unknown key: " + keyId);
             }
