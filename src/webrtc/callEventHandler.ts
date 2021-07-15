@@ -47,12 +47,12 @@ export class CallEventHandler {
 
     public start() {
         this.client.on("sync", this.evaluateEventBuffer);
-        this.client.on("event", this.onEvent);
+        this.client.on("Room.timeline", this.onRoomTimeline);
     }
 
     public stop() {
         this.client.removeListener("sync", this.evaluateEventBuffer);
-        this.client.removeListener("event", this.onEvent);
+        this.client.removeListener("Room.timeline", this.onRoomTimeline);
     }
 
     private evaluateEventBuffer = async () => {
@@ -89,7 +89,7 @@ export class CallEventHandler {
         }
     };
 
-    private onEvent = (event: MatrixEvent) => {
+    private onRoomTimeline = (event: MatrixEvent) => {
         this.client.decryptEventIfNeeded(event);
         // any call events or ones that might be once they're decrypted
         if (this.eventIsACall(event) || event.isBeingDecrypted()) {
