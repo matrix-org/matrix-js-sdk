@@ -46,3 +46,31 @@ export interface IAbortablePromise<T> extends Promise<T> {
 }
 
 export type IdServerUnbindResult = "no-support" | "success";
+
+// Knock and private are reserved keywords which are not yet implemented.
+export enum JoinRule {
+    Public = "public",
+    Invite = "invite",
+    /**
+     * @deprecated Reserved keyword. Should not be used. Not yet implemented.
+     */
+    Private = "private",
+    Knock = "knock", // MSC2403 - only valid inside experimental room versions at this time.
+    Restricted = "restricted", // MSC3083 - only valid inside experimental room versions at this time.
+}
+
+export enum RestrictedAllowType {
+    RoomMembership = "m.room_membership", // MSC3083 - only valid inside experimental room versions at this time.
+}
+
+export enum GuestAccess {
+    CanJoin = "can_join",
+    Forbidden = "forbidden",
+}
+
+export enum HistoryVisibility {
+    Invited = "invited",
+    Joined = "joined",
+    Shared = "shared",
+    WorldReadable = "world_readable",
+}

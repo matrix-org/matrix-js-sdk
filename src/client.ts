@@ -394,9 +394,15 @@ export enum RoomVersionStability {
     Unstable = "unstable",
 }
 
+export interface IRoomCapability { // MSC3244
+    preferred: string | null;
+    support: string[];
+}
+
 export interface IRoomVersionsCapability {
     default: string;
     available: Record<string, RoomVersionStability>;
+    "org.matrix.msc3244.room_capabilities"?: Record<string, IRoomCapability>; // MSC3244
 }
 
 export interface IChangePasswordCapability {
@@ -4930,7 +4936,7 @@ export class MatrixClient extends EventEmitter {
             guest_access: opts.allowJoin ? "can_join" : "forbidden",
         }, "");
 
-        let readPromise: Promise<any> = Promise.resolve();
+        let readPromise: Promise<any> = Promise.resolve<any>(undefined);
         if (opts.allowRead) {
             readPromise = this.sendStateEvent(roomId, EventType.RoomHistoryVisibility, {
                 history_visibility: "world_readable",
