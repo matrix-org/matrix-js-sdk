@@ -3863,7 +3863,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: to an empty object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async sendReadReceipt(event: MatrixEvent, opts: { hidden?: boolean }, callback?: Callback): Promise<{}> {
+    public async sendReadReceipt(event: MatrixEvent, opts?: { hidden?: boolean }, callback?: Callback): Promise<{}> {
         if (typeof (opts) === 'function') {
             callback = opts as any as Callback; // legacy
             opts = {};
