@@ -40,8 +40,8 @@ export interface IEphemeral {
 
 /* eslint-disable camelcase */
 interface IUnreadNotificationCounts {
-    highlight_count: number;
-    notification_count: number;
+    highlight_count?: number;
+    notification_count?: number;
 }
 
 export interface IRoomEvent extends IMinimalEvent {
@@ -64,7 +64,7 @@ interface IState {
 
 export interface ITimeline {
     events: Array<IRoomEvent | IStateEvent>;
-    limited: boolean;
+    limited?: boolean;
     prev_batch: string;
 }
 
@@ -167,6 +167,13 @@ interface IRoom {
             eventId: string;
         };
     };
+}
+
+export interface ISyncData {
+    nextBatch: string;
+    accountData: IMinimalEvent[];
+    roomsData: IRooms;
+    groupsData: IGroups;
 }
 
 /**
@@ -544,8 +551,8 @@ export class SyncAccumulator {
      * /sync response from the 'rooms' key onwards. The "accountData" key is
      * a list of raw events which represent global account data.
      */
-    public getJSON(forDatabase = false): object {
-        const data = {
+    public getJSON(forDatabase = false): ISyncData {
+        const data: IRooms = {
             join: {},
             invite: {},
             // always empty. This is set by /sync when a room was previously
@@ -575,7 +582,7 @@ export class SyncAccumulator {
                     prev_batch: null,
                 },
                 unread_notifications: roomData._unreadNotifications,
-                summary: roomData._summary,
+                summary: roomData._summary as IRoomSummary,
             };
             // Add account data
             Object.keys(roomData._accountData).forEach((evType) => {
@@ -678,7 +685,7 @@ export class SyncAccumulator {
         });
 
         // Add account data
-        const accData = [];
+        const accData: IMinimalEvent[] = [];
         Object.keys(this.accountData).forEach((evType) => {
             accData.push(this.accountData[evType]);
         });

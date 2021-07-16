@@ -31,15 +31,28 @@ import type NodeCrypto from "crypto";
  * @return {string} The encoded string e.g. foo=bar&baz=taz
  */
 export function encodeParams(params: Record<string, string>): string {
-    let qs = "";
-    for (const key in params) {
-        if (!params.hasOwnProperty(key)) {
-            continue;
-        }
-        qs += "&" + encodeURIComponent(key) + "=" +
-                encodeURIComponent(params[key]);
+    return new URLSearchParams(params).toString();
+}
+
+export type QueryDict = Record<string, string | string[]>;
+
+/**
+ * Decode a query string in `application/x-www-form-urlencoded` format.
+ * @param {string} query A query string to decode e.g.
+ * foo=bar&via=server1&server2
+ * @return {Object} The decoded object, if any keys occurred multiple times
+ * then the value will be an array of strings, else it will be an array.
+ * This behaviour matches Node's qs.parse but is built on URLSearchParams
+ * for native web compatibility
+ */
+export function decodeParams(query: string): QueryDict {
+    const o: QueryDict = {};
+    const params = new URLSearchParams(query);
+    for (const key of params.keys()) {
+        const val = params.getAll(key);
+        o[key] = val.length === 1 ? val[0] : val;
     }
-    return qs.substring(1);
+    return o;
 }
 
 /**
@@ -464,7 +477,7 @@ export async function promiseMapSeries<T>(
     }
 }
 
-export function promiseTry<T>(fn: () => T): Promise<T> {
+export function promiseTry<T>(fn: () => T | Promise<T>): Promise<T> {
     return new Promise((resolve) => resolve(fn()));
 }
 

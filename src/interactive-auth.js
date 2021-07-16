@@ -18,7 +18,6 @@ limitations under the License.
 
 /** @module interactive-auth */
 
-import url from "url";
 import * as utils from "./utils";
 import { logger } from './logger';
 
@@ -187,9 +186,7 @@ InteractiveAuth.prototype = {
                     client_secret: this._clientSecret,
                 };
                 if (await this._matrixClient.doesServerRequireIdServerParam()) {
-                    const idServerParsedUrl = url.parse(
-                        this._matrixClient.getIdentityServerUrl(),
-                    );
+                    const idServerParsedUrl = new URL(this._matrixClient.getIdentityServerUrl());
                     creds.id_server = idServerParsedUrl.host;
                 }
                 authDict = {
@@ -217,7 +214,7 @@ InteractiveAuth.prototype = {
 
     /**
      * get the client secret used for validation sessions
-     * with the ID server.
+     * with the identity server.
      *
      * @return {string} client secret
      */

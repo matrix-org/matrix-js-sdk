@@ -37,9 +37,9 @@ export interface ISecretRequest {
 
 export interface IAccountDataClient extends EventEmitter {
     // Subset of MatrixClient (which also uses any for the event content)
-    getAccountDataFromServer: (eventType: string) => Promise<any>;
+    getAccountDataFromServer: (eventType: string) => Promise<Record<string, any>>;
     getAccountData: (eventType: string) => MatrixEvent;
-    setAccountData: (eventType: string, content: any) => Promise<void>;
+    setAccountData: (eventType: string, content: any) => Promise<{}>;
 }
 
 interface ISecretRequestInternal {
@@ -174,7 +174,7 @@ export class SecretStorage {
      *     the form [keyId, keyInfo].  Otherwise, null is returned.
      *     XXX: why is this an array when addKey returns an object?
      */
-    public async getKey(keyId: string): Promise<SecretStorageKeyTuple> {
+    public async getKey(keyId: string): Promise<SecretStorageKeyTuple | null> {
         if (!keyId) {
             keyId = await this.getDefaultKeyId();
         }
@@ -184,7 +184,7 @@ export class SecretStorage {
 
         const keyInfo = await this.accountDataAdapter.getAccountDataFromServer(
             "m.secret_storage.key." + keyId,
-        );
+        ) as ISecretStorageKeyInfo;
         return keyInfo ? [keyId, keyInfo] : null;
     }
 
@@ -248,7 +248,7 @@ export class SecretStorage {
             // get key information from key storage
             const keyInfo = await this.accountDataAdapter.getAccountDataFromServer(
                 "m.secret_storage.key." + keyId,
-            );
+            ) as ISecretStorageKeyInfo;
             if (!keyInfo) {
                 throw new Error("Unknown key: " + keyId);
             }

@@ -1,7 +1,5 @@
 /*
-Copyright 2017 Vector Creations Ltd
-Copyright 2018 New Vector Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2017 - 2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,14 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { SyncAccumulator } from "../sync-accumulator";
+import { IMinimalEvent, ISyncData, ISyncResponse, SyncAccumulator } from "../sync-accumulator";
 import * as utils from "../utils";
 import * as IndexedDBHelpers from "../indexeddb-helpers";
 import { logger } from '../logger';
+import { IEvent, IStartClientOpts } from "..";
+import { ISavedSync } from "./index";
+import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend";
 
 const VERSION = 3;
 
-function createDatabase(db) {
+function createDatabase(db: IDBDatabase): void {
     // Make user store, clobber based on user ID. (userId property of User objects)
     db.createObjectStore("users", { keyPath: ["userId"] });
 
@@ -35,7 +36,7 @@ function createDatabase(db) {
     db.createObjectStore("sync", { keyPath: ["clobber"] });
 }
 
-function upgradeSchemaV2(db) {
+function upgradeSchemaV2(db: IDBDatabase): void {
     const oobMembersStore = db.createObjectStore(
         "oob_membership_events", {
             keyPath: ["room_id", "state_key"],
@@ -43,7 +44,7 @@ function upgradeSchemaV2(db) {
     oobMembersStore.createIndex("room", "room_id");
 }
 
-function upgradeSchemaV3(db) {
+function upgradeSchemaV3(db: IDBDatabase): void {
     db.createObjectStore("client_options",
         { keyPath: ["clobber"] });
 }
@@ -58,16 +59,20 @@ function upgradeSchemaV3(db) {
  * @return {Promise<T[]>} Resolves to an array of whatever you returned from
  * resultMapper.
  */
-function selectQuery(store, keyRange, resultMapper) {
+function selectQuery<T>(
+    store: IDBObjectStore,
+    keyRange: IDBKeyRange | IDBValidKey | undefined,
+    resultMapper: (cursor: IDBCursorWithValue) => T,
+): Promise<T[]> {
     const query = store.openCursor(keyRange);
     return new Promise((resolve, reject) => {
         const results = [];
-        query.onerror = (event) => {
-            reject(new Error("Query failed: " + event.target.errorCode));
+        query.onerror = () => {
+            reject(new Error("Query failed: " + query.error));
         };
         // collect results
-        query.onsuccess = (event) => {
-            const cursor = event.target.result;
+        query.onsuccess = () => {
+            const cursor = query.result;
             if (!cursor) {
                 resolve(results);
                 return; // end of results
@@ -78,88 +83,84 @@ function selectQuery(store, keyRange, resultMapper) {
     });
 }
 
-function txnAsPromise(txn) {
+function txnAsPromise(txn: IDBTransaction): Promise<Event> {
     return new Promise((resolve, reject) => {
         txn.oncomplete = function(event) {
             resolve(event);
         };
-        txn.onerror = function(event) {
-            reject(event.target.error);
+        txn.onerror = function() {
+            reject(txn.error);
         };
     });
 }
 
-function reqAsEventPromise(req) {
+function reqAsEventPromise(req: IDBRequest): Promise<Event> {
     return new Promise((resolve, reject) => {
         req.onsuccess = function(event) {
             resolve(event);
         };
-        req.onerror = function(event) {
-            reject(event.target.error);
+        req.onerror = function() {
+            reject(req.error);
         };
     });
 }
 
-function reqAsPromise(req) {
+function reqAsPromise(req: IDBRequest): Promise<IDBRequest> {
     return new Promise((resolve, reject) => {
         req.onsuccess = () => resolve(req);
         req.onerror = (err) => reject(err);
     });
 }
 
-function reqAsCursorPromise(req) {
-    return reqAsEventPromise(req).then((event) => event.target.result);
+function reqAsCursorPromise(req: IDBRequest<IDBCursor | null>): Promise<IDBCursor> {
+    return reqAsEventPromise(req).then((event) => req.result);
 }
 
-/**
- * Does the actual reading from and writing to the indexeddb
- *
- * Construct a new Indexed Database store backend. This requires a call to
- * <code>connect()</code> before this store can be used.
- * @constructor
- * @param {Object} indexedDBInterface The Indexed DB interface e.g
- * <code>window.indexedDB</code>
- * @param {string=} dbName Optional database name. The same name must be used
- * to open the same database.
- */
-export function LocalIndexedDBStoreBackend(
-    indexedDBInterface, dbName,
-) {
-    this.indexedDB = indexedDBInterface;
-    this._dbName = "matrix-js-sdk:" + (dbName || "default");
-    this.db = null;
-    this._disconnected = true;
-    this._syncAccumulator = new SyncAccumulator();
-    this._isNewlyCreated = false;
-}
+export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
+    public static exists(indexedDB: IDBFactory, dbName: string): boolean {
+        dbName = "matrix-js-sdk:" + (dbName || "default");
+        return IndexedDBHelpers.exists(indexedDB, dbName);
+    }
 
-LocalIndexedDBStoreBackend.exists = function(indexedDB, dbName) {
-    dbName = "matrix-js-sdk:" + (dbName || "default");
-    return IndexedDBHelpers.exists(indexedDB, dbName);
-};
+    private readonly dbName: string;
+    private readonly syncAccumulator: SyncAccumulator;
+    private db: IDBDatabase = null;
+    private disconnected = true;
+    private _isNewlyCreated = false;
 
-LocalIndexedDBStoreBackend.prototype = {
+    /**
+     * Does the actual reading from and writing to the indexeddb
+     *
+     * Construct a new Indexed Database store backend. This requires a call to
+     * <code>connect()</code> before this store can be used.
+     * @constructor
+     * @param {Object} indexedDB The Indexed DB interface e.g
+     * <code>window.indexedDB</code>
+     * @param {string=} dbName Optional database name. The same name must be used
+     * to open the same database.
+     */
+    constructor(private readonly indexedDB: IDBFactory, dbName: string) {
+        this.dbName = "matrix-js-sdk:" + (dbName || "default");
+        this.syncAccumulator = new SyncAccumulator();
+    }
+
     /**
      * Attempt to connect to the database. This can fail if the user does not
      * grant permission.
      * @return {Promise} Resolves if successfully connected.
      */
-    connect: function() {
-        if (!this._disconnected) {
-            logger.log(
-                `LocalIndexedDBStoreBackend.connect: already connected or connecting`,
-            );
+    public connect(): Promise<void> {
+        if (!this.disconnected) {
+            logger.log(`LocalIndexedDBStoreBackend.connect: already connected or connecting`);
             return Promise.resolve();
         }
 
-        this._disconnected = false;
+        this.disconnected = false;
 
-        logger.log(
-            `LocalIndexedDBStoreBackend.connect: connecting...`,
-        );
-        const req = this.indexedDB.open(this._dbName, VERSION);
+        logger.log(`LocalIndexedDBStoreBackend.connect: connecting...`);
+        const req = this.indexedDB.open(this.dbName, VERSION);
         req.onupgradeneeded = (ev) => {
-            const db = ev.target.result;
+            const db = req.result;
             const oldVersion = ev.oldVersion;
             logger.log(
                 `LocalIndexedDBStoreBackend.connect: upgrading from ${oldVersion}`,
@@ -178,19 +179,13 @@ LocalIndexedDBStoreBackend.prototype = {
         };
 
         req.onblocked = () => {
-            logger.log(
-                `can't yet open LocalIndexedDBStoreBackend because it is open elsewhere`,
-            );
+            logger.log(`can't yet open LocalIndexedDBStoreBackend because it is open elsewhere`);
         };
 
-        logger.log(
-            `LocalIndexedDBStoreBackend.connect: awaiting connection...`,
-        );
-        return reqAsEventPromise(req).then((ev) => {
-            logger.log(
-                `LocalIndexedDBStoreBackend.connect: connected`,
-            );
-            this.db = ev.target.result;
+        logger.log(`LocalIndexedDBStoreBackend.connect: awaiting connection...`);
+        return reqAsEventPromise(req).then(() => {
+            logger.log(`LocalIndexedDBStoreBackend.connect: connected`);
+            this.db = req.result;
 
             // add a poorly-named listener for when deleteDatabase is called
             // so we can close our db connections.
@@ -198,27 +193,26 @@ LocalIndexedDBStoreBackend.prototype = {
                 this.db.close();
             };
 
-            return this._init();
+            return this.init();
         });
-    },
-    /** @return {bool} whether or not the database was newly created in this session. */
-    isNewlyCreated: function() {
+    }
+
+    /** @return {boolean} whether or not the database was newly created in this session. */
+    public isNewlyCreated(): Promise<boolean> {
         return Promise.resolve(this._isNewlyCreated);
-    },
+    }
 
     /**
      * Having connected, load initial data from the database and prepare for use
      * @return {Promise} Resolves on success
      */
-    _init: function() {
+    private init() {
         return Promise.all([
-            this._loadAccountData(),
-            this._loadSyncData(),
+            this.loadAccountData(),
+            this.loadSyncData(),
         ]).then(([accountData, syncData]) => {
-            logger.log(
-                `LocalIndexedDBStoreBackend: loaded initial data`,
-            );
-            this._syncAccumulator.accumulate({
+            logger.log(`LocalIndexedDBStoreBackend: loaded initial data`);
+            this.syncAccumulator.accumulate({
                 next_batch: syncData.nextBatch,
                 rooms: syncData.roomsData,
                 groups: syncData.groupsData,
@@ -227,7 +221,7 @@ LocalIndexedDBStoreBackend.prototype = {
                 },
             }, true);
         });
-    },
+    }
 
     /**
      * Returns the out-of-band membership events for this room that
@@ -236,8 +230,8 @@ LocalIndexedDBStoreBackend.prototype = {
      * @returns {Promise<event[]>} the events, potentially an empty array if OOB loading didn't yield any new members
      * @returns {null} in case the members for this room haven't been stored yet
      */
-    getOutOfBandMembers: function(roomId) {
-        return new Promise((resolve, reject) =>{
+    public getOutOfBandMembers(roomId: string): Promise<IEvent[] | null> {
+        return new Promise<IEvent[] | null>((resolve, reject) =>{
             const tx = this.db.transaction(["oob_membership_events"], "readonly");
             const store = tx.objectStore("oob_membership_events");
             const roomIndex = store.index("room");
@@ -252,8 +246,8 @@ LocalIndexedDBStoreBackend.prototype = {
             // were all known already
             let oobWritten = false;
 
-            request.onsuccess = (event) => {
-                const cursor = event.target.result;
+            request.onsuccess = () => {
+                const cursor = request.result;
                 if (!cursor) {
                     // Unknown room
                     if (!membershipEvents.length && !oobWritten) {
@@ -273,11 +267,10 @@ LocalIndexedDBStoreBackend.prototype = {
                 reject(err);
             };
         }).then((events) => {
-            logger.log(`LL: got ${events && events.length}` +
-                ` membershipEvents from storage for room ${roomId} ...`);
+            logger.log(`LL: got ${events && events.length} membershipEvents from storage for room ${roomId} ...`);
             return events;
         });
-    },
+    }
 
     /**
      * Stores the out-of-band membership events for this room. Note that
@@ -286,7 +279,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * @param {string} roomId
      * @param {event[]} membershipEvents the membership events to store
      */
-    setOutOfBandMembers: async function(roomId, membershipEvents) {
+    public async setOutOfBandMembers(roomId: string, membershipEvents: IEvent[]): Promise<void> {
         logger.log(`LL: backend about to store ${membershipEvents.length}` +
             ` members for ${roomId}`);
         const tx = this.db.transaction(["oob_membership_events"], "readwrite");
@@ -307,9 +300,9 @@ LocalIndexedDBStoreBackend.prototype = {
         store.put(markerObject);
         await txnAsPromise(tx);
         logger.log(`LL: backend done storing for ${roomId}!`);
-    },
+    }
 
-    clearOutOfBandMembers: async function(roomId) {
+    public async clearOutOfBandMembers(roomId: string): Promise<void> {
         // the approach to delete all members for a room
         // is to get the min and max state key from the index
         // for that room, and then delete between those
@@ -324,11 +317,11 @@ LocalIndexedDBStoreBackend.prototype = {
         const roomRange = IDBKeyRange.only(roomId);
 
         const minStateKeyProm = reqAsCursorPromise(
-                roomIndex.openKeyCursor(roomRange, "next"),
-            ).then((cursor) => cursor && cursor.primaryKey[1]);
+            roomIndex.openKeyCursor(roomRange, "next"),
+        ).then((cursor) => cursor && cursor.primaryKey[1]);
         const maxStateKeyProm = reqAsCursorPromise(
-                roomIndex.openKeyCursor(roomRange, "prev"),
-            ).then((cursor) => cursor && cursor.primaryKey[1]);
+            roomIndex.openKeyCursor(roomRange, "prev"),
+        ).then((cursor) => cursor && cursor.primaryKey[1]);
         const [minStateKey, maxStateKey] = await Promise.all(
             [minStateKeyProm, maxStateKeyProm]);
 
@@ -341,45 +334,39 @@ LocalIndexedDBStoreBackend.prototype = {
             [roomId, maxStateKey],
         );
 
-        logger.log(`LL: Deleting all users + marker in storage for ` +
-            `room ${roomId}, with key range:`,
+        logger.log(`LL: Deleting all users + marker in storage for room ${roomId}, with key range:`,
             [roomId, minStateKey], [roomId, maxStateKey]);
         await reqAsPromise(writeStore.delete(membersKeyRange));
-    },
+    }
 
     /**
      * Clear the entire database. This should be used when logging out of a client
      * to prevent mixing data between accounts.
      * @return {Promise} Resolved when the database is cleared.
      */
-    clearDatabase: function() {
-        return new Promise((resolve, reject) => {
-            logger.log(`Removing indexeddb instance: ${this._dbName}`);
-            const req = this.indexedDB.deleteDatabase(this._dbName);
+    public clearDatabase(): Promise<void> {
+        return new Promise((resolve) => {
+            logger.log(`Removing indexeddb instance: ${this.dbName}`);
+            const req = this.indexedDB.deleteDatabase(this.dbName);
 
             req.onblocked = () => {
-                logger.log(
-                    `can't yet delete indexeddb ${this._dbName}` +
-                    ` because it is open elsewhere`,
-                );
+                logger.log(`can't yet delete indexeddb ${this.dbName} because it is open elsewhere`);
             };
 
-            req.onerror = (ev) => {
+            req.onerror = () => {
                 // in firefox, with indexedDB disabled, this fails with a
                 // DOMError. We treat this as non-fatal, so that we can still
                 // use the app.
-                logger.warn(
-                    `unable to delete js-sdk store indexeddb: ${ev.target.error}`,
-                );
+                logger.warn(`unable to delete js-sdk store indexeddb: ${req.error}`);
                 resolve();
             };
 
             req.onsuccess = () => {
-                logger.log(`Removed indexeddb instance: ${this._dbName}`);
+                logger.log(`Removed indexeddb instance: ${this.dbName}`);
                 resolve();
             };
         });
-    },
+    }
 
     /**
      * @param {boolean=} copy If false, the data returned is from internal
@@ -390,10 +377,8 @@ LocalIndexedDBStoreBackend.prototype = {
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
-    getSavedSync: function(copy) {
-        if (copy === undefined) copy = true;
-
-        const data = this._syncAccumulator.getJSON();
+    public getSavedSync(copy = true): Promise<ISavedSync> {
+        const data = this.syncAccumulator.getJSON();
         if (!data.nextBatch) return Promise.resolve(null);
         if (copy) {
             // We must deep copy the stored data so that the /sync processing code doesn't
@@ -402,29 +387,27 @@ LocalIndexedDBStoreBackend.prototype = {
         } else {
             return Promise.resolve(data);
         }
-    },
+    }
 
-    getNextBatchToken: function() {
-        return Promise.resolve(this._syncAccumulator.getNextBatchToken());
-    },
+    public getNextBatchToken(): Promise<string> {
+        return Promise.resolve(this.syncAccumulator.getNextBatchToken());
+    }
 
-    setSyncData: function(syncData) {
+    public setSyncData(syncData: ISyncResponse): Promise<void> {
         return Promise.resolve().then(() => {
-            this._syncAccumulator.accumulate(syncData);
+            this.syncAccumulator.accumulate(syncData);
         });
-    },
+    }
 
-    syncToDatabase: function(userTuples) {
-        const syncData = this._syncAccumulator.getJSON(true);
+    public async syncToDatabase(userTuples: UserTuple[]): Promise<void> {
+        const syncData = this.syncAccumulator.getJSON(true);
 
-        return Promise.all([
-            this._persistUserPresenceEvents(userTuples),
-            this._persistAccountData(syncData.accountData),
-            this._persistSyncData(
-                syncData.nextBatch, syncData.roomsData, syncData.groupsData,
-            ),
+        await Promise.all([
+            this.persistUserPresenceEvents(userTuples),
+            this.persistAccountData(syncData.accountData),
+            this.persistSyncData(syncData.nextBatch, syncData.roomsData, syncData.groupsData),
         ]);
-    },
+    }
 
     /**
      * Persist rooms /sync data along with the next batch token.
@@ -433,20 +416,24 @@ LocalIndexedDBStoreBackend.prototype = {
      * @param {Object} groupsData The 'groups' /sync data from a SyncAccumulator
      * @return {Promise} Resolves if the data was persisted.
      */
-    _persistSyncData: function(nextBatch, roomsData, groupsData) {
+    private persistSyncData(
+        nextBatch: string,
+        roomsData: ISyncResponse["rooms"],
+        groupsData: ISyncResponse["groups"],
+    ): Promise<void> {
         logger.log("Persisting sync data up to", nextBatch);
-        return utils.promiseTry(() => {
+        return utils.promiseTry<void>(() => {
             const txn = this.db.transaction(["sync"], "readwrite");
             const store = txn.objectStore("sync");
             store.put({
                 clobber: "-", // constant key so will always clobber
-                nextBatch: nextBatch,
-                roomsData: roomsData,
-                groupsData: groupsData,
+                nextBatch,
+                roomsData,
+                groupsData,
             }); // put == UPSERT
-            return txnAsPromise(txn);
+            return txnAsPromise(txn).then();
         });
-    },
+    }
 
     /**
      * Persist a list of account data events. Events with the same 'type' will
@@ -454,16 +441,16 @@ LocalIndexedDBStoreBackend.prototype = {
      * @param {Object[]} accountData An array of raw user-scoped account data events
      * @return {Promise} Resolves if the events were persisted.
      */
-    _persistAccountData: function(accountData) {
-        return utils.promiseTry(() => {
+    private persistAccountData(accountData: IMinimalEvent[]): Promise<void> {
+        return utils.promiseTry<void>(() => {
             const txn = this.db.transaction(["accountData"], "readwrite");
             const store = txn.objectStore("accountData");
             for (let i = 0; i < accountData.length; i++) {
                 store.put(accountData[i]); // put == UPSERT
             }
-            return txnAsPromise(txn);
+            return txnAsPromise(txn).then();
         });
-    },
+    }
 
     /**
      * Persist a list of [user id, presence event] they are for.
@@ -473,8 +460,8 @@ LocalIndexedDBStoreBackend.prototype = {
      * @param {Object[]} tuples An array of [userid, event] tuples
      * @return {Promise} Resolves if the users were persisted.
      */
-    _persistUserPresenceEvents: function(tuples) {
-        return utils.promiseTry(() => {
+    private persistUserPresenceEvents(tuples: UserTuple[]): Promise<void> {
+        return utils.promiseTry<void>(() => {
             const txn = this.db.transaction(["users"], "readwrite");
             const store = txn.objectStore("users");
             for (const tuple of tuples) {
@@ -483,9 +470,9 @@ LocalIndexedDBStoreBackend.prototype = {
                     event: tuple[1],
                 }); // put == UPSERT
             }
-            return txnAsPromise(txn);
+            return txnAsPromise(txn).then();
         });
-    },
+    }
 
     /**
      * Load all user presence events from the database. This is not cached.
@@ -493,64 +480,56 @@ LocalIndexedDBStoreBackend.prototype = {
      * sync.
      * @return {Promise<Object[]>} A list of presence events in their raw form.
      */
-    getUserPresenceEvents: function() {
-        return utils.promiseTry(() => {
+    public getUserPresenceEvents(): Promise<UserTuple[]> {
+        return utils.promiseTry<UserTuple[]>(() => {
             const txn = this.db.transaction(["users"], "readonly");
             const store = txn.objectStore("users");
             return selectQuery(store, undefined, (cursor) => {
                 return [cursor.value.userId, cursor.value.event];
             });
         });
-    },
+    }
 
     /**
      * Load all the account data events from the database. This is not cached.
      * @return {Promise<Object[]>} A list of raw global account events.
      */
-    _loadAccountData: function() {
-        logger.log(
-            `LocalIndexedDBStoreBackend: loading account data...`,
-        );
-        return utils.promiseTry(() => {
+    private loadAccountData(): Promise<IMinimalEvent[]> {
+        logger.log(`LocalIndexedDBStoreBackend: loading account data...`);
+        return utils.promiseTry<IMinimalEvent[]>(() => {
             const txn = this.db.transaction(["accountData"], "readonly");
             const store = txn.objectStore("accountData");
             return selectQuery(store, undefined, (cursor) => {
                 return cursor.value;
-            }).then((result) => {
-                logger.log(
-                    `LocalIndexedDBStoreBackend: loaded account data`,
-                );
+            }).then((result: IMinimalEvent[]) => {
+                logger.log(`LocalIndexedDBStoreBackend: loaded account data`);
                 return result;
             });
         });
-    },
+    }
 
     /**
      * Load the sync data from the database.
      * @return {Promise<Object>} An object with "roomsData" and "nextBatch" keys.
      */
-    _loadSyncData: function() {
-        logger.log(
-            `LocalIndexedDBStoreBackend: loading sync data...`,
-        );
-        return utils.promiseTry(() => {
+    private loadSyncData(): Promise<ISyncData> {
+        logger.log(`LocalIndexedDBStoreBackend: loading sync data...`);
+        return utils.promiseTry<ISyncData>(() => {
             const txn = this.db.transaction(["sync"], "readonly");
             const store = txn.objectStore("sync");
             return selectQuery(store, undefined, (cursor) => {
                 return cursor.value;
-            }).then((results) => {
-                logger.log(
-                    `LocalIndexedDBStoreBackend: loaded sync data`,
-                );
+            }).then((results: ISyncData[]) => {
+                logger.log(`LocalIndexedDBStoreBackend: loaded sync data`);
                 if (results.length > 1) {
                     logger.warn("loadSyncData: More than 1 sync row found.");
                 }
-                return (results.length > 0 ? results[0] : {});
+                return results.length > 0 ? results[0] : {} as ISyncData;
             });
         });
-    },
+    }
 
-    getClientOptions: function() {
+    public getClientOptions(): Promise<IStartClientOpts> {
         return Promise.resolve().then(() => {
             const txn = this.db.transaction(["client_options"], "readonly");
             const store = txn.objectStore("client_options");
@@ -560,9 +539,9 @@ LocalIndexedDBStoreBackend.prototype = {
                 }
             }).then((results) => results[0]);
         });
-    },
+    }
 
-    storeClientOptions: async function(options) {
+    public async storeClientOptions(options: IStartClientOpts): Promise<void> {
         const txn = this.db.transaction(["client_options"], "readwrite");
         const store = txn.objectStore("client_options");
         store.put({
@@ -570,5 +549,5 @@ LocalIndexedDBStoreBackend.prototype = {
             options: options,
         }); // put == UPSERT
         await txnAsPromise(txn);
-    },
-};
+    }
+}
