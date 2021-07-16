@@ -28,7 +28,7 @@ import OlmDevice from "./OlmDevice";
 import { DeviceInfo } from "./deviceinfo";
 import { logger } from '../logger';
 import * as utils from "../utils";
-import { OneTimeKey } from "./dehydration";
+import { IOneTimeKey } from "./dehydration";
 import { MatrixClient } from "../client";
 
 enum Algorithm {
@@ -407,7 +407,7 @@ export async function ensureOlmSessionsForDevices(
 
 async function _verifyKeyAndStartSession(
     olmDevice: OlmDevice,
-    oneTimeKey: OneTimeKey,
+    oneTimeKey: IOneTimeKey,
     userId: string,
     deviceInfo: DeviceInfo,
 ): Promise<string> {
@@ -465,7 +465,7 @@ export interface IObject {
  */
 export async function verifySignature(
     olmDevice: OlmDevice,
-    obj: OneTimeKey | IObject,
+    obj: IOneTimeKey | IObject,
     signingUserId: string,
     signingDeviceId: string,
     signingKey: string,
