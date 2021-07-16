@@ -126,7 +126,6 @@ import {
 } from "./@types/event";
 import { IAbortablePromise, IdServerUnbindResult, IImageInfo, Preset, Visibility } from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
-import url from "url";
 import { randomString } from "./randomstring";
 import { ReadStream } from "fs";
 import { WebStorageSessionStore } from "./store/session/webstorage";
@@ -5156,10 +5155,7 @@ export class MatrixClient extends EventEmitter {
         // If the HS supports separate add and bind, then requestToken endpoints
         // don't need an IS as they are all validated by the HS directly.
         if (!await this.doesServerSupportSeparateAddAndBind() && this.idBaseUrl) {
-            const idServerUrl = url.parse(this.idBaseUrl);
-            if (!idServerUrl.host) {
-                throw new Error("Invalid identity server URL: " + this.idBaseUrl);
-            }
+            const idServerUrl = new URL(this.idBaseUrl);
             postParams.id_server = idServerUrl.host;
 
             if (
