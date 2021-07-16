@@ -93,6 +93,7 @@ export class MemoryStore implements IStore {
     /**
      * Store the given room.
      * @param {Group} group The group to be stored
+     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
      */
     public storeGroup(group: Group) {
         this.groups[group.groupId] = group;
@@ -102,6 +103,7 @@ export class MemoryStore implements IStore {
      * Retrieve a group by its group ID.
      * @param {string} groupId The group ID.
      * @return {Group} The group or null.
+     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
      */
     public getGroup(groupId: string): Group | null {
         return this.groups[groupId] || null;
@@ -110,6 +112,7 @@ export class MemoryStore implements IStore {
     /**
      * Retrieve all known groups.
      * @return {Group[]} A list of groups, which may be empty.
+     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
      */
     public getGroups(): Group[] {
         return Object.values(this.groups);
