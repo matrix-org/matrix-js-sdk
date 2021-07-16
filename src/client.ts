@@ -145,7 +145,7 @@ import {
 import { ISynapseAdminDeactivateResponse, ISynapseAdminWhoisResponse } from "./@types/synapse";
 import { ISpaceSummaryEvent, ISpaceSummaryRoom } from "./@types/spaces";
 import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, RuleId } from "./@types/PushRules";
-import { IThirdPartyIdentifier } from "./@types/threepids";
+import { IThreepid } from "./@types/threepids";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -597,33 +597,11 @@ interface IUserDirectoryResponse {
     limited: boolean;
 }
 
-interface IThreepid {
-    medium: "email" | "msisdn";
-    address: string;
-    validated_at: number;
-    added_at: number;
-}
-
 interface IMyDevice {
     device_id: string;
     display_name?: string;
     last_seen_ip?: string;
     last_seen_ts?: number;
-}
-
-interface IPusher {
-    pushkey: string;
-    kind: string;
-    app_id: string;
-    app_display_name: string;
-    device_display_name: string;
-    profile_tag?: string;
-    lang: string;
-    data: {
-        url?: string;
-        format?: string;
-        brand?: string; // undocumented
-    };
 }
 
 interface IDownloadKeyResult {

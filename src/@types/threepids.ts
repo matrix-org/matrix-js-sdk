@@ -20,9 +20,9 @@ export enum ThreepidMedium {
 }
 
 // TODO: Are these types universal, or specific to just /account/3pid?
-export interface IThirdPartyIdentifier {
-    added_at: number; // eslint-disable-line camelcase
-    address: string;
+export interface IThreepid {
     medium: ThreepidMedium;
-    validated_at: number; // eslint-disable-line camelcase
+    address: string;
+    validated_at: number;
+    added_at: number;
 }
