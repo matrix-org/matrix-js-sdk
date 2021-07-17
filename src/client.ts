@@ -7219,7 +7219,7 @@ export class MatrixClient extends EventEmitter {
     public addPushRule(
         scope: string,
         kind: PushRuleKind,
-        ruleId: RuleId | string,
+        ruleId: Exclude<string, RuleId>,
         body: any,
         callback?: Callback,
     ): Promise<any> { // TODO: Types
@@ -7242,7 +7242,7 @@ export class MatrixClient extends EventEmitter {
     public deletePushRule(
         scope: string,
         kind: PushRuleKind,
-        ruleId: RuleId | string,
+        ruleId: Exclude<string, RuleId>,
         callback?: Callback,
     ): Promise<any> { // TODO: Types
         // NB. Scope not uri encoded because devices need the '/'
