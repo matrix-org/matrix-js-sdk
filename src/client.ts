@@ -144,6 +144,8 @@ import {
 } from "./@types/search";
 import { ISynapseAdminDeactivateResponse, ISynapseAdminWhoisResponse } from "./@types/synapse";
 import { ISpaceSummaryEvent, ISpaceSummaryRoom } from "./@types/spaces";
+import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, RuleId } from "./@types/PushRules";
+import { IThreepid } from "./@types/threepids";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -595,33 +597,11 @@ interface IUserDirectoryResponse {
     limited: boolean;
 }
 
-interface IThreepid {
-    medium: "email" | "msisdn";
-    address: string;
-    validated_at: number;
-    added_at: number;
-}
-
 interface IMyDevice {
     device_id: string;
     display_name?: string;
     last_seen_ip?: string;
     last_seen_ts?: number;
-}
-
-interface IPusher {
-    pushkey: string;
-    kind: string;
-    app_id: string;
-    app_display_name: string;
-    device_display_name: string;
-    profile_tag?: string;
-    lang: string;
-    data: {
-        url?: string;
-        format?: string;
-        brand?: string; // undocumented
-    };
 }
 
 interface IDownloadKeyResult {
@@ -3883,7 +3863,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: to an empty object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async sendReadReceipt(event: MatrixEvent, opts: { hidden?: boolean }, callback?: Callback): Promise<{}> {
+    public async sendReadReceipt(event: MatrixEvent, opts?: { hidden?: boolean }, callback?: Callback): Promise<{}> {
         if (typeof (opts) === 'function') {
             callback = opts as any as Callback; // legacy
             opts = {};
@@ -5220,20 +5200,20 @@ export class MatrixClient extends EventEmitter {
         if (!mute) {
             // Remove the rule only if it is a muting rule
             if (hasDontNotifyRule) {
-                deferred = this.deletePushRule(scope, "room", roomPushRule.rule_id);
+                deferred = this.deletePushRule(scope, PushRuleKind.RoomSpecific, roomPushRule.rule_id);
             }
         } else {
             if (!roomPushRule) {
-                deferred = this.addPushRule(scope, "room", roomId, {
+                deferred = this.addPushRule(scope, PushRuleKind.RoomSpecific, roomId, {
                     actions: ["dont_notify"],
                 });
             } else if (!hasDontNotifyRule) {
                 // Remove the existing one before setting the mute push rule
                 // This is a workaround to SYN-590 (Push rule update fails)
                 deferred = utils.defer();
-                this.deletePushRule(scope, "room", roomPushRule.rule_id)
+                this.deletePushRule(scope, PushRuleKind.RoomSpecific, roomPushRule.rule_id)
                     .then(() => {
-                        this.addPushRule(scope, "room", roomId, {
+                        this.addPushRule(scope, PushRuleKind.RoomSpecific, roomId, {
                             actions: ["dont_notify"],
                         }).then(() => {
                             deferred.resolve();
@@ -6974,7 +6954,7 @@ export class MatrixClient extends EventEmitter {
 
     /**
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves to a list of the user's threepids.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public getThreePids(callback?: Callback): Promise<{ threepids: IThreepid[] }> {
@@ -7205,22 +7185,23 @@ export class MatrixClient extends EventEmitter {
     /**
      * Adds a new pusher or updates an existing pusher
      *
-     * @param {Object} pusher Object representing a pusher
+     * @param {IPusherRequest} pusher Object representing a pusher
      * @param {module:client.callback} callback Optional.
      * @return {Promise} Resolves: Empty json object on success
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setPusher(pusher: IPusher, callback?: Callback): Promise<{}> {
+    public setPusher(pusher: IPusherRequest, callback?: Callback): Promise<{}> {
         const path = "/pushers/set";
         return this.http.authedRequest(callback, "POST", path, null, pusher);
     }
 
     /**
+     * Get the push rules for the account from the server.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves to the push rules.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getPushRules(callback?: Callback): Promise<any> { // TODO: Types
+    public getPushRules(callback?: Callback): Promise<IPushRules> {
         return this.http.authedRequest(callback, "GET", "/pushrules/").then(rules => {
             return PushProcessor.rewriteDefaultRules(rules);
         });
@@ -7235,7 +7216,13 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public addPushRule(scope: string, kind: string, ruleId: string, body: any, callback?: Callback): Promise<{}> {
+    public addPushRule(
+        scope: string,
+        kind: PushRuleKind,
+        ruleId: Exclude<string, RuleId>,
+        body: any,
+        callback?: Callback,
+    ): Promise<any> { // TODO: Types
         // NB. Scope not uri encoded because devices need the '/'
         const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
             $kind: kind,
@@ -7252,7 +7239,12 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public deletePushRule(scope: string, kind: string, ruleId: string, callback?: Callback): Promise<{}> {
+    public deletePushRule(
+        scope: string,
+        kind: PushRuleKind,
+        ruleId: Exclude<string, RuleId>,
+        callback?: Callback,
+    ): Promise<any> { // TODO: Types
         // NB. Scope not uri encoded because devices need the '/'
         const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
             $kind: kind,
@@ -7273,8 +7265,8 @@ export class MatrixClient extends EventEmitter {
      */
     public setPushRuleEnabled(
         scope: string,
-        kind: string,
-        ruleId: string,
+        kind: PushRuleKind,
+        ruleId: RuleId | string,
         enabled: boolean,
         callback?: Callback,
     ): Promise<{}> {
@@ -7299,9 +7291,9 @@ export class MatrixClient extends EventEmitter {
      */
     public setPushRuleActions(
         scope: string,
-        kind: string,
-        ruleId: string,
-        actions: string[],
+        kind: PushRuleKind,
+        ruleId: RuleId | string,
+        actions: PushRuleAction[],
         callback?: Callback,
     ): Promise<{}> {
         const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId/actions", {
