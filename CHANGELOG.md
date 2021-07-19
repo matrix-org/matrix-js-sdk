@@ -1,3 +1,44 @@
+Changes in [12.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v12.1.0) (2021-07-19)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v12.1.0-rc.1...v12.1.0)
+
+ * No changes from rc.1
+
+Changes in [12.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v12.1.0-rc.1) (2021-07-14)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v12.0.1...v12.1.0-rc.1)
+
+ * Add VS Code to gitignore
+   [\#1783](https://github.com/matrix-org/matrix-js-sdk/pull/1783)
+ * Make `Crypto::inRoomVerificationRequests` public
+   [\#1781](https://github.com/matrix-org/matrix-js-sdk/pull/1781)
+ * Call `setEventMetadata()` for filtered `timelineSet`s
+   [\#1765](https://github.com/matrix-org/matrix-js-sdk/pull/1765)
+ * Symmetric backup
+   [\#1775](https://github.com/matrix-org/matrix-js-sdk/pull/1775)
+ * Attempt to fix megolm key not being in SSSS
+   [\#1776](https://github.com/matrix-org/matrix-js-sdk/pull/1776)
+ * Convert SecretStorage to TypeScript
+   [\#1774](https://github.com/matrix-org/matrix-js-sdk/pull/1774)
+ * Strip hash from urls being previewed to de-duplicate
+   [\#1721](https://github.com/matrix-org/matrix-js-sdk/pull/1721)
+ * Do not generate a lockfile when running in CI
+   [\#1773](https://github.com/matrix-org/matrix-js-sdk/pull/1773)
+ * Tidy up secret requesting code
+   [\#1766](https://github.com/matrix-org/matrix-js-sdk/pull/1766)
+ * Convert Sync and SyncAccumulator to Typescript
+   [\#1763](https://github.com/matrix-org/matrix-js-sdk/pull/1763)
+ * Convert EventTimeline, EventTimelineSet and TimelineWindow to TS
+   [\#1762](https://github.com/matrix-org/matrix-js-sdk/pull/1762)
+ * Comply with new member-delimiter-style rule
+   [\#1764](https://github.com/matrix-org/matrix-js-sdk/pull/1764)
+ * Do not honor string power levels
+   [\#1754](https://github.com/matrix-org/matrix-js-sdk/pull/1754)
+ * Typescriptify some crypto stuffs
+   [\#1508](https://github.com/matrix-org/matrix-js-sdk/pull/1508)
+ * Make filterId read/write and optional
+   [\#1760](https://github.com/matrix-org/matrix-js-sdk/pull/1760)
+
 Changes in [12.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v12.0.1) (2021-07-05)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v12.0.1-rc.1...v12.0.1)
