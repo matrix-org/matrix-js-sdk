@@ -4426,7 +4426,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: to nothing
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public _unstable_setStatusMessage(newMessage: string): Promise<void> { // eslint-disable-line camelcase
+    public _unstable_setStatusMessage(newMessage: string): Promise<void> { // eslint-disable-line
         const type = "im.vector.user_status";
         return Promise.all(this.getRooms().map(async (room) => {
             const isJoined = room.getMyMembership() === "join";
@@ -5732,7 +5732,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise<string[]>} Resolves to a set of rooms
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async _unstable_getSharedRooms(userId: string): Promise<string[]> { // eslint-disable-line camelcase
+    public async _unstable_getSharedRooms(userId: string): Promise<string[]> { // eslint-disable-line
         if (!(await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666"))) {
             throw Error('Server does not support shared_rooms API');
         }

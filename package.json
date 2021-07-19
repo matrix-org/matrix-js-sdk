@@ -16,6 +16,7 @@
     "gendoc": "jsdoc -c jsdoc.json -P package.json",
     "lint": "yarn lint:types && yarn lint:js",
     "lint:js": "eslint --max-warnings 57 src spec",
+    "lint:js-fix": "eslint --fix src spec",
     "lint:types": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
