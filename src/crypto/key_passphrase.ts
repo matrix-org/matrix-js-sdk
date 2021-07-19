@@ -22,8 +22,8 @@ const DEFAULT_BITSIZE = 256;
 
 /* eslint-disable camelcase */
 interface IAuthData {
-    private_key_salt: string;
-    private_key_iterations: number;
+    private_key_salt?: string;
+    private_key_iterations?: number;
     private_key_bits?: number;
 }
 /* eslint-enable camelcase */
@@ -31,7 +31,7 @@ interface IAuthData {
 interface IKey {
     key: Uint8Array;
     salt: string;
-    iterations: number
+    iterations: number;
 }
 
 export async function keyFromAuthData(authData: IAuthData, password: string): Promise<Uint8Array> {

@@ -18,15 +18,26 @@ import { EventType } from "../@types/event";
 import { Group } from "../models/group";
 import { Room } from "../models/room";
 import { User } from "../models/user";
-import { MatrixEvent } from "../models/event";
+import { IEvent, MatrixEvent } from "../models/event";
 import { Filter } from "../filter";
 import { RoomSummary } from "../models/room-summary";
+import { IMinimalEvent, IGroups, IRooms, ISyncResponse } from "../sync-accumulator";
+import { IStartClientOpts } from "../client";
+
+export interface ISavedSync {
+    nextBatch: string;
+    roomsData: IRooms;
+    groupsData: IGroups;
+    accountData: IMinimalEvent[];
+}
 
 /**
  * Construct a stub store. This does no-ops on most store methods.
  * @constructor
  */
 export interface IStore {
+    readonly accountData: Record<string, MatrixEvent>; // type : content
+
     /** @return {Promise<bool>} whether or not the database was newly created in this session. */
     isNewlyCreated(): Promise<boolean>;
 
@@ -174,7 +185,7 @@ export interface IStore {
      * @param {Object} syncData The sync data
      * @return {Promise} An immediately resolved promise.
      */
-    setSyncData(syncData: object): Promise<void>;
+    setSyncData(syncData: ISyncResponse): Promise<void>;
 
     /**
      * We never want to save because we have nothing to save to.
@@ -186,7 +197,7 @@ export interface IStore {
     /**
      * Save does nothing as there is no backing data store.
      */
-    save(force: boolean): void;
+    save(force?: boolean): void;
 
     /**
      * Startup does nothing.
@@ -199,7 +210,7 @@ export interface IStore {
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
-    getSavedSync(): Promise<object>;
+    getSavedSync(): Promise<ISavedSync>;
 
     /**
      * @return {Promise} If there is a saved sync, the nextBatch token
@@ -214,13 +225,13 @@ export interface IStore {
      */
     deleteAllData(): Promise<void>;
 
-    getOutOfBandMembers(roomId: string): Promise<MatrixEvent[] | null>;
+    getOutOfBandMembers(roomId: string): Promise<IEvent[] | null>;
 
-    setOutOfBandMembers(roomId: string, membershipEvents: MatrixEvent[]): Promise<void>;
+    setOutOfBandMembers(roomId: string, membershipEvents: IEvent[]): Promise<void>;
 
     clearOutOfBandMembers(roomId: string): Promise<void>;
 
-    getClientOptions(): Promise<object>;
+    getClientOptions(): Promise<IStartClientOpts>;
 
-    storeClientOptions(options: object): Promise<void>;
+    storeClientOptions(options: IStartClientOpts): Promise<void>;
 }

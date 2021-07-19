@@ -29,6 +29,7 @@ import { RoomState } from "./room-state";
 export class RoomMember extends EventEmitter {
     private _isOutOfBand = false;
     private _modified: number;
+    public _requestedProfileInfo: boolean; // used by sync.ts
 
     // XXX these should be read-only
     public typing = false;
@@ -163,7 +164,7 @@ export class RoomMember extends EventEmitter {
         const oldPowerLevel = this.powerLevel;
         const oldPowerLevelNorm = this.powerLevelNorm;
 
-        if (users[this.userId] !== undefined) {
+        if (users[this.userId] !== undefined && Number.isInteger(users[this.userId])) {
             this.powerLevel = users[this.userId];
         } else if (evContent.users_default !== undefined) {
             this.powerLevel = evContent.users_default;

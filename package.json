@@ -1,6 +1,6 @@
 {
   "name": "matrix-js-sdk",
-  "version": "12.0.1",
+  "version": "12.1.0",
   "description": "Matrix Client-Server SDK for Javascript",
   "scripts": {
     "prepublishOnly": "yarn build",
@@ -28,7 +28,7 @@
   "keywords": [
     "matrix-org"
   ],
-  "main": "./lib/index.js",
+  "main": "./src/index.ts",
   "browser": "./lib/browser-index.js",
   "matrix_src_main": "./src/index.ts",
   "matrix_src_browser": "./src/browser-index.js",
@@ -74,6 +74,7 @@
     "@babel/preset-typescript": "^7.12.7",
     "@babel/register": "^7.12.10",
     "@matrix-org/olm": "https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.3.tgz",
+    "@types/bs58": "^4.0.1",
     "@types/jest": "^26.0.20",
     "@types/node": "12",
     "@types/request": "^2.48.5",
@@ -109,6 +110,5 @@
     "coverageReporters": [
       "text"
     ]
-  },
-  "typings": "./lib/index.d.ts"
+  }
 }

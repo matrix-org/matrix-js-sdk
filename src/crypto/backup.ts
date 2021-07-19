@@ -29,38 +29,45 @@ import { keyFromPassphrase } from './key_passphrase';
 import { sleep } from "../utils";
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { encodeRecoveryKey } from './recoverykey';
+import { encryptAES, decryptAES, calculateKeyCheck } from './aes';
+import { getCrypto } from '../utils';
+import { ICurve25519AuthData, IAes256AuthData, IKeyBackupInfo, IKeyBackupSession } from "./keybackup";
+import { UnstableValue } from "../NamespacedValue";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 
-type AuthData = Record<string, any>;
-
-type BackupInfo = {
-    algorithm: string,
-    auth_data: AuthData, // eslint-disable-line camelcase
-    [properties: string]: any,
-};
+type AuthData = IKeyBackupInfo["auth_data"];
 
 type SigInfo = {
-    deviceId: string,
-    valid?: boolean | null, // true: valid, false: invalid, null: cannot attempt validation
-    device?: DeviceInfo | null,
-    crossSigningId?: boolean,
-    deviceTrust?: DeviceTrustLevel,
+    deviceId: string;
+    valid?: boolean | null; // true: valid, false: invalid, null: cannot attempt validation
+    device?: DeviceInfo | null;
+    crossSigningId?: boolean;
+    deviceTrust?: DeviceTrustLevel;
 };
 
 export type TrustInfo = {
-    usable: boolean, // is the backup trusted, true iff there is a sig that is valid & from a trusted device
-    sigs: SigInfo[],
+    usable: boolean; // is the backup trusted, true iff there is a sig that is valid & from a trusted device
+    sigs: SigInfo[];
 };
 
 export interface IKeyBackupCheck {
-    backupInfo: BackupInfo;
+    backupInfo: IKeyBackupInfo;
     trustInfo: TrustInfo;
 }
 
+/* eslint-disable camelcase */
+export interface IPreparedKeyBackupVersion {
+    algorithm: string;
+    auth_data: AuthData;
+    recovery_key: string;
+    privateKey: Uint8Array;
+}
+/* eslint-enable camelcase */
+
 /** A function used to get the secret key for a backup.
  */
-type GetKey = () => Promise<Uint8Array>;
+type GetKey = () => Promise<ArrayLike<number>>;
 
 interface BackupAlgorithmClass {
     algorithmName: string;
@@ -71,14 +78,27 @@ interface BackupAlgorithmClass {
     prepare(
         key: string | Uint8Array | null,
     ): Promise<[Uint8Array, AuthData]>;
+
+    checkBackupVersion(info: IKeyBackupInfo): void;
 }
 
 interface BackupAlgorithm {
+    untrusted: boolean;
     encryptSession(data: Record<string, any>): Promise<any>;
-    decryptSessions(ciphertexts: Record<string, any>): Promise<Record<string, any>[]>;
+    decryptSessions(ciphertexts: Record<string, IKeyBackupSession>): Promise<Record<string, any>[]>;
     authData: AuthData;
-    keyMatches(key: Uint8Array): Promise<boolean>;
+    keyMatches(key: ArrayLike<number>): Promise<boolean>;
     free(): void;
+}
+
+export interface IKeyBackup {
+    rooms: {
+        [roomId: string]: {
+            sessions: {
+                [sessionId: string]: IKeyBackupSession;
+            };
+        };
+    };
 }
 
 /**
@@ -86,7 +106,7 @@ interface BackupAlgorithm {
  */
 export class BackupManager {
     private algorithm: BackupAlgorithm | undefined;
-    public backupInfo: BackupInfo | undefined; // The info dict from /room_keys/version
+    public backupInfo: IKeyBackupInfo | undefined; // The info dict from /room_keys/version
     public checkedForBackup: boolean; // Have we checked the server for a backup we can use?
     private sendingBackups: boolean; // Are we currently sending backups?
     constructor(private readonly baseApis: MatrixClient, public readonly getKey: GetKey) {
@@ -98,7 +118,25 @@ export class BackupManager {
         return this.backupInfo && this.backupInfo.version;
     }
 
-    public static async makeAlgorithm(info: BackupInfo, getKey: GetKey): Promise<BackupAlgorithm> {
+    /**
+     * Performs a quick check to ensure that the backup info looks sane.
+     *
+     * Throws an error if a problem is detected.
+     *
+     * @param {IKeyBackupInfo} info the key backup info
+     */
+    public static checkBackupVersion(info: IKeyBackupInfo): void {
+        const Algorithm = algorithmsByName[info.algorithm];
+        if (!Algorithm) {
+            throw new Error("Unknown backup algorithm: " + info.algorithm);
+        }
+        if (!(typeof info.auth_data === "object")) {
+            throw new Error("Invalid backup data returned");
+        }
+        return Algorithm.checkBackupVersion(info);
+    }
+
+    public static async makeAlgorithm(info: IKeyBackupInfo, getKey: GetKey): Promise<BackupAlgorithm> {
         const Algorithm = algorithmsByName[info.algorithm];
         if (!Algorithm) {
             throw new Error("Unknown backup algorithm");
@@ -106,7 +144,7 @@ export class BackupManager {
         return await Algorithm.init(info.auth_data, getKey);
     }
 
-    public async enableKeyBackup(info: BackupInfo): Promise<void> {
+    public async enableKeyBackup(info: IKeyBackupInfo): Promise<void> {
         this.backupInfo = info;
         if (this.algorithm) {
             this.algorithm.free();
@@ -145,7 +183,8 @@ export class BackupManager {
     public async prepareKeyBackupVersion(
         key?: string | Uint8Array | null,
         algorithm?: string | undefined,
-    ): Promise<BackupInfo> {
+        // eslint-disable-next-line camelcase
+    ): Promise<IPreparedKeyBackupVersion> {
         const Algorithm = algorithm ? algorithmsByName[algorithm] : DefaultAlgorithm;
         if (!Algorithm) {
             throw new Error("Unknown backup algorithm");
@@ -161,7 +200,7 @@ export class BackupManager {
         };
     }
 
-    public async createKeyBackupVersion(info: BackupInfo): Promise<void> {
+    public async createKeyBackupVersion(info: IKeyBackupInfo): Promise<void> {
         this.algorithm = await BackupManager.makeAlgorithm(info, this.getKey);
     }
 
@@ -171,14 +210,14 @@ export class BackupManager {
      * one of the user's verified devices, start backing up
      * to it.
      */
-    public async checkAndStart(): Promise<{backupInfo: BackupInfo, trustInfo: TrustInfo}> {
+    public async checkAndStart(): Promise<IKeyBackupCheck> {
         logger.log("Checking key backup status...");
         if (this.baseApis.isGuest()) {
             logger.log("Skipping key backup check since user is guest");
             this.checkedForBackup = true;
             return null;
         }
-        let backupInfo: BackupInfo;
+        let backupInfo: IKeyBackupInfo;
         try {
             backupInfo = await this.baseApis.getKeyBackupVersion();
         } catch (e) {
@@ -245,7 +284,7 @@ export class BackupManager {
     /**
      * Check if the given backup info is trusted.
      *
-     * @param {object} backupInfo key backup info dict from /room_keys/version
+     * @param {IKeyBackupInfo} backupInfo key backup info dict from /room_keys/version
      * @return {object} {
      *     usable: [bool], // is the backup trusted, true iff there is a sig that is valid & from a trusted device
      *     sigs: [
@@ -255,7 +294,7 @@ export class BackupManager {
      *     ]
      * }
      */
-    public async isKeyBackupTrusted(backupInfo: BackupInfo): Promise<TrustInfo> {
+    public async isKeyBackupTrusted(backupInfo: IKeyBackupInfo): Promise<TrustInfo> {
         const ret = {
             usable: false,
             trusted_locally: false,
@@ -266,7 +305,6 @@ export class BackupManager {
             !backupInfo ||
                 !backupInfo.algorithm ||
                 !backupInfo.auth_data ||
-                !backupInfo.auth_data.public_key ||
                 !backupInfo.auth_data.signatures
         ) {
             logger.info("Key backup is absent or missing required data");
@@ -275,7 +313,7 @@ export class BackupManager {
 
         const trustedPubkey = this.baseApis.crypto.sessionStore.getLocalTrustedBackupPubKey();
 
-        if (backupInfo.auth_data.public_key === trustedPubkey) {
+        if ("public_key" in backupInfo.auth_data && backupInfo.auth_data.public_key === trustedPubkey) {
             logger.info("Backup public key " + trustedPubkey + " is trusted locally");
             ret.trusted_locally = true;
         }
@@ -436,11 +474,11 @@ export class BackupManager {
         let remaining = await this.baseApis.crypto.cryptoStore.countSessionsNeedingBackup();
         this.baseApis.crypto.emit("crypto.keyBackupSessionsRemaining", remaining);
 
-        const data = {};
+        const rooms: IKeyBackup["rooms"] = {};
         for (const session of sessions) {
             const roomId = session.sessionData.room_id;
-            if (data[roomId] === undefined) {
-                data[roomId] = { sessions: {} };
+            if (rooms[roomId] === undefined) {
+                rooms[roomId] = { sessions: {} };
             }
 
             const sessionData = await this.baseApis.crypto.olmDevice.exportInboundGroupSession(
@@ -459,7 +497,7 @@ export class BackupManager {
             );
             const verified = this.baseApis.crypto.checkDeviceInfoTrust(userId, device).isVerified();
 
-            data[roomId]['sessions'][session.sessionId] = {
+            rooms[roomId]['sessions'][session.sessionId] = {
                 first_message_index: sessionData.first_known_index,
                 forwarded_count: forwardedCount,
                 is_verified: verified,
@@ -467,10 +505,7 @@ export class BackupManager {
             };
         }
 
-        await this.baseApis.sendKeyBackup(
-            undefined, undefined, this.backupInfo.version,
-            { rooms: data },
-        );
+        await this.baseApis.sendKeyBackup(undefined, undefined, this.backupInfo.version, { rooms });
 
         await this.baseApis.crypto.cryptoStore.unmarkSessionsNeedingBackup(sessions);
         remaining = await this.baseApis.crypto.cryptoStore.countSessionsNeedingBackup();
@@ -547,7 +582,7 @@ export class Curve25519 implements BackupAlgorithm {
     public static algorithmName = "m.megolm_backup.v1.curve25519-aes-sha2";
 
     constructor(
-        public authData: AuthData,
+        public authData: ICurve25519AuthData,
         private publicKey: any, // FIXME: PkEncryption
         private getKey: () => Promise<Uint8Array>,
     ) {}
@@ -556,12 +591,12 @@ export class Curve25519 implements BackupAlgorithm {
         authData: AuthData,
         getKey: () => Promise<Uint8Array>,
     ): Promise<Curve25519> {
-        if (!authData || !authData.public_key) {
+        if (!authData || !("public_key" in authData)) {
             throw new Error("auth_data missing required information");
         }
         const publicKey = new global.Olm.PkEncryption();
         publicKey.set_recipient_key(authData.public_key);
-        return new Curve25519(authData, publicKey, getKey);
+        return new Curve25519(authData as ICurve25519AuthData, publicKey, getKey);
     }
 
     public static async prepare(
@@ -569,7 +604,7 @@ export class Curve25519 implements BackupAlgorithm {
     ): Promise<[Uint8Array, AuthData]> {
         const decryption = new global.Olm.PkDecryption();
         try {
-            const authData: AuthData = {};
+            const authData: Partial<ICurve25519AuthData> = {};
             if (!key) {
                 authData.public_key = decryption.generate_key();
             } else if (key instanceof Uint8Array) {
@@ -585,12 +620,20 @@ export class Curve25519 implements BackupAlgorithm {
 
             return [
                 decryption.get_private_key(),
-                authData,
+                authData as AuthData,
             ];
         } finally {
             decryption.free();
         }
     }
+
+    public static checkBackupVersion(info: IKeyBackupInfo): void {
+        if (!("public_key" in info.auth_data)) {
+            throw new Error("Invalid backup data returned");
+        }
+    }
+
+    public get untrusted() { return true; }
 
     public async encryptSession(data: Record<string, any>): Promise<any> {
         const plainText: Record<string, any> = Object.assign({}, data);
@@ -600,7 +643,9 @@ export class Curve25519 implements BackupAlgorithm {
         return this.publicKey.encrypt(JSON.stringify(plainText));
     }
 
-    public async decryptSessions(sessions: Record<string, Record<string, any>>): Promise<Record<string, any>[]> {
+    public async decryptSessions(
+        sessions: Record<string, IKeyBackupSession>,
+    ): Promise<Record<string, any>[]> {
         const privKey = await this.getKey();
         const decryption = new global.Olm.PkDecryption();
         try {
@@ -649,8 +694,120 @@ export class Curve25519 implements BackupAlgorithm {
     }
 }
 
+function randomBytes(size: number): Uint8Array {
+    const crypto: {randomBytes: (n: number) => Uint8Array} | undefined = getCrypto() as any;
+    if (crypto) {
+        // nodejs version
+        return crypto.randomBytes(size);
+    }
+    if (window?.crypto) {
+        // browser version
+        const buf = new Uint8Array(size);
+        window.crypto.getRandomValues(buf);
+        return buf;
+    }
+    throw new Error("No usable crypto implementation");
+}
+
+const UNSTABLE_MSC3270_NAME = new UnstableValue(null, "org.matrix.msc3270.v1.aes-hmac-sha2");
+
+export class Aes256 implements BackupAlgorithm {
+    public static algorithmName = UNSTABLE_MSC3270_NAME.name;
+
+    constructor(
+        public readonly authData: IAes256AuthData,
+        private readonly key: Uint8Array,
+    ) {}
+
+    public static async init(
+        authData: IAes256AuthData,
+        getKey: () => Promise<Uint8Array>,
+    ): Promise<Aes256> {
+        if (!authData) {
+            throw new Error("auth_data missing");
+        }
+        const key = await getKey();
+        if (authData.mac) {
+            const { mac } = await calculateKeyCheck(key, authData.iv);
+            if (authData.mac.replace(/=+$/g, '') !== mac.replace(/=+/g, '')) {
+                throw new Error("Key does not match");
+            }
+        }
+        return new Aes256(authData, key);
+    }
+
+    public static async prepare(
+        key: string | Uint8Array | null,
+    ): Promise<[Uint8Array, AuthData]> {
+        let outKey: Uint8Array;
+        const authData: Partial<IAes256AuthData> = {};
+        if (!key) {
+            outKey = randomBytes(32);
+        } else if (key instanceof Uint8Array) {
+            outKey = new Uint8Array(key);
+        } else {
+            const derivation = await keyFromPassphrase(key);
+            authData.private_key_salt = derivation.salt;
+            authData.private_key_iterations = derivation.iterations;
+            outKey = derivation.key;
+        }
+
+        const { iv, mac } = await calculateKeyCheck(outKey);
+        authData.iv = iv;
+        authData.mac = mac;
+
+        return [outKey, authData as AuthData];
+    }
+
+    public static checkBackupVersion(info: IKeyBackupInfo): void {
+        if (!("iv" in info.auth_data && "mac" in info.auth_data)) {
+            throw new Error("Invalid backup data returned");
+        }
+    }
+
+    public get untrusted() { return false; }
+
+    async encryptSession(data: Record<string, any>): Promise<any> {
+        const plainText: Record<string, any> = Object.assign({}, data);
+        delete plainText.session_id;
+        delete plainText.room_id;
+        delete plainText.first_known_index;
+        return await encryptAES(JSON.stringify(plainText), this.key, data.session_id);
+    }
+
+    async decryptSessions(sessions: Record<string, IKeyBackupSession>): Promise<Record<string, any>[]> {
+        const keys = [];
+
+        for (const [sessionId, sessionData] of Object.entries(sessions)) {
+            try {
+                const decrypted = JSON.parse(await decryptAES(sessionData.session_data, this.key, sessionId));
+                decrypted.session_id = sessionId;
+                keys.push(decrypted);
+            } catch (e) {
+                logger.log("Failed to decrypt megolm session from backup", e, sessionData);
+            }
+        }
+        return keys;
+    }
+
+    async keyMatches(key: Uint8Array): Promise<boolean> {
+        if (this.authData.mac) {
+            const { mac } = await calculateKeyCheck(key, this.authData.iv);
+            return this.authData.mac.replace(/=+$/g, '') === mac.replace(/=+/g, '');
+        } else {
+            // if we have no information, we have to assume the key is right
+            return true;
+        }
+    }
+
+    public free(): void {
+        this.key.fill(0);
+    }
+}
+
 export const algorithmsByName: Record<string, BackupAlgorithmClass> = {
     [Curve25519.algorithmName]: Curve25519,
+    [Aes256.algorithmName]: Aes256,
 };
 
 export const DefaultAlgorithm: BackupAlgorithmClass = Curve25519;

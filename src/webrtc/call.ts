@@ -56,22 +56,22 @@ import { CallFeed } from './callFeed';
  */
 
 interface CallOpts {
-    roomId?: string,
-    client?: any, // Fix when client is TSified
-    forceTURN?: boolean,
-    turnServers?: Array<TurnServer>,
+    roomId?: string;
+    client?: any; // Fix when client is TSified
+    forceTURN?: boolean;
+    turnServers?: Array<TurnServer>;
 }
 
 interface TurnServer {
-    urls: Array<string>,
-    username?: string,
-    password?: string,
-    ttl?: number,
+    urls: Array<string>;
+    username?: string;
+    password?: string;
+    ttl?: number;
 }
 
 interface AssertedIdentity {
-    id: string,
-    displayName: string,
+    id: string;
+    displayName: string;
 }
 
 export enum CallState {
@@ -288,7 +288,7 @@ export class MatrixCall extends EventEmitter {
     // yet, null if we have but they didn't send a party ID.
     private opponentPartyId: string;
     private opponentCaps: CallCapabilities;
-    private inviteTimeout: NodeJS.Timeout; // in the browser it's 'number'
+    private inviteTimeout: number;
 
     // The logic of when & if a call is on hold is nontrivial and explained in is*OnHold
     // This flag represents whether we want the other party to be on hold

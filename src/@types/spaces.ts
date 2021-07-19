@@ -14,12 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export interface ISignatures {
-    [entity: string]: {
-        [keyId: string]: string;
-    };
+import { IPublicRoomsChunkRoom } from "../client";
+
+// Types relating to Rooms of type `m.space` and related APIs
+
+/* eslint-disable camelcase */
+export interface ISpaceSummaryRoom extends IPublicRoomsChunkRoom {
+    num_refs: number;
+    room_type: string;
 }
 
-export interface ISigned {
-    signatures?: ISignatures;
+export interface ISpaceSummaryEvent {
+    room_id: string;
+    event_id: string;
+    origin_server_ts: number;
+    type: string;
+    state_key: string;
+    content: {
+        order?: string;
+        suggested?: boolean;
+        auto_join?: boolean;
+        via?: string[];
+    };
 }
+/* eslint-enable camelcase */

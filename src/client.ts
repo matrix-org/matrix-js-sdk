@@ -20,22 +20,22 @@ limitations under the License.
  */
 
 import { EventEmitter } from "events";
-import { SyncApi } from "./sync";
-import { EventStatus, IDecryptOptions, MatrixEvent } from "./models/event";
+import { ISyncStateData, SyncApi } from "./sync";
+import { EventStatus, IContent, IDecryptOptions, IEvent, MatrixEvent } from "./models/event";
 import { StubStore } from "./store/stub";
 import { createNewMatrixCall, MatrixCall } from "./webrtc/call";
-import { Filter } from "./filter";
+import { Filter, IFilterDefinition } from "./filter";
 import { CallEventHandler } from './webrtc/callEventHandler';
 import * as utils from './utils';
 import { sleep } from './utils';
 import { Group } from "./models/group";
-import { EventTimeline } from "./models/event-timeline";
+import { Direction, EventTimeline } from "./models/event-timeline";
 import { PushAction, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery } from "./autodiscovery";
 import * as olmlib from "./crypto/olmlib";
 import { decodeBase64, encodeBase64 } from "./crypto/olmlib";
 import { ReEmitter } from './ReEmitter';
-import { RoomList } from './crypto/RoomList';
+import { IRoomEncryption, RoomList } from './crypto/RoomList';
 import { logger } from './logger';
 import { SERVICE_TYPES } from './service-types';
 import {
@@ -47,35 +47,39 @@ import {
     PREFIX_UNSTABLE,
     retryNetworkOperation,
 } from "./http-api";
-import { Crypto, fixBackupKey, IBootstrapCrossSigningOpts, isCryptoAvailable } from './crypto';
+import {
+    Crypto,
+    fixBackupKey,
+    IBootstrapCrossSigningOpts,
+    ICheckOwnCrossSigningTrustOpts,
+    IMegolmSessionData,
+    isCryptoAvailable,
+    VerificationMethod,
+} from './crypto';
 import { DeviceInfo, IDevice } from "./crypto/deviceinfo";
 import { decodeRecoveryKey } from './crypto/recoverykey';
 import { keyFromAuthData } from './crypto/key_passphrase';
 import { User } from "./models/user";
 import { getHttpUriForMxc } from "./content-repo";
 import { SearchResult } from "./models/search-result";
-import { DEHYDRATION_ALGORITHM, IDehydratedDevice, IDehydratedDeviceKeyInfo } from "./crypto/dehydration";
 import {
+    DEHYDRATION_ALGORITHM,
+    IDehydratedDevice,
+    IDehydratedDeviceKeyInfo,
+    IDeviceKeys,
+    IOneTimeKey,
+} from "./crypto/dehydration";
+import {
+    IKeyBackupInfo,
     IKeyBackupPrepareOpts,
     IKeyBackupRestoreOpts,
     IKeyBackupRestoreResult,
-    IKeyBackupVersion,
+    IKeyBackupSession,
 } from "./crypto/keybackup";
 import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
 import type Request from "request";
 import { MatrixScheduler } from "./scheduler";
-import { ICryptoCallbacks, ISecretStorageKeyInfo, NotificationCountType } from "./matrix";
-import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store";
-import { LocalStorageCryptoStore } from "./crypto/store/localStorage-crypto-store";
-import { IndexedDBCryptoStore } from "./crypto/store/indexeddb-crypto-store";
-import { MemoryStore } from "./store/memory";
-import { LocalIndexedDBStoreBackend } from "./store/indexeddb-local-backend";
-import { RemoteIndexedDBStoreBackend } from "./store/indexeddb-remote-backend";
-import { SyncState } from "./sync.api";
-import { EventTimelineSet } from "./models/event-timeline-set";
-import { VerificationRequest } from "./crypto/verification/request/VerificationRequest";
-import { Base as Verification } from "./crypto/verification/Base";
-import * as ContentHelpers from "./content-helpers";
+import { ICryptoCallbacks, IMinimalEvent, IRoomEvent, IStateEvent, NotificationCountType } from "./matrix";
 import {
     CrossSigningKey,
     IAddSecretStorageKeyOpts,
@@ -83,11 +87,21 @@ import {
     IEncryptedEventInfo,
     IImportRoomKeysOpts,
     IRecoveryKey,
-    ISecretStorageKey,
+    ISecretStorageKeyInfo,
 } from "./crypto/api";
-import { CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from "./crypto/CrossSigning";
+import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store";
+import { LocalStorageCryptoStore } from "./crypto/store/localStorage-crypto-store";
+import { IndexedDBCryptoStore } from "./crypto/store/indexeddb-crypto-store";
+import { SyncState } from "./sync.api";
+import { EventTimelineSet } from "./models/event-timeline-set";
+import { VerificationRequest } from "./crypto/verification/request/VerificationRequest";
+import { Base as Verification } from "./crypto/verification/Base";
+import * as ContentHelpers from "./content-helpers";
+import { CrossSigningInfo, DeviceTrustLevel, ICacheCallbacks, UserTrustLevel } from "./crypto/CrossSigning";
 import { Room } from "./models/room";
 import {
+    IAddThreePidOnlyBody,
+    IBindThreePidBody,
     ICreateRoomOpts,
     IEventSearchOpts,
     IGuestAccessOpts,
@@ -102,22 +116,38 @@ import {
 } from "./@types/requests";
 import {
     EventType,
+    MsgType,
+    RelationType,
     RoomCreateTypeField,
     RoomType,
     UNSTABLE_MSC3088_ENABLED,
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
 } from "./@types/event";
-import { IImageInfo, Preset } from "./@types/partials";
+import { IAbortablePromise, IdServerUnbindResult, IImageInfo, Preset, Visibility } from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
-import url from "url";
 import { randomString } from "./randomstring";
 import { ReadStream } from "fs";
 import { WebStorageSessionStore } from "./store/session/webstorage";
-import { BackupManager, IKeyBackupCheck, TrustInfo } from "./crypto/backup";
+import { BackupManager, IKeyBackup, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE, MSC3089TreeSpace } from "./models/MSC3089TreeSpace";
+import { ISignatures } from "./@types/signed";
+import { IStore } from "./store";
+import { ISecretRequest } from "./crypto/SecretStorage";
+import {
+    IEventWithRoomId,
+    ISearchRequestBody,
+    ISearchResponse,
+    ISearchResults,
+    IStateEventWithRoomId,
+    SearchOrderBy,
+} from "./@types/search";
+import { ISynapseAdminDeactivateResponse, ISynapseAdminWhoisResponse } from "./@types/synapse";
+import { ISpaceSummaryEvent, ISpaceSummaryRoom } from "./@types/spaces";
+import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, RuleId } from "./@types/PushRules";
+import { IThreepid } from "./@types/threepids";
 
-export type Store = StubStore | MemoryStore | LocalIndexedDBStoreBackend | RemoteIndexedDBStoreBackend;
+export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
 export type CryptoStore = MemoryCryptoStore | LocalStorageCryptoStore | IndexedDBCryptoStore;
 
@@ -131,7 +161,7 @@ const TURN_CHECK_INTERVAL = 10 * 60 * 1000; // poll for turn credentials every 1
 
 interface IOlmDevice {
     pickledAccount: string;
-    sessions: Array<Record<string, any>>;
+    sessions: Array<Record<string, IKeyBackupSession>>;
     pickleKey: string;
 }
 
@@ -260,7 +290,7 @@ export interface ICreateClientOpts {
      */
     unstableClientRelationAggregation?: boolean;
 
-    verificationMethods?: Array<any>;
+    verificationMethods?: Array<VerificationMethod>;
 
     /**
      * Whether relaying calls through a TURN server should be forced. Default false.
@@ -297,6 +327,11 @@ export interface IMatrixClientCreateOpts extends ICreateClientOpts {
     usingExternalCrypto?: boolean;
 }
 
+export enum PendingEventOrdering {
+    Chronological = "chronological",
+    Detached = "detached",
+}
+
 export interface IStartClientOpts {
     /**
      * The event <code>limit=</code> to apply to initial sync. Default: 8.
@@ -319,7 +354,7 @@ export interface IStartClientOpts {
      * pending messages will appear in a separate list, accessbile via {@link module:models/room#getPendingEvents}.
      * Default: "chronological".
      */
-    pendingEventOrdering?: "chronological" | "detached";
+    pendingEventOrdering?: PendingEventOrdering;
 
     /**
      * The number of milliseconds to wait on /sync. Default: 30000 (30 seconds).
@@ -375,6 +410,257 @@ interface ICapabilities {
     "m.room_versions"?: IRoomVersionsCapability;
 }
 
+/* eslint-disable camelcase */
+export interface ICrossSigningKey {
+    keys: { [algorithm: string]: string };
+    signatures?: ISignatures;
+    usage: string[];
+    user_id: string;
+}
+
+enum CrossSigningKeyType {
+    MasterKey = "master_key",
+    SelfSigningKey = "self_signing_key",
+    UserSigningKey = "user_signing_key",
+}
+
+export type CrossSigningKeys = Record<CrossSigningKeyType, ICrossSigningKey>;
+
+export interface ISignedKey {
+    keys: Record<string, string>;
+    signatures: ISignatures;
+    user_id: string;
+    algorithms: string[];
+    device_id: string;
+}
+
+export type KeySignatures = Record<string, Record<string, ICrossSigningKey | ISignedKey>>;
+interface IUploadKeySignaturesResponse {
+    failures: Record<string, Record<string, {
+        errcode: string;
+        error: string;
+    }>>;
+}
+
+export interface IPreviewUrlResponse {
+    [key: string]: string | number;
+    "og:title": string;
+    "og:type": string;
+    "og:url": string;
+    "og:image"?: string;
+    "og:image:type"?: string;
+    "og:image:height"?: number;
+    "og:image:width"?: number;
+    "og:description"?: string;
+    "matrix:image:size"?: number;
+}
+
+interface ITurnServerResponse {
+    uris: string[];
+    username: string;
+    password: string;
+    ttl: number;
+}
+
+interface ITurnServer {
+    urls: string[];
+    username: string;
+    credential: string;
+}
+
+interface IServerVersions {
+    versions: string;
+    unstable_features: Record<string, boolean>;
+}
+
+interface IClientWellKnown {
+    [key: string]: any;
+    "m.homeserver": {
+        base_url: string;
+    };
+    "m.identity_server"?: {
+        base_url: string;
+    };
+}
+
+interface IKeyBackupPath {
+    path: string;
+    queryData?: {
+        version: string;
+    };
+}
+
+interface IMediaConfig {
+    [key: string]: any; // extensible
+    "m.upload.size"?: number;
+}
+
+interface IThirdPartySigned {
+    sender: string;
+    mxid: string;
+    token: string;
+    signatures: ISignatures;
+}
+
+interface IJoinRequestBody {
+    third_party_signed?: IThirdPartySigned;
+}
+
+interface ITagMetadata {
+    [key: string]: any;
+    order: number;
+}
+
+interface IMessagesResponse {
+    start: string;
+    end: string;
+    chunk: IRoomEvent[];
+    state: IStateEvent[];
+}
+
+interface IRequestTokenResponse {
+    sid: string;
+    submit_url?: string;
+}
+
+interface IRequestMsisdnTokenResponse extends IRequestTokenResponse {
+    msisdn: string;
+    success: boolean;
+    intl_fmt: string;
+}
+
+interface IUploadKeysRequest {
+    device_keys?: Required<IDeviceKeys>;
+    one_time_keys?: {
+        [userId: string]: {
+            [deviceId: string]: number;
+        };
+    };
+    "org.matrix.msc2732.fallback_keys"?: Record<string, IOneTimeKey>;
+}
+
+interface IOpenIDToken {
+    access_token: string;
+    token_type: "Bearer" | string;
+    matrix_server_name: string;
+    expires_in: number;
+}
+
+interface IRoomInitialSyncResponse {
+    room_id: string;
+    membership: "invite" | "join" | "leave" | "ban";
+    messages?: {
+        start?: string;
+        end?: string;
+        chunk: IEventWithRoomId[];
+    };
+    state?: IStateEventWithRoomId[];
+    visibility: Visibility;
+    account_data?: IMinimalEvent[];
+    presence: Partial<IEvent>; // legacy and undocumented, api is deprecated so this won't get attention
+}
+
+interface IJoinedMembersResponse {
+    joined: {
+        [userId: string]: {
+            display_name: string;
+            avatar_url: string;
+        };
+    };
+}
+
+export interface IPublicRoomsChunkRoom {
+    room_id: string;
+    name?: string;
+    avatar_url?: string;
+    topic?: string;
+    canonical_alias?: string;
+    aliases?: string[];
+    world_readable: boolean;
+    guest_can_join: boolean;
+    num_joined_members: number;
+}
+
+interface IPublicRoomsResponse {
+    chunk: IPublicRoomsChunkRoom[];
+    next_batch?: string;
+    prev_batch?: string;
+    total_room_count_estimate?: number;
+}
+
+interface IUserDirectoryResponse {
+    results: {
+        user_id: string;
+        display_name?: string;
+        avatar_url?: string;
+    }[];
+    limited: boolean;
+}
+
+interface IMyDevice {
+    device_id: string;
+    display_name?: string;
+    last_seen_ip?: string;
+    last_seen_ts?: number;
+}
+
+interface IDownloadKeyResult {
+    failures: { [serverName: string]: object };
+    device_keys: {
+        [userId: string]: {
+            [deviceId: string]: IDeviceKeys & {
+                unsigned?: {
+                    device_display_name: string;
+                };
+            };
+        };
+    };
+}
+
+interface IClaimOTKsResult {
+    failures: { [serverName: string]: object };
+    one_time_keys: {
+        [userId: string]: {
+            [deviceId: string]: string;
+        };
+    };
+}
+
+export interface IFieldType {
+    regexp: string;
+    placeholder: string;
+}
+
+export interface IInstance {
+    desc: string;
+    icon?: string;
+    fields: object;
+    network_id: string;
+    // XXX: this is undocumented but we rely on it: https://github.com/matrix-org/matrix-doc/issues/3203
+    instance_id: string;
+}
+
+export interface IProtocol {
+    user_fields: string[];
+    location_fields: string[];
+    icon: string;
+    field_types: Record<string, IFieldType>;
+    instances: IInstance[];
+}
+
+interface IThirdPartyLocation {
+    alias: string;
+    protocol: string;
+    fields: object;
+}
+
+interface IThirdPartyUser {
+    userid: string;
+    protocol: string;
+    fields: object;
+}
+/* eslint-enable camelcase */
+
 /**
  * Represents a Matrix Client. Only directly construct this if you want to use
  * custom modules. Normally, {@link createClient} should be used
@@ -393,7 +679,7 @@ export class MatrixClient extends EventEmitter {
     public scheduler: MatrixScheduler;
     public clientRunning = false;
     public timelineSupport = false;
-    public urlPreviewCache: { [key: string]: Promise<any> } = {}; // TODO: Types
+    public urlPreviewCache: { [key: string]: Promise<IPreviewUrlResponse> } = {};
     public unstableClientRelationAggregation = false;
     public identityServer: IIdentityServerProvider;
     public sessionStore: SessionStore; // XXX: Intended private, used in code.
@@ -413,14 +699,14 @@ export class MatrixClient extends EventEmitter {
     protected canSupportVoip = false;
     protected peekSync: SyncApi = null;
     protected isGuestAccount = false;
-    protected ongoingScrollbacks: {[roomId: string]: {promise?: Promise<any>, errorTs?: number}} = {}; // TODO: Types
+    protected ongoingScrollbacks: {[roomId: string]: {promise?: Promise<Room>, errorTs?: number}} = {};
     protected notifTimelineSet: EventTimelineSet = null;
     protected cryptoStore: CryptoStore;
-    protected verificationMethods: string[];
+    protected verificationMethods: VerificationMethod[];
     protected fallbackICEServerAllowed = false;
     protected roomList: RoomList;
     protected syncApi: SyncApi;
-    protected pushRules: any; // TODO: Types
+    public pushRules: any; // TODO: Types
     protected syncLeftRoomsPromise: Promise<Room[]>;
     protected syncedLeftRooms = false;
     protected clientOpts: IStoredClientOpts;
@@ -432,15 +718,15 @@ export class MatrixClient extends EventEmitter {
 
     // Promise to a response of the server's /versions response
     // TODO: This should expire: https://github.com/matrix-org/matrix-js-sdk/issues/1020
-    protected serverVersionsPromise: Promise<any>;
+    protected serverVersionsPromise: Promise<IServerVersions>;
 
     protected cachedCapabilities: {
         capabilities: ICapabilities;
         expiration: number;
     };
-    protected clientWellKnown: any;
-    protected clientWellKnownPromise: Promise<any>;
-    protected turnServers: any[] = []; // TODO: Types
+    protected clientWellKnown: IClientWellKnown;
+    protected clientWellKnownPromise: Promise<IClientWellKnown>;
+    protected turnServers: ITurnServer[] = [];
     protected turnServersExpiry = 0;
     protected checkTurnServersIntervalID: number;
     protected exportedOlmDeviceToImport: IOlmDevice;
@@ -662,7 +948,7 @@ export class MatrixClient extends EventEmitter {
         if (this.canSupportVoip) {
             this.checkTurnServersIntervalID = setInterval(() => {
                 this.checkTurnServers();
-            }, TURN_CHECK_INTERVAL) as any as number; // XXX: Typecast because we know better
+            }, TURN_CHECK_INTERVAL);
             // noinspection ES6MissingAwait
             this.checkTurnServers();
         }
@@ -674,7 +960,7 @@ export class MatrixClient extends EventEmitter {
         }
 
         // shallow-copy the opts dict before modifying and storing it
-        this.clientOpts = <any>Object.assign({}, opts); // XXX: Typecast because we're about to add the missing props
+        this.clientOpts = Object.assign({}, opts) as IStoredClientOpts;
         this.clientOpts.crypto = this.crypto;
         this.clientOpts.canResetEntireTimeline = (roomId) => {
             if (!this.canResetTimelineCallback) {
@@ -686,11 +972,9 @@ export class MatrixClient extends EventEmitter {
         this.syncApi.sync();
 
         if (this.clientOpts.clientWellKnownPollPeriod !== undefined) {
-            this.clientWellKnownIntervalID =
-                // XXX: Typecast on timer ID because we know better
-                setInterval(() => {
-                    this.fetchClientWellKnown();
-                }, 1000 * this.clientOpts.clientWellKnownPollPeriod) as any as number;
+            this.clientWellKnownIntervalID = setInterval(() => {
+                this.fetchClientWellKnown();
+            }, 1000 * this.clientOpts.clientWellKnownPollPeriod);
             this.fetchClientWellKnown();
         }
     }
@@ -1003,7 +1287,7 @@ export class MatrixClient extends EventEmitter {
      * this object.
      * @return {?Object}
      */
-    public getSyncStateData(): any { // TODO: Unify types.
+    public getSyncStateData(): ISyncStateData | null {
         if (!this.syncApi) {
             return null;
         }
@@ -1453,7 +1737,7 @@ export class MatrixClient extends EventEmitter {
         return this.crypto.beginKeyVerification(method, userId, deviceId);
     }
 
-    public checkSecretStorageKey(key: any, info: any): Promise<any> { // TODO: Types
+    public checkSecretStorageKey(key: Uint8Array, info: ISecretStorageKeyInfo): Promise<boolean> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -1583,9 +1867,9 @@ export class MatrixClient extends EventEmitter {
     /**
      * Check the copy of our cross-signing key that we have in the device list and
      * see if we can get the private key. If so, mark it as trusted.
-     * @param {Object} opts TODO
+     * @param {Object} opts ICheckOwnCrossSigningTrustOpts object
      */
-    public checkOwnCrossSigningTrust(opts?: any): Promise<any> { // TODO: Types
+    public checkOwnCrossSigningTrust(opts?: ICheckOwnCrossSigningTrustOpts): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -1607,7 +1891,11 @@ export class MatrixClient extends EventEmitter {
         return this.crypto.checkCrossSigningPrivateKey(privateKey, expectedPublicKey);
     }
 
-    public legacyDeviceVerification(userId: string, deviceId: string, method: string): Promise<VerificationRequest> {
+    public legacyDeviceVerification(
+        userId: string,
+        deviceId: string,
+        method: VerificationMethod,
+    ): Promise<VerificationRequest> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -1802,7 +2090,11 @@ export class MatrixClient extends EventEmitter {
      *     keyId: {string} the ID of the key
      *     keyInfo: {object} details about the key (iv, mac, passphrase)
      */
-    public addSecretStorageKey(algorithm: string, opts: IAddSecretStorageKeyOpts, keyName?: string): ISecretStorageKey {
+    public addSecretStorageKey(
+        algorithm: string,
+        opts: IAddSecretStorageKeyOpts,
+        keyName?: string,
+    ): Promise<{keyId: string, keyInfo: ISecretStorageKeyInfo}> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -1818,7 +2110,7 @@ export class MatrixClient extends EventEmitter {
      *     for. Defaults to the default key ID if not provided.
      * @return {boolean} Whether we have the key.
      */
-    public hasSecretStorageKey(keyId?: string): boolean {
+    public hasSecretStorageKey(keyId?: string): Promise<boolean> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -1871,7 +2163,7 @@ export class MatrixClient extends EventEmitter {
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    public isSecretStored(name: string, checkKey: boolean): Record<string, ISecretStorageKeyInfo> {
+    public isSecretStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo>> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -1886,9 +2178,9 @@ export class MatrixClient extends EventEmitter {
      * @param {string} name the name of the secret to request
      * @param {string[]} devices the devices to request the secret from
      *
-     * @return {string} the contents of the secret
+     * @return {ISecretRequest} the secret request object
      */
-    public requestSecret(name: string, devices: string[]): any { // TODO types
+    public requestSecret(name: string, devices: string[]): ISecretRequest {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -1989,7 +2281,7 @@ export class MatrixClient extends EventEmitter {
      * @param {object} config The encryption config for the room.
      * @return {Promise} A promise that will resolve when encryption is set up.
      */
-    public setRoomEncryption(roomId: string, config: any): Promise<void> {
+    public setRoomEncryption(roomId: string, config: IRoomEncryption): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-End encryption disabled");
         }
@@ -2011,7 +2303,7 @@ export class MatrixClient extends EventEmitter {
 
         // if there is an 'm.room.encryption' event in this room, it should be
         // encrypted (independently of whether we actually support encryption)
-        const ev = room.currentState.getStateEvents("m.room.encryption", "");
+        const ev = room.currentState.getStateEvents(EventType.RoomEncryption, "");
         if (ev) {
             return true;
         }
@@ -2045,7 +2337,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} a promise which resolves to a list of
      *    session export objects
      */
-    public exportRoomKeys(): Promise<any[]> { // TODO: Types
+    public exportRoomKeys(): Promise<IMegolmSessionData[]> {
         if (!this.crypto) {
             return Promise.reject(new Error("End-to-end encryption disabled"));
         }
@@ -2062,7 +2354,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} a promise which resolves when the keys
      *    have been imported
      */
-    public importRoomKeys(keys: any[], opts: IImportRoomKeysOpts): Promise<void> {
+    public importRoomKeys(keys: IMegolmSessionData[], opts: IImportRoomKeysOpts): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2086,28 +2378,26 @@ export class MatrixClient extends EventEmitter {
      * Get information about the current key backup.
      * @returns {Promise} Information object from API or null
      */
-    public getKeyBackupVersion(): Promise<IKeyBackupVersion> {
-        return this.http.authedRequest(
-            undefined, "GET", "/room_keys/version", undefined, undefined,
-            { prefix: PREFIX_UNSTABLE },
-        ).then((res) => {
-            if (res.algorithm !== olmlib.MEGOLM_BACKUP_ALGORITHM) {
-                const err = "Unknown backup algorithm: " + res.algorithm;
-                return Promise.reject(err);
-            } else if (!(typeof res.auth_data === "object")
-                || !res.auth_data.public_key) {
-                const err = "Invalid backup data returned";
-                return Promise.reject(err);
-            } else {
-                return res;
-            }
-        }).catch((e) => {
+    public async getKeyBackupVersion(): Promise<IKeyBackupInfo> {
+        let res;
+        try {
+            res = await this.http.authedRequest(
+                undefined, "GET", "/room_keys/version", undefined, undefined,
+                { prefix: PREFIX_UNSTABLE },
+            );
+        } catch (e) {
             if (e.errcode === 'M_NOT_FOUND') {
                 return null;
             } else {
                 throw e;
             }
-        });
+        }
+        try {
+            BackupManager.checkBackupVersion(res);
+        } catch (e) {
+            throw e;
+        }
+        return res;
     }
 
     /**
@@ -2120,7 +2410,7 @@ export class MatrixClient extends EventEmitter {
      *     ]
      * }
      */
-    public isKeyBackupTrusted(info: IKeyBackupVersion): Promise<TrustInfo> {
+    public isKeyBackupTrusted(info: IKeyBackupInfo): Promise<TrustInfo> {
         return this.crypto.backupManager.isKeyBackupTrusted(info);
     }
 
@@ -2143,7 +2433,7 @@ export class MatrixClient extends EventEmitter {
      * @param {object} info Backup information object as returned by getKeyBackupVersion
      * @returns {Promise<void>} Resolves when complete.
      */
-    public enableKeyBackup(info: IKeyBackupVersion): Promise<void> {
+    public enableKeyBackup(info: IKeyBackupInfo): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2180,7 +2470,7 @@ export class MatrixClient extends EventEmitter {
     public async prepareKeyBackupVersion(
         password: string,
         opts: IKeyBackupPrepareOpts = { secureSecretStorage: false },
-    ): Promise<IKeyBackupVersion> {
+    ): Promise<Pick<IPreparedKeyBackupVersion, "algorithm" | "auth_data" | "recovery_key">> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2198,7 +2488,7 @@ export class MatrixClient extends EventEmitter {
             algorithm,
             auth_data,
             recovery_key,
-        } as any; // TODO: Types
+        };
     }
 
     /**
@@ -2219,7 +2509,7 @@ export class MatrixClient extends EventEmitter {
      * @returns {Promise<object>} Object with 'version' param indicating the version created
      */
     // TODO: Fix types
-    public async createKeyBackupVersion(info: IKeyBackupVersion): Promise<IKeyBackupVersion> {
+    public async createKeyBackupVersion(info: IKeyBackupInfo): Promise<IKeyBackupInfo> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2288,7 +2578,7 @@ export class MatrixClient extends EventEmitter {
         );
     }
 
-    private makeKeyBackupPath(roomId: string, sessionId: string, version: string): { path: string, queryData: any } {
+    private makeKeyBackupPath(roomId: string, sessionId: string, version: string): IKeyBackupPath {
         let path;
         if (sessionId !== undefined) {
             path = utils.encodeUri("/room_keys/keys/$roomId/$sessionId", {
@@ -2302,24 +2592,20 @@ export class MatrixClient extends EventEmitter {
         } else {
             path = "/room_keys/keys";
         }
-        const queryData = version === undefined ? undefined : { version: version };
-        return {
-            path: path,
-            queryData: queryData,
-        };
+        const queryData = version === undefined ? undefined : { version };
+        return { path, queryData };
     }
 
     /**
      * Back up session keys to the homeserver.
      * @param {string} roomId ID of the room that the keys are for Optional.
      * @param {string} sessionId ID of the session that the keys are for Optional.
-     * @param {integer} version backup version Optional.
+     * @param {number} version backup version Optional.
      * @param {object} data Object keys to send
      * @return {Promise} a promise that will resolve when the keys
      * are uploaded
      */
-    // TODO: Verify types
-    public sendKeyBackup(roomId: string, sessionId: string, version: string, data: any): Promise<void> {
+    public sendKeyBackup(roomId: string, sessionId: string, version: string, data: IKeyBackup): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2375,7 +2661,7 @@ export class MatrixClient extends EventEmitter {
      * @param {object} backupInfo Backup metadata from `checkKeyBackup`
      * @return {Promise<Uint8Array>} key backup key
      */
-    public keyBackupKeyFromPassword(password: string, backupInfo: IKeyBackupVersion): Promise<Uint8Array> {
+    public keyBackupKeyFromPassword(password: string, backupInfo: IKeyBackupInfo): Promise<Uint8Array> {
         return keyFromAuthData(backupInfo.auth_data, password);
     }
 
@@ -2410,7 +2696,7 @@ export class MatrixClient extends EventEmitter {
         password: string,
         targetRoomId: string,
         targetSessionId: string,
-        backupInfo: IKeyBackupVersion,
+        backupInfo: IKeyBackupInfo,
         opts: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult> {
         const privKey = await keyFromAuthData(backupInfo.auth_data, password);
@@ -2434,7 +2720,7 @@ export class MatrixClient extends EventEmitter {
      */
     // TODO: Types
     public async restoreKeyBackupWithSecretStorage(
-        backupInfo: IKeyBackupVersion,
+        backupInfo: IKeyBackupInfo,
         targetRoomId?: string,
         targetSessionId?: string,
         opts?: IKeyBackupRestoreOpts,
@@ -2474,20 +2760,18 @@ export class MatrixClient extends EventEmitter {
         recoveryKey: string,
         targetRoomId: string,
         targetSessionId: string,
-        backupInfo: IKeyBackupVersion,
+        backupInfo: IKeyBackupInfo,
         opts: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult> {
         const privKey = decodeRecoveryKey(recoveryKey);
-        return this.restoreKeyBackup(
-            privKey, targetRoomId, targetSessionId, backupInfo, opts,
-        );
+        return this.restoreKeyBackup(privKey, targetRoomId, targetSessionId, backupInfo, opts);
     }
 
     // TODO: Types
     public async restoreKeyBackupWithCache(
         targetRoomId: string,
         targetSessionId: string,
-        backupInfo: IKeyBackupVersion,
+        backupInfo: IKeyBackupInfo,
         opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult> {
         const privKey = await this.crypto.getSessionBackupPrivateKey();
@@ -2498,10 +2782,10 @@ export class MatrixClient extends EventEmitter {
     }
 
     private async restoreKeyBackup(
-        privKey: Uint8Array,
+        privKey: ArrayLike<number>,
         targetRoomId: string,
         targetSessionId: string,
-        backupInfo: IKeyBackupVersion,
+        backupInfo: IKeyBackupInfo,
         opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult> {
         const cacheCompleteCallback = opts?.cacheCompleteCallback;
@@ -2514,11 +2798,11 @@ export class MatrixClient extends EventEmitter {
         let totalKeyCount = 0;
         let keys = [];
 
-        const path = this.makeKeyBackupPath(
-            targetRoomId, targetSessionId, backupInfo.version,
-        );
+        const path = this.makeKeyBackupPath(targetRoomId, targetSessionId, backupInfo.version);
 
         const algorithm = await BackupManager.makeAlgorithm(backupInfo, async () => { return privKey; });
+
+        const untrusted = algorithm.untrusted;
 
         try {
             // If the pubkey computed from the private data we've been given
@@ -2552,9 +2836,7 @@ export class MatrixClient extends EventEmitter {
                     if (!roomData.sessions) continue;
 
                     totalKeyCount += Object.keys(roomData.sessions).length;
-                    const roomKeys = await algorithm.decryptSessions(
-                        roomData.sessions,
-                    );
+                    const roomKeys = await algorithm.decryptSessions(roomData.sessions);
                     for (const k of roomKeys) {
                         k.room_id = roomId;
                         keys.push(k);
@@ -2562,9 +2844,7 @@ export class MatrixClient extends EventEmitter {
                 }
             } else if (res.sessions) {
                 totalKeyCount = Object.keys(res.sessions).length;
-                keys = await algorithm.decryptSessions(
-                    res.sessions,
-                );
+                keys = await algorithm.decryptSessions(res.sessions);
                 for (const k of keys) {
                     k.room_id = targetRoomId;
                 }
@@ -2587,7 +2867,7 @@ export class MatrixClient extends EventEmitter {
 
         await this.importRoomKeys(keys, {
             progressCallback,
-            untrusted: true,
+            untrusted,
             source: "backup",
         });
 
@@ -2666,7 +2946,7 @@ export class MatrixClient extends EventEmitter {
      * @param {module:client.callback} callback Optional.
      * @return {Promise} Resolves with an object containing the config.
      */
-    public getMediaConfig(callback?: Callback): Promise<any> { // TODO: Types
+    public getMediaConfig(callback?: Callback): Promise<IMediaConfig> {
         return this.http.authedRequest(
             callback, "GET", "/config", undefined, undefined, {
                 prefix: PREFIX_MEDIA_R0,
@@ -2706,7 +2986,7 @@ export class MatrixClient extends EventEmitter {
 
         const replacedRooms = new Set();
         for (const r of allRooms) {
-            const createEvent = r.currentState.getStateEvents('m.room.create', '');
+            const createEvent = r.currentState.getStateEvents(EventType.RoomCreate, '');
             // invites are included in this list and we don't know their create events yet
             if (createEvent) {
                 const predecessor = createEvent.getContent()['predecessor'];
@@ -2717,7 +2997,7 @@ export class MatrixClient extends EventEmitter {
         }
 
         return allRooms.filter((r) => {
-            const tombstone = r.currentState.getStateEvents('m.room.tombstone', '');
+            const tombstone = r.currentState.getStateEvents(EventType.RoomTombstone, '');
             if (tombstone && replacedRooms.has(r.roomId)) {
                 return false;
             }
@@ -2749,10 +3029,10 @@ export class MatrixClient extends EventEmitter {
      * @param {string} eventType The event type
      * @param {Object} content the contents object for the event
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: an empty object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setAccountData(eventType: EventType | string, content: any, callback?: Callback): Promise<void> {
+    public setAccountData(eventType: EventType | string, content: IContent, callback?: Callback): Promise<{}> {
         const path = utils.encodeUri("/user/$userId/account_data/$type", {
             $userId: this.credentials.userId,
             $type: eventType,
@@ -2784,7 +3064,7 @@ export class MatrixClient extends EventEmitter {
      * data event.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async getAccountDataFromServer(eventType: string): Promise<any> {
+    public async getAccountDataFromServer(eventType: string): Promise<Record<string, any>> {
         if (this.isInitialSyncComplete()) {
             const event = this.store.getAccountData(eventType);
             if (!event) {
@@ -2824,10 +3104,10 @@ export class MatrixClient extends EventEmitter {
      * Sets the users that the current user should ignore.
      * @param {string[]} userIds the user IDs to ignore
      * @param {module:client.callback} [callback] Optional.
-     * @return {Promise} Resolves: Account data event
+     * @return {Promise} Resolves: an empty object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setIgnoredUsers(userIds: string[], callback?: Callback): Promise<any> {
+    public setIgnoredUsers(userIds: string[], callback?: Callback): Promise<{}> {
         const content = { ignored_users: {} };
         userIds.map((u) => content.ignored_users[u] = {});
         return this.setAccountData("m.ignored_user_list", content, callback);
@@ -2870,7 +3150,7 @@ export class MatrixClient extends EventEmitter {
             return Promise.resolve(room);
         }
 
-        let signPromise = Promise.resolve();
+        let signPromise: Promise<IThirdPartySigned | void> = Promise.resolve();
 
         if (opts.inviteSignUrl) {
             signPromise = this.http.requestOtherUrl(
@@ -2887,11 +3167,10 @@ export class MatrixClient extends EventEmitter {
         const reqOpts = { qsStringifyOptions: { arrayFormat: 'repeat' } };
 
         try {
-            const data: any = {};
-            // XXX: Explicit cast due to underlying types not existing
-            const signedInviteObj = <Promise<any>><any>(await signPromise);
+            const data: IJoinRequestBody = {};
+            const signedInviteObj = await signPromise;
             if (signedInviteObj) {
-                data['third_party_signed'] = signedInviteObj;
+                data.third_party_signed = signedInviteObj;
             }
 
             const path = utils.encodeUri("/join/$roomid", { $roomid: roomIdOrAlias });
@@ -2917,10 +3196,10 @@ export class MatrixClient extends EventEmitter {
      * @param {MatrixEvent} event The event to resend.
      * @param {Room} room Optional. The room the event is in. Will update the
      * timeline entry if provided.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: to an ISendEventResponse object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public resendEvent(event: MatrixEvent, room: Room): Promise<any> { // TODO: Types
+    public resendEvent(event: MatrixEvent, room: Room): Promise<ISendEventResponse> {
         this.updatePendingEventStatus(room, event, EventStatus.SENDING);
         return this.encryptAndSendEvent(room, event);
     }
@@ -2954,8 +3233,8 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setRoomName(roomId: string, name: string, callback?: Callback): Promise<void> {
-        return this.sendStateEvent(roomId, "m.room.name", { name: name }, undefined, callback);
+    public setRoomName(roomId: string, name: string, callback?: Callback): Promise<ISendEventResponse> {
+        return this.sendStateEvent(roomId, EventType.RoomName, { name: name }, undefined, callback);
     }
 
     /**
@@ -2965,8 +3244,8 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setRoomTopic(roomId: string, topic: string, callback?: Callback): Promise<void> {
-        return this.sendStateEvent(roomId, "m.room.topic", { topic: topic }, undefined, callback);
+    public setRoomTopic(roomId: string, topic: string, callback?: Callback): Promise<ISendEventResponse> {
+        return this.sendStateEvent(roomId, EventType.RoomTopic, { topic: topic }, undefined, callback);
     }
 
     /**
@@ -2990,18 +3269,16 @@ export class MatrixClient extends EventEmitter {
      * @param {string} tagName name of room tag to be set
      * @param {object} metadata associated with that tag to be stored
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: to an empty object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setRoomTag(roomId: string, tagName: string, metadata: any, callback?: Callback): Promise<unknown> { // TODO: Types
+    public setRoomTag(roomId: string, tagName: string, metadata: ITagMetadata, callback?: Callback): Promise<{}> {
         const path = utils.encodeUri("/user/$userId/rooms/$roomId/tags/$tag", {
             $userId: this.credentials.userId,
             $roomId: roomId,
             $tag: tagName,
         });
-        return this.http.authedRequest(
-            callback, "PUT", path, undefined, metadata,
-        );
+        return this.http.authedRequest(callback, "PUT", path, undefined, metadata);
     }
 
     /**
@@ -3027,18 +3304,21 @@ export class MatrixClient extends EventEmitter {
      * @param {string} eventType event type to be set
      * @param {object} content event content
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setRoomAccountData(roomId: string, eventType: string, content: any, callback?: Callback): Promise<void> {
+    public setRoomAccountData(
+        roomId: string,
+        eventType: string,
+        content: Record<string, any>,
+        callback?: Callback,
+    ): Promise<{}> {
         const path = utils.encodeUri("/user/$userId/rooms/$roomId/account_data/$type", {
             $userId: this.credentials.userId,
             $roomId: roomId,
             $type: eventType,
         });
-        return this.http.authedRequest(
-            callback, "PUT", path, undefined, content,
-        );
+        return this.http.authedRequest(callback, "PUT", path, undefined, content);
     }
 
     /**
@@ -3048,7 +3328,7 @@ export class MatrixClient extends EventEmitter {
      * @param {Number} powerLevel
      * @param {MatrixEvent} event
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: to an ISendEventResponse object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public setPowerLevel(
@@ -3057,11 +3337,11 @@ export class MatrixClient extends EventEmitter {
         powerLevel: number,
         event: MatrixEvent,
         callback?: Callback,
-    ): Promise<void> {
+    ): Promise<ISendEventResponse> {
         let content = {
             users: {},
         };
-        if (event && event.getType() === "m.room.power_levels") {
+        if (event?.getType() === EventType.RoomPowerLevels) {
             // take a copy of the content to ensure we don't corrupt
             // existing client state with a failed power level change
             content = utils.deepCopy(event.getContent()) as typeof content;
@@ -3070,9 +3350,7 @@ export class MatrixClient extends EventEmitter {
         const path = utils.encodeUri("/rooms/$roomId/state/m.room.power_levels", {
             $roomId: roomId,
         });
-        return this.http.authedRequest(
-            callback, "PUT", path, undefined, content,
-        );
+        return this.http.authedRequest(callback, "PUT", path, undefined, content);
     }
 
     /**
@@ -3081,13 +3359,13 @@ export class MatrixClient extends EventEmitter {
      * @param {Object} content
      * @param {string} txnId Optional.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public sendEvent(
         roomId: string,
         eventType: string,
-        content: any,
+        content: IContent,
         txnId?: string,
         callback?: Callback,
     ): Promise<ISendEventResponse> {
@@ -3099,7 +3377,7 @@ export class MatrixClient extends EventEmitter {
      * @param {object} eventObject An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
      * @param {string} txnId the txnId.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     private sendCompleteEvent(
@@ -3365,15 +3643,20 @@ export class MatrixClient extends EventEmitter {
      * @param {Object} content
      * @param {string} txnId Optional.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: to an ISendEventResponse object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public sendMessage(roomId: string, content: any, txnId?: string, callback?: Callback): Promise<ISendEventResponse> {
+    public sendMessage(
+        roomId: string,
+        content: IContent,
+        txnId?: string,
+        callback?: Callback,
+    ): Promise<ISendEventResponse> {
         if (utils.isFunction(txnId)) {
             callback = txnId as any as Callback; // for legacy
             txnId = undefined;
         }
-        return this.sendEvent(roomId, "m.room.message", content, txnId, callback);
+        return this.sendEvent(roomId, EventType.RoomMessage, content, txnId, callback);
     }
 
     /**
@@ -3381,7 +3664,7 @@ export class MatrixClient extends EventEmitter {
      * @param {string} body
      * @param {string} txnId Optional.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public sendTextMessage(
@@ -3399,7 +3682,7 @@ export class MatrixClient extends EventEmitter {
      * @param {string} body
      * @param {string} txnId Optional.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: to a ISendEventResponse object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public sendNotice(roomId: string, body: string, txnId?: string, callback?: Callback): Promise<ISendEventResponse> {
@@ -3412,7 +3695,7 @@ export class MatrixClient extends EventEmitter {
      * @param {string} body
      * @param {string} txnId Optional.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: to a ISendEventResponse object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public sendEmoteMessage(
@@ -3431,7 +3714,7 @@ export class MatrixClient extends EventEmitter {
      * @param {Object} info
      * @param {string} text
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: to a ISendEventResponse object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public sendImageMessage(
@@ -3446,7 +3729,7 @@ export class MatrixClient extends EventEmitter {
             text = undefined;
         }
         const content = {
-            msgtype: "m.image",
+            msgtype: MsgType.Image,
             url: url,
             info: info,
             body: text,
@@ -3460,7 +3743,7 @@ export class MatrixClient extends EventEmitter {
      * @param {Object} info
      * @param {string} text
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: to a ISendEventResponse object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public sendStickerMessage(
@@ -3487,7 +3770,7 @@ export class MatrixClient extends EventEmitter {
      * @param {string} body
      * @param {string} htmlBody
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: to a ISendEventResponse object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public sendHtmlMessage(
@@ -3505,7 +3788,7 @@ export class MatrixClient extends EventEmitter {
      * @param {string} body
      * @param {string} htmlBody
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: to a ISendEventResponse object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public sendHtmlNotice(
@@ -3523,7 +3806,7 @@ export class MatrixClient extends EventEmitter {
      * @param {string} body
      * @param {string} htmlBody
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: to a ISendEventResponse object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public sendHtmlEmote(
@@ -3540,12 +3823,12 @@ export class MatrixClient extends EventEmitter {
      * Send a receipt.
      * @param {Event} event The event being acknowledged
      * @param {string} receiptType The kind of receipt e.g. "m.read"
-     * @param {object} opts Additional content to send alongside the receipt.
+     * @param {object} body Additional content to send alongside the receipt.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public sendReceipt(event: MatrixEvent, receiptType: string, body: any, callback?: Callback): Promise<any> {
+    public sendReceipt(event: MatrixEvent, receiptType: string, body: any, callback?: Callback): Promise<{}> {
         if (typeof (body) === 'function') {
             callback = body as any as Callback; // legacy
             body = {};
@@ -3560,9 +3843,7 @@ export class MatrixClient extends EventEmitter {
             $receiptType: receiptType,
             $eventId: event.getId(),
         });
-        const promise = this.http.authedRequest(
-            callback, "POST", path, undefined, body || {},
-        );
+        const promise = this.http.authedRequest(callback, "POST", path, undefined, body || {});
 
         const room = this.getRoom(event.getRoomId());
         if (room) {
@@ -3579,10 +3860,10 @@ export class MatrixClient extends EventEmitter {
      * other users and homeservers. Default false (send to everyone). <b>This
      * property is unstable and may change in the future.</b>
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: to an empty object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async sendReadReceipt(event: MatrixEvent, opts: { hidden?: boolean }, callback?: Callback): Promise<any> {
+    public async sendReadReceipt(event: MatrixEvent, opts?: { hidden?: boolean }, callback?: Callback): Promise<{}> {
         if (typeof (opts) === 'function') {
             callback = opts as any as Callback; // legacy
             opts = {};
@@ -3596,7 +3877,7 @@ export class MatrixClient extends EventEmitter {
         }
 
         const addlContent = {
-            "m.hidden": Boolean(opts.hidden),
+            "org.matrix.msc2285.hidden": Boolean(opts.hidden),
         };
 
         return this.sendReceipt(event, "m.read", addlContent, callback);
@@ -3622,7 +3903,7 @@ export class MatrixClient extends EventEmitter {
         rmEventId: string,
         rrEvent: MatrixEvent,
         opts: { hidden?: boolean },
-    ): Promise<any> { // TODO: Types
+    ): Promise<{}> {
         const room = this.getRoom(roomId);
         if (room && room.hasPendingEvent(rmEventId)) {
             throw new Error(`Cannot set read marker to a pending event (${rmEventId})`);
@@ -3658,10 +3939,14 @@ export class MatrixClient extends EventEmitter {
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      * May return synthesized attributes if the URL lacked OG meta.
      */
-    public getUrlPreview(url: string, ts: number, callback?: Callback): Promise<any> {
+    public getUrlPreview(url: string, ts: number, callback?: Callback): Promise<IPreviewUrlResponse> {
         // bucket the timestamp to the nearest minute to prevent excessive spam to the server
         // Surely 60-second accuracy is enough for anyone.
         ts = Math.floor(ts / 60000) * 60000;
+
+        const parsed = new URL(url);
+        parsed.hash = ""; // strip the hash as it won't affect the preview
+        url = parsed.toString();
 
         const key = ts + "_" + url;
 
@@ -3692,10 +3977,10 @@ export class MatrixClient extends EventEmitter {
      * @param {boolean} isTyping
      * @param {Number} timeoutMs
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public sendTyping(roomId: string, isTyping: boolean, timeoutMs: number, callback?: Callback): Promise<any> {
+    public sendTyping(roomId: string, isTyping: boolean, timeoutMs: number, callback?: Callback): Promise<{}> {
         if (this.isGuest()) {
             return Promise.resolve({}); // guests cannot send typing notifications so don't bother.
         }
@@ -3710,9 +3995,7 @@ export class MatrixClient extends EventEmitter {
         if (isTyping) {
             data.timeout = timeoutMs ? timeoutMs : 20000;
         }
-        return this.http.authedRequest(
-            callback, "PUT", path, undefined, data,
-        );
+        return this.http.authedRequest(callback, "PUT", path, undefined, data);
     }
 
     /**
@@ -3736,7 +4019,7 @@ export class MatrixClient extends EventEmitter {
         const upgradeHistory = [currentRoom];
 
         // Work backwards first, looking at create events.
-        let createEvent = currentRoom.currentState.getStateEvents("m.room.create", "");
+        let createEvent = currentRoom.currentState.getStateEvents(EventType.RoomCreate, "");
         while (createEvent) {
             logger.log(`Looking at ${createEvent.getId()}`);
             const predecessor = createEvent.getContent()['predecessor'];
@@ -3746,8 +4029,7 @@ export class MatrixClient extends EventEmitter {
                 if (!refRoom) break; // end of the chain
 
                 if (verifyLinks) {
-                    const tombstone = refRoom.currentState
-                        .getStateEvents("m.room.tombstone", "");
+                    const tombstone = refRoom.currentState.getStateEvents(EventType.RoomTombstone, "");
 
                     if (!tombstone
                         || tombstone.getContent()['replacement_room'] !== refRoom.roomId) {
@@ -3757,7 +4039,7 @@ export class MatrixClient extends EventEmitter {
 
                 // Insert at the front because we're working backwards from the currentRoom
                 upgradeHistory.splice(0, 0, refRoom);
-                createEvent = refRoom.currentState.getStateEvents("m.room.create", "");
+                createEvent = refRoom.currentState.getStateEvents(EventType.RoomCreate, "");
             } else {
                 // No further create events to look at
                 break;
@@ -3765,14 +4047,14 @@ export class MatrixClient extends EventEmitter {
         }
 
         // Work forwards next, looking at tombstone events
-        let tombstoneEvent = currentRoom.currentState.getStateEvents("m.room.tombstone", "");
+        let tombstoneEvent = currentRoom.currentState.getStateEvents(EventType.RoomTombstone, "");
         while (tombstoneEvent) {
             const refRoom = this.getRoom(tombstoneEvent.getContent()['replacement_room']);
             if (!refRoom) break; // end of the chain
             if (refRoom.roomId === currentRoom.roomId) break; // Tombstone is referencing it's own room
 
             if (verifyLinks) {
-                createEvent = refRoom.currentState.getStateEvents("m.room.create", "");
+                createEvent = refRoom.currentState.getStateEvents(EventType.RoomCreate, "");
                 if (!createEvent || !createEvent.getContent()['predecessor']) break;
 
                 const predecessor = createEvent.getContent()['predecessor'];
@@ -3790,7 +4072,7 @@ export class MatrixClient extends EventEmitter {
 
             // Set the current room to the reference room so we know where we're at
             currentRoom = refRoom;
-            tombstoneEvent = currentRoom.currentState.getStateEvents("m.room.tombstone", "");
+            tombstoneEvent = currentRoom.currentState.getStateEvents(EventType.RoomTombstone, "");
         }
 
         return upgradeHistory;
@@ -4066,17 +4348,18 @@ export class MatrixClient extends EventEmitter {
      * @param {string} info The kind of info to set (e.g. 'avatar_url')
      * @param {Object} data The JSON object to set.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setProfileInfo(info: string, data: any, callback?: Callback): Promise<void> {
+    // eslint-disable-next-line camelcase
+    public setProfileInfo(info: "avatar_url", data: { avatar_url: string }, callback?: Callback): Promise<{}>;
+    public setProfileInfo(info: "displayname", data: { displayname: string }, callback?: Callback): Promise<{}>;
+    public setProfileInfo(info: "avatar_url" | "displayname", data: object, callback?: Callback): Promise<{}> {
         const path = utils.encodeUri("/profile/$userId/$info", {
             $userId: this.credentials.userId,
             $info: info,
         });
-        return this.http.authedRequest(
-            callback, "PUT", path, undefined, data,
-        );
+        return this.http.authedRequest(callback, "PUT", path, undefined, data);
     }
 
     /**
@@ -4085,10 +4368,8 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: {} an empty object.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async setDisplayName(name: string, callback?: Callback): Promise<any> {
-        const prom = await this.setProfileInfo(
-            "displayname", { displayname: name }, callback,
-        );
+    public async setDisplayName(name: string, callback?: Callback): Promise<{}> {
+        const prom = await this.setProfileInfo("displayname", { displayname: name }, callback);
         // XXX: synthesise a profile update for ourselves because Synapse is broken and won't
         const user = this.getUser(this.getUserId());
         if (user) {
@@ -4104,10 +4385,8 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: {} an empty object.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async setAvatarUrl(url: string, callback?: Callback): Promise<any> {
-        const prom = await this.setProfileInfo(
-            "avatar_url", { avatar_url: url }, callback,
-        );
+    public async setAvatarUrl(url: string, callback?: Callback): Promise<{}> {
+        const prom = await this.setProfileInfo("avatar_url", { avatar_url: url }, callback);
         // XXX: synthesise a profile update for ourselves because Synapse is broken and won't
         const user = this.getUser(this.getUserId());
         if (user) {
@@ -4149,20 +4428,14 @@ export class MatrixClient extends EventEmitter {
      */
     public _unstable_setStatusMessage(newMessage: string): Promise<void> { // eslint-disable-line camelcase
         const type = "im.vector.user_status";
-        return Promise.all(this.getRooms().map((room) => {
+        return Promise.all(this.getRooms().map(async (room) => {
             const isJoined = room.getMyMembership() === "join";
             const looksLikeDm = room.getInvitedAndJoinedMemberCount() === 2;
-            if (!isJoined || !looksLikeDm) {
-                return Promise.resolve();
-            }
+            if (!isJoined || !looksLikeDm) return;
             // Check power level separately as it's a bit more expensive.
             const maySend = room.currentState.mayClientSendStateEvent(type, this);
-            if (!maySend) {
-                return Promise.resolve();
-            }
-            return this.sendStateEvent(room.roomId, type, {
-                status: newMessage,
-            }, this.getUserId());
+            if (!maySend) return;
+            await this.sendStateEvent(room.roomId, type, { status: newMessage }, this.getUserId());
         })).then(); // .then to fix return type
     }
 
@@ -4260,8 +4533,9 @@ export class MatrixClient extends EventEmitter {
                     room.roomId,
                     room.oldState.paginationToken,
                     limit,
-                    'b');
-            }).then((res: any) => { // TODO: Types
+                    Direction.Backward,
+                );
+            }).then((res: IMessagesResponse) => {
                 const matrixEvents = res.chunk.map(this.getEventMapper());
                 if (res.state) {
                     const stateEvents = res.state.map(this.getEventMapper());
@@ -4296,7 +4570,7 @@ export class MatrixClient extends EventEmitter {
 
     /**
      * @param {object} [options]
-     * @param {boolean} options.preventReEmit don't reemit events emitted on an event mapped by this mapper on the client
+     * @param {boolean} options.preventReEmit don't re-emit events emitted on an event mapped by this mapper on the client
      * @param {boolean} options.decrypt decrypt event proactively
      * @return {Function}
      */
@@ -4402,16 +4676,14 @@ export class MatrixClient extends EventEmitter {
         roomId: string,
         fromToken: string,
         limit: number,
-        dir: string,
+        dir: Direction,
         timelineFilter?: Filter,
-    ): Promise<unknown> { // TODO: Types
-        const path = utils.encodeUri(
-            "/rooms/$roomId/messages", { $roomId: roomId },
-        );
+    ): Promise<IMessagesResponse> {
+        const path = utils.encodeUri("/rooms/$roomId/messages", { $roomId: roomId });
         if (limit === undefined) {
             limit = 30;
         }
-        const params: any = {
+        const params: Record<string, string | number> = {
             from: fromToken,
             limit: limit,
             dir: dir,
@@ -4470,7 +4742,7 @@ export class MatrixClient extends EventEmitter {
             return Promise.resolve(false);
         }
 
-        const pendingRequest = eventTimeline._paginationRequests[dir];
+        const pendingRequest = eventTimeline.paginationRequests[dir];
 
         if (pendingRequest) {
             // already a request in progress - return the existing promise
@@ -4519,9 +4791,9 @@ export class MatrixClient extends EventEmitter {
                 }
                 return res.next_token ? true : false;
             }).finally(() => {
-                eventTimeline._paginationRequests[dir] = null;
+                eventTimeline.paginationRequests[dir] = null;
             });
-            eventTimeline._paginationRequests[dir] = promise;
+            eventTimeline.paginationRequests[dir] = promise;
         } else {
             const room = this.getRoom(eventTimeline.getRoomId());
             if (!room) {
@@ -4553,9 +4825,9 @@ export class MatrixClient extends EventEmitter {
                 }
                 return res.end != res.start;
             }).finally(() => {
-                eventTimeline._paginationRequests[dir] = null;
+                eventTimeline.paginationRequests[dir] = null;
             });
-            eventTimeline._paginationRequests[dir] = promise;
+            eventTimeline.paginationRequests[dir] = promise;
         }
 
         return promise;
@@ -4633,13 +4905,13 @@ export class MatrixClient extends EventEmitter {
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public setGuestAccess(roomId: string, opts: IGuestAccessOpts): Promise<void> {
-        const writePromise = this.sendStateEvent(roomId, "m.room.guest_access", {
+        const writePromise = this.sendStateEvent(roomId, EventType.RoomGuestAccess, {
             guest_access: opts.allowJoin ? "can_join" : "forbidden",
         }, "");
 
-        let readPromise = Promise.resolve();
+        let readPromise: Promise<any> = Promise.resolve();
         if (opts.allowRead) {
-            readPromise = this.sendStateEvent(roomId, "m.room.history_visibility", {
+            readPromise = this.sendStateEvent(roomId, EventType.RoomHistoryVisibility, {
                 history_visibility: "world_readable",
             }, "");
         }
@@ -4666,7 +4938,7 @@ export class MatrixClient extends EventEmitter {
         clientSecret: string,
         sendAttempt: number,
         nextLink?: string,
-    ): Promise<any> { // TODO: Types
+    ): Promise<IRequestTokenResponse> {
         return this.requestTokenFromEndpoint(
             "/register/email/requestToken",
             {
@@ -4698,7 +4970,7 @@ export class MatrixClient extends EventEmitter {
         clientSecret: string,
         sendAttempt: number,
         nextLink?: string,
-    ): Promise<any> { // TODO: Types
+    ): Promise<IRequestMsisdnTokenResponse> {
         return this.requestTokenFromEndpoint(
             "/register/msisdn/requestToken",
             {
@@ -4720,7 +4992,7 @@ export class MatrixClient extends EventEmitter {
      * If an account with the given email address already exists and is
      * associated with an account other than the one the user is authed as,
      * it will either send an email to the address informing them of this
-     * or return M_THREEPID_IN_USE (which one is up to the Home Server).
+     * or return M_THREEPID_IN_USE (which one is up to the homeserver).
      *
      * @param {string} email As requestEmailToken
      * @param {string} clientSecret As requestEmailToken
@@ -4733,7 +5005,7 @@ export class MatrixClient extends EventEmitter {
         clientSecret: string,
         sendAttempt: number,
         nextLink: string,
-    ): Promise<any> { // TODO: Types
+    ): Promise<IRequestTokenResponse> {
         return this.requestTokenFromEndpoint(
             "/account/3pid/email/requestToken",
             {
@@ -4748,7 +5020,7 @@ export class MatrixClient extends EventEmitter {
     /**
      * Requests a text message verification token for the purposes of adding a
      * third party identifier to an account.
-     * This API proxies the Identity Server /validate/email/requestToken API,
+     * This API proxies the identity server /validate/email/requestToken API,
      * adding specific behaviour for the addition of phone numbers to an
      * account, as requestAdd3pidEmailToken.
      *
@@ -4765,7 +5037,7 @@ export class MatrixClient extends EventEmitter {
         clientSecret: string,
         sendAttempt: number,
         nextLink: string,
-    ): Promise<any> { // TODO: Types
+    ): Promise<IRequestMsisdnTokenResponse> {
         return this.requestTokenFromEndpoint(
             "/account/3pid/msisdn/requestToken",
             {
@@ -4781,13 +5053,13 @@ export class MatrixClient extends EventEmitter {
     /**
      * Requests an email verification token for the purposes of resetting
      * the password on an account.
-     * This API proxies the Identity Server /validate/email/requestToken API,
+     * This API proxies the identity server /validate/email/requestToken API,
      * adding specific behaviour for the password resetting. Specifically,
      * if no account with the given email address exists, it may either
      * return M_THREEPID_NOT_FOUND or send an email
-     * to the address informing them of this (which one is up to the Home Server).
+     * to the address informing them of this (which one is up to the homeserver).
      *
-     * requestEmailToken calls the equivalent API directly on the ID server,
+     * requestEmailToken calls the equivalent API directly on the identity server,
      * therefore bypassing the password reset specific logic.
      *
      * @param {string} email As requestEmailToken
@@ -4802,7 +5074,7 @@ export class MatrixClient extends EventEmitter {
         clientSecret: string,
         sendAttempt: number,
         nextLink: string,
-    ): Promise<any> { // TODO: Types
+    ): Promise<IRequestTokenResponse> {
         return this.requestTokenFromEndpoint(
             "/account/password/email/requestToken",
             {
@@ -4817,7 +5089,7 @@ export class MatrixClient extends EventEmitter {
     /**
      * Requests a text message verification token for the purposes of resetting
      * the password on an account.
-     * This API proxies the Identity Server /validate/email/requestToken API,
+     * This API proxies the identity server /validate/email/requestToken API,
      * adding specific behaviour for the password resetting, as requestPasswordEmailToken.
      *
      * @param {string} phoneCountry As requestRegisterMsisdnToken
@@ -4833,7 +5105,7 @@ export class MatrixClient extends EventEmitter {
         clientSecret: string,
         sendAttempt: number,
         nextLink: string,
-    ): Promise<any> { // TODO: Types
+    ): Promise<IRequestMsisdnTokenResponse> {
         return this.requestTokenFromEndpoint(
             "/account/password/msisdn/requestToken",
             {
@@ -4854,16 +5126,16 @@ export class MatrixClient extends EventEmitter {
      * @param {object} params Parameters for the POST request
      * @return {Promise} Resolves: As requestEmailToken
      */
-    private async requestTokenFromEndpoint(endpoint: string, params: any): Promise<void> {
+    private async requestTokenFromEndpoint<T extends IRequestTokenResponse>(
+        endpoint: string,
+        params: Record<string, any>,
+    ): Promise<T> {
         const postParams = Object.assign({}, params);
 
         // If the HS supports separate add and bind, then requestToken endpoints
         // don't need an IS as they are all validated by the HS directly.
         if (!await this.doesServerSupportSeparateAddAndBind() && this.idBaseUrl) {
-            const idServerUrl = url.parse(this.idBaseUrl);
-            if (!idServerUrl.host) {
-                throw new Error("Invalid ID server URL: " + this.idBaseUrl);
-            }
+            const idServerUrl = new URL(this.idBaseUrl);
             postParams.id_server = idServerUrl.host;
 
             if (
@@ -4878,10 +5150,7 @@ export class MatrixClient extends EventEmitter {
             }
         }
 
-        return this.http.request(
-            undefined, "POST", endpoint, undefined,
-            postParams,
-        );
+        return this.http.request(undefined, "POST", endpoint, undefined, postParams);
     }
 
     /**
@@ -4916,7 +5185,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: result object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setRoomMutePushRule(scope: string, roomId: string, mute: string): any { // TODO: Types
+    public setRoomMutePushRule(scope: string, roomId: string, mute: string): Promise<void> | void {
         let deferred;
         let hasDontNotifyRule;
 
@@ -4931,20 +5200,20 @@ export class MatrixClient extends EventEmitter {
         if (!mute) {
             // Remove the rule only if it is a muting rule
             if (hasDontNotifyRule) {
-                deferred = this.deletePushRule(scope, "room", roomPushRule.rule_id);
+                deferred = this.deletePushRule(scope, PushRuleKind.RoomSpecific, roomPushRule.rule_id);
             }
         } else {
             if (!roomPushRule) {
-                deferred = this.addPushRule(scope, "room", roomId, {
+                deferred = this.addPushRule(scope, PushRuleKind.RoomSpecific, roomId, {
                     actions: ["dont_notify"],
                 });
             } else if (!hasDontNotifyRule) {
                 // Remove the existing one before setting the mute push rule
                 // This is a workaround to SYN-590 (Push rule update fails)
                 deferred = utils.defer();
-                this.deletePushRule(scope, "room", roomPushRule.rule_id)
+                this.deletePushRule(scope, PushRuleKind.RoomSpecific, roomPushRule.rule_id)
                     .then(() => {
-                        this.addPushRule(scope, "room", roomId, {
+                        this.addPushRule(scope, PushRuleKind.RoomSpecific, roomId, {
                             actions: ["dont_notify"],
                         }).then(() => {
                             deferred.resolve();
@@ -4983,8 +5252,8 @@ export class MatrixClient extends EventEmitter {
         }
     }
 
-    public searchMessageText(opts: ISearchOpts, callback?: Callback): Promise<any> { // TODO: Types
-        const roomEvents: any = {
+    public searchMessageText(opts: ISearchOpts, callback?: Callback): Promise<ISearchResponse> {
+        const roomEvents: ISearchRequestBody["search_categories"]["room_events"] = {
             search_term: opts.query,
         };
 
@@ -5021,7 +5290,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: result object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public searchRoomEvents(opts: IEventSearchOpts): Promise<any> { // TODO: Types
+    public searchRoomEvents(opts: IEventSearchOpts): Promise<ISearchResults> {
         // TODO: support groups
 
         const body = {
@@ -5029,7 +5298,7 @@ export class MatrixClient extends EventEmitter {
                 room_events: {
                     search_term: opts.term,
                     filter: opts.filter,
-                    order_by: "recent",
+                    order_by: SearchOrderBy.Recent,
                     event_context: {
                         before_limit: 1,
                         after_limit: 1,
@@ -5039,7 +5308,7 @@ export class MatrixClient extends EventEmitter {
             },
         };
 
-        const searchResults = {
+        const searchResults: ISearchResults = {
             _query: body,
             results: [],
             highlights: [],
@@ -5055,7 +5324,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: updated result object
      * @return {Error} Rejects: with an error response.
      */
-    public backPaginateRoomEventsSearch(searchResults: any): Promise<any> { // TODO: Types
+    public backPaginateRoomEventsSearch<T extends ISearchResults>(searchResults: T): Promise<T> {
         // TODO: we should implement a backoff (as per scrollback()) to deal more
         // nicely with HTTP errors.
 
@@ -5065,7 +5334,7 @@ export class MatrixClient extends EventEmitter {
 
         if (searchResults.pendingRequest) {
             // already a request in progress - return the existing promise
-            return searchResults.pendingRequest;
+            return searchResults.pendingRequest as Promise<T>;
         }
 
         const searchOpts = {
@@ -5092,8 +5361,9 @@ export class MatrixClient extends EventEmitter {
      * @return {Object} searchResults
      * @private
      */
-    public processRoomEventsSearch(searchResults: any, response: any): any { // XXX: Intended private, used in code
-        const roomEvents = response.search_categories.room_events;  // eslint-disable-line camelcase
+    // XXX: Intended private, used in code
+    public processRoomEventsSearch<T extends ISearchResults>(searchResults: T, response: ISearchResponse): T {
+        const roomEvents = response.search_categories.room_events;
 
         searchResults.count = roomEvents.count;
         searchResults.next_batch = roomEvents.next_batch;
@@ -5154,7 +5424,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Filter} Resolves to a Filter object.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public createFilter(content: any): Promise<Filter> { // TODO: Types
+    public createFilter(content: IFilterDefinition): Promise<Filter> {
         const path = utils.encodeUri("/user/$userId/filter", {
             $userId: this.credentials.userId,
         });
@@ -5174,7 +5444,7 @@ export class MatrixClient extends EventEmitter {
      * @param {string} filterId The filter ID to retrieve
      * @param {boolean} allowCached True to allow cached filters to be returned.
      * Default: True.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: a Filter object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public getFilter(userId: string, filterId: string, allowCached: boolean): Promise<Filter> {
@@ -5258,13 +5528,13 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
-     * Gets a bearer token from the Home Server that the user can
+     * Gets a bearer token from the homeserver that the user can
      * present to a third party in order to prove their ownership
      * of the Matrix account they are logged into.
      * @return {Promise} Resolves: Token object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getOpenIdToken(): Promise<any> { // TODO: Types
+    public getOpenIdToken(): Promise<IOpenIDToken> {
         const path = utils.encodeUri("/user/$userId/openid/request_token", {
             $userId: this.credentials.userId,
         });
@@ -5274,7 +5544,7 @@ export class MatrixClient extends EventEmitter {
         );
     }
 
-    private startCallEventHandler = () => {
+    private startCallEventHandler = (): void => {
         if (this.isInitialSyncComplete()) {
             this.callEventHandler.start();
             this.off("sync", this.startCallEventHandler);
@@ -5283,18 +5553,18 @@ export class MatrixClient extends EventEmitter {
 
     /**
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: ITurnServerResponse object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public turnServer(callback?: Callback): Promise<any> { // TODO: Types
+    public turnServer(callback?: Callback): Promise<ITurnServerResponse> {
         return this.http.authedRequest(callback, "GET", "/voip/turnServer");
     }
 
     /**
-     * Get the TURN servers for this home server.
+     * Get the TURN servers for this homeserver.
      * @return {Array<Object>} The servers or an empty list.
      */
-    public getTurnServers(): any[] { // TODO: Types
+    public getTurnServers(): ITurnServer[] {
         return this.turnServers || [];
     }
 
@@ -5325,7 +5595,7 @@ export class MatrixClient extends EventEmitter {
                 if (res.uris) {
                     logger.log("Got TURN URIs: " + res.uris + " refresh in " + res.ttl + " secs");
                     // map the response to a format that can be fed to RTCPeerConnection
-                    const servers = {
+                    const servers: ITurnServer = {
                         urls: res.uris,
                         username: res.username,
                         credential: res.password,
@@ -5396,14 +5666,12 @@ export class MatrixClient extends EventEmitter {
      * @param {string} userId the User ID to look up.
      * @return {object} the whois response - see Synapse docs for information.
      */
-    public whoisSynapseUser(userId: string): Promise<any> {
+    public whoisSynapseUser(userId: string): Promise<ISynapseAdminWhoisResponse> {
         const path = utils.encodeUri(
             "/_synapse/admin/v1/whois/$userId",
             { $userId: userId },
         );
-        return this.http.authedRequest(
-            undefined, 'GET', path, undefined, undefined, { prefix: '' },
-        );
+        return this.http.authedRequest(undefined, 'GET', path, undefined, undefined, { prefix: '' });
     }
 
     /**
@@ -5412,7 +5680,7 @@ export class MatrixClient extends EventEmitter {
      * @param {string} userId the User ID to deactivate.
      * @return {object} the deactivate response - see Synapse docs for information.
      */
-    public deactivateSynapseUser(userId: string): Promise<any> {
+    public deactivateSynapseUser(userId: string): Promise<ISynapseAdminDeactivateResponse> {
         const path = utils.encodeUri(
             "/_synapse/admin/v1/deactivate/$userId",
             { $userId: userId },
@@ -5422,21 +5690,19 @@ export class MatrixClient extends EventEmitter {
         );
     }
 
-    private async fetchClientWellKnown() {
+    private async fetchClientWellKnown(): Promise<void> {
         // `getRawClientConfig` does not throw or reject on network errors, instead
         // it absorbs errors and returns `{}`.
-        this.clientWellKnownPromise = AutoDiscovery.getRawClientConfig(
-            this.getDomain(),
-        );
+        this.clientWellKnownPromise = AutoDiscovery.getRawClientConfig(this.getDomain());
         this.clientWellKnown = await this.clientWellKnownPromise;
         this.emit("WellKnown.client", this.clientWellKnown);
     }
 
-    public getClientWellKnown(): any {
+    public getClientWellKnown(): IClientWellKnown {
         return this.clientWellKnown;
     }
 
-    public waitForClientWellKnown(): Promise<any> {
+    public waitForClientWellKnown(): Promise<IClientWellKnown> {
         return this.clientWellKnownPromise;
     }
 
@@ -5447,7 +5713,7 @@ export class MatrixClient extends EventEmitter {
      * @param {object} opts the complete set of client options
      * @return {Promise} for store operation
      */
-    public storeClientOptions() { // XXX: Intended private, used in code
+    public storeClientOptions(): Promise<void> { // XXX: Intended private, used in code
         const primTypes = ["boolean", "string", "number"];
         const serializableOpts = Object.entries(this.clientOpts)
             .filter(([key, value]) => {
@@ -5485,7 +5751,7 @@ export class MatrixClient extends EventEmitter {
      * unstable APIs it supports
      * @return {Promise<object>} The server /versions response
      */
-    public getVersions(): Promise<any> { // TODO: Types
+    public getVersions(): Promise<IServerVersions> {
         if (this.serverVersionsPromise) {
             return this.serverVersionsPromise;
         }
@@ -5685,14 +5951,14 @@ export class MatrixClient extends EventEmitter {
             originalEvent = mapper(result.original_event);
         }
         let events = result.chunk.map(mapper);
-        if (fetchedEventType === "m.room.encrypted") {
+        if (fetchedEventType === EventType.RoomMessageEncrypted) {
             const allEvents = originalEvent ? events.concat(originalEvent) : events;
             await Promise.all(allEvents.map(e => {
                 return new Promise(resolve => e.once("Event.decrypted", resolve));
             }));
             events = events.filter(e => e.getType() === eventType);
         }
-        if (originalEvent && relationType === "m.replace") {
+        if (originalEvent && relationType === RelationType.Replace) {
             events = events.filter(e => e.getSender() === originalEvent.getSender());
         }
         return {
@@ -5707,7 +5973,7 @@ export class MatrixClient extends EventEmitter {
      * triggering a user interaction.
      * @return {object}
      */
-    public getCrossSigningCacheCallbacks(): any { // TODO: Types
+    public getCrossSigningCacheCallbacks(): ICacheCallbacks {
         // XXX: Private member access
         return this.crypto?.crossSigningInfo.getCacheCallbacks();
     }
@@ -5761,9 +6027,9 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
-     * Get the Identity Server URL of this client
+     * Get the identity server URL of this client
      * @param {boolean} stripProto whether or not to strip the protocol from the URL
-     * @return {string} Identity Server URL of this client
+     * @return {string} Identity server URL of this client
      */
     public getIdentityServerUrl(stripProto = false): string {
         if (stripProto && (this.idBaseUrl.startsWith("http://") ||
@@ -5774,8 +6040,8 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
-     * Set the Identity Server URL of this client
-     * @param {string} url New Identity Server URL
+     * Set the identity server URL of this client
+     * @param {string} url New identity server URL
      */
     public setIdentityServerUrl(url: string) {
         this.idBaseUrl = utils.ensureNoTrailingSlash(url);
@@ -5826,7 +6092,7 @@ export class MatrixClient extends EventEmitter {
      * @param {string} sessionId
      * @param {Object} auth
      * @param {Object} bindThreepids Set key 'email' to true to bind any email
-     *     threepid uses during registration in the ID server. Set 'msisdn' to
+     *     threepid uses during registration in the identity server. Set 'msisdn' to
      *     true to bind msisdn.
      * @param {string} guestAccessToken
      * @param {string} inhibitLogin
@@ -6071,9 +6337,7 @@ export class MatrixClient extends EventEmitter {
      */
     public deactivateAccount(auth?: any, erase?: boolean): Promise<{}> {
         if (typeof (erase) === 'function') {
-            throw new Error(
-                'deactivateAccount no longer accepts a callback parameter',
-            );
+            throw new Error('deactivateAccount no longer accepts a callback parameter');
         }
 
         const body: any = {};
@@ -6084,9 +6348,7 @@ export class MatrixClient extends EventEmitter {
             body.erase = erase;
         }
 
-        return this.http.authedRequest(
-            undefined, "POST", '/account/deactivate', undefined, body,
-        );
+        return this.http.authedRequest(undefined, "POST", '/account/deactivate', undefined, body);
     }
 
     /**
@@ -6117,14 +6379,13 @@ export class MatrixClient extends EventEmitter {
      * @param {string} options.name The name to give this room.
      * @param {string} options.topic The topic to give this room.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: <code>{room_id: {string},
-     * room_alias: {string(opt)}}</code>
+     * @return {Promise} Resolves: <code>{room_id: {string}}</code>
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public async createRoom(
         options: ICreateRoomOpts,
         callback?: Callback,
-    ): Promise<{ room_id: string, room_alias?: string }> { // eslint-disable-line camelcase
+    ): Promise<{ room_id: string }> { // eslint-disable-line camelcase
         // some valid options include: room_alias_name, visibility, invite
 
         // inject the id_access_token if inviting 3rd party addresses
@@ -6144,9 +6405,7 @@ export class MatrixClient extends EventEmitter {
             }
         }
 
-        return this.http.authedRequest(
-            callback, "POST", "/createRoom", undefined, options,
-        );
+        return this.http.authedRequest(callback, "POST", "/createRoom", undefined, options);
     }
 
     /**
@@ -6191,7 +6450,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public roomState(roomId: string, callback?: Callback): Promise<any> { // TODO: Types
+    public roomState(roomId: string, callback?: Callback): Promise<IStateEventWithRoomId[]> {
         const path = utils.encodeUri("/rooms/$roomId/state", { $roomId: roomId });
         return this.http.authedRequest(callback, "GET", path);
     }
@@ -6205,7 +6464,11 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves to an object containing the event.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public fetchRoomEvent(roomId: string, eventId: string, callback?: Callback): Promise<any> { // TODO: Types
+    public fetchRoomEvent(
+        roomId: string,
+        eventId: string,
+        callback?: Callback,
+    ): Promise<IMinimalEvent> {
         const path = utils.encodeUri(
             "/rooms/$roomId/event/$eventId", {
                 $roomId: roomId,
@@ -6230,7 +6493,7 @@ export class MatrixClient extends EventEmitter {
         excludeMembership?: string[],
         atEventId?: string,
         callback?: Callback,
-    ): Promise<{ [userId: string]: any }> {
+    ): Promise<{ [userId: string]: IStateEventWithRoomId }> {
         const queryParams: any = {};
         if (includeMembership) {
             queryParams.membership = includeMembership;
@@ -6275,7 +6538,12 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getStateEvent(roomId: string, eventType: string, stateKey: string, callback?: Callback): Promise<any> {
+    public getStateEvent(
+        roomId: string,
+        eventType: string,
+        stateKey: string,
+        callback?: Callback,
+    ): Promise<IStateEventWithRoomId> {
         const pathParams = {
             $roomId: roomId,
             $eventType: eventType,
@@ -6305,7 +6573,7 @@ export class MatrixClient extends EventEmitter {
         content: any,
         stateKey = "",
         callback?: Callback,
-    ): Promise<any> { // TODO: Types
+    ): Promise<ISendEventResponse> {
         const pathParams = {
             $roomId: roomId,
             $eventType: eventType,
@@ -6315,9 +6583,7 @@ export class MatrixClient extends EventEmitter {
         if (stateKey !== undefined) {
             path = utils.encodeUri(path + "/$stateKey", pathParams);
         }
-        return this.http.authedRequest(
-            callback, "PUT", path, undefined, content,
-        );
+        return this.http.authedRequest(callback, "PUT", path, undefined, content);
     }
 
     /**
@@ -6327,7 +6593,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public roomInitialSync(roomId: string, limit: number, callback?: Callback): Promise<any> { // TODO: Types
+    public roomInitialSync(roomId: string, limit: number, callback?: Callback): Promise<IRoomInitialSyncResponse> {
         if (utils.isFunction(limit)) {
             callback = limit as any as Callback; // legacy
             limit = undefined;
@@ -6371,12 +6637,10 @@ export class MatrixClient extends EventEmitter {
         const content = {
             "m.fully_read": rmEventId,
             "m.read": rrEventId,
-            "m.hidden": Boolean(opts ? opts.hidden : false),
+            "org.matrix.msc2285.hidden": Boolean(opts ? opts.hidden : false),
         };
 
-        return this.http.authedRequest(
-            undefined, "POST", path, undefined, content,
-        );
+        return this.http.authedRequest(undefined, "POST", path, undefined, content);
     }
 
     /**
@@ -6395,7 +6659,7 @@ export class MatrixClient extends EventEmitter {
      *                                 and their profile data.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getJoinedRoomMembers(roomId: string): Promise<any> { // TODO: Types
+    public getJoinedRoomMembers(roomId: string): Promise<IJoinedMembersResponse> {
         const path = utils.encodeUri("/rooms/$roomId/joined_members", {
             $roomId: roomId,
         });
@@ -6415,7 +6679,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public publicRooms(options: IRoomDirectoryOptions, callback?: Callback): Promise<any> { // TODO: Types
+    public publicRooms(options: IRoomDirectoryOptions, callback?: Callback): Promise<IPublicRoomsResponse> {
         if (typeof (options) == 'function') {
             callback = options;
             options = {};
@@ -6433,9 +6697,7 @@ export class MatrixClient extends EventEmitter {
         if (Object.keys(options).length === 0 && Object.keys(queryParams).length === 0) {
             return this.http.authedRequest(callback, "GET", "/publicRooms");
         } else {
-            return this.http.authedRequest(
-                callback, "POST", "/publicRooms", queryParams, options,
-            );
+            return this.http.authedRequest(callback, "POST", "/publicRooms", queryParams, options);
         }
     }
 
@@ -6444,19 +6706,17 @@ export class MatrixClient extends EventEmitter {
      * @param {string} alias The room alias to create.
      * @param {string} roomId The room ID to link the alias to.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO.
+     * @return {Promise} Resolves: an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public createAlias(alias: string, roomId: string, callback?: Callback): Promise<any> { // TODO: Types
+    public createAlias(alias: string, roomId: string, callback?: Callback): Promise<{}> {
         const path = utils.encodeUri("/directory/room/$alias", {
             $alias: alias,
         });
         const data = {
             room_id: roomId,
         };
-        return this.http.authedRequest(
-            callback, "PUT", path, undefined, data,
-        );
+        return this.http.authedRequest(callback, "PUT", path, undefined, data);
     }
 
     /**
@@ -6464,16 +6724,14 @@ export class MatrixClient extends EventEmitter {
      * and you must have sufficient access to do this operation.
      * @param {string} alias The room alias to delete.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO.
+     * @return {Promise} Resolves: an empty object.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public deleteAlias(alias: string, callback?: Callback): Promise<any> { // TODO: Types
+    public deleteAlias(alias: string, callback?: Callback): Promise<{}> {
         const path = utils.encodeUri("/directory/room/$alias", {
             $alias: alias,
         });
-        return this.http.authedRequest(
-            callback, "DELETE", path, undefined, undefined,
-        );
+        return this.http.authedRequest(callback, "DELETE", path, undefined, undefined);
     }
 
     /**
@@ -6486,8 +6744,7 @@ export class MatrixClient extends EventEmitter {
         const path = utils.encodeUri("/rooms/$roomId/aliases",
             { $roomId: roomId });
         const prefix = PREFIX_UNSTABLE + "/org.matrix.msc2432";
-        return this.http.authedRequest(callback, "GET", path,
-            null, null, { prefix });
+        return this.http.authedRequest(callback, "GET", path, null, null, { prefix });
     }
 
     /**
@@ -6505,18 +6762,17 @@ export class MatrixClient extends EventEmitter {
         const path = utils.encodeUri("/directory/room/$alias", {
             $alias: alias,
         });
-        return this.http.authedRequest(
-            callback, "GET", path,
-        );
+        return this.http.authedRequest(callback, "GET", path);
     }
 
     /**
      * @param {string} roomAlias
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: Object with room_id and servers.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public resolveRoomAlias(roomAlias: string, callback?: Callback): Promise<any> { // TODO: Types
+    // eslint-disable-next-line camelcase
+    public resolveRoomAlias(roomAlias: string, callback?: Callback): Promise<{ room_id: string, servers: string[] }> {
         // TODO: deprecate this or getRoomIdForAlias
         const path = utils.encodeUri("/directory/room/$alias", { $alias: roomAlias });
         return this.http.request(callback, "GET", path);
@@ -6529,7 +6785,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getRoomDirectoryVisibility(roomId: string, callback?: Callback): Promise<any> { // TODO: Types
+    public getRoomDirectoryVisibility(roomId: string, callback?: Callback): Promise<{ visibility: Visibility }> {
         const path = utils.encodeUri("/directory/list/room/$roomId", {
             $roomId: roomId,
         });
@@ -6546,17 +6802,11 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: result object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setRoomDirectoryVisibility(
-        roomId: string,
-        visibility: "public" | "private",
-        callback?: Callback,
-    ): Promise<any> { // TODO: Types
+    public setRoomDirectoryVisibility(roomId: string, visibility: Visibility, callback?: Callback): Promise<{}> {
         const path = utils.encodeUri("/directory/list/room/$roomId", {
             $roomId: roomId,
         });
-        return this.http.authedRequest(
-            callback, "PUT", path, undefined, { "visibility": visibility },
-        );
+        return this.http.authedRequest(callback, "PUT", path, undefined, { visibility });
     }
 
     /**
@@ -6595,7 +6845,7 @@ export class MatrixClient extends EventEmitter {
      *                 apply a limit if unspecified.
      * @return {Promise} Resolves: an array of results.
      */
-    public searchUserDirectory(opts: { term: string, limit?: number }): Promise<any> { // TODO: Types
+    public searchUserDirectory(opts: { term: string, limit?: number }): Promise<IUserDirectoryResponse> {
         const body: any = {
             search_term: opts.term,
         };
@@ -6604,13 +6854,11 @@ export class MatrixClient extends EventEmitter {
             body.limit = opts.limit;
         }
 
-        return this.http.authedRequest(
-            undefined, "POST", "/user_directory/search", undefined, body,
-        );
+        return this.http.authedRequest(undefined, "POST", "/user_directory/search", undefined, body);
     }
 
     /**
-     * Upload a file to the media repository on the home server.
+     * Upload a file to the media repository on the homeserver.
      *
      * @param {object} file The object to upload. On a browser, something that
      *   can be sent to XMLHttpRequest.send (typically a File).  Under node.js,
@@ -6652,7 +6900,7 @@ export class MatrixClient extends EventEmitter {
     public uploadContent(
         file: File | String | Buffer | ReadStream | Blob,
         opts?: IUploadOpts,
-    ): Promise<any> { // TODO: Advanced types
+    ): IAbortablePromise<any> { // TODO: Advanced types
         return this.http.uploadContent(file, opts);
     }
 
@@ -6661,7 +6909,7 @@ export class MatrixClient extends EventEmitter {
      * @param {Promise} promise The promise returned from uploadContent
      * @return {boolean} true if canceled, otherwise false
      */
-    public cancelUpload(promise: Promise<any>): boolean { // TODO: Advanced types
+    public cancelUpload(promise: IAbortablePromise<any>): boolean {
         return this.http.cancelUpload(promise);
     }
 
@@ -6685,7 +6933,12 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getProfileInfo(userId: string, info?: string, callback?: Callback): Promise<any> { // TODO: Types
+    public getProfileInfo(
+        userId: string,
+        info?: string,
+        callback?: Callback,
+        // eslint-disable-next-line camelcase
+    ): Promise<{ avatar_url?: string, displayname?: string }> {
         if (utils.isFunction(info)) {
             callback = info as any as Callback; // legacy
             info = undefined;
@@ -6701,14 +6954,12 @@ export class MatrixClient extends EventEmitter {
 
     /**
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves to a list of the user's threepids.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getThreePids(callback?: Callback): Promise<any> { // TODO: Types
+    public getThreePids(callback?: Callback): Promise<{ threepids: IThreepid[] }> {
         const path = "/account/3pid";
-        return this.http.authedRequest(
-            callback, "GET", path, undefined, undefined,
-        );
+        return this.http.authedRequest(callback, "GET", path, undefined, undefined);
     }
 
     /**
@@ -6747,13 +6998,10 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: on success
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async addThreePidOnly(data: any): Promise<void> { // TODO: Types
+    public async addThreePidOnly(data: IAddThreePidOnlyBody): Promise<{}> {
         const path = "/account/3pid/add";
-        const prefix = await this.isVersionSupported("r0.6.0") ?
-            PREFIX_R0 : PREFIX_UNSTABLE;
-        return this.http.authedRequest(
-            undefined, "POST", path, null, data, { prefix },
-        );
+        const prefix = await this.isVersionSupported("r0.6.0") ? PREFIX_R0 : PREFIX_UNSTABLE;
+        return this.http.authedRequest(undefined, "POST", path, null, data, { prefix });
     }
 
     /**
@@ -6770,7 +7018,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: on success
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async bindThreePid(data: any): Promise<void> { // TODO: Types
+    public async bindThreePid(data: IBindThreePidBody): Promise<{}> {
         const path = "/account/3pid/bind";
         const prefix = await this.isVersionSupported("r0.6.0") ?
             PREFIX_R0 : PREFIX_UNSTABLE;
@@ -6790,18 +7038,19 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: on success
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async unbindThreePid(medium: string, address: string): Promise<void> {
+    public async unbindThreePid(
+        medium: string,
+        address: string,
+        // eslint-disable-next-line camelcase
+    ): Promise<{ id_server_unbind_result: IdServerUnbindResult }> {
         const path = "/account/3pid/unbind";
         const data = {
             medium,
             address,
             id_server: this.getIdentityServerUrl(true),
         };
-        const prefix = await this.isVersionSupported("r0.6.0") ?
-            PREFIX_R0 : PREFIX_UNSTABLE;
-        return this.http.authedRequest(
-            undefined, "POST", path, null, data, { prefix },
-        );
+        const prefix = await this.isVersionSupported("r0.6.0") ? PREFIX_R0 : PREFIX_UNSTABLE;
+        return this.http.authedRequest(undefined, "POST", path, null, data, { prefix });
     }
 
     /**
@@ -6812,13 +7061,13 @@ export class MatrixClient extends EventEmitter {
      *     (generally the empty JSON object)
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public deleteThreePid(medium: string, address: string): Promise<void> {
+    public deleteThreePid(
+        medium: string,
+        address: string,
+        // eslint-disable-next-line camelcase
+    ): Promise<{ id_server_unbind_result: IdServerUnbindResult }> {
         const path = "/account/3pid/delete";
-        const data = {
-            'medium': medium,
-            'address': address,
-        };
-        return this.http.authedRequest(undefined, "POST", path, null, data);
+        return this.http.authedRequest(undefined, "POST", path, null, { medium, address });
     }
 
     /**
@@ -6846,10 +7095,8 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: result object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getDevices(): Promise<any> { // TODO: Types
-        return this.http.authedRequest(
-            undefined, 'GET', "/devices", undefined, undefined,
-        );
+    public getDevices(): Promise<{ devices: IMyDevice[] }> {
+        return this.http.authedRequest(undefined, 'GET', "/devices", undefined, undefined);
     }
 
     /**
@@ -6858,13 +7105,11 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: result object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getDevice(deviceId: string): Promise<any> { // TODO: Types
+    public getDevice(deviceId: string): Promise<IMyDevice> {
         const path = utils.encodeUri("/devices/$device_id", {
             $device_id: deviceId,
         });
-        return this.http.authedRequest(
-            undefined, 'GET', path, undefined, undefined,
-        );
+        return this.http.authedRequest(undefined, 'GET', path, undefined, undefined);
     }
 
     /**
@@ -6875,7 +7120,8 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: result object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setDeviceDetails(deviceId: string, body: any): Promise<any> { // TODO: Types
+    // eslint-disable-next-line camelcase
+    public setDeviceDetails(deviceId: string, body: { display_name: string }): Promise<{}> {
         const path = utils.encodeUri("/devices/$device_id", {
             $device_id: deviceId,
         });
@@ -6931,34 +7177,31 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: Array of objects representing pushers
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getPushers(callback?: Callback): Promise<any> { // TODO: Types
+    public getPushers(callback?: Callback): Promise<{ pushers: IPusher[] }> {
         const path = "/pushers";
-        return this.http.authedRequest(
-            callback, "GET", path, undefined, undefined,
-        );
+        return this.http.authedRequest(callback, "GET", path, undefined, undefined);
     }
 
     /**
      * Adds a new pusher or updates an existing pusher
      *
-     * @param {Object} pusher Object representing a pusher
+     * @param {IPusherRequest} pusher Object representing a pusher
      * @param {module:client.callback} callback Optional.
      * @return {Promise} Resolves: Empty json object on success
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setPusher(pusher: any, callback?: Callback): Promise<any> { // TODO: Types
+    public setPusher(pusher: IPusherRequest, callback?: Callback): Promise<{}> {
         const path = "/pushers/set";
-        return this.http.authedRequest(
-            callback, "POST", path, null, pusher,
-        );
+        return this.http.authedRequest(callback, "POST", path, null, pusher);
     }
 
     /**
+     * Get the push rules for the account from the server.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves to the push rules.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getPushRules(callback?: Callback): Promise<any> { // TODO: Types
+    public getPushRules(callback?: Callback): Promise<IPushRules> {
         return this.http.authedRequest(callback, "GET", "/pushrules/").then(rules => {
             return PushProcessor.rewriteDefaultRules(rules);
         });
@@ -6970,18 +7213,22 @@ export class MatrixClient extends EventEmitter {
      * @param {string} ruleId
      * @param {Object} body
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public addPushRule(scope: string, kind: string, ruleId: string, body: any, callback?: Callback): Promise<any> { // TODO: Types
+    public addPushRule(
+        scope: string,
+        kind: PushRuleKind,
+        ruleId: Exclude<string, RuleId>,
+        body: any,
+        callback?: Callback,
+    ): Promise<any> { // TODO: Types
         // NB. Scope not uri encoded because devices need the '/'
         const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
             $kind: kind,
             $ruleId: ruleId,
         });
-        return this.http.authedRequest(
-            callback, "PUT", path, undefined, body,
-        );
+        return this.http.authedRequest(callback, "PUT", path, undefined, body);
     }
 
     /**
@@ -6989,10 +7236,15 @@ export class MatrixClient extends EventEmitter {
      * @param {string} kind
      * @param {string} ruleId
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public deletePushRule(scope: string, kind: string, ruleId: string, callback?: Callback): Promise<any> { // TODO: Types
+    public deletePushRule(
+        scope: string,
+        kind: PushRuleKind,
+        ruleId: Exclude<string, RuleId>,
+        callback?: Callback,
+    ): Promise<any> { // TODO: Types
         // NB. Scope not uri encoded because devices need the '/'
         const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
             $kind: kind,
@@ -7013,11 +7265,11 @@ export class MatrixClient extends EventEmitter {
      */
     public setPushRuleEnabled(
         scope: string,
-        kind: string,
-        ruleId: string,
+        kind: PushRuleKind,
+        ruleId: RuleId | string,
         enabled: boolean,
         callback?: Callback,
-    ): Promise<any> { // TODO: Types
+    ): Promise<{}> {
         const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId/enabled", {
             $kind: kind,
             $ruleId: ruleId,
@@ -7039,11 +7291,11 @@ export class MatrixClient extends EventEmitter {
      */
     public setPushRuleActions(
         scope: string,
-        kind: string,
-        ruleId: string,
-        actions: string[],
+        kind: PushRuleKind,
+        ruleId: RuleId | string,
+        actions: PushRuleAction[],
         callback?: Callback,
-    ): Promise<any> { // TODO: Types
+    ): Promise<{}> {
         const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId/actions", {
             $kind: kind,
             $ruleId: ruleId,
@@ -7063,16 +7315,14 @@ export class MatrixClient extends EventEmitter {
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public search(
-        opts: { body: any, next_batch?: string }, // eslint-disable-line camelcase
+        opts: { body: ISearchRequestBody, next_batch?: string }, // eslint-disable-line camelcase
         callback?: Callback,
-    ): Promise<any> { // TODO: Types
+    ): Promise<ISearchResponse> {
         const queryParams: any = {};
         if (opts.next_batch) {
             queryParams.next_batch = opts.next_batch;
         }
-        return this.http.authedRequest(
-            callback, "POST", "/search", queryParams, opts.body,
-        );
+        return this.http.authedRequest(callback, "POST", "/search", queryParams, opts.body);
     }
 
     /**
@@ -7088,11 +7338,15 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: result object. Rejects: with
      *     an error response ({@link module:http-api.MatrixError}).
      */
-    public uploadKeysRequest(content: any, opts?: any, callback?: Callback): Promise<IKeysUploadResponse> {
+    public uploadKeysRequest(
+        content: IUploadKeysRequest,
+        opts?: void,
+        callback?: Callback,
+    ): Promise<IKeysUploadResponse> {
         return this.http.authedRequest(callback, "POST", "/keys/upload", undefined, content);
     }
 
-    public uploadKeySignatures(content: any): Promise<any> { // TODO: Types
+    public uploadKeySignatures(content: KeySignatures): Promise<IUploadKeySignaturesResponse> {
         return this.http.authedRequest(
             undefined, "POST", '/keys/signatures/upload', undefined,
             content, {
@@ -7114,12 +7368,10 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: result object. Rejects: with
      *     an error response ({@link module:http-api.MatrixError}).
      */
-    public downloadKeysForUsers(userIds: string[], opts: { token?: string }): Promise<any> { // TODO: Types
+    public downloadKeysForUsers(userIds: string[], opts: { token?: string }): Promise<IDownloadKeyResult> {
         if (utils.isFunction(opts)) {
             // opts used to be 'callback'.
-            throw new Error(
-                'downloadKeysForUsers no longer accepts a callback parameter',
-            );
+            throw new Error('downloadKeysForUsers no longer accepts a callback parameter');
         }
         opts = opts || {};
 
@@ -7149,7 +7401,11 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: result object. Rejects: with
      *     an error response ({@link module:http-api.MatrixError}).
      */
-    public claimOneTimeKeys(devices: string[], keyAlgorithm = "signed_curve25519", timeout?: number): Promise<any> { // TODO: Types
+    public claimOneTimeKeys(
+        devices: string[],
+        keyAlgorithm = "signed_curve25519",
+        timeout?: number,
+    ): Promise<IClaimOTKsResult> {
         const queries = {};
 
         if (keyAlgorithm === undefined) {
@@ -7181,7 +7437,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: result object. Rejects: with
      *     an error response ({@link module:http-api.MatrixError}).
      */
-    public getKeyChanges(oldToken: string, newToken: string): Promise<any> { // TODO: Types
+    public getKeyChanges(oldToken: string, newToken: string): Promise<{ changed: string[], left: string[] }> {
         const qps = {
             from: oldToken,
             to: newToken,
@@ -7191,7 +7447,7 @@ export class MatrixClient extends EventEmitter {
         return this.http.authedRequest(undefined, "GET", path, qps, undefined);
     }
 
-    public uploadDeviceSigningKeys(auth: any, keys: any): Promise<any> { // TODO: Lots of types
+    public uploadDeviceSigningKeys(auth: any, keys: CrossSigningKeys): Promise<{}> { // TODO: types
         const data = Object.assign({}, keys);
         if (auth) Object.assign(data, { auth });
         return this.http.authedRequest(
@@ -7202,7 +7458,7 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
-     * Register with an Identity Server using the OpenID token from the user's
+     * Register with an identity server using the OpenID token from the user's
      * Homeserver, which can be retrieved via
      * {@link module:client~MatrixClient#getOpenIdToken}.
      *
@@ -7216,7 +7472,7 @@ export class MatrixClient extends EventEmitter {
      */
     public registerWithIdentityServer(hsOpenIdToken: any): Promise<any> { // TODO: Types
         if (!this.idBaseUrl) {
-            throw new Error("No Identity Server base URL set");
+            throw new Error("No identity server base URL set");
         }
 
         const uri = this.idBaseUrl + PREFIX_IDENTITY_V2 + "/account/register";
@@ -7325,7 +7581,7 @@ export class MatrixClient extends EventEmitter {
      * Submits a MSISDN token to the identity server
      *
      * This is used when submitting the code sent by SMS to a phone number.
-     * The ID server has an equivalent API for email but the js-sdk does
+     * The identity server has an equivalent API for email but the js-sdk does
      * not expose this, since email is normally validated by the user clicking
      * a link rather than entering a code.
      *
@@ -7338,7 +7594,7 @@ export class MatrixClient extends EventEmitter {
      *
      * @return {Promise} Resolves: Object, currently with no parameters.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @throws Error if No ID server is set
+     * @throws Error if No identity server is set
      */
     public async submitMsisdnToken(
         sid: string,
@@ -7491,7 +7747,7 @@ export class MatrixClient extends EventEmitter {
 
     /**
      * Looks up the public Matrix ID mapping for a given 3rd party
-     * identifier from the Identity Server
+     * identifier from the identity server
      *
      * @param {string} medium The medium of the threepid, eg. 'email'
      * @param {string} address The textual address of the threepid
@@ -7576,7 +7832,7 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
-     * Get account info from the Identity Server. This is useful as a neutral check
+     * Get account info from the identity server. This is useful as a neutral check
      * to verify that other APIs are likely to approve access by testing that the
      * token is valid, terms have been agreed, etc.
      *
@@ -7603,7 +7859,11 @@ export class MatrixClient extends EventEmitter {
      *    supplied.
      * @return {Promise} Resolves to the result object
      */
-    public sendToDevice(eventType: string, contentMap: any, txnId?: string): Promise<any> { // TODO: Types
+    public sendToDevice(
+        eventType: string,
+        contentMap: { [userId: string]: { [deviceId: string]: Record<string, any> } },
+        txnId?: string,
+    ): Promise<{}> {
         const path = utils.encodeUri("/sendToDevice/$eventType/$txnId", {
             $eventType: eventType,
             $txnId: txnId ? txnId : this.makeTxnId(),
@@ -7627,15 +7887,13 @@ export class MatrixClient extends EventEmitter {
      * this HS
      * @return {Promise} Resolves to the result object
      */
-    public getThirdpartyProtocols(): Promise<any> { // TODO: Types
+    public getThirdpartyProtocols(): Promise<{ [protocol: string]: IProtocol }> {
         return this.http.authedRequest(
             undefined, "GET", "/thirdparty/protocols", undefined, undefined,
         ).then((response) => {
             // sanity check
             if (!response || typeof (response) !== 'object') {
-                throw new Error(
-                    `/thirdparty/protocols did not return an object: ${response}`,
-                );
+                throw new Error(`/thirdparty/protocols did not return an object: ${response}`);
             }
             return response;
         });
@@ -7649,7 +7907,10 @@ export class MatrixClient extends EventEmitter {
      *                        response to getThirdpartyProtocols()
      * @return {Promise} Resolves to the result object
      */
-    public getThirdpartyLocation(protocol: string, params: any): Promise<any> { // TODO: Types
+    public getThirdpartyLocation(
+        protocol: string,
+        params: { searchFields?: string[] },
+    ): Promise<IThirdPartyLocation[]> {
         const path = utils.encodeUri("/thirdparty/location/$protocol", {
             $protocol: protocol,
         });
@@ -7665,7 +7926,7 @@ export class MatrixClient extends EventEmitter {
      *                        response to getThirdpartyProtocols()
      * @return {Promise} Resolves to the result object
      */
-    public getThirdpartyUser(protocol: string, params: any): Promise<any> { // TODO: Types
+    public getThirdpartyUser(protocol: string, params: any): Promise<IThirdPartyUser[]> { // TODO: Types
         const path = utils.encodeUri("/thirdparty/user/$protocol", {
             $protocol: protocol,
         });
@@ -7675,9 +7936,7 @@ export class MatrixClient extends EventEmitter {
 
     public getTerms(serviceType: SERVICE_TYPES, baseUrl: string): Promise<any> { // TODO: Types
         const url = this.termsUrlForService(serviceType, baseUrl);
-        return this.http.requestOtherUrl(
-            undefined, 'GET', url,
-        );
+        return this.http.requestOtherUrl(undefined, 'GET', url);
     }
 
     public agreeToTerms(
@@ -7690,9 +7949,7 @@ export class MatrixClient extends EventEmitter {
         const headers = {
             Authorization: "Bearer " + accessToken,
         };
-        return this.http.requestOtherUrl(
-            undefined, 'POST', url, null, { user_accepts: termsUrls }, { headers },
-        );
+        return this.http.requestOtherUrl(undefined, 'POST', url, null, { user_accepts: termsUrls }, { headers });
     }
 
     /**
@@ -7703,7 +7960,7 @@ export class MatrixClient extends EventEmitter {
      * @param {string} reason The reason the content is being reported. May be blank.
      * @returns {Promise} Resolves to an empty object if successful
      */
-    public reportEvent(roomId: string, eventId: string, score: number, reason: string): Promise<any> { // TODO: Types
+    public reportEvent(roomId: string, eventId: string, score: number, reason: string): Promise<{}> {
         const path = utils.encodeUri("/rooms/$roomId/report/$eventId", {
             $roomId: roomId,
             $eventId: eventId,
@@ -7729,7 +7986,10 @@ export class MatrixClient extends EventEmitter {
         autoJoinOnly?: boolean,
         limit?: number,
         batch?: string,
-    ): Promise<any> { // TODO: Types
+    ): Promise<{
+        rooms: ISpaceSummaryRoom[];
+        events: ISpaceSummaryEvent[];
+    }> {
         const path = utils.encodeUri("/rooms/$roomId/spaces", {
             $roomId: roomId,
         });

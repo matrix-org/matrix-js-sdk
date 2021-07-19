@@ -19,7 +19,7 @@ import { IndexedDBCryptoStore } from '../crypto/store/indexeddb-crypto-store';
 import { decryptAES, encryptAES } from './aes';
 import anotherjson from "another-json";
 import { logger } from '../logger';
-import { ISecretStorageKeyInfo } from "../matrix";
+import { ISecretStorageKeyInfo } from "./api";
 
 // FIXME: these types should eventually go in a different file
 type Signatures = Record<string, Record<string, string>>;
@@ -36,7 +36,7 @@ export interface IDehydratedDeviceKeyInfo {
     passphrase?: string;
 }
 
-interface DeviceKeys {
+export interface IDeviceKeys {
     algorithms: Array<string>;
     device_id: string; // eslint-disable-line camelcase
     user_id: string; // eslint-disable-line camelcase
@@ -44,7 +44,7 @@ interface DeviceKeys {
     signatures?: Signatures;
 }
 
-interface OneTimeKey {
+export interface IOneTimeKey {
     key: string;
     fallback?: boolean;
     signatures?: Signatures;
@@ -222,7 +222,7 @@ export class DehydrationManager {
             // send the keys to the server
             const deviceId = dehydrateResult.device_id;
             logger.log("Preparing device keys", deviceId);
-            const deviceKeys: DeviceKeys = {
+            const deviceKeys: IDeviceKeys = {
                 algorithms: this.crypto.supportedAlgorithms,
                 device_id: deviceId,
                 user_id: this.crypto.userId,
@@ -244,7 +244,7 @@ export class DehydrationManager {
             logger.log("Preparing one-time keys");
             const oneTimeKeys = {};
             for (const [keyId, key] of Object.entries(otks.curve25519)) {
-                const k: OneTimeKey = { key };
+                const k: IOneTimeKey = { key };
                 const signature = account.sign(anotherjson.stringify(k));
                 k.signatures = {
                     [this.crypto.userId]: {
@@ -257,7 +257,7 @@ export class DehydrationManager {
             logger.log("Preparing fallback keys");
             const fallbackKeys = {};
             for (const [keyId, key] of Object.entries(fallbacks.curve25519)) {
-                const k: OneTimeKey = { key, fallback: true };
+                const k: IOneTimeKey = { key, fallback: true };
                 const signature = account.sign(anotherjson.stringify(k));
                 k.signatures = {
                     [this.crypto.userId]: {

@@ -15,11 +15,17 @@ limitations under the License.
 */
 
 // this is needed to tell TS about global.Olm
-import * as Olm from "@matrix-org/olm"; // eslint-disable-line @typescript-eslint/no-unused-vars
+import "@matrix-org/olm";
 
 export {};
 
 declare global {
+    // use `number` as the return type in all cases for global.set{Interval,Timeout},
+    // so we don't accidentally use the methods on NodeJS.Timeout - they only exist in a subset of environments.
+    // The overload for clear{Interval,Timeout} is resolved as expected.
+    function setInterval(handler: TimerHandler, timeout: number, ...arguments: any[]): number;
+    function setTimeout(handler: TimerHandler, timeout: number, ...arguments: any[]): number;
+
     namespace NodeJS {
         interface Global {
             localStorage: Storage;
@@ -32,6 +38,10 @@ declare global {
 
     interface Electron {
         getDesktopCapturerSources(options: GetSourcesOptions): Promise<Array<DesktopCapturerSource>>;
+    }
+
+    interface Crypto {
+        webkitSubtle?: Window["crypto"]["subtle"];
     }
 
     interface MediaDevices {

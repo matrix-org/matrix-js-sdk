@@ -19,11 +19,14 @@ limitations under the License.
 import { EventEmitter } from 'events';
 
 import { MemoryStore, IOpts as IBaseOpts } from "./memory";
-import { LocalIndexedDBStoreBackend } from "./indexeddb-local-backend.js";
-import { RemoteIndexedDBStoreBackend } from "./indexeddb-remote-backend.js";
+import { LocalIndexedDBStoreBackend } from "./indexeddb-local-backend";
+import { RemoteIndexedDBStoreBackend } from "./indexeddb-remote-backend";
 import { User } from "../models/user";
-import { MatrixEvent } from "../models/event";
+import { IEvent, MatrixEvent } from "../models/event";
 import { logger } from '../logger';
+import { ISavedSync } from "./index";
+import { IIndexedDBBackend } from "./indexeddb-backend";
+import { ISyncResponse } from "../sync-accumulator";
 
 /**
  * This is an internal module. See {@link IndexedDBStore} for the public class.
@@ -40,8 +43,7 @@ const WRITE_DELAY_MS = 1000 * 60 * 5; // once every 5 minutes
 interface IOpts extends IBaseOpts {
     indexedDB: IDBFactory;
     dbName?: string;
-    workerScript?: string;
-    workerApi?: typeof Worker;
+    workerFactory?: () => Worker;
 }
 
 export class IndexedDBStore extends MemoryStore {
@@ -49,8 +51,7 @@ export class IndexedDBStore extends MemoryStore {
         return LocalIndexedDBStoreBackend.exists(indexedDB, dbName);
     }
 
-    // TODO these should conform to one interface
-    public readonly backend: LocalIndexedDBStoreBackend | RemoteIndexedDBStoreBackend;
+    public readonly backend: IIndexedDBBackend;
 
     private startedUp = false;
     private syncTs = 0;
@@ -109,16 +110,8 @@ export class IndexedDBStore extends MemoryStore {
             throw new Error('Missing required option: indexedDB');
         }
 
-        if (opts.workerScript) {
-            // try & find a webworker-compatible API
-            let workerApi = opts.workerApi;
-            if (!workerApi) {
-                // default to the global Worker object (which is where it in a browser)
-                workerApi = global.Worker;
-            }
-            this.backend = new RemoteIndexedDBStoreBackend(
-                opts.workerScript, opts.dbName, workerApi,
-            );
+        if (opts.workerFactory) {
+            this.backend = new RemoteIndexedDBStoreBackend(opts.workerFactory, opts.dbName);
         } else {
             this.backend = new LocalIndexedDBStoreBackend(opts.indexedDB, opts.dbName);
         }
@@ -157,7 +150,7 @@ export class IndexedDBStore extends MemoryStore {
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
-    public getSavedSync = this.degradable((): Promise<object> => {
+    public getSavedSync = this.degradable((): Promise<ISavedSync> => {
         return this.backend.getSavedSync();
     }, "getSavedSync");
 
@@ -221,7 +214,7 @@ export class IndexedDBStore extends MemoryStore {
 
         // work out changed users (this doesn't handle deletions but you
         // can't 'delete' users as they are just presence events).
-        const userTuples = [];
+        const userTuples: [userId: string, presenceEvent: Partial<IEvent>][] = [];
         for (const u of this.getUsers()) {
             if (this.userModifiedMap[u.userId] === u.getLastModifiedTime()) continue;
             if (!u.events.presence) continue;
@@ -235,7 +228,7 @@ export class IndexedDBStore extends MemoryStore {
         return this.backend.syncToDatabase(userTuples);
     });
 
-    public setSyncData = this.degradable((syncData: object): Promise<void> => {
+    public setSyncData = this.degradable((syncData: ISyncResponse): Promise<void> => {
         return this.backend.setSyncData(syncData);
     }, "setSyncData");
 
@@ -246,7 +239,7 @@ export class IndexedDBStore extends MemoryStore {
      * @returns {event[]} the events, potentially an empty array if OOB loading didn't yield any new members
      * @returns {null} in case the members for this room haven't been stored yet
      */
-    public getOutOfBandMembers = this.degradable((roomId: string): Promise<MatrixEvent[]> => {
+    public getOutOfBandMembers = this.degradable((roomId: string): Promise<IEvent[]> => {
         return this.backend.getOutOfBandMembers(roomId);
     }, "getOutOfBandMembers");
 
@@ -258,7 +251,7 @@ export class IndexedDBStore extends MemoryStore {
      * @param {event[]} membershipEvents the membership events to store
      * @returns {Promise} when all members have been stored
      */
-    public setOutOfBandMembers = this.degradable((roomId: string, membershipEvents: MatrixEvent[]): Promise<void> => {
+    public setOutOfBandMembers = this.degradable((roomId: string, membershipEvents: IEvent[]): Promise<void> => {
         super.setOutOfBandMembers(roomId, membershipEvents);
         return this.backend.setOutOfBandMembers(roomId, membershipEvents);
     }, "setOutOfBandMembers");

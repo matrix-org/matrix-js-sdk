@@ -49,7 +49,7 @@ export class Relations extends EventEmitter {
      * notification timeline.
      */
     constructor(
-        public readonly relationType: RelationType,
+        public readonly relationType: RelationType | string,
         public readonly eventType: string,
         private readonly room: Room,
     ) {
