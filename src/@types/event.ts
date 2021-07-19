@@ -148,6 +148,19 @@ export const UNSTABLE_MSC3089_BRANCH = new UnstableValue("m.branch", "org.matrix
  * Functional members type for declaring a purpose of room members (e.g. helpful bots).
  * Note that this reference is UNSTABLE and subject to breaking changes, including its
  * eventual removal.
+ *
+ * Schema (TypeScript):
+ * {
+ *   service_members?: string[]
+ * }
+ *
+ * Example:
+ * {
+ *   "service_members": [
+ *     "@helperbot:localhost",
+ *     "@reminderbot:alice.tdl"
+ *   ]
+ * }
  */
 export const UNSTABLE_ELEMENT_FUNCTIONAL_USERS = new UnstableValue(
     "io.element.functional_members",
