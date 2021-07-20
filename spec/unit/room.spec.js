@@ -1719,6 +1719,29 @@ describe("Room", function() {
                 ]);
                 expect(room.getDefaultRoomName(userA)).toEqual("Empty room");
             });
+
+            it("should not break if an unjoined user is marked as a service user",
+            function() {
+                const room = new Room(roomId, null, userA);
+                room.addLiveEvents([
+                    utils.mkMembership({
+                        user: userA, mship: "join",
+                        room: roomId, event: true, name: "User A",
+                    }),
+                    utils.mkMembership({
+                        user: userB, mship: "join",
+                        room: roomId, event: true, name: "User B",
+                    }),
+                    utils.mkEvent({
+                        type: UNSTABLE_ELEMENT_FUNCTIONAL_USERS.name, skey: "",
+                        room: roomId, event: true, user: userA,
+                        content: {
+                            service_members: [userC],
+                        },
+                    }),
+                ]);
+                expect(room.getDefaultRoomName(userA)).toEqual("User B");
+            });
         });
     });
 });
