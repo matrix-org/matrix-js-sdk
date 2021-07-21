@@ -53,7 +53,7 @@ export class RoomState extends EventEmitter {
     private modified: number;
 
     // XXX: Should be read-only
-    public members: Record<string, RoomMember> = {}; // userId: RoomMember
+    public members = new Map<string, RoomMember>(); // userId: RoomMember
     public events = new Map<string, Map<string, MatrixEvent>>(); // Map<eventType, Map<stateKey, MatrixEvent>>
     public paginationToken: string = null;
 
@@ -150,7 +150,7 @@ export class RoomState extends EventEmitter {
      * @return {Array<RoomMember>} A list of RoomMembers.
      */
     public getMembers(): RoomMember[] {
-        return Object.values(this.members);
+        return Array.from(this.members.values());
     }
 
     /**
@@ -168,7 +168,7 @@ export class RoomState extends EventEmitter {
      * @return {RoomMember} The member or null if they do not exist.
      */
     public getMember(userId: string): RoomMember | null {
-        return this.members[userId] || null;
+        return this.members.get(userId) || null;
     }
 
     /**
@@ -186,7 +186,7 @@ export class RoomState extends EventEmitter {
 
         if (sentinel === undefined) {
             sentinel = new RoomMember(this.roomId, userId);
-            const member = this.members[userId];
+            const member = this.members.get(userId);
             if (member) {
                 sentinel.setMembershipEvent(member.events.member, this);
             }
@@ -348,7 +348,7 @@ export class RoomState extends EventEmitter {
                 if (event.getStateKey() !== "") {
                     return;
                 }
-                const members = Object.values(this.members);
+                const members = Array.from(this.members.values());
                 members.forEach((member) => {
                     // We only propagate `RoomState.members` event if the
                     // power levels has been changed
@@ -377,12 +377,12 @@ export class RoomState extends EventEmitter {
      * @returns {RoomMember} the member, existing or newly created.
      */
     private getOrCreateMember(userId: string, event: MatrixEvent): RoomMember {
-        let member = this.members[userId];
+        let member = this.members.get(userId);
         if (!member) {
             member = new RoomMember(this.roomId, userId);
             // add member to members before emitting any events,
             // as event handlers often lookup the member
-            this.members[userId] = member;
+            this.members.set(userId, member);
             this.emit("RoomState.newMember", event, this, member);
         }
         return member;
@@ -410,7 +410,7 @@ export class RoomState extends EventEmitter {
         // blow away the sentinel which is now outdated
         delete this.sentinels[member.userId];
 
-        this.members[member.userId] = member;
+        this.members.set(member.userId, member);
         this.joinedMemberCount = null;
         this.invitedMemberCount = null;
     }
@@ -451,11 +451,11 @@ export class RoomState extends EventEmitter {
      */
     public clearOutOfBandMembers(): void {
         let count = 0;
-        Object.keys(this.members).forEach((userId) => {
-            const member = this.members[userId];
+        Array.from(this.members.keys()).forEach((userId) => {
+            const member = this.members.get(userId);
             if (member.isOutOfBand()) {
                 ++count;
-                delete this.members[userId];
+                this.members.delete(userId);
             }
         });
         logger.log(`LL: RoomState removed ${count} members...`);
@@ -510,7 +510,7 @@ export class RoomState extends EventEmitter {
      * @param {MatrixEvent} event The typing event
      */
     public setTypingEvent(event: MatrixEvent): void {
-        Object.values(this.members).forEach(function(member) {
+        Array.from(this.members.values()).forEach(function(member) {
             member.setTypingEvent(event);
         });
     }

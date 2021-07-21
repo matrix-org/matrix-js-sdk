@@ -1076,6 +1076,14 @@ export class Room extends EventEmitter {
     }
 
     /**
+     * Returns the number of loaded members in this room
+     * @return {number} The number of loaded members in this room
+     */
+    public getMembersCount(): number {
+        return this.currentState.members.size;
+    }
+
+    /**
      * Returns the number of joined members in this room
      * This method caches the result.
      * This is a wrapper around the method of the same name in roomState, returning
