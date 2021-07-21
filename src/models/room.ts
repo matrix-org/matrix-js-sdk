@@ -2053,7 +2053,7 @@ export class Room extends EventEmitter {
                     (m.membership === "invite" || m.membership === "join");
             });
             // make sure members have stable order
-            otherMembers.sort((a, b) => a.userId.localeCompare(b.userId));
+            otherMembers.sort((a, b) => utils.compare(a.userId, b.userId));
             // only 5 first members, immitate summaryHeroes
             otherMembers = otherMembers.slice(0, 5);
             otherNames = otherMembers.map((m) => m.name);
