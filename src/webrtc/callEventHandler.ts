@@ -152,6 +152,10 @@ export class CallEventHandler {
                 );
             }
 
+            if (content.invitee && content.invitee !== this.client.getUserId()) {
+                return; // This invite was meant for another user in the room
+            }
+
             const timeUntilTurnCresExpire = this.client.getTurnServersExpiry() - Date.now();
             logger.info("Current turn creds expire in " + timeUntilTurnCresExpire + " ms");
             call = createNewMatrixCall(this.client, event.getRoomId(), {

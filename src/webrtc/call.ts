@@ -57,6 +57,7 @@ import { CallFeed } from './callFeed';
 
 interface CallOpts {
     roomId?: string;
+    invitee?: string;
     client?: any; // Fix when client is TSified
     forceTURN?: boolean;
     turnServers?: Array<TurnServer>;
@@ -259,6 +260,7 @@ function genCallID(): string {
  */
 export class MatrixCall extends EventEmitter {
     roomId: string;
+    invitee?: string;
     type: CallType;
     callId: string;
     state: CallState;
@@ -316,6 +318,7 @@ export class MatrixCall extends EventEmitter {
     constructor(opts: CallOpts) {
         super();
         this.roomId = opts.roomId;
+        this.invitee = opts.invitee;
         this.client = opts.client;
         this.type = null;
         this.forceTURN = opts.forceTURN;
@@ -1164,6 +1167,10 @@ export class MatrixCall extends EventEmitter {
             lifetime: CALL_TIMEOUT_MS,
         } as MCallOfferNegotiate;
 
+        if (eventType === EventType.CallInvite && this.invitee) {
+            content.invitee = this.invitee;
+        }
+
         // clunky because TypeScript can't folow the types through if we use an expression as the key
         if (this.state === CallState.CreateOffer) {
             content.offer = this.peerConn.localDescription;
@@ -1801,6 +1808,7 @@ export function createNewMatrixCall(client: any, roomId: string, options?: CallO
     const opts = {
         client: client,
         roomId: roomId,
+        invitee: options.invitee,
         turnServers: client.getTurnServers(),
         // call level options
         forceTURN: client.forceTURN || optionsForceTURN,

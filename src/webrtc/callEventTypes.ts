@@ -25,6 +25,7 @@ export interface MCallOfferNegotiate {
     description: CallOfferAnswer;
     lifetime: number;
     capabilities: CallCapabilities;
+    invitee?: string;
 }
 
 export interface MCallReplacesTarget {
