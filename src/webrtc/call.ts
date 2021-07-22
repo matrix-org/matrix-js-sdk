@@ -901,6 +901,7 @@ export class MatrixCall extends EventEmitter {
      * (including if the call is not set up yet).
      */
     isLocalVideoMuted(): boolean {
+        if (this.type === CallType.Voice) return true;
         return this.vidMuted;
     }
 
