@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { Callback } from "../client";
+import { IContent } from "../models/event";
 import { Preset, Visibility } from "./partials";
 import { SearchKey } from "./search";
 import { IRoomEventFilter } from "../filter";
@@ -84,7 +85,7 @@ export interface IInvite3PID {
 export interface ICreateRoomStateEvent {
     type: string;
     state_key?: string; // defaults to an empty string
-    content: object;
+    content: IContent;
 }
 
 export interface ICreateRoomOpts {
