@@ -338,7 +338,7 @@ export class MatrixEvent extends EventEmitter {
             return {} as T;
         }
         if (this.clearEvent) {
-            return this.clearEvent.content as T;
+            return (this.clearEvent.content || {}) as T;
         }
         return (this.event.content || {}) as T;
     }
@@ -732,10 +732,7 @@ export class MatrixEvent extends EventEmitter {
      * @returns {Object} The cleartext (decrypted) content for the event
      */
     public getClearContent(): IContent | null {
-        if (this.clearEvent) {
-            return this.clearEvent.content;
-        }
-        return null;
+        return this.clearEvent?.content || null;
     }
 
     /**
