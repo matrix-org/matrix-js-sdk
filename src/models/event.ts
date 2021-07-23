@@ -338,7 +338,7 @@ export class MatrixEvent extends EventEmitter {
             return {} as T;
         }
         if (this.clearEvent) {
-           return this.clearEvent.content as T;
+            return this.clearEvent.content as T;
         }
         return (this.event.content || {}) as T;
     }
