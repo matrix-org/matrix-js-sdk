@@ -285,7 +285,10 @@ export class MatrixEvent extends EventEmitter {
      * @return {string} The event type, e.g. <code>m.room.message</code>
      */
     public getType(): EventType | string {
-        return this.clearEvent?.type || this.event.type;
+        if (this.clearEvent) {
+            return this.clearEvent.type;
+        }
+        return this.event.type;
     }
 
     /**
@@ -334,7 +337,10 @@ export class MatrixEvent extends EventEmitter {
         if (this._localRedactionEvent) {
             return {} as T;
         }
-        return (this.clearEvent?.content || this.event.content || {}) as T;
+        if (this.clearEvent) {
+           return this.clearEvent.content as T;
+        }
+        return (this.event.content || {}) as T;
     }
 
     /**
@@ -518,7 +524,7 @@ export class MatrixEvent extends EventEmitter {
             throw new Error("Attempt to decrypt event which isn't encrypted");
         }
 
-        if (this.clearEvent?.content?.msgtype !== "m.bad.encrypted") {
+        if (this.isDecryptionFailure()) {
             // we may want to just ignore this? let's start with rejecting it.
             throw new Error(
                 "Attempt to decrypt event which has already been decrypted",
@@ -726,7 +732,10 @@ export class MatrixEvent extends EventEmitter {
      * @returns {Object} The cleartext (decrypted) content for the event
      */
     public getClearContent(): IContent | null {
-        return this.clearEvent?.content || null;
+        if (this.clearEvent) {
+            return this.clearEvent.content;
+        }
+        return null;
     }
 
     /**
