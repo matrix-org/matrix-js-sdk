@@ -264,9 +264,7 @@ export class InteractiveAuth {
                     client_secret: this.clientSecret,
                 };
                 if (await this.matrixClient.doesServerRequireIdServerParam()) {
-                    const idServerParsedUrl = url.parse(
-                        this.matrixClient.getIdentityServerUrl(),
-                    );
+                    const idServerParsedUrl = new URL(this.matrixClient.getIdentityServerUrl());
                     creds.id_server = idServerParsedUrl.host;
                 }
                 authDict = {
@@ -294,7 +292,7 @@ export class InteractiveAuth {
 
     /**
      * get the client secret used for validation sessions
-     * with the ID server.
+     * with the identity server.
      *
      * @return {string} client secret
      */

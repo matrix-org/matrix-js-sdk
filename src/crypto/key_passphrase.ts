@@ -22,8 +22,8 @@ const DEFAULT_BITSIZE = 256;
 
 /* eslint-disable camelcase */
 interface IAuthData {
-    private_key_salt: string;
-    private_key_iterations: number;
+    private_key_salt?: string;
+    private_key_iterations?: number;
     private_key_bits?: number;
 }
 /* eslint-enable camelcase */

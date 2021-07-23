@@ -24,10 +24,10 @@ import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { CryptoStore } from "../client";
 
 /* eslint-disable camelcase */
-interface IRoomEncryption {
+export interface IRoomEncryption {
     algorithm: string;
-    rotation_period_ms: number;
-    rotation_period_msgs: number;
+    rotation_period_ms?: number;
+    rotation_period_msgs?: number;
 }
 /* eslint-enable camelcase */
 

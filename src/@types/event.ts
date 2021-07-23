@@ -144,6 +144,28 @@ export const UNSTABLE_MSC3089_LEAF = new UnstableValue("m.leaf", "org.matrix.msc
  */
 export const UNSTABLE_MSC3089_BRANCH = new UnstableValue("m.branch", "org.matrix.msc3089.branch");
 
+/**
+ * Functional members type for declaring a purpose of room members (e.g. helpful bots).
+ * Note that this reference is UNSTABLE and subject to breaking changes, including its
+ * eventual removal.
+ *
+ * Schema (TypeScript):
+ * {
+ *   service_members?: string[]
+ * }
+ *
+ * Example:
+ * {
+ *   "service_members": [
+ *     "@helperbot:localhost",
+ *     "@reminderbot:alice.tdl"
+ *   ]
+ * }
+ */
+export const UNSTABLE_ELEMENT_FUNCTIONAL_USERS = new UnstableValue(
+    "io.element.functional_members",
+    "io.element.functional_members");
+
 export interface IEncryptedFile {
     url: string;
     mimetype?: string;

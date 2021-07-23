@@ -1,3 +1,19 @@
+/*
+Copyright 2021 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 import { logger } from "../logger";
 import { MatrixEvent } from "../models/event";
 import { EventEmitter } from "events";
@@ -9,10 +25,10 @@ import {
     CrossSigningKeys,
     ICrossSigningKey,
     ICryptoCallbacks,
-    ISecretStorageKeyInfo,
     ISignedKey,
     KeySignatures,
 } from "../matrix";
+import { ISecretStorageKeyInfo } from "./api";
 import { IKeyBackupInfo } from "./keybackup";
 
 interface ICrossSigningKeys {
@@ -109,8 +125,8 @@ export class EncryptionSetupBuilder {
      * @param {Object} content
      * @return {Promise}
      */
-    public setAccountData(type: string, content: object): Promise<void> {
-        return this.accountDataClientAdapter.setAccountData(type, content);
+    public async setAccountData(type: string, content: object): Promise<void> {
+        await this.accountDataClientAdapter.setAccountData(type, content);
     }
 
     /**
@@ -246,7 +262,7 @@ export class EncryptionSetupOperation {
  * implementing the methods related to account data in MatrixClient
  */
 class AccountDataClientAdapter extends EventEmitter {
-    public readonly values = new Map<string, object>();
+    public readonly values = new Map<string, MatrixEvent>();
 
     /**
      * @param  {Object.<String, MatrixEvent>} existingValues existing account data
@@ -259,7 +275,7 @@ class AccountDataClientAdapter extends EventEmitter {
      * @param  {String} type
      * @return {Promise<Object>} the content of the account data
      */
-    public getAccountDataFromServer(type: string): Promise<object> {
+    public getAccountDataFromServer(type: string): Promise<any> {
         return Promise.resolve(this.getAccountData(type));
     }
 
@@ -267,7 +283,7 @@ class AccountDataClientAdapter extends EventEmitter {
      * @param  {String} type
      * @return {Object} the content of the account data
      */
-    public getAccountData(type: string): object {
+    public getAccountData(type: string): MatrixEvent {
         const modifiedValue = this.values.get(type);
         if (modifiedValue) {
             return modifiedValue;
@@ -284,7 +300,7 @@ class AccountDataClientAdapter extends EventEmitter {
      * @param {Object} content
      * @return {Promise}
      */
-    public setAccountData(type: string, content: object): Promise<void> {
+    public setAccountData(type: string, content: any): Promise<{}> {
         const lastEvent = this.values.get(type);
         this.values.set(type, content);
         // ensure accountData is emitted on the next tick,
@@ -293,6 +309,7 @@ class AccountDataClientAdapter extends EventEmitter {
         return Promise.resolve().then(() => {
             const event = new MatrixEvent({ type, content });
             this.emit("accountData", event, lastEvent);
+            return {};
         });
     }
 }
@@ -337,7 +354,7 @@ class SSSSCryptoCallbacks {
     constructor(private readonly delegateCryptoCallbacks: ICryptoCallbacks) {}
 
     public async getSecretStorageKey(
-        { keys }: { keys: Record<string, object> },
+        { keys }: { keys: Record<string, ISecretStorageKeyInfo> },
         name: string,
     ): Promise<[string, Uint8Array]> {
         for (const keyId of Object.keys(keys)) {

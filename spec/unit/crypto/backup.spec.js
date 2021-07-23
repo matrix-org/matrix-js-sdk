@@ -52,7 +52,7 @@ const ENCRYPTED_EVENT = new MatrixEvent({
     origin_server_ts: 1507753886000,
 });
 
-const KEY_BACKUP_DATA = {
+const CURVE25519_KEY_BACKUP_DATA = {
     first_message_index: 0,
     forwarded_count: 0,
     is_verified: false,
@@ -73,11 +73,38 @@ const KEY_BACKUP_DATA = {
     },
 };
 
-const BACKUP_INFO = {
+const AES256_KEY_BACKUP_DATA = {
+    first_message_index: 0,
+    forwarded_count: 0,
+    is_verified: false,
+    session_data: {
+        iv: 'b3Jqqvm5S9QdmXrzssspLQ',
+        ciphertext: 'GOOASO3E9ThogkG0zMjEduGLM3u9jHZTkS7AvNNbNj3q1znwk4OlaVKXce'
+            + '7ynofiiYIiS865VlOqrKEEXv96XzRyUpgn68e3WsicwYl96EtjIEh/iY003PG2Qd'
+            + 'EluT899Ax7PydpUHxEktbWckMppYomUR5q8x1KI1SsOQIiJaIGThmIMPANRCFiK0'
+            + 'WQj+q+dnhzx4lt9AFqU5bKov8qKnw2qGYP7/+6RmJ0Kpvs8tG6lrcNDEHtFc2r0r'
+            + 'KKubDypo0Vc8EWSwsAHdKa36ewRavpreOuE8Z9RLfY0QIR1ecXrMqW0CdGFr7H3P'
+            + 'vcjF8sjwvQAavzxEKT1WMGizSMLeKWo2mgZ5cKnwV5HGUAw596JQvKs9laG2U89K'
+            + 'YrT0sH30vi62HKzcBLcDkWkUSNYPz7UiZ1MM0L380UA+1ZOXSOmtBA9xxzzbc8Xd'
+            + 'fRimVgklGdxrxjzuNLYhL2BvVH4oPWonD9j0bvRwE6XkimdbGQA8HB7UmXXjE8WA'
+            + 'RgaDHkfzoA3g3aeQ',
+        mac: 'uR988UYgGL99jrvLLPX3V1ows+UYbktTmMxPAo2kxnU',
+    },
+};
+
+const CURVE25519_BACKUP_INFO = {
     algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
     version: 1,
     auth_data: {
         public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
+    },
+};
+
+const AES256_BACKUP_INFO = {
+    algorithm: "org.matrix.msc3270.v1.aes-hmac-sha2",
+    version: 1,
+    auth_data: {
+        // FIXME: add iv and mac
     },
 };
 
@@ -144,7 +171,7 @@ describe("MegolmBackup", function() {
         mockCrypto.backupKey.set_recipient_key(
             "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
         );
-        mockCrypto.backupInfo = BACKUP_INFO;
+        mockCrypto.backupInfo = CURVE25519_BACKUP_INFO;
 
         mockStorage = new MockStorageApi();
         sessionStore = new WebStorageSessionStore(mockStorage);
@@ -228,7 +255,7 @@ describe("MegolmBackup", function() {
             });
         });
 
-        it('sends backups to the server', function() {
+        it('sends backups to the server (Curve25519 version)', function() {
             const groupSession = new Olm.OutboundGroupSession();
             groupSession.create();
             const ibGroupSession = new Olm.InboundGroupSession();
@@ -272,6 +299,88 @@ describe("MegolmBackup", function() {
                         version: 1,
                         auth_data: {
                             public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
+                        },
+                    });
+                    let numCalls = 0;
+                    return new Promise((resolve, reject) => {
+                        client.http.authedRequest = function(
+                            callback, method, path, queryParams, data, opts,
+                        ) {
+                            ++numCalls;
+                            expect(numCalls).toBeLessThanOrEqual(1);
+                            if (numCalls >= 2) {
+                                // exit out of retry loop if there's something wrong
+                                reject(new Error("authedRequest called too many timmes"));
+                                return Promise.resolve({});
+                            }
+                            expect(method).toBe("PUT");
+                            expect(path).toBe("/room_keys/keys");
+                            expect(queryParams.version).toBe(1);
+                            expect(data.rooms[ROOM_ID].sessions).toBeDefined();
+                            expect(data.rooms[ROOM_ID].sessions).toHaveProperty(
+                                groupSession.session_id(),
+                            );
+                            resolve();
+                            return Promise.resolve({});
+                        };
+                        client.crypto.backupManager.backupGroupSession(
+                            "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
+                            groupSession.session_id(),
+                        );
+                    }).then(() => {
+                        expect(numCalls).toBe(1);
+                    });
+                });
+        });
+
+        it('sends backups to the server (AES-256 version)', function() {
+            const groupSession = new Olm.OutboundGroupSession();
+            groupSession.create();
+            const ibGroupSession = new Olm.InboundGroupSession();
+            ibGroupSession.create(groupSession.session_key());
+
+            const client = makeTestClient(sessionStore, cryptoStore);
+
+            megolmDecryption = new MegolmDecryption({
+                userId: '@user:id',
+                crypto: mockCrypto,
+                olmDevice: olmDevice,
+                baseApis: client,
+                roomId: ROOM_ID,
+            });
+
+            megolmDecryption.olmlib = mockOlmLib;
+
+            return client.initCrypto()
+                .then(() => {
+                    return client.crypto.storeSessionBackupPrivateKey(new Uint8Array(32));
+                })
+                .then(() => {
+                    return cryptoStore.doTxn(
+                        "readwrite",
+                        [cryptoStore.STORE_SESSION],
+                        (txn) => {
+                            cryptoStore.addEndToEndInboundGroupSession(
+                                "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
+                                groupSession.session_id(),
+                                {
+                                    forwardingCurve25519KeyChain: undefined,
+                                    keysClaimed: {
+                                        ed25519: "SENDER_ED25519",
+                                    },
+                                    room_id: ROOM_ID,
+                                    session: ibGroupSession.pickle(olmDevice._pickleKey),
+                                },
+                                txn);
+                        });
+                })
+                .then(() => {
+                    client.enableKeyBackup({
+                        algorithm: "org.matrix.msc3270.v1.aes-hmac-sha2",
+                        version: 1,
+                        auth_data: {
+                            iv: "PsCAtR7gMc4xBd9YS3A9Ow",
+                            mac: "ZSDsTFEZK7QzlauCLMleUcX96GQZZM7UNtk4sripSqQ",
                         },
                     });
                     let numCalls = 0;
@@ -512,30 +621,47 @@ describe("MegolmBackup", function() {
             client.stopClient();
         });
 
-        it('can restore from backup', function() {
+        it('can restore from backup (Curve25519 version)', function() {
             client.http.authedRequest = function() {
-                return Promise.resolve(KEY_BACKUP_DATA);
+                return Promise.resolve(CURVE25519_KEY_BACKUP_DATA);
             };
             return client.restoreKeyBackupWithRecoveryKey(
                 "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d",
                 ROOM_ID,
                 SESSION_ID,
-                BACKUP_INFO,
+                CURVE25519_BACKUP_INFO,
             ).then(() => {
                 return megolmDecryption.decryptEvent(ENCRYPTED_EVENT);
             }).then((res) => {
                 expect(res.clearEvent.content).toEqual('testytest');
-                expect(res.untrusted).toBeTruthy(); // keys from backup are untrusted
+                expect(res.untrusted).toBeTruthy(); // keys from Curve25519 backup are untrusted
             });
         });
 
-        it('can restore backup by room', function() {
+        it('can restore from backup (AES-256 version)', function() {
+            client.http.authedRequest = function() {
+                return Promise.resolve(AES256_KEY_BACKUP_DATA);
+            };
+            return client.restoreKeyBackupWithRecoveryKey(
+                "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d",
+                ROOM_ID,
+                SESSION_ID,
+                AES256_BACKUP_INFO,
+            ).then(() => {
+                return megolmDecryption.decryptEvent(ENCRYPTED_EVENT);
+            }).then((res) => {
+                expect(res.clearEvent.content).toEqual('testytest');
+                expect(res.untrusted).toBeFalsy(); // keys from AES backup are trusted
+            });
+        });
+
+        it('can restore backup by room (Curve25519 version)', function() {
             client.http.authedRequest = function() {
                 return Promise.resolve({
                     rooms: {
                         [ROOM_ID]: {
                             sessions: {
-                                [SESSION_ID]: KEY_BACKUP_DATA,
+                                [SESSION_ID]: CURVE25519_KEY_BACKUP_DATA,
                             },
                         },
                     },
@@ -543,7 +669,7 @@ describe("MegolmBackup", function() {
             };
             return client.restoreKeyBackupWithRecoveryKey(
                 "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d",
-                null, null, BACKUP_INFO,
+                null, null, CURVE25519_BACKUP_INFO,
             ).then(() => {
                 return megolmDecryption.decryptEvent(ENCRYPTED_EVENT);
             }).then((res) => {
@@ -562,14 +688,14 @@ describe("MegolmBackup", function() {
             const cachedNull = await client.crypto.getSessionBackupPrivateKey();
             expect(cachedNull).toBeNull();
             client.http.authedRequest = function() {
-                return Promise.resolve(KEY_BACKUP_DATA);
+                return Promise.resolve(CURVE25519_KEY_BACKUP_DATA);
             };
             await new Promise((resolve) => {
                 client.restoreKeyBackupWithRecoveryKey(
                     "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d",
                     ROOM_ID,
                     SESSION_ID,
-                    BACKUP_INFO,
+                    CURVE25519_BACKUP_INFO,
                     { cacheCompleteCallback: resolve },
                 );
             });
@@ -578,11 +704,11 @@ describe("MegolmBackup", function() {
         });
 
         it("fails if an known algorithm is used", async function() {
-            const BAD_BACKUP_INFO = Object.assign({}, BACKUP_INFO, {
+            const BAD_BACKUP_INFO = Object.assign({}, CURVE25519_BACKUP_INFO, {
                 algorithm: "this.algorithm.does.not.exist",
             });
             client.http.authedRequest = function() {
-                return Promise.resolve(KEY_BACKUP_DATA);
+                return Promise.resolve(CURVE25519_KEY_BACKUP_DATA);
             };
 
             await expect(client.restoreKeyBackupWithRecoveryKey(

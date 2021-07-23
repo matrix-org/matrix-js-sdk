@@ -1,7 +1,5 @@
 /*
-Copyright 2017 Vector Creations Ltd
-Copyright 2018 New Vector Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2017 - 2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,8 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { LocalIndexedDBStoreBackend } from "./indexeddb-local-backend.js";
+import { LocalIndexedDBStoreBackend } from "./indexeddb-local-backend";
 import { logger } from '../logger';
+
+interface ICmd {
+    command: string;
+    seq: number;
+    args?: any[];
+}
 
 /**
  * This class lives in the webworker and drives a LocalIndexedDBStoreBackend
@@ -35,16 +39,13 @@ import { logger } from '../logger';
  *
  */
 export class IndexedDBStoreWorker {
+    private backend: LocalIndexedDBStoreBackend = null;
+
     /**
      * @param {function} postMessage The web worker postMessage function that
      * should be used to communicate back to the main script.
      */
-    constructor(postMessage) {
-        this.backend = null;
-        this.postMessage = postMessage;
-
-        this.onMessage = this.onMessage.bind(this);
-    }
+    constructor(private readonly postMessage: InstanceType<typeof Worker>["postMessage"]) {}
 
     /**
      * Passes a message event from the main script into the class. This method
@@ -52,17 +53,15 @@ export class IndexedDBStoreWorker {
      *
      * @param {Object} ev The message event
      */
-    onMessage(ev) {
-        const msg = ev.data;
+    public onMessage = (ev: MessageEvent): void => {
+        const msg: ICmd = ev.data;
         let prom;
 
         switch (msg.command) {
             case '_setupWorker':
-                this.backend = new LocalIndexedDBStoreBackend(
-                    // this is the 'indexedDB' global (where global != window
-                    // because it's a web worker and there is no window).
-                    indexedDB, msg.args[0],
-                );
+                // this is the 'indexedDB' global (where global != window
+                // because it's a web worker and there is no window).
+                this.backend = new LocalIndexedDBStoreBackend(indexedDB, msg.args[0]);
                 prom = Promise.resolve();
                 break;
             case 'connect':
@@ -72,23 +71,16 @@ export class IndexedDBStoreWorker {
                 prom = this.backend.isNewlyCreated();
                 break;
             case 'clearDatabase':
-                prom = this.backend.clearDatabase().then((result) => {
-                    // This returns special classes which can't be cloned
-                    // across to the main script, so don't try.
-                    return {};
-                });
+                prom = this.backend.clearDatabase();
                 break;
             case 'getSavedSync':
                 prom = this.backend.getSavedSync(false);
                 break;
             case 'setSyncData':
-                prom = this.backend.setSyncData(...msg.args);
+                prom = this.backend.setSyncData(msg.args[0]);
                 break;
             case 'syncToDatabase':
-                prom = this.backend.syncToDatabase(...msg.args).then(() => {
-                    // This also returns IndexedDB events which are not cloneable
-                    return {};
-                });
+                prom = this.backend.syncToDatabase(msg.args[0]);
                 break;
             case 'getUserPresenceEvents':
                 prom = this.backend.getUserPresenceEvents();
@@ -130,7 +122,7 @@ export class IndexedDBStoreWorker {
                 result: ret,
             });
         }, (err) => {
-            logger.error("Error running command: "+msg.command);
+            logger.error("Error running command: " + msg.command);
             logger.error(err);
             this.postMessage.call(null, {
                 command: 'cmd_fail',
@@ -142,5 +134,5 @@ export class IndexedDBStoreWorker {
                 },
             });
         });
-    }
+    };
 }

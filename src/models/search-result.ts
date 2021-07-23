@@ -20,26 +20,8 @@ limitations under the License.
 
 import { EventContext } from "./event-context";
 import { EventMapper } from "../event-mapper";
+import { IResultContext, ISearchResult } from "../@types/search";
 import { IRoomEvent } from "../sync-accumulator";
-
-/* eslint-disable camelcase */
-interface IContext {
-    events_before?: IRoomEvent[];
-    events_after?: IRoomEvent[];
-    start?: string;
-    end?: string;
-    profile_info?: Record<string, {
-        displayname: string;
-        avatar_url: string;
-    }>;
-}
-/* eslint-enable camelcase */
-
-interface ISearchResult {
-    rank: number;
-    result: IRoomEvent;
-    context: IContext;
-}
 
 export class SearchResult {
     /**
@@ -49,8 +31,9 @@ export class SearchResult {
      * @param {function} eventMapper
      * @return {SearchResult}
      */
+
     public static fromJson(jsonObj: ISearchResult, eventMapper: EventMapper): SearchResult {
-        const jsonContext: IContext = jsonObj.context || {};
+        const jsonContext = jsonObj.context || {} as IResultContext;
         const eventsBefore = jsonContext.events_before || [];
         const eventsAfter = jsonContext.events_after || [];
 

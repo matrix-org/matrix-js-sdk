@@ -264,6 +264,16 @@ export class MatrixEvent extends EventEmitter {
     }
 
     /**
+     * Gets the event as though it would appear unencrypted. If the event is already not
+     * encrypted, it is simply returned as-is.
+     * @returns {IEvent} The event in wire format.
+     */
+    public getEffectiveEvent(): IEvent {
+        // clearEvent doesn't have all the fields, so we'll copy what we can from this.event
+        return Object.assign({}, this.event, this.clearEvent) as IEvent;
+    }
+
+    /**
      * Get the event_id for this event.
      * @return {string} The event ID, e.g. <code>$143350589368169JsLZx:localhost
      * </code>
@@ -1231,20 +1241,7 @@ export class MatrixEvent extends EventEmitter {
      * @return {Object}
      */
     public toJSON(): object {
-        const event: any = {
-            type: this.getType(),
-            sender: this.getSender(),
-            content: this.getContent(),
-            event_id: this.getId(),
-            origin_server_ts: this.getTs(),
-            unsigned: this.getUnsigned(),
-            room_id: this.getRoomId(),
-        };
-
-        // if this is a redaction then attach the redacts key
-        if (this.isRedaction()) {
-            event.redacts = this.event.redacts;
-        }
+        const event = this.getEffectiveEvent();
 
         if (!this.isEncrypted()) {
             return event;

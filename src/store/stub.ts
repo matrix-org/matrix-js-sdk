@@ -23,19 +23,21 @@ import { EventType } from "../@types/event";
 import { Group } from "../models/group";
 import { Room } from "../models/room";
 import { User } from "../models/user";
-import { MatrixEvent } from "../models/event";
+import { IEvent, MatrixEvent } from "../models/event";
 import { Filter } from "../filter";
 import { ISavedSync, IStore } from "./index";
 import { RoomSummary } from "../models/room-summary";
+import { ISyncResponse } from "../sync-accumulator";
 
 /**
  * Construct a stub store. This does no-ops on most store methods.
  * @constructor
  */
 export class StubStore implements IStore {
+    public readonly accountData = {}; // stub
     private fromToken: string = null;
 
-    /** @return {Promise<bool>} whether or not the database was newly created in this session. */
+    /** @return {Promise<boolean>} whether or not the database was newly created in this session. */
     public isNewlyCreated(): Promise<boolean> {
         return Promise.resolve(true);
     }
@@ -212,7 +214,7 @@ export class StubStore implements IStore {
      * @param {Object} syncData The sync data
      * @return {Promise} An immediately resolved promise.
      */
-    public setSyncData(syncData: object): Promise<void> {
+    public setSyncData(syncData: ISyncResponse): Promise<void> {
         return Promise.resolve();
     }
 
@@ -264,11 +266,11 @@ export class StubStore implements IStore {
         return Promise.resolve();
     }
 
-    public getOutOfBandMembers(): Promise<MatrixEvent[]> {
+    public getOutOfBandMembers(): Promise<IEvent[]> {
         return Promise.resolve(null);
     }
 
-    public setOutOfBandMembers(roomId: string, membershipEvents: MatrixEvent[]): Promise<void> {
+    public setOutOfBandMembers(roomId: string, membershipEvents: IEvent[]): Promise<void> {
         return Promise.resolve();
     }
 

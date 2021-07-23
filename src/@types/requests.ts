@@ -15,9 +15,12 @@ limitations under the License.
 */
 
 import { Callback } from "../client";
+import { IContent } from "../models/event";
 import { Preset, Visibility } from "./partials";
+import { SearchKey } from "./search";
+import { IRoomEventFilter } from "../filter";
 
-// allow camelcase as these are things go onto the wire
+// allow camelcase as these are things that go onto the wire
 /* eslint-disable camelcase */
 
 export interface IJoinRoomOpts {
@@ -63,12 +66,12 @@ export interface IGuestAccessOpts {
 }
 
 export interface ISearchOpts {
-    keys?: string[];
+    keys?: SearchKey[];
     query: string;
 }
 
 export interface IEventSearchOpts {
-    filter: any; // TODO: Types
+    filter?: IRoomEventFilter;
     term: string;
 }
 
@@ -82,7 +85,7 @@ export interface IInvite3PID {
 export interface ICreateRoomStateEvent {
     type: string;
     state_key?: string; // defaults to an empty string
-    content: object;
+    content: IContent;
 }
 
 export interface ICreateRoomOpts {
@@ -104,9 +107,11 @@ export interface IRoomDirectoryOptions {
     server?: string;
     limit?: number;
     since?: string;
-
-    // TODO: Proper types
-    filter?: any & {generic_search_term: string};
+    filter?: {
+        generic_search_term: string;
+    };
+    include_all_networks?: boolean;
+    third_party_instance_id?: string;
 }
 
 export interface IUploadOpts {
@@ -119,4 +124,19 @@ export interface IUploadOpts {
     progressHandler?: (state: {loaded: number, total: number}) => void;
 }
 
+export interface IAddThreePidOnlyBody {
+    auth?: {
+        type: string;
+        session?: string;
+    };
+    client_secret: string;
+    sid: string;
+}
+
+export interface IBindThreePidBody {
+    client_secret: string;
+    id_server: string;
+    id_access_token: string;
+    sid: string;
+}
 /* eslint-enable camelcase */
