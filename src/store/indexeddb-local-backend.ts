@@ -117,7 +117,7 @@ function reqAsCursorPromise(req: IDBRequest<IDBCursor | null>): Promise<IDBCurso
 }
 
 export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
-    public static exists(indexedDB: IDBFactory, dbName: string): boolean {
+    public static exists(indexedDB: IDBFactory, dbName: string): Promise<boolean> {
         dbName = "matrix-js-sdk:" + (dbName || "default");
         return IndexedDBHelpers.exists(indexedDB, dbName);
     }

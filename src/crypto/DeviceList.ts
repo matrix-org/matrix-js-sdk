@@ -24,12 +24,13 @@ import { EventEmitter } from 'events';
 
 import { logger } from '../logger';
 import { DeviceInfo, IDevice } from './deviceinfo';
-import { CrossSigningInfo } from './CrossSigning';
+import { CrossSigningInfo, ICrossSigningInfo } from './CrossSigning';
 import * as olmlib from './olmlib';
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { chunkPromises, defer, IDeferred, sleep } from '../utils';
-import { MatrixClient, CryptoStore } from "../client";
+import { MatrixClient } from "../client";
 import { OlmDevice } from "./OlmDevice";
+import { CryptoStore } from "./store/base";
 
 /* State transition diagram for DeviceList.deviceTrackingStatus
  *
@@ -52,7 +53,7 @@ import { OlmDevice } from "./OlmDevice";
  */
 
 // constants for DeviceList.deviceTrackingStatus
-enum TrackingStatus {
+export enum TrackingStatus {
     NotTracked,
     PendingDownload,
     DownloadInProgress,
@@ -65,32 +66,22 @@ export type DeviceInfoMap = Record<string, Record<string, DeviceInfo>>;
  * @alias module:crypto/DeviceList
  */
 export class DeviceList extends EventEmitter {
-    // userId -> {
-    //     deviceId -> {
-    //         [device info]
-    //     }
-    // }
-    private devices: Record<string, Record<string, IDevice>> = {};
+    private devices: { [userId: string]: { [deviceId: string]: IDevice } } = {};
 
-    // userId -> {
-    //     [key info]
-    // }
-    public crossSigningInfo: Record<string, object> = {};
+    public crossSigningInfo: { [userId: string]: ICrossSigningInfo } = {};
 
     // map of identity keys to the user who owns it
     private userByIdentityKey: Record<string, string> = {};
 
     // which users we are tracking device status for.
-    // userId -> TRACKING_STATUS_*
-    private deviceTrackingStatus: Record<string, TrackingStatus> = {}; // loaded from storage in load()
+    private deviceTrackingStatus: { [userId: string]: TrackingStatus } = {}; // loaded from storage in load()
 
     // The 'next_batch' sync token at the point the data was written,
     // ie. a token representing the point immediately after the
     // moment represented by the snapshot in the db.
     private syncToken: string = null;
 
-    // userId -> promise
-    private keyDownloadsInProgressByUser: Record<string, Promise<void>> = {};
+    private keyDownloadsInProgressByUser: { [userId: string]: Promise<void> } = {};
 
     // Set whenever changes are made other than setting the sync token
     private dirty = false;
@@ -375,7 +366,7 @@ export class DeviceList extends EventEmitter {
         return CrossSigningInfo.fromStorage(this.crossSigningInfo[userId], userId);
     }
 
-    public storeCrossSigningForUser(userId: string, info: CrossSigningInfo): void {
+    public storeCrossSigningForUser(userId: string, info: ICrossSigningInfo): void {
         this.crossSigningInfo[userId] = info;
         this.dirty = true;
     }
@@ -603,7 +594,7 @@ export class DeviceList extends EventEmitter {
         }
     }
 
-    public setRawStoredCrossSigningForUser(userId: string, info: object): void {
+    public setRawStoredCrossSigningForUser(userId: string, info: ICrossSigningInfo): void {
         this.crossSigningInfo[userId] = info;
     }
 
@@ -864,9 +855,7 @@ class DeviceListUpdateSerialiser {
 
                 crossSigning.setKeys(crossSigningResponse);
 
-                this.deviceList.setRawStoredCrossSigningForUser(
-                    userId, crossSigning.toStorage(),
-                );
+                this.deviceList.setRawStoredCrossSigningForUser(userId, crossSigning.toStorage());
 
                 // NB. Unlike most events in the js-sdk, this one is internal to the
                 // js-sdk and is not re-emitted

@@ -15,9 +15,9 @@ limitations under the License.
 */
 
 import { logger } from '../logger';
-import { CryptoStore, MatrixClient } from "../client";
+import { MatrixClient } from "../client";
 import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "./index";
-import { OutgoingRoomKeyRequest } from './store/base';
+import { CryptoStore, OutgoingRoomKeyRequest } from './store/base';
 import { EventType } from "../@types/event";
 
 /**
@@ -263,9 +263,8 @@ export class OutgoingRoomKeyRequestManager {
                         'deleting unnecessary room key request for ' +
                         stringifyRequestBody(requestBody),
                     );
-                    return this.cryptoStore.deleteOutgoingRoomKeyRequest(
-                        req.requestId, RoomKeyRequestState.Unsent,
-                    );
+                    return this.cryptoStore.deleteOutgoingRoomKeyRequest(req.requestId, RoomKeyRequestState.Unsent)
+                        .then(); // match Promise<void> signature
 
                 case RoomKeyRequestState.Sent: {
                     // send a cancellation.
@@ -325,7 +324,7 @@ export class OutgoingRoomKeyRequestManager {
      * @return {Promise} resolves to a list of all the
      *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
      */
-    public getOutgoingSentRoomKeyRequest(userId: string, deviceId: string): OutgoingRoomKeyRequest[] {
+    public getOutgoingSentRoomKeyRequest(userId: string, deviceId: string): Promise<OutgoingRoomKeyRequest[]> {
         return this.cryptoStore.getOutgoingRoomKeyRequestsByTarget(userId, deviceId, [RoomKeyRequestState.Sent]);
     }
 
@@ -415,7 +414,7 @@ export class OutgoingRoomKeyRequestManager {
     }
 
     // given a RoomKeyRequest, send it and update the request record
-    private sendOutgoingRoomKeyRequest(req: OutgoingRoomKeyRequest): Promise<void> {
+    private async sendOutgoingRoomKeyRequest(req: OutgoingRoomKeyRequest): Promise<void> {
         logger.log(
             `Requesting keys for ${stringifyRequestBody(req.requestBody)}` +
             ` from ${stringifyRecipientList(req.recipients)}` +
@@ -429,19 +428,19 @@ export class OutgoingRoomKeyRequestManager {
             body: req.requestBody,
         };
 
-        return this.sendMessageToDevices(
-            requestMessage, req.recipients, req.requestTxnId || req.requestId,
-        ).then(() => {
-            return this.cryptoStore.updateOutgoingRoomKeyRequest(
-                req.requestId, RoomKeyRequestState.Unsent,
-                { state: RoomKeyRequestState.Sent },
-            );
-        });
+        await this.sendMessageToDevices(requestMessage, req.recipients, req.requestTxnId || req.requestId);
+        await this.cryptoStore.updateOutgoingRoomKeyRequest(
+            req.requestId, RoomKeyRequestState.Unsent,
+            { state: RoomKeyRequestState.Sent },
+        );
     }
 
     // Given a RoomKeyRequest, cancel it and delete the request record unless
     // andResend is set, in which case transition to UNSENT.
-    private sendOutgoingRoomKeyRequestCancellation(req: OutgoingRoomKeyRequest, andResend = false): Promise<void> {
+    private async sendOutgoingRoomKeyRequestCancellation(
+        req: OutgoingRoomKeyRequest,
+        andResend = false,
+    ): Promise<void> {
         logger.log(
             `Sending cancellation for key request for ` +
             `${stringifyRequestBody(req.requestBody)} to ` +
@@ -455,21 +454,19 @@ export class OutgoingRoomKeyRequestManager {
             request_id: req.requestId,
         };
 
-        return this.sendMessageToDevices(
-            requestMessage, req.recipients, req.cancellationTxnId,
-        ).then(() => {
-            if (andResend) {
-                // We want to resend, so transition to UNSENT
-                return this.cryptoStore.updateOutgoingRoomKeyRequest(
-                    req.requestId,
-                    RoomKeyRequestState.CancellationPendingAndWillResend,
-                    { state: RoomKeyRequestState.Unsent },
-                );
-            }
-            return this.cryptoStore.deleteOutgoingRoomKeyRequest(
+        await this.sendMessageToDevices(requestMessage, req.recipients, req.cancellationTxnId);
+        if (andResend) {
+            // We want to resend, so transition to UNSENT
+            await this.cryptoStore.updateOutgoingRoomKeyRequest(
+                req.requestId,
+                RoomKeyRequestState.CancellationPendingAndWillResend,
+                { state: RoomKeyRequestState.Unsent },
+            );
+        } else {
+            await this.cryptoStore.deleteOutgoingRoomKeyRequest(
                 req.requestId, RoomKeyRequestState.CancellationPending,
             );
-        });
+        }
     }
 
     // send a RoomKeyRequest to a list of recipients

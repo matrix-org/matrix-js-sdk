@@ -61,7 +61,7 @@ interface IBlockedMap {
     };
 }
 
-interface IOlmDevice<T = DeviceInfo> {
+export interface IOlmDevice<T = DeviceInfo> {
     userId: string;
     deviceInfo: T;
 }

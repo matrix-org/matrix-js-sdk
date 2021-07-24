@@ -146,10 +146,10 @@ import { ISynapseAdminDeactivateResponse, ISynapseAdminWhoisResponse } from "./@
 import { ISpaceSummaryEvent, ISpaceSummaryRoom } from "./@types/spaces";
 import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, RuleId } from "./@types/PushRules";
 import { IThreepid } from "./@types/threepids";
+import { CryptoStore } from "./crypto/store/base";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
-export type CryptoStore = MemoryCryptoStore | LocalStorageCryptoStore | IndexedDBCryptoStore;
 
 export type Callback = (err: Error | any | null, data?: any) => void;
 export type ResetTimelineCallback = (roomId: string) => boolean;

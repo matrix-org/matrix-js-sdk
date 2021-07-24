@@ -59,12 +59,13 @@ import { IStore } from "../store";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
 import { MatrixEvent } from "../models/event";
-import { MatrixClient, IKeysUploadResponse, SessionStore, CryptoStore, ISignedKey } from "../client";
+import { MatrixClient, IKeysUploadResponse, SessionStore, ISignedKey } from "../client";
 import type { EncryptionAlgorithm, DecryptionAlgorithm } from "./algorithms/base";
 import type { IRoomEncryption, RoomList } from "./RoomList";
 import { IRecoveryKey, IEncryptedEventInfo } from "./api";
 import { IKeyBackupInfo } from "./keybackup";
 import { ISyncStateData } from "../sync";
+import { CryptoStore } from "./store/base";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -1410,9 +1411,7 @@ export class Crypto extends EventEmitter {
                 crossSigning.updateCrossSigningVerifiedBefore(
                     this.checkUserTrust(userId).isCrossSigningVerified(),
                 );
-                this.deviceList.setRawStoredCrossSigningForUser(
-                    userId, crossSigning.toStorage(),
-                );
+                this.deviceList.setRawStoredCrossSigningForUser(userId, crossSigning.toStorage());
             }
 
             this.emit("userTrustStatusChanged", userId, this.checkUserTrust(userId));
