@@ -353,9 +353,9 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param {function(string)} func Called with the private key
      * @param {string} type A key type
      */
-    public getSecretStorePrivateKey<T>(
+    public getSecretStorePrivateKey(
         txn: IDBTransaction,
-        func: (key: IEncryptedPayload | null) => T,
+        func: (key: IEncryptedPayload | null) => void,
         type: string,
     ): void {
         this.backend.getSecretStorePrivateKey(txn, func, type);

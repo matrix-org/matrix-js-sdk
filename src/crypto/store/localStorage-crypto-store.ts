@@ -386,7 +386,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         func(keys);
     }
 
-    public getSecretStorePrivateKey<T>(txn: unknown, func: (key: IEncryptedPayload | null) => T, type: string): T {
+    public getSecretStorePrivateKey(txn: unknown, func: (key: IEncryptedPayload | null) => void, type: string): void {
         const key = getJsonItem<IEncryptedPayload>(this.store, E2E_PREFIX + `ssss_cache.${type}`);
         func(key);
     }

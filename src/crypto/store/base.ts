@@ -60,7 +60,7 @@ export interface CryptoStore {
     getAccount(txn: unknown, func: (accountPickle: string) => void);
     storeAccount(txn: unknown, accountPickle: string): void;
     getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey>) => void): void;
-    getSecretStorePrivateKey<T>(txn: unknown, func: (key: IEncryptedPayload | null) => T, type: string): void;
+    getSecretStorePrivateKey(txn: unknown, func: (key: IEncryptedPayload | null) => void, type: string): void;
     storeCrossSigningKeys(txn: unknown, keys: Record<string, ICrossSigningKey>): void;
     storeSecretStorePrivateKey(txn: unknown, type: string, key: IEncryptedPayload): void;
 

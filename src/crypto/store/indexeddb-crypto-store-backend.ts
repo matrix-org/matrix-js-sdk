@@ -54,9 +54,18 @@ export class Backend implements CryptoStore {
         // attempts to delete the database will block (and subsequent
         // attempts to re-create it will also block).
         db.onversionchange = () => {
-            logger.log(`versionchange for indexeddb ${this._dbName}: closing`);
+            logger.log(`versionchange for indexeddb ${this.db.name}: closing`);
             db.close();
         };
+    }
+
+    public async startup(): Promise<CryptoStore> {
+        // No work to do, as the startup is done by the caller (e.g IndexedDBCryptoStore)
+        // by passing us a ready IDBDatabase instance
+        return this;
+    }
+    public async deleteAllData(): Promise<void> {
+        throw Error("This is not implemented, call IDBFactory::deleteDatabase(dbName) instead.");
     }
 
     /**
@@ -387,9 +396,9 @@ export class Backend implements CryptoStore {
         };
     }
 
-    public getSecretStorePrivateKey<T>(
+    public getSecretStorePrivateKey(
         txn: IDBTransaction,
-        func: (key: IEncryptedPayload | null) => T,
+        func: (key: IEncryptedPayload | null) => void,
         type: string,
     ): void {
         const objectStore = txn.objectStore("account");
