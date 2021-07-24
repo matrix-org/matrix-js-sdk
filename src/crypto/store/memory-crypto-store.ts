@@ -225,7 +225,7 @@ export class MemoryCryptoStore implements CryptoStore {
                 continue;
             }
 
-            if (req.state != expectedState) {
+            if (req.state !== expectedState) {
                 logger.warn(
                     `Cannot update room key request from ${expectedState} ` +
                     `as it was already updated to ${req.state}`,

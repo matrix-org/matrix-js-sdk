@@ -89,9 +89,6 @@ import {
     IRecoveryKey,
     ISecretStorageKeyInfo,
 } from "./crypto/api";
-import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store";
-import { LocalStorageCryptoStore } from "./crypto/store/localStorage-crypto-store";
-import { IndexedDBCryptoStore } from "./crypto/store/indexeddb-crypto-store";
 import { SyncState } from "./sync.api";
 import { EventTimelineSet } from "./models/event-timeline-set";
 import { VerificationRequest } from "./crypto/verification/request/VerificationRequest";
