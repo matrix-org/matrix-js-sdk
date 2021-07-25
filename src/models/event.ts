@@ -534,7 +534,7 @@ export class MatrixEvent extends EventEmitter {
             throw new Error("Attempt to decrypt event which isn't encrypted");
         }
 
-        if (this.isDecryptionFailure()) {
+        if (this.clearEvent?.content && this.clearEvent.content.msgtype !== "m.bad.encrypted") {
             // we may want to just ignore this? let's start with rejecting it.
             throw new Error(
                 "Attempt to decrypt event which has already been decrypted",
