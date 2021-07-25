@@ -1046,7 +1046,7 @@ describe("megolm", function() {
                 type: "m.room.message",
                 content: undefined,
                 room_id: ROOM_ID,
-            }
+            };
 
             const messageEncrypted = {
                 event_id: 'test_megolm_event',
