@@ -732,7 +732,7 @@ export class MatrixEvent extends EventEmitter {
      * @returns {Object} The cleartext (decrypted) content for the event
      */
     public getClearContent(): IContent | null {
-        return this.clearEvent?.content || null;
+        return this.clearEvent ? this.clearEvent.content : null;
     }
 
     /**
