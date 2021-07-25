@@ -135,7 +135,7 @@ export class SyncApi {
     private syncStateData: ISyncStateData = null; // additional data (eg. error object for failed sync)
     private catchingUp = false;
     private running = false;
-    private keepAliveTimer: NodeJS.Timeout = null;
+    private keepAliveTimer: number = null;
     private connectionReturnedDefer: IDeferred<boolean> = null;
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
     private failedSyncCount = 0; // Number of consecutive failed /sync requests
@@ -318,7 +318,7 @@ export class SyncApi {
         this._peekRoom = this.createRoom(roomId);
         return this.client.roomInitialSync(roomId, 20).then((response) => {
             // make sure things are init'd
-            response.messages = response.messages || {};
+            response.messages = response.messages || { chunk: [] };
             response.messages.chunk = response.messages.chunk || [];
             response.state = response.state || [];
 
@@ -329,8 +329,7 @@ export class SyncApi {
             const stateEvents = response.state.map(client.getEventMapper());
             const messages = response.messages.chunk.map(client.getEventMapper());
 
-            // XXX: copypasted from /sync until we kill off this
-            // minging v1 API stuff)
+            // XXX: copypasted from /sync until we kill off this minging v1 API stuff)
             // handle presence events (User objects)
             if (response.presence && Array.isArray(response.presence)) {
                 response.presence.map(client.getEventMapper()).forEach(
@@ -643,12 +642,12 @@ export class SyncApi {
             // Now wait for the saved sync to finish...
             debuglog("Waiting for saved sync before starting sync processing...");
             await savedSyncPromise;
-            this._sync({ filterId });
+            this.doSync({ filterId });
         };
 
         if (client.isGuest()) {
             // no push rules for guests, no access to POST filter for guests.
-            this._sync({});
+            this.doSync({});
         } else {
             // Pull the saved sync token out first, before the worker starts sending
             // all the sync data which could take a while. This will let us send our
@@ -754,7 +753,7 @@ export class SyncApi {
      * @param {string} syncOptions.filterId
      * @param {boolean} syncOptions.hasSyncedBefore
      */
-    private async _sync(syncOptions: ISyncOptions): Promise<void> {
+    private async doSync(syncOptions: ISyncOptions): Promise<void> {
         const client = this.client;
 
         if (!this.running) {
@@ -851,7 +850,7 @@ export class SyncApi {
         }
 
         // Begin next sync
-        this._sync(syncOptions);
+        this.doSync(syncOptions);
     }
 
     private doSyncRequest(syncOptions: ISyncOptions, syncToken: string): IRequestPromise<ISyncResponse> {
@@ -956,7 +955,7 @@ export class SyncApi {
                     catchingUp: true,
                 });
             }
-            this._sync(syncOptions);
+            this.doSync(syncOptions);
         });
 
         this.currentSyncRequest = null;

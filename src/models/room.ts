@@ -25,13 +25,13 @@ import { EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
 import { normalize } from "../utils";
-import { EventStatus, MatrixEvent } from "./event";
+import { EventStatus, IEvent, MatrixEvent } from "./event";
 import { RoomMember } from "./room-member";
 import { IRoomSummary, RoomSummary } from "./room-summary";
 import { logger } from '../logger';
 import { ReEmitter } from '../ReEmitter';
-import { EventType, RoomCreateTypeField, RoomType } from "../@types/event";
-import { IRoomVersionsCapability, MatrixClient, RoomVersionStability } from "../client";
+import { EventType, RoomCreateTypeField, RoomType, UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../@types/event";
+import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
 import { ResizeMethod } from "../@types/partials";
 import { Filter } from "../filter";
 import { RoomState } from "./room-state";
@@ -64,7 +64,7 @@ function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: stri
 
 interface IOpts {
     storageToken?: string;
-    pendingEventOrdering?: "chronological" | "detached";
+    pendingEventOrdering?: PendingEventOrdering;
     timelineSupport?: boolean;
     unstableClientRelationAggregation?: boolean;
     lazyLoadMembers?: boolean;
@@ -218,7 +218,7 @@ export class Room extends EventEmitter {
         this.setMaxListeners(100);
         this.reEmitter = new ReEmitter(this);
 
-        opts.pendingEventOrdering = opts.pendingEventOrdering || "chronological";
+        opts.pendingEventOrdering = opts.pendingEventOrdering || PendingEventOrdering.Chronological;
         if (["chronological", "detached"].indexOf(opts.pendingEventOrdering) === -1) {
             throw new Error(
                 "opts.pendingEventOrdering MUST be either 'chronological' or " +
@@ -649,7 +649,7 @@ export class Room extends EventEmitter {
         }
     }
 
-    private async loadMembersFromServer(): Promise<object[]> {
+    private async loadMembersFromServer(): Promise<IEvent[]> {
         const lastSyncToken = this.client.store.getSyncToken();
         const queryString = utils.encodeParams({
             not_membership: "leave",
@@ -665,8 +665,7 @@ export class Room extends EventEmitter {
     private async loadMembers(): Promise<{ memberEvents: MatrixEvent[], fromServer: boolean }> {
         // were the members loaded from the server?
         let fromServer = false;
-        let rawMembersEvents =
-            await this.client.store.getOutOfBandMembers(this.roomId);
+        let rawMembersEvents = await this.client.store.getOutOfBandMembers(this.roomId);
         if (rawMembersEvents === null) {
             fromServer = true;
             rawMembersEvents = await this.loadMembersFromServer();
@@ -713,7 +712,7 @@ export class Room extends EventEmitter {
             if (fromServer) {
                 const oobMembers = this.currentState.getMembers()
                     .filter((m) => m.isOutOfBand())
-                    .map((m) => m.events.member.event);
+                    .map((m) => m.events.member.event as IEvent);
                 logger.log(`LL: telling store to write ${oobMembers.length}`
                     + ` members for room ${this.roomId}`);
                 const store = this.client.store;
@@ -2037,24 +2036,45 @@ export class Room extends EventEmitter {
         const joinedMemberCount = this.currentState.getJoinedMemberCount();
         const invitedMemberCount = this.currentState.getInvitedMemberCount();
         // -1 because these numbers include the syncing user
-        const inviteJoinCount = joinedMemberCount + invitedMemberCount - 1;
+        let inviteJoinCount = joinedMemberCount + invitedMemberCount - 1;
+
+        // get service members (e.g. helper bots) for exclusion
+        let excludedUserIds: string[] = [];
+        const mFunctionalMembers = this.currentState.getStateEvents(UNSTABLE_ELEMENT_FUNCTIONAL_USERS.name, "");
+        if (Array.isArray(mFunctionalMembers?.getContent().service_members)) {
+            excludedUserIds = mFunctionalMembers.getContent().service_members;
+        }
 
         // get members that are NOT ourselves and are actually in the room.
         let otherNames = null;
         if (this.summaryHeroes) {
             // if we have a summary, the member state events
             // should be in the room state
-            otherNames = this.summaryHeroes.map((userId) => {
+            otherNames = [];
+            this.summaryHeroes.forEach((userId) => {
+                // filter service members
+                if (excludedUserIds.includes(userId)) {
+                    inviteJoinCount--;
+                    return;
+                }
                 const member = this.getMember(userId);
-                return member ? member.name : userId;
+                otherNames.push(member ? member.name : userId);
             });
         } else {
             let otherMembers = this.currentState.getMembers().filter((m) => {
                 return m.userId !== userId &&
                     (m.membership === "invite" || m.membership === "join");
             });
+            otherMembers = otherMembers.filter(({ userId }) => {
+                // filter service members
+                if (excludedUserIds.includes(userId)) {
+                    inviteJoinCount--;
+                    return false;
+                }
+                return true;
+            });
             // make sure members have stable order
-            otherMembers.sort((a, b) => a.userId.localeCompare(b.userId));
+            otherMembers.sort((a, b) => utils.compare(a.userId, b.userId));
             // only 5 first members, immitate summaryHeroes
             otherMembers = otherMembers.slice(0, 5);
             otherNames = otherMembers.map((m) => m.name);
@@ -2065,7 +2085,7 @@ export class Room extends EventEmitter {
         }
 
         const myMembership = this.getMyMembership();
-        // if I have created a room and invited people throuh
+        // if I have created a room and invited people through
         // 3rd party invites
         if (myMembership == 'join') {
             const thirdPartyInvites =

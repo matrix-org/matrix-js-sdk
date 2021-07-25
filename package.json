@@ -15,7 +15,8 @@
     "build:minify-browser": "terser dist/browser-matrix.js --compress --mangle --source-map --output dist/browser-matrix.min.js",
     "gendoc": "jsdoc -c jsdoc.json -P package.json",
     "lint": "yarn lint:types && yarn lint:js",
-    "lint:js": "eslint --max-warnings 57 src spec",
+    "lint:js": "eslint --max-warnings 7 src spec",
+    "lint:js-fix": "eslint --fix src spec",
     "lint:types": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -28,7 +29,7 @@
   "keywords": [
     "matrix-org"
   ],
-  "main": "./lib/index.js",
+  "main": "./src/index.ts",
   "browser": "./lib/browser-index.js",
   "matrix_src_main": "./src/index.ts",
   "matrix_src_browser": "./src/browser-index.js",
@@ -110,6 +111,5 @@
     "coverageReporters": [
       "text"
     ]
-  },
-  "typings": "./lib/index.d.ts"
+  }
 }

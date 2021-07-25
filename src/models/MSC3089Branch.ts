@@ -70,8 +70,8 @@ export class MSC3089Branch {
      * @param {string} name The new name for this file.
      * @returns {Promise<void>} Resolves when complete.
      */
-    public setName(name: string): Promise<void> {
-        return this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {
+    public async setName(name: string): Promise<void> {
+        await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {
             ...this.indexEvent.getContent(),
             name: name,
         }, this.id);

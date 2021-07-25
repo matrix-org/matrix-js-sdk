@@ -15,9 +15,9 @@ limitations under the License.
 */
 
 import { MatrixClient } from "./client";
-import { MatrixEvent } from "./models/event";
+import { IEvent, MatrixEvent } from "./models/event";
 
-export type EventMapper = (obj: any) => MatrixEvent;
+export type EventMapper = (obj: Partial<IEvent>) => MatrixEvent;
 
 export interface MapperOpts {
     preventReEmit?: boolean;
@@ -28,7 +28,7 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
     const preventReEmit = Boolean(options.preventReEmit);
     const decrypt = options.decrypt !== false;
 
-    function mapper(plainOldJsObject) {
+    function mapper(plainOldJsObject: Partial<IEvent>) {
         const event = new MatrixEvent(plainOldJsObject);
         if (event.isEncrypted()) {
             if (!preventReEmit) {
