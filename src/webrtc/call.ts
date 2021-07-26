@@ -1808,7 +1808,7 @@ export function createNewMatrixCall(client: any, roomId: string, options?: CallO
     const opts = {
         client: client,
         roomId: roomId,
-        invitee: options.invitee,
+        invitee: options && options.invitee,
         turnServers: client.getTurnServers(),
         // call level options
         forceTURN: client.forceTURN || optionsForceTURN,

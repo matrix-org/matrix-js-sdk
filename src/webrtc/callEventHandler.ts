@@ -173,7 +173,7 @@ export class CallEventHandler {
             }
 
             call.callId = content.call_id;
-            call.initWithInvite(event);
+            const invitePromise = call.initWithInvite(event);
             this.calls.set(call.callId, call);
 
             // if we stashed candidate events for that call ID, play them back now
@@ -193,6 +193,7 @@ export class CallEventHandler {
                 if (
                     call.roomId === thisCall.roomId &&
                     thisCall.direction === CallDirection.Outbound &&
+                    call.invitee === thisCall.invitee &&
                     isCalling
                 ) {
                     existingCall = thisCall;
@@ -222,7 +223,9 @@ export class CallEventHandler {
                     call.hangup(CallErrorCode.Replaced, true);
                 }
             } else {
-                this.client.emit("Call.incoming", call);
+                invitePromise.then(() => {
+                    this.client.emit("Call.incoming", call);
+                });
             }
         } else if (event.getType() === EventType.CallAnswer) {
             if (!call) {
