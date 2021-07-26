@@ -274,7 +274,7 @@ describe("Crypto", function() {
                     // alice encrypts each event, and then bob tries to decrypt
                     // them without any keys, so that they'll be in pending
                     await aliceClient.crypto.encryptEvent(event, aliceRoom);
-                    event.clearEvent = {};
+                    event.clearEvent = undefined;
                     event.senderCurve25519Key = null;
                     event.claimedEd25519Key = null;
                     try {
