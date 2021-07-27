@@ -22,8 +22,8 @@ limitations under the License.
  * @param {string} dbName The database name to test for
  * @returns {boolean} Whether the database exists
  */
-export function exists(indexedDB, dbName) {
-    return new Promise((resolve, reject) => {
+export function exists(indexedDB: IDBFactory, dbName: string): Promise<boolean> {
+    return new Promise<boolean>((resolve, reject) => {
         let exists = true;
         const req = indexedDB.open(dbName);
         req.onupgradeneeded = () => {
@@ -31,7 +31,7 @@ export function exists(indexedDB, dbName) {
             // should only fire if the DB did not exist before at any version.
             exists = false;
         };
-        req.onblocked = () => reject();
+        req.onblocked = () => reject(req.error);
         req.onsuccess = () => {
             const db = req.result;
             db.close();
@@ -45,6 +45,6 @@ export function exists(indexedDB, dbName) {
             }
             resolve(exists);
         };
-        req.onerror = ev => reject(ev.target.error);
+        req.onerror = ev => reject(req.error);
     });
 }

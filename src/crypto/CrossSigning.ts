@@ -28,10 +28,11 @@ import { decryptAES, encryptAES } from './aes';
 import { PkSigning } from "@matrix-org/olm";
 import { DeviceInfo } from "./deviceinfo";
 import { SecretStorage } from "./SecretStorage";
-import { CryptoStore, ICrossSigningKey, ISignedKey, MatrixClient } from "../client";
+import { ICrossSigningKey, ISignedKey, MatrixClient } from "../client";
 import { OlmDevice } from "./OlmDevice";
 import { ICryptoCallbacks } from "../matrix";
 import { ISignatures } from "../@types/signed";
+import { CryptoStore } from "./store/base";
 
 const KEY_REQUEST_TIMEOUT_MS = 1000 * 60;
 
@@ -45,6 +46,12 @@ function publicKeyFromKeyInfo(keyInfo: ICrossSigningKey): string {
 export interface ICacheCallbacks {
     getCrossSigningKeyCache?(type: string, expectedPublicKey?: string): Promise<Uint8Array>;
     storeCrossSigningKeyCache?(type: string, key: Uint8Array): Promise<void>;
+}
+
+export interface ICrossSigningInfo {
+    keys: Record<string, ICrossSigningKey>;
+    firstUse: boolean;
+    crossSigningVerifiedBefore: boolean;
 }
 
 export class CrossSigningInfo extends EventEmitter {
@@ -75,7 +82,7 @@ export class CrossSigningInfo extends EventEmitter {
         super();
     }
 
-    public static fromStorage(obj: object, userId: string): CrossSigningInfo {
+    public static fromStorage(obj: ICrossSigningInfo, userId: string): CrossSigningInfo {
         const res = new CrossSigningInfo(userId);
         for (const prop in obj) {
             if (obj.hasOwnProperty(prop)) {
@@ -85,7 +92,7 @@ export class CrossSigningInfo extends EventEmitter {
         return res;
     }
 
-    public toStorage(): object {
+    public toStorage(): ICrossSigningInfo {
         return {
             keys: this.keys,
             firstUse: this.firstUse,
