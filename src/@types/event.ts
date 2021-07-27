@@ -53,6 +53,7 @@ export enum EventType {
     CallReject = "m.call.reject",
     CallSelectAnswer = "m.call.select_answer",
     CallNegotiate = "m.call.negotiate",
+    CallSDPStreamMetadataChanged = "org.matrix.call.sdp_stream_metadata_changed",
     CallReplaces = "m.call.replaces",
     CallAssertedIdentity = "m.call.asserted_identity",
     CallAssertedIdentityPrefix = "org.matrix.call.asserted_identity",
