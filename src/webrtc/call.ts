@@ -34,6 +34,8 @@ import {
     MCallOfferNegotiate,
     CallCapabilities,
     SDPStreamMetadataPurpose,
+    SDPStreamMetadata,
+    SDPStreamMetadataKey,
 } from './callEventTypes';
 import { CallFeed } from './callFeed';
 
@@ -276,10 +278,14 @@ export class MatrixCall extends EventEmitter {
     private peerConn: RTCPeerConnection;
     private feeds: Array<CallFeed>;
     private screenSharingStream: MediaStream;
+    // TODO: Rename to usermedia rather than AV for consistency
     private localAVStream: MediaStream;
+    private usermediaSenders: Array<RTCRtpSender>;
+    private screensharingSenders: Array<RTCRtpSender>;
     private inviteOrAnswerSent: boolean;
     private waitForLocalAVStream: boolean;
     // XXX: I don't know why this is called 'config'.
+    // XXX: Do we even needs this? Seems to be unused
     private config: MediaStreamConstraints;
     private successor: MatrixCall;
     private opponentMember: RoomMember;
@@ -312,6 +318,8 @@ export class MatrixCall extends EventEmitter {
     private remoteCandidateBuffer = new Map<string, RTCIceCandidate[]>();
 
     private remoteAssertedIdentity: AssertedIdentity;
+
+    private remoteSDPStreamMetadata: SDPStreamMetadata;
 
     constructor(opts: CallOpts) {
         super();
@@ -349,6 +357,9 @@ export class MatrixCall extends EventEmitter {
         this.vidMuted = false;
 
         this.feeds = [];
+
+        this.usermediaSenders = [];
+        this.screensharingSenders = [];
     }
 
     /**
@@ -373,47 +384,6 @@ export class MatrixCall extends EventEmitter {
         const constraints = getUserMediaContraints(ConstraintsType.Video);
         this.type = CallType.Video;
         await this.placeCallWithConstraints(constraints);
-    }
-
-    /**
-     * Place a screen-sharing call to this room. This includes audio.
-     * <b>This method is EXPERIMENTAL and subject to change without warning. It
-     * only works in Google Chrome and Firefox >= 44.</b>
-     * @throws If you have not specified a listener for 'error' events.
-     */
-    async placeScreenSharingCall(selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>) {
-        logger.debug("placeScreenSharingCall");
-        this.checkForErrorListener();
-        try {
-            const screenshareConstraints = await getScreenshareContraints(selectDesktopCapturerSource);
-            if (!screenshareConstraints) {
-                this.terminate(CallParty.Local, CallErrorCode.NoUserMedia, false);
-                return;
-            }
-
-            if (window.electron?.getDesktopCapturerSources) {
-                // We are using Electron
-                logger.debug("Getting screen stream using getUserMedia()...");
-                this.screenSharingStream = await navigator.mediaDevices.getUserMedia(screenshareConstraints);
-            } else {
-                // We are not using Electron
-                logger.debug("Getting screen stream using getDisplayMedia()...");
-                this.screenSharingStream = await navigator.mediaDevices.getDisplayMedia(screenshareConstraints);
-            }
-
-            logger.debug("Got screen stream, requesting audio stream...");
-            const audioConstraints = getUserMediaContraints(ConstraintsType.Audio);
-            this.placeCallWithConstraints(audioConstraints);
-        } catch (err) {
-            this.emit(CallEvent.Error,
-                new CallError(
-                    CallErrorCode.NoUserMedia,
-                    "Failed to get screen-sharing stream: ", err,
-                ),
-            );
-            this.terminate(CallParty.Local, CallErrorCode.NoUserMedia, false);
-        }
-        this.type = CallType.Video;
     }
 
     public getOpponentMember() {
@@ -453,6 +423,21 @@ export class MatrixCall extends EventEmitter {
     }
 
     /**
+     * Generates and returns localSDPStreamMetadata
+     * @returns {SDPStreamMetadata} localSDPStreamMetadata
+     */
+    private getLocalSDPStreamMetadata(): SDPStreamMetadata {
+        const metadata = {};
+        for (const localFeed of this.getLocalFeeds()) {
+            metadata[localFeed.stream.id] = {
+                purpose: localFeed.purpose,
+            };
+        }
+        logger.debug("Got local SDPStreamMetadata", metadata);
+        return metadata;
+    }
+
+    /**
      * Returns true if there are no incoming feeds,
      * otherwise returns false
      * @returns {boolean} no incoming feeds
@@ -461,7 +446,52 @@ export class MatrixCall extends EventEmitter {
         return !this.feeds.some((feed) => !feed.isLocal());
     }
 
-    private pushNewFeed(stream: MediaStream, userId: string, purpose: SDPStreamMetadataPurpose) {
+    private pushRemoteFeed(stream: MediaStream) {
+        // Fallback to old behavior if the other side doesn't support SDPStreamMetadata
+        if (!this.opponentSupportsSDPStreamMetadata()) {
+            this.pushRemoteFeedWithoutMetadata(stream);
+            return;
+        }
+
+        const userId = this.getOpponentMember().userId;
+        const purpose = this.remoteSDPStreamMetadata[stream.id].purpose;
+
+        if (!purpose) {
+            logger.warn(`Ignoring stream with id ${stream.id} because we didn't get any metadata about it`);
+            return;
+        }
+
+        // Try to find a feed with the same purpose as the new stream,
+        // if we find it replace the old stream with the new one
+        const existingFeed = this.getRemoteFeeds().find((feed) => feed.purpose === purpose);
+        if (existingFeed) {
+            existingFeed.setNewStream(stream);
+        } else {
+            this.feeds.push(new CallFeed(stream, userId, purpose, this.client, this.roomId));
+            this.emit(CallEvent.FeedsChanged, this.feeds);
+        }
+
+        logger.info(`Pushed remote stream (id="${stream.id}", active="${stream.active}", purpose=${purpose})`);
+    }
+
+    /**
+     * This method is used ONLY if the other client doesn't support sending SDPStreamMetadata
+     */
+    private pushRemoteFeedWithoutMetadata(stream: MediaStream) {
+        const userId = this.getOpponentMember().userId;
+        // We can guess the purpose here since the other client can only send one stream
+        const purpose = SDPStreamMetadataPurpose.Usermedia;
+        const oldRemoteStream = this.feeds.find((feed) => !feed.isLocal())?.stream;
+
+        // Note that we check by ID and always set the remote stream: Chrome appears
+        // to make new stream objects when transceiver directionality is changed and the 'active'
+        // status of streams change - Dave
+        // If we already have a stream, check this stream has the same id
+        if (oldRemoteStream && stream.id !== oldRemoteStream.id) {
+            logger.warn(`Ignoring new stream ID ${stream.id}: we already have stream ID ${oldRemoteStream.id}`);
+            return;
+        }
+
         // Try to find a feed with the same stream id as the new stream,
         // if we find it replace the old stream with the new one
         const feed = this.feeds.find((feed) => feed.stream.id === stream.id);
@@ -471,10 +501,63 @@ export class MatrixCall extends EventEmitter {
             this.feeds.push(new CallFeed(stream, userId, purpose, this.client, this.roomId));
             this.emit(CallEvent.FeedsChanged, this.feeds);
         }
+
+        logger.info(`Pushed remote stream (id="${stream.id}", active="${stream.active}")`);
+    }
+
+    private pushLocalFeed(stream: MediaStream, purpose: SDPStreamMetadataPurpose, addToPeerConnection = true) {
+        const userId = this.client.getUserId();
+
+        // We try to replace an existing feed if there already is one with the same purpose
+        const existingFeed = this.getLocalFeeds().find((feed) => feed.purpose === purpose);
+        if (existingFeed) {
+            existingFeed.setNewStream(stream);
+        } else {
+            this.feeds.push(new CallFeed(stream, userId, purpose, this.client, this.roomId));
+            this.emit(CallEvent.FeedsChanged, this.feeds);
+        }
+
+        // why do we enable audio (and only audio) tracks here? -- matthew
+        setTracksEnabled(stream.getAudioTracks(), true);
+
+        if (addToPeerConnection) {
+            const senderArray = purpose === SDPStreamMetadataPurpose.Usermedia ?
+                this.usermediaSenders : this.screensharingSenders;
+            // Empty the array
+            senderArray.splice(0, senderArray.length);
+
+            this.emit(CallEvent.FeedsChanged, this.feeds);
+            for (const track of stream.getTracks()) {
+                logger.info(
+                    `Adding track (` +
+                    `id="${track.id}", ` +
+                    `kind="${track.kind}", ` +
+                    `streamId="${stream.id}", ` +
+                    `streamPurpose="${purpose}"` +
+                    `) to peer connection`,
+                );
+                senderArray.push(this.peerConn.addTrack(track, stream));
+            }
+        }
+
+        logger.info(`Pushed local stream (id="${stream.id}", active="${stream.active}", purpose="${purpose}")`);
     }
 
     private deleteAllFeeds() {
         this.feeds = [];
+        this.emit(CallEvent.FeedsChanged, this.feeds);
+    }
+
+    private deleteFeedByStream(stream: MediaStream) {
+        logger.debug(`Removing feed with stream id ${stream.id}`);
+
+        const feed = this.feeds.find((feed) => feed.stream.id === stream.id);
+        if (!feed) {
+            logger.warn(`Didn't find the feed with stream id ${stream.id} to delete`);
+            return;
+        }
+
+        this.feeds.splice(this.feeds.indexOf(feed), 1);
         this.emit(CallEvent.FeedsChanged, this.feeds);
     }
 
@@ -514,6 +597,13 @@ export class MatrixCall extends EventEmitter {
         const haveTurnCreds = await this.client.checkTurnServers();
         if (!haveTurnCreds) {
             logger.warn("Failed to get TURN credentials! Proceeding with call anyway...");
+        }
+
+        const sdpStreamMetadata = invite[SDPStreamMetadataKey];
+        if (sdpStreamMetadata) {
+            this.remoteSDPStreamMetadata = sdpStreamMetadata;
+        } else {
+            logger.debug("Did not get any SDPStreamMetadata! Can not send/receive multiple streams");
         }
 
         this.peerConn = this.createPeerConnection();
@@ -674,6 +764,125 @@ export class MatrixCall extends EventEmitter {
     }
 
     /**
+     * Returns true if this.remoteSDPStreamMetadata is defined, otherwise returns false
+     * @returns {boolean} can screenshare
+     */
+    public opponentSupportsSDPStreamMetadata(): boolean {
+        return Boolean(this.remoteSDPStreamMetadata);
+    }
+
+    /**
+     * If there is a screensharing stream returns true, otherwise returns false
+     * @returns {boolean} is screensharing
+     */
+    public isScreensharing(): boolean {
+        return Boolean(this.screenSharingStream);
+    }
+
+    /**
+     * Starts/stops screensharing
+     * @param enabled the desired screensharing state
+     * @param selectDesktopCapturerSource callBack to select a screensharing stream on desktop
+     * @returns {boolean} new screensharing state
+     */
+    public async setScreensharingEnabled(
+        enabled: boolean,
+        selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>,
+    ) {
+        // Skip if there is nothing to do
+        if (enabled && this.isScreensharing()) {
+            logger.warn(`There is already a screensharing stream - there is nothing to do!`);
+            return true;
+        } else if (!enabled && !this.isScreensharing()) {
+            logger.warn(`There already isn't a screensharing stream - there is nothing to do!`);
+            return false;
+        }
+
+        // Fallback to replaceTrack()
+        if (!this.opponentSupportsSDPStreamMetadata()) {
+            return await this.setScreensharingEnabledWithoutMetadataSupport(enabled, selectDesktopCapturerSource);
+        }
+
+        logger.debug(`Set screensharing enabled? ${enabled}`);
+        if (enabled) {
+            try {
+                this.screenSharingStream = await getScreensharingStream(selectDesktopCapturerSource);
+                if (!this.screenSharingStream) return false;
+                this.pushLocalFeed(this.screenSharingStream, SDPStreamMetadataPurpose.Screenshare);
+                return true;
+            } catch (err) {
+                this.emit(CallEvent.Error,
+                    new CallError(CallErrorCode.NoUserMedia, "Failed to get screen-sharing stream: ", err),
+                );
+                return false;
+            }
+        } else {
+            for (const sender of this.screensharingSenders) {
+                this.peerConn.removeTrack(sender);
+            }
+            this.deleteFeedByStream(this.screenSharingStream);
+            for (const track of this.screenSharingStream.getTracks()) {
+                track.stop();
+            }
+            this.screenSharingStream = null;
+            return false;
+        }
+    }
+
+    /**
+     * Starts/stops screensharing
+     * Should be used ONLY if the opponent doesn't support SDPStreamMetadata
+     * @param enabled the desired screensharing state
+     * @param selectDesktopCapturerSource callBack to select a screensharing stream on desktop
+     * @returns {boolean} new screensharing state
+     */
+    private async setScreensharingEnabledWithoutMetadataSupport(
+        enabled: boolean,
+        selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>,
+    ) {
+        logger.debug(`Set screensharing enabled? ${enabled} using replaceTrack()`);
+        if (enabled) {
+            try {
+                this.screenSharingStream = await getScreensharingStream(selectDesktopCapturerSource);
+                if (!this.screenSharingStream) return false;
+
+                const track = this.screenSharingStream.getTracks().find((track) => {
+                    return track.kind === "video";
+                });
+                const sender = this.usermediaSenders.find((sender) => {
+                    return sender.track?.kind === "video";
+                });
+                sender.replaceTrack(track);
+
+                this.pushLocalFeed(this.screenSharingStream, SDPStreamMetadataPurpose.Screenshare, false);
+
+                return true;
+            } catch (err) {
+                this.emit(CallEvent.Error,
+                    new CallError(CallErrorCode.NoUserMedia, "Failed to get screen-sharing stream: ", err),
+                );
+                return false;
+            }
+        } else {
+            const track = this.localAVStream.getTracks().find((track) => {
+                return track.kind === "video";
+            });
+            const sender = this.usermediaSenders.find((sender) => {
+                return sender.track?.kind === "video";
+            });
+            sender.replaceTrack(track);
+
+            this.deleteFeedByStream(this.screenSharingStream);
+            for (const track of this.screenSharingStream.getTracks()) {
+                track.stop();
+            }
+            this.screenSharingStream = null;
+
+            return false;
+        }
+    }
+
+    /**
      * Set whether our outbound video should be muted or not.
      * @param {boolean} muted True to mute the outbound video.
      */
@@ -692,6 +901,7 @@ export class MatrixCall extends EventEmitter {
      * (including if the call is not set up yet).
      */
     isLocalVideoMuted(): boolean {
+        if (this.type === CallType.Voice) return true;
         return this.vidMuted;
     }
 
@@ -801,34 +1011,13 @@ export class MatrixCall extends EventEmitter {
             this.stopAllMedia();
             return;
         }
-        this.localAVStream = stream;
-        logger.info("Got local AV stream with id " + this.localAVStream.id);
 
+        this.localAVStream = stream;
+        this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
         this.setState(CallState.CreateOffer);
 
+        logger.info("Got local AV stream with id " + this.localAVStream.id);
         logger.debug("gotUserMediaForInvite -> " + this.type);
-
-        if (this.screenSharingStream) {
-            logger.debug(
-                "Setting screen sharing stream to the local video element",
-            );
-            this.pushNewFeed(this.screenSharingStream, this.client.getUserId(), SDPStreamMetadataPurpose.Screenshare);
-        } else {
-            this.pushNewFeed(stream, this.client.getUserId(), SDPStreamMetadataPurpose.Usermedia);
-        }
-
-        // why do we enable audio (and only audio) tracks here? -- matthew
-        setTracksEnabled(stream.getAudioTracks(), true);
-
-        for (const audioTrack of stream.getAudioTracks()) {
-            logger.info("Adding audio track with id " + audioTrack.id);
-            this.peerConn.addTrack(audioTrack, stream);
-        }
-        for (const videoTrack of (this.screenSharingStream || stream).getVideoTracks()) {
-            logger.info("Adding video track with id " + videoTrack.id);
-            this.peerConn.addTrack(videoTrack, stream);
-        }
-
         // Now we wait for the negotiationneeded event
     };
 
@@ -840,6 +1029,7 @@ export class MatrixCall extends EventEmitter {
                 // required to still be sent for backwards compat
                 type: this.peerConn.localDescription.type,
             },
+            [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(),
         } as MCallAnswer;
 
         if (this.client.supportsCallTransfer) {
@@ -884,19 +1074,16 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        this.pushNewFeed(stream, this.client.getUserId(), SDPStreamMetadataPurpose.Usermedia);
+        this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
 
         this.localAVStream = stream;
         logger.info("Got local AV stream with id " + this.localAVStream.id);
-        setTracksEnabled(stream.getAudioTracks(), true);
-        for (const track of stream.getTracks()) {
-            this.peerConn.addTrack(track, stream);
-        }
 
         this.setState(CallState.CreateAnswer);
 
         let myAnswer;
         try {
+            this.getRidOfRTXCodecs();
             myAnswer = await this.peerConn.createAnswer();
         } catch (err) {
             logger.debug("Failed to create answer: ", err);
@@ -1022,6 +1209,13 @@ export class MatrixCall extends EventEmitter {
 
         this.setState(CallState.Connecting);
 
+        const sdpStreamMetadata = event.getContent()[SDPStreamMetadataKey];
+        if (sdpStreamMetadata) {
+            this.remoteSDPStreamMetadata = sdpStreamMetadata;
+        } else {
+            logger.warn("Did not get any SDPStreamMetadata! Can not send/receive multiple streams");
+        }
+
         try {
             await this.peerConn.setRemoteDescription(event.getContent().answer);
         } catch (e) {
@@ -1092,15 +1286,24 @@ export class MatrixCall extends EventEmitter {
 
         const prevLocalOnHold = this.isLocalOnHold();
 
+        const metadata = event.getContent()[SDPStreamMetadataKey];
+        if (metadata) {
+            this.remoteSDPStreamMetadata = metadata;
+        } else {
+            logger.warn("Received negotiation event without SDPStreamMetadata!");
+        }
+
         try {
             await this.peerConn.setRemoteDescription(description);
 
             if (description.type === 'offer') {
+                this.getRidOfRTXCodecs();
                 const localDescription = await this.peerConn.createAnswer();
                 await this.peerConn.setLocalDescription(localDescription);
 
                 this.sendVoipEvent(EventType.CallNegotiate, {
                     description: this.peerConn.localDescription,
+                    [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(),
                 });
             }
         } catch (err) {
@@ -1176,6 +1379,8 @@ export class MatrixCall extends EventEmitter {
                 'm.call.transferee': true,
             };
         }
+
+        content[SDPStreamMetadataKey] = this.getLocalSDPStreamMetadata();
 
         // Get rid of any candidates waiting to be sent: they'll be included in the local
         // description we just got and will send in the offer.
@@ -1281,31 +1486,51 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        const oldRemoteStream = this.feeds.find((feed) => !feed.isLocal())?.stream;
-
-        // If we already have a stream, check this track is from the same one
-        // Note that we check by ID and always set the remote stream: Chrome appears
-        // to make new stream objects when tranciever directionality is changed and the 'active'
-        // status of streams change - Dave
-        if (oldRemoteStream && ev.streams[0].id !== oldRemoteStream.id) {
-            logger.warn(
-                `Ignoring new stream ID ${ev.streams[0].id}: we already have stream ID ${oldRemoteStream.id}`,
-            );
-            return;
-        }
-
-        if (!oldRemoteStream) {
-            logger.info("Got remote stream with id " + ev.streams[0].id);
-        }
-
-        const newRemoteStream = ev.streams[0];
-
-        logger.debug(`Track id ${ev.track.id} of kind ${ev.track.kind} added`);
-
-        this.pushNewFeed(newRemoteStream, this.getOpponentMember().userId, SDPStreamMetadataPurpose.Usermedia);
-
-        logger.info("playing remote. stream active? " + newRemoteStream.active);
+        const stream = ev.streams[0];
+        this.pushRemoteFeed(stream);
+        stream.addEventListener("removetrack", () => this.deleteFeedByStream(stream));
     };
+
+    /**
+     * This method removes all video/rtx codecs from screensharing video
+     * transceivers. This is necessary since they can cause problems. Without
+     * this the following steps should produce an error:
+     *   Chromium calls Firefox
+     *   Firefox answers
+     *   Firefox starts screen-sharing
+     *   Chromium starts screen-sharing
+     *   Call crashes for Chromium with:
+     *       [96685:23:0518/162603.933321:ERROR:webrtc_video_engine.cc(3296)] RTX codec (PT=97) mapped to PT=96 which is not in the codec list.
+     *       [96685:23:0518/162603.933377:ERROR:webrtc_video_engine.cc(1171)] GetChangedRecvParameters called without any video codecs.
+     *       [96685:23:0518/162603.933430:ERROR:sdp_offer_answer.cc(4302)] Failed to set local video description recv parameters for m-section with mid='2'. (INVALID_PARAMETER)
+     */
+    private getRidOfRTXCodecs() {
+        // RTCRtpReceiver.getCapabilities and RTCRtpSender.getCapabilities don't seem to be supported on FF
+        if (!RTCRtpReceiver.getCapabilities || !RTCRtpSender.getCapabilities) return;
+
+        const recvCodecs = RTCRtpReceiver.getCapabilities("video").codecs;
+        const sendCodecs = RTCRtpSender.getCapabilities("video").codecs;
+        const codecs = [...sendCodecs, ...recvCodecs];
+
+        for (const codec of codecs) {
+            if (codec.mimeType === "video/rtx") {
+                const rtxCodecIndex = codecs.indexOf(codec);
+                codecs.splice(rtxCodecIndex, 1);
+            }
+        }
+
+        for (const trans of this.peerConn.getTransceivers()) {
+            if (
+                this.screensharingSenders.includes(trans.sender) &&
+                    (
+                        trans.sender.track?.kind === "video" ||
+                        trans.receiver.track?.kind === "video"
+                    )
+            ) {
+                trans.setCodecPreferences(codecs);
+            }
+        }
+    }
 
     onNegotiationNeeded = async () => {
         logger.info("Negotation is needed!");
@@ -1317,6 +1542,7 @@ export class MatrixCall extends EventEmitter {
 
         this.makingOffer = true;
         try {
+            this.getRidOfRTXCodecs();
             const myOffer = await this.peerConn.createOffer();
             await this.gotLocalOffer(myOffer);
         } catch (e) {
@@ -1671,6 +1897,23 @@ export class MatrixCall extends EventEmitter {
                 }
             }
         }
+    }
+}
+
+async function getScreensharingStream(
+    selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>,
+): Promise<MediaStream> {
+    const screenshareConstraints = await getScreenshareContraints(selectDesktopCapturerSource);
+    if (!screenshareConstraints) return null;
+
+    if (window.electron?.getDesktopCapturerSources) {
+        // We are using Electron
+        logger.debug("Getting screen stream using getUserMedia()...");
+        return await navigator.mediaDevices.getUserMedia(screenshareConstraints);
+    } else {
+        // We are not using Electron
+        logger.debug("Getting screen stream using getDisplayMedia()...");
+        return await navigator.mediaDevices.getDisplayMedia(screenshareConstraints);
     }
 }
 
