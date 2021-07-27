@@ -1,3 +1,54 @@
+Changes in [12.2.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v12.2.0-rc.1) (2021-07-27)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v12.1.0...v12.2.0-rc.1)
+
+ * Update ESLint config
+   [\#1810](https://github.com/matrix-org/matrix-js-sdk/pull/1810)
+ * Clean up Event.clearEvent handling to fix a bug where malformed events with
+   falsey content wouldn't be considered decrypted
+   [\#1807](https://github.com/matrix-org/matrix-js-sdk/pull/1807)
+ * Update matrix-org-eslint-plugin and tighten max warning limit
+   [\#1806](https://github.com/matrix-org/matrix-js-sdk/pull/1806)
+ * Initial MSC3244 support and type cleanup
+   [\#1745](https://github.com/matrix-org/matrix-js-sdk/pull/1745)
+ * Functional members
+   [\#1771](https://github.com/matrix-org/matrix-js-sdk/pull/1771)
+ * yarn upgrade
+   [\#1802](https://github.com/matrix-org/matrix-js-sdk/pull/1802)
+ * Improve calculateRoomName performances by using Intl.Collator
+   [\#1801](https://github.com/matrix-org/matrix-js-sdk/pull/1801)
+ * Conform to new typescript eslint rules
+   [\#1798](https://github.com/matrix-org/matrix-js-sdk/pull/1798)
+ * Actually print IndexedDB command error if there is one
+   [\#1799](https://github.com/matrix-org/matrix-js-sdk/pull/1799)
+ * Update eslint-plugin-matrix-org
+   [\#1796](https://github.com/matrix-org/matrix-js-sdk/pull/1796)
+ * Add minimal types for "notification settings" UI
+   [\#1778](https://github.com/matrix-org/matrix-js-sdk/pull/1778)
+ * Switch from `url` to URL constructor
+   [\#1791](https://github.com/matrix-org/matrix-js-sdk/pull/1791)
+ * Switch callEventHandler from listening on `event` to `Room.timeline`
+   [\#1789](https://github.com/matrix-org/matrix-js-sdk/pull/1789)
+ * Contributing guidelines for new changelog generation
+   [\#1787](https://github.com/matrix-org/matrix-js-sdk/pull/1787)
+ * Fix link to CONTRIBUTING.md
+   [\#1786](https://github.com/matrix-org/matrix-js-sdk/pull/1786)
+ * Use an unstable prefix for MSC2885: Hidden read receipts
+   [\#1788](https://github.com/matrix-org/matrix-js-sdk/pull/1788)
+ * Standardise spelling and casing of homeserver, identity server, and
+   integration manager
+   [\#1782](https://github.com/matrix-org/matrix-js-sdk/pull/1782)
+ * Convert CONTRIBUTING to markdown
+   [\#1785](https://github.com/matrix-org/matrix-js-sdk/pull/1785)
+ * Use webpack worker-loader instead of homegrown hack
+   [\#1780](https://github.com/matrix-org/matrix-js-sdk/pull/1780)
+ * Convert IndexedDB store & worker to Typescript
+   [\#1779](https://github.com/matrix-org/matrix-js-sdk/pull/1779)
+ * Expose MatrixEvent's internal clearEvent as a function
+   [\#1784](https://github.com/matrix-org/matrix-js-sdk/pull/1784)
+ * Improve and consolidate typing
+   [\#1777](https://github.com/matrix-org/matrix-js-sdk/pull/1777)
+
 Changes in [12.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v12.1.0) (2021-07-19)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v12.1.0-rc.1...v12.1.0)
