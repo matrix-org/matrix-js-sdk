@@ -24,6 +24,7 @@ interface CallOfferAnswer {
 
 export interface CallCapabilities {
     'm.call.transferee': boolean;
+    'm.call.dtmf': boolean;
 }
 
 export interface MCallAnswer {
