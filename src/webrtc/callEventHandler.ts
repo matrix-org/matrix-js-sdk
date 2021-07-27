@@ -297,6 +297,15 @@ export class CallEventHandler {
             }
 
             call.onAssertedIdentityReceived(event);
+        } else if (event.getType() === EventType.CallSDPStreamMetadataChanged) {
+            if (!call) return;
+
+            if (event.getContent().party_id === call.ourPartyId) {
+                // Ignore remote echo
+                return;
+            }
+
+            call.onSDPStreamMetadataChangedReceived(event);
         }
     }
 }

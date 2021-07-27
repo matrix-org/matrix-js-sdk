@@ -36,6 +36,7 @@ import {
     SDPStreamMetadataPurpose,
     SDPStreamMetadata,
     SDPStreamMetadataKey,
+    MCallSDPStreamMetadataChanged,
 } from './callEventTypes';
 import { CallFeed } from './callFeed';
 
@@ -353,8 +354,6 @@ export class MatrixCall extends EventEmitter {
         this.makingOffer = false;
 
         this.remoteOnHold = false;
-        this.micMuted = false;
-        this.vidMuted = false;
 
         this.feeds = [];
 
@@ -398,6 +397,14 @@ export class MatrixCall extends EventEmitter {
         return this.remoteAssertedIdentity;
     }
 
+    public get localUsermediaFeed(): CallFeed {
+        return this.getLocalFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Usermedia);
+    }
+
+    private getFeedByStreamId(streamId: string): CallFeed {
+        return this.getFeeds().find((feed) => feed.stream.id === streamId);
+    }
+
     /**
      * Returns an array of all CallFeeds
      * @returns {Array<CallFeed>} CallFeeds
@@ -427,10 +434,12 @@ export class MatrixCall extends EventEmitter {
      * @returns {SDPStreamMetadata} localSDPStreamMetadata
      */
     private getLocalSDPStreamMetadata(): SDPStreamMetadata {
-        const metadata = {};
+        const metadata: SDPStreamMetadata = {};
         for (const localFeed of this.getLocalFeeds()) {
             metadata[localFeed.stream.id] = {
                 purpose: localFeed.purpose,
+                audio_muted: localFeed.isAudioMuted(),
+                video_muted: localFeed.isVideoMuted(),
             };
         }
         logger.debug("Got local SDPStreamMetadata", metadata);
@@ -455,6 +464,8 @@ export class MatrixCall extends EventEmitter {
 
         const userId = this.getOpponentMember().userId;
         const purpose = this.remoteSDPStreamMetadata[stream.id].purpose;
+        const audioMuted = this.remoteSDPStreamMetadata[stream.id].audio_muted;
+        const videoMuted = this.remoteSDPStreamMetadata[stream.id].video_muted;
 
         if (!purpose) {
             logger.warn(`Ignoring stream with id ${stream.id} because we didn't get any metadata about it`);
@@ -467,7 +478,7 @@ export class MatrixCall extends EventEmitter {
         if (existingFeed) {
             existingFeed.setNewStream(stream);
         } else {
-            this.feeds.push(new CallFeed(stream, userId, purpose, this.client, this.roomId));
+            this.feeds.push(new CallFeed(stream, userId, purpose, this.client, this.roomId, audioMuted, videoMuted));
             this.emit(CallEvent.FeedsChanged, this.feeds);
         }
 
@@ -494,7 +505,7 @@ export class MatrixCall extends EventEmitter {
 
         // Try to find a feed with the same stream id as the new stream,
         // if we find it replace the old stream with the new one
-        const feed = this.feeds.find((feed) => feed.stream.id === stream.id);
+        const feed = this.getFeedByStreamId(stream.id);
         if (feed) {
             feed.setNewStream(stream);
         } else {
@@ -513,7 +524,7 @@ export class MatrixCall extends EventEmitter {
         if (existingFeed) {
             existingFeed.setNewStream(stream);
         } else {
-            this.feeds.push(new CallFeed(stream, userId, purpose, this.client, this.roomId));
+            this.feeds.push(new CallFeed(stream, userId, purpose, this.client, this.roomId, true, true));
             this.emit(CallEvent.FeedsChanged, this.feeds);
         }
 
@@ -551,7 +562,7 @@ export class MatrixCall extends EventEmitter {
     private deleteFeedByStream(stream: MediaStream) {
         logger.debug(`Removing feed with stream id ${stream.id}`);
 
-        const feed = this.feeds.find((feed) => feed.stream.id === stream.id);
+        const feed = this.getFeedByStreamId(stream.id);
         if (!feed) {
             logger.warn(`Didn't find the feed with stream id ${stream.id} to delete`);
             return;
@@ -887,7 +898,7 @@ export class MatrixCall extends EventEmitter {
      * @param {boolean} muted True to mute the outbound video.
      */
     setLocalVideoMuted(muted: boolean) {
-        this.vidMuted = muted;
+        this.localUsermediaFeed?.setVideoMuted(muted);
         this.updateMuteStatus();
     }
 
@@ -901,8 +912,7 @@ export class MatrixCall extends EventEmitter {
      * (including if the call is not set up yet).
      */
     isLocalVideoMuted(): boolean {
-        if (this.type === CallType.Voice) return true;
-        return this.vidMuted;
+        return this.localUsermediaFeed?.isVideoMuted();
     }
 
     /**
@@ -910,7 +920,7 @@ export class MatrixCall extends EventEmitter {
      * @param {boolean} muted True to mute the mic.
      */
     setMicrophoneMuted(muted: boolean) {
-        this.micMuted = muted;
+        this.localUsermediaFeed?.setAudioMuted(muted);
         this.updateMuteStatus();
     }
 
@@ -924,7 +934,7 @@ export class MatrixCall extends EventEmitter {
      * is not set up yet).
      */
     isMicrophoneMuted(): boolean {
-        return this.micMuted;
+        return this.localUsermediaFeed?.isAudioMuted();
     }
 
     /**
@@ -987,14 +997,14 @@ export class MatrixCall extends EventEmitter {
     }
 
     private updateMuteStatus() {
-        if (!this.localAVStream) {
-            return;
-        }
+        this.sendVoipEvent(EventType.CallSDPStreamMetadataChanged, {
+            [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(),
+        });
 
-        const micShouldBeMuted = this.micMuted || this.remoteOnHold;
+        const micShouldBeMuted = this.localUsermediaFeed?.isAudioMuted() || this.remoteOnHold;
+        const vidShouldBeMuted = this.localUsermediaFeed?.isVideoMuted() || this.remoteOnHold;
+
         setTracksEnabled(this.localAVStream.getAudioTracks(), !micShouldBeMuted);
-
-        const vidShouldBeMuted = this.vidMuted || this.remoteOnHold;
         setTracksEnabled(this.localAVStream.getVideoTracks(), !vidShouldBeMuted);
     }
 
@@ -1315,6 +1325,19 @@ export class MatrixCall extends EventEmitter {
             this.emit(CallEvent.LocalHoldUnhold, newLocalOnHold);
             // also this one for backwards compat
             this.emit(CallEvent.HoldUnhold, newLocalOnHold);
+        }
+    }
+
+    public onSDPStreamMetadataChangedReceived(event: MatrixEvent): void {
+        // TODO: What if the values is missing
+        // TODO: Handle purpose changes
+        const content = event.getContent<MCallSDPStreamMetadataChanged>();
+        const metadata = content[SDPStreamMetadataKey];
+        this.remoteSDPStreamMetadata = metadata;
+        for (const feed of this.getRemoteFeeds()) {
+            const streamId = feed.stream.id;
+            feed.setAudioMuted(metadata[streamId].audio_muted);
+            feed.setVideoMuted(metadata[streamId].video_muted);
         }
     }
 
