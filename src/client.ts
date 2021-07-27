@@ -89,9 +89,6 @@ import {
     IRecoveryKey,
     ISecretStorageKeyInfo,
 } from "./crypto/api";
-import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store";
-import { LocalStorageCryptoStore } from "./crypto/store/localStorage-crypto-store";
-import { IndexedDBCryptoStore } from "./crypto/store/indexeddb-crypto-store";
 import { SyncState } from "./sync.api";
 import { EventTimelineSet } from "./models/event-timeline-set";
 import { VerificationRequest } from "./crypto/verification/request/VerificationRequest";
@@ -146,10 +143,10 @@ import { ISynapseAdminDeactivateResponse, ISynapseAdminWhoisResponse } from "./@
 import { ISpaceSummaryEvent, ISpaceSummaryRoom } from "./@types/spaces";
 import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, RuleId } from "./@types/PushRules";
 import { IThreepid } from "./@types/threepids";
+import { CryptoStore } from "./crypto/store/base";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
-export type CryptoStore = MemoryCryptoStore | LocalStorageCryptoStore | IndexedDBCryptoStore;
 
 export type Callback = (err: Error | any | null, data?: any) => void;
 export type ResetTimelineCallback = (roomId: string) => boolean;
