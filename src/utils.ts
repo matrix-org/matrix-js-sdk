@@ -702,10 +702,7 @@ export function compare(a: string, b: string): number {
  * @param {Object} source
  * @returns the target object
  */
-export function recursivelyAssign<T extends Object, S extends Object>(target: T, source: S, ignoreNullish = false): T {
-    if (!target) target = Object({});
-    if (!source) source = Object({});
-
+export function recursivelyAssign(target: Object, source: Object, ignoreNullish = false): any {
     for (const [sourceKey, sourceValue] of Object.entries(source)) {
         if (target[sourceKey] instanceof Object && sourceValue) {
             recursivelyAssign(target[sourceKey], sourceValue);
