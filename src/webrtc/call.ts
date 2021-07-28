@@ -1329,12 +1329,12 @@ export class MatrixCall extends EventEmitter {
     }
 
     private updateRemoteSDPStreamMetadata(metadata: SDPStreamMetadata): void {
-        metadata = utils.recursivelyAssign(this.remoteSDPStreamMetadata, metadata, true);
+        this.remoteSDPStreamMetadata = utils.recursivelyAssign(this.remoteSDPStreamMetadata || {}, metadata, true);
         for (const feed of this.getRemoteFeeds()) {
             const streamId = feed.stream.id;
-            feed.setAudioMuted(metadata[streamId]?.audio_muted ?? feed.isAudioMuted());
-            feed.setVideoMuted(metadata[streamId]?.video_muted ?? feed.isVideoMuted());
-            feed.purpose = metadata[streamId]?.purpose ?? feed.purpose;
+            feed.setAudioMuted(this.remoteSDPStreamMetadata[streamId]?.audio_muted);
+            feed.setVideoMuted(this.remoteSDPStreamMetadata[streamId]?.video_muted);
+            feed.purpose = this.remoteSDPStreamMetadata[streamId]?.purpose;
         }
     }
 
