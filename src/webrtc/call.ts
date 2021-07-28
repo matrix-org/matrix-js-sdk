@@ -612,7 +612,7 @@ export class MatrixCall extends EventEmitter {
 
         const sdpStreamMetadata = invite[SDPStreamMetadataKey];
         if (sdpStreamMetadata) {
-            this.remoteSDPStreamMetadata = sdpStreamMetadata;
+            this.updateRemoteSDPStreamMetadata(sdpStreamMetadata);
         } else {
             logger.debug("Did not get any SDPStreamMetadata! Can not send/receive multiple streams");
         }
@@ -1221,7 +1221,7 @@ export class MatrixCall extends EventEmitter {
 
         const sdpStreamMetadata = event.getContent()[SDPStreamMetadataKey];
         if (sdpStreamMetadata) {
-            this.remoteSDPStreamMetadata = sdpStreamMetadata;
+            this.updateRemoteSDPStreamMetadata(sdpStreamMetadata);
         } else {
             logger.warn("Did not get any SDPStreamMetadata! Can not send/receive multiple streams");
         }
@@ -1296,9 +1296,9 @@ export class MatrixCall extends EventEmitter {
 
         const prevLocalOnHold = this.isLocalOnHold();
 
-        const metadata = event.getContent()[SDPStreamMetadataKey];
-        if (metadata) {
-            this.remoteSDPStreamMetadata = metadata;
+        const sdpStreamMetadata = event.getContent()[SDPStreamMetadataKey];
+        if (sdpStreamMetadata) {
+            this.updateRemoteSDPStreamMetadata(sdpStreamMetadata);
         } else {
             logger.warn("Received negotiation event without SDPStreamMetadata!");
         }
@@ -1328,17 +1328,20 @@ export class MatrixCall extends EventEmitter {
         }
     }
 
-    public onSDPStreamMetadataChangedReceived(event: MatrixEvent): void {
-        // TODO: What if the values is missing
-        const content = event.getContent<MCallSDPStreamMetadataChanged>();
-        const metadata = content[SDPStreamMetadataKey];
+    private updateRemoteSDPStreamMetadata(metadata: SDPStreamMetadata): void {
         this.remoteSDPStreamMetadata = metadata;
         for (const feed of this.getRemoteFeeds()) {
             const streamId = feed.stream.id;
-            feed.setAudioMuted(metadata[streamId].audio_muted);
-            feed.setVideoMuted(metadata[streamId].video_muted);
-            feed.purpose = metadata[streamId].purpose;
+            feed.setAudioMuted(metadata[streamId]?.audio_muted ?? feed.isAudioMuted());
+            feed.setVideoMuted(metadata[streamId]?.video_muted ?? feed.isVideoMuted());
+            feed.purpose = metadata[streamId]?.purpose ?? feed.purpose;
         }
+    }
+
+    public onSDPStreamMetadataChangedReceived(event: MatrixEvent): void {
+        const content = event.getContent<MCallSDPStreamMetadataChanged>();
+        const metadata = content[SDPStreamMetadataKey];
+        this.updateRemoteSDPStreamMetadata(metadata);
     }
 
     async onAssertedIdentityReceived(event: MatrixEvent) {
