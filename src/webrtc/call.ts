@@ -1037,7 +1037,7 @@ export class MatrixCall extends EventEmitter {
         } as MCallAnswer;
 
         answerContent.capabilities = {
-            'm.call.transferee': true,
+            'm.call.transferee': this.client.supportsCallTransfer,
             'm.call.dtmf': false,
         };
 
@@ -1378,7 +1378,7 @@ export class MatrixCall extends EventEmitter {
         }
 
         content.capabilities = {
-            'm.call.transferee': true,
+            'm.call.transferee': this.client.supportsCallTransfer,
             'm.call.dtmf': false,
         };
 
