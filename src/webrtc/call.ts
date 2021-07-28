@@ -1330,7 +1330,6 @@ export class MatrixCall extends EventEmitter {
 
     public onSDPStreamMetadataChangedReceived(event: MatrixEvent): void {
         // TODO: What if the values is missing
-        // TODO: Handle purpose changes
         const content = event.getContent<MCallSDPStreamMetadataChanged>();
         const metadata = content[SDPStreamMetadataKey];
         this.remoteSDPStreamMetadata = metadata;
@@ -1338,6 +1337,7 @@ export class MatrixCall extends EventEmitter {
             const streamId = feed.stream.id;
             feed.setAudioMuted(metadata[streamId].audio_muted);
             feed.setVideoMuted(metadata[streamId].video_muted);
+            feed.purpose = metadata[streamId].purpose;
         }
     }
 
