@@ -1329,7 +1329,7 @@ export class MatrixCall extends EventEmitter {
     }
 
     private updateRemoteSDPStreamMetadata(metadata: SDPStreamMetadata): void {
-        this.remoteSDPStreamMetadata = metadata;
+        metadata = utils.recursivelyAssign(this.remoteSDPStreamMetadata, metadata, true);
         for (const feed of this.getRemoteFeeds()) {
             const streamId = feed.stream.id;
             feed.setAudioMuted(metadata[streamId]?.audio_muted ?? feed.isAudioMuted());
