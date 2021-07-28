@@ -31,8 +31,8 @@ export class CallFeed extends EventEmitter {
         public purpose: SDPStreamMetadataPurpose,
         private client: MatrixClient,
         private roomId: string,
-        private audioMuted?: boolean,
-        private videoMuted?: boolean,
+        private audioMuted: boolean,
+        private videoMuted: boolean,
     ) {
         super();
     }
