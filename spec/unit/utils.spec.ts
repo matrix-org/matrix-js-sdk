@@ -493,4 +493,68 @@ describe("utils", function() {
             expect(deepSortedObjectEntries(input)).toMatchObject(output);
         });
     });
+
+    describe("recursivelyAssign", () => {
+        it("doesn't override with null/undefined", () => {
+            const result = utils.recursivelyAssign(
+                {
+                    string: "Hello world",
+                    object: {},
+                    float: 0.1,
+                }, {
+                    string: null,
+                    object: undefined,
+                },
+                true,
+            );
+
+            expect(result).toStrictEqual({
+                string: "Hello world",
+                object: {},
+                float: 0.1,
+            });
+        });
+
+        it("assigns recursively", () => {
+            const result = utils.recursivelyAssign(
+                {
+                    number: 42,
+                    object: {
+                        message: "Hello world",
+                        day: "Monday",
+                        langs: {
+                            compiled: ["c++"],
+                        },
+                    },
+                    thing: "string",
+                }, {
+                    number: 2,
+                    object: {
+                        message: "How are you",
+                        day: "Friday",
+                        langs: {
+                            compiled: ["c++", "c"],
+                        },
+                    },
+                    thing: {
+                        aSubThing: "something",
+                    },
+                },
+            );
+
+            expect(result).toStrictEqual({
+                number: 2,
+                object: {
+                    message: "How are you",
+                    day: "Friday",
+                    langs: {
+                        compiled: ["c++", "c"],
+                    },
+                },
+                thing: {
+                    aSubThing: "something",
+                },
+            });
+        });
+    });
 });
