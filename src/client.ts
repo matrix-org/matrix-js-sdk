@@ -7981,7 +7981,7 @@ export class MatrixClient extends EventEmitter {
      * @param {number?} limit The maximum number of rooms to return in total.
      * @param {string?} batch The opaque token to paginate a previous summary request.
      * @returns {Promise} the response, with next_token, rooms fields.
-     * @deprecated in favour of `getChildren` due to the MSC changing paths.
+     * @deprecated in favour of `getRoomChildren` due to the MSC changing paths.
      */
     public getSpaceSummary(
         roomId: string,
