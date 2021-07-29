@@ -10,6 +10,7 @@
     "sourceMap": true,
     "outDir": "./lib",
     "declaration": true,
+    "strictNullChecks": true,
     "types": [
       "node"
     ]
