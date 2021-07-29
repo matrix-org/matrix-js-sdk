@@ -393,6 +393,10 @@ export class MatrixCall extends EventEmitter {
         return Boolean(this.opponentCaps && this.opponentCaps["m.call.transferee"]);
     }
 
+    public opponentSupportsDTMF(): boolean {
+        return Boolean(this.opponentCaps && this.opponentCaps["m.call.dtmf"]);
+    }
+
     public getRemoteAssertedIdentity(): AssertedIdentity {
         return this.remoteAssertedIdentity;
     }
@@ -1042,11 +1046,10 @@ export class MatrixCall extends EventEmitter {
             [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(),
         } as MCallAnswer;
 
-        if (this.client.supportsCallTransfer) {
-            answerContent.capabilities = {
-                'm.call.transferee': true,
-            };
-        }
+        answerContent.capabilities = {
+            'm.call.transferee': this.client.supportsCallTransfer,
+            'm.call.dtmf': false,
+        };
 
         // We have just taken the local description from the peerconnection which will
         // contain all the local candidates added so far, so we can discard any candidates
@@ -1400,11 +1403,10 @@ export class MatrixCall extends EventEmitter {
             content.description = this.peerConn.localDescription;
         }
 
-        if (this.client.supportsCallTransfer) {
-            content.capabilities = {
-                'm.call.transferee': true,
-            };
-        }
+        content.capabilities = {
+            'm.call.transferee': this.client.supportsCallTransfer,
+            'm.call.dtmf': false,
+        };
 
         content[SDPStreamMetadataKey] = this.getLocalSDPStreamMetadata();
 
