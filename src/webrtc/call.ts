@@ -1001,7 +1001,7 @@ export class MatrixCall extends EventEmitter {
     }
 
     private updateMuteStatus() {
-        this.sendVoipEvent(EventType.CallSDPStreamMetadataChanged, {
+        this.sendVoipEvent(EventType.CallSDPStreamMetadataChangedPrefix, {
             [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(),
         });
 

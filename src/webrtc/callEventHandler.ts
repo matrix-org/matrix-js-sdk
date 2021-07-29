@@ -297,7 +297,10 @@ export class CallEventHandler {
             }
 
             call.onAssertedIdentityReceived(event);
-        } else if (event.getType() === EventType.CallSDPStreamMetadataChanged) {
+        } else if (
+            event.getType() === EventType.CallSDPStreamMetadataChanged ||
+            event.getType() === EventType.CallSDPStreamMetadataChangedPrefix
+        ) {
             if (!call) return;
 
             if (event.getContent().party_id === call.ourPartyId) {
