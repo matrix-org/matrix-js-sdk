@@ -15,26 +15,45 @@ limitations under the License.
 */
 
 import { IPublicRoomsChunkRoom } from "../client";
+import { RoomType } from "./event";
+import { IStrippedState } from "../sync-accumulator";
 
 // Types relating to Rooms of type `m.space` and related APIs
 
 /* eslint-disable camelcase */
+/** @deprecated */
 export interface ISpaceSummaryRoom extends IPublicRoomsChunkRoom {
     num_refs: number;
     room_type: string;
 }
 
+/** @deprecated */
 export interface ISpaceSummaryEvent {
     room_id: string;
     event_id: string;
     origin_server_ts: number;
     type: string;
     state_key: string;
+    sender: string;
     content: {
         order?: string;
         suggested?: boolean;
         auto_join?: boolean;
         via?: string[];
     };
+}
+
+export interface IRoomChildState extends IStrippedState {
+    room_id: string;
+    content: {
+        order?: string;
+        suggested?: boolean;
+        via?: string[];
+    };
+}
+
+export interface IRoomChild extends IPublicRoomsChunkRoom {
+    room_type?: RoomType | string;
+    children_state: IRoomChildState[];
 }
 /* eslint-enable camelcase */
