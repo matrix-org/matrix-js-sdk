@@ -43,8 +43,9 @@ export interface ISpaceSummaryEvent {
     };
 }
 
-export interface IRoomChildState extends IStrippedState {
+export interface IHierarchyRelation extends IStrippedState {
     room_id: string;
+    origin_server_ts: number;
     content: {
         order?: string;
         suggested?: boolean;
@@ -52,8 +53,8 @@ export interface IRoomChildState extends IStrippedState {
     };
 }
 
-export interface IRoomChild extends IPublicRoomsChunkRoom {
+export interface IHierarchyRoom extends IPublicRoomsChunkRoom {
     room_type?: RoomType | string;
-    children_state: IRoomChildState[];
+    children_state: IHierarchyRelation[];
 }
 /* eslint-enable camelcase */
