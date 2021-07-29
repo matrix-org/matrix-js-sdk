@@ -50,12 +50,12 @@ async function encryptNode(data: string, key: Uint8Array, name: string, ivStr?: 
         iv = decodeBase64(ivStr);
     } else {
         iv = crypto.randomBytes(16);
-    }
 
-    // clear bit 63 of the IV to stop us hitting the 64-bit counter boundary
-    // (which would mean we wouldn't be able to decrypt on Android). The loss
-    // of a single bit of iv is a price we have to pay.
-    iv[8] &= 0x7f;
+        // clear bit 63 of the IV to stop us hitting the 64-bit counter boundary
+        // (which would mean we wouldn't be able to decrypt on Android). The loss
+        // of a single bit of iv is a price we have to pay.
+        iv[8] &= 0x7f;
+    }
 
     const [aesKey, hmacKey] = deriveKeysNode(key, name);
 
@@ -137,12 +137,12 @@ async function encryptBrowser(data: string, key: Uint8Array, name: string, ivStr
     } else {
         iv = new Uint8Array(16);
         window.crypto.getRandomValues(iv);
-    }
 
-    // clear bit 63 of the IV to stop us hitting the 64-bit counter boundary
-    // (which would mean we wouldn't be able to decrypt on Android). The loss
-    // of a single bit of iv is a price we have to pay.
-    iv[8] &= 0x7f;
+        // clear bit 63 of the IV to stop us hitting the 64-bit counter boundary
+        // (which would mean we wouldn't be able to decrypt on Android). The loss
+        // of a single bit of iv is a price we have to pay.
+        iv[8] &= 0x7f;
+    }
 
     const [aesKey, hmacKey] = await deriveKeysBrowser(key, name);
     const encodedData = new TextEncoder().encode(data);
