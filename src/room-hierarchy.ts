@@ -104,7 +104,11 @@ export class RoomHierarchy {
             this.loadRequest = null;
         }
 
-        this._rooms = rooms; // TODO merge
+        if (this._rooms) {
+            this._rooms = this._rooms.concat(rooms);
+        } else {
+            this._rooms = rooms;
+        }
 
         rooms.forEach(room => {
             this.roomMap.set(room.room_id, room);
