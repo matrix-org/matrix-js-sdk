@@ -284,9 +284,6 @@ export class MatrixCall extends EventEmitter {
     private screensharingSenders: Array<RTCRtpSender>;
     private inviteOrAnswerSent: boolean;
     private waitForLocalAVStream: boolean;
-    // XXX: I don't know why this is called 'config'.
-    // XXX: Do we even needs this? Seems to be unused
-    private config: MediaStreamConstraints;
     private successor: MatrixCall;
     private opponentMember: RoomMember;
     private opponentVersion: number;
@@ -1800,7 +1797,6 @@ export class MatrixCall extends EventEmitter {
         this.client.callEventHandler.calls.set(this.callId, this);
         this.setState(CallState.WaitLocalMedia);
         this.direction = CallDirection.Outbound;
-        this.config = constraints;
 
         // make sure we have valid turn creds. Unless something's gone wrong, it should
         // poll and keep the credentials valid so this should be instant.
