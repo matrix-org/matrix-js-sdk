@@ -694,3 +694,25 @@ const collator = new Intl.Collator();
 export function compare(a: string, b: string): number {
     return collator.compare(a, b);
 }
+
+/**
+ * This function is similar to Object.assign() but it assigns recursively and
+ * allows you to ignore nullish values from the source
+ *
+ * @param {Object} target
+ * @param {Object} source
+ * @returns the target object
+ */
+export function recursivelyAssign(target: Object, source: Object, ignoreNullish = false): any {
+    for (const [sourceKey, sourceValue] of Object.entries(source)) {
+        if (target[sourceKey] instanceof Object && sourceValue) {
+            recursivelyAssign(target[sourceKey], sourceValue);
+            continue;
+        }
+        if ((sourceValue !== null && sourceValue !== undefined) || !ignoreNullish) {
+            target[sourceKey] = sourceValue;
+            continue;
+        }
+    }
+    return target;
+}
