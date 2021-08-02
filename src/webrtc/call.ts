@@ -278,8 +278,6 @@ export class MatrixCall extends EventEmitter {
     private sentEndOfCandidates: boolean;
     private peerConn: RTCPeerConnection;
     private feeds: Array<CallFeed>;
-    private localScreenSharingStream: MediaStream;
-    // TODO: Rename to usermedia rather than AV for consistency
     private localUsermediaStream: MediaStream;
     private usermediaSenders: Array<RTCRtpSender>;
     private screensharingSenders: Array<RTCRtpSender>;
@@ -400,6 +398,14 @@ export class MatrixCall extends EventEmitter {
 
     public get localUsermediaFeed(): CallFeed {
         return this.getLocalFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Usermedia);
+    }
+
+    public get localScreenSharingFeed(): CallFeed {
+        return this.getLocalFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
+    }
+
+    private get localScreenSharingStream(): MediaStream {
+        return this.localScreenSharingFeed?.stream;
     }
 
     private getFeedByStreamId(streamId: string): CallFeed {
@@ -818,9 +824,9 @@ export class MatrixCall extends EventEmitter {
         logger.debug(`Set screensharing enabled? ${enabled}`);
         if (enabled) {
             try {
-                this.localScreenSharingStream = await getScreensharingStream(selectDesktopCapturerSource);
-                if (!this.localScreenSharingStream) return false;
-                this.pushLocalFeed(this.localScreenSharingStream, SDPStreamMetadataPurpose.Screenshare);
+                const stream = await getScreensharingStream(selectDesktopCapturerSource);
+                if (!stream) return false;
+                this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Screenshare);
                 return true;
             } catch (err) {
                 this.emit(CallEvent.Error,
@@ -836,7 +842,6 @@ export class MatrixCall extends EventEmitter {
             for (const track of this.localScreenSharingStream.getTracks()) {
                 track.stop();
             }
-            this.localScreenSharingStream = null;
             return false;
         }
     }
@@ -855,10 +860,10 @@ export class MatrixCall extends EventEmitter {
         logger.debug(`Set screensharing enabled? ${enabled} using replaceTrack()`);
         if (enabled) {
             try {
-                this.localScreenSharingStream = await getScreensharingStream(selectDesktopCapturerSource);
-                if (!this.localScreenSharingStream) return false;
+                const stream = await getScreensharingStream(selectDesktopCapturerSource);
+                if (!stream) return false;
 
-                const track = this.localScreenSharingStream.getTracks().find((track) => {
+                const track = stream.getTracks().find((track) => {
                     return track.kind === "video";
                 });
                 const sender = this.usermediaSenders.find((sender) => {
@@ -866,7 +871,7 @@ export class MatrixCall extends EventEmitter {
                 });
                 sender.replaceTrack(track);
 
-                this.pushLocalFeed(this.localScreenSharingStream, SDPStreamMetadataPurpose.Screenshare, false);
+                this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Screenshare, false);
 
                 return true;
             } catch (err) {
@@ -888,7 +893,6 @@ export class MatrixCall extends EventEmitter {
             for (const track of this.localScreenSharingStream.getTracks()) {
                 track.stop();
             }
-            this.localScreenSharingStream = null;
 
             return false;
         }
