@@ -278,7 +278,6 @@ export class MatrixCall extends EventEmitter {
     private sentEndOfCandidates: boolean;
     private peerConn: RTCPeerConnection;
     private feeds: Array<CallFeed>;
-    private localUsermediaStream: MediaStream;
     private usermediaSenders: Array<RTCRtpSender>;
     private screensharingSenders: Array<RTCRtpSender>;
     private inviteOrAnswerSent: boolean;
@@ -402,6 +401,10 @@ export class MatrixCall extends EventEmitter {
 
     public get localScreenSharingFeed(): CallFeed {
         return this.getLocalFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
+    }
+
+    public get localUsermediaStream(): MediaStream {
+        return this.localUsermediaFeed?.stream;
     }
 
     private get localScreenSharingStream(): MediaStream {
@@ -728,11 +731,9 @@ export class MatrixCall extends EventEmitter {
         } else if (this.state === CallState.CreateOffer) {
             logger.debug("Handing local stream to new call");
             newCall.gotUserMediaForAnswer(this.localUsermediaStream);
-            delete(this.localUsermediaStream);
         } else if (this.state === CallState.InviteSent) {
             logger.debug("Handing local stream to new call");
             newCall.gotUserMediaForAnswer(this.localUsermediaStream);
-            delete(this.localUsermediaStream);
         }
         this.successor = newCall;
         this.emit(CallEvent.Replaced, newCall);
@@ -1027,7 +1028,6 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        this.localUsermediaStream = stream;
         this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
         this.setState(CallState.CreateOffer);
 
@@ -1090,7 +1090,6 @@ export class MatrixCall extends EventEmitter {
 
         this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
 
-        this.localUsermediaStream = stream;
         logger.info("Got local AV stream with id " + this.localUsermediaStream.id);
 
         this.setState(CallState.CreateAnswer);
