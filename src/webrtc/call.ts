@@ -277,7 +277,7 @@ export class MatrixCall extends EventEmitter {
     private sentEndOfCandidates: boolean;
     private peerConn: RTCPeerConnection;
     private feeds: Array<CallFeed>;
-    private screenSharingStream: MediaStream;
+    private localScreenSharingStream: MediaStream;
     // TODO: Rename to usermedia rather than AV for consistency
     private localUsermediaStream: MediaStream;
     private usermediaSenders: Array<RTCRtpSender>;
@@ -780,7 +780,7 @@ export class MatrixCall extends EventEmitter {
      * @returns {boolean} is screensharing
      */
     public isScreensharing(): boolean {
-        return Boolean(this.screenSharingStream);
+        return Boolean(this.localScreenSharingStream);
     }
 
     /**
@@ -810,9 +810,9 @@ export class MatrixCall extends EventEmitter {
         logger.debug(`Set screensharing enabled? ${enabled}`);
         if (enabled) {
             try {
-                this.screenSharingStream = await getScreensharingStream(selectDesktopCapturerSource);
-                if (!this.screenSharingStream) return false;
-                this.pushLocalFeed(this.screenSharingStream, SDPStreamMetadataPurpose.Screenshare);
+                this.localScreenSharingStream = await getScreensharingStream(selectDesktopCapturerSource);
+                if (!this.localScreenSharingStream) return false;
+                this.pushLocalFeed(this.localScreenSharingStream, SDPStreamMetadataPurpose.Screenshare);
                 return true;
             } catch (err) {
                 this.emit(CallEvent.Error,
@@ -824,11 +824,11 @@ export class MatrixCall extends EventEmitter {
             for (const sender of this.screensharingSenders) {
                 this.peerConn.removeTrack(sender);
             }
-            this.deleteFeedByStream(this.screenSharingStream);
-            for (const track of this.screenSharingStream.getTracks()) {
+            this.deleteFeedByStream(this.localScreenSharingStream);
+            for (const track of this.localScreenSharingStream.getTracks()) {
                 track.stop();
             }
-            this.screenSharingStream = null;
+            this.localScreenSharingStream = null;
             return false;
         }
     }
@@ -847,10 +847,10 @@ export class MatrixCall extends EventEmitter {
         logger.debug(`Set screensharing enabled? ${enabled} using replaceTrack()`);
         if (enabled) {
             try {
-                this.screenSharingStream = await getScreensharingStream(selectDesktopCapturerSource);
-                if (!this.screenSharingStream) return false;
+                this.localScreenSharingStream = await getScreensharingStream(selectDesktopCapturerSource);
+                if (!this.localScreenSharingStream) return false;
 
-                const track = this.screenSharingStream.getTracks().find((track) => {
+                const track = this.localScreenSharingStream.getTracks().find((track) => {
                     return track.kind === "video";
                 });
                 const sender = this.usermediaSenders.find((sender) => {
@@ -858,7 +858,7 @@ export class MatrixCall extends EventEmitter {
                 });
                 sender.replaceTrack(track);
 
-                this.pushLocalFeed(this.screenSharingStream, SDPStreamMetadataPurpose.Screenshare, false);
+                this.pushLocalFeed(this.localScreenSharingStream, SDPStreamMetadataPurpose.Screenshare, false);
 
                 return true;
             } catch (err) {
@@ -876,11 +876,11 @@ export class MatrixCall extends EventEmitter {
             });
             sender.replaceTrack(track);
 
-            this.deleteFeedByStream(this.screenSharingStream);
-            for (const track of this.screenSharingStream.getTracks()) {
+            this.deleteFeedByStream(this.localScreenSharingStream);
+            for (const track of this.localScreenSharingStream.getTracks()) {
                 track.stop();
             }
-            this.screenSharingStream = null;
+            this.localScreenSharingStream = null;
 
             return false;
         }
