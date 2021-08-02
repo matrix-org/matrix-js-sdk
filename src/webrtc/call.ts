@@ -141,7 +141,7 @@ export enum CallErrorCode {
     UnknownDevices = 'unknown_devices',
 
     /**
-     * Error code usewd when we fail to send the invite
+     * Error code used when we fail to send the invite
      * for some reason other than there being unknown devices
      */
     SendInvite = 'send_invite',
@@ -152,7 +152,7 @@ export enum CallErrorCode {
     CreateAnswer = 'create_answer',
 
     /**
-     * Error code usewd when we fail to send the answer
+     * Error code used when we fail to send the answer
      * for some reason other than there being unknown devices
      */
     SendAnswer = 'send_answer',
@@ -238,7 +238,7 @@ export class CallError extends Error {
     code: string;
 
     constructor(code: CallErrorCode, msg: string, err: Error) {
-        // Stil ldon't think there's any way to have proper nested errors
+        // Still don't think there's any way to have proper nested errors
         super(msg + ": " + err);
 
         this.code = code;
@@ -641,7 +641,7 @@ export class MatrixCall extends EventEmitter {
         const remoteStream = this.feeds.find((feed) => !feed.isLocal())?.stream;
 
         // According to previous comments in this file, firefox at some point did not
-        // add streams until media started ariving on them. Testing latest firefox
+        // add streams until media started arriving on them. Testing latest firefox
         // (81 at time of writing), this is no longer a problem, so let's do it the correct way.
         if (!remoteStream || remoteStream.getTracks().length === 0) {
             logger.error("No remote stream or no tracks after setting remote description!");
@@ -952,11 +952,11 @@ export class MatrixCall extends EventEmitter {
         if (this.isRemoteOnHold() === onHold) return;
         this.remoteOnHold = onHold;
 
-        for (const tranceiver of this.peerConn.getTransceivers()) {
+        for (const transceiver of this.peerConn.getTransceivers()) {
             // We don't send hold music or anything so we're not actually
             // sending anything, but sendrecv is fairly standard for hold and
             // it makes it a lot easier to figure out who's put who on hold.
-            tranceiver.direction = onHold ? 'sendonly' : 'sendrecv';
+            transceiver.direction = onHold ? 'sendonly' : 'sendrecv';
         }
         this.updateMuteStatus();
 
@@ -975,8 +975,8 @@ export class MatrixCall extends EventEmitter {
 
         // We consider a call to be on hold only if *all* the tracks are on hold
         // (is this the right thing to do?)
-        for (const tranceiver of this.peerConn.getTransceivers()) {
-            const trackOnHold = ['inactive', 'recvonly'].includes(tranceiver.currentDirection);
+        for (const transceiver of this.peerConn.getTransceivers()) {
+            const trackOnHold = ['inactive', 'recvonly'].includes(transceiver.currentDirection);
 
             if (!trackOnHold) callOnHold = false;
         }
@@ -1049,7 +1049,7 @@ export class MatrixCall extends EventEmitter {
             'm.call.dtmf': false,
         };
 
-        // We have just taken the local description from the peerconnection which will
+        // We have just taken the local description from the peerConn which will
         // contain all the local candidates added so far, so we can discard any candidates
         // we had queued up because they'll be in the answer.
         logger.info(`Discarding ${this.candidateSendQueue.length} candidates that will be sent in answer`);
@@ -1165,8 +1165,8 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        const cands = ev.getContent().candidates;
-        if (!cands) {
+        const candidates = ev.getContent().candidates;
+        if (!candidates) {
             logger.info("Ignoring candidates event with no candidates!");
             return;
         }
@@ -1175,10 +1175,10 @@ export class MatrixCall extends EventEmitter {
 
         if (this.opponentPartyId === undefined) {
             // we haven't picked an opponent yet so save the candidates
-            logger.info(`Bufferring ${cands.length} candidates until we pick an opponent`);
-            const bufferedCands = this.remoteCandidateBuffer.get(fromPartyId) || [];
-            bufferedCands.push(...cands);
-            this.remoteCandidateBuffer.set(fromPartyId, bufferedCands);
+            logger.info(`Buffering ${candidates.length} candidates until we pick an opponent`);
+            const bufferedCandidates = this.remoteCandidateBuffer.get(fromPartyId) || [];
+            bufferedCandidates.push(...candidates);
+            this.remoteCandidateBuffer.set(fromPartyId, bufferedCandidates);
             return;
         }
 
@@ -1191,7 +1191,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        await this.addIceCandidates(cands);
+        await this.addIceCandidates(candidates);
     }
 
     /**
@@ -1393,7 +1393,7 @@ export class MatrixCall extends EventEmitter {
             lifetime: CALL_TIMEOUT_MS,
         } as MCallOfferNegotiate;
 
-        // clunky because TypeScript can't folow the types through if we use an expression as the key
+        // clunky because TypeScript can't follow the types through if we use an expression as the key
         if (this.state === CallState.CreateOffer) {
             content.offer = this.peerConn.localDescription;
         } else {
@@ -1558,7 +1558,7 @@ export class MatrixCall extends EventEmitter {
     }
 
     onNegotiationNeeded = async () => {
-        logger.info("Negotation is needed!");
+        logger.info("Negotiation is needed!");
 
         if (this.state !== CallState.CreateOffer && this.opponentVersion === 0) {
             logger.info("Opponent does not support renegotiation: ignoring negotiationneeded event");
@@ -1646,12 +1646,12 @@ export class MatrixCall extends EventEmitter {
         // Don't send the ICE candidates yet if the call is in the ringing state: this
         // means we tried to pick (ie. started generating candidates) and then failed to
         // send the answer and went back to the ringing state. Queue up the candidates
-        // to send if we sucessfully send the answer.
+        // to send if we successfully send the answer.
         // Equally don't send if we haven't yet sent the answer because we can send the
         // first batch of candidates along with the answer
         if (this.state === CallState.Ringing || !this.inviteOrAnswerSent) return;
 
-        // MSC2746 reccomends these values (can be quite long when calling because the
+        // MSC2746 recommends these values (can be quite long when calling because the
         // callee will need a while to answer the call)
         const delay = this.direction === CallDirection.Inbound ? 500 : 2000;
 
@@ -1667,7 +1667,7 @@ export class MatrixCall extends EventEmitter {
      */
     async transfer(targetUserId: string) {
         // Fetch the target user's global profile info: their room avatar / displayname
-        // could be different in whatever room we shae with them.
+        // could be different in whatever room we share with them.
         const profileInfo = await this.client.getProfileInfo(targetUserId);
 
         const replacementId = genCallID();
@@ -1776,13 +1776,13 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        const cands = this.candidateSendQueue;
+        const candidates = this.candidateSendQueue;
         this.candidateSendQueue = [];
         ++this.candidateSendTries;
         const content = {
-            candidates: cands,
+            candidates: candidates,
         };
-        logger.debug("Attempting to send " + cands.length + " candidates");
+        logger.debug("Attempting to send " + candidates.length + " candidates");
         try {
             await this.sendVoipEvent(EventType.CallCandidates, content);
         } catch (error) {
@@ -1791,7 +1791,7 @@ export class MatrixCall extends EventEmitter {
             if (error.event) this.client.cancelPendingEvent(error.event);
 
             // put all the candidates we failed to send back in the queue
-            this.candidateSendQueue.push(...cands);
+            this.candidateSendQueue.push(...candidates);
 
             if (this.candidateSendTries > 5) {
                 logger.debug(
@@ -1895,16 +1895,16 @@ export class MatrixCall extends EventEmitter {
     }
 
     private async addBufferedIceCandidates() {
-        const bufferedCands = this.remoteCandidateBuffer.get(this.opponentPartyId);
-        if (bufferedCands) {
-            logger.info(`Adding ${bufferedCands.length} buffered candidates for opponent ${this.opponentPartyId}`);
-            await this.addIceCandidates(bufferedCands);
+        const bufferedCandidates = this.remoteCandidateBuffer.get(this.opponentPartyId);
+        if (bufferedCandidates) {
+            logger.info(`Adding ${bufferedCandidates.length} buffered candidates for opponent ${this.opponentPartyId}`);
+            await this.addIceCandidates(bufferedCandidates);
         }
         this.remoteCandidateBuffer = null;
     }
 
-    private async addIceCandidates(cands: RTCIceCandidate[]) {
-        for (const cand of cands) {
+    private async addIceCandidates(candidates: RTCIceCandidate[]) {
+        for (const cand of candidates) {
             if (
                 (cand.sdpMid === null || cand.sdpMid === undefined) &&
                 (cand.sdpMLineIndex === null || cand.sdpMLineIndex === undefined)
