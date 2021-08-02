@@ -11,6 +11,8 @@ export enum SDPStreamMetadataPurpose {
 
 export interface SDPStreamMetadataObject {
     purpose: SDPStreamMetadataPurpose;
+    audio_muted: boolean;
+    video_muted: boolean;
 }
 
 export interface SDPStreamMetadata {
@@ -38,6 +40,10 @@ export interface MCallOfferNegotiate {
     description: CallOfferAnswer;
     lifetime: number;
     capabilities: CallCapabilities;
+    [SDPStreamMetadataKey]: SDPStreamMetadata;
+}
+
+export interface MCallSDPStreamMetadataChanged {
     [SDPStreamMetadataKey]: SDPStreamMetadata;
 }
 

@@ -321,16 +321,19 @@ describe('Call', function() {
                     [SDPStreamMetadataKey]: {
                         "stream_id": {
                             purpose: SDPStreamMetadataPurpose.Usermedia,
+                            audio_muted: true,
+                            video_muted: false,
                         },
                     },
                 };
             },
         });
 
-        call.pushRemoteFeed({ id: "stream_id" });
-        expect(call.getFeeds().find((feed) => {
-            return feed.stream.id === "stream_id";
-        })?.purpose).toBe(SDPStreamMetadataPurpose.Usermedia);
+        call.pushRemoteFeed({ id: "stream_id", getAudioTracks: () => ["track1"], getVideoTracks: () => ["track1"] });
+        const feed = call.getFeeds().find((feed) => feed.stream.id === "stream_id");
+        expect(feed?.purpose).toBe(SDPStreamMetadataPurpose.Usermedia);
+        expect(feed?.isAudioMuted()).toBeTruthy();
+        expect(feed?.isVideoMuted()).not.toBeTruthy();
     });
 
     it("should fallback to replaceTrack() if the other side doesn't support SPDStreamMetadata", async () => {

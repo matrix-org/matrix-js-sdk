@@ -21,6 +21,7 @@ import { RoomMember } from "../models/room-member";
 
 export enum CallFeedEvent {
     NewStream = "new_stream",
+    MuteStateChanged = "mute_state_changed"
 }
 
 export class CallFeed extends EventEmitter {
@@ -30,6 +31,8 @@ export class CallFeed extends EventEmitter {
         public purpose: SDPStreamMetadataPurpose,
         private client: MatrixClient,
         private roomId: string,
+        private audioMuted: boolean,
+        private videoMuted: boolean,
     ) {
         super();
     }
@@ -51,15 +54,13 @@ export class CallFeed extends EventEmitter {
         return this.userId === this.client.getUserId();
     }
 
-    // TODO: The two following methods should be later replaced
-    // by something that will also check if the remote is muted
     /**
      * Returns true if audio is muted or if there are no audio
      * tracks, otherwise returns false
      * @returns {boolean} is audio muted?
      */
     public isAudioMuted(): boolean {
-        return this.stream.getAudioTracks().length === 0;
+        return this.stream.getAudioTracks().length === 0 || this.audioMuted;
     }
 
     /**
@@ -69,7 +70,7 @@ export class CallFeed extends EventEmitter {
      */
     public isVideoMuted(): boolean {
         // We assume only one video track
-        return this.stream.getVideoTracks().length === 0;
+        return this.stream.getVideoTracks().length === 0 || this.videoMuted;
     }
 
     /**
@@ -80,5 +81,15 @@ export class CallFeed extends EventEmitter {
     public setNewStream(newStream: MediaStream) {
         this.stream = newStream;
         this.emit(CallFeedEvent.NewStream, this.stream);
+    }
+
+    public setAudioMuted(muted: boolean): void {
+        this.audioMuted = muted;
+        this.emit(CallFeedEvent.MuteStateChanged, this.audioMuted, this.videoMuted);
+    }
+
+    public setVideoMuted(muted: boolean): void {
+        this.videoMuted = muted;
+        this.emit(CallFeedEvent.MuteStateChanged, this.audioMuted, this.videoMuted);
     }
 }
