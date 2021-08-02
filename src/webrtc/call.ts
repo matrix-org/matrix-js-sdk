@@ -396,7 +396,7 @@ export class MatrixCall extends EventEmitter {
         return this.getLocalFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Usermedia);
     }
 
-    public get localScreenSharingFeed(): CallFeed {
+    public get localScreensharingFeed(): CallFeed {
         return this.getLocalFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
     }
 
@@ -404,8 +404,8 @@ export class MatrixCall extends EventEmitter {
         return this.localUsermediaFeed?.stream;
     }
 
-    private get localScreenSharingStream(): MediaStream {
-        return this.localScreenSharingFeed?.stream;
+    private get localScreensharingStream(): MediaStream {
+        return this.localScreensharingFeed?.stream;
     }
 
     private getFeedByStreamId(streamId: string): CallFeed {
@@ -792,7 +792,7 @@ export class MatrixCall extends EventEmitter {
      * @returns {boolean} is screensharing
      */
     public isScreensharing(): boolean {
-        return Boolean(this.localScreenSharingStream);
+        return Boolean(this.localScreensharingStream);
     }
 
     /**
@@ -836,8 +836,8 @@ export class MatrixCall extends EventEmitter {
             for (const sender of this.screensharingSenders) {
                 this.peerConn.removeTrack(sender);
             }
-            this.deleteFeedByStream(this.localScreenSharingStream);
-            for (const track of this.localScreenSharingStream.getTracks()) {
+            this.deleteFeedByStream(this.localScreensharingStream);
+            for (const track of this.localScreensharingStream.getTracks()) {
                 track.stop();
             }
             return false;
@@ -887,8 +887,8 @@ export class MatrixCall extends EventEmitter {
             });
             sender.replaceTrack(track);
 
-            this.deleteFeedByStream(this.localScreenSharingStream);
-            for (const track of this.localScreenSharingStream.getTracks()) {
+            this.deleteFeedByStream(this.localScreensharingStream);
+            for (const track of this.localScreensharingStream.getTracks()) {
                 track.stop();
             }
 
