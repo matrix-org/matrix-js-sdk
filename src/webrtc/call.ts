@@ -279,7 +279,7 @@ export class MatrixCall extends EventEmitter {
     private feeds: Array<CallFeed>;
     private screenSharingStream: MediaStream;
     // TODO: Rename to usermedia rather than AV for consistency
-    private localAVStream: MediaStream;
+    private localUsermediaStream: MediaStream;
     private usermediaSenders: Array<RTCRtpSender>;
     private screensharingSenders: Array<RTCRtpSender>;
     private inviteOrAnswerSent: boolean;
@@ -676,7 +676,7 @@ export class MatrixCall extends EventEmitter {
 
         logger.debug(`Answering call ${this.callId} of type ${this.type}`);
 
-        if (!this.localAVStream && !this.waitForLocalAVStream) {
+        if (!this.localUsermediaStream && !this.waitForLocalAVStream) {
             const constraints = getUserMediaContraints(
                 this.type == CallType.Video ?
                     ConstraintsType.Video:
@@ -694,8 +694,8 @@ export class MatrixCall extends EventEmitter {
                 this.getUserMediaFailed(e);
                 return;
             }
-        } else if (this.localAVStream) {
-            this.gotUserMediaForAnswer(this.localAVStream);
+        } else if (this.localUsermediaStream) {
+            this.gotUserMediaForAnswer(this.localUsermediaStream);
         } else if (this.waitForLocalAVStream) {
             this.setState(CallState.WaitLocalMedia);
         }
@@ -713,12 +713,12 @@ export class MatrixCall extends EventEmitter {
             newCall.waitForLocalAVStream = true;
         } else if (this.state === CallState.CreateOffer) {
             logger.debug("Handing local stream to new call");
-            newCall.gotUserMediaForAnswer(this.localAVStream);
-            delete(this.localAVStream);
+            newCall.gotUserMediaForAnswer(this.localUsermediaStream);
+            delete(this.localUsermediaStream);
         } else if (this.state === CallState.InviteSent) {
             logger.debug("Handing local stream to new call");
-            newCall.gotUserMediaForAnswer(this.localAVStream);
-            delete(this.localAVStream);
+            newCall.gotUserMediaForAnswer(this.localUsermediaStream);
+            delete(this.localUsermediaStream);
         }
         this.successor = newCall;
         this.emit(CallEvent.Replaced, newCall);
@@ -868,7 +868,7 @@ export class MatrixCall extends EventEmitter {
                 return false;
             }
         } else {
-            const track = this.localAVStream.getTracks().find((track) => {
+            const track = this.localUsermediaStream.getTracks().find((track) => {
                 return track.kind === "video";
             });
             const sender = this.usermediaSenders.find((sender) => {
@@ -991,15 +991,15 @@ export class MatrixCall extends EventEmitter {
     }
 
     private updateMuteStatus() {
-        if (!this.localAVStream) {
+        if (!this.localUsermediaStream) {
             return;
         }
 
         const micShouldBeMuted = this.micMuted || this.remoteOnHold;
-        setTracksEnabled(this.localAVStream.getAudioTracks(), !micShouldBeMuted);
+        setTracksEnabled(this.localUsermediaStream.getAudioTracks(), !micShouldBeMuted);
 
         const vidShouldBeMuted = this.vidMuted || this.remoteOnHold;
-        setTracksEnabled(this.localAVStream.getVideoTracks(), !vidShouldBeMuted);
+        setTracksEnabled(this.localUsermediaStream.getVideoTracks(), !vidShouldBeMuted);
     }
 
     /**
@@ -1016,11 +1016,11 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        this.localAVStream = stream;
+        this.localUsermediaStream = stream;
         this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
         this.setState(CallState.CreateOffer);
 
-        logger.info("Got local AV stream with id " + this.localAVStream.id);
+        logger.info("Got local AV stream with id " + this.localUsermediaStream.id);
         logger.debug("gotUserMediaForInvite -> " + this.type);
         // Now we wait for the negotiationneeded event
     };
@@ -1079,8 +1079,8 @@ export class MatrixCall extends EventEmitter {
 
         this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
 
-        this.localAVStream = stream;
-        logger.info("Got local AV stream with id " + this.localAVStream.id);
+        this.localUsermediaStream = stream;
+        logger.info("Got local AV stream with id " + this.localUsermediaStream.id);
 
         this.setState(CallState.CreateAnswer);
 
@@ -1731,7 +1731,7 @@ export class MatrixCall extends EventEmitter {
     }
 
     private stopAllMedia() {
-        logger.debug(`stopAllMedia (stream=${this.localAVStream})`);
+        logger.debug(`stopAllMedia (stream=${this.localUsermediaStream})`);
 
         for (const feed of this.feeds) {
             for (const track of feed.stream.getTracks()) {
