@@ -295,9 +295,6 @@ export class MatrixCall extends EventEmitter {
     // This flag represents whether we want the other party to be on hold
     private remoteOnHold;
 
-    private micMuted;
-    private vidMuted;
-
     // the stats for the call at the point it ended. We can't get these after we
     // tear the call down, so we just grab a snapshot before we stop the call.
     // The typescript definitions have this type as 'any' :(
