@@ -1904,17 +1904,19 @@ export class MatrixCall extends EventEmitter {
     }
 
     private async addIceCandidates(candidates: RTCIceCandidate[]) {
-        for (const cand of candidates) {
+        for (const candidate of candidates) {
             if (
-                (cand.sdpMid === null || cand.sdpMid === undefined) &&
-                (cand.sdpMLineIndex === null || cand.sdpMLineIndex === undefined)
+                (candidate.sdpMid === null || candidate.sdpMid === undefined) &&
+                (candidate.sdpMLineIndex === null || candidate.sdpMLineIndex === undefined)
             ) {
                 logger.debug("Ignoring remote ICE candidate with no sdpMid or sdpMLineIndex");
                 continue;
             }
-            logger.debug("Call " + this.callId + " got remote ICE " + cand.sdpMid + " candidate: " + cand.candidate);
+            logger.debug(
+                "Call " + this.callId + " got remote ICE " + candidate.sdpMid + " candidate: " + candidate.candidate,
+            );
             try {
-                await this.peerConn.addIceCandidate(cand);
+                await this.peerConn.addIceCandidate(candidate);
             } catch (err) {
                 if (!this.ignoreOffer) {
                     logger.info("Failed to add remote ICE candidate", err);
