@@ -47,7 +47,7 @@ export interface MCallSDPStreamMetadataChanged {
     [SDPStreamMetadataKey]: SDPStreamMetadata;
 }
 
-export interface MCallReplacesTarget {
+export interface CallReplacesTarget {
     id: string;
     display_name: string;
     avatar_url: string;
@@ -55,7 +55,7 @@ export interface MCallReplacesTarget {
 
 export interface MCallReplacesEvent {
     replacement_id: string;
-    target_user: MCallReplacesTarget;
+    target_user: CallReplacesTarget;
     create_call: string;
     await_call: string;
     target_room: string;
