@@ -1,4 +1,4 @@
-// allow camelcase as these are events type that go onto the wire
+// allow non-camelcase as these are events type that go onto the wire
 /* eslint-disable camelcase */
 
 // TODO: Change to "sdp_stream_metadata" when MSC3077 is merged
