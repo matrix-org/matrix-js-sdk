@@ -29,6 +29,12 @@ export interface CallCapabilities {
     'm.call.dtmf': boolean;
 }
 
+export interface CallReplacesTarget {
+    id: string;
+    display_name: string;
+    avatar_url: string;
+}
+
 export interface MCallAnswer {
     answer: CallOfferAnswer;
     capabilities: CallCapabilities;
@@ -45,12 +51,6 @@ export interface MCallOfferNegotiate {
 
 export interface MCallSDPStreamMetadataChanged {
     [SDPStreamMetadataKey]: SDPStreamMetadata;
-}
-
-export interface CallReplacesTarget {
-    id: string;
-    display_name: string;
-    avatar_url: string;
 }
 
 export interface MCallReplacesEvent {
