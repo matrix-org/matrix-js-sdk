@@ -91,10 +91,10 @@ export interface ISenderNotificationPermissionCondition
 }
 
 export type PushRuleCondition = IPushRuleCondition<string>
-    | IEventMatchCondition
-    | IContainsDisplayNameCondition
-    | IRoomMemberCountCondition
-    | ISenderNotificationPermissionCondition;
+| IEventMatchCondition
+| IContainsDisplayNameCondition
+| IRoomMemberCountCondition
+| ISenderNotificationPermissionCondition;
 
 export enum PushRuleKind {
     Override = "override",
