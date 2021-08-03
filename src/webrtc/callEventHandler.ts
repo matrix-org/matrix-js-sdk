@@ -130,10 +130,11 @@ export class CallEventHandler {
 
     private handleCallEvent(event: MatrixEvent) {
         const content = event.getContent();
+        const type = event.getType() as EventType;
         let call = content.call_id ? this.calls.get(content.call_id) : undefined;
-        //console.info("RECV %s content=%s", event.getType(), JSON.stringify(content));
+        //console.info("RECV %s content=%s", type, JSON.stringify(content));
 
-        if (event.getType() === EventType.CallInvite) {
+        if (type === EventType.CallInvite) {
             if (event.getSender() === this.client.credentials.userId) {
                 return; // ignore invites you send
             }
@@ -220,7 +221,7 @@ export class CallEventHandler {
             } else {
                 this.client.emit("Call.incoming", call);
             }
-        } else if (event.getType() === EventType.CallCandidates) {
+        } else if (type === EventType.CallCandidates) {
             if (event.getSender() === this.client.credentials.userId) {
                 return;
             }
@@ -233,7 +234,7 @@ export class CallEventHandler {
             } else {
                 call.onRemoteIceCandidatesReceived(event);
             }
-        } else if ([EventType.CallHangup, EventType.CallReject].includes(event.getType() as EventType)) {
+        } else if ([EventType.CallHangup, EventType.CallReject].includes(type)) {
             // Note that we also observe our own hangups here so we can see
             // if we've already rejected a call that would otherwise be valid
             if (!call) {
@@ -248,7 +249,7 @@ export class CallEventHandler {
                 }
             } else {
                 if (call.state !== CallState.Ended) {
-                    if (event.getType() === EventType.CallHangup) {
+                    if (type === EventType.CallHangup) {
                         call.onHangupReceived(content);
                     } else {
                         call.onRejectReceived(content);
@@ -263,7 +264,7 @@ export class CallEventHandler {
         // Ignore remote echo
         if (event.getContent().party_id === call.ourPartyId) return;
 
-        switch (event.getType()) {
+        switch (type) {
             case EventType.CallAnswer:
                 if (event.getSender() === this.client.credentials.userId) {
                     if (call.state === CallState.Ringing) {
