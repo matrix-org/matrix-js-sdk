@@ -102,11 +102,6 @@ yarn cache clean
 # Ensure all dependencies are updated
 yarn install --ignore-scripts --pure-lockfile
 
-if [ -z "$skip_changelog" ]; then
-    # update_changelog doesn't have a --version flag
-    update_changelog -h > /dev/null || (echo "github-changelog-generator is required: please install it"; exit)
-fi
-
 # Login and publish continues to use `npm`, as it seems to have more clearly
 # defined options and semantics than `yarn` for writing to the registry.
 if [ -z "$skip_npm" ]; then
@@ -133,14 +128,6 @@ if [ $prerelease -eq 1 ]; then
     echo Making a PRE-RELEASE
 fi
 
-if [ -z "$skip_changelog" ]; then
-    if ! command -v update_changelog >/dev/null 2>&1; then
-        echo "release.sh requires github-changelog-generator. Try:" >&2
-        echo "    pip install git+https://github.com/matrix-org/github-changelog-generator.git" >&2
-        exit 1
-    fi
-fi
-
 # we might already be on the release branch, in which case, yay
 # If we're on any branch starting with 'release', we don't create
 # a separate release branch (this allows us to use the same
@@ -156,7 +143,7 @@ fi
 
 if [ -z "$skip_changelog" ]; then
     echo "Generating changelog"
-    update_changelog -f "$changelog_file" "$release"
+    yarn run allchange "$release"
     read -p "Edit $changelog_file manually, or press enter to continue " REPLY
 
     if [ -n "$(git ls-files --modified $changelog_file)" ]; then
