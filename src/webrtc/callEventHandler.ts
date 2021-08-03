@@ -220,17 +220,6 @@ export class CallEventHandler {
             } else {
                 this.client.emit("Call.incoming", call);
             }
-        } else if (event.getType() === EventType.CallAnswer) {
-            if (!call) {
-                return;
-            }
-            if (event.getSender() === this.client.credentials.userId) {
-                if (call.state === CallState.Ringing) {
-                    call.onAnsweredElsewhere(content);
-                }
-            } else {
-                call.onAnswerReceived(event);
-            }
         } else if (event.getType() === EventType.CallCandidates) {
             if (event.getSender() === this.client.credentials.userId) {
                 return;
@@ -267,48 +256,40 @@ export class CallEventHandler {
                     this.calls.delete(content.call_id);
                 }
             }
-        } else if (event.getType() === EventType.CallSelectAnswer) {
-            if (!call) return;
+        }
 
-            if (event.getContent().party_id === call.ourPartyId) {
-                // Ignore remote echo
-                return;
-            }
+        // The following events need a call
+        if (!call) return;
+        // Ignore remote echo
+        if (event.getContent().party_id === call.ourPartyId) return;
 
-            call.onSelectAnswerReceived(event);
-        } else if (event.getType() === EventType.CallNegotiate) {
-            if (!call) return;
+        switch (event.getType()) {
+            case EventType.CallAnswer:
+                if (event.getSender() === this.client.credentials.userId) {
+                    if (call.state === CallState.Ringing) {
+                        call.onAnsweredElsewhere(content);
+                    }
+                } else {
+                    call.onAnswerReceived(event);
+                }
+                break;
+            case EventType.CallSelectAnswer:
+                call.onSelectAnswerReceived(event);
+                break;
 
-            if (event.getContent().party_id === call.ourPartyId) {
-                // Ignore remote echo
-                return;
-            }
+            case EventType.CallNegotiate:
+                call.onNegotiateReceived(event);
+                break;
 
-            call.onNegotiateReceived(event);
-        } else if (
-            event.getType() === EventType.CallAssertedIdentity ||
-            event.getType() === EventType.CallAssertedIdentityPrefix
-        ) {
-            if (!call) return;
+            case EventType.CallAssertedIdentity:
+            case EventType.CallAssertedIdentityPrefix:
+                call.onAssertedIdentityReceived(event);
+                break;
 
-            if (event.getContent().party_id === call.ourPartyId) {
-                // Ignore remote echo (not that we send asserted identity, but still...)
-                return;
-            }
-
-            call.onAssertedIdentityReceived(event);
-        } else if (
-            event.getType() === EventType.CallSDPStreamMetadataChanged ||
-            event.getType() === EventType.CallSDPStreamMetadataChangedPrefix
-        ) {
-            if (!call) return;
-
-            if (event.getContent().party_id === call.ourPartyId) {
-                // Ignore remote echo
-                return;
-            }
-
-            call.onSDPStreamMetadataChangedReceived(event);
+            case EventType.CallSDPStreamMetadataChanged:
+            case EventType.CallSDPStreamMetadataChangedPrefix:
+                call.onSDPStreamMetadataChangedReceived(event);
+                break;
         }
     }
 }
