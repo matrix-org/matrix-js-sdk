@@ -131,11 +131,12 @@ export class CallEventHandler {
     private handleCallEvent(event: MatrixEvent) {
         const content = event.getContent();
         const type = event.getType() as EventType;
+        const weSentTheEvent = event.getSender() === this.client.credentials.userId;
         let call = content.call_id ? this.calls.get(content.call_id) : undefined;
         //console.info("RECV %s content=%s", type, JSON.stringify(content));
 
         if (type === EventType.CallInvite) {
-            if (event.getSender() === this.client.credentials.userId) {
+            if (weSentTheEvent) {
                 return; // ignore invites you send
             }
 
@@ -222,7 +223,7 @@ export class CallEventHandler {
                 this.client.emit("Call.incoming", call);
             }
         } else if (type === EventType.CallCandidates) {
-            if (event.getSender() === this.client.credentials.userId) {
+            if (weSentTheEvent) {
                 return;
             }
             if (!call) {
@@ -266,7 +267,7 @@ export class CallEventHandler {
 
         switch (type) {
             case EventType.CallAnswer:
-                if (event.getSender() === this.client.credentials.userId) {
+                if (weSentTheEvent) {
                     if (call.state === CallState.Ringing) {
                         call.onAnsweredElsewhere(content);
                     }
