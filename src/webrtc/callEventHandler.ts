@@ -136,17 +136,13 @@ export class CallEventHandler {
         //console.info("RECV %s content=%s", type, JSON.stringify(content));
 
         if (type === EventType.CallInvite) {
-            if (weSentTheEvent) {
-                return; // ignore invites you send
-            }
+            // ignore invites you send
+            if (weSentTheEvent) return;
+            // expired call
+            if (event.getLocalAge() > content.lifetime - RING_GRACE_PERIOD) return;
+            // stale/old invite event
+            if (call && call.state === CallState.Ended) return;
 
-            if (event.getLocalAge() > content.lifetime - RING_GRACE_PERIOD) {
-                return; // expired call
-            }
-
-            if (call && call.state === CallState.Ended) {
-                return; // stale/old invite event
-            }
             if (call) {
                 logger.log(
                     `WARN: Already have a MatrixCall with id ${content.call_id} but got an ` +
@@ -223,9 +219,8 @@ export class CallEventHandler {
                 this.client.emit("Call.incoming", call);
             }
         } else if (type === EventType.CallCandidates) {
-            if (weSentTheEvent) {
-                return;
-            }
+            if (weSentTheEvent) return;
+
             if (!call) {
                 // store the candidates; we may get a call eventually.
                 if (!this.candidateEventsByCall.has(content.call_id)) {
