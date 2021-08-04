@@ -4,7 +4,7 @@ Matrix Javascript SDK
 This is the [Matrix](https://matrix.org) Client-Server r0 SDK for
 JavaScript. This SDK can be run in a browser or in Node.js.
 
-Quickstart
+Quackstart
 ==========
 
 In a browser
