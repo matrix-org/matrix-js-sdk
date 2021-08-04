@@ -35,6 +35,7 @@ import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersio
 import { ResizeMethod } from "../@types/partials";
 import { Filter } from "../filter";
 import { RoomState } from "./room-state";
+import { Thread } from "./thread";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -144,6 +145,8 @@ export class Room extends EventEmitter {
     public timeline: MatrixEvent[];
     public oldState: RoomState;
     public currentState: RoomState;
+
+    private threads = new Map<string, Thread>();
 
     /**
      * Construct a new Room.
@@ -1047,6 +1050,74 @@ export class Room extends EventEmitter {
             events, toStartOfTimeline,
             timeline, paginationToken,
         );
+        this.parseEventsForThread(events, timeline);
+    }
+
+    public async parseEventsForThread(
+        events: MatrixEvent[],
+        timeline: EventTimeline,
+    ): Promise<void> {
+        for (let i = events.length - 1; i >= 0; i--) {
+            if (events[i].replyEventId) {
+                const thread = this.findThreadByTailEvent(events[i].replyEventId);
+                if (thread) {
+                    thread.addEvent(events[i]);
+                } else {
+                    const replyChain = await this.getReplyChain(timeline.getTimelineSet(), [events[i]]);
+
+                    const rootId = replyChain[0].getId();
+                    const thread = this.threads.get(rootId);
+                    if (thread) {
+                        replyChain.forEach(event => thread.addEvent(event));
+                    } else {
+                        this.threads.set(
+                            rootId,
+                            new Thread(replyChain),
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    public findThreadByTailEvent(eventId: string): Thread {
+        return Array.from(this.threads.values()).find(thread => {
+            return thread.tail.has(eventId);
+        });
+    }
+
+    /**
+     * Build the reply chain starting from the bottom up
+     */
+    public async getReplyChain(
+        timelinetSet: EventTimelineSet,
+        events: MatrixEvent[] = [],
+    ): Promise<MatrixEvent[]> {
+        const parentEvent = await this.getEvent(events[0].replyEventId);
+        if (parentEvent.replyEventId) {
+            return this.getReplyChain(timelinetSet, [parentEvent, ...events]);
+        } else {
+            return [parentEvent, ...events];
+        }
+    }
+
+    /**
+     * Retrieve an event with the option to get it from the already
+     * loaded event timeline set
+     */
+    public async getEvent(eventId: string, timelineSet?: EventTimelineSet): Promise<MatrixEvent> {
+        const parentEvent = timelineSet?.findEventById(eventId);
+        if (parentEvent) {
+            return parentEvent;
+        }
+
+        const response = await this.client.http.authedRequest(
+            undefined,
+            "GET",
+            `/rooms/${this.roomId}/event/${eventId}`,
+        );
+
+        return new MatrixEvent(response);
     }
 
     /**

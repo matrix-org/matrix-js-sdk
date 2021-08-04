@@ -190,6 +190,10 @@ export class MatrixEvent extends EventEmitter {
      */
     private txnId: string = null;
 
+    /** A reference to the event ID making the root of the thread
+     */
+    private threadRoot: string = null;
+
     /* Set an approximate timestamp for the event relative the local clock.
      * This will inherently be approximate because it doesn't take into account
      * the time between the server putting the 'age' field on the event as it sent
@@ -378,6 +382,14 @@ export class MatrixEvent extends EventEmitter {
      */
     public getWireContent(): IContent {
         return this.event.content || {};
+    }
+
+    /**
+     * Get the event ID of the replied event
+     */
+    public get replyEventId(): string {
+        const relations = this.getWireContent()["m.relates_to"];
+        return relations?.["m.in_reply_to"]?.["event_id"];
     }
 
     /**
@@ -1264,6 +1276,14 @@ export class MatrixEvent extends EventEmitter {
 
     public getTxnId(): string | undefined {
         return this.txnId;
+    }
+
+    public setThreadRoot(threadRoot: string): void {
+        this.threadRoot = threadRoot;
+    }
+
+    public getThreadRoot(): string {
+        return this.threadRoot;
     }
 }
 
