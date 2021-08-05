@@ -16,7 +16,6 @@ limitations under the License.
 
 import { MatrixClient } from "../../../src";
 import { Room } from "../../../src/models/room";
-import { MatrixEvent } from "../../../src/models/event";
 import { UNSTABLE_MSC3089_BRANCH } from "../../../src/@types/event";
 import { EventTimelineSet } from "../../../src/models/event-timeline-set";
 import { EventTimeline } from "../../../src/models/event-timeline";
@@ -25,7 +24,7 @@ import { MSC3089Branch } from "../../../src/models/MSC3089Branch";
 describe("MSC3089Branch", () => {
     let client: MatrixClient;
     // @ts-ignore - TS doesn't know that this is a type
-    let indexEvent: MatrixEvent;
+    let indexEvent: any;
     let branch: MSC3089Branch;
 
     const branchRoomId = "!room:example.org";
@@ -47,10 +46,10 @@ describe("MSC3089Branch", () => {
                 }
             },
         };
-        indexEvent = {
+        indexEvent = ({
             getRoomId: () => branchRoomId,
             getStateKey: () => fileEventId,
-        };
+        });
         branch = new MSC3089Branch(client, indexEvent);
     });
 
