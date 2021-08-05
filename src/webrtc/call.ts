@@ -750,9 +750,10 @@ export class MatrixCall extends EventEmitter {
         // We don't want to send hangup here if we didn't even get to sending an invite
         if (this.state === CallState.WaitLocalMedia) return;
         const content = {};
-        // Continue to send no reason for user hangups temporarily, until
-        // clients understand the user_hangup reason (voip v1)
-        if (reason !== CallErrorCode.UserHangup) content['reason'] = reason;
+        // Don't send UserHangup reason to older clients
+        if ((this.opponentVersion && this.opponentVersion >= 1) || reason !== CallErrorCode.UserHangup) {
+            content["reason"] = reason;
+        }
         this.sendVoipEvent(EventType.CallHangup, content);
     }
 
