@@ -291,6 +291,7 @@ export class MatrixCall extends EventEmitter {
     private opponentPartyId: string;
     private opponentCaps: CallCapabilities;
     private inviteTimeout: NodeJS.Timeout; // in the browser it's 'number'
+    private iceDisconnectedTimeout: NodeJS.Timeout;
 
     // The logic of when & if a call is on hold is nontrivial and explained in is*OnHold
     // This flag represents whether we want the other party to be on hold
@@ -1269,9 +1270,14 @@ export class MatrixCall extends EventEmitter {
         // ideally we'd consider the call to be connected when we get media but
         // chrome doesn't implement any of the 'onstarted' events yet
         if (this.peerConn.iceConnectionState == 'connected') {
+            clearTimeout(this.iceDisconnectedTimeout);
             this.setState(CallState.Connected);
         } else if (this.peerConn.iceConnectionState == 'failed') {
             this.hangup(CallErrorCode.IceFailed, false);
+        } else if (this.peerConn.iceConnectionState == 'disconnected') {
+            this.iceDisconnectedTimeout = setTimeout(() => {
+                this.hangup(CallErrorCode.IceFailed, false);
+            }, 30 * 1000);
         }
     };
 
