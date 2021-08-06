@@ -201,7 +201,7 @@ export enum CallErrorCode {
     Transfered = 'transferred',
 }
 
-enum ConstraintsType {
+export enum ConstraintsType {
     Audio = "audio",
     Video = "video",
 }
@@ -281,8 +281,6 @@ export class MatrixCall extends EventEmitter {
     private localAVStream: MediaStream;
     private inviteOrAnswerSent: boolean;
     private waitForLocalAVStream: boolean;
-    // XXX: I don't know why this is called 'config'.
-    private config: MediaStreamConstraints;
     private successor: MatrixCall;
     private opponentMember: RoomMember;
     private opponentVersion: number;
@@ -362,9 +360,8 @@ export class MatrixCall extends EventEmitter {
     async placeVoiceCall() {
         logger.debug("placeVoiceCall");
         this.checkForErrorListener();
-        const constraints = getUserMediaContraints(ConstraintsType.Audio);
         this.type = CallType.Voice;
-        await this.placeCallWithConstraints(constraints);
+        await this.placeCall(ConstraintsType.Audio);
     }
 
     /**
@@ -374,9 +371,8 @@ export class MatrixCall extends EventEmitter {
     async placeVideoCall() {
         logger.debug("placeVideoCall");
         this.checkForErrorListener();
-        const constraints = getUserMediaContraints(ConstraintsType.Video);
         this.type = CallType.Video;
-        await this.placeCallWithConstraints(constraints);
+        await this.placeCall(ConstraintsType.Video);
     }
 
     /**
@@ -406,8 +402,7 @@ export class MatrixCall extends EventEmitter {
             }
 
             logger.debug("Got screen stream, requesting audio stream...");
-            const audioConstraints = getUserMediaContraints(ConstraintsType.Audio);
-            this.placeCallWithConstraints(audioConstraints);
+            this.placeCall(ConstraintsType.Audio);
         } catch (err) {
             this.emit(CallEvent.Error,
                 new CallError(
@@ -587,17 +582,18 @@ export class MatrixCall extends EventEmitter {
         logger.debug(`Answering call ${this.callId} of type ${this.type}`);
 
         if (!this.localAVStream && !this.waitForLocalAVStream) {
-            const constraints = getUserMediaContraints(
-                this.type == CallType.Video ?
-                    ConstraintsType.Video:
-                    ConstraintsType.Audio,
-            );
-            logger.log("Getting user media with constraints", constraints);
             this.setState(CallState.WaitLocalMedia);
             this.waitForLocalAVStream = true;
 
             try {
-                const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+                let mediaStream: MediaStream;
+
+                if (this.type === CallType.Voice) {
+                    mediaStream = await this.client.getLocalAudioStream();
+                } else {
+                    mediaStream = await this.client.getLocalVideoStream();
+                }
+
                 this.waitForLocalAVStream = false;
                 this.gotUserMediaForAnswer(mediaStream);
             } catch (e) {
@@ -1519,8 +1515,10 @@ export class MatrixCall extends EventEmitter {
         logger.debug(`stopAllMedia (stream=${this.localAVStream})`);
 
         for (const feed of this.feeds) {
-            for (const track of feed.stream.getTracks()) {
-                track.stop();
+            if (!feed.isLocal()) {
+                for (const track of feed.stream.getTracks()) {
+                    track.stop();
+                }
             }
         }
     }
@@ -1579,13 +1577,11 @@ export class MatrixCall extends EventEmitter {
         }
     }
 
-    private async placeCallWithConstraints(constraints: MediaStreamConstraints) {
-        logger.log("Getting user media with constraints", constraints);
+    private async placeCall(constraintsType: ConstraintsType) {
         // XXX Find a better way to do this
         this.client.callEventHandler.calls.set(this.callId, this);
         this.setState(CallState.WaitLocalMedia);
         this.direction = CallDirection.Outbound;
-        this.config = constraints;
 
         // make sure we have valid turn creds. Unless something's gone wrong, it should
         // poll and keep the credentials valid so this should be instant.
@@ -1599,7 +1595,14 @@ export class MatrixCall extends EventEmitter {
         this.peerConn = this.createPeerConnection();
 
         try {
-            const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+            let mediaStream: MediaStream;
+
+            if (constraintsType === ConstraintsType.Audio) {
+                mediaStream = await this.client.getLocalAudioStream();
+            } else {
+                mediaStream = await this.client.getLocalVideoStream();
+            }
+
             this.gotUserMediaForInvite(mediaStream);
         } catch (e) {
             this.getUserMediaFailed(e);
@@ -1693,7 +1696,7 @@ function setTracksEnabled(tracks: Array<MediaStreamTrack>, enabled: boolean) {
     }
 }
 
-function getUserMediaContraints(type: ConstraintsType) {
+export function getUserMediaContraints(type: ConstraintsType) {
     const isWebkit = !!navigator.webkitGetUserMedia;
 
     switch (type) {

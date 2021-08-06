@@ -23,7 +23,7 @@ import { EventEmitter } from "events";
 import { SyncApi } from "./sync";
 import { EventStatus, IDecryptOptions, MatrixEvent } from "./models/event";
 import { StubStore } from "./store/stub";
-import { createNewMatrixCall, MatrixCall } from "./webrtc/call";
+import { createNewMatrixCall, MatrixCall, ConstraintsType, getUserMediaContraints } from "./webrtc/call";
 import { Filter } from "./filter";
 import { CallEventHandler } from './webrtc/callEventHandler';
 import * as utils from './utils';
@@ -458,6 +458,8 @@ export class MatrixClient extends EventEmitter {
     public iceCandidatePoolSize = 0; // XXX: Intended private, used in code.
     public idBaseUrl: string;
     public baseUrl: string;
+    private localAVStreamType: ConstraintsType;
+    private localAVStream: MediaStream;
 
     // Note: these are all `protected` to let downstream consumers make mistakes if they want to.
     // We don't technically support this usage, but have reasons to do this.
@@ -1022,6 +1024,40 @@ export class MatrixClient extends EventEmitter {
      */
     public setSupportsCallTransfer(support: boolean) {
         this.supportsCallTransfer = support;
+    }
+
+    public async getLocalVideoStream() {
+        if (this.localAVStreamType === ConstraintsType.Video) {
+            return this.localAVStream.clone();
+        }
+
+        const constraints = getUserMediaContraints(ConstraintsType.Video);
+        logger.log("Getting user media with constraints", constraints);
+        const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+        this.localAVStreamType = ConstraintsType.Video;
+        this.localAVStream = mediaStream;
+        return mediaStream;
+    }
+
+    public async getLocalAudioStream() {
+        if (this.localAVStreamType === ConstraintsType.Audio) {
+            return this.localAVStream.clone();
+        }
+
+        const constraints = getUserMediaContraints(ConstraintsType.Audio);
+        logger.log("Getting user media with constraints", constraints);
+        const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+        this.localAVStreamType = ConstraintsType.Audio;
+        this.localAVStream = mediaStream;
+        return mediaStream;
+    }
+
+    public stopLocalMediaStream() {
+        if (this.localAVStream) {
+            for (const track of this.localAVStream.getTracks()) {
+                track.stop();
+            }
+        }
     }
 
     /**
