@@ -837,10 +837,10 @@ export class MatrixCall extends EventEmitter {
             for (const sender of this.screensharingSenders) {
                 this.peerConn.removeTrack(sender);
             }
-            this.deleteFeedByStream(this.localScreensharingStream);
             for (const track of this.localScreensharingStream.getTracks()) {
                 track.stop();
             }
+            this.deleteFeedByStream(this.localScreensharingStream);
             return false;
         }
     }
@@ -888,10 +888,10 @@ export class MatrixCall extends EventEmitter {
             });
             sender.replaceTrack(track);
 
-            this.deleteFeedByStream(this.localScreensharingStream);
             for (const track of this.localScreensharingStream.getTracks()) {
                 track.stop();
             }
+            this.deleteFeedByStream(this.localScreensharingStream);
 
             return false;
         }
