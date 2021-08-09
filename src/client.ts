@@ -1057,6 +1057,9 @@ export class MatrixClient extends EventEmitter {
             for (const track of this.localAVStream.getTracks()) {
                 track.stop();
             }
+
+            this.localAVStreamType = null;
+            this.localAVStream = null;
         }
     }
 
