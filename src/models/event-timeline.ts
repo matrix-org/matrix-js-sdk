@@ -55,10 +55,10 @@ export class EventTimeline {
         // have a membership event, so test to see if events.member is set. We
         // check this to avoid overriding non-sentinel members by sentinel ones
         // when adding the event to a filtered timeline
-        if (!event.sender?.events.member) {
+        if (!event.sender?.events?.member) {
             event.sender = stateContext.getSentinelMember(event.getSender());
         }
-        if (!event.target?.events.member && event.getType() === EventType.RoomMember) {
+        if (!event.target?.events?.member && event.getType() === EventType.RoomMember) {
             event.target = stateContext.getSentinelMember(event.getStateKey());
         }
 
