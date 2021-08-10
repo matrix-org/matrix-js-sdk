@@ -50,13 +50,15 @@ export class EventTimeline {
      * @param {boolean} toStartOfTimeline  if true the event's forwardLooking flag is set false
      */
     static setEventMetadata(event: MatrixEvent, stateContext: RoomState, toStartOfTimeline: boolean): void {
-        // We always check if the event doesn't already have the property. We do
-        // this to avoid overriding non-sentinel members by sentinel ones when
-        // adding the event to a filtered timeline
-        if (!event.sender) {
+        // When we try to generate a sentinel member before we have that member
+        // in the members object, we still generate a sentinel but it doesn't
+        // have a membership event, so test to see if events.member is set. We
+        // check this to avoid overriding non-sentinel members by sentinel ones
+        // when adding the event to a filtered timeline
+        if (!event.sender?.events?.member) {
             event.sender = stateContext.getSentinelMember(event.getSender());
         }
-        if (!event.target && event.getType() === EventType.RoomMember) {
+        if (!event.target?.events?.member && event.getType() === EventType.RoomMember) {
             event.target = stateContext.getSentinelMember(event.getStateKey());
         }
 
