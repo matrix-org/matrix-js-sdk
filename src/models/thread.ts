@@ -21,7 +21,6 @@ export class Thread {
     private root: string;
     public tail = new Set<string>();
     private events = new Map<string, MatrixEvent>();
-    private _messageCount = 0;
 
     constructor(events: MatrixEvent[] = []) {
         events.forEach(event => this.addEvent(event));
@@ -83,7 +82,7 @@ export class Thread {
      * The number of messages in the thread
      */
     public get length(): number {
-        return this._messageCount;
+        return this.eventTimeline.length;
     }
 
     /**
@@ -92,9 +91,7 @@ export class Thread {
     public get participants(): Set<string> {
         const participants = new Set<string>();
         this.events.forEach(event => {
-            if (event.getType() === EventType.RoomMessage) {
-                participants.add(event.getSender());
-            }
+            participants.add(event.getSender());
         });
         return participants;
     }

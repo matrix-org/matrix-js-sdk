@@ -1086,6 +1086,10 @@ export class Room extends EventEmitter {
         });
     }
 
+    public getThread(eventId: string): Thread {
+        return this.threads.get(eventId);
+    }
+
     /**
      * Build the reply chain starting from the bottom up
      */
