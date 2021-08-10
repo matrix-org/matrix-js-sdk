@@ -62,6 +62,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
      * @return {Number}
      * @see module:scheduler~retryAlgorithm
      */
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     public static RETRY_BACKOFF_RATELIMIT(event: MatrixEvent, attempts: number, err: MatrixError): number {
         if (err.httpStatus === 400 || err.httpStatus === 403 || err.httpStatus === 401) {
             // client error; no amount of retrying with save you now.
@@ -97,6 +98,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
      * @return {string}
      * @see module:scheduler~queueAlgorithm
      */
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     public static QUEUE_MESSAGES(event: MatrixEvent) {
         // enqueue messages or events that associate with another event (redactions and relations)
         if (event.getType() === EventType.RoomMessage || event.hasAssocation()) {

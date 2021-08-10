@@ -18,8 +18,6 @@ limitations under the License.
 
 /** @module interactive-auth */
 
-import url from "url";
-
 import * as utils from "./utils";
 import { logger } from './logger';
 import { MatrixClient } from "./client";

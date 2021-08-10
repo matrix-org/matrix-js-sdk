@@ -21,7 +21,6 @@ limitations under the License.
 import { EventContext } from "./event-context";
 import { EventMapper } from "../event-mapper";
 import { IResultContext, ISearchResult } from "../@types/search";
-import { IRoomEvent } from "../sync-accumulator";
 
 export class SearchResult {
     /**
