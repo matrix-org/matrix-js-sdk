@@ -90,8 +90,7 @@ export interface ISenderNotificationPermissionCondition
     key: string;
 }
 
-export type PushRuleCondition = IPushRuleCondition<string>
-    | IEventMatchCondition
+export type PushRuleCondition = IEventMatchCondition
     | IContainsDisplayNameCondition
     | IRoomMemberCountCondition
     | ISenderNotificationPermissionCondition;

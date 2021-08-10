@@ -18,89 +18,39 @@ import { escapeRegExp, globToRegexp, isNullOrUndefined } from "./utils";
 import { logger } from './logger';
 import { MatrixClient } from "./client";
 import { MatrixEvent } from "./models/event";
+import {
+    ConditionKind,
+    IAnnotatedPushRule,
+    IContainsDisplayNameCondition,
+    IEventMatchCondition,
+    IPushRule,
+    IRoomMemberCountCondition,
+    ISenderNotificationPermissionCondition,
+    PushRuleAction,
+    PushRuleActionName,
+    PushRuleCondition,
+    PushRuleKind,
+    TweakName,
+} from "./@types/PushRules";
 
 /**
  * @module pushprocessor
  */
 
-enum RuleKind {
-    Override = "override",
-    Content = "content",
-    Room = "room",
-    Sender = "sender",
-    Underride = "underride",
-}
-
-const RULEKINDS_IN_ORDER = [RuleKind.Override, RuleKind.Content, RuleKind.Room, RuleKind.Sender, RuleKind.Underride];
-
-enum ConditionKind {
-    EventMatch = "event_match",
-    ContainsDisplayName = "contains_display_name",
-    RoomMemberCount = "room_member_count",
-    SenderNotificationPermission = "sender_notification_permission",
-}
-
-enum Tweak {
-    Sound = "sound",
-    Highlight = "highlight",
-}
-
-interface ISetTweak {
-    // eslint-disable-next-line camelcase
-    set_tweak: Tweak;
-    value: any;
-}
-
-export enum Action {
-    Notify = "notify",
-    DontNotify = "dont_notify",
-    Coalesce = "coalesce",
-}
-
-type PushAction = Action | ISetTweak;
-
-interface IEventMatchCondition {
-    kind: ConditionKind.EventMatch;
-    key: string;
-    pattern: string;
-    value?: string; // Legacy field?
-}
-
-interface IContainsDisplayNameCondition {
-    kind: ConditionKind.ContainsDisplayName;
-}
-
-interface IRoomMemberCountCondition {
-    kind: ConditionKind.RoomMemberCount;
-    is: string;
-}
-
-interface ISenderNotificationPermissionCondition {
-    kind: ConditionKind.SenderNotificationPermission;
-    key: string;
-}
-
-type PushCondition = IEventMatchCondition
-    | IContainsDisplayNameCondition
-    | IRoomMemberCountCondition
-    | ISenderNotificationPermissionCondition;
-
-interface IPushRule {
-    // eslint-disable-next-line camelcase
-    rule_id: string;
-    default?: boolean;
-    enabled?: boolean;
-    conditions: PushCondition[];
-    actions: PushAction[];
-    kind?: RuleKind; // this is a locally monkey wrenched field
-}
+const RULEKINDS_IN_ORDER = [
+    PushRuleKind.Override,
+    PushRuleKind.ContentSpecific,
+    PushRuleKind.RoomSpecific,
+    PushRuleKind.SenderSpecific,
+    PushRuleKind.Underride,
+];
 
 interface IRuleset {
-    [RuleKind.Content]: IPushRule[];
-    [RuleKind.Override]: IPushRule[];
-    [RuleKind.Room]: IPushRule[];
-    [RuleKind.Sender]: IPushRule[];
-    [RuleKind.Underride]: IPushRule[];
+    [PushRuleKind.ContentSpecific]: IPushRule[];
+    [PushRuleKind.Override]: IPushRule[];
+    [PushRuleKind.RoomSpecific]: IPushRule[];
+    [PushRuleKind.SenderSpecific]: IPushRule[];
+    [PushRuleKind.Underride]: IPushRule[];
 }
 
 export interface IRulesets {
@@ -133,9 +83,9 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
             },
         ],
         actions: [
-            Action.Notify,
+            PushRuleActionName.Notify,
             {
-                set_tweak: Tweak.Highlight,
+                set_tweak: TweakName.Highlight,
                 value: true,
             },
         ],
@@ -153,14 +103,14 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
             },
         ],
         actions: [
-            Action.DontNotify,
+            PushRuleActionName.DontNotify,
         ],
     },
 ];
 
 export interface IActionsObject {
     notify: boolean;
-    tweaks: Partial<Record<Tweak, any>>;
+    tweaks: Partial<Record<TweakName, any>>;
 }
 
 export class PushProcessor {
@@ -172,11 +122,11 @@ export class PushProcessor {
      *
      * @return {object} A object with key 'notify' (true or false) and an object of actions
      */
-    public static actionListToActionsObject(actionList: PushAction[]): IActionsObject {
+    public static actionListToActionsObject(actionList: PushRuleAction[]): IActionsObject {
         const actionObj: IActionsObject = { notify: false, tweaks: {} };
         for (let i = 0; i < actionList.length; ++i) {
             const action = actionList[i];
-            if (action === Action.Notify) {
+            if (action === PushRuleActionName.Notify) {
                 actionObj.notify = true;
             } else if (typeof action === 'object') {
                 if (action.value === undefined) {
@@ -236,7 +186,7 @@ export class PushProcessor {
      */
     constructor(private readonly client: MatrixClient) {}
 
-    private matchingRuleFromKindSet(ev: MatrixEvent, kindset: IRuleset): IPushRule {
+    private matchingRuleFromKindSet(ev: MatrixEvent, kindset: IRuleset): IAnnotatedPushRule {
         for (let ruleKindIndex = 0; ruleKindIndex < RULEKINDS_IN_ORDER.length; ++ruleKindIndex) {
             const kind = RULEKINDS_IN_ORDER[ruleKindIndex];
             const ruleset = kindset[kind];
@@ -256,26 +206,28 @@ export class PushProcessor {
                 }
 
                 if (this.ruleMatchesEvent(rawrule, ev)) {
-                    rule.kind = kind;
-                    return rule;
+                    return {
+                        ...rule,
+                        kind,
+                    };
                 }
             }
         }
         return null;
     }
 
-    private templateRuleToRaw(kind: RuleKind, tprule: any): any {
+    private templateRuleToRaw(kind: PushRuleKind, tprule: any): any {
         const rawrule = {
             'rule_id': tprule.rule_id,
             'actions': tprule.actions,
             'conditions': [],
         };
         switch (kind) {
-            case RuleKind.Underride:
-            case RuleKind.Override:
+            case PushRuleKind.Underride:
+            case PushRuleKind.Override:
                 rawrule.conditions = tprule.conditions;
                 break;
-            case RuleKind.Room:
+            case PushRuleKind.RoomSpecific:
                 if (!tprule.rule_id) {
                     return null;
                 }
@@ -285,7 +237,7 @@ export class PushProcessor {
                     'value': tprule.rule_id,
                 });
                 break;
-            case RuleKind.Sender:
+            case PushRuleKind.SenderSpecific:
                 if (!tprule.rule_id) {
                     return null;
                 }
@@ -295,7 +247,7 @@ export class PushProcessor {
                     'value': tprule.rule_id,
                 });
                 break;
-            case RuleKind.Content:
+            case PushRuleKind.ContentSpecific:
                 if (!tprule.pattern) {
                     return null;
                 }
@@ -309,7 +261,7 @@ export class PushProcessor {
         return rawrule;
     }
 
-    private eventFulfillsCondition(cond: PushCondition, ev: MatrixEvent): boolean {
+    private eventFulfillsCondition(cond: PushRuleCondition, ev: MatrixEvent): boolean {
         switch (cond.kind) {
             case ConditionKind.EventMatch:
                 return this.eventFulfillsEventMatchCondition(cond, ev);
@@ -475,7 +427,7 @@ export class PushProcessor {
         return val;
     }
 
-    private matchingRuleForEventWithRulesets(ev: MatrixEvent, rulesets): IPushRule {
+    private matchingRuleForEventWithRulesets(ev: MatrixEvent, rulesets): IAnnotatedPushRule {
         if (!rulesets) {
             return null;
         }
@@ -498,7 +450,7 @@ export class PushProcessor {
         if (actionObj.tweaks.highlight === undefined) {
             // if it isn't specified, highlight if it's a content
             // rule but otherwise not
-            actionObj.tweaks.highlight = (rule.kind == 'content');
+            actionObj.tweaks.highlight = (rule.kind == PushRuleKind.ContentSpecific);
         }
 
         return actionObj;
