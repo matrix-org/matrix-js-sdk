@@ -193,12 +193,14 @@ export class InteractiveAuth {
     private submitPromise: Promise<void> = null;
 
     constructor(opts: IOpts) {
+        this.matrixClient = opts.matrixClient;
         this.data = opts.authData || {};
         this.requestCallback = opts.doRequest;
         this.busyChangedCallback = opts.busyChanged;
         // startAuthStage included for backwards compat
         this.stateUpdatedCallback = opts.stateUpdated || opts.startAuthStage;
         this.requestEmailTokenCallback = opts.requestEmailToken;
+        this.inputs = opts.inputs || {};
 
         if (opts.sessionId) this.data.session = opts.sessionId;
         this.clientSecret = opts.clientSecret || this.matrixClient.generateClientSecret();
@@ -216,6 +218,7 @@ export class InteractiveAuth {
         // This promise will be quite long-lived and will resolve when the
         // request is authenticated and completes successfully.
         this.attemptAuthDeferred = defer();
+        const promise = this.attemptAuthDeferred.promise;
 
         const hasFlows = this.data && this.data.flows;
 
@@ -236,7 +239,7 @@ export class InteractiveAuth {
             this.startNextAuthStage();
         }
 
-        return this.attemptAuthDeferred.promise;
+        return promise;
     }
 
     /**
@@ -406,6 +409,7 @@ export class InteractiveAuth {
         try {
             const result = await this.requestCallback(auth, background);
             this.attemptAuthDeferred.resolve(result);
+            this.attemptAuthDeferred = null;
         } catch (error) {
             // sometimes UI auth errors don't come with flows
             const errorFlows = error.data ? error.data.flows : null;
@@ -436,6 +440,7 @@ export class InteractiveAuth {
                 this.startNextAuthStage();
             } catch (e) {
                 this.attemptAuthDeferred.reject(e);
+                this.attemptAuthDeferred = null;
             }
 
             if (
@@ -470,12 +475,11 @@ export class InteractiveAuth {
                     // the failure up as the user can't complete auth if we can't
                     // send the email, for whatever reason.
                     this.attemptAuthDeferred.reject(e);
+                    this.attemptAuthDeferred = null;
                 } finally {
                     this.requestingEmailToken = false;
                 }
             }
-        } finally {
-            this.attemptAuthDeferred = null; // TODO
         }
     }
 
