@@ -1067,8 +1067,8 @@ export class SyncApi {
                     // will be updated when we receive push rules via getPushRules
                     // (see sync) before syncing over the network.
                     if (accountDataEvent.getType() === EventType.PushRules) {
-                        const rules = accountDataEvent.getContent();
-                        client.pushRules = PushProcessor.rewriteDefaultRules(rules as IRulesets);
+                        const rules = accountDataEvent.getContent<IRulesets>();
+                        client.pushRules = PushProcessor.rewriteDefaultRules(rules);
                     }
                     const prevEvent = prevEventsMap[accountDataEvent.getId()];
                     client.emit("accountData", accountDataEvent, prevEvent);

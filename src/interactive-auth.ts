@@ -218,14 +218,13 @@ export class InteractiveAuth {
         // This promise will be quite long-lived and will resolve when the
         // request is authenticated and completes successfully.
         this.attemptAuthDeferred = defer();
+        // pluck the promise out now, as doRequest may clear before we return
         const promise = this.attemptAuthDeferred.promise;
 
-        const hasFlows = this.data && this.data.flows;
-
         // if we have no flows, try a request to acquire the flows
-        if (!hasFlows) {
+        if (!this.data?.flows) {
             this.busyChangedCallback?.(true);
-            // use the existing sessionid, if one is present.
+            // use the existing sessionId, if one is present.
             let auth = null;
             if (this.data.session) {
                 auth = {
@@ -412,7 +411,7 @@ export class InteractiveAuth {
             this.attemptAuthDeferred = null;
         } catch (error) {
             // sometimes UI auth errors don't come with flows
-            const errorFlows = error.data ? error.data.flows : null;
+            const errorFlows = error.data?.flows ?? null;
             const haveFlows = this.data.flows || Boolean(errorFlows);
             if (error.httpStatus !== 401 || !error.data || !haveFlows) {
                 // doesn't look like an interactive-auth failure.
