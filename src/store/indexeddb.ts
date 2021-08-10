@@ -47,7 +47,7 @@ interface IOpts extends IBaseOpts {
 }
 
 export class IndexedDBStore extends MemoryStore {
-    static exists(indexedDB: IDBFactory, dbName: string): boolean {
+    static exists(indexedDB: IDBFactory, dbName: string): Promise<boolean> {
         return LocalIndexedDBStoreBackend.exists(indexedDB, dbName);
     }
 

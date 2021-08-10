@@ -1,3 +1,20 @@
+Changes in [12.2.0](https://github.com/vector-im/element-desktop/releases/tag/v12.2.0) (2021-07-02)
+===================================================================================================
+
+## ✨ Features
+ * Improve calculateRoomName performances by using Intl.Collator
+   [\#1801](https://github.com/matrix-org/matrix-js-sdk/pull/1801)
+ * Switch callEventHandler from listening on `event` to `Room.timeline`
+   [\#1789](https://github.com/matrix-org/matrix-js-sdk/pull/1789)
+ * Expose MatrixEvent's internal clearEvent as a function
+   [\#1784](https://github.com/matrix-org/matrix-js-sdk/pull/1784)
+
+## 🐛 Bug Fixes
+ * Clean up Event.clearEvent handling to fix a bug where malformed events with falsey content wouldn't be considered decrypted
+   [\#1807](https://github.com/matrix-org/matrix-js-sdk/pull/1807)
+ * Standardise spelling and casing of homeserver, identity server, and integration manager
+   [\#1782](https://github.com/matrix-org/matrix-js-sdk/pull/1782)
+
 Changes in [12.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v12.1.0) (2021-07-19)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v12.1.0-rc.1...v12.1.0)

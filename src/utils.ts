@@ -402,10 +402,11 @@ export function normalize(str: string): string {
 // various width spaces U+2000 - U+200D
 // LTR and RTL marks U+200E and U+200F
 // LTR/RTL and other directional formatting marks U+202A - U+202F
+// Arabic Letter RTL mark U+061C
 // Combining characters U+0300 - U+036F
 // Zero width no-break space (BOM) U+FEFF
 // eslint-disable-next-line no-misleading-character-class
-const removeHiddenCharsRegex = /[\u2000-\u200F\u202A-\u202F\u0300-\u036f\uFEFF\s]/g;
+const removeHiddenCharsRegex = /[\u2000-\u200F\u202A-\u202F\u0300-\u036F\uFEFF\u061C\s]/g;
 
 export function escapeRegExp(string: string): string {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -692,4 +693,26 @@ const collator = new Intl.Collator();
  */
 export function compare(a: string, b: string): number {
     return collator.compare(a, b);
+}
+
+/**
+ * This function is similar to Object.assign() but it assigns recursively and
+ * allows you to ignore nullish values from the source
+ *
+ * @param {Object} target
+ * @param {Object} source
+ * @returns the target object
+ */
+export function recursivelyAssign(target: Object, source: Object, ignoreNullish = false): any {
+    for (const [sourceKey, sourceValue] of Object.entries(source)) {
+        if (target[sourceKey] instanceof Object && sourceValue) {
+            recursivelyAssign(target[sourceKey], sourceValue);
+            continue;
+        }
+        if ((sourceValue !== null && sourceValue !== undefined) || !ignoreNullish) {
+            target[sourceKey] = sourceValue;
+            continue;
+        }
+    }
+    return target;
 }

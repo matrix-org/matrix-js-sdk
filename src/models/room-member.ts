@@ -131,7 +131,11 @@ export class RoomMember extends EventEmitter {
             this.disambiguate,
         );
 
-        this.rawDisplayName = event.getDirectionalContent().displayname || this.userId;
+        this.rawDisplayName = event.getDirectionalContent().displayname;
+        if (!this.rawDisplayName || !utils.removeHiddenChars(this.rawDisplayName)) {
+            this.rawDisplayName = this.userId;
+        }
+
         if (oldMembership !== this.membership) {
             this.updateModifiedTime();
             this.emit("RoomMember.membership", event, this, oldMembership);

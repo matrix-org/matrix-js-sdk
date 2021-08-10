@@ -29,7 +29,7 @@ import { MatrixError } from "../../../src/http-api";
 
 describe("MSC3089TreeSpace", () => {
     let client: MatrixClient;
-    let room: Room;
+    let room: any;
     let tree: MSC3089TreeSpace;
     const roomId = "!tree:localhost";
     const targetUser = "@target:example.org";
@@ -170,7 +170,7 @@ describe("MSC3089TreeSpace", () => {
             expect(userIds).toMatchObject([target]);
             return Promise.resolve();
         });
-        client.invite = () => Promise.resolve(); // we're not testing this here - see other tests
+        client.invite = () => Promise.resolve({}); // we're not testing this here - see other tests
         client.sendSharedHistoryKeys = sendKeysFn;
 
         // Mock the history check as best as possible
@@ -198,7 +198,7 @@ describe("MSC3089TreeSpace", () => {
             expect(userIds).toMatchObject([target]);
             return Promise.resolve();
         });
-        client.invite = () => Promise.resolve(); // we're not testing this here - see other tests
+        client.invite = () => Promise.resolve({}); // we're not testing this here - see other tests
         client.sendSharedHistoryKeys = sendKeysFn;
 
         const historyVis = "joined"; // NOTE: Changed.
@@ -446,9 +446,9 @@ describe("MSC3089TreeSpace", () => {
         // Danger: these are partial implementations for testing purposes only
 
         // @ts-ignore - "MatrixEvent is a value but used as a type", which is true but not important
-        let childState: { [roomId: string]: MatrixEvent[] } = {};
+        let childState: { [roomId: string]: any[] } = {};
         // @ts-ignore - "MatrixEvent is a value but used as a type", which is true but not important
-        let parentState: MatrixEvent[] = [];
+        let parentState: any[] = [];
         let parentRoom: Room;
         let childTrees: MSC3089TreeSpace[];
         let rooms: { [roomId: string]: Room };

@@ -89,9 +89,6 @@ import {
     IRecoveryKey,
     ISecretStorageKeyInfo,
 } from "./crypto/api";
-import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store";
-import { LocalStorageCryptoStore } from "./crypto/store/localStorage-crypto-store";
-import { IndexedDBCryptoStore } from "./crypto/store/indexeddb-crypto-store";
 import { SyncState } from "./sync.api";
 import { EventTimelineSet } from "./models/event-timeline-set";
 import { VerificationRequest } from "./crypto/verification/request/VerificationRequest";
@@ -146,10 +143,10 @@ import { ISynapseAdminDeactivateResponse, ISynapseAdminWhoisResponse } from "./@
 import { ISpaceSummaryEvent, ISpaceSummaryRoom } from "./@types/spaces";
 import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, RuleId } from "./@types/PushRules";
 import { IThreepid } from "./@types/threepids";
+import { CryptoStore } from "./crypto/store/base";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
-export type CryptoStore = MemoryCryptoStore | LocalStorageCryptoStore | IndexedDBCryptoStore;
 
 export type Callback = (err: Error | any | null, data?: any) => void;
 export type ResetTimelineCallback = (roomId: string) => boolean;
@@ -5187,11 +5184,11 @@ export class MatrixClient extends EventEmitter {
      * The operation also updates MatrixClient.pushRules at the end.
      * @param {string} scope "global" or device-specific.
      * @param {string} roomId the id of the room.
-     * @param {string} mute the mute state.
+     * @param {boolean} mute the mute state.
      * @return {Promise} Resolves: result object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setRoomMutePushRule(scope: string, roomId: string, mute: string): Promise<void> | void {
+    public setRoomMutePushRule(scope: string, roomId: string, mute: boolean): Promise<void> | void {
         let deferred;
         let hasDontNotifyRule;
 

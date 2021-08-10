@@ -1,6 +1,5 @@
 /*
-Copyright 2017, 2018 New Vector Ltd
-Copyright 2020 The Matrix.org Foundation C.I.C.
+Copyright 2017 - 2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +16,12 @@ limitations under the License.
 
 import { logger } from '../../logger';
 import { MemoryCryptoStore } from './memory-crypto-store';
+import { IDeviceData, IProblem, ISession, ISessionInfo, IWithheld, Mode } from "./base";
+import { IOlmDevice } from "../algorithms/megolm";
+import { IRoomEncryption } from "../RoomList";
+import { ICrossSigningKey } from "../../client";
+import { InboundGroupSessionData } from "../../@types/partials";
+import { IEncryptedPayload } from "../aes";
 
 /**
  * Internal module. Partial localStorage backed storage for e2e.
@@ -38,23 +43,23 @@ const KEY_INBOUND_SESSION_WITHHELD_PREFIX = E2E_PREFIX + "inboundgroupsessions.w
 const KEY_ROOMS_PREFIX = E2E_PREFIX + "rooms/";
 const KEY_SESSIONS_NEEDING_BACKUP = E2E_PREFIX + "sessionsneedingbackup";
 
-function keyEndToEndSessions(deviceKey) {
+function keyEndToEndSessions(deviceKey: string): string {
     return E2E_PREFIX + "sessions/" + deviceKey;
 }
 
-function keyEndToEndSessionProblems(deviceKey) {
+function keyEndToEndSessionProblems(deviceKey: string): string {
     return E2E_PREFIX + "session.problems/" + deviceKey;
 }
 
-function keyEndToEndInboundGroupSession(senderKey, sessionId) {
+function keyEndToEndInboundGroupSession(senderKey: string, sessionId: string): string {
     return KEY_INBOUND_SESSION_PREFIX + senderKey + "/" + sessionId;
 }
 
-function keyEndToEndInboundGroupSessionWithheld(senderKey, sessionId) {
+function keyEndToEndInboundGroupSessionWithheld(senderKey: string, sessionId: string): string {
     return KEY_INBOUND_SESSION_WITHHELD_PREFIX + senderKey + "/" + sessionId;
 }
 
-function keyEndToEndRoomsPrefix(roomId) {
+function keyEndToEndRoomsPrefix(roomId: string): string {
     return KEY_ROOMS_PREFIX + roomId;
 }
 
@@ -62,24 +67,23 @@ function keyEndToEndRoomsPrefix(roomId) {
  * @implements {module:crypto/store/base~CryptoStore}
  */
 export class LocalStorageCryptoStore extends MemoryCryptoStore {
-    constructor(webStore) {
-        super();
-        this.store = webStore;
-    }
-
-    static exists(webStore) {
-        const length = webStore.length;
+    public static exists(store: Storage): boolean {
+        const length = store.length;
         for (let i = 0; i < length; i++) {
-            if (webStore.key(i).startsWith(E2E_PREFIX)) {
+            if (store.key(i).startsWith(E2E_PREFIX)) {
                 return true;
             }
         }
         return false;
     }
 
+    constructor(private readonly store: Storage) {
+        super();
+    }
+
     // Olm Sessions
 
-    countEndToEndSessions(txn, func) {
+    public countEndToEndSessions(txn: unknown, func: (count: number) => void): void {
         let count = 0;
         for (let i = 0; i < this.store.length; ++i) {
             if (this.store.key(i).startsWith(keyEndToEndSessions(''))) ++count;
@@ -87,9 +91,10 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         func(count);
     }
 
-    _getEndToEndSessions(deviceKey, txn, func) {
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    private _getEndToEndSessions(deviceKey: string): Record<string, ISessionInfo> {
         const sessions = getJsonItem(this.store, keyEndToEndSessions(deviceKey));
-        const fixedSessions = {};
+        const fixedSessions: Record<string, ISessionInfo> = {};
 
         // fix up any old sessions to be objects rather than just the base64 pickle
         for (const [sid, val] of Object.entries(sessions || {})) {
@@ -105,16 +110,25 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         return fixedSessions;
     }
 
-    getEndToEndSession(deviceKey, sessionId, txn, func) {
+    public getEndToEndSession(
+        deviceKey: string,
+        sessionId: string,
+        txn: unknown,
+        func: (session: ISessionInfo) => void,
+    ): void {
         const sessions = this._getEndToEndSessions(deviceKey);
         func(sessions[sessionId] || {});
     }
 
-    getEndToEndSessions(deviceKey, txn, func) {
+    public getEndToEndSessions(
+        deviceKey: string,
+        txn: unknown,
+        func: (sessions: { [sessionId: string]: ISessionInfo }) => void,
+    ): void {
         func(this._getEndToEndSessions(deviceKey) || {});
     }
 
-    getAllEndToEndSessions(txn, func) {
+    public getAllEndToEndSessions(txn: unknown, func: (session: ISessionInfo) => void): void {
         for (let i = 0; i < this.store.length; ++i) {
             if (this.store.key(i).startsWith(keyEndToEndSessions(''))) {
                 const deviceKey = this.store.key(i).split('/')[1];
@@ -125,17 +139,15 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         }
     }
 
-    storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn) {
+    public storeEndToEndSession(deviceKey: string, sessionId: string, sessionInfo: ISessionInfo, txn: unknown): void {
         const sessions = this._getEndToEndSessions(deviceKey) || {};
         sessions[sessionId] = sessionInfo;
-        setJsonItem(
-            this.store, keyEndToEndSessions(deviceKey), sessions,
-        );
+        setJsonItem(this.store, keyEndToEndSessions(deviceKey), sessions);
     }
 
-    async storeEndToEndSessionProblem(deviceKey, type, fixed) {
+    public async storeEndToEndSessionProblem(deviceKey: string, type: string, fixed: boolean): Promise<void> {
         const key = keyEndToEndSessionProblems(deviceKey);
-        const problems = getJsonItem(this.store, key) || [];
+        const problems = getJsonItem<IProblem[]>(this.store, key) || [];
         problems.push({ type, fixed, time: Date.now() });
         problems.sort((a, b) => {
             return a.time - b.time;
@@ -143,9 +155,9 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         setJsonItem(this.store, key, problems);
     }
 
-    async getEndToEndSessionProblem(deviceKey, timestamp) {
+    async getEndToEndSessionProblem(deviceKey: string, timestamp: number): Promise<IProblem | null> {
         const key = keyEndToEndSessionProblems(deviceKey);
-        const problems = getJsonItem(this.store, key) || [];
+        const problems = getJsonItem<IProblem[]>(this.store, key) || [];
         if (!problems.length) {
             return null;
         }
@@ -162,9 +174,8 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         }
     }
 
-    async filterOutNotifiedErrorDevices(devices) {
-        const notifiedErrorDevices =
-              getJsonItem(this.store, KEY_NOTIFIED_ERROR_DEVICES) || {};
+    public async filterOutNotifiedErrorDevices(devices: IOlmDevice[]): Promise<IOlmDevice[]> {
+        const notifiedErrorDevices = getJsonItem<string[]>(this.store, KEY_NOTIFIED_ERROR_DEVICES) || {};
         const ret = [];
 
         for (const device of devices) {
@@ -187,7 +198,12 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
 
     // Inbound Group Sessions
 
-    getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
+    public getEndToEndInboundGroupSession(
+        senderCurve25519Key: string,
+        sessionId: string,
+        txn: unknown,
+        func: (groupSession: InboundGroupSessionData | null, groupSessionWithheld: IWithheld | null) => void,
+    ): void {
         func(
             getJsonItem(
                 this.store,
@@ -200,7 +216,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         );
     }
 
-    getAllEndToEndInboundGroupSessions(txn, func) {
+    public getAllEndToEndInboundGroupSessions(txn: unknown, func: (session: ISession | null) => void): void {
         for (let i = 0; i < this.store.length; ++i) {
             const key = this.store.key(i);
             if (key.startsWith(KEY_INBOUND_SESSION_PREFIX)) {
@@ -219,7 +235,12 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         func(null);
     }
 
-    addEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
+    public addEndToEndInboundGroupSession(
+        senderCurve25519Key: string,
+        sessionId: string,
+        sessionData: InboundGroupSessionData,
+        txn: unknown,
+    ): void {
         const existing = getJsonItem(
             this.store,
             keyEndToEndInboundGroupSession(senderCurve25519Key, sessionId),
@@ -231,7 +252,12 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         }
     }
 
-    storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
+    public storeEndToEndInboundGroupSession(
+        senderCurve25519Key: string,
+        sessionId: string,
+        sessionData: InboundGroupSessionData,
+        txn: unknown,
+    ): void {
         setJsonItem(
             this.store,
             keyEndToEndInboundGroupSession(senderCurve25519Key, sessionId),
@@ -239,9 +265,12 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         );
     }
 
-    storeEndToEndInboundGroupSessionWithheld(
-        senderCurve25519Key, sessionId, sessionData, txn,
-    ) {
+    public storeEndToEndInboundGroupSessionWithheld(
+        senderCurve25519Key: string,
+        sessionId: string,
+        sessionData: IWithheld,
+        txn: unknown,
+    ): void {
         setJsonItem(
             this.store,
             keyEndToEndInboundGroupSessionWithheld(senderCurve25519Key, sessionId),
@@ -249,25 +278,19 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         );
     }
 
-    getEndToEndDeviceData(txn, func) {
-        func(getJsonItem(
-            this.store, KEY_DEVICE_DATA,
-        ));
+    public getEndToEndDeviceData(txn: unknown, func: (deviceData: IDeviceData | null) => void): void {
+        func(getJsonItem(this.store, KEY_DEVICE_DATA));
     }
 
-    storeEndToEndDeviceData(deviceData, txn) {
-        setJsonItem(
-            this.store, KEY_DEVICE_DATA, deviceData,
-        );
+    public storeEndToEndDeviceData(deviceData: IDeviceData, txn: unknown): void {
+        setJsonItem(this.store, KEY_DEVICE_DATA, deviceData);
     }
 
-    storeEndToEndRoom(roomId, roomInfo, txn) {
-        setJsonItem(
-            this.store, keyEndToEndRoomsPrefix(roomId), roomInfo,
-        );
+    public storeEndToEndRoom(roomId: string, roomInfo: IRoomEncryption, txn: unknown): void {
+        setJsonItem(this.store, keyEndToEndRoomsPrefix(roomId), roomInfo);
     }
 
-    getEndToEndRooms(txn, func) {
+    public getEndToEndRooms(txn: unknown, func: (rooms: Record<string, IRoomEncryption>) => void): void {
         const result = {};
         const prefix = keyEndToEndRoomsPrefix('');
 
@@ -281,9 +304,8 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         func(result);
     }
 
-    getSessionsNeedingBackup(limit) {
-        const sessionsNeedingBackup
-              = getJsonItem(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};
+    public getSessionsNeedingBackup(limit: number): Promise<ISession[]> {
+        const sessionsNeedingBackup = getJsonItem<string[]>(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};
         const sessions = [];
 
         for (const session in sessionsNeedingBackup) {
@@ -309,13 +331,12 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         return Promise.resolve(sessions);
     }
 
-    countSessionsNeedingBackup() {
-        const sessionsNeedingBackup
-              = getJsonItem(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};
+    public countSessionsNeedingBackup(): Promise<number> {
+        const sessionsNeedingBackup = getJsonItem(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};
         return Promise.resolve(Object.keys(sessionsNeedingBackup).length);
     }
 
-    unmarkSessionsNeedingBackup(sessions) {
+    public unmarkSessionsNeedingBackup(sessions: ISession[]): Promise<void> {
         const sessionsNeedingBackup
               = getJsonItem(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};
         for (const session of sessions) {
@@ -327,7 +348,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         return Promise.resolve();
     }
 
-    markSessionsNeedingBackup(sessions) {
+    public markSessionsNeedingBackup(sessions: ISession[]): Promise<void> {
         const sessionsNeedingBackup
               = getJsonItem(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};
         for (const session of sessions) {
@@ -344,52 +365,46 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
      *
      * @returns {Promise} Promise which resolves when the store has been cleared.
      */
-    deleteAllData() {
+    public deleteAllData(): Promise<void> {
         this.store.removeItem(KEY_END_TO_END_ACCOUNT);
         return Promise.resolve();
     }
 
     // Olm account
 
-    getAccount(txn, func) {
-        const account = getJsonItem(this.store, KEY_END_TO_END_ACCOUNT);
-        func(account);
+    public getAccount(txn: unknown, func: (accountPickle: string) => void): void {
+        const accountPickle = getJsonItem<string>(this.store, KEY_END_TO_END_ACCOUNT);
+        func(accountPickle);
     }
 
-    storeAccount(txn, newData) {
-        setJsonItem(
-            this.store, KEY_END_TO_END_ACCOUNT, newData,
-        );
+    public storeAccount(txn: unknown, accountPickle: string): void {
+        setJsonItem(this.store, KEY_END_TO_END_ACCOUNT, accountPickle);
     }
 
-    getCrossSigningKeys(txn, func) {
-        const keys = getJsonItem(this.store, KEY_CROSS_SIGNING_KEYS);
+    public getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey>) => void): void {
+        const keys = getJsonItem<Record<string, ICrossSigningKey>>(this.store, KEY_CROSS_SIGNING_KEYS);
         func(keys);
     }
 
-    getSecretStorePrivateKey(txn, func, type) {
-        const key = getJsonItem(this.store, E2E_PREFIX + `ssss_cache.${type}`);
+    public getSecretStorePrivateKey(txn: unknown, func: (key: IEncryptedPayload | null) => void, type: string): void {
+        const key = getJsonItem<IEncryptedPayload>(this.store, E2E_PREFIX + `ssss_cache.${type}`);
         func(key);
     }
 
-    storeCrossSigningKeys(txn, keys) {
-        setJsonItem(
-            this.store, KEY_CROSS_SIGNING_KEYS, keys,
-        );
+    public storeCrossSigningKeys(txn: unknown, keys: Record<string, ICrossSigningKey>): void {
+        setJsonItem(this.store, KEY_CROSS_SIGNING_KEYS, keys);
     }
 
-    storeSecretStorePrivateKey(txn, type, key) {
-        setJsonItem(
-            this.store, E2E_PREFIX + `ssss_cache.${type}`, key,
-        );
+    public storeSecretStorePrivateKey(txn: unknown, type: string, key: IEncryptedPayload): void {
+        setJsonItem(this.store, E2E_PREFIX + `ssss_cache.${type}`, key);
     }
 
-    doTxn(mode, stores, func) {
+    doTxn<T>(mode: Mode, stores: Iterable<string>, func: (txn: unknown) => T): Promise<T> {
         return Promise.resolve(func(null));
     }
 }
 
-function getJsonItem(store, key) {
+function getJsonItem<T>(store: Storage, key: string): T | null {
     try {
         // if the key is absent, store.getItem() returns null, and
         // JSON.parse(null) === null, so this returns null.
@@ -401,6 +416,6 @@ function getJsonItem(store, key) {
     return null;
 }
 
-function setJsonItem(store, key, val) {
+function setJsonItem<T>(store: Storage, key: string, val: T): void {
     store.setItem(key, JSON.stringify(val));
 }
