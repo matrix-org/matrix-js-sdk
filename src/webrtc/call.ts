@@ -1640,8 +1640,15 @@ export class MatrixCall extends EventEmitter {
     }
 
     queueCandidate(content: RTCIceCandidate) {
-        // Sends candidates with are sent in a special way because we try to amalgamate
-        // them into one message
+        // We partially de-trickle candidates by waiting for `delay` before sending them
+        // amalgamated, in order to avoid sending too many m.call.candidates events and hitting
+        // rate limits in Matrix.
+        // In practice, it'd be better to remove rate limits for m.call.*
+
+        // N.B. this deliberately lets you queue and send blank candidates, which MSC2746
+        // currently proposes as the way to indicate that candidate gathering is complete.
+        // This will hopefully be changed to an explicit rather than implicit notification
+        // shortly.
         this.candidateSendQueue.push(content);
 
         // Don't send the ICE candidates yet if the call is in the ringing state: this
@@ -1786,6 +1793,9 @@ export class MatrixCall extends EventEmitter {
         logger.debug("Attempting to send " + candidates.length + " candidates");
         try {
             await this.sendVoipEvent(EventType.CallCandidates, content);
+            // reset our retry count if we have successfully sent our candidates
+            // otherwise queueCandidate() will refuse to try to flush the queue
+            this.candidateSendTries = 0;
         } catch (error) {
             // don't retry this event: we'll send another one later as we might
             // have more candidates by then.
