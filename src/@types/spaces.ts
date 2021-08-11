@@ -21,13 +21,13 @@ import { IStrippedState } from "../sync-accumulator";
 // Types relating to Rooms of type `m.space` and related APIs
 
 /* eslint-disable camelcase */
-/** @deprecated */
+/** @deprecated Use hierarchy instead where possible. */
 export interface ISpaceSummaryRoom extends IPublicRoomsChunkRoom {
     num_refs: number;
     room_type: string;
 }
 
-/** @deprecated */
+/** @deprecated Use hierarchy instead where possible. */
 export interface ISpaceSummaryEvent {
     room_id: string;
     event_id: string;
