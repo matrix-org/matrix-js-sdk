@@ -24,12 +24,14 @@ import {
     IContainsDisplayNameCondition,
     IEventMatchCondition,
     IPushRule,
+    IPushRules,
     IRoomMemberCountCondition,
     ISenderNotificationPermissionCondition,
     PushRuleAction,
     PushRuleActionName,
     PushRuleCondition,
     PushRuleKind,
+    PushRuleSet,
     TweakName,
 } from "./@types/PushRules";
 
@@ -44,18 +46,6 @@ const RULEKINDS_IN_ORDER = [
     PushRuleKind.SenderSpecific,
     PushRuleKind.Underride,
 ];
-
-interface IRuleset {
-    [PushRuleKind.ContentSpecific]: IPushRule[];
-    [PushRuleKind.Override]: IPushRule[];
-    [PushRuleKind.RoomSpecific]: IPushRule[];
-    [PushRuleKind.SenderSpecific]: IPushRule[];
-    [PushRuleKind.Underride]: IPushRule[];
-}
-
-export interface IRulesets {
-    global: IRuleset;
-}
 
 // The default override rules to apply to the push rules that arrive from the server.
 // We do this for two reasons:
@@ -115,6 +105,13 @@ export interface IActionsObject {
 
 export class PushProcessor {
     /**
+     * Construct a Push Processor.
+     * @constructor
+     * @param {Object} client The Matrix client object to use
+     */
+    constructor(private readonly client: MatrixClient) {}
+
+    /**
      * Convert a list of actions into a object with the actions as keys and their values
      * eg. [ 'notify', { set_tweak: 'sound', value: 'default' } ]
      *     becomes { notify: true, tweaks: { sound: 'default' } }
@@ -145,13 +142,13 @@ export class PushProcessor {
      * @param {object} incomingRules The client's existing push rules
      * @returns {object} The rewritten rules
      */
-    public static rewriteDefaultRules(incomingRules: IRulesets): IRulesets {
-        let newRules: IRulesets = JSON.parse(JSON.stringify(incomingRules)); // deep clone
+    public static rewriteDefaultRules(incomingRules: IPushRules): IPushRules {
+        let newRules: IPushRules = JSON.parse(JSON.stringify(incomingRules)); // deep clone
 
         // These lines are mostly to make the tests happy. We shouldn't run into these
         // properties missing in practice.
-        if (!newRules) newRules = {} as IRulesets;
-        if (!newRules.global) newRules.global = {} as IRuleset;
+        if (!newRules) newRules = {} as IPushRules;
+        if (!newRules.global) newRules.global = {} as PushRuleSet;
         if (!newRules.global.override) newRules.global.override = [];
 
         // Merge the client-level defaults with the ones from the server
@@ -179,14 +176,7 @@ export class PushProcessor {
 
     private static cachedGlobToRegex: Record<string, RegExp> = {}; // $glob: RegExp
 
-    /**
-     * Construct a Push Processor.
-     * @constructor
-     * @param {Object} client The Matrix client object to use
-     */
-    constructor(private readonly client: MatrixClient) {}
-
-    private matchingRuleFromKindSet(ev: MatrixEvent, kindset: IRuleset): IAnnotatedPushRule {
+    private matchingRuleFromKindSet(ev: MatrixEvent, kindset: PushRuleSet): IAnnotatedPushRule {
         for (let ruleKindIndex = 0; ruleKindIndex < RULEKINDS_IN_ORDER.length; ++ruleKindIndex) {
             const kind = RULEKINDS_IN_ORDER[ruleKindIndex];
             const ruleset = kindset[kind];

@@ -81,6 +81,15 @@ export interface IAuthDict {
     threepidCreds?: any;
 }
 
+class NoAuthFlowFoundError extends Error {
+    public name = "NoAuthFlowFoundError";
+
+    // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
+    constructor(m: string, public readonly required_stages: string[], public readonly flows: IFlow[]) {
+        super(m);
+    }
+}
+
 interface IOpts {
     matrixClient: MatrixClient;
     authData?: IAuthData;
@@ -574,16 +583,13 @@ export class InteractiveAuth {
                 return flow;
             }
         }
-        // Throw an error with a fairly generic description, but with more
-        // information such that the app can give a better one if so desired.
-        const err = new Error("No appropriate authentication flow found");
-        err.name = 'NoAuthFlowFoundError';
+
         const requiredStages: string[] = [];
         if (haveEmail) requiredStages.push(EMAIL_STAGE_TYPE);
         if (haveMsisdn) requiredStages.push(MSISDN_STAGE_TYPE);
-        (err as any).required_stages = requiredStages;
-        (err as any).available_flows = flows;
-        throw err;
+        // Throw an error with a fairly generic description, but with more
+        // information such that the app can give a better one if so desired.
+        throw new NoAuthFlowFoundError("No appropriate authentication flow found", requiredStages, flows);
     }
 
     /**

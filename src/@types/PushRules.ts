@@ -90,6 +90,8 @@ export interface ISenderNotificationPermissionCondition
     key: string;
 }
 
+// XXX: custom conditions are possible but always fail, and break the typescript discriminated union so ignore them here
+// IPushRuleCondition<Exclude<string, ConditionKind>> unfortunately does not resolve this at the time of writing.
 export type PushRuleCondition = IEventMatchCondition
     | IContainsDisplayNameCondition
     | IRoomMemberCountCondition
