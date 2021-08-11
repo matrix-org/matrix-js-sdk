@@ -261,7 +261,7 @@ export class CallEventHandler {
         }
 
         // The following events need a call and a peer connection
-        if (!call && !call.hasPeerConnection) {
+        if (!call || !call.hasPeerConnection) {
             logger.warn('Discarding an event, we don't have a call/peerConn', type);
             return;
         }
