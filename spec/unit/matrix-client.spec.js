@@ -270,6 +270,29 @@ describe("MatrixClient", function() {
         expect(tree.room).toBe(mockRoom);
     });
 
+    it("should not get (unstable) file trees if not joined", async () => {
+        const roomId = "!room:example.org";
+        const mockRoom = {
+            getMyMembership: () => "leave", // "not join"
+        };
+        client.getRoom = (getRoomId) => {
+            expect(getRoomId).toEqual(roomId);
+            return mockRoom;
+        };
+        const tree = client.unstableGetFileTreeSpace(roomId);
+        expect(tree).toBeFalsy();
+    });
+
+    it("should not get (unstable) file trees for unknown rooms", async () => {
+        const roomId = "!room:example.org";
+        client.getRoom = (getRoomId) => {
+            expect(getRoomId).toEqual(roomId);
+            return null; // imply unknown
+        };
+        const tree = client.unstableGetFileTreeSpace(roomId);
+        expect(tree).toBeFalsy();
+    });
+
     it("should not get (unstable) file trees with invalid create contents", async () => {
         const roomId = "!room:example.org";
         const mockRoom = {
