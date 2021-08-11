@@ -121,7 +121,7 @@ MatrixHttpApi.prototype = {
     },
 
     /**
-     * Upload content to the Home Server
+     * Upload content to the homeserver
      *
      * @param {object} file The object to upload. On a browser, something that
      *   can be sent to XMLHttpRequest.send (typically a File).  Under node.js,
@@ -393,7 +393,7 @@ MatrixHttpApi.prototype = {
         accessToken,
     ) {
         if (!this.opts.idBaseUrl) {
-            throw new Error("No Identity Server base URL set");
+            throw new Error("No identity server base URL set");
         }
 
         const fullUri = this.opts.idBaseUrl + prefix + path;

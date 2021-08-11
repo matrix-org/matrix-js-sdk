@@ -1,3 +1,19 @@
+/*
+Copyright 2021 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 import { logger } from "../logger";
 import { MatrixEvent } from "../models/event";
 import { EventEmitter } from "events";
@@ -109,8 +125,8 @@ export class EncryptionSetupBuilder {
      * @param {Object} content
      * @return {Promise}
      */
-    public setAccountData(type: string, content: object): Promise<void> {
-        return this.accountDataClientAdapter.setAccountData(type, content);
+    public async setAccountData(type: string, content: object): Promise<void> {
+        await this.accountDataClientAdapter.setAccountData(type, content);
     }
 
     /**
@@ -284,7 +300,7 @@ class AccountDataClientAdapter extends EventEmitter {
      * @param {Object} content
      * @return {Promise}
      */
-    public setAccountData(type: string, content: any): Promise<void> {
+    public setAccountData(type: string, content: any): Promise<{}> {
         const lastEvent = this.values.get(type);
         this.values.set(type, content);
         // ensure accountData is emitted on the next tick,
@@ -293,6 +309,7 @@ class AccountDataClientAdapter extends EventEmitter {
         return Promise.resolve().then(() => {
             const event = new MatrixEvent({ type, content });
             this.emit("accountData", event, lastEvent);
+            return {};
         });
     }
 }

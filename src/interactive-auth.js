@@ -217,7 +217,7 @@ InteractiveAuth.prototype = {
 
     /**
      * get the client secret used for validation sessions
-     * with the ID server.
+     * with the identity server.
      *
      * @return {string} client secret
      */

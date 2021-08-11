@@ -78,7 +78,7 @@ export enum RoomKeyRequestState {
 export class OutgoingRoomKeyRequestManager {
     // handle for the delayed call to sendOutgoingRoomKeyRequests. Non-null
     // if the callback has been set, or if it is still running.
-    private sendOutgoingRoomKeyRequestsTimer: NodeJS.Timeout = null;
+    private sendOutgoingRoomKeyRequestsTimer: number = null;
 
     // sanity check to ensure that we don't end up with two concurrent runs
     // of sendOutgoingRoomKeyRequests
@@ -366,7 +366,7 @@ export class OutgoingRoomKeyRequestManager {
             });
         };
 
-        this.sendOutgoingRoomKeyRequestsTimer = global.setTimeout(
+        this.sendOutgoingRoomKeyRequestsTimer = setTimeout(
             startSendingOutgoingRoomKeyRequests,
             SEND_KEY_REQUESTS_DELAY_MS,
         );

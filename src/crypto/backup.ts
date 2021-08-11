@@ -31,7 +31,7 @@ import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { encodeRecoveryKey } from './recoverykey';
 import { encryptAES, decryptAES, calculateKeyCheck } from './aes';
 import { getCrypto } from '../utils';
-import { ICurve25519AuthData, IAes256AuthData, IKeyBackupInfo } from "./keybackup";
+import { ICurve25519AuthData, IAes256AuthData, IKeyBackupInfo, IKeyBackupSession } from "./keybackup";
 import { UnstableValue } from "../NamespacedValue";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
@@ -85,10 +85,20 @@ interface BackupAlgorithmClass {
 interface BackupAlgorithm {
     untrusted: boolean;
     encryptSession(data: Record<string, any>): Promise<any>;
-    decryptSessions(ciphertexts: Record<string, any>): Promise<Record<string, any>[]>;
+    decryptSessions(ciphertexts: Record<string, IKeyBackupSession>): Promise<Record<string, any>[]>;
     authData: AuthData;
     keyMatches(key: ArrayLike<number>): Promise<boolean>;
     free(): void;
+}
+
+export interface IKeyBackup {
+    rooms: {
+        [roomId: string]: {
+            sessions: {
+                [sessionId: string]: IKeyBackupSession;
+            };
+        };
+    };
 }
 
 /**
@@ -464,11 +474,11 @@ export class BackupManager {
         let remaining = await this.baseApis.crypto.cryptoStore.countSessionsNeedingBackup();
         this.baseApis.crypto.emit("crypto.keyBackupSessionsRemaining", remaining);
 
-        const data = {};
+        const rooms: IKeyBackup["rooms"] = {};
         for (const session of sessions) {
             const roomId = session.sessionData.room_id;
-            if (data[roomId] === undefined) {
-                data[roomId] = { sessions: {} };
+            if (rooms[roomId] === undefined) {
+                rooms[roomId] = { sessions: {} };
             }
 
             const sessionData = await this.baseApis.crypto.olmDevice.exportInboundGroupSession(
@@ -487,7 +497,7 @@ export class BackupManager {
             );
             const verified = this.baseApis.crypto.checkDeviceInfoTrust(userId, device).isVerified();
 
-            data[roomId]['sessions'][session.sessionId] = {
+            rooms[roomId]['sessions'][session.sessionId] = {
                 first_message_index: sessionData.first_known_index,
                 forwarded_count: forwardedCount,
                 is_verified: verified,
@@ -495,10 +505,7 @@ export class BackupManager {
             };
         }
 
-        await this.baseApis.sendKeyBackup(
-            undefined, undefined, this.backupInfo.version,
-            { rooms: data },
-        );
+        await this.baseApis.sendKeyBackup(undefined, undefined, this.backupInfo.version, { rooms });
 
         await this.baseApis.crypto.cryptoStore.unmarkSessionsNeedingBackup(sessions);
         remaining = await this.baseApis.crypto.cryptoStore.countSessionsNeedingBackup();
@@ -636,7 +643,9 @@ export class Curve25519 implements BackupAlgorithm {
         return this.publicKey.encrypt(JSON.stringify(plainText));
     }
 
-    public async decryptSessions(sessions: Record<string, Record<string, any>>): Promise<Record<string, any>[]> {
+    public async decryptSessions(
+        sessions: Record<string, IKeyBackupSession>,
+    ): Promise<Record<string, any>[]> {
         const privKey = await this.getKey();
         const decryption = new global.Olm.PkDecryption();
         try {
@@ -766,14 +775,12 @@ export class Aes256 implements BackupAlgorithm {
         return await encryptAES(JSON.stringify(plainText), this.key, data.session_id);
     }
 
-    async decryptSessions(sessions: Record<string, any>): Promise<Record<string, any>[]> {
+    async decryptSessions(sessions: Record<string, IKeyBackupSession>): Promise<Record<string, any>[]> {
         const keys = [];
 
         for (const [sessionId, sessionData] of Object.entries(sessions)) {
             try {
-                const decrypted = JSON.parse(await decryptAES(
-                    sessionData.session_data, this.key, sessionId,
-                ));
+                const decrypted = JSON.parse(await decryptAES(sessionData.session_data, this.key, sessionId));
                 decrypted.session_id = sessionId;
                 keys.push(decrypted);
             } catch (e) {

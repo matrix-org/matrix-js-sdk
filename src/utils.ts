@@ -464,7 +464,7 @@ export async function promiseMapSeries<T>(
     }
 }
 
-export function promiseTry<T>(fn: () => T): Promise<T> {
+export function promiseTry<T>(fn: () => T | Promise<T>): Promise<T> {
     return new Promise((resolve) => resolve(fn()));
 }
 

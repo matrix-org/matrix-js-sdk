@@ -24,6 +24,7 @@ export interface IKeyBackupSession {
         ciphertext: string;
         ephemeral: string;
         mac: string;
+        iv: string;
     };
 }
 

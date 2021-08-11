@@ -20,6 +20,12 @@ import "@matrix-org/olm";
 export {};
 
 declare global {
+    // use `number` as the return type in all cases for global.set{Interval,Timeout},
+    // so we don't accidentally use the methods on NodeJS.Timeout - they only exist in a subset of environments.
+    // The overload for clear{Interval,Timeout} is resolved as expected.
+    function setInterval(handler: TimerHandler, timeout: number, ...arguments: any[]): number;
+    function setTimeout(handler: TimerHandler, timeout: number, ...arguments: any[]): number;
+
     namespace NodeJS {
         interface Global {
             localStorage: Storage;
