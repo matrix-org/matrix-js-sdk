@@ -237,6 +237,7 @@ describe("MatrixClient", function() {
     it("should get (unstable) file trees with valid state", async () => {
         const roomId = "!room:example.org";
         const mockRoom = {
+            getMyMembership: () => "join",
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
                     if (eventType === EventType.RoomCreate) {
@@ -270,9 +271,33 @@ describe("MatrixClient", function() {
         expect(tree.room).toBe(mockRoom);
     });
 
+    it("should not get (unstable) file trees if not joined", async () => {
+        const roomId = "!room:example.org";
+        const mockRoom = {
+            getMyMembership: () => "leave", // "not join"
+        };
+        client.getRoom = (getRoomId) => {
+            expect(getRoomId).toEqual(roomId);
+            return mockRoom;
+        };
+        const tree = client.unstableGetFileTreeSpace(roomId);
+        expect(tree).toBeFalsy();
+    });
+
+    it("should not get (unstable) file trees for unknown rooms", async () => {
+        const roomId = "!room:example.org";
+        client.getRoom = (getRoomId) => {
+            expect(getRoomId).toEqual(roomId);
+            return null; // imply unknown
+        };
+        const tree = client.unstableGetFileTreeSpace(roomId);
+        expect(tree).toBeFalsy();
+    });
+
     it("should not get (unstable) file trees with invalid create contents", async () => {
         const roomId = "!room:example.org";
         const mockRoom = {
+            getMyMembership: () => "join",
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
                     if (eventType === EventType.RoomCreate) {
@@ -307,6 +332,7 @@ describe("MatrixClient", function() {
     it("should not get (unstable) file trees with invalid purpose/subtype contents", async () => {
         const roomId = "!room:example.org";
         const mockRoom = {
+            getMyMembership: () => "join",
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
                     if (eventType === EventType.RoomCreate) {

@@ -8060,7 +8060,7 @@ export class MatrixClient extends EventEmitter {
      */
     public unstableGetFileTreeSpace(roomId: string): MSC3089TreeSpace {
         const room = this.getRoom(roomId);
-        if (!room) return null;
+        if (room?.getMyMembership() !== 'join') return null;
 
         const createEvent = room.currentState.getStateEvents(EventType.RoomCreate, "");
         const purposeEvent = room.currentState.getStateEvents(
