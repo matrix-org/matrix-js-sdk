@@ -36,22 +36,9 @@ export class RoomHierarchy {
     private serverSupportError?: Error;
 
     /**
-     * Construct a new EventTimeline
+     * Construct a new RoomHierarchy
      *
-     * TODO
-     * <p>An EventTimeline represents a contiguous sequence of events in a room.
-     *
-     * <p>As well as keeping track of the events themselves, it stores the state of
-     * the room at the beginning and end of the timeline, and pagination tokens for
-     * going backwards and forwards in the timeline.
-     *
-     * <p>In order that clients can meaningfully maintain an index into a timeline,
-     * the EventTimeline object tracks a 'baseIndex'. This starts at zero, but is
-     * incremented when events are prepended to the timeline. The index of an event
-     * relative to baseIndex therefore remains constant.
-     *
-     * <p>Once a timeline joins up with its neighbour, they are linked together into a
-     * doubly-linked list.
+     * A RoomHierarchy instance allows you to easily make use of the /hierarchy API and paginate it.
      *
      * @param {Room} root the root of this hierarchy
      * @param {number} pageSize the maximum number of rooms to return per page, can be overridden per load request.
@@ -96,7 +83,7 @@ export class RoomHierarchy {
             if (e.errcode === "M_UNRECOGNIZED") {
                 this.serverSupportError = e;
             } else {
-                // TODO retry?
+                throw e;
             }
 
             return [];
@@ -145,6 +132,7 @@ export class RoomHierarchy {
         return this.getRelation(parentId, childId)?.content.suggested;
     }
 
+    // locally remove a relation as a form of local echo
     public removeRelation(parentId: string, childId: string): void {
         const backRefs = this.backRefs.get(childId);
         if (backRefs?.length === 1) {
