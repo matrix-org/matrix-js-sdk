@@ -237,6 +237,7 @@ describe("MatrixClient", function() {
     it("should get (unstable) file trees with valid state", async () => {
         const roomId = "!room:example.org";
         const mockRoom = {
+            getMyMembership: () => "join",
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
                     if (eventType === EventType.RoomCreate) {
@@ -296,6 +297,7 @@ describe("MatrixClient", function() {
     it("should not get (unstable) file trees with invalid create contents", async () => {
         const roomId = "!room:example.org";
         const mockRoom = {
+            getMyMembership: () => "join",
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
                     if (eventType === EventType.RoomCreate) {
@@ -330,6 +332,7 @@ describe("MatrixClient", function() {
     it("should not get (unstable) file trees with invalid purpose/subtype contents", async () => {
         const roomId = "!room:example.org";
         const mockRoom = {
+            getMyMembership: () => "join",
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
                     if (eventType === EventType.RoomCreate) {
