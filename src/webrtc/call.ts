@@ -1645,10 +1645,10 @@ export class MatrixCall extends EventEmitter {
         // rate limits in Matrix.
         // In practice, it'd be better to remove rate limits for m.call.*
 
-	// N.B. this deliberately lets you queue and send blank candidates, which MSC2746
-	// currently proposes as the way to indicate that candidate gathering is complete.
-	// This will hopefully be changed to an explicit rather than implicit notification
-	// shortly.
+        // N.B. this deliberately lets you queue and send blank candidates, which MSC2746
+        // currently proposes as the way to indicate that candidate gathering is complete.
+        // This will hopefully be changed to an explicit rather than implicit notification
+        // shortly.
         this.candidateSendQueue.push(content);
 
         // Don't send the ICE candidates yet if the call is in the ringing state: this
