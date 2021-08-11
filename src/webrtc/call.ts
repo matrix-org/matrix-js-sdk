@@ -1936,7 +1936,7 @@ export class MatrixCall extends EventEmitter {
         }
     }
 
-    get hasPeerConnection() {
+    public get hasPeerConnection() {
         return Boolean(this.peerConn);
     }
 }
