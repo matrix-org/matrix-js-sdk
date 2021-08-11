@@ -62,7 +62,7 @@ log.methodFactory = function(methodName, logLevel, loggerName) {
 export const logger: PrefixedLogger = log.getLogger(DEFAULT_NAMESPACE);
 logger.setLevel(log.levels.DEBUG);
 
-interface PrefixedLogger extends Logger {
+export interface PrefixedLogger extends Logger {
     withPrefix?: (prefix: string) => PrefixedLogger;
     prefix?: string;
 }

@@ -208,7 +208,7 @@ export class User extends EventEmitter {
      * @param {MatrixEvent} event The <code>im.vector.user_status</code> event.
      * @fires module:client~MatrixClient#event:"User.unstable_statusMessage"
      */
-    // eslint-disable-next-line camelcase
+    // eslint-disable-next-line
     public unstable_updateStatusMessage(event: MatrixEvent): void {
         if (!event.getContent()) this.unstable_statusMessage = "";
         else this.unstable_statusMessage = event.getContent()["status"];

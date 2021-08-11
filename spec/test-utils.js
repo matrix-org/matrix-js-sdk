@@ -91,7 +91,7 @@ export function mkEvent(opts) {
         event.state_key = opts.skey;
     } else if (["m.room.name", "m.room.topic", "m.room.create", "m.room.join_rules",
          "m.room.power_levels", "m.room.topic",
-         "com.example.state"].indexOf(opts.type) !== -1) {
+         "com.example.state"].includes(opts.type)) {
         event.state_key = "";
     }
     return opts.event ? new MatrixEvent(event) : event;

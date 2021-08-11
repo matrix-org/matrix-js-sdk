@@ -47,12 +47,12 @@ export class CallEventHandler {
 
     public start() {
         this.client.on("sync", this.evaluateEventBuffer);
-        this.client.on("event", this.onEvent);
+        this.client.on("Room.timeline", this.onRoomTimeline);
     }
 
     public stop() {
         this.client.removeListener("sync", this.evaluateEventBuffer);
-        this.client.removeListener("event", this.onEvent);
+        this.client.removeListener("Room.timeline", this.onRoomTimeline);
     }
 
     private evaluateEventBuffer = async () => {
@@ -89,7 +89,7 @@ export class CallEventHandler {
         }
     };
 
-    private onEvent = (event: MatrixEvent) => {
+    private onRoomTimeline = (event: MatrixEvent) => {
         this.client.decryptEventIfNeeded(event);
         // any call events or ones that might be once they're decrypted
         if (this.eventIsACall(event) || event.isBeingDecrypted()) {
@@ -130,21 +130,19 @@ export class CallEventHandler {
 
     private handleCallEvent(event: MatrixEvent) {
         const content = event.getContent();
+        const type = event.getType() as EventType;
+        const weSentTheEvent = event.getSender() === this.client.credentials.userId;
         let call = content.call_id ? this.calls.get(content.call_id) : undefined;
-        //console.info("RECV %s content=%s", event.getType(), JSON.stringify(content));
+        //console.info("RECV %s content=%s", type, JSON.stringify(content));
 
-        if (event.getType() === EventType.CallInvite) {
-            if (event.getSender() === this.client.credentials.userId) {
-                return; // ignore invites you send
-            }
+        if (type === EventType.CallInvite) {
+            // ignore invites you send
+            if (weSentTheEvent) return;
+            // expired call
+            if (event.getLocalAge() > content.lifetime - RING_GRACE_PERIOD) return;
+            // stale/old invite event
+            if (call && call.state === CallState.Ended) return;
 
-            if (event.getLocalAge() > content.lifetime - RING_GRACE_PERIOD) {
-                return; // expired call
-            }
-
-            if (call && call.state === CallState.Ended) {
-                return; // stale/old invite event
-            }
             if (call) {
                 logger.log(
                     `WARN: Already have a MatrixCall with id ${content.call_id} but got an ` +
@@ -158,9 +156,11 @@ export class CallEventHandler {
 
             const timeUntilTurnCresExpire = this.client.getTurnServersExpiry() - Date.now();
             logger.info("Current turn creds expire in " + timeUntilTurnCresExpire + " ms");
-            call = createNewMatrixCall(this.client, event.getRoomId(), {
-                forceTURN: this.client.forceTURN,
-            });
+            call = createNewMatrixCall(
+                this.client,
+                event.getRoomId(),
+                { forceTURN: this.client.forceTURN },
+            );
             if (!call) {
                 logger.log(
                     "Incoming call ID " + content.call_id + " but this client " +
@@ -227,21 +227,9 @@ export class CallEventHandler {
                     this.client.emit("Call.incoming", call);
                 });
             }
-        } else if (event.getType() === EventType.CallAnswer) {
-            if (!call) {
-                return;
-            }
-            if (event.getSender() === this.client.credentials.userId) {
-                if (call.state === CallState.Ringing) {
-                    call.onAnsweredElsewhere(content);
-                }
-            } else {
-                call.onAnswerReceived(event);
-            }
-        } else if (event.getType() === EventType.CallCandidates) {
-            if (event.getSender() === this.client.credentials.userId) {
-                return;
-            }
+        } else if (type === EventType.CallCandidates) {
+            if (weSentTheEvent) return;
+
             if (!call) {
                 // store the candidates; we may get a call eventually.
                 if (!this.candidateEventsByCall.has(content.call_id)) {
@@ -251,7 +239,7 @@ export class CallEventHandler {
             } else {
                 call.onRemoteIceCandidatesReceived(event);
             }
-        } else if ([EventType.CallHangup, EventType.CallReject].includes(event.getType() as EventType)) {
+        } else if ([EventType.CallHangup, EventType.CallReject].includes(type)) {
             // Note that we also observe our own hangups here so we can see
             // if we've already rejected a call that would otherwise be valid
             if (!call) {
@@ -266,7 +254,7 @@ export class CallEventHandler {
                 }
             } else {
                 if (call.state !== CallState.Ended) {
-                    if (event.getType() === EventType.CallHangup) {
+                    if (type === EventType.CallHangup) {
                         call.onHangupReceived(content);
                     } else {
                         call.onRejectReceived(content);
@@ -274,36 +262,40 @@ export class CallEventHandler {
                     this.calls.delete(content.call_id);
                 }
             }
-        } else if (event.getType() === EventType.CallSelectAnswer) {
-            if (!call) return;
+        }
 
-            if (event.getContent().party_id === call.ourPartyId) {
-                // Ignore remote echo
-                return;
-            }
+        // The following events need a call
+        if (!call) return;
+        // Ignore remote echo
+        if (event.getContent().party_id === call.ourPartyId) return;
 
-            call.onSelectAnswerReceived(event);
-        } else if (event.getType() === EventType.CallNegotiate) {
-            if (!call) return;
+        switch (type) {
+            case EventType.CallAnswer:
+                if (weSentTheEvent) {
+                    if (call.state === CallState.Ringing) {
+                        call.onAnsweredElsewhere(content);
+                    }
+                } else {
+                    call.onAnswerReceived(event);
+                }
+                break;
+            case EventType.CallSelectAnswer:
+                call.onSelectAnswerReceived(event);
+                break;
 
-            if (event.getContent().party_id === call.ourPartyId) {
-                // Ignore remote echo
-                return;
-            }
+            case EventType.CallNegotiate:
+                call.onNegotiateReceived(event);
+                break;
 
-            call.onNegotiateReceived(event);
-        } else if (
-            event.getType() === EventType.CallAssertedIdentity ||
-            event.getType() === EventType.CallAssertedIdentityPrefix
-        ) {
-            if (!call) return;
+            case EventType.CallAssertedIdentity:
+            case EventType.CallAssertedIdentityPrefix:
+                call.onAssertedIdentityReceived(event);
+                break;
 
-            if (event.getContent().party_id === call.ourPartyId) {
-                // Ignore remote echo (not that we send asserted identity, but still...)
-                return;
-            }
-
-            call.onAssertedIdentityReceived(event);
+            case EventType.CallSDPStreamMetadataChanged:
+            case EventType.CallSDPStreamMetadataChangedPrefix:
+                call.onSDPStreamMetadataChangedReceived(event);
+                break;
         }
     }
 }

@@ -185,7 +185,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
                 def.reject(error);
             }
         } else {
-            logger.warn("Unrecognised message from worker: " + msg);
+            logger.warn("Unrecognised message from worker: ", msg);
         }
     };
 }

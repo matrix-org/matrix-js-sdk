@@ -949,7 +949,7 @@ OlmDevice.prototype.getOutboundGroupSessionKey = function(sessionId) {
  * data stored in the session store about an inbound group session
  *
  * @typedef {Object} InboundGroupSessionData
- * @property {string} room_Id
+ * @property {string} room_id
  * @property {string} session   pickled Olm.InboundGroupSession
  * @property {Object<string, string>} keysClaimed
  * @property {Array<string>} forwardingCurve25519KeyChain  Devices involved in forwarding

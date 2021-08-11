@@ -194,6 +194,28 @@ export class MSC3089TreeSpace {
     }
 
     /**
+     * Gets the current permissions of a user. Note that any users missing explicit permissions (or not
+     * in the space) will be considered Viewers. Appropriate membership checks need to be performed
+     * elsewhere.
+     * @param {string} userId The user ID to check permissions of.
+     * @returns {TreePermissions} The permissions for the user, defaulting to Viewer.
+     */
+    public getPermissions(userId: string): TreePermissions {
+        const currentPls = this.room.currentState.getStateEvents(EventType.RoomPowerLevels, "");
+        if (Array.isArray(currentPls)) throw new Error("Unexpected return type for power levels");
+
+        const pls = currentPls.getContent() || {};
+        const viewLevel = pls['users_default'] || 0;
+        const editLevel = pls['events_default'] || 50;
+        const adminLevel = pls['events']?.[EventType.RoomPowerLevels] || 100;
+
+        const userLevel = pls['users']?.[userId] || viewLevel;
+        if (userLevel >= adminLevel) return TreePermissions.Owner;
+        if (userLevel >= editLevel) return TreePermissions.Editor;
+        return TreePermissions.Viewer;
+    }
+
+    /**
      * Creates a directory under this tree space, represented as another tree space.
      * @param {string} name The name for the directory.
      * @returns {Promise<MSC3089TreeSpace>} Resolves to the created directory.

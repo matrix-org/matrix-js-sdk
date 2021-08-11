@@ -1025,4 +1025,68 @@ describe("megolm", function() {
             });
         });
     });
+
+    it("Alice can decrypt a message with falsey content", function() {
+        return aliceTestClient.start().then(() => {
+            return createOlmSession(testOlmAccount, aliceTestClient);
+        }).then((p2pSession) => {
+            const groupSession = new Olm.OutboundGroupSession();
+            groupSession.create();
+
+            // make the room_key event
+            const roomKeyEncrypted = encryptGroupSessionKey({
+                senderKey: testSenderKey,
+                recipient: aliceTestClient,
+                p2pSession: p2pSession,
+                groupSession: groupSession,
+                room_id: ROOM_ID,
+            });
+
+            const plaintext = {
+                type: "m.room.message",
+                content: undefined,
+                room_id: ROOM_ID,
+            };
+
+            const messageEncrypted = {
+                event_id: 'test_megolm_event',
+                content: {
+                    algorithm: "m.megolm.v1.aes-sha2",
+                    ciphertext: groupSession.encrypt(JSON.stringify(plaintext)),
+                    device_id: "testDevice",
+                    sender_key: testSenderKey,
+                    session_id: groupSession.session_id(),
+                },
+                type: "m.room.encrypted",
+            };
+
+            // Alice gets both the events in a single sync
+            const syncResponse = {
+                next_batch: 1,
+                to_device: {
+                    events: [roomKeyEncrypted],
+                },
+                rooms: {
+                    join: {},
+                },
+            };
+            syncResponse.rooms.join[ROOM_ID] = {
+                timeline: {
+                    events: [messageEncrypted],
+                },
+            };
+
+            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
+            return aliceTestClient.flushSync();
+        }).then(function() {
+            const room = aliceTestClient.client.getRoom(ROOM_ID);
+            const event = room.getLiveTimeline().getEvents()[0];
+            expect(event.isEncrypted()).toBe(true);
+            return testUtils.awaitDecryption(event);
+        }).then((event) => {
+            expect(event.getRoomId()).toEqual(ROOM_ID);
+            expect(event.getContent()).toEqual({});
+            expect(event.getClearContent()).toBeUndefined();
+        });
+    });
 });

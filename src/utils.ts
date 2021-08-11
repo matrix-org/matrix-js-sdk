@@ -31,15 +31,28 @@ import type NodeCrypto from "crypto";
  * @return {string} The encoded string e.g. foo=bar&baz=taz
  */
 export function encodeParams(params: Record<string, string>): string {
-    let qs = "";
-    for (const key in params) {
-        if (!params.hasOwnProperty(key)) {
-            continue;
-        }
-        qs += "&" + encodeURIComponent(key) + "=" +
-                encodeURIComponent(params[key]);
+    return new URLSearchParams(params).toString();
+}
+
+export type QueryDict = Record<string, string | string[]>;
+
+/**
+ * Decode a query string in `application/x-www-form-urlencoded` format.
+ * @param {string} query A query string to decode e.g.
+ * foo=bar&via=server1&server2
+ * @return {Object} The decoded object, if any keys occurred multiple times
+ * then the value will be an array of strings, else it will be an array.
+ * This behaviour matches Node's qs.parse but is built on URLSearchParams
+ * for native web compatibility
+ */
+export function decodeParams(query: string): QueryDict {
+    const o: QueryDict = {};
+    const params = new URLSearchParams(query);
+    for (const key of params.keys()) {
+        const val = params.getAll(key);
+        o[key] = val.length === 1 ? val[0] : val;
     }
-    return qs.substring(1);
+    return o;
 }
 
 /**
@@ -116,10 +129,10 @@ export function isFunction(value: any) {
  * @throws If the object is missing keys.
  */
 // note using 'keys' here would shadow the 'keys' function defined above
-export function checkObjectHasKeys(obj: object, keys_: string[]) {
-    for (let i = 0; i < keys_.length; i++) {
-        if (!obj.hasOwnProperty(keys_[i])) {
-            throw new Error("Missing required key: " + keys_[i]);
+export function checkObjectHasKeys(obj: object, keys: string[]) {
+    for (let i = 0; i < keys.length; i++) {
+        if (!obj.hasOwnProperty(keys[i])) {
+            throw new Error("Missing required key: " + keys[i]);
         }
     }
 }
@@ -389,10 +402,11 @@ export function normalize(str: string): string {
 // various width spaces U+2000 - U+200D
 // LTR and RTL marks U+200E and U+200F
 // LTR/RTL and other directional formatting marks U+202A - U+202F
+// Arabic Letter RTL mark U+061C
 // Combining characters U+0300 - U+036F
 // Zero width no-break space (BOM) U+FEFF
 // eslint-disable-next-line no-misleading-character-class
-const removeHiddenCharsRegex = /[\u2000-\u200F\u202A-\u202F\u0300-\u036f\uFEFF\s]/g;
+const removeHiddenCharsRegex = /[\u2000-\u200F\u202A-\u202F\u0300-\u036F\uFEFF\u061C\s]/g;
 
 export function escapeRegExp(string: string): string {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -669,4 +683,36 @@ export function lexicographicCompare(a: string, b: string): number {
     // Dev note: this exists because I'm sad that you can use math operators on strings, so I've
     // hidden the operation in this function.
     return (a < b) ? -1 : ((a === b) ? 0 : 1);
+}
+
+const collator = new Intl.Collator();
+/**
+ * Performant language-sensitive string comparison
+ * @param a the first string to compare
+ * @param b the second string to compare
+ */
+export function compare(a: string, b: string): number {
+    return collator.compare(a, b);
+}
+
+/**
+ * This function is similar to Object.assign() but it assigns recursively and
+ * allows you to ignore nullish values from the source
+ *
+ * @param {Object} target
+ * @param {Object} source
+ * @returns the target object
+ */
+export function recursivelyAssign(target: Object, source: Object, ignoreNullish = false): any {
+    for (const [sourceKey, sourceValue] of Object.entries(source)) {
+        if (target[sourceKey] instanceof Object && sourceValue) {
+            recursivelyAssign(target[sourceKey], sourceValue);
+            continue;
+        }
+        if ((sourceValue !== null && sourceValue !== undefined) || !ignoreNullish) {
+            target[sourceKey] = sourceValue;
+            continue;
+        }
+    }
+    return target;
 }

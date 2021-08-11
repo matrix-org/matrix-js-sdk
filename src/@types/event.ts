@@ -53,6 +53,8 @@ export enum EventType {
     CallReject = "m.call.reject",
     CallSelectAnswer = "m.call.select_answer",
     CallNegotiate = "m.call.negotiate",
+    CallSDPStreamMetadataChanged = "m.call.sdp_stream_metadata_changed",
+    CallSDPStreamMetadataChangedPrefix = "org.matrix.call.sdp_stream_metadata_changed",
     CallReplaces = "m.call.replaces",
     CallAssertedIdentity = "m.call.asserted_identity",
     CallAssertedIdentityPrefix = "org.matrix.call.asserted_identity",
@@ -143,6 +145,28 @@ export const UNSTABLE_MSC3089_LEAF = new UnstableValue("m.leaf", "org.matrix.msc
  * UNSTABLE and subject to breaking changes, including its eventual removal.
  */
 export const UNSTABLE_MSC3089_BRANCH = new UnstableValue("m.branch", "org.matrix.msc3089.branch");
+
+/**
+ * Functional members type for declaring a purpose of room members (e.g. helpful bots).
+ * Note that this reference is UNSTABLE and subject to breaking changes, including its
+ * eventual removal.
+ *
+ * Schema (TypeScript):
+ * {
+ *   service_members?: string[]
+ * }
+ *
+ * Example:
+ * {
+ *   "service_members": [
+ *     "@helperbot:localhost",
+ *     "@reminderbot:alice.tdl"
+ *   ]
+ * }
+ */
+export const UNSTABLE_ELEMENT_FUNCTIONAL_USERS = new UnstableValue(
+    "io.element.functional_members",
+    "io.element.functional_members");
 
 export interface IEncryptedFile {
     url: string;

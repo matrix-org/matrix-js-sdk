@@ -152,7 +152,7 @@ export class MatrixEvent extends EventEmitter {
     private _replacingEvent: MatrixEvent = null;
     private _localRedactionEvent: MatrixEvent = null;
     private _isCancelled = false;
-    private clearEvent: Partial<IClearEvent> = {};
+    private clearEvent?: IClearEvent;
 
     /* curve25519 key which we believe belongs to the sender of the event. See
      * getSenderKey()
@@ -295,7 +295,10 @@ export class MatrixEvent extends EventEmitter {
      * @return {string} The event type, e.g. <code>m.room.message</code>
      */
     public getType(): EventType | string {
-        return this.clearEvent.type || this.event.type;
+        if (this.clearEvent) {
+            return this.clearEvent.type;
+        }
+        return this.event.type;
     }
 
     /**
@@ -344,7 +347,10 @@ export class MatrixEvent extends EventEmitter {
         if (this._localRedactionEvent) {
             return {} as T;
         }
-        return (this.clearEvent.content || this.event.content || {}) as T;
+        if (this.clearEvent) {
+            return (this.clearEvent.content || {}) as T;
+        }
+        return (this.event.content || {}) as T;
     }
 
     /**
@@ -496,7 +502,7 @@ export class MatrixEvent extends EventEmitter {
     }
 
     public shouldAttemptDecryption() {
-        return this.isEncrypted() && !this.isBeingDecrypted() && this.getClearContent() === null;
+        return this.isEncrypted() && !this.isBeingDecrypted() && !this.clearEvent;
     }
 
     /**
@@ -528,10 +534,7 @@ export class MatrixEvent extends EventEmitter {
             throw new Error("Attempt to decrypt event which isn't encrypted");
         }
 
-        if (
-            this.clearEvent && this.clearEvent.content &&
-            this.clearEvent.content.msgtype !== "m.bad.encrypted"
-        ) {
+        if (this.clearEvent && !this.isDecryptionFailure()) {
             // we may want to just ignore this? let's start with rejecting it.
             throw new Error(
                 "Attempt to decrypt event which has already been decrypted",
@@ -739,8 +742,7 @@ export class MatrixEvent extends EventEmitter {
      * @returns {Object} The cleartext (decrypted) content for the event
      */
     public getClearContent(): IContent | null {
-        const ev = this.clearEvent;
-        return ev && ev.content ? ev.content : null;
+        return this.clearEvent ? this.clearEvent.content : null;
     }
 
     /**
@@ -931,8 +933,8 @@ export class MatrixEvent extends EventEmitter {
     public getRedactionEvent(): object | null {
         if (!this.isRedacted()) return null;
 
-        if (this.clearEvent.unsigned) {
-            return this.clearEvent.unsigned.redacted_because;
+        if (this.clearEvent?.unsigned) {
+            return this.clearEvent?.unsigned.redacted_because;
         } else if (this.event.unsigned.redacted_because) {
             return this.event.unsigned.redacted_because;
         } else {

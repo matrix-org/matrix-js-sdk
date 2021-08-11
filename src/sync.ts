@@ -642,12 +642,12 @@ export class SyncApi {
             // Now wait for the saved sync to finish...
             debuglog("Waiting for saved sync before starting sync processing...");
             await savedSyncPromise;
-            this._sync({ filterId });
+            this.doSync({ filterId });
         };
 
         if (client.isGuest()) {
             // no push rules for guests, no access to POST filter for guests.
-            this._sync({});
+            this.doSync({});
         } else {
             // Pull the saved sync token out first, before the worker starts sending
             // all the sync data which could take a while. This will let us send our
@@ -753,7 +753,7 @@ export class SyncApi {
      * @param {string} syncOptions.filterId
      * @param {boolean} syncOptions.hasSyncedBefore
      */
-    private async _sync(syncOptions: ISyncOptions): Promise<void> {
+    private async doSync(syncOptions: ISyncOptions): Promise<void> {
         const client = this.client;
 
         if (!this.running) {
@@ -850,7 +850,7 @@ export class SyncApi {
         }
 
         // Begin next sync
-        this._sync(syncOptions);
+        this.doSync(syncOptions);
     }
 
     private doSyncRequest(syncOptions: ISyncOptions, syncToken: string): IRequestPromise<ISyncResponse> {
@@ -955,7 +955,7 @@ export class SyncApi {
                     catchingUp: true,
                 });
             }
-            this._sync(syncOptions);
+            this.doSync(syncOptions);
         });
 
         this.currentSyncRequest = null;
