@@ -31,7 +31,7 @@ export class RoomHierarchy {
     // Map from room id to object
     public readonly roomMap = new Map<string, IHierarchyRoom>();
     private loadRequest: ReturnType<MatrixClient["getRoomHierarchy"]>;
-    private nextToken?: string;
+    private nextBatch?: string;
     private _rooms?: IHierarchyRoom[];
     private serverSupportError?: Error;
 
@@ -71,7 +71,7 @@ export class RoomHierarchy {
     }
 
     public get canLoadMore(): boolean {
-        return !!this.serverSupportError || !!this.nextToken || !this._rooms;
+        return !!this.serverSupportError || !!this.nextBatch || !this._rooms;
     }
 
     public get rooms(): IHierarchyRoom[] {
@@ -86,12 +86,12 @@ export class RoomHierarchy {
             pageSize,
             this.maxDepth,
             this.suggestedOnly,
-            this.nextToken,
+            this.nextBatch,
         );
 
         let rooms: IHierarchyRoom[];
         try {
-            ({ rooms, next_token: this.nextToken } = await this.loadRequest);
+            ({ rooms, next_batch: this.nextBatch } = await this.loadRequest);
         } catch (e) {
             if (e.errcode === "M_UNRECOGNIZED") {
                 this.serverSupportError = e;

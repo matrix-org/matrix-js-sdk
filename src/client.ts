@@ -8017,7 +8017,7 @@ export class MatrixClient extends EventEmitter {
      * @param {number?} maxDepth The maximum depth in the tree from the root room to return.
      * @param {boolean?} suggestedOnly Whether to only return rooms with suggested=true.
      * @param {string?} fromToken The opaque token to paginate a previous request.
-     * @returns {Promise} the response, with next_token & rooms fields.
+     * @returns {Promise} the response, with next_batch & rooms fields.
      */
     public getRoomHierarchy(
         roomId: string,
@@ -8027,7 +8027,7 @@ export class MatrixClient extends EventEmitter {
         fromToken?: string,
     ): Promise<{
         rooms: IHierarchyRoom[];
-        next_token?: string; // eslint-disable-line camelcase
+        next_batch?: string; // eslint-disable-line camelcase
     }> {
         const path = utils.encodeUri("/rooms/$roomId/hierarchy", {
             $roomId: roomId,
