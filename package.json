@@ -9,7 +9,7 @@
     "clean": "rimraf lib dist",
     "build": "yarn build:dev && yarn build:compile-browser && yarn build:minify-browser",
     "build:dev": "yarn clean && git rev-parse HEAD > git-revision.txt && yarn build:compile && yarn build:types",
-    "build:types": "tsc --emitDeclarationOnly",
+    "build:types": "tsc -p tsconfig-build.json --emitDeclarationOnly",
     "build:compile": "babel -d lib --verbose --extensions \".ts,.js\" src",
     "build:compile-browser": "mkdirp dist && browserify -d src/browser-index.js -p [ tsify -p ./tsconfig-build.json ] -t [ babelify --sourceMaps=inline --presets [ @babel/preset-env @babel/preset-typescript ] ] | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js",
     "build:minify-browser": "terser dist/browser-matrix.js --compress --mangle --source-map --output dist/browser-matrix.min.js",

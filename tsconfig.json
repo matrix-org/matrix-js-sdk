@@ -1,14 +1,11 @@
 {
   "compilerOptions": {
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
     "esModuleInterop": true,
     "module": "commonjs",
     "moduleResolution": "node",
-    "target": "es2016",
     "noImplicitAny": false,
-    "sourceMap": true,
-    "outDir": "./lib",
+    "noEmit": true,
     "declaration": true
   },
   "include": [
