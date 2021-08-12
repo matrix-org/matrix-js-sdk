@@ -13,12 +13,12 @@ export function InvalidStoreError(reason, value) {
 InvalidStoreError.TOGGLED_LAZY_LOADING = "TOGGLED_LAZY_LOADING";
 
 InvalidStoreError.prototype = Object.create(Error.prototype, {
-  constructor: {
-    value: Error,
-    enumerable: false,
-    writable: true,
-    configurable: true,
-  },
+    constructor: {
+        value: Error,
+        enumerable: false,
+        writable: true,
+        configurable: true,
+    },
 });
 Reflect.setPrototypeOf(InvalidStoreError, Error);
 
@@ -29,24 +29,24 @@ export function InvalidCryptoStoreError(reason) {
     Reflect.setPrototypeOf(instance, Reflect.getPrototypeOf(this));
     instance.reason = reason;
     instance.name = 'InvalidCryptoStoreError';
-    return instance;
 }
 
 InvalidCryptoStoreError.TOO_NEW = "TOO_NEW";
 
 InvalidCryptoStoreError.prototype = Object.create(Error.prototype, {
-  constructor: {
-    value: Error,
-    enumerable: false,
-    writable: true,
-    configurable: true,
-  },
+    constructor: {
+        value: Error,
+        enumerable: false,
+        writable: true,
+        configurable: true,
+    },
 });
 Reflect.setPrototypeOf(InvalidCryptoStoreError, Error);
 
 export class KeySignatureUploadError extends Error {
-  constructor(message, value) {
-    super(message);
-    this.value = value;
-  }
+    value: any;
+    constructor(message, value) {
+        super(message);
+        this.value = value;
+    }
 }
