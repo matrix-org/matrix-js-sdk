@@ -4,7 +4,6 @@
     "sourceMap": true,
     "noEmit": false,
     "emitDecoratorMetadata": true,
-    "target": "es2016",
     "outDir": "./lib",
     "rootDir": "src"
   },
