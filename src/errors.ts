@@ -7,7 +7,6 @@ export function InvalidStoreError(reason, value) {
     Reflect.setPrototypeOf(instance, Reflect.getPrototypeOf(this));
     instance.reason = reason;
     instance.value = value;
-    return instance;
 }
 
 InvalidStoreError.TOGGLED_LAZY_LOADING = "TOGGLED_LAZY_LOADING";
