@@ -1,3 +1,9 @@
+Changes in [12.3.0-rc.2](https://github.com/vector-im/element-desktop/releases/tag/v12.3.0-rc.2) (2021-07-12)
+=============================================================================================================
+
+## 🐛 Bug Fixes
+ * Fix the types in shipped package ([\#1842](https://github.com/matrix-org/matrix-js-sdk/pull/1842)). Fixes vector-im/element-web#18503 and vector-im/element-web#18503.
+
 Changes in [12.3.0-rc.1](https://github.com/vector-im/element-desktop/releases/tag/v12.3.0-rc.1) (2021-07-11)
 =============================================================================================================
 
