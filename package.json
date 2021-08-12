@@ -1,6 +1,6 @@
 {
   "name": "matrix-js-sdk",
-  "version": "12.1.0",
+  "version": "12.2.0",
   "description": "Matrix Client-Server SDK for Javascript",
   "scripts": {
     "prepublishOnly": "yarn build",
@@ -11,7 +11,7 @@
     "build:dev": "yarn clean && git rev-parse HEAD > git-revision.txt && yarn build:compile && yarn build:types",
     "build:types": "tsc --emitDeclarationOnly",
     "build:compile": "babel -d lib --verbose --extensions \".ts,.js\" src",
-    "build:compile-browser": "mkdirp dist && browserify -d src/browser-index.js -p [ tsify -p ./tsconfig.json ] -t [ babelify --sourceMaps=inline --presets [ @babel/preset-env @babel/preset-typescript ] ] | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js",
+    "build:compile-browser": "mkdirp dist && browserify -d src/browser-index.js -p [ tsify -p ./tsconfig-build.json ] -t [ babelify --sourceMaps=inline --presets [ @babel/preset-env @babel/preset-typescript ] ] | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js",
     "build:minify-browser": "terser dist/browser-matrix.js --compress --mangle --source-map --output dist/browser-matrix.min.js",
     "gendoc": "jsdoc -c jsdoc.json -P package.json",
     "lint": "yarn lint:types && yarn lint:js",
@@ -81,6 +81,7 @@
     "@types/request": "^2.48.5",
     "@typescript-eslint/eslint-plugin": "^4.17.0",
     "@typescript-eslint/parser": "^4.17.0",
+    "allchange": "github:matrix-org/allchange",
     "babel-jest": "^26.6.3",
     "babelify": "^10.0.0",
     "better-docs": "^2.4.0-beta.9",
@@ -88,7 +89,7 @@
     "docdash": "^1.2.0",
     "eslint": "7.18.0",
     "eslint-config-google": "^0.14.0",
-    "eslint-plugin-matrix-org": "github:matrix-org/eslint-plugin-matrix-org#main",
+    "eslint-plugin-matrix-org": "github:matrix-org/eslint-plugin-matrix-org#2306b3d4da4eba908b256014b979f1d3d43d2945",
     "exorcist": "^1.0.1",
     "fake-indexeddb": "^3.1.2",
     "jest": "^26.6.3",

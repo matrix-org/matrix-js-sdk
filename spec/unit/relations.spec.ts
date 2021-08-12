@@ -16,11 +16,13 @@ limitations under the License.
 
 import { EventTimelineSet } from "../../src/models/event-timeline-set";
 import { MatrixEvent } from "../../src/models/event";
+import { Room } from "../../src/models/room";
 import { Relations } from "../../src/models/relations";
 
 describe("Relations", function() {
     it("should deduplicate annotations", function() {
-        const relations = new Relations("m.annotation", "m.reaction");
+        const room = new Room("room123", null, null);
+        const relations = new Relations("m.annotation", "m.reaction", room);
 
         // Create an instance of an annotation
         const eventData = {
@@ -95,10 +97,8 @@ describe("Relations", function() {
         });
 
         // Stub the room
-        const room = {
-            getPendingEvent() { return null; },
-            getUnfilteredTimelineSet() { return null; },
-        };
+
+        const room = new Room("room123", null, null);
 
         // Add the target event first, then the relation event
         {

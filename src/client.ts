@@ -5184,11 +5184,11 @@ export class MatrixClient extends EventEmitter {
      * The operation also updates MatrixClient.pushRules at the end.
      * @param {string} scope "global" or device-specific.
      * @param {string} roomId the id of the room.
-     * @param {string} mute the mute state.
+     * @param {boolean} mute the mute state.
      * @return {Promise} Resolves: result object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setRoomMutePushRule(scope: string, roomId: string, mute: string): Promise<void> | void {
+    public setRoomMutePushRule(scope: string, roomId: string, mute: boolean): Promise<void> | void {
         let deferred;
         let hasDontNotifyRule;
 
@@ -8115,7 +8115,7 @@ export class MatrixClient extends EventEmitter {
      */
     public unstableGetFileTreeSpace(roomId: string): MSC3089TreeSpace {
         const room = this.getRoom(roomId);
-        if (!room) return null;
+        if (room?.getMyMembership() !== 'join') return null;
 
         const createEvent = room.currentState.getStateEvents(EventType.RoomCreate, "");
         const purposeEvent = room.currentState.getStateEvents(
