@@ -220,6 +220,7 @@ export class CallEventHandler {
             } else {
                 this.client.emit("Call.incoming", call);
             }
+            return;
         } else if (type === EventType.CallCandidates) {
             if (weSentTheEvent) return;
 
@@ -232,6 +233,7 @@ export class CallEventHandler {
             } else {
                 call.onRemoteIceCandidatesReceived(event);
             }
+            return;
         } else if ([EventType.CallHangup, EventType.CallReject].includes(type)) {
             // Note that we also observe our own hangups here so we can see
             // if we've already rejected a call that would otherwise be valid
@@ -255,10 +257,14 @@ export class CallEventHandler {
                     this.calls.delete(content.call_id);
                 }
             }
+            return;
         }
 
-        // The following events need a call
-        if (!call) return;
+        // The following events need a call and a peer connection
+        if (!call || !call.hasPeerConnection) {
+            logger.warn("Discarding an event, we don't have a call/peerConn", type);
+            return;
+        }
         // Ignore remote echo
         if (event.getContent().party_id === call.ourPartyId) return;
 
