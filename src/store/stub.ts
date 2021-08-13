@@ -61,6 +61,7 @@ export class StubStore implements IStore {
     /**
      * No-op.
      * @param {Group} group
+     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
      */
     public storeGroup(group: Group) {}
 
@@ -68,6 +69,7 @@ export class StubStore implements IStore {
      * No-op.
      * @param {string} groupId
      * @return {null}
+     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
      */
     public getGroup(groupId: string): Group | null {
         return null;
@@ -76,6 +78,7 @@ export class StubStore implements IStore {
     /**
      * No-op.
      * @return {Array} An empty array.
+     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
      */
     public getGroups(): Group[] {
         return [];
