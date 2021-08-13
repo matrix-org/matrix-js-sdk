@@ -356,7 +356,7 @@ class SSSSCryptoCallbacks {
     public async getSecretStorageKey(
         { keys }: { keys: Record<string, ISecretStorageKeyInfo> },
         name: string,
-    ): Promise<[string, Uint8Array]> {
+    ): Promise<[string, Uint8Array]|void> {
         for (const keyId of Object.keys(keys)) {
             const privateKey = this.privateKeys.get(keyId);
             if (privateKey) {
