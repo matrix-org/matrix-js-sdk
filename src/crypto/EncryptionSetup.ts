@@ -351,7 +351,7 @@ class CrossSigningCallbacks implements ICryptoCallbacks, ICacheCallbacks {
 class SSSSCryptoCallbacks {
     private readonly privateKeys = new Map<string, Uint8Array>();
 
-    constructor(private readonly delegateCryptoCallbacks: ICryptoCallbacks) {}
+    constructor(private readonly delegateCryptoCallbacks?: ICryptoCallbacks) {}
 
     public async getSecretStorageKey(
         { keys }: { keys: Record<string, ISecretStorageKeyInfo> },
