@@ -412,7 +412,7 @@ export function escapeRegExp(string: string): string {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export function globToRegexp(glob: string, extended: any): string {
+export function globToRegexp(glob: string, extended?: any): string {
     extended = typeof(extended) === 'boolean' ? extended : true;
     // From
     // https://github.com/matrix-org/synapse/blob/abbee6b29be80a77e05730707602f3bbfc3f38cb/synapse/push/__init__.py#L132
@@ -457,7 +457,7 @@ export interface IDeferred<T> {
 }
 
 // Returns a Deferred
-export function defer<T>(): IDeferred<T> {
+export function defer<T = void>(): IDeferred<T> {
     let resolve;
     let reject;
 

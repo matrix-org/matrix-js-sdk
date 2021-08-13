@@ -52,6 +52,8 @@ import {
 import { MatrixEvent } from "./models/event";
 import { MatrixError } from "./http-api";
 import { ISavedSync } from "./store";
+import { EventType } from "./@types/event";
+import { IPushRules } from "./@types/PushRules";
 
 const DEBUG = true;
 
@@ -1065,8 +1067,8 @@ export class SyncApi {
                     // honour push rules that were previously cached. Base rules
                     // will be updated when we receive push rules via getPushRules
                     // (see sync) before syncing over the network.
-                    if (accountDataEvent.getType() === 'm.push_rules') {
-                        const rules = accountDataEvent.getContent();
+                    if (accountDataEvent.getType() === EventType.PushRules) {
+                        const rules = accountDataEvent.getContent<IPushRules>();
                         client.pushRules = PushProcessor.rewriteDefaultRules(rules);
                     }
                     const prevEvent = prevEventsMap[accountDataEvent.getId()];

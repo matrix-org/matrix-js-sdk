@@ -31,7 +31,7 @@ export class SearchResult {
      * @return {SearchResult}
      */
 
-    static fromJson(jsonObj: ISearchResult, eventMapper: EventMapper): SearchResult {
+    public static fromJson(jsonObj: ISearchResult, eventMapper: EventMapper): SearchResult {
         const jsonContext = jsonObj.context || {} as IResultContext;
         const eventsBefore = jsonContext.events_before || [];
         const eventsAfter = jsonContext.events_after || [];
@@ -57,4 +57,3 @@ export class SearchResult {
      */
     constructor(public readonly rank: number, public readonly context: EventContext) {}
 }
-

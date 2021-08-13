@@ -30,7 +30,7 @@ import * as utils from './utils';
 import { sleep } from './utils';
 import { Group } from "./models/group";
 import { Direction, EventTimeline } from "./models/event-timeline";
-import { PushAction, PushProcessor } from "./pushprocessor";
+import { IActionsObject, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery } from "./autodiscovery";
 import * as olmlib from "./crypto/olmlib";
 import { decodeBase64, encodeBase64 } from "./crypto/olmlib";
@@ -4342,7 +4342,7 @@ export class MatrixClient extends EventEmitter {
      * @param {MatrixEvent} event The event to get push actions for.
      * @return {module:pushprocessor~PushAction} A dict of actions to perform.
      */
-    public getPushActionsForEvent(event: MatrixEvent): PushAction {
+    public getPushActionsForEvent(event: MatrixEvent): IActionsObject {
         if (!event.getPushActions()) {
             event.setPushActions(this.pushProcessor.actionsForEvent(event));
         }
