@@ -365,7 +365,7 @@ class SSSSCryptoCallbacks {
         }
         // if we don't have the key cached yet, ask
         // for it to the general crypto callbacks and cache it
-        if (this.delegateCryptoCallbacks) {
+        if (this.delegateCryptoCallbacks && this.delegateCryptoCallbacks.getSecretStorageKey) {
             const result = await this.delegateCryptoCallbacks.
                 getSecretStorageKey({ keys }, name);
             if (result) {
