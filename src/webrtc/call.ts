@@ -725,10 +725,7 @@ export class MatrixCall extends EventEmitter {
         if (this.state === CallState.WaitLocalMedia) {
             logger.debug("Telling new call to wait for local media");
             newCall.waitForLocalAVStream = true;
-        } else if (this.state === CallState.CreateOffer) {
-            logger.debug("Handing local stream to new call");
-            newCall.gotUserMediaForAnswer(this.localUsermediaStream);
-        } else if (this.state === CallState.InviteSent) {
+        } else if ([CallState.CreateOffer, CallState.InviteSent].includes(this.state)) {
             logger.debug("Handing local stream to new call");
             newCall.gotUserMediaForAnswer(this.localUsermediaStream);
         }
