@@ -709,8 +709,6 @@ export class MatrixCall extends EventEmitter {
                 this.getUserMediaFailed(e);
                 return;
             }
-        } else if (this.localUsermediaStream) {
-            this.gotUserMediaForAnswer(this.localUsermediaStream);
         } else if (this.waitForLocalAVStream) {
             this.setState(CallState.WaitLocalMedia);
         }
