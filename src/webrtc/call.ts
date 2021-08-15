@@ -722,7 +722,6 @@ export class MatrixCall extends EventEmitter {
      * @param {MatrixCall} newCall The new call.
      */
     replacedBy(newCall: MatrixCall) {
-        logger.debug(this.callId + " being replaced by " + newCall.callId);
         if (this.state === CallState.WaitLocalMedia) {
             logger.debug("Telling new call to wait for local media");
             newCall.waitForLocalAVStream = true;
@@ -1030,7 +1029,6 @@ export class MatrixCall extends EventEmitter {
         this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
         this.setState(CallState.CreateOffer);
 
-        logger.info("Got local AV stream with id " + this.localUsermediaStream.id);
         logger.debug("gotUserMediaForInvite -> " + this.type);
         // Now we wait for the negotiationneeded event
     };
@@ -1088,9 +1086,6 @@ export class MatrixCall extends EventEmitter {
         }
 
         this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
-
-        logger.info("Got local AV stream with id " + this.localUsermediaStream.id);
-
         this.setState(CallState.CreateAnswer);
 
         let myAnswer;
