@@ -535,6 +535,7 @@ export class MatrixCall extends EventEmitter {
             this.emit(CallEvent.FeedsChanged, this.feeds);
         }
 
+        // TODO: Find out what is going on here
         // why do we enable audio (and only audio) tracks here? -- matthew
         setTracksEnabled(stream.getAudioTracks(), true);
 
