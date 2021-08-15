@@ -201,9 +201,11 @@ export class CallEventHandler {
                 // we've got an invite, pick the incoming call because we know
                 // we haven't sent our invite yet otherwise, pick whichever
                 // call has the lowest call ID (by string comparison)
-                if (existingCall.state === CallState.WaitLocalMedia ||
-                        existingCall.state === CallState.CreateOffer ||
-                        existingCall.callId > call.callId) {
+                if (
+                    existingCall.state === CallState.WaitLocalMedia ||
+                    existingCall.state === CallState.CreateOffer ||
+                    existingCall.callId > call.callId
+                ) {
                     logger.log(
                         "Glare detected: answering incoming call " + call.callId +
                         " and canceling outgoing call " + existingCall.callId,
