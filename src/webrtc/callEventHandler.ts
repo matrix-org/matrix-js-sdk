@@ -128,7 +128,7 @@ export class CallEventHandler {
         return type.startsWith("m.call.") || type.startsWith("org.matrix.call.");
     }
 
-    private handleCallEvent(event: MatrixEvent) {
+    private async handleCallEvent(event: MatrixEvent) {
         const content = event.getContent();
         const type = event.getType() as EventType;
         const weSentTheEvent = event.getSender() === this.client.credentials.userId;
@@ -169,7 +169,7 @@ export class CallEventHandler {
             }
 
             call.callId = content.call_id;
-            call.initWithInvite(event);
+            await call.initWithInvite(event);
             this.calls.set(call.callId, call);
 
             // if we stashed candidate events for that call ID, play them back now
