@@ -1235,10 +1235,15 @@ export class MatrixEvent extends EventEmitter {
     }
 
     /**
-     * Summarise the event as JSON for debugging. If encrypted, include both the
-     * decrypted and encrypted view of the event. This is named `toJSON` for use
-     * with `JSON.stringify` which checks objects for functions named `toJSON`
-     * and will call them to customise the output if they are defined.
+     * Summarise the event as JSON. This is currently used by React SDK's view
+     * event source feature and Seshat's event indexing, so take care when
+     * adjusting the output here.
+     *
+     * If encrypted, include both the decrypted and encrypted view of the event.
+     *
+     * This is named `toJSON` for use with `JSON.stringify` which checks objects
+     * for functions named `toJSON` and will call them to customise the output
+     * if they are defined.
      *
      * @return {Object}
      */
