@@ -1,10 +1,10 @@
-Changes in [12.3.0-rc.2](https://github.com/vector-im/element-desktop/releases/tag/v12.3.0-rc.2) (2021-07-12)
+Changes in [12.3.0-rc.2](https://github.com/vector-im/element-desktop/releases/tag/v12.3.0-rc.2) (2021-08-12)
 =============================================================================================================
 
 ## 🐛 Bug Fixes
  * Fix the types in shipped package ([\#1842](https://github.com/matrix-org/matrix-js-sdk/pull/1842)). Fixes vector-im/element-web#18503 and vector-im/element-web#18503.
 
-Changes in [12.3.0-rc.1](https://github.com/vector-im/element-desktop/releases/tag/v12.3.0-rc.1) (2021-07-11)
+Changes in [12.3.0-rc.1](https://github.com/vector-im/element-desktop/releases/tag/v12.3.0-rc.1) (2021-08-11)
 =============================================================================================================
 
 ## ✨ Features
@@ -20,7 +20,7 @@ Changes in [12.3.0-rc.1](https://github.com/vector-im/element-desktop/releases/t
  * Apply hidden char check to rawDisplayName too ([\#1816](https://github.com/matrix-org/matrix-js-sdk/pull/1816)).
  * Only clear bit 63 when we create the IV ([\#1819](https://github.com/matrix-org/matrix-js-sdk/pull/1819)).
 
-Changes in [12.2.0](https://github.com/vector-im/element-desktop/releases/tag/v12.2.0) (2021-07-02)
+Changes in [12.2.0](https://github.com/vector-im/element-desktop/releases/tag/v12.2.0) (2021-08-02)
 ===================================================================================================
 
 ## ✨ Features
