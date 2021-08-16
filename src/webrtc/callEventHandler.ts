@@ -80,7 +80,7 @@ export class CallEventHandler {
                     continue;
                 }
                 try {
-                    this.handleCallEvent(e);
+                    await this.handleCallEvent(e);
                 } catch (e) {
                     logger.error("Caught exception handling call event", e);
                 }
@@ -100,7 +100,7 @@ export class CallEventHandler {
 
         if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
             // add an event listener for once the event is decrypted.
-            event.once("Event.decrypted", () => {
+            event.once("Event.decrypted", async () => {
                 if (!this.eventIsACall(event)) return;
 
                 if (this.callEventBuffer.includes(event)) {
@@ -110,7 +110,7 @@ export class CallEventHandler {
                     // This one wasn't buffered so just run the event handler for it
                     // straight away
                     try {
-                        this.handleCallEvent(event);
+                        await this.handleCallEvent(event);
                     } catch (e) {
                         logger.error("Caught exception handling call event", e);
                     }
