@@ -1,11 +1,5 @@
-Changes in [12.3.0-rc.2](https://github.com/vector-im/element-desktop/releases/tag/v12.3.0-rc.2) (2021-08-12)
-=============================================================================================================
-
-## 🐛 Bug Fixes
- * Fix the types in shipped package ([\#1842](https://github.com/matrix-org/matrix-js-sdk/pull/1842)). Fixes vector-im/element-web#18503 and vector-im/element-web#18503.
-
-Changes in [12.3.0-rc.1](https://github.com/vector-im/element-desktop/releases/tag/v12.3.0-rc.1) (2021-08-11)
-=============================================================================================================
+Changes in [12.3.0](https://github.com/vector-im/element-desktop/releases/tag/v12.3.0) (2021-08-16)
+===================================================================================================
 
 ## ✨ Features
  * Support for MSC3291: Muting in VoIP calls ([\#1812](https://github.com/matrix-org/matrix-js-sdk/pull/1812)). Contributed by [SimonBrandner](https://github.com/SimonBrandner).
@@ -13,6 +7,8 @@ Changes in [12.3.0-rc.1](https://github.com/vector-im/element-desktop/releases/t
  * Handle DTMF support ([\#1813](https://github.com/matrix-org/matrix-js-sdk/pull/1813)). Contributed by [SimonBrandner](https://github.com/SimonBrandner).
 
 ## 🐛 Bug Fixes
+ * [Release] Fix glare related regressions ([\#1854](https://github.com/matrix-org/matrix-js-sdk/pull/1854)). Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+ * Fix the types in shipped package ([\#1842](https://github.com/matrix-org/matrix-js-sdk/pull/1842)). Fixes vector-im/element-web#18503 and vector-im/element-web#18503.
  * Fix error on turning off screensharing ([\#1833](https://github.com/matrix-org/matrix-js-sdk/pull/1833)). Fixes vector-im/element-web#18449. Contributed by [SimonBrandner](https://github.com/SimonBrandner).
  * Fix blank profile in join events ([\#1837](https://github.com/matrix-org/matrix-js-sdk/pull/1837)). Fixes vector-im/element-web#18321.
  * fix TURN by fixing regression preventing multiple ICE candidates from sending. ([\#1838](https://github.com/matrix-org/matrix-js-sdk/pull/1838)).
