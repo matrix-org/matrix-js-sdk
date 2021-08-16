@@ -535,6 +535,7 @@ export class MatrixCall extends EventEmitter {
             this.emit(CallEvent.FeedsChanged, this.feeds);
         }
 
+        // TODO: Find out what is going on here
         // why do we enable audio (and only audio) tracks here? -- matthew
         setTracksEnabled(stream.getAudioTracks(), true);
 
@@ -708,8 +709,6 @@ export class MatrixCall extends EventEmitter {
                 this.getUserMediaFailed(e);
                 return;
             }
-        } else if (this.localUsermediaStream) {
-            this.gotUserMediaForAnswer(this.localUsermediaStream);
         } else if (this.waitForLocalAVStream) {
             this.setState(CallState.WaitLocalMedia);
         }
@@ -721,14 +720,10 @@ export class MatrixCall extends EventEmitter {
      * @param {MatrixCall} newCall The new call.
      */
     replacedBy(newCall: MatrixCall) {
-        logger.debug(this.callId + " being replaced by " + newCall.callId);
         if (this.state === CallState.WaitLocalMedia) {
             logger.debug("Telling new call to wait for local media");
             newCall.waitForLocalAVStream = true;
-        } else if (this.state === CallState.CreateOffer) {
-            logger.debug("Handing local stream to new call");
-            newCall.gotUserMediaForAnswer(this.localUsermediaStream);
-        } else if (this.state === CallState.InviteSent) {
+        } else if ([CallState.CreateOffer, CallState.InviteSent].includes(this.state)) {
             logger.debug("Handing local stream to new call");
             newCall.gotUserMediaForAnswer(this.localUsermediaStream);
         }
@@ -1029,7 +1024,6 @@ export class MatrixCall extends EventEmitter {
         this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
         this.setState(CallState.CreateOffer);
 
-        logger.info("Got local AV stream with id " + this.localUsermediaStream.id);
         logger.debug("gotUserMediaForInvite -> " + this.type);
         // Now we wait for the negotiationneeded event
     };
@@ -1087,9 +1081,6 @@ export class MatrixCall extends EventEmitter {
         }
 
         this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
-
-        logger.info("Got local AV stream with id " + this.localUsermediaStream.id);
-
         this.setState(CallState.CreateAnswer);
 
         let myAnswer;
