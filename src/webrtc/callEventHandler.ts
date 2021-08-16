@@ -80,7 +80,7 @@ export class CallEventHandler {
                     continue;
                 }
                 try {
-                    await this.handleCallEvent(e);
+                    this.handleCallEvent(e);
                 } catch (e) {
                     logger.error("Caught exception handling call event", e);
                 }
@@ -100,7 +100,7 @@ export class CallEventHandler {
 
         if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
             // add an event listener for once the event is decrypted.
-            event.once("Event.decrypted", async () => {
+            event.once("Event.decrypted", () => {
                 if (!this.eventIsACall(event)) return;
 
                 if (this.callEventBuffer.includes(event)) {
@@ -110,7 +110,7 @@ export class CallEventHandler {
                     // This one wasn't buffered so just run the event handler for it
                     // straight away
                     try {
-                        await this.handleCallEvent(event);
+                        this.handleCallEvent(event);
                     } catch (e) {
                         logger.error("Caught exception handling call event", e);
                     }
@@ -128,7 +128,7 @@ export class CallEventHandler {
         return type.startsWith("m.call.") || type.startsWith("org.matrix.call.");
     }
 
-    private async handleCallEvent(event: MatrixEvent) {
+    private handleCallEvent(event: MatrixEvent) {
         const content = event.getContent();
         const type = event.getType() as EventType;
         const weSentTheEvent = event.getSender() === this.client.credentials.userId;
@@ -169,7 +169,7 @@ export class CallEventHandler {
             }
 
             call.callId = content.call_id;
-            await call.initWithInvite(event);
+            call.initWithInvite(event);
             this.calls.set(call.callId, call);
 
             // if we stashed candidate events for that call ID, play them back now
@@ -201,11 +201,9 @@ export class CallEventHandler {
                 // we've got an invite, pick the incoming call because we know
                 // we haven't sent our invite yet otherwise, pick whichever
                 // call has the lowest call ID (by string comparison)
-                if (
-                    existingCall.state === CallState.WaitLocalMedia ||
-                    existingCall.state === CallState.CreateOffer ||
-                    existingCall.callId > call.callId
-                ) {
+                if (existingCall.state === CallState.WaitLocalMedia ||
+                        existingCall.state === CallState.CreateOffer ||
+                        existingCall.callId > call.callId) {
                     logger.log(
                         "Glare detected: answering incoming call " + call.callId +
                         " and canceling outgoing call " + existingCall.callId,
