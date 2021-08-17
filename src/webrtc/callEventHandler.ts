@@ -80,7 +80,7 @@ export class CallEventHandler {
                     continue;
                 }
                 try {
-                    await this.handleCallEvent(e);
+                    this.handleCallEvent(e);
                 } catch (e) {
                     logger.error("Caught exception handling call event", e);
                 }
@@ -100,7 +100,7 @@ export class CallEventHandler {
 
         if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
             // add an event listener for once the event is decrypted.
-            event.once("Event.decrypted", async () => {
+            event.once("Event.decrypted", () => {
                 if (!this.eventIsACall(event)) return;
 
                 if (this.callEventBuffer.includes(event)) {
@@ -110,7 +110,7 @@ export class CallEventHandler {
                     // This one wasn't buffered so just run the event handler for it
                     // straight away
                     try {
-                        await this.handleCallEvent(event);
+                        this.handleCallEvent(event);
                     } catch (e) {
                         logger.error("Caught exception handling call event", e);
                     }
@@ -169,7 +169,7 @@ export class CallEventHandler {
             }
 
             call.callId = content.call_id;
-            await call.initWithInvite(event);
+            const initWithInvitePromise = call.initWithInvite(event);
             this.calls.set(call.callId, call);
 
             // if we stashed candidate events for that call ID, play them back now
@@ -210,6 +210,8 @@ export class CallEventHandler {
                         "Glare detected: answering incoming call " + call.callId +
                         " and canceling outgoing call " + existingCall.callId,
                     );
+                    // Await init with invite as we need a peerConn for the following methods
+                    await initWithInvitePromise;
                     existingCall.replacedBy(call);
                     call.answer();
                 } else {
