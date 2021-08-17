@@ -535,6 +535,7 @@ export class MatrixCall extends EventEmitter {
             this.emit(CallEvent.FeedsChanged, this.feeds);
         }
 
+        // TODO: Find out what is going on here
         // why do we enable audio (and only audio) tracks here? -- matthew
         setTracksEnabled(stream.getAudioTracks(), true);
 
@@ -708,8 +709,6 @@ export class MatrixCall extends EventEmitter {
                 this.getUserMediaFailed(e);
                 return;
             }
-        } else if (this.localUsermediaStream) {
-            this.gotUserMediaForAnswer(this.localUsermediaStream);
         } else if (this.waitForLocalAVStream) {
             this.setState(CallState.WaitLocalMedia);
         }
@@ -721,14 +720,10 @@ export class MatrixCall extends EventEmitter {
      * @param {MatrixCall} newCall The new call.
      */
     replacedBy(newCall: MatrixCall) {
-        logger.debug(this.callId + " being replaced by " + newCall.callId);
         if (this.state === CallState.WaitLocalMedia) {
             logger.debug("Telling new call to wait for local media");
             newCall.waitForLocalAVStream = true;
-        } else if (this.state === CallState.CreateOffer) {
-            logger.debug("Handing local stream to new call");
-            newCall.gotUserMediaForAnswer(this.localUsermediaStream);
-        } else if (this.state === CallState.InviteSent) {
+        } else if ([CallState.CreateOffer, CallState.InviteSent].includes(this.state)) {
             logger.debug("Handing local stream to new call");
             newCall.gotUserMediaForAnswer(this.localUsermediaStream);
         }
@@ -750,9 +745,10 @@ export class MatrixCall extends EventEmitter {
         // We don't want to send hangup here if we didn't even get to sending an invite
         if (this.state === CallState.WaitLocalMedia) return;
         const content = {};
-        // Continue to send no reason for user hangups temporarily, until
-        // clients understand the user_hangup reason (voip v1)
-        if (reason !== CallErrorCode.UserHangup) content['reason'] = reason;
+        // Don't send UserHangup reason to older clients
+        if ((this.opponentVersion && this.opponentVersion >= 1) || reason !== CallErrorCode.UserHangup) {
+            content["reason"] = reason;
+        }
         this.sendVoipEvent(EventType.CallHangup, content);
     }
 
@@ -836,10 +832,10 @@ export class MatrixCall extends EventEmitter {
             for (const sender of this.screensharingSenders) {
                 this.peerConn.removeTrack(sender);
             }
-            this.deleteFeedByStream(this.localScreensharingStream);
             for (const track of this.localScreensharingStream.getTracks()) {
                 track.stop();
             }
+            this.deleteFeedByStream(this.localScreensharingStream);
             return false;
         }
     }
@@ -887,10 +883,10 @@ export class MatrixCall extends EventEmitter {
             });
             sender.replaceTrack(track);
 
-            this.deleteFeedByStream(this.localScreensharingStream);
             for (const track of this.localScreensharingStream.getTracks()) {
                 track.stop();
             }
+            this.deleteFeedByStream(this.localScreensharingStream);
 
             return false;
         }
@@ -1028,7 +1024,6 @@ export class MatrixCall extends EventEmitter {
         this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
         this.setState(CallState.CreateOffer);
 
-        logger.info("Got local AV stream with id " + this.localUsermediaStream.id);
         logger.debug("gotUserMediaForInvite -> " + this.type);
         // Now we wait for the negotiationneeded event
     };
@@ -1086,9 +1081,6 @@ export class MatrixCall extends EventEmitter {
         }
 
         this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
-
-        logger.info("Got local AV stream with id " + this.localUsermediaStream.id);
-
         this.setState(CallState.CreateAnswer);
 
         let myAnswer;
@@ -1285,7 +1277,7 @@ export class MatrixCall extends EventEmitter {
         // https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation
         const offerCollision = (
             (description.type === 'offer') &&
-            (this.makingOffer || this.peerConn.signalingState != 'stable')
+            (this.makingOffer || this.peerConn.signalingState !== 'stable')
         );
 
         this.ignoreOffer = !polite && offerCollision;
@@ -1639,8 +1631,15 @@ export class MatrixCall extends EventEmitter {
     }
 
     queueCandidate(content: RTCIceCandidate) {
-        // Sends candidates with are sent in a special way because we try to amalgamate
-        // them into one message
+        // We partially de-trickle candidates by waiting for `delay` before sending them
+        // amalgamated, in order to avoid sending too many m.call.candidates events and hitting
+        // rate limits in Matrix.
+        // In practice, it'd be better to remove rate limits for m.call.*
+
+        // N.B. this deliberately lets you queue and send blank candidates, which MSC2746
+        // currently proposes as the way to indicate that candidate gathering is complete.
+        // This will hopefully be changed to an explicit rather than implicit notification
+        // shortly.
         this.candidateSendQueue.push(content);
 
         // Don't send the ICE candidates yet if the call is in the ringing state: this
@@ -1785,6 +1784,9 @@ export class MatrixCall extends EventEmitter {
         logger.debug("Attempting to send " + candidates.length + " candidates");
         try {
             await this.sendVoipEvent(EventType.CallCandidates, content);
+            // reset our retry count if we have successfully sent our candidates
+            // otherwise queueCandidate() will refuse to try to flush the queue
+            this.candidateSendTries = 0;
         } catch (error) {
             // don't retry this event: we'll send another one later as we might
             // have more candidates by then.
@@ -1923,6 +1925,10 @@ export class MatrixCall extends EventEmitter {
                 }
             }
         }
+    }
+
+    public get hasPeerConnection() {
+        return Boolean(this.peerConn);
     }
 }
 

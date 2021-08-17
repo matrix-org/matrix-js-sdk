@@ -1,20 +1,16 @@
 {
   "compilerOptions": {
+    "target": "es2016",
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
     "esModuleInterop": true,
     "module": "commonjs",
     "moduleResolution": "node",
-    "target": "es2016",
     "noImplicitAny": false,
-    "sourceMap": true,
-    "outDir": "./lib",
-    "declaration": true,
-    "types": [
-      "node"
-    ]
+    "noEmit": true,
+    "declaration": true
   },
   "include": [
-    "./src/**/*.ts"
+    "./src/**/*.ts",
+    "./spec/**/*.ts",
   ]
 }

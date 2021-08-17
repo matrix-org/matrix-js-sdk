@@ -82,6 +82,19 @@ export class MSC3089Branch {
      * @returns {Promise<{info: IEncryptedFile, httpUrl: string}>} Information about the file.
      */
     public async getFileInfo(): Promise<{ info: IEncryptedFile, httpUrl: string }> {
+        const event = await this.getFileEvent();
+
+        const file = event.getContent()['file'];
+        const httpUrl = this.client.mxcUrlToHttp(file['url']);
+
+        return { info: file, httpUrl: httpUrl };
+    }
+
+    /**
+     * Gets the event the file points to.
+     * @returns {Promise<MatrixEvent>} Resolves to the file's event.
+     */
+    public async getFileEvent(): Promise<MatrixEvent> {
         const room = this.client.getRoom(this.roomId);
         if (!room) throw new Error("Unknown room");
 
@@ -94,9 +107,6 @@ export class MSC3089Branch {
         // Sometimes the event context doesn't decrypt for us, so do that.
         await this.client.decryptEventIfNeeded(event, { emit: false, isRetry: false });
 
-        const file = event.getContent()['file'];
-        const httpUrl = this.client.mxcUrlToHttp(file['url']);
-
-        return { info: file, httpUrl: httpUrl };
+        return event;
     }
 }

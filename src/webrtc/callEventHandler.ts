@@ -128,7 +128,7 @@ export class CallEventHandler {
         return type.startsWith("m.call.") || type.startsWith("org.matrix.call.");
     }
 
-    private handleCallEvent(event: MatrixEvent) {
+    private async handleCallEvent(event: MatrixEvent) {
         const content = event.getContent();
         const type = event.getType() as EventType;
         const weSentTheEvent = event.getSender() === this.client.credentials.userId;
@@ -169,7 +169,7 @@ export class CallEventHandler {
             }
 
             call.callId = content.call_id;
-            call.initWithInvite(event);
+            const initWithInvitePromise = call.initWithInvite(event);
             this.calls.set(call.callId, call);
 
             // if we stashed candidate events for that call ID, play them back now
@@ -201,13 +201,17 @@ export class CallEventHandler {
                 // we've got an invite, pick the incoming call because we know
                 // we haven't sent our invite yet otherwise, pick whichever
                 // call has the lowest call ID (by string comparison)
-                if (existingCall.state === CallState.WaitLocalMedia ||
-                        existingCall.state === CallState.CreateOffer ||
-                        existingCall.callId > call.callId) {
+                if (
+                    existingCall.state === CallState.WaitLocalMedia ||
+                    existingCall.state === CallState.CreateOffer ||
+                    existingCall.callId > call.callId
+                ) {
                     logger.log(
                         "Glare detected: answering incoming call " + call.callId +
                         " and canceling outgoing call " + existingCall.callId,
                     );
+                    // Await init with invite as we need a peerConn for the following methods
+                    await initWithInvitePromise;
                     existingCall.replacedBy(call);
                     call.answer();
                 } else {
@@ -220,6 +224,7 @@ export class CallEventHandler {
             } else {
                 this.client.emit("Call.incoming", call);
             }
+            return;
         } else if (type === EventType.CallCandidates) {
             if (weSentTheEvent) return;
 
@@ -232,6 +237,7 @@ export class CallEventHandler {
             } else {
                 call.onRemoteIceCandidatesReceived(event);
             }
+            return;
         } else if ([EventType.CallHangup, EventType.CallReject].includes(type)) {
             // Note that we also observe our own hangups here so we can see
             // if we've already rejected a call that would otherwise be valid
@@ -255,10 +261,14 @@ export class CallEventHandler {
                     this.calls.delete(content.call_id);
                 }
             }
+            return;
         }
 
-        // The following events need a call
-        if (!call) return;
+        // The following events need a call and a peer connection
+        if (!call || !call.hasPeerConnection) {
+            logger.warn("Discarding an event, we don't have a call/peerConn", type);
+            return;
+        }
         // Ignore remote echo
         if (event.getContent().party_id === call.ourPartyId) return;
 

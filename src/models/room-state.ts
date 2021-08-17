@@ -204,9 +204,9 @@ export class RoomState extends EventEmitter {
      * @return {MatrixEvent[]|MatrixEvent} A list of events if state_key was
      * <code>undefined</code>, else a single event (or null if no match found).
      */
-    public getStateEvents(eventType: string): MatrixEvent[];
-    public getStateEvents(eventType: string, stateKey: string): MatrixEvent;
-    public getStateEvents(eventType: string, stateKey?: string) {
+    public getStateEvents(eventType: EventType | string): MatrixEvent[];
+    public getStateEvents(eventType: EventType | string, stateKey: string): MatrixEvent;
+    public getStateEvents(eventType: EventType | string, stateKey?: string) {
         if (!this.events.has(eventType)) {
             // no match
             return stateKey === undefined ? [] : null;
