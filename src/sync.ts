@@ -1700,11 +1700,11 @@ export class SyncApi {
 
     private processThreadEvents(room: Room, threadedEvents: MatrixEvent[]): void {
         threadedEvents.forEach(event => {
-            let thread = room.findThreadByTailEvent(event.replyEventId);
+            let thread = room.findEventById(event.replyEventId).getThread();
             if (thread) {
                 thread.addEvent(event);
             } else {
-                thread = new Thread([event], this.client);
+                thread = new Thread([event], room, this.client);
                 room.addThread(thread);
             }
         });

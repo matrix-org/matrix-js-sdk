@@ -146,7 +146,7 @@ export class Room extends EventEmitter {
     public oldState: RoomState;
     public currentState: RoomState;
 
-    private threads = new Set<Thread>();
+    public threads = new Set<Thread>();
 
     /**
      * Construct a new Room.
@@ -1052,12 +1052,6 @@ export class Room extends EventEmitter {
         );
     }
 
-    public findThreadByTailEvent(eventId: string): Thread {
-        return Array.from(this.threads.values()).find(thread => {
-            return thread.tail.has(eventId);
-        });
-    }
-
     public addThread(thread: Thread): Set<Thread> {
         this.threads.add(thread);
         if (!thread.ready) {
@@ -1066,6 +1060,12 @@ export class Room extends EventEmitter {
             this.reEmitter.reEmit(thread, ["Thread.update", "Thread.ready"]);
         }
         return this.threads;
+    }
+
+    public getThread(eventId: string): Thread {
+        return this.getThreads().find(thread => {
+            return thread.id === eventId;
+        });
     }
 
     public getThreads(): Thread[] {

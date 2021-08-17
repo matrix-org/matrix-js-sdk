@@ -17,18 +17,27 @@ limitations under the License.
 import { EventEmitter } from "events";
 import { MatrixClient } from "../matrix";
 import { MatrixEvent } from "./event";
+import { EventTimelineSet } from './event-timeline-set';
+import { Room } from './room';
 
 export class Thread extends EventEmitter {
     private root: string;
     public tail = new Set<string>();
     private events = new Map<string, MatrixEvent>();
+    private _timelineSet: EventTimelineSet;
+
     private decrypted = false;
 
     constructor(
         events: MatrixEvent[] = [],
+        public readonly room: Room,
         public readonly client: MatrixClient,
     ) {
         super();
+        this._timelineSet = new EventTimelineSet(room, {
+            unstableClientRelationAggregation: true,
+            timelineSupport: true,
+        });
         events.forEach(event => this.addEvent(event));
     }
 
@@ -38,7 +47,7 @@ export class Thread extends EventEmitter {
      * @param event The event to add
      */
     public addEvent(event: MatrixEvent): void {
-        if (this.events.has(event.getId())) {
+        if (this.events.has(event.getId()) || event.status !== null) {
             return;
         }
 
@@ -51,8 +60,14 @@ export class Thread extends EventEmitter {
             this.root = event.getId();
         }
 
-        this.events.set(event.getId(), event);
         event.setThread(this);
+        this.events.set(event.getId(), event);
+        this._timelineSet.addEventToTimeline(
+            event,
+            this._timelineSet.getLiveTimeline(),
+            false,
+            false,
+        );
 
         if (this.ready) {
             this.client.decryptEventIfNeeded(event, {});
@@ -100,14 +115,6 @@ export class Thread extends EventEmitter {
     }
 
     /**
-     * A sorted list of events to display
-     */
-    public get eventTimeline(): MatrixEvent[] {
-        return Array.from(this.events.values())
-            .sort((a, b) => a.getTs() - b.getTs());
-    }
-
-    /**
      * The thread ID, which is the same as the root event ID
      */
     public get id(): string {
@@ -122,7 +129,7 @@ export class Thread extends EventEmitter {
      * The number of messages in the thread
      */
     public get length(): number {
-        return this.eventTimeline.length;
+        return this._timelineSet.getLiveTimeline().getEvents().length;
     }
 
     /**
@@ -134,5 +141,14 @@ export class Thread extends EventEmitter {
             participants.add(event.getSender());
         });
         return participants;
+    }
+
+    public get timelineSet(): EventTimelineSet {
+        return this._timelineSet;
+    }
+
+    public get replyToEvent(): MatrixEvent {
+        const events = this._timelineSet.getLiveTimeline().getEvents();
+        return events[events.length -1];
     }
 }
