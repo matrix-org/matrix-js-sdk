@@ -30,6 +30,7 @@ import { deepSortedObjectEntries } from "../utils";
 import { RoomMember } from "./room-member";
 import { Thread } from "./thread";
 import { IActionsObject } from '../pushprocessor';
+import { ReEmitter } from '../ReEmitter';
 
 /**
  * Enum for event statuses.
@@ -217,6 +218,8 @@ export class MatrixEvent extends EventEmitter {
      */
     public verificationRequest = null;
 
+    private readonly reEmitter: ReEmitter;
+
     /**
      * Construct a Matrix Event object
      * @constructor
@@ -266,6 +269,7 @@ export class MatrixEvent extends EventEmitter {
 
         this.txnId = event.txn_id || null;
         this.localTimestamp = Date.now() - this.getAge();
+        this.reEmitter = new ReEmitter(this);
     }
 
     /**
@@ -1287,6 +1291,7 @@ export class MatrixEvent extends EventEmitter {
 
     public setThread(thread: Thread): void {
         this.thread = thread;
+        this.reEmitter.reEmit(thread, ["Thread.ready", "Thread.update"]);
     }
 
     public getThread(): Thread {

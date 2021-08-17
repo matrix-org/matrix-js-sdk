@@ -866,7 +866,20 @@ export class Room extends EventEmitter {
      * @return {?module:models/event.MatrixEvent} the given event, or undefined if unknown
      */
     public findEventById(eventId: string): MatrixEvent | undefined {
-        return this.getUnfilteredTimelineSet().findEventById(eventId);
+        let event = this.getUnfilteredTimelineSet().findEventById(eventId);
+
+        if (event) {
+            return event;
+        } else {
+            const threads = this.getThreads();
+            for (let i = 0; i < threads.length; i++) {
+                const thread = threads[i];
+                event = thread.findEventById(eventId);
+                if (event) {
+                    return event;
+                }
+            }
+        }
     }
 
     /**
@@ -1258,6 +1271,24 @@ export class Room extends EventEmitter {
         const i = this.timelineSets.indexOf(timelineSet);
         if (i > -1) {
             this.timelineSets.splice(i, 1);
+        }
+    }
+
+    public addThreadedEvent(event: MatrixEvent): void {
+        if (event.getUnsigned().transaction_id) {
+            const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id];
+            if (existingEvent) {
+                // remote echo of an event we sent earlier
+                this.handleRemoteEcho(event, existingEvent);
+            }
+        }
+
+        let thread = this.findEventById(event.replyEventId)?.getThread();
+        if (thread) {
+            thread.addEvent(event);
+        } else {
+            thread = new Thread([event], this, this.client);
+            this.addThread(thread);
         }
     }
 

@@ -46,7 +46,7 @@ export class Thread extends EventEmitter {
      * the tail/root references if needed
      * @param event The event to add
      */
-    public addEvent(event: MatrixEvent): void {
+    public async addEvent(event: MatrixEvent): Promise<void> {
         if (this.events.has(event.getId()) || event.status !== null) {
             return;
         }
@@ -62,25 +62,26 @@ export class Thread extends EventEmitter {
 
         event.setThread(this);
         this.events.set(event.getId(), event);
-        this._timelineSet.addEventToTimeline(
-            event,
-            this._timelineSet.getLiveTimeline(),
-            false,
-            false,
-        );
+        this._timelineSet.addLiveEvent(event);
 
         if (this.ready) {
             this.client.decryptEventIfNeeded(event, {});
+            this.emit("Thread.update", this);
+        } else {
             this.emit("Thread.update", this);
         }
     }
 
     public async fetchReplyChain(): Promise<void> {
         if (!this.ready) {
-            const mxEvent = await this.fetchEventById(
-                this.rootEvent.getRoomId(),
-                this.rootEvent.replyEventId,
-            );
+            let mxEvent = this.room.findEventById(this.rootEvent.replyEventId);
+            if (!mxEvent) {
+                mxEvent = await this.fetchEventById(
+                    this.rootEvent.getRoomId(),
+                    this.rootEvent.replyEventId,
+                );
+            }
+
             this.addEvent(mxEvent);
             if (mxEvent.replyEventId) {
                 await this.fetchReplyChain();
@@ -101,7 +102,7 @@ export class Thread extends EventEmitter {
         this.decrypted = true;
     }
 
-    public async fetchEventById(roomId: string, eventId: string): Promise<MatrixEvent> {
+    private async fetchEventById(roomId: string, eventId: string): Promise<MatrixEvent> {
         const response = await this.client.http.authedRequest(
             undefined,
             "GET",
@@ -110,8 +111,12 @@ export class Thread extends EventEmitter {
         return new MatrixEvent(response);
     }
 
+    public findEventById(eventId: string) {
+        return this.events.get(eventId);
+    }
+
     public get ready(): boolean {
-        return this.rootEvent.replyEventId === undefined && this.decrypted;
+        return this.rootEvent.replyEventId === undefined;
     }
 
     /**

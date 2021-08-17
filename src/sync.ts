@@ -301,7 +301,7 @@ export class SyncApi {
                 client.store.storeRoom(room);
                 client.emit("Room", room);
 
-                this.processEventsForNotifs(room, timelineEvents);
+                this.processEventsForNotifs(room, events);
             });
             return rooms;
         });
@@ -1314,7 +1314,7 @@ export class SyncApi {
                 client.emit("Room", room);
             }
 
-            this.processEventsForNotifs(room, timelineEvents);
+            this.processEventsForNotifs(room, events);
 
             const processRoomEvent = async (e) => {
                 client.emit("event", e);
@@ -1370,7 +1370,7 @@ export class SyncApi {
                 client.emit("Room", room);
             }
 
-            this.processEventsForNotifs(room, timelineEvents);
+            this.processEventsForNotifs(room, events);
 
             stateEvents.forEach(function(e) {
                 client.emit("event", e);
@@ -1702,13 +1702,7 @@ export class SyncApi {
 
     private processThreadEvents(room: Room, threadedEvents: MatrixEvent[]): void {
         threadedEvents.forEach(event => {
-            let thread = room.findEventById(event.replyEventId).getThread();
-            if (thread) {
-                thread.addEvent(event);
-            } else {
-                thread = new Thread([event], room, this.client);
-                room.addThread(thread);
-            }
+            room.addThreadedEvent(event);
         });
     }
 
