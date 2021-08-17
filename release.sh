@@ -191,7 +191,10 @@ git commit package.json $pkglock -m "$tag"
 # figure out if we should be signing this release
 signing_id=
 if [ -f release_config.yaml ]; then
-    signing_id=`cat release_config.yaml | python -c "import yaml; import sys; print yaml.load(sys.stdin)['signing_id']"`
+    result=`cat release_config.yaml | python -c "import yaml; import sys; print yaml.load(sys.stdin)['signing_id']" 2> /dev/null || true`
+    if [ "$?" -eq 0 ]; then
+        signing_id=$result
+    fi
 fi
 
 
