@@ -52,6 +52,7 @@ import {
 import { MatrixEvent } from "./models/event";
 import { MatrixError } from "./http-api";
 import { ISavedSync } from "./store";
+import { Thread } from "./models/thread";
 
 const DEBUG = true;
 
@@ -281,8 +282,9 @@ export class SyncApi {
                     return;
                 }
                 leaveObj.timeline = leaveObj.timeline || {};
-                const timelineEvents =
-                    this.mapSyncEventsFormat(leaveObj.timeline, room);
+                const events = this.mapSyncEventsFormat(leaveObj.timeline, room);
+                const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(events);
+
                 const stateEvents = this.mapSyncEventsFormat(leaveObj.state, room);
 
                 // set the back-pagination token. Do this *before* adding any
@@ -291,6 +293,7 @@ export class SyncApi {
                     EventTimeline.BACKWARDS);
 
                 this.processRoomEvents(room, stateEvents, timelineEvents);
+                this.processThreadEvents(room, threadedEvents);
 
                 room.recalculate();
                 client.store.storeRoom(room);
@@ -300,6 +303,13 @@ export class SyncApi {
             });
             return rooms;
         });
+    }
+
+    public partitionThreadedEvents(events: MatrixEvent[]): [MatrixEvent[], MatrixEvent[]] {
+        return events.reduce((memo, event: MatrixEvent) => {
+            memo[event.replyEventId ? 1 : 0].push(event);
+            return memo;
+        }, [[], []]);
     }
 
     /**
@@ -1191,7 +1201,7 @@ export class SyncApi {
             // this helps large account to speed up faster
             // room::decryptCriticalEvent is in charge of decrypting all the events
             // required for a client to function properly
-            const timelineEvents = this.mapSyncEventsFormat(joinObj.timeline, room, false);
+            const events = this.mapSyncEventsFormat(joinObj.timeline, room, false);
             const ephemeralEvents = this.mapSyncEventsFormat(joinObj.ephemeral);
             const accountDataEvents = this.mapSyncEventsFormat(joinObj.account_data);
 
@@ -1238,8 +1248,8 @@ export class SyncApi {
                 // which we'll try to paginate but not get any new events (which
                 // will stop us linking the empty timeline into the chain).
                 //
-                for (let i = timelineEvents.length - 1; i >= 0; i--) {
-                    const eventId = timelineEvents[i].getId();
+                for (let i = events.length - 1; i >= 0; i--) {
+                    const eventId = events[i].getId();
                     if (room.getTimelineForEvent(eventId)) {
                         debuglog("Already have event " + eventId + " in limited " +
                             "sync - not resetting");
@@ -1248,7 +1258,7 @@ export class SyncApi {
                         // we might still be missing some of the events before i;
                         // we don't want to be adding them to the end of the
                         // timeline because that would put them out of order.
-                        timelineEvents.splice(0, i);
+                        events.splice(0, i);
 
                         // XXX: there's a problem here if the skipped part of the
                         // timeline modifies the state set in stateEvents, because
@@ -1278,7 +1288,10 @@ export class SyncApi {
                 }
             }
 
+            const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(events);
+
             this.processRoomEvents(room, stateEvents, timelineEvents, syncEventData.fromCache);
+            this.processThreadEvents(room, threadedEvents);
 
             // set summary after processing events,
             // because it will trigger a name calculation
@@ -1320,6 +1333,7 @@ export class SyncApi {
 
             await utils.promiseMapSeries(stateEvents, processRoomEvent);
             await utils.promiseMapSeries(timelineEvents, processRoomEvent);
+            await utils.promiseMapSeries(threadedEvents, processRoomEvent);
             ephemeralEvents.forEach(function(e) {
                 client.emit("event", e);
             });
@@ -1339,10 +1353,13 @@ export class SyncApi {
         leaveRooms.forEach((leaveObj) => {
             const room = leaveObj.room;
             const stateEvents = this.mapSyncEventsFormat(leaveObj.state, room);
-            const timelineEvents = this.mapSyncEventsFormat(leaveObj.timeline, room);
+            const events = this.mapSyncEventsFormat(leaveObj.timeline, room);
             const accountDataEvents = this.mapSyncEventsFormat(leaveObj.account_data);
 
+            const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(events);
+
             this.processRoomEvents(room, stateEvents, timelineEvents);
+            this.processThreadEvents(room, threadedEvents);
             room.addAccountData(accountDataEvents);
 
             room.recalculate();
@@ -1357,6 +1374,9 @@ export class SyncApi {
                 client.emit("event", e);
             });
             timelineEvents.forEach(function(e) {
+                client.emit("event", e);
+            });
+            threadedEvents.forEach(function(e) {
                 client.emit("event", e);
             });
             accountDataEvents.forEach(function(e) {
@@ -1676,6 +1696,18 @@ export class SyncApi {
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
         room.addLiveEvents(timelineEventList || [], null, fromCache);
+    }
+
+    private processThreadEvents(room: Room, threadedEvents: MatrixEvent[]): void {
+        threadedEvents.forEach(event => {
+            let thread = room.findThreadByTailEvent(event.replyEventId);
+            if (thread) {
+                thread.addEvent(event);
+            } else {
+                thread = new Thread([event], this.client);
+                room.addThread(thread);
+            }
+        });
     }
 
     /**

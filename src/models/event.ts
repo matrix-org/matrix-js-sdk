@@ -28,6 +28,7 @@ import { EventType, MsgType, RelationType } from "../@types/event";
 import { Crypto } from "../crypto";
 import { deepSortedObjectEntries } from "../utils";
 import { RoomMember } from "./room-member";
+import { Thread } from "./thread";
 
 /**
  * Enum for event statuses.
@@ -192,7 +193,7 @@ export class MatrixEvent extends EventEmitter {
 
     /** A reference to the event ID making the root of the thread
      */
-    private threadRoot: string = null;
+    private thread: Thread = null;
 
     /* Set an approximate timestamp for the event relative the local clock.
      * This will inherently be approximate because it doesn't take into account
@@ -1278,12 +1279,12 @@ export class MatrixEvent extends EventEmitter {
         return this.txnId;
     }
 
-    public setThreadRoot(threadRoot: string): void {
-        this.threadRoot = threadRoot;
+    public setThread(thread: Thread): void {
+        this.thread = thread;
     }
 
-    public getThreadRoot(): string {
-        return this.threadRoot;
+    public getThread(): Thread {
+        return this.thread;
     }
 }
 

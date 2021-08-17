@@ -146,7 +146,7 @@ export class Room extends EventEmitter {
     public oldState: RoomState;
     public currentState: RoomState;
 
-    private threads = new Map<string, Thread>();
+    private threads = new Set<Thread>();
 
     /**
      * Construct a new Room.
@@ -1050,34 +1050,6 @@ export class Room extends EventEmitter {
             events, toStartOfTimeline,
             timeline, paginationToken,
         );
-        this.parseEventsForThread(events, timeline);
-    }
-
-    public async parseEventsForThread(
-        events: MatrixEvent[],
-        timeline: EventTimeline,
-    ): Promise<void> {
-        for (let i = events.length - 1; i >= 0; i--) {
-            if (events[i].replyEventId) {
-                const thread = this.findThreadByTailEvent(events[i].replyEventId);
-                if (thread) {
-                    thread.addEvent(events[i]);
-                } else {
-                    const replyChain = await this.getReplyChain(timeline.getTimelineSet(), [events[i]]);
-
-                    const rootId = replyChain[0].getId();
-                    const thread = this.threads.get(rootId);
-                    if (thread) {
-                        replyChain.forEach(event => thread.addEvent(event));
-                    } else {
-                        this.threads.set(
-                            rootId,
-                            new Thread(replyChain),
-                        );
-                    }
-                }
-            }
-        }
     }
 
     public findThreadByTailEvent(eventId: string): Thread {
@@ -1086,43 +1058,32 @@ export class Room extends EventEmitter {
         });
     }
 
-    public getThread(eventId: string): Thread {
-        return this.threads.get(eventId);
-    }
-
-    /**
-     * Build the reply chain starting from the bottom up
-     */
-    public async getReplyChain(
-        timelinetSet: EventTimelineSet,
-        events: MatrixEvent[] = [],
-    ): Promise<MatrixEvent[]> {
-        const parentEvent = await this.getEvent(events[0].replyEventId);
-        if (parentEvent.replyEventId) {
-            return this.getReplyChain(timelinetSet, [parentEvent, ...events]);
-        } else {
-            return [parentEvent, ...events];
+    public addThread(thread: Thread): Set<Thread> {
+        this.threads.add(thread);
+        if (!thread.ready) {
+            thread.once("Thread.ready", this.dedupeThreads);
+            this.emit("Thread.update", thread);
+            this.reEmitter.reEmit(thread, ["Thread.update", "Thread.ready"]);
         }
+        return this.threads;
     }
 
-    /**
-     * Retrieve an event with the option to get it from the already
-     * loaded event timeline set
-     */
-    public async getEvent(eventId: string, timelineSet?: EventTimelineSet): Promise<MatrixEvent> {
-        const parentEvent = timelineSet?.findEventById(eventId);
-        if (parentEvent) {
-            return parentEvent;
+    public getThreads(): Thread[] {
+        return Array.from(this.threads.values());
+    }
+
+    private dedupeThreads = (readyThread): void => {
+        const threads = Array.from(this.threads);
+        if (threads.includes(readyThread)) {
+            this.threads = new Set(threads.filter(thread => {
+                if (readyThread.id === thread.id && readyThread !== thread) {
+                    return false;
+                } else {
+                    return true;
+                }
+            }));
         }
-
-        const response = await this.client.http.authedRequest(
-            undefined,
-            "GET",
-            `/rooms/${this.roomId}/event/${eventId}`,
-        );
-
-        return new MatrixEvent(response);
-    }
+    };
 
     /**
      * Get a member from the current room state.

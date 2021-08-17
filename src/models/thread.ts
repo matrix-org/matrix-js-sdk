@@ -14,15 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventType } from "../@types/event";
+import { EventEmitter } from "events";
+import { MatrixClient } from "../matrix";
 import { MatrixEvent } from "./event";
 
-export class Thread {
+export class Thread extends EventEmitter {
     private root: string;
     public tail = new Set<string>();
     private events = new Map<string, MatrixEvent>();
+    private decrypted = false;
 
-    constructor(events: MatrixEvent[] = []) {
+    constructor(
+        events: MatrixEvent[] = [],
+        public readonly client: MatrixClient,
+    ) {
+        super();
         events.forEach(event => this.addEvent(event));
     }
 
@@ -36,27 +42,61 @@ export class Thread {
             return;
         }
 
-        const isRoomMessage = event.getType() === EventType.RoomMessage;
-
         if (this.tail.has(event.replyEventId)) {
             this.tail.delete(event.replyEventId);
         }
         this.tail.add(event.getId());
 
-        if (!event.replyEventId && isRoomMessage) {
+        if (!event.replyEventId || !this.events.has(event.replyEventId)) {
             this.root = event.getId();
-            this.events.forEach(event => event.setThreadRoot(this.root));
-        }
-
-        if (isRoomMessage) {
-            this._messageCount++;
         }
 
         this.events.set(event.getId(), event);
+        event.setThread(this);
 
-        if (this.root) {
-            event.setThreadRoot(this.root);
+        if (this.ready) {
+            this.client.decryptEventIfNeeded(event, {});
+            this.emit("Thread.update", this);
         }
+    }
+
+    public async fetchReplyChain(): Promise<void> {
+        if (!this.ready) {
+            const mxEvent = await this.fetchEventById(
+                this.rootEvent.getRoomId(),
+                this.rootEvent.replyEventId,
+            );
+            this.addEvent(mxEvent);
+            if (mxEvent.replyEventId) {
+                await this.fetchReplyChain();
+            } else {
+                await this.decryptEvents();
+                this.emit("Thread.ready", this);
+            }
+        }
+    }
+
+    private async decryptEvents(): Promise<void> {
+        await Promise.allSettled(
+            Array.from(this.events.values()).map(event => {
+                return this.client.decryptEventIfNeeded(event, {});
+            }),
+        );
+
+        this.decrypted = true;
+    }
+
+    public async fetchEventById(roomId: string, eventId: string): Promise<MatrixEvent> {
+        const response = await this.client.http.authedRequest(
+            undefined,
+            "GET",
+            `/rooms/${roomId}/event/${eventId}`,
+        );
+        return new MatrixEvent(response);
+    }
+
+    public get ready(): boolean {
+        return this.rootEvent.replyEventId === undefined && this.decrypted;
     }
 
     /**
