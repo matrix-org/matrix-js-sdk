@@ -600,7 +600,7 @@ interface IUserDirectoryResponse {
     limited: boolean;
 }
 
-interface IMyDevice {
+export interface IMyDevice {
     device_id: string;
     display_name?: string;
     last_seen_ip?: string;
