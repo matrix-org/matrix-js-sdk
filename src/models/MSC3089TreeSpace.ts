@@ -18,7 +18,7 @@ import { MatrixClient } from "../client";
 import { EventType, IEncryptedFile, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_MSC3089_LEAF } from "../@types/event";
 import { Room } from "./room";
 import { logger } from "../logger";
-import { MatrixEvent } from "./event";
+import { IContent, MatrixEvent } from "./event";
 import {
     averageBetweenStrings,
     DEFAULT_ALPHABET,
@@ -451,11 +451,14 @@ export class MSC3089TreeSpace {
      * @param {string} name The name of the file.
      * @param {ArrayBuffer} encryptedContents The encrypted contents.
      * @param {Partial<IEncryptedFile>} info The encrypted file information.
+     * @param {IContent} additionalContent Optional event content fields to include in the message.
      * @returns {Promise<void>} Resolves when uploaded.
      */
     public async createFile(
         name: string,
-        encryptedContents: ArrayBuffer, info: Partial<IEncryptedFile>,
+        encryptedContents: ArrayBuffer,
+        info: Partial<IEncryptedFile>,
+        additionalContent?: IContent,
     ): Promise<void> {
         const mxc = await this.client.uploadContent(new Blob([encryptedContents]), {
             includeFilename: false,
@@ -464,6 +467,7 @@ export class MSC3089TreeSpace {
         info.url = mxc;
 
         const res = await this.client.sendMessage(this.roomId, {
+            ...(additionalContent ?? {}),
             msgtype: MsgType.File,
             body: name,
             url: mxc,
