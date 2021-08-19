@@ -403,8 +403,11 @@ class MegolmEncryption extends EncryptionAlgorithm {
                     logger.debug(`Shared keys (all phases done) with new Olm sessions in ${this.roomId}`);
                 })(),
                 (async () => {
-                    logger.debug(`Notifying blocked devices in ${this.roomId}`);
-                    // also, notify blocked devices that they're blocked
+                    logger.debug(`There are ${Object.entries(blocked).length} blocked devices in ${this.roomId}`,
+                        Object.entries(blocked));
+
+                    // also, notify newly blocked devices that they're blocked
+                    logger.debug(`Notifying newly blocked devices in ${this.roomId}`);
                     const blockedMap: Record<string, Record<string, { device: IBlockedDevice }>> = {};
                     let blockedCount = 0;
                     for (const [userId, userBlockedDevices] of Object.entries(blocked)) {
@@ -421,7 +424,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
                     }
 
                     await this.notifyBlockedDevices(session, blockedMap);
-                    logger.debug(`Notified ${blockedCount} blocked devices in ${this.roomId}`);
+                    logger.debug(`Notified ${blockedCount} newly blocked devices in ${this.roomId}`, blockedMap);
                 })(),
             ]);
         };
