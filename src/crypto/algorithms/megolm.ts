@@ -846,9 +846,9 @@ class MegolmEncryption extends EncryptionAlgorithm {
 
         this.getDevicesWithoutSessions(devicemap, devicesByUser, errorDevices);
 
-        logger.debug(`Sharing keys with Olm sessions in ${this.roomId}`);
+        logger.debug(`Sharing keys with newly created Olm sessions in ${this.roomId}`);
         await this.shareKeyWithOlmSessions(session, key, payload, devicemap);
-        logger.debug(`Shared keys with Olm sessions in ${this.roomId}`);
+        logger.debug(`Shared keys with newly created Olm sessions in ${this.roomId}`);
     }
 
     private async shareKeyWithOlmSessions(
