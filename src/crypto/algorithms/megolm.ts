@@ -700,7 +700,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
 
         await this.baseApis.sendToDevice("org.matrix.room_key.withheld", contentMap);
 
-        // store that we successfully uploaded the keys of the current slice
+        // record the fact that we notified these blocked devices
         for (const userId of Object.keys(contentMap)) {
             for (const deviceId of Object.keys(contentMap[userId])) {
                 session.markNotifiedBlockedDevice(userId, deviceId);
