@@ -121,16 +121,28 @@ export class CallFeed extends EventEmitter {
         }
     }
 
+    /**
+     * Set feed's internal audio mute state
+     * @param muted is the feed's audio muted?
+     */
     public setAudioMuted(muted: boolean): void {
         this.audioMuted = muted;
         this.emit(CallFeedEvent.MuteStateChanged, this.audioMuted, this.videoMuted);
     }
 
+    /**
+     * Set feed's internal video mute state
+     * @param muted is the feed's video muted?
+     */
     public setVideoMuted(muted: boolean): void {
         this.videoMuted = muted;
         this.emit(CallFeedEvent.MuteStateChanged, this.audioMuted, this.videoMuted);
     }
 
+    /**
+     * Starts emitting volume_changed events where the emitter value is in decibels
+     * @param enabled emit volume changes
+     */
     public measureVolumeActivity(enabled: boolean): void {
         if (enabled) {
             if (!this.audioContext || !this.analyser || !this.frequencyBinCount || !this.hasAudioTrack) return;
