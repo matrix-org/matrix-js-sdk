@@ -341,12 +341,15 @@ class MegolmEncryption extends EncryptionAlgorithm {
             await Promise.all([
                 (async () => {
                     // share keys with devices that we already have a session for
-                    logger.debug(`Sharing keys with existing Olm sessions in ${this.roomId}`);
+                    logger.debug(`Sharing keys with existing Olm sessions in ${this.roomId}`, olmSessions);
                     await this.shareKeyWithOlmSessions(session, key, payload, olmSessions);
                     logger.debug(`Shared keys with existing Olm sessions in ${this.roomId}`);
                 })(),
                 (async () => {
-                    logger.debug(`Sharing keys (start phase 1) with new Olm sessions in ${this.roomId}`);
+                    logger.debug(
+                        `Sharing keys (start phase 1) with new Olm sessions in ${this.roomId}`,
+                        devicesWithoutSession
+                    );
                     const errorDevices = [];
 
                     // meanwhile, establish olm sessions for devices that we don't
