@@ -20,11 +20,13 @@ import { MatrixClient } from "../client";
 import { RoomMember } from "../models/room-member";
 
 const POLLING_INTERVAL = 250; // ms
+const SPEAKING_THRESHOLD = -60; // dB
 
 export enum CallFeedEvent {
     NewStream = "new_stream",
     MuteStateChanged = "mute_state_changed",
     VolumeChanged = "volume_changed",
+    Speaking = "speaking",
 }
 
 export class CallFeed extends EventEmitter {
@@ -32,6 +34,8 @@ export class CallFeed extends EventEmitter {
     private audioContext: AudioContext;
     private analyser: AnalyserNode;
     private frequencyBinCount: Float32Array;
+    private speakingThreshold = SPEAKING_THRESHOLD;
+    private speaking = false;
 
     constructor(
         public stream: MediaStream,
@@ -155,6 +159,10 @@ export class CallFeed extends EventEmitter {
         }
     }
 
+    public setSpeakingThreshold(threshold: number) {
+        this.speakingThreshold = threshold;
+    }
+
     private volumeLooper(): void {
         if (!this.analyser) return;
 
@@ -171,6 +179,12 @@ export class CallFeed extends EventEmitter {
             }
 
             this.emit(CallFeedEvent.VolumeChanged, maxVolume);
+            const newSpeaking = maxVolume > this.speakingThreshold;
+            if (this.speaking !== newSpeaking) {
+                this.speaking = newSpeaking;
+                this.emit(CallFeedEvent.Speaking, this.speaking);
+            }
+
             this.volumeLooper();
         }, POLLING_INTERVAL);
     }
