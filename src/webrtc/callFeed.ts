@@ -110,7 +110,7 @@ export class CallFeed extends EventEmitter {
      * This method should be only used by MatrixCall.
      * @param newStream new stream with which to replace the current one
      */
-    public setNewStream(newStream: MediaStream) {
+    public setNewStream(newStream: MediaStream): void {
         this.stream = newStream;
         this.emit(CallFeedEvent.NewStream, this.stream);
 
@@ -131,7 +131,7 @@ export class CallFeed extends EventEmitter {
         this.emit(CallFeedEvent.MuteStateChanged, this.audioMuted, this.videoMuted);
     }
 
-    public measureVolumeActivity(enabled: boolean) {
+    public measureVolumeActivity(enabled: boolean): void {
         if (enabled) {
             if (!this.audioContext || !this.analyser || !this.frequencyBinCount || !this.hasAudioTrack) return;
 
