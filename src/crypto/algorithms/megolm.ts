@@ -864,7 +864,8 @@ class MegolmEncryption extends EncryptionAlgorithm {
                 `megolm keys for ${session.sessionId} ` +
                 `in ${this.roomId} (slice ${i + 1}/${userDeviceMaps.length})`;
             try {
-                logger.debug(`Sharing ${taskDetail}`);
+                logger.debug(`Sharing ${taskDetail}`,
+                    userDeviceMaps[i].map((d) => `${d.userId}/${d.deviceInfo.deviceId}`));
                 await this.encryptAndSendKeysToDevices(
                     session, key.chain_index, userDeviceMaps[i], payload,
                 );
