@@ -907,14 +907,16 @@ class MegolmEncryption extends EncryptionAlgorithm {
             );
         }
 
-        const filteredFailedDevices =
-            await this.olmDevice.filterOutNotifiedErrorDevices(failedDevices);
+        const unnotifiedFailedDevices =
+            await this.olmDevice.filterOutNotifiedErrorDevices(
+                failedDevices,
+            );
         logger.debug(
-            `Filtered down to ${filteredFailedDevices.length} error devices ` +
-            `in ${this.roomId}`,
+            `Need to notify ${unnotifiedFailedDevices.length} failed devices ` +
+            `which haven't been notified before in ${this.roomId}`,
         );
         const blockedMap: Record<string, Record<string, { device: IBlockedDevice }>> = {};
-        for (const { userId, deviceInfo } of filteredFailedDevices) {
+        for (const { userId, deviceInfo } of unnotifiedFailedDevices) {
             blockedMap[userId] = blockedMap[userId] || {};
             // we use a similar format to what
             // olmlib.ensureOlmSessionsForDevices returns, so that
@@ -931,7 +933,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
         // send the notifications
         await this.notifyBlockedDevices(session, blockedMap);
         logger.debug(
-            `Notified ${filteredFailedDevices.length} devices we failed to ` +
+            `Notified ${unnotifiedFailedDevices.length} devices we failed to ` +
             `create Olm sessions in ${this.roomId}`,
         );
     }
