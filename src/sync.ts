@@ -149,6 +149,7 @@ export class SyncApi {
         this.opts.resolveInvitesToProfiles = this.opts.resolveInvitesToProfiles || false;
         this.opts.pollTimeout = this.opts.pollTimeout || (30 * 1000);
         this.opts.pendingEventOrdering = this.opts.pendingEventOrdering || PendingEventOrdering.Chronological;
+        this.opts.experimentalThreadSupport = this.opts.experimentalThreadSupport === true;
 
         if (!opts.canResetEntireTimeline) {
             opts.canResetEntireTimeline = (roomId: string) => {
@@ -313,10 +314,19 @@ export class SyncApi {
      * @experimental
      */
     public partitionThreadedEvents(events: MatrixEvent[]): [MatrixEvent[], MatrixEvent[]] {
-        return events.reduce((memo, event: MatrixEvent) => {
-            memo[event.replyEventId ? 1 : 0].push(event);
-            return memo;
-        }, [[], []]);
+        if (this.opts.experimentalThreadSupport) {
+            return events.reduce((memo, event: MatrixEvent) => {
+                memo[event.replyEventId ? 1 : 0].push(event);
+                return memo;
+            }, [[], []]);
+        } else {
+            // When `experimentalThreadSupport` is disabled
+            // treat all events as timelineEvents
+            return [
+                events,
+                [],
+            ];
+        }
     }
 
     /**
