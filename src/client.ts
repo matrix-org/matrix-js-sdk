@@ -7991,10 +7991,7 @@ export class MatrixClient extends EventEmitter {
         autoJoinOnly?: boolean,
         limit?: number,
         batch?: string,
-    ): Promise<{
-            rooms: ISpaceSummaryRoom[];
-            events: ISpaceSummaryEvent[];
-        }> {
+    ): Promise<{rooms: ISpaceSummaryRoom[], events: ISpaceSummaryEvent[]}> {
         const path = utils.encodeUri("/rooms/$roomId/spaces", {
             $roomId: roomId,
         });
