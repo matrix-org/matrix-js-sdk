@@ -19,12 +19,20 @@ import { SDPStreamMetadataPurpose } from "./callEventTypes";
 import { MatrixClient } from "../client";
 import { RoomMember } from "../models/room-member";
 
+const POLLING_INTERVAL = 250; // ms
+
 export enum CallFeedEvent {
     NewStream = "new_stream",
-    MuteStateChanged = "mute_state_changed"
+    MuteStateChanged = "mute_state_changed",
+    VolumeChanged = "volume_changed",
 }
 
 export class CallFeed extends EventEmitter {
+    private measuringVolumeActivity = false;
+    private audioContext: AudioContext;
+    private analyser: AnalyserNode;
+    private frequencyBinCount: Float32Array;
+
     constructor(
         public stream: MediaStream,
         public userId: string,
@@ -35,6 +43,30 @@ export class CallFeed extends EventEmitter {
         private videoMuted: boolean,
     ) {
         super();
+
+        if (this.hasAudioTrack) {
+            this.initVolumeMeasuring();
+        }
+    }
+
+    private get hasAudioTrack(): boolean {
+        return this.stream.getAudioTracks().length > 0;
+    }
+
+    private initVolumeMeasuring(): void {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!this.hasAudioTrack || !AudioContext) return;
+
+        this.audioContext = new AudioContext();
+
+        this.analyser = this.audioContext.createAnalyser();
+        this.analyser.fftSize = 512;
+        this.analyser.smoothingTimeConstant = 0.1;
+
+        const mediaStreamAudioSourceNode = this.audioContext.createMediaStreamSource(this.stream);
+        mediaStreamAudioSourceNode.connect(this.analyser);
+
+        this.frequencyBinCount = new Float32Array(this.analyser.frequencyBinCount);
     }
 
     /**
@@ -81,6 +113,12 @@ export class CallFeed extends EventEmitter {
     public setNewStream(newStream: MediaStream) {
         this.stream = newStream;
         this.emit(CallFeedEvent.NewStream, this.stream);
+
+        if (this.hasAudioTrack) {
+            this.initVolumeMeasuring();
+        } else {
+            this.measureVolumeActivity(false);
+        }
     }
 
     public setAudioMuted(muted: boolean): void {
@@ -91,5 +129,37 @@ export class CallFeed extends EventEmitter {
     public setVideoMuted(muted: boolean): void {
         this.videoMuted = muted;
         this.emit(CallFeedEvent.MuteStateChanged, this.audioMuted, this.videoMuted);
+    }
+
+    public measureVolumeActivity(enabled: boolean) {
+        if (enabled) {
+            if (!this.audioContext || !this.analyser || !this.frequencyBinCount || !this.hasAudioTrack) return;
+
+            this.measuringVolumeActivity = true;
+            this.volumeLooper();
+        } else {
+            this.measuringVolumeActivity = false;
+            this.emit(CallFeedEvent.VolumeChanged, -Infinity);
+        }
+    }
+
+    private volumeLooper(): void {
+        if (!this.analyser) return;
+
+        setTimeout(() => {
+            if (!this.measuringVolumeActivity) return;
+
+            this.analyser.getFloatFrequencyData(this.frequencyBinCount);
+
+            let maxVolume = -Infinity;
+            for (let i = 0; i < this.frequencyBinCount.length; i++) {
+                if (this.frequencyBinCount[i] > maxVolume) {
+                    maxVolume = this.frequencyBinCount[i];
+                }
+            }
+
+            this.emit(CallFeedEvent.VolumeChanged, maxVolume);
+            this.volumeLooper();
+        }, POLLING_INTERVAL);
     }
 }
