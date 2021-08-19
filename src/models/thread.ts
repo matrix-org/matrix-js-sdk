@@ -20,13 +20,19 @@ import { MatrixEvent } from "./event";
 import { EventTimelineSet } from './event-timeline-set';
 import { Room } from './room';
 
+/**
+ * @experimental
+ */
 export class Thread extends EventEmitter {
+    /**
+     * A reference to the event ID at the top of the thread
+     */
     private root: string;
+    /**
+     * A reference to all the events ID at the bottom of the threads
+     */
     public tail = new Set<string>();
-    private events = new Map<string, MatrixEvent>();
     private _timelineSet: EventTimelineSet;
-
-    private decrypted = false;
 
     constructor(
         events: MatrixEvent[] = [],
@@ -44,10 +50,11 @@ export class Thread extends EventEmitter {
     /**
      * Add an event to the thread and updates
      * the tail/root references if needed
+     * Will fire "Thread.update"
      * @param event The event to add
      */
     public async addEvent(event: MatrixEvent): Promise<void> {
-        if (this.events.has(event.getId()) || event.status !== null) {
+        if (this._timelineSet.findEventById(event.getId()) || event.status !== null) {
             return;
         }
 
@@ -56,12 +63,11 @@ export class Thread extends EventEmitter {
         }
         this.tail.add(event.getId());
 
-        if (!event.replyEventId || !this.events.has(event.replyEventId)) {
+        if (!event.replyEventId || !this._timelineSet.findEventById(event.replyEventId)) {
             this.root = event.getId();
         }
 
         event.setThread(this);
-        this.events.set(event.getId(), event);
         this._timelineSet.addLiveEvent(event);
 
         if (this.ready) {
@@ -72,6 +78,11 @@ export class Thread extends EventEmitter {
         }
     }
 
+    /**
+     * Completes the reply chain with all events
+     * missing from the current sync data
+     * Will fire "Thread.ready"
+     */
     public async fetchReplyChain(): Promise<void> {
         if (!this.ready) {
             let mxEvent = this.room.findEventById(this.rootEvent.replyEventId);
@@ -94,14 +105,15 @@ export class Thread extends EventEmitter {
 
     private async decryptEvents(): Promise<void> {
         await Promise.allSettled(
-            Array.from(this.events.values()).map(event => {
+            Array.from(this._timelineSet.getLiveTimeline().getEvents()).map(event => {
                 return this.client.decryptEventIfNeeded(event, {});
             }),
         );
-
-        this.decrypted = true;
     }
 
+    /**
+     * Fetches an event over the network
+     */
     private async fetchEventById(roomId: string, eventId: string): Promise<MatrixEvent> {
         const response = await this.client.http.authedRequest(
             undefined,
@@ -111,10 +123,16 @@ export class Thread extends EventEmitter {
         return new MatrixEvent(response);
     }
 
+    /**
+     * Finds an event by ID in the current thread
+     */
     public findEventById(eventId: string) {
-        return this.events.get(eventId);
+        return this._timelineSet.findEventById(eventId);
     }
 
+    /**
+     * Determines thread's ready status
+     */
     public get ready(): boolean {
         return this.rootEvent.replyEventId === undefined;
     }
@@ -126,8 +144,11 @@ export class Thread extends EventEmitter {
         return this.root;
     }
 
+    /**
+     * The thread root event
+     */
     public get rootEvent(): MatrixEvent {
-        return this.events.get(this.root);
+        return this.findEventById(this.root);
     }
 
     /**
@@ -142,16 +163,22 @@ export class Thread extends EventEmitter {
      */
     public get participants(): Set<string> {
         const participants = new Set<string>();
-        this.events.forEach(event => {
+        this._timelineSet.getLiveTimeline().getEvents().forEach(event => {
             participants.add(event.getSender());
         });
         return participants;
     }
 
+    /**
+     * A read-only getter to access the timeline set
+     */
     public get timelineSet(): EventTimelineSet {
         return this._timelineSet;
     }
 
+    /**
+     * A getter for the last event added to the thread
+     */
     public get replyToEvent(): MatrixEvent {
         const events = this._timelineSet.getLiveTimeline().getEvents();
         return events[events.length -1];

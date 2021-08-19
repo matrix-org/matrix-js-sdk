@@ -146,6 +146,9 @@ export class Room extends EventEmitter {
     public oldState: RoomState;
     public currentState: RoomState;
 
+    /**
+     * @experimental
+     */
     public threads = new Set<Thread>();
 
     /**
@@ -860,7 +863,7 @@ export class Room extends EventEmitter {
     }
 
     /**
-     * Get an event which is stored in our unfiltered timeline set
+     * Get an event which is stored in our unfiltered timeline set or in a thread
      *
      * @param {string} eventId  event ID to look for
      * @return {?module:models/event.MatrixEvent} the given event, or undefined if unknown
@@ -1065,6 +1068,9 @@ export class Room extends EventEmitter {
         );
     }
 
+    /**
+     * @experimental
+     */
     public addThread(thread: Thread): Set<Thread> {
         this.threads.add(thread);
         if (!thread.ready) {
@@ -1075,16 +1081,28 @@ export class Room extends EventEmitter {
         return this.threads;
     }
 
+    /**
+     * @experimental
+     */
     public getThread(eventId: string): Thread {
         return this.getThreads().find(thread => {
             return thread.id === eventId;
         });
     }
 
+    /**
+     * @experimental
+     */
     public getThreads(): Thread[] {
         return Array.from(this.threads.values());
     }
 
+    /**
+     * Two threads starting from a different child event can end up
+     * with the same event root. This method ensures that the duplicates
+     * are removed
+     * @experimental
+     */
     private dedupeThreads = (readyThread): void => {
         const threads = Array.from(this.threads);
         if (threads.includes(readyThread)) {
@@ -1274,6 +1292,10 @@ export class Room extends EventEmitter {
         }
     }
 
+    /**
+     * Add an event to a thread's timeline. Will fire "Thread.update"
+     * @experimental
+     */
     public addThreadedEvent(event: MatrixEvent): void {
         if (event.getUnsigned().transaction_id) {
             const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id];

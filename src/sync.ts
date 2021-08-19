@@ -307,6 +307,11 @@ export class SyncApi {
         });
     }
 
+    /**
+     * Split events between the ones that will end up in the main
+     * room timeline versus the one that need to be processed in a thread
+     * @experimental
+     */
     public partitionThreadedEvents(events: MatrixEvent[]): [MatrixEvent[], MatrixEvent[]] {
         return events.reduce((memo, event: MatrixEvent) => {
             memo[event.replyEventId ? 1 : 0].push(event);
@@ -1700,6 +1705,9 @@ export class SyncApi {
         room.addLiveEvents(timelineEventList || [], null, fromCache);
     }
 
+    /**
+     * @experimental
+     */
     private processThreadEvents(room: Room, threadedEvents: MatrixEvent[]): void {
         threadedEvents.forEach(event => {
             room.addThreadedEvent(event);

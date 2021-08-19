@@ -193,7 +193,9 @@ export class MatrixEvent extends EventEmitter {
      */
     private txnId: string = null;
 
-    /** A reference to the event ID making the root of the thread
+    /**
+     * @experimental
+     * A reference to the thread this event belongs to
      */
     private thread: Thread = null;
 
@@ -391,6 +393,7 @@ export class MatrixEvent extends EventEmitter {
     }
 
     /**
+     * @experimental
      * Get the event ID of the replied event
      */
     public get replyEventId(): string {
@@ -1289,11 +1292,17 @@ export class MatrixEvent extends EventEmitter {
         return this.txnId;
     }
 
+    /**
+     * @experimental
+     */
     public setThread(thread: Thread): void {
         this.thread = thread;
         this.reEmitter.reEmit(thread, ["Thread.ready", "Thread.update"]);
     }
 
+    /**
+     * @experimental
+     */
     public getThread(): Thread {
         return this.thread;
     }
