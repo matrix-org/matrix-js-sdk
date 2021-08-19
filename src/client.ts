@@ -521,7 +521,7 @@ interface IMessagesResponse {
     state: IStateEvent[];
 }
 
-interface IRequestTokenResponse {
+export interface IRequestTokenResponse {
     sid: string;
     submit_url?: string;
 }
@@ -5078,7 +5078,7 @@ export class MatrixClient extends EventEmitter {
         email: string,
         clientSecret: string,
         sendAttempt: number,
-        nextLink: string,
+        nextLink?: string,
     ): Promise<IRequestTokenResponse> {
         return this.requestTokenFromEndpoint(
             "/account/password/email/requestToken",
@@ -7991,10 +7991,7 @@ export class MatrixClient extends EventEmitter {
         autoJoinOnly?: boolean,
         limit?: number,
         batch?: string,
-    ): Promise<{
-        rooms: ISpaceSummaryRoom[];
-        events: ISpaceSummaryEvent[];
-    }> {
+    ): Promise<{rooms: ISpaceSummaryRoom[], events: ISpaceSummaryEvent[]}> {
         const path = utils.encodeUri("/rooms/$roomId/spaces", {
             $roomId: roomId,
         });
