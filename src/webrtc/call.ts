@@ -1774,10 +1774,8 @@ export class MatrixCall extends EventEmitter {
         logger.debug(`stopAllMedia (stream=${this.localUsermediaStream})`);
 
         for (const feed of this.feeds) {
-            if (!feed.isLocal()) {
-                for (const track of feed.stream.getTracks()) {
-                    track.stop();
-                }
+            for (const track of feed.stream.getTracks()) {
+                track.stop();
             }
         }
     }
