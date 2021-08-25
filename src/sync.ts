@@ -52,7 +52,6 @@ import {
 import { MatrixEvent } from "./models/event";
 import { MatrixError } from "./http-api";
 import { ISavedSync } from "./store";
-import { Thread } from "./models/thread";
 import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
 
