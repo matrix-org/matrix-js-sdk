@@ -150,6 +150,7 @@ export interface IDecryptOptions {
 
 export class MatrixEvent extends EventEmitter {
     private pushActions: IActionsObject = null;
+    private wirePushActions: IActionsObject = null;
     private _replacingEvent: MatrixEvent = null;
     private _localRedactionEvent: MatrixEvent = null;
     private _isCancelled = false;
@@ -949,7 +950,16 @@ export class MatrixEvent extends EventEmitter {
      * @return {?Object} push actions
      */
     public getPushActions(): IActionsObject | null {
-        return this.pushActions;
+        return this.pushActions || this.wirePushActions;
+    }
+
+    /**
+     * Get the push actions, if known, for this event
+     *
+     * @return {?Object} push actions
+     */
+    public getWirePushActions(): IActionsObject | null {
+        return this.wirePushActions;
     }
 
     /**
@@ -958,7 +968,11 @@ export class MatrixEvent extends EventEmitter {
      * @param {Object} pushActions push actions
      */
     public setPushActions(pushActions: IActionsObject): void {
-        this.pushActions = pushActions;
+        if (this._decryptionPromise) {
+            this.wirePushActions = pushActions;
+        } else {
+            this.pushActions = pushActions;
+        }
     }
 
     /**
