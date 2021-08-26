@@ -838,7 +838,7 @@ export class MatrixClient extends EventEmitter {
         // We do this so that push rules are correctly executed on events in their decrypted
         // state, such as highlights when the user's name is mentioned.
         this.on("Event.decrypted", (event: MatrixEvent) => {
-            const oldActions = event.getPushActions();
+            const oldActions = event.getWirePushActions();
             const actions = this.pushProcessor.actionsForEvent(event);
             event.setPushActions(actions); // Might as well while we're here
 
