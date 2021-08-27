@@ -838,36 +838,7 @@ export class MatrixClient extends EventEmitter {
         // We do this so that push rules are correctly executed on events in their decrypted
         // state, such as highlights when the user's name is mentioned.
         this.on("Event.decrypted", (event: MatrixEvent) => {
-            const oldActions = event.getWirePushActions();
-            const actions = this.pushProcessor.actionsForEvent(event);
-            event.setPushActions(actions); // Might as well while we're here
-
-            const room = this.getRoom(event.getRoomId());
-            if (!room) return;
-
-            const currentHighlightCount = room.getUnreadNotificationCount(NotificationCountType.Highlight);
-
-            // Ensure the unread counts are kept up to date if the event is encrypted
-            // We also want to make sure that the notification count goes up if we already
-            // have encrypted events to avoid other code from resetting 'highlight' to zero.
-            const oldHighlight = Boolean(oldActions?.tweaks?.highlight);
-            const newHighlight = Boolean(actions?.tweaks?.highlight);
-            if (oldHighlight !== newHighlight || currentHighlightCount > 0) {
-                // TODO: Handle mentions received while the client is offline
-                // See also https://github.com/vector-im/element-web/issues/9069
-                if (!room.hasUserReadEvent(this.getUserId(), event.getId())) {
-                    let newCount = currentHighlightCount;
-                    if (newHighlight && !oldHighlight) newCount++;
-                    if (!newHighlight && oldHighlight) newCount--;
-                    room.setUnreadNotificationCount(NotificationCountType.Highlight, newCount);
-
-                    // Fix 'Mentions Only' rooms from not having the right badge count
-                    const totalCount = room.getUnreadNotificationCount(NotificationCountType.Total);
-                    if (totalCount < newCount) {
-                        room.setUnreadNotificationCount(NotificationCountType.Total, newCount);
-                    }
-                }
-            }
+            this.updateEncryptedRoomNotificationCount(event);
         });
 
         // Like above, we have to listen for read receipts from ourselves in order to
@@ -911,6 +882,35 @@ export class MatrixClient extends EventEmitter {
                 room.setUnreadNotificationCount("highlight", highlightCount);
             }
         });
+    }
+
+    /**
+     * In encrypted rooms we can't rely on the server giving as the right
+     * notification count as it can't see the event type and message content.
+     * Therefore we increment the counters manually client-side
+     */
+    private updateEncryptedRoomNotificationCount(event: MatrixEvent): void {
+        const room = this.getRoom(event.getRoomId());
+        const actions = this.pushProcessor.actionsForEvent(event);
+        event.setPushActions(actions); // Might as well while we're here
+
+        if (!room) return;
+        // If the user has already read the message don't increase counters
+        if (room.hasUserReadEvent(this.getUserId(), event.getId())) return;
+
+        const currentHighlightCount = room.getUnreadNotificationCount(NotificationCountType.Highlight);
+        const currentTotalCount = room.getUnreadNotificationCount(NotificationCountType.Total);
+
+        const newHighlight = Boolean(actions?.tweaks?.highlight);
+        const newNotify = Boolean(actions?.notify);
+
+        if (newHighlight) {
+            room.setUnreadNotificationCount(NotificationCountType.Highlight, currentHighlightCount + 1);
+        }
+
+        if (newNotify) {
+            room.setUnreadNotificationCount(NotificationCountType.Total, currentTotalCount + 1);
+        }
     }
 
     /**
