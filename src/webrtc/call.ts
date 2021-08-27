@@ -120,6 +120,8 @@ export enum CallEvent {
     FeedsChanged = 'feeds_changed',
 
     AssertedIdentityChanged = 'asserted_identity_changed',
+
+    LengthChanged = 'length_changed'
 }
 
 export enum CallErrorCode {
@@ -312,6 +314,9 @@ export class MatrixCall extends EventEmitter {
     private remoteAssertedIdentity: AssertedIdentity;
 
     private remoteSDPStreamMetadata: SDPStreamMetadata;
+
+    private callLengthInterval: number;
+    private callLength = 0;
 
     constructor(opts: CallOpts) {
         super();
@@ -1485,6 +1490,10 @@ export class MatrixCall extends EventEmitter {
         // chrome doesn't implement any of the 'onstarted' events yet
         if (this.peerConn.iceConnectionState == 'connected') {
             this.setState(CallState.Connected);
+            this.callLengthInterval = setInterval(() => {
+                this.callLength++;
+                this.emit(CallEvent.LengthChanged, this.callLength);
+            }, 1000);
         } else if (this.peerConn.iceConnectionState == 'failed') {
             this.hangup(CallErrorCode.IceFailed, false);
         }
@@ -1734,6 +1743,10 @@ export class MatrixCall extends EventEmitter {
         if (this.inviteTimeout) {
             clearTimeout(this.inviteTimeout);
             this.inviteTimeout = null;
+        }
+        if (this.callLengthInterval) {
+            clearInterval(this.callLengthInterval);
+            this.callLengthInterval = null;
         }
 
         // Order is important here: first we stopAllMedia() and only then we can deleteAllFeeds()
