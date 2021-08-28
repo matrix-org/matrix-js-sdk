@@ -1,6 +1,8 @@
 // allow non-camelcase as these are events type that go onto the wire
 /* eslint-disable camelcase */
 
+import { CallErrorCode } from "./call";
+
 // TODO: Change to "sdp_stream_metadata" when MSC3077 is merged
 export const SDPStreamMetadataKey = "org.matrix.msc3077.sdp_stream_metadata";
 
@@ -19,11 +21,6 @@ export interface SDPStreamMetadata {
     [key: string]: SDPStreamMetadataObject;
 }
 
-interface CallOfferAnswer {
-    type: string;
-    sdp: string;
-}
-
 export interface CallCapabilities {
     'm.call.transferee': boolean;
     'm.call.dtmf': boolean;
@@ -35,29 +32,56 @@ export interface CallReplacesTarget {
     avatar_url: string;
 }
 
-export interface MCallAnswer {
-    answer: CallOfferAnswer;
-    capabilities: CallCapabilities;
+export interface MCallBase {
+    call_id: string;
+    version: string | number;
+    party_id?: string;
+}
+
+export interface MCallAnswer extends MCallBase {
+    answer: RTCSessionDescription;
+    capabilities?: CallCapabilities;
     [SDPStreamMetadataKey]: SDPStreamMetadata;
 }
 
-export interface MCallOfferNegotiate {
-    offer: CallOfferAnswer;
-    description: CallOfferAnswer;
+export interface MCallSelectAnswer extends MCallBase {
+    selected_party_id: string;
+}
+
+export interface MCallInviteNegotiate extends MCallBase {
+    offer: RTCSessionDescription;
+    description: RTCSessionDescription;
     lifetime: number;
-    capabilities: CallCapabilities;
+    capabilities?: CallCapabilities;
     [SDPStreamMetadataKey]: SDPStreamMetadata;
 }
 
-export interface MCallSDPStreamMetadataChanged {
+export interface MCallSDPStreamMetadataChanged extends MCallBase {
     [SDPStreamMetadataKey]: SDPStreamMetadata;
 }
 
-export interface MCallReplacesEvent {
+export interface MCallReplacesEvent extends MCallBase {
     replacement_id: string;
     target_user: CallReplacesTarget;
     create_call: string;
     await_call: string;
     target_room: string;
 }
+
+export interface MCAllAssertedIdentity extends MCallBase {
+    asserted_identity: {
+        id: string;
+        display_name: string;
+        avatar_url: string;
+    };
+}
+
+export interface MCallCandidates extends MCallBase {
+    candidates: RTCIceCandidate[];
+}
+
+export interface MCallHangupReject extends MCallBase {
+    reason?: CallErrorCode;
+}
+
 /* eslint-enable camelcase */
