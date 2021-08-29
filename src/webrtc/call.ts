@@ -251,7 +251,6 @@ function genCallID(): string {
  */
 export class MatrixCall extends EventEmitter {
     public roomId: string;
-    public type: CallType = null;
     public callId: string;
     public state = CallState.Fledgling;
     public hangupParty: CallParty;
@@ -357,6 +356,25 @@ export class MatrixCall extends EventEmitter {
 
     public getRemoteAssertedIdentity(): AssertedIdentity {
         return this.remoteAssertedIdentity;
+    }
+
+    public get type(): CallType {
+        return (this.hasLocalUserMediaVideoTrack || this.hasRemoteUserMediaVideoTrack)
+            ? CallType.Video
+            : CallType.Voice;
+    }
+
+    public get hasLocalUserMediaVideoTrack(): boolean {
+        return this.localUsermediaStream?.getVideoTracks().length > 0;
+    }
+
+    public get hasRemoteUserMediaVideoTrack(): boolean {
+        return this.getRemoteFeeds().some((feed) => {
+            return (
+                feed.purpose === SDPStreamMetadataPurpose.Usermedia &&
+                feed.stream.getVideoTracks().length > 0
+            );
+        });
     }
 
     public get localUsermediaFeed(): CallFeed {
@@ -617,8 +635,6 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        this.type = remoteStream.getTracks().some(t => t.kind === 'video') ? CallType.Video : CallType.Voice;
-
         this.setState(CallState.Ringing);
 
         if (event.getLocalAge()) {
@@ -656,7 +672,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        logger.debug(`Answering call ${this.callId} of type ${this.type}`);
+        logger.debug(`Answering call ${this.callId}`);
 
         if (!this.localUsermediaStream && !this.waitForLocalAVStream) {
             this.setState(CallState.WaitLocalMedia);
@@ -665,7 +681,7 @@ export class MatrixCall extends EventEmitter {
             try {
                 const mediaStream = await this.client.getMediaHandler().getUserMediaStream(
                     true,
-                    this.type === CallType.Video,
+                    this.hasRemoteUserMediaVideoTrack,
                 );
                 this.waitForLocalAVStream = false;
                 this.gotUserMediaForAnswer(mediaStream);
@@ -986,7 +1002,7 @@ export class MatrixCall extends EventEmitter {
         this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
         this.setState(CallState.CreateOffer);
 
-        logger.debug("gotUserMediaForInvite -> " + this.type);
+        logger.debug("gotUserMediaForInvite");
         // Now we wait for the negotiationneeded event
     };
 
@@ -1803,7 +1819,6 @@ export class MatrixCall extends EventEmitter {
         if (!audio) {
             throw new Error("You CANNOT start a call without audio");
         }
-        this.type = video ? CallType.Video : CallType.Voice;
         this.checkForErrorListener();
         // XXX Find a better way to do this
         this.client.callEventHandler.calls.set(this.callId, this);
