@@ -34,6 +34,7 @@ declare global {
 
     interface Window {
         electron?: Electron;
+        webkitAudioContext: typeof AudioContext;
     }
 
     interface Electron {
