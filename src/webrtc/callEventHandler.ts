@@ -80,7 +80,7 @@ export class CallEventHandler {
                     continue;
                 }
                 try {
-                    this.handleCallEvent(e);
+                    await this.handleCallEvent(e);
                 } catch (e) {
                     logger.error("Caught exception handling call event", e);
                 }
@@ -100,7 +100,7 @@ export class CallEventHandler {
 
         if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
             // add an event listener for once the event is decrypted.
-            event.once("Event.decrypted", () => {
+            event.once("Event.decrypted", async () => {
                 if (!this.eventIsACall(event)) return;
 
                 if (this.callEventBuffer.includes(event)) {
@@ -110,7 +110,7 @@ export class CallEventHandler {
                     // This one wasn't buffered so just run the event handler for it
                     // straight away
                     try {
-                        this.handleCallEvent(event);
+                        await this.handleCallEvent(event);
                     } catch (e) {
                         logger.error("Caught exception handling call event", e);
                     }
@@ -173,7 +173,7 @@ export class CallEventHandler {
             }
 
             call.callId = content.call_id;
-            const initWithInvitePromise = call.initWithInvite(event);
+            await call.initWithInvite(event);
             this.calls.set(call.callId, call);
 
             // if we stashed candidate events for that call ID, play them back now
@@ -215,8 +215,6 @@ export class CallEventHandler {
                         "Glare detected: answering incoming call " + call.callId +
                         " and canceling outgoing call " + existingCall.callId,
                     );
-                    // Await init with invite as we need a peerConn for the following methods
-                    await initWithInvitePromise;
                     existingCall.replacedBy(call);
                     call.answer();
                 } else {
@@ -231,6 +229,7 @@ export class CallEventHandler {
                     this.client.emit("Call.incoming", call);
                 });
             }
+            return;
         } else if (type === EventType.CallCandidates) {
             if (weSentTheEvent) return;
 
@@ -243,6 +242,7 @@ export class CallEventHandler {
             } else {
                 call.onRemoteIceCandidatesReceived(event);
             }
+            return;
         } else if ([EventType.CallHangup, EventType.CallReject].includes(type)) {
             // Note that we also observe our own hangups here so we can see
             // if we've already rejected a call that would otherwise be valid
@@ -266,10 +266,14 @@ export class CallEventHandler {
                     this.calls.delete(content.call_id);
                 }
             }
+            return;
         }
 
-        // The following events need a call
-        if (!call) return;
+        // The following events need a call and a peer connection
+        if (!call || !call.hasPeerConnection) {
+            logger.warn("Discarding an event, we don't have a call/peerConn", type);
+            return;
+        }
         // Ignore remote echo
         if (event.getContent().party_id === call.ourPartyId) return;
 

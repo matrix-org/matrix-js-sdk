@@ -28,6 +28,7 @@ import { EventType, MsgType, RelationType } from "../@types/event";
 import { Crypto } from "../crypto";
 import { deepSortedObjectEntries } from "../utils";
 import { RoomMember } from "./room-member";
+import { IActionsObject } from '../pushprocessor';
 
 /**
  * Enum for event statuses.
@@ -148,7 +149,7 @@ export interface IDecryptOptions {
 }
 
 export class MatrixEvent extends EventEmitter {
-    private pushActions: object = null;
+    private pushActions: IActionsObject = null;
     private _replacingEvent: MatrixEvent = null;
     private _localRedactionEvent: MatrixEvent = null;
     private _isCancelled = false;
@@ -947,7 +948,7 @@ export class MatrixEvent extends EventEmitter {
      *
      * @return {?Object} push actions
      */
-    public getPushActions(): object | null {
+    public getPushActions(): IActionsObject | null {
         return this.pushActions;
     }
 
@@ -956,7 +957,7 @@ export class MatrixEvent extends EventEmitter {
      *
      * @param {Object} pushActions push actions
      */
-    public setPushActions(pushActions: object): void {
+    public setPushActions(pushActions: IActionsObject): void {
         this.pushActions = pushActions;
     }
 
@@ -1234,10 +1235,15 @@ export class MatrixEvent extends EventEmitter {
     }
 
     /**
-     * Summarise the event as JSON for debugging. If encrypted, include both the
-     * decrypted and encrypted view of the event. This is named `toJSON` for use
-     * with `JSON.stringify` which checks objects for functions named `toJSON`
-     * and will call them to customise the output if they are defined.
+     * Summarise the event as JSON. This is currently used by React SDK's view
+     * event source feature and Seshat's event indexing, so take care when
+     * adjusting the output here.
+     *
+     * If encrypted, include both the decrypted and encrypted view of the event.
+     *
+     * This is named `toJSON` for use with `JSON.stringify` which checks objects
+     * for functions named `toJSON` and will call them to customise the output
+     * if they are defined.
      *
      * @return {Object}
      */

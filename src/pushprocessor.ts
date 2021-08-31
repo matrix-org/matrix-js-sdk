@@ -1,6 +1,5 @@
 /*
-Copyright 2015, 2016 OpenMarket Ltd
-Copyright 2017 New Vector Ltd
+Copyright 2015 - 2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,12 +16,36 @@ limitations under the License.
 
 import { escapeRegExp, globToRegexp, isNullOrUndefined } from "./utils";
 import { logger } from './logger';
+import { MatrixClient } from "./client";
+import { MatrixEvent } from "./models/event";
+import {
+    ConditionKind,
+    IAnnotatedPushRule,
+    IContainsDisplayNameCondition,
+    IEventMatchCondition,
+    IPushRule,
+    IPushRules,
+    IRoomMemberCountCondition,
+    ISenderNotificationPermissionCondition,
+    PushRuleAction,
+    PushRuleActionName,
+    PushRuleCondition,
+    PushRuleKind,
+    PushRuleSet,
+    TweakName,
+} from "./@types/PushRules";
 
 /**
  * @module pushprocessor
  */
 
-const RULEKINDS_IN_ORDER = ['override', 'content', 'room', 'sender', 'underride'];
+const RULEKINDS_IN_ORDER = [
+    PushRuleKind.Override,
+    PushRuleKind.ContentSpecific,
+    PushRuleKind.RoomSpecific,
+    PushRuleKind.SenderSpecific,
+    PushRuleKind.Underride,
+];
 
 // The default override rules to apply to the push rules that arrive from the server.
 // We do this for two reasons:
@@ -31,7 +54,7 @@ const RULEKINDS_IN_ORDER = ['override', 'content', 'room', 'sender', 'underride'
 //      more details.
 //   2. We often want to start using push rules ahead of the server supporting them,
 //      and so we can put them here.
-const DEFAULT_OVERRIDE_RULES = [
+const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
     {
         // For homeservers which don't support MSC1930 yet
         rule_id: ".m.rule.tombstone",
@@ -39,20 +62,20 @@ const DEFAULT_OVERRIDE_RULES = [
         enabled: true,
         conditions: [
             {
-                kind: "event_match",
+                kind: ConditionKind.EventMatch,
                 key: "type",
                 pattern: "m.room.tombstone",
             },
             {
-                kind: "event_match",
+                kind: ConditionKind.EventMatch,
                 key: "state_key",
                 pattern: "",
             },
         ],
         actions: [
-            "notify",
+            PushRuleActionName.Notify,
             {
-                set_tweak: "highlight",
+                set_tweak: TweakName.Highlight,
                 value: true,
             },
         ],
@@ -64,31 +87,97 @@ const DEFAULT_OVERRIDE_RULES = [
         enabled: true,
         conditions: [
             {
-                kind: "event_match",
+                kind: ConditionKind.EventMatch,
                 key: "type",
                 pattern: "m.reaction",
             },
         ],
         actions: [
-            "dont_notify",
+            PushRuleActionName.DontNotify,
         ],
     },
 ];
 
-/**
- * Construct a Push Processor.
- * @constructor
- * @param {Object} client The Matrix client object to use
- */
-export function PushProcessor(client) {
-    const cachedGlobToRegex = {
-        // $glob: RegExp,
-    };
+export interface IActionsObject {
+    notify: boolean;
+    tweaks: Partial<Record<TweakName, any>>;
+}
 
-    const matchingRuleFromKindSet = (ev, kindset) => {
-        for (let ruleKindIndex = 0;
-                ruleKindIndex < RULEKINDS_IN_ORDER.length;
-                ++ruleKindIndex) {
+export class PushProcessor {
+    /**
+     * Construct a Push Processor.
+     * @constructor
+     * @param {Object} client The Matrix client object to use
+     */
+    constructor(private readonly client: MatrixClient) {}
+
+    /**
+     * Convert a list of actions into a object with the actions as keys and their values
+     * eg. [ 'notify', { set_tweak: 'sound', value: 'default' } ]
+     *     becomes { notify: true, tweaks: { sound: 'default' } }
+     * @param {array} actionList The actions list
+     *
+     * @return {object} A object with key 'notify' (true or false) and an object of actions
+     */
+    public static actionListToActionsObject(actionList: PushRuleAction[]): IActionsObject {
+        const actionObj: IActionsObject = { notify: false, tweaks: {} };
+        for (let i = 0; i < actionList.length; ++i) {
+            const action = actionList[i];
+            if (action === PushRuleActionName.Notify) {
+                actionObj.notify = true;
+            } else if (typeof action === 'object') {
+                if (action.value === undefined) {
+                    action.value = true;
+                }
+                actionObj.tweaks[action.set_tweak] = action.value;
+            }
+        }
+        return actionObj;
+    }
+
+    /**
+     * Rewrites conditions on a client's push rules to match the defaults
+     * where applicable. Useful for upgrading push rules to more strict
+     * conditions when the server is falling behind on defaults.
+     * @param {object} incomingRules The client's existing push rules
+     * @returns {object} The rewritten rules
+     */
+    public static rewriteDefaultRules(incomingRules: IPushRules): IPushRules {
+        let newRules: IPushRules = JSON.parse(JSON.stringify(incomingRules)); // deep clone
+
+        // These lines are mostly to make the tests happy. We shouldn't run into these
+        // properties missing in practice.
+        if (!newRules) newRules = {} as IPushRules;
+        if (!newRules.global) newRules.global = {} as PushRuleSet;
+        if (!newRules.global.override) newRules.global.override = [];
+
+        // Merge the client-level defaults with the ones from the server
+        const globalOverrides = newRules.global.override;
+        for (const override of DEFAULT_OVERRIDE_RULES) {
+            const existingRule = globalOverrides
+                .find((r) => r.rule_id === override.rule_id);
+
+            if (existingRule) {
+                // Copy over the actions, default, and conditions. Don't touch the user's
+                // preference.
+                existingRule.default = override.default;
+                existingRule.conditions = override.conditions;
+                existingRule.actions = override.actions;
+            } else {
+                // Add the rule
+                const ruleId = override.rule_id;
+                logger.warn(`Adding default global override for ${ruleId}`);
+                globalOverrides.push(override);
+            }
+        }
+
+        return newRules;
+    }
+
+    private static cachedGlobToRegex: Record<string, RegExp> = {}; // $glob: RegExp
+
+    private matchingRuleFromKindSet(ev: MatrixEvent, kindset: PushRuleSet): IAnnotatedPushRule {
+        for (let ruleKindIndex = 0; ruleKindIndex < RULEKINDS_IN_ORDER.length; ++ruleKindIndex) {
             const kind = RULEKINDS_IN_ORDER[ruleKindIndex];
             const ruleset = kindset[kind];
             if (!ruleset) {
@@ -101,89 +190,96 @@ export function PushProcessor(client) {
                     continue;
                 }
 
-                const rawrule = templateRuleToRaw(kind, rule);
+                const rawrule = this.templateRuleToRaw(kind, rule);
                 if (!rawrule) {
                     continue;
                 }
 
                 if (this.ruleMatchesEvent(rawrule, ev)) {
-                    rule.kind = kind;
-                    return rule;
+                    return {
+                        ...rule,
+                        kind,
+                    };
                 }
             }
         }
         return null;
-    };
+    }
 
-    const templateRuleToRaw = function(kind, tprule) {
+    private templateRuleToRaw(kind: PushRuleKind, tprule: any): any {
         const rawrule = {
             'rule_id': tprule.rule_id,
             'actions': tprule.actions,
             'conditions': [],
         };
         switch (kind) {
-            case 'underride':
-            case 'override':
+            case PushRuleKind.Underride:
+            case PushRuleKind.Override:
                 rawrule.conditions = tprule.conditions;
                 break;
-            case 'room':
+            case PushRuleKind.RoomSpecific:
                 if (!tprule.rule_id) {
                     return null;
                 }
                 rawrule.conditions.push({
-                    'kind': 'event_match',
+                    'kind': ConditionKind.EventMatch,
                     'key': 'room_id',
                     'value': tprule.rule_id,
                 });
                 break;
-            case 'sender':
+            case PushRuleKind.SenderSpecific:
                 if (!tprule.rule_id) {
                     return null;
                 }
                 rawrule.conditions.push({
-                    'kind': 'event_match',
+                    'kind': ConditionKind.EventMatch,
                     'key': 'user_id',
                     'value': tprule.rule_id,
                 });
                 break;
-            case 'content':
+            case PushRuleKind.ContentSpecific:
                 if (!tprule.pattern) {
                     return null;
                 }
                 rawrule.conditions.push({
-                    'kind': 'event_match',
+                    'kind': ConditionKind.EventMatch,
                     'key': 'content.body',
                     'pattern': tprule.pattern,
                 });
                 break;
         }
         return rawrule;
-    };
+    }
 
-    const eventFulfillsCondition = function(cond, ev) {
-        const condition_functions = {
-            "event_match": eventFulfillsEventMatchCondition,
-            "contains_display_name": eventFulfillsDisplayNameCondition,
-            "room_member_count": eventFulfillsRoomMemberCountCondition,
-            "sender_notification_permission": eventFulfillsSenderNotifPermCondition,
-        };
-        if (condition_functions[cond.kind]) {
-            return condition_functions[cond.kind](cond, ev);
+    private eventFulfillsCondition(cond: PushRuleCondition, ev: MatrixEvent): boolean {
+        switch (cond.kind) {
+            case ConditionKind.EventMatch:
+                return this.eventFulfillsEventMatchCondition(cond, ev);
+            case ConditionKind.ContainsDisplayName:
+                return this.eventFulfillsDisplayNameCondition(cond, ev);
+            case ConditionKind.RoomMemberCount:
+                return this.eventFulfillsRoomMemberCountCondition(cond, ev);
+            case ConditionKind.SenderNotificationPermission:
+                return this.eventFulfillsSenderNotifPermCondition(cond, ev);
         }
+
         // unknown conditions: we previously matched all unknown conditions,
         // but given that rules can be added to the base rules on a server,
         // it's probably better to not match unknown conditions.
         return false;
-    };
+    }
 
-    const eventFulfillsSenderNotifPermCondition = function(cond, ev) {
+    private eventFulfillsSenderNotifPermCondition(
+        cond: ISenderNotificationPermissionCondition,
+        ev: MatrixEvent,
+    ): boolean {
         const notifLevelKey = cond['key'];
         if (!notifLevelKey) {
             return false;
         }
 
-        const room = client.getRoom(ev.getRoomId());
-        if (!room || !room.currentState) {
+        const room = this.client.getRoom(ev.getRoomId());
+        if (!room?.currentState) {
             return false;
         }
 
@@ -191,14 +287,14 @@ export function PushProcessor(client) {
         // the point the event is in the DAG. Unfortunately the js-sdk does not store
         // this.
         return room.currentState.mayTriggerNotifOfType(notifLevelKey, ev.getSender());
-    };
+    }
 
-    const eventFulfillsRoomMemberCountCondition = function(cond, ev) {
+    private eventFulfillsRoomMemberCountCondition(cond: IRoomMemberCountCondition, ev: MatrixEvent): boolean {
         if (!cond.is) {
             return false;
         }
 
-        const room = client.getRoom(ev.getRoomId());
+        const room = this.client.getRoom(ev.getRoomId());
         if (!room || !room.currentState || !room.currentState.members) {
             return false;
         }
@@ -229,9 +325,9 @@ export function PushProcessor(client) {
             default:
                 return false;
         }
-    };
+    }
 
-    const eventFulfillsDisplayNameCondition = function(cond, ev) {
+    private eventFulfillsDisplayNameCondition(cond: IContainsDisplayNameCondition, ev: MatrixEvent): boolean {
         let content = ev.getContent();
         if (ev.isEncrypted() && ev.getClearContent()) {
             content = ev.getClearContent();
@@ -240,26 +336,26 @@ export function PushProcessor(client) {
             return false;
         }
 
-        const room = client.getRoom(ev.getRoomId());
+        const room = this.client.getRoom(ev.getRoomId());
         if (!room || !room.currentState || !room.currentState.members ||
-            !room.currentState.getMember(client.credentials.userId)) {
+            !room.currentState.getMember(this.client.credentials.userId)) {
             return false;
         }
 
-        const displayName = room.currentState.getMember(client.credentials.userId).name;
+        const displayName = room.currentState.getMember(this.client.credentials.userId).name;
 
         // N.B. we can't use \b as it chokes on unicode. however \W seems to be okay
         // as shorthand for [^0-9A-Za-z_].
         const pat = new RegExp("(^|\\W)" + escapeRegExp(displayName) + "(\\W|$)", 'i');
         return content.body.search(pat) > -1;
-    };
+    }
 
-    const eventFulfillsEventMatchCondition = function(cond, ev) {
+    private eventFulfillsEventMatchCondition(cond: IEventMatchCondition, ev: MatrixEvent): boolean {
         if (!cond.key) {
             return false;
         }
 
-        const val = valueForDottedKey(cond.key, ev);
+        const val = this.valueForDottedKey(cond.key, ev);
         if (typeof val !== 'string') {
             return false;
         }
@@ -275,26 +371,26 @@ export function PushProcessor(client) {
         let regex;
 
         if (cond.key == 'content.body') {
-            regex = createCachedRegex('(^|\\W)', cond.pattern, '(\\W|$)');
+            regex = this.createCachedRegex('(^|\\W)', cond.pattern, '(\\W|$)');
         } else {
-            regex = createCachedRegex('^', cond.pattern, '$');
+            regex = this.createCachedRegex('^', cond.pattern, '$');
         }
 
         return !!val.match(regex);
-    };
+    }
 
-    const createCachedRegex = function(prefix, glob, suffix) {
-        if (cachedGlobToRegex[glob]) {
-            return cachedGlobToRegex[glob];
+    private createCachedRegex(prefix: string, glob: string, suffix: string): RegExp {
+        if (PushProcessor.cachedGlobToRegex[glob]) {
+            return PushProcessor.cachedGlobToRegex[glob];
         }
-        cachedGlobToRegex[glob] = new RegExp(
+        PushProcessor.cachedGlobToRegex[glob] = new RegExp(
             prefix + globToRegexp(glob) + suffix,
             'i', // Case insensitive
         );
-        return cachedGlobToRegex[glob];
-    };
+        return PushProcessor.cachedGlobToRegex[glob];
+    }
 
-    const valueForDottedKey = function(key, ev) {
+    private valueForDottedKey(key: string, ev: MatrixEvent): any {
         const parts = key.split('.');
         let val;
 
@@ -319,23 +415,23 @@ export function PushProcessor(client) {
             val = val[thisPart];
         }
         return val;
-    };
+    }
 
-    const matchingRuleForEventWithRulesets = function(ev, rulesets) {
+    private matchingRuleForEventWithRulesets(ev: MatrixEvent, rulesets): IAnnotatedPushRule {
         if (!rulesets) {
             return null;
         }
-        if (ev.getSender() === client.credentials.userId) {
+        if (ev.getSender() === this.client.credentials.userId) {
             return null;
         }
 
-        return matchingRuleFromKindSet(ev, rulesets.global);
-    };
+        return this.matchingRuleFromKindSet(ev, rulesets.global);
+    }
 
-    const pushActionsForEventAndRulesets = function(ev, rulesets) {
-        const rule = matchingRuleForEventWithRulesets(ev, rulesets);
+    private pushActionsForEventAndRulesets(ev: MatrixEvent, rulesets): IActionsObject {
+        const rule = this.matchingRuleForEventWithRulesets(ev, rulesets);
         if (!rule) {
-            return {};
+            return {} as IActionsObject;
         }
 
         const actionObj = PushProcessor.actionListToActionsObject(rule.actions);
@@ -344,21 +440,22 @@ export function PushProcessor(client) {
         if (actionObj.tweaks.highlight === undefined) {
             // if it isn't specified, highlight if it's a content
             // rule but otherwise not
-            actionObj.tweaks.highlight = (rule.kind == 'content');
+            actionObj.tweaks.highlight = (rule.kind == PushRuleKind.ContentSpecific);
         }
 
         return actionObj;
-    };
+    }
 
-    this.ruleMatchesEvent = function(rule, ev) {
+    public ruleMatchesEvent(rule: IPushRule, ev: MatrixEvent): boolean {
         let ret = true;
         for (let i = 0; i < rule.conditions.length; ++i) {
             const cond = rule.conditions[i];
-            ret &= eventFulfillsCondition(cond, ev);
+            // @ts-ignore
+            ret &= this.eventFulfillsCondition(cond, ev);
         }
         //console.log("Rule "+rule.rule_id+(ret ? " matches" : " doesn't match"));
         return ret;
-    };
+    }
 
     /**
      * Get the user's push actions for the given event
@@ -367,9 +464,9 @@ export function PushProcessor(client) {
      *
      * @return {PushAction}
      */
-    this.actionsForEvent = function(ev) {
-        return pushActionsForEventAndRulesets(ev, client.pushRules);
-    };
+    public actionsForEvent(ev: MatrixEvent): IActionsObject {
+        return this.pushActionsForEventAndRulesets(ev, this.client.pushRules);
+    }
 
     /**
      * Get one of the users push rules by its ID
@@ -377,84 +474,21 @@ export function PushProcessor(client) {
      * @param {string} ruleId The ID of the rule to search for
      * @return {object} The push rule, or null if no such rule was found
      */
-    this.getPushRuleById = function(ruleId) {
+    public getPushRuleById(ruleId: string): IPushRule {
         for (const scope of ['global']) {
-            if (client.pushRules[scope] === undefined) continue;
+            if (this.client.pushRules[scope] === undefined) continue;
 
             for (const kind of RULEKINDS_IN_ORDER) {
-                if (client.pushRules[scope][kind] === undefined) continue;
+                if (this.client.pushRules[scope][kind] === undefined) continue;
 
-                for (const rule of client.pushRules[scope][kind]) {
+                for (const rule of this.client.pushRules[scope][kind]) {
                     if (rule.rule_id === ruleId) return rule;
                 }
             }
         }
         return null;
-    };
+    }
 }
-
-/**
- * Convert a list of actions into a object with the actions as keys and their values
- * eg. [ 'notify', { set_tweak: 'sound', value: 'default' } ]
- *     becomes { notify: true, tweaks: { sound: 'default' } }
- * @param {array} actionlist The actions list
- *
- * @return {object} A object with key 'notify' (true or false) and an object of actions
- */
-PushProcessor.actionListToActionsObject = function(actionlist) {
-    const actionobj = { 'notify': false, 'tweaks': {} };
-    for (let i = 0; i < actionlist.length; ++i) {
-        const action = actionlist[i];
-        if (action === 'notify') {
-            actionobj.notify = true;
-        } else if (typeof action === 'object') {
-            if (action.value === undefined) {
-                action.value = true;
-            }
-            actionobj.tweaks[action.set_tweak] = action.value;
-        }
-    }
-    return actionobj;
-};
-
-/**
- * Rewrites conditions on a client's push rules to match the defaults
- * where applicable. Useful for upgrading push rules to more strict
- * conditions when the server is falling behind on defaults.
- * @param {object} incomingRules The client's existing push rules
- * @returns {object} The rewritten rules
- */
-PushProcessor.rewriteDefaultRules = function(incomingRules) {
-    let newRules = JSON.parse(JSON.stringify(incomingRules)); // deep clone
-
-    // These lines are mostly to make the tests happy. We shouldn't run into these
-    // properties missing in practice.
-    if (!newRules) newRules = {};
-    if (!newRules.global) newRules.global = {};
-    if (!newRules.global.override) newRules.global.override = [];
-
-    // Merge the client-level defaults with the ones from the server
-    const globalOverrides = newRules.global.override;
-    for (const override of DEFAULT_OVERRIDE_RULES) {
-        const existingRule = globalOverrides
-            .find((r) => r.rule_id === override.rule_id);
-
-        if (existingRule) {
-            // Copy over the actions, default, and conditions. Don't touch the user's
-            // preference.
-            existingRule.default = override.default;
-            existingRule.conditions = override.conditions;
-            existingRule.actions = override.actions;
-        } else {
-            // Add the rule
-            const ruleId = override.rule_id;
-            logger.warn(`Adding default global override for ${ruleId}`);
-            globalOverrides.push(override);
-        }
-    }
-
-    return newRules;
-};
 
 /**
  * @typedef {Object} PushAction

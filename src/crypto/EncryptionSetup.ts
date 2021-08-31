@@ -59,7 +59,7 @@ export class EncryptionSetupBuilder {
      * @param {Object.<String, MatrixEvent>} accountData pre-existing account data, will only be read, not written.
      * @param {CryptoCallbacks} delegateCryptoCallbacks crypto callbacks to delegate to if the key isn't in cache yet
      */
-    constructor(accountData: Record<string, MatrixEvent>, delegateCryptoCallbacks: ICryptoCallbacks) {
+    constructor(accountData: Record<string, MatrixEvent>, delegateCryptoCallbacks?: ICryptoCallbacks) {
         this.accountDataClientAdapter = new AccountDataClientAdapter(accountData);
         this.crossSigningCallbacks = new CrossSigningCallbacks();
         this.ssssCryptoCallbacks = new SSSSCryptoCallbacks(delegateCryptoCallbacks);
@@ -351,12 +351,12 @@ class CrossSigningCallbacks implements ICryptoCallbacks, ICacheCallbacks {
 class SSSSCryptoCallbacks {
     private readonly privateKeys = new Map<string, Uint8Array>();
 
-    constructor(private readonly delegateCryptoCallbacks: ICryptoCallbacks) {}
+    constructor(private readonly delegateCryptoCallbacks?: ICryptoCallbacks) {}
 
     public async getSecretStorageKey(
         { keys }: { keys: Record<string, ISecretStorageKeyInfo> },
         name: string,
-    ): Promise<[string, Uint8Array]> {
+    ): Promise<[string, Uint8Array]|null> {
         for (const keyId of Object.keys(keys)) {
             const privateKey = this.privateKeys.get(keyId);
             if (privateKey) {
@@ -365,7 +365,7 @@ class SSSSCryptoCallbacks {
         }
         // if we don't have the key cached yet, ask
         // for it to the general crypto callbacks and cache it
-        if (this.delegateCryptoCallbacks) {
+        if (this?.delegateCryptoCallbacks?.getSecretStorageKey) {
             const result = await this.delegateCryptoCallbacks.
                 getSecretStorageKey({ keys }, name);
             if (result) {
@@ -374,6 +374,7 @@ class SSSSCryptoCallbacks {
             }
             return result;
         }
+        return null;
     }
 
     public addPrivateKey(keyId: string, keyInfo: ISecretStorageKeyInfo, privKey: Uint8Array): void {
