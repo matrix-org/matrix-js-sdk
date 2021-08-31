@@ -226,9 +226,7 @@ export class CallEventHandler {
                     call.hangup(CallErrorCode.Replaced, true);
                 }
             } else {
-                initWithInvitePromise.then(() => {
-                    this.client.emit("Call.incoming", call);
-                });
+                this.client.emit("Call.incoming", call);
             }
             return;
         } else if (type === EventType.CallCandidates) {
