@@ -35,6 +35,7 @@ import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersio
 import { ResizeMethod } from "../@types/partials";
 import { Filter } from "../filter";
 import { RoomState } from "./room-state";
+import { Thread } from "./thread";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -144,6 +145,11 @@ export class Room extends EventEmitter {
     public timeline: MatrixEvent[];
     public oldState: RoomState;
     public currentState: RoomState;
+
+    /**
+     * @experimental
+     */
+    public threads = new Set<Thread>();
 
     /**
      * Construct a new Room.
@@ -857,13 +863,26 @@ export class Room extends EventEmitter {
     }
 
     /**
-     * Get an event which is stored in our unfiltered timeline set
+     * Get an event which is stored in our unfiltered timeline set or in a thread
      *
      * @param {string} eventId  event ID to look for
      * @return {?module:models/event.MatrixEvent} the given event, or undefined if unknown
      */
     public findEventById(eventId: string): MatrixEvent | undefined {
-        return this.getUnfilteredTimelineSet().findEventById(eventId);
+        let event = this.getUnfilteredTimelineSet().findEventById(eventId);
+
+        if (event) {
+            return event;
+        } else {
+            const threads = this.getThreads();
+            for (let i = 0; i < threads.length; i++) {
+                const thread = threads[i];
+                event = thread.findEventById(eventId);
+                if (event) {
+                    return event;
+                }
+            }
+        }
     }
 
     /**
@@ -1050,6 +1069,54 @@ export class Room extends EventEmitter {
     }
 
     /**
+     * @experimental
+     */
+    public addThread(thread: Thread): Set<Thread> {
+        this.threads.add(thread);
+        if (!thread.ready) {
+            thread.once("Thread.ready", this.dedupeThreads);
+            this.emit("Thread.update", thread);
+            this.reEmitter.reEmit(thread, ["Thread.update", "Thread.ready"]);
+        }
+        return this.threads;
+    }
+
+    /**
+     * @experimental
+     */
+    public getThread(eventId: string): Thread {
+        return this.getThreads().find(thread => {
+            return thread.id === eventId;
+        });
+    }
+
+    /**
+     * @experimental
+     */
+    public getThreads(): Thread[] {
+        return Array.from(this.threads.values());
+    }
+
+    /**
+     * Two threads starting from a different child event can end up
+     * with the same event root. This method ensures that the duplicates
+     * are removed
+     * @experimental
+     */
+    private dedupeThreads = (readyThread): void => {
+        const threads = Array.from(this.threads);
+        if (threads.includes(readyThread)) {
+            this.threads = new Set(threads.filter(thread => {
+                if (readyThread.id === thread.id && readyThread !== thread) {
+                    return false;
+                } else {
+                    return true;
+                }
+            }));
+        }
+    };
+
+    /**
      * Get a member from the current room state.
      * @param {string} userId The user ID of the member.
      * @return {RoomMember} The member or <code>null</code>.
@@ -1222,6 +1289,28 @@ export class Room extends EventEmitter {
         const i = this.timelineSets.indexOf(timelineSet);
         if (i > -1) {
             this.timelineSets.splice(i, 1);
+        }
+    }
+
+    /**
+     * Add an event to a thread's timeline. Will fire "Thread.update"
+     * @experimental
+     */
+    public addThreadedEvent(event: MatrixEvent): void {
+        if (event.getUnsigned().transaction_id) {
+            const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id];
+            if (existingEvent) {
+                // remote echo of an event we sent earlier
+                this.handleRemoteEcho(event, existingEvent);
+            }
+        }
+
+        let thread = this.findEventById(event.replyEventId)?.getThread();
+        if (thread) {
+            thread.addEvent(event);
+        } else {
+            thread = new Thread([event], this, this.client);
+            this.addThread(thread);
         }
     }
 
