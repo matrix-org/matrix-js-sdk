@@ -346,7 +346,7 @@ export class MatrixCall extends EventEmitter {
      * Place a voice call to this room.
      * @throws If you have not specified a listener for 'error' events.
      */
-    async placeVoiceCall(): Promise<void> {
+    public async placeVoiceCall(): Promise<void> {
         logger.debug("placeVoiceCall");
         this.checkForErrorListener();
         const constraints = getUserMediaContraints(ConstraintsType.Audio);
@@ -358,7 +358,7 @@ export class MatrixCall extends EventEmitter {
      * Place a video call to this room.
      * @throws If you have not specified a listener for 'error' events.
      */
-    async placeVideoCall(): Promise<void> {
+    public async placeVideoCall(): Promise<void> {
         logger.debug("placeVideoCall");
         this.checkForErrorListener();
         const constraints = getUserMediaContraints(ConstraintsType.Video);
