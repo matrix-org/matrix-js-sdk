@@ -1,5 +1,5 @@
-Changes in [12.4.0-rc.1](https://github.com/vector-im/element-desktop/releases/tag/v12.4.0-rc.1) (2021-08-24)
-=============================================================================================================
+Changes in [12.4.0](https://github.com/vector-im/element-desktop/releases/tag/v12.4.0) (2021-08-31)
+===================================================================================================
 
 ## 🦖 Deprecations
  * Deprecate groups APIs. Groups are no longer supported, only Synapse has support. They are being replaced by Spaces which build off of Rooms and are far more flexible. ([\#1792](https://github.com/matrix-org/matrix-js-sdk/pull/1792)).
