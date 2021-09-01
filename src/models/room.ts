@@ -32,7 +32,7 @@ import { logger } from '../logger';
 import { ReEmitter } from '../ReEmitter';
 import { EventType, RoomCreateTypeField, RoomType, UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../@types/event";
 import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
-import { ResizeMethod } from "../@types/partials";
+import { JoinRule, ResizeMethod } from "../@types/partials";
 import { Filter } from "../filter";
 import { RoomState } from "./room-state";
 import { Thread } from "./thread";
@@ -2062,7 +2062,7 @@ export class Room extends EventEmitter {
      * Returns the join rule based on the m.room.join_rule state event, defaulting to `invite`.
      * @returns {string} the join_rule applied to this room
      */
-    public getJoinRule(): string {
+    public getJoinRule(): JoinRule {
         return this.currentState.getJoinRule();
     }
 
