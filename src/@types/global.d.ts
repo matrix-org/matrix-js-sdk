@@ -62,12 +62,6 @@ declare global {
         };
     }
 
-    interface DesktopCapturerSource {
-        id: string;
-        name: string;
-        thumbnailURL: string;
-    }
-
     interface HTMLAudioElement {
         // sinkId & setSinkId are experimental and typescript doesn't know about them
         sinkId: string;

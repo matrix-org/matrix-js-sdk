@@ -84,6 +84,12 @@ interface AssertedIdentity {
     displayName: string;
 }
 
+export interface DesktopCapturerSource {
+    id: string;
+    name: string;
+    thumbnailURL: string;
+}
+
 export enum CallState {
     Fledgling = 'fledgling',
     InviteSent = 'invite_sent',
