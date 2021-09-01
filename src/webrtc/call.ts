@@ -226,21 +226,6 @@ const FALLBACK_ICE_SERVER = 'stun:turn.matrix.org';
 /** The length of time a call can be ringing for. */
 const CALL_TIMEOUT_MS = 60000;
 
-/** Retrieves sources from desktopCapturer */
-export function getDesktopCapturerSources(): Promise<Array<DesktopCapturerSource>> {
-    const options: GetSourcesOptions = {
-        thumbnailSize: {
-            height: 176,
-            width: 312,
-        },
-        types: [
-            "screen",
-            "window",
-        ],
-    };
-    return window.electron.getDesktopCapturerSources(options);
-}
-
 export class CallError extends Error {
     code: string;
 
