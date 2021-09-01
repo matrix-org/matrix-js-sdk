@@ -24,7 +24,12 @@ import { EventEmitter } from 'events';
 
 import { logger } from '../logger';
 import { VerificationRequest } from "../crypto/verification/request/VerificationRequest";
-import { EventType, MsgType, RelationType } from "../@types/event";
+import {
+    EventType,
+    MsgType,
+    RelationType,
+    UNSTABLE_ELEMENT_REPLY_IN_THREAD,
+} from "../@types/event";
 import { Crypto } from "../crypto";
 import { deepSortedObjectEntries } from "../utils";
 import { RoomMember } from "./room-member";
@@ -399,6 +404,17 @@ export class MatrixEvent extends EventEmitter {
     public get replyEventId(): string {
         const relations = this.getWireContent()["m.relates_to"];
         return relations?.["m.in_reply_to"]?.["event_id"];
+    }
+
+    /**
+     * @experimental
+     * Determines whether a reply should be rendered in a thread
+     * or in the main room timeline
+     */
+    public get replyInThread(): boolean {
+        const relations = this.getWireContent()["m.relates_to"];
+        return this.replyEventId
+            && relations[UNSTABLE_ELEMENT_REPLY_IN_THREAD.name];
     }
 
     /**
