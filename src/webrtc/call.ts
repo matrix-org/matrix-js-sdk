@@ -555,6 +555,10 @@ export class MatrixCall extends EventEmitter {
     }
 
     private deleteAllFeeds(): void {
+        for (const feed of this.feeds) {
+            feed.dispose();
+        }
+
         this.feeds = [];
         this.emit(CallEvent.FeedsChanged, this.feeds);
     }
@@ -568,6 +572,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
+        feed.dispose();
         this.feeds.splice(this.feeds.indexOf(feed), 1);
         this.emit(CallEvent.FeedsChanged, this.feeds);
     }
