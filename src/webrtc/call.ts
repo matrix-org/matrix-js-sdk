@@ -84,12 +84,6 @@ interface AssertedIdentity {
     displayName: string;
 }
 
-export interface DesktopCapturerSource {
-    id: string;
-    name: string;
-    thumbnailURL: string;
-}
-
 export enum CallState {
     Fledgling = 'fledgling',
     InviteSent = 'invite_sent',
@@ -775,11 +769,11 @@ export class MatrixCall extends EventEmitter {
     /**
      * Starts/stops screensharing
      * @param enabled the desired screensharing state
-     * @param desktopCapturerSource optional desktop capturer source to use
+     * @param {string} desktopCapturerSourceId optional id of the desktop capturer source to use
      * @returns {boolean} new screensharing state
      */
     public async setScreensharingEnabled(
-        enabled: boolean, desktopCapturerSource?: DesktopCapturerSource,
+        enabled: boolean, desktopCapturerSourceId?: string,
     ): Promise<boolean> {
         // Skip if there is nothing to do
         if (enabled && this.isScreensharing()) {
@@ -792,13 +786,13 @@ export class MatrixCall extends EventEmitter {
 
         // Fallback to replaceTrack()
         if (!this.opponentSupportsSDPStreamMetadata()) {
-            return await this.setScreensharingEnabledWithoutMetadataSupport(enabled, desktopCapturerSource);
+            return await this.setScreensharingEnabledWithoutMetadataSupport(enabled, desktopCapturerSourceId);
         }
 
         logger.debug(`Set screensharing enabled? ${enabled}`);
         if (enabled) {
             try {
-                const stream = await getScreensharingStream(desktopCapturerSource);
+                const stream = await getScreensharingStream(desktopCapturerSourceId);
                 if (!stream) return false;
                 this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Screenshare);
                 return true;
@@ -824,16 +818,16 @@ export class MatrixCall extends EventEmitter {
      * Starts/stops screensharing
      * Should be used ONLY if the opponent doesn't support SDPStreamMetadata
      * @param enabled the desired screensharing state
-     * @param desktopCapturerSource optional desktop capturer source to use
+     * @param {string} desktopCapturerSourceId optional id of the desktop capturer source to use
      * @returns {boolean} new screensharing state
      */
     private async setScreensharingEnabledWithoutMetadataSupport(
-        enabled: boolean, desktopCapturerSource?: DesktopCapturerSource,
+        enabled: boolean, desktopCapturerSourceId?: string,
     ): Promise<boolean> {
         logger.debug(`Set screensharing enabled? ${enabled} using replaceTrack()`);
         if (enabled) {
             try {
-                const stream = await getScreensharingStream(desktopCapturerSource);
+                const stream = await getScreensharingStream(desktopCapturerSourceId);
                 if (!stream) return false;
 
                 const track = stream.getTracks().find((track) => {
@@ -1915,11 +1909,11 @@ export class MatrixCall extends EventEmitter {
     }
 }
 
-async function getScreensharingStream(desktopCapturerSource: DesktopCapturerSource): Promise<MediaStream> {
-    const screenshareConstraints = getScreenshareContraints(desktopCapturerSource);
+async function getScreensharingStream(desktopCapturerSourceId: string): Promise<MediaStream> {
+    const screenshareConstraints = getScreenshareContraints(desktopCapturerSourceId);
     if (!screenshareConstraints) return null;
 
-    if (desktopCapturerSource) {
+    if (desktopCapturerSourceId) {
         // We are using Electron
         logger.debug("Getting screen stream using getUserMedia()...");
         return await navigator.mediaDevices.getUserMedia(screenshareConstraints);
@@ -1967,15 +1961,15 @@ function getUserMediaContraints(type: ConstraintsType): MediaStreamConstraints {
     }
 }
 
-function getScreenshareContraints(desktopCapturerSource?: DesktopCapturerSource): DesktopCapturerConstraints {
-    if (desktopCapturerSource) {
-        logger.debug("Using desktop capturer source", desktopCapturerSource);
+function getScreenshareContraints(desktopCapturerSourceId?: string): DesktopCapturerConstraints {
+    if (desktopCapturerSourceId) {
+        logger.debug("Using desktop capturer source", desktopCapturerSourceId);
         return {
             audio: false,
             video: {
                 mandatory: {
                     chromeMediaSource: "desktop",
-                    chromeMediaSourceId: desktopCapturerSource.id,
+                    chromeMediaSourceId: desktopCapturerSourceId,
                 },
             },
         };
