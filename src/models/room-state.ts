@@ -26,6 +26,7 @@ import * as utils from "../utils";
 import { EventType } from "../@types/event";
 import { MatrixEvent } from "./event";
 import { MatrixClient } from "../client";
+import { IJoinRuleEventContent, JoinRule } from "../@types/partials";
 
 // possible statuses for out-of-band member loading
 enum OobStatus {
@@ -728,10 +729,10 @@ export class RoomState extends EventEmitter {
      * Returns the join rule based on the m.room.join_rule state event, defaulting to `invite`.
      * @returns {string} the join_rule applied to this room
      */
-    public getJoinRule(): string {
+    public getJoinRule(): JoinRule {
         const joinRuleEvent = this.getStateEvents(EventType.RoomJoinRules, "");
-        const joinRuleContent = joinRuleEvent ? joinRuleEvent.getContent() : {};
-        return joinRuleContent["join_rule"] || "invite";
+        const joinRuleContent = joinRuleEvent?.getContent<IJoinRuleEventContent>() ?? {};
+        return joinRuleContent["join_rule"] || JoinRule.Invite;
     }
 
     private updateThirdPartyTokenCache(memberEvent: MatrixEvent): void {

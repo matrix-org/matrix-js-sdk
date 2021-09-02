@@ -55,12 +55,20 @@ export enum JoinRule {
      * @deprecated Reserved keyword. Should not be used. Not yet implemented.
      */
     Private = "private",
-    Knock = "knock", // MSC2403 - only valid inside experimental room versions at this time.
-    Restricted = "restricted", // MSC3083 - only valid inside experimental room versions at this time.
+    Knock = "knock",
+    Restricted = "restricted",
 }
 
 export enum RestrictedAllowType {
-    RoomMembership = "m.room_membership", // MSC3083 - only valid inside experimental room versions at this time.
+    RoomMembership = "m.room_membership",
+}
+
+export interface IJoinRuleEventContent {
+    join_rule: JoinRule; // eslint-disable-line camelcase
+    allow?: {
+        type: RestrictedAllowType;
+        room_id: string; // eslint-disable-line camelcase
+    }[];
 }
 
 export enum GuestAccess {

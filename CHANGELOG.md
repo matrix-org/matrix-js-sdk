@@ -1,3 +1,19 @@
+Changes in [12.4.0](https://github.com/vector-im/element-desktop/releases/tag/v12.4.0) (2021-08-31)
+===================================================================================================
+
+## 🦖 Deprecations
+ * Deprecate groups APIs. Groups are no longer supported, only Synapse has support. They are being replaced by Spaces which build off of Rooms and are far more flexible. ([\#1792](https://github.com/matrix-org/matrix-js-sdk/pull/1792)).
+
+## ✨ Features
+ * Add method for including extra fields when uploading to a tree space ([\#1850](https://github.com/matrix-org/matrix-js-sdk/pull/1850)).
+
+## 🐛 Bug Fixes
+ * Fix broken voice calls, no ringing and broken call notifications ([\#1858](https://github.com/matrix-org/matrix-js-sdk/pull/1858)). Fixes vector-im/element-web#18578 vector-im/element-web#18538 and vector-im/element-web#18578. Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+ * Revert "Fix glare related regressions" ([\#1857](https://github.com/matrix-org/matrix-js-sdk/pull/1857)).
+ * Fix glare related regressions ([\#1851](https://github.com/matrix-org/matrix-js-sdk/pull/1851)). Fixes vector-im/element-web#18538 and vector-im/element-web#18538. Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+ * Fix temporary call messages being handled without call  ([\#1834](https://github.com/matrix-org/matrix-js-sdk/pull/1834)). Contributed by [Palid](https://github.com/Palid).
+ * Fix conditional on returning file tree spaces ([\#1841](https://github.com/matrix-org/matrix-js-sdk/pull/1841)).
+
 Changes in [12.3.1](https://github.com/vector-im/element-desktop/releases/tag/v12.3.1) (2021-08-17)
 ===================================================================================================
 
