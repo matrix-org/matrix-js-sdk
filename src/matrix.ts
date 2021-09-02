@@ -53,6 +53,11 @@ export {
     setVideoInput as setMatrixCallVideoInput,
 } from "./webrtc/call";
 
+// TODO: This export is temporary and is only used for the local call feed for conference calls
+// Ideally conference calls will become a first-class concept and we will have a local call feed with
+// a lifecycle that matches the conference call, not individual calls to members.
+export { CallFeed } from "./webrtc/callFeed";
+
 // expose the underlying request object so different environments can use
 // different request libs (e.g. request or browser-request)
 let requestInstance;
