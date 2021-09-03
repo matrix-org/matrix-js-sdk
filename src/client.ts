@@ -895,6 +895,9 @@ export class MatrixClient extends EventEmitter {
      * Therefore we increment the counters manually client-side
      */
     private updateEncryptedRoomNotificationCount(event: MatrixEvent): void {
+        // TODO: Handle mentions received while the client is offline
+        // See also https://github.com/vector-im/element-web/issues/9069
+
         const room = this.getRoom(event.getRoomId());
         const actions = this.pushProcessor.actionsForEvent(event);
         event.setPushActions(actions); // Might as well while we're here
