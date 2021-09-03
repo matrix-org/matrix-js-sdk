@@ -315,7 +315,7 @@ export class SyncApi {
     public partitionThreadedEvents(events: MatrixEvent[]): [MatrixEvent[], MatrixEvent[]] {
         if (this.opts.experimentalThreadSupport) {
             return events.reduce((memo, event: MatrixEvent) => {
-                memo[event.replyEventId ? 1 : 0].push(event);
+                memo[event.replyInThread ? 1 : 0].push(event);
                 return memo;
             }, [[], []]);
         } else {
