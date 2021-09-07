@@ -78,6 +78,8 @@ interface IInitOpts {
  * @property {Object<string, string>} keysClaimed
  * @property {Array<string>} forwardingCurve25519KeyChain  Devices involved in forwarding
  *     this session to us (normally empty).
+ * @property {boolean=} untrusted whether this session is untrusted.
+ * @property {boolean=} sharedHistory whether this session exists during the room being set to shared history.
  */
 
 export interface InboundGroupSessionData {
@@ -233,7 +235,7 @@ export class OlmDevice {
      * Note that for now only the “account” and “sessions” stores are populated;
      * Other stores will be as with a new device.
      *
-     * @param {Object} exportedData Data exported from another device
+     * @param {IExportedDevice} exportedData Data exported from another device
      *     through the “export” method.
      * @param {Olm.Account} account an olm account to initialize
      */
