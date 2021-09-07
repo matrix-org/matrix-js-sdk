@@ -1446,7 +1446,7 @@ export class OlmDevice {
                 "room_id": sessionData.room_id,
                 "session_id": sessionId,
                 "session_key": session.export_session(messageIndex),
-                "forwarding_curve25519_key_chain": session.forwardingCurve25519KeyChain || [],
+                "forwarding_curve25519_key_chain": sessionData.forwardingCurve25519KeyChain || [],
                 "first_known_index": session.first_known_index(),
                 "org.matrix.msc3061.shared_history": sessionData.sharedHistory || false,
             } as IMegolmSessionData;
