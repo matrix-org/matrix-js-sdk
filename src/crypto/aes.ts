@@ -26,9 +26,10 @@ const subtleCrypto = (typeof window !== "undefined" && window.crypto) ?
 const zeroSalt = new Uint8Array(8);
 
 export interface IEncryptedPayload {
-    iv: string;
-    ciphertext: string;
-    mac: string;
+    [key: string]: any; // extensible
+    iv?: string;
+    ciphertext?: string;
+    mac?: string;
 }
 
 /**

@@ -130,7 +130,7 @@ export interface IRoomKeyRequestBody extends IRoomKey {
 }
 
 export interface IMegolmSessionData {
-    [key: string]: any;
+    [key: string]: any; // extensible
     sender_key: string;
     forwarding_curve25519_key_chain: string[];
     sender_claimed_keys: Record<string, string>;
@@ -206,7 +206,7 @@ export class Crypto extends EventEmitter {
 
     private readonly reEmitter: ReEmitter;
     private readonly verificationMethods: any; // TODO types
-    private readonly supportedAlgorithms: string[];
+    public readonly supportedAlgorithms: string[];
     private readonly outgoingRoomKeyRequestManager: OutgoingRoomKeyRequestManager;
     private readonly toDeviceVerificationRequests: ToDeviceRequests;
     public readonly inRoomVerificationRequests: InRoomRequests;
@@ -292,7 +292,7 @@ export class Crypto extends EventEmitter {
     constructor(
         public readonly baseApis: MatrixClient,
         public readonly sessionStore: SessionStore,
-        private readonly userId: string,
+        public readonly userId: string,
         private readonly deviceId: string,
         private readonly clientStore: IStore,
         public readonly cryptoStore: CryptoStore,
