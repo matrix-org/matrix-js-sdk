@@ -130,13 +130,14 @@ export interface IRoomKeyRequestBody extends IRoomKey {
 }
 
 export interface IMegolmSessionData {
+    [key: string]: any;
     sender_key: string;
     forwarding_curve25519_key_chain: string[];
     sender_claimed_keys: Record<string, string>;
     room_id: string;
     session_id: string;
     session_key: string;
-    algorithm: string;
+    algorithm?: string;
     untrusted?: boolean;
 }
 /* eslint-enable camelcase */
@@ -192,7 +193,7 @@ export class Crypto extends EventEmitter {
     /**
      * @return {string} The version of Olm.
      */
-    static getOlmVersion(): string {
+    static getOlmVersion(): [number, number, number] {
         return OlmDevice.getOlmVersion();
     }
 
@@ -1097,7 +1098,7 @@ export class Crypto extends EventEmitter {
             await this.storeSessionBackupPrivateKey(key);
         }
         if (key && key.ciphertext) {
-            const pickleKey = Buffer.from(this.olmDevice._pickleKey);
+            const pickleKey = Buffer.from(this.olmDevice.pickleKey);
             const decrypted = await decryptAES(key, pickleKey, "m.megolm_backup.v1");
             key = olmlib.decodeBase64(decrypted);
         }
@@ -1113,7 +1114,7 @@ export class Crypto extends EventEmitter {
         if (!(key instanceof Uint8Array)) {
             throw new Error(`storeSessionBackupPrivateKey expects Uint8Array, got ${key}`);
         }
-        const pickleKey = Buffer.from(this.olmDevice._pickleKey);
+        const pickleKey = Buffer.from(this.olmDevice.pickleKey);
         const encryptedKey = await encryptAES(olmlib.encodeBase64(key), pickleKey, "m.megolm_backup.v1");
         return this.cryptoStore.doTxn(
             'readwrite',
@@ -1912,7 +1913,7 @@ export class Crypto extends EventEmitter {
 
         const fallbackJson: Record<string, IOneTimeKey> = {};
         if (this.getNeedsNewFallback()) {
-            const fallbackKeys = await this.olmDevice.getFallbackKey() as Record<string, Record<string, string>>;
+            const fallbackKeys = await this.olmDevice.getFallbackKey();
             for (const [keyId, key] of Object.entries(fallbackKeys.curve25519)) {
                 const k = { key, fallback: true };
                 fallbackJson["signed_curve25519:" + keyId] = k;

@@ -24,7 +24,7 @@ import anotherjson from "another-json";
 import type { PkSigning } from "@matrix-org/olm";
 import { Logger } from "loglevel";
 
-import OlmDevice from "./OlmDevice";
+import { OlmDevice } from "./OlmDevice";
 import { DeviceInfo } from "./deviceinfo";
 import { logger } from '../logger';
 import * as utils from "../utils";
@@ -252,13 +252,13 @@ export async function ensureOlmSessionsForDevices(
                 continue;
             }
 
-            if (!olmDevice._sessionsInProgress[key]) {
+            if (!olmDevice.sessionsInProgress[key]) {
                 // pre-emptively mark the session as in-progress to avoid race
                 // conditions.  If we find that we already have a session, then
                 // we'll resolve
-                olmDevice._sessionsInProgress[key] = new Promise(resolve => {
+                olmDevice.sessionsInProgress[key] = new Promise(resolve => {
                     resolveSession[key] = (v: any) => {
-                        delete olmDevice._sessionsInProgress[key];
+                        delete olmDevice.sessionsInProgress[key];
                         resolve(v);
                     };
                 });
@@ -291,9 +291,7 @@ export async function ensureOlmSessionsForDevices(
             }
 
             const forWhom = `for ${key} (${userId}:${deviceId})`;
-            const sessionId = await olmDevice.getSessionIdForDevice(
-                key, resolveSession[key], log,
-            );
+            const sessionId = await olmDevice.getSessionIdForDevice(key, !!resolveSession[key], log);
             if (sessionId !== null && resolveSession[key]) {
                 // we found a session, but we had marked the session as
                 // in-progress, so resolve it now, which will unmark it and
