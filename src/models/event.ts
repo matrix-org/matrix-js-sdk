@@ -412,9 +412,12 @@ export class MatrixEvent extends EventEmitter {
      * or in the main room timeline
      */
     public get replyInThread(): boolean {
-        const relations = this.getWireContent()["m.relates_to"];
-        return this.replyEventId
-            && relations[UNSTABLE_ELEMENT_REPLY_IN_THREAD.name];
+        const replyTo = this.getWireContent()
+            ?.["m.relates_to"]
+            ?.["m.in_reply_to"];
+        return (this.replyEventId
+            && replyTo[UNSTABLE_ELEMENT_REPLY_IN_THREAD.name])
+            || this.thread instanceof Thread;
     }
 
     /**

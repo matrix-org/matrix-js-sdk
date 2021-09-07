@@ -31,7 +31,7 @@ export class Thread extends EventEmitter {
     /**
      * A reference to all the events ID at the bottom of the threads
      */
-    public tail = new Set<string>();
+    public readonly tail = new Set<string>();
     private _timelineSet: EventTimelineSet;
 
     constructor(
@@ -155,7 +155,7 @@ export class Thread extends EventEmitter {
      * The number of messages in the thread
      */
     public get length(): number {
-        return this._timelineSet.getLiveTimeline().getEvents().length;
+        return this.events.length;
     }
 
     /**
@@ -163,7 +163,7 @@ export class Thread extends EventEmitter {
      */
     public get participants(): Set<string> {
         const participants = new Set<string>();
-        this._timelineSet.getLiveTimeline().getEvents().forEach(event => {
+        this.events.forEach(event => {
             participants.add(event.getSender());
         });
         return participants;
@@ -180,7 +180,18 @@ export class Thread extends EventEmitter {
      * A getter for the last event added to the thread
      */
     public get replyToEvent(): MatrixEvent {
-        const events = this._timelineSet.getLiveTimeline().getEvents();
+        const events = this.events;
         return events[events.length -1];
+    }
+
+    public get events(): MatrixEvent[] {
+        return this._timelineSet.getLiveTimeline().getEvents();
+    }
+
+    public merge(thread: Thread): void {
+        thread.events.forEach(event => {
+            this.addEvent(event);
+        });
+        this.events.forEach(event => event.setThread(this));
     }
 }
