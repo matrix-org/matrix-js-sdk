@@ -1222,18 +1222,24 @@ export class SyncApi {
             const accountDataEvents = this.mapSyncEventsFormat(joinObj.account_data);
 
             const encrypted = client.isRoomEncrypted(room.roomId);
-            // We do this first so it's correct when any of the events fire. We
-            // track unread notifications ourselves in encrypted rooms in
-            // MatrixClient::updateEncryptedRoomNotificationCount()
-            if (!encrypted && joinObj.unread_notifications) {
+            // we do this first so it's correct when any of the events fire
+            if (joinObj.unread_notifications) {
                 room.setUnreadNotificationCount(
                     NotificationCountType.Total,
                     joinObj.unread_notifications.notification_count,
                 );
-                room.setUnreadNotificationCount(
-                    NotificationCountType.Highlight,
-                    joinObj.unread_notifications.highlight_count,
-                );
+
+                // We track unread notifications ourselves in encrypted rooms, so don't
+                // bother setting it here. We trust our calculations better than the
+                // server's for this case, and therefore will assume that our non-zero
+                // count is accurate.
+                if (!encrypted
+                    || (encrypted && room.getUnreadNotificationCount(NotificationCountType.Highlight) <= 0)) {
+                    room.setUnreadNotificationCount(
+                        NotificationCountType.Highlight,
+                        joinObj.unread_notifications.highlight_count,
+                    );
+                }
             }
 
             joinObj.timeline = joinObj.timeline || {} as ITimeline;
