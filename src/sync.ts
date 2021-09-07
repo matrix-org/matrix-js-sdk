@@ -704,7 +704,7 @@ export class SyncApi {
      */
     public stop(): void {
         debuglog("SyncApi.stop");
-        if (global.window) {
+        if (global.window && global.window.removeEventListener) {
             global.window.removeEventListener("online", this.onOnline, false);
         }
         this.running = false;
