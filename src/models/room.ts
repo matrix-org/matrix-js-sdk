@@ -1104,16 +1104,17 @@ export class Room extends EventEmitter {
      * @experimental
      */
     private dedupeThreads = (readyThread): void => {
-        const threads = Array.from(this.threads);
-        if (threads.includes(readyThread)) {
-            this.threads = new Set(threads.filter(thread => {
-                if (readyThread.id === thread.id && readyThread !== thread) {
-                    return false;
-                } else {
-                    return true;
-                }
-            }));
-        }
+        const deduped = Array.from(this.threads).reduce((dedupedThreads, thread) => {
+            if (dedupedThreads.has(thread.id)) {
+                dedupedThreads.get(thread.id).merge(thread);
+            } else {
+                dedupedThreads.set(thread.id, thread);
+            }
+
+            return dedupedThreads;
+        }, new Map<string, Thread>());
+
+        this.threads = new Set<Thread>(deduped.values());
     };
 
     /**
