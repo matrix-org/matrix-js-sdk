@@ -288,7 +288,7 @@ describe("MegolmBackup", function() {
                                         ed25519: "SENDER_ED25519",
                                     },
                                     room_id: ROOM_ID,
-                                    session: ibGroupSession.pickle(olmDevice._pickleKey),
+                                    session: ibGroupSession.pickle(olmDevice.pickleKey),
                                 },
                                 txn);
                         });
@@ -369,7 +369,7 @@ describe("MegolmBackup", function() {
                                         ed25519: "SENDER_ED25519",
                                     },
                                     room_id: ROOM_ID,
-                                    session: ibGroupSession.pickle(olmDevice._pickleKey),
+                                    session: ibGroupSession.pickle(olmDevice.pickleKey),
                                 },
                                 txn);
                         });
@@ -546,7 +546,7 @@ describe("MegolmBackup", function() {
                                         ed25519: "SENDER_ED25519",
                                     },
                                     room_id: ROOM_ID,
-                                    session: ibGroupSession.pickle(olmDevice._pickleKey),
+                                    session: ibGroupSession.pickle(olmDevice.pickleKey),
                                 },
                                 txn);
                         });
