@@ -713,7 +713,7 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
             });
 
             if (key && key.ciphertext) {
-                const pickleKey = Buffer.from(olmDevice._pickleKey);
+                const pickleKey = Buffer.from(olmDevice.pickleKey);
                 const decrypted = await decryptAES(key, pickleKey, type);
                 return decodeBase64(decrypted);
             } else {
@@ -726,7 +726,7 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
                     `storeCrossSigningKeyCache expects Uint8Array, got ${key}`,
                 );
             }
-            const pickleKey = Buffer.from(olmDevice._pickleKey);
+            const pickleKey = Buffer.from(olmDevice.pickleKey);
             const encryptedKey = await encryptAES(encodeBase64(key), pickleKey, type);
             return store.doTxn(
                 'readwrite',

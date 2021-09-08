@@ -67,7 +67,7 @@ export interface IOlmDevice<T = DeviceInfo> {
 }
 
 /* eslint-disable camelcase */
-interface IOutboundGroupSessionKey {
+export interface IOutboundGroupSessionKey {
     chain_index: number;
     key: string;
 }
@@ -887,9 +887,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
         }
 
         const filteredFailedDevices =
-            await this.olmDevice.filterOutNotifiedErrorDevices(
-                failedDevices,
-            );
+            await this.olmDevice.filterOutNotifiedErrorDevices(failedDevices);
         logger.debug(
             `Filtered down to ${filteredFailedDevices.length} error devices ` +
             `in ${this.roomId}`,
@@ -1391,7 +1389,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
      *
      * @param {module:models/event.MatrixEvent} event key event
      */
-    public onRoomKeyEvent(event: MatrixEvent): void {
+    public onRoomKeyEvent(event: MatrixEvent): Promise<void> {
         const content = event.getContent();
         const sessionId = content.session_id;
         let senderKey = event.getSenderKey();
