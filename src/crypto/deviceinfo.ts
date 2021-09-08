@@ -68,7 +68,7 @@ export class DeviceInfo {
      *
      * @return {module:crypto~DeviceInfo} new DeviceInfo
      */
-    public static fromStorage(obj: IDevice, deviceId: string): DeviceInfo {
+    public static fromStorage(obj: Partial<IDevice>, deviceId: string): DeviceInfo {
         const res = new DeviceInfo(deviceId);
         for (const prop in obj) {
             if (obj.hasOwnProperty(prop)) {

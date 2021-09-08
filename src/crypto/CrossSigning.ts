@@ -739,6 +739,8 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
     };
 }
 
+export type KeysDuringVerification = [[string, PkSigning], [string, PkSigning], [string, PkSigning], void] | void;
+
 /**
  * Request cross-signing keys from another device during verification.
  *
@@ -746,15 +748,19 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
  * @param {string} userId The user ID being verified
  * @param {string} deviceId The device ID being verified
  */
-export async function requestKeysDuringVerification(baseApis: MatrixClient, userId: string, deviceId: string) {
+export function requestKeysDuringVerification(
+    baseApis: MatrixClient,
+    userId: string,
+    deviceId: string,
+): Promise<[[string, PkSigning], [string, PkSigning], [string, PkSigning], void] | void> {
     // If this is a self-verification, ask the other party for keys
     if (baseApis.getUserId() !== userId) {
         return;
     }
     logger.log("Cross-signing: Self-verification done; requesting keys");
     // This happens asynchronously, and we're not concerned about waiting for
-    // it.  We return here in order to test.
-    return new Promise((resolve, reject) => {
+    // it. We return here in order to test.
+    return new Promise<KeysDuringVerification>((resolve, reject) => {
         const client = baseApis;
         const original = client.crypto.crossSigningInfo;
 
@@ -781,7 +787,7 @@ export async function requestKeysDuringVerification(baseApis: MatrixClient, user
         // https://github.com/vector-im/element-web/issues/12604
         // then change here to reject on the timeout
         // Requests can be ignored, so don't wait around forever
-        const timeout = new Promise((resolve, reject) => {
+        const timeout = new Promise<void>((resolve) => {
             setTimeout(
                 resolve,
                 KEY_REQUEST_TIMEOUT_MS,
@@ -814,13 +820,13 @@ export async function requestKeysDuringVerification(baseApis: MatrixClient, user
         })();
 
         // We call getCrossSigningKey() for its side-effects
-        return Promise.race([
+        return Promise.race<KeysDuringVerification>([
             Promise.all([
                 crossSigning.getCrossSigningKey("master"),
                 crossSigning.getCrossSigningKey("self_signing"),
                 crossSigning.getCrossSigningKey("user_signing"),
                 backupKeyPromise,
-            ]),
+            ]) as Promise<[[string, PkSigning], [string, PkSigning], [string, PkSigning], void]>,
             timeout,
         ]).then(resolve, reject);
     }).catch((e) => {
