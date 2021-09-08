@@ -51,6 +51,7 @@ export {
     createNewMatrixCall,
     setAudioInput as setMatrixCallAudioInput,
     setVideoInput as setMatrixCallVideoInput,
+    CallType,
 } from "./webrtc/call";
 
 // TODO: This export is temporary and is only used for the local call feed for conference calls

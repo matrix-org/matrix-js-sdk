@@ -128,6 +128,8 @@ export enum CallEvent {
     FeedsChanged = 'feeds_changed',
 
     AssertedIdentityChanged = 'asserted_identity_changed',
+
+    DataChannel = 'datachannel',
 }
 
 export enum CallErrorCode {
@@ -366,6 +368,13 @@ export class MatrixCall extends EventEmitter {
         this.checkForErrorListener();
         this.type = CallType.Video;
         await this.placeCallWithConstraints(ConstraintsType.Video);
+    }
+
+    public createDataChannel(label: string, options: RTCDataChannelInit) {
+        logger.debug("createDataChannel");
+        const dataChannel = this.peerConn.createDataChannel(label, options);
+        this.emit(CallEvent.DataChannel, dataChannel);
+        return dataChannel;
     }
 
     public getOpponentMember(): RoomMember {
@@ -1525,6 +1534,10 @@ export class MatrixCall extends EventEmitter {
         stream.addEventListener("removetrack", () => this.deleteFeedByStream(stream));
     };
 
+    private onDataChannel = (ev: RTCDataChannelEvent): void => {
+        this.emit(CallEvent.DataChannel, ev.channel);
+    };
+
     /**
      * This method removes all video/rtx codecs from screensharing video
      * transceivers. This is necessary since they can cause problems. Without
@@ -1883,6 +1896,7 @@ export class MatrixCall extends EventEmitter {
         pc.addEventListener('icegatheringstatechange', this.onIceGatheringStateChange);
         pc.addEventListener('track', this.onTrack);
         pc.addEventListener('negotiationneeded', this.onNegotiationNeeded);
+        pc.addEventListener('datachannel', this.onDataChannel);
 
         return pc;
     }

@@ -35,7 +35,7 @@ export class CallFeed extends EventEmitter {
     private analyser: AnalyserNode;
     private frequencyBinCount: Float32Array;
     private speakingThreshold = SPEAKING_THRESHOLD;
-    private speaking = false;
+    public speaking = false;
     private volumeLooperTimeout: number;
 
     constructor(

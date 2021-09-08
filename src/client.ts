@@ -23,7 +23,7 @@ import { EventEmitter } from "events";
 import { ISyncStateData, SyncApi } from "./sync";
 import { EventStatus, IContent, IDecryptOptions, IEvent, MatrixEvent } from "./models/event";
 import { StubStore } from "./store/stub";
-import { createNewMatrixCall, MatrixCall, ConstraintsType, getUserMediaContraints } from "./webrtc/call";
+import { createNewMatrixCall, MatrixCall, ConstraintsType, getUserMediaContraints, CallType } from "./webrtc/call";
 import { Filter, IFilterDefinition } from "./filter";
 import { CallEventHandler } from './webrtc/callEventHandler';
 import * as utils from './utils';
@@ -144,6 +144,7 @@ import { IHierarchyRoom, ISpaceSummaryEvent, ISpaceSummaryRoom } from "./@types/
 import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, RuleId } from "./@types/PushRules";
 import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
+import { GroupCall, GroupCallEvent } from "./webrtc/groupCall";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -1313,6 +1314,23 @@ export class MatrixClient extends EventEmitter {
      */
     public createCall(roomId: string, invitee?: string): MatrixCall {
         return createNewMatrixCall(this, roomId, { invitee });
+    }
+
+    /**
+     * Creates a new group call.
+     *
+     * @param {string} roomId The room the call is to be placed in.
+     * @return {GroupCall} the call or null if the browser doesn't support calling.
+     */
+    public createGroupCall(
+        roomId: string,
+        type: CallType,
+        dataChannelsEnabled?: boolean,
+        dataChannelOptions?: RTCDataChannelInit,
+    ): GroupCall {
+        const groupCall = new GroupCall(this, roomId, type, dataChannelsEnabled, dataChannelOptions);
+        this.reEmitter.reEmit(groupCall, Object.values(GroupCallEvent));
+        return groupCall;
     }
 
     /**
@@ -6153,11 +6171,11 @@ export class MatrixClient extends EventEmitter {
     public register(
         username: string,
         password: string,
-        sessionId: string,
+        sessionId: string | null,
         auth: any,
-        bindThreepids: any,
-        guestAccessToken: string,
-        inhibitLogin: boolean,
+        bindThreepids?: any,
+        guestAccessToken?: string,
+        inhibitLogin?: boolean,
         callback?: Callback,
     ): Promise<any> { // TODO: Types (many)
         // backwards compat
