@@ -26,7 +26,7 @@ import { EventEmitter } from 'events';
 
 import { ReEmitter } from '../ReEmitter';
 import { logger } from '../logger';
-import { OlmDevice } from "./OlmDevice";
+import { IExportedDevice, OlmDevice } from "./OlmDevice";
 import * as olmlib from "./olmlib";
 import { DeviceInfoMap, DeviceList } from "./DeviceList";
 import { DeviceInfo, IDevice } from "./deviceinfo";
@@ -66,6 +66,7 @@ import { IRecoveryKey, IEncryptedEventInfo } from "./api";
 import { IKeyBackupInfo } from "./keybackup";
 import { ISyncStateData } from "../sync";
 import { CryptoStore } from "./store/base";
+import { IVerificationChannel } from "./verification/request/Channel";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -84,12 +85,12 @@ const defaultVerificationMethods = {
  * verification method names
  */
 // legacy export identifier
-export enum verificationMethods {
-    RECIPROCATE_QR_CODE = ReciprocateQRCode.NAME,
-    SAS = SASVerification.NAME,
-}
+export const verificationMethods = {
+    RECIPROCATE_QR_CODE: ReciprocateQRCode.NAME,
+    SAS: SASVerification.NAME,
+};
 
-export type VerificationMethod = verificationMethods;
+export type VerificationMethod = keyof typeof verificationMethods | string;
 
 export function isCryptoAvailable(): boolean {
     return Boolean(global.Olm);
@@ -98,7 +99,7 @@ export function isCryptoAvailable(): boolean {
 const MIN_FORCE_SESSION_INTERVAL_MS = 60 * 60 * 1000;
 
 interface IInitOpts {
-    exportedOlmDevice?: any; // TODO types
+    exportedOlmDevice?: IExportedDevice;
     pickleKey?: string;
 }
 
@@ -2177,11 +2178,11 @@ export class Crypto extends EventEmitter {
         return this.inRoomVerificationRequests.findRequestInProgress(roomId);
     }
 
-    public getVerificationRequestsToDeviceInProgress(userId: string): VerificationRequest {
+    public getVerificationRequestsToDeviceInProgress(userId: string): VerificationRequest[] {
         return this.toDeviceVerificationRequests.getRequestsInProgress(userId);
     }
 
-    public requestVerificationDM(userId: string, roomId: string): VerificationRequest {
+    public requestVerificationDM(userId: string, roomId: string): Promise<VerificationRequest> {
         const existingRequest = this.inRoomVerificationRequests.findRequestInProgress(roomId);
         if (existingRequest) {
             return Promise.resolve(existingRequest);
@@ -2194,7 +2195,7 @@ export class Crypto extends EventEmitter {
         );
     }
 
-    public requestVerification(userId: string, devices: string[]): VerificationRequest {
+    public requestVerification(userId: string, devices: string[]): Promise<VerificationRequest> {
         if (!devices) {
             devices = Object.keys(this.deviceList.getRawStoredDevicesForUser(userId));
         }
@@ -2212,9 +2213,9 @@ export class Crypto extends EventEmitter {
 
     private async requestVerificationWithChannel(
         userId: string,
-        channel: any, // TODO types
+        channel: IVerificationChannel,
         requestsMap: any, // TODO types
-    ): VerificationRequest {
+    ): Promise<VerificationRequest> {
         let request = new VerificationRequest(channel, this.verificationMethods, this.baseApis);
         // if transaction id is already known, add request
         if (channel.transactionId) {
@@ -2260,14 +2261,11 @@ export class Crypto extends EventEmitter {
         userId: string,
         deviceId: string,
         method: VerificationMethod,
-    ): VerificationRequest {
+    ): Promise<VerificationRequest> {
         const transactionId = ToDeviceChannel.makeTransactionId();
-        const channel = new ToDeviceChannel(
-            this.baseApis, userId, [deviceId], transactionId, deviceId);
-        const request = new VerificationRequest(
-            channel, this.verificationMethods, this.baseApis);
-        this.toDeviceVerificationRequests.setRequestBySenderAndTxnId(
-            userId, transactionId, request);
+        const channel = new ToDeviceChannel(this.baseApis, userId, [deviceId], transactionId, deviceId);
+        const request = new VerificationRequest(channel, this.verificationMethods, this.baseApis);
+        this.toDeviceVerificationRequests.setRequestBySenderAndTxnId(userId, transactionId, request);
         const verifier = request.beginKeyVerification(method, { userId, deviceId });
         // either reject by an error from verify() while sending .start
         // or resolve when the request receives the

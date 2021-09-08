@@ -1,5 +1,5 @@
 /*
-Copyright 2018 New Vector Ltd
+Copyright 2018 - 2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,17 +22,17 @@ limitations under the License.
 
 import { MatrixEvent } from "../../models/event";
 
-export function newVerificationError(code, reason, extradata) {
-    const content = Object.assign({}, { code, reason }, extradata);
+export function newVerificationError(code: string, reason: string, extraData: Record<string, any>): MatrixEvent {
+    const content = Object.assign({}, { code, reason }, extraData);
     return new MatrixEvent({
         type: "m.key.verification.cancel",
         content,
     });
 }
 
-export function errorFactory(code, reason) {
-    return function(extradata) {
-        return newVerificationError(code, reason, extradata);
+export function errorFactory(code: string, reason: string): (extraData?: Record<string, any>) => MatrixEvent {
+    return function(extraData?: Record<string, any>) {
+        return newVerificationError(code, reason, extraData);
     };
 }
 
@@ -84,7 +84,7 @@ export const newInvalidMessageError = errorFactory(
     "m.invalid_message", "Invalid message",
 );
 
-export function errorFromEvent(event) {
+export function errorFromEvent(event: MatrixEvent): { code: string, reason: string } {
     const content = event.getContent();
     if (content) {
         const { code, reason } = content;
