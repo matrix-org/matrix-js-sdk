@@ -2,14 +2,20 @@ import EventEmitter from "events";
 import { CallFeed, CallFeedEvent } from "./callFeed";
 import { MatrixClient } from "../client";
 import { randomString } from "../randomstring";
-import { CallErrorCode, CallEvent, CallType, MatrixCall } from "./call";
+import { CallErrorCode, CallEvent, CallState, CallType, MatrixCall } from "./call";
 import { RoomMember } from "../models/room-member";
 import { SDPStreamMetadataPurpose } from "./callEventTypes";
 import { Room } from "../models/room";
 import { logger } from "../logger";
+import { Callback } from "../client";
+import { ReEmitter } from "../ReEmitter";
 
 export enum GroupCallEvent {
+    Entered = "entered",
+    Left = "left",
     ActiveSpeakerChanged = "active_speaker_changed",
+    ParticipantsChanged = "participants_changed",
+    LocalMuteStateChanged = "local_mute_state_changed",
 }
 
 const CONF_ROOM = "me.robertlong.conf";
@@ -18,6 +24,14 @@ const PARTICIPANT_TIMEOUT = 1000 * 15;
 const SPEAKING_THRESHOLD = -80;
 const ACTIVE_SPEAKER_INTERVAL = 1000;
 const ACTIVE_SPEAKER_SAMPLES = 8;
+
+export enum GroupCallParticipantEvent {
+    Speaking = "speaking",
+    VolumeChanged = "volume_changed",
+    MuteStateChanged = "mute_state_changed",
+    Datachannel = "datachannel",
+    CallReplaced = "call_replaced"
+}
 
 export class GroupCallParticipant extends EventEmitter {
     public feeds: CallFeed[] = [];
@@ -48,6 +62,8 @@ export class GroupCallParticipant extends EventEmitter {
     }
 
     public replaceCall(call: MatrixCall, sessionId: string) {
+        const oldCall = this.call;
+
         if (this.call) {
             this.call.hangup(CallErrorCode.Replaced, false);
             this.call.removeListener(CallEvent.State, this.onCallStateChanged);
@@ -70,6 +86,8 @@ export class GroupCallParticipant extends EventEmitter {
         this.call.on(CallEvent.Replaced, this.onCallReplaced);
         this.call.on(CallEvent.Hangup, this.onCallHangup);
         this.call.on(CallEvent.DataChannel, this.onCallDataChannel);
+
+        this.groupCall.emit(GroupCallParticipantEvent.CallReplaced, this, oldCall, call);
     }
 
     public get usermediaFeed() {
@@ -119,13 +137,6 @@ export class GroupCallParticipant extends EventEmitter {
         ) {
             call.setLocalVideoMuted(videoMuted);
         }
-
-        this.groupCall.emit(
-            "debugstate",
-            this.member.userId,
-            this.call.callId,
-            state,
-        );
     };
 
     onCallFeedsChanged = () => {
@@ -146,12 +157,10 @@ export class GroupCallParticipant extends EventEmitter {
     onCallReplaced = (newCall) => {
         // TODO: Should we always reuse the sessionId?
         this.replaceCall(newCall, this.sessionId);
-        this.groupCall.emit("call", newCall);
-        this.groupCall.emit("participants_changed");
     };
 
     onCallHangup = () => {
-        if (this.call.hangupReason === "replaced") {
+        if (this.call.hangupReason === CallErrorCode.Replaced) {
             return;
         }
 
@@ -169,9 +178,10 @@ export class GroupCallParticipant extends EventEmitter {
         ) {
             this.groupCall.activeSpeaker = this.groupCall.participants[0];
             this.groupCall.activeSpeaker.activeSpeaker = true;
+            this.groupCall.emit(GroupCallEvent.ActiveSpeakerChanged, this.groupCall.activeSpeaker);
         }
 
-        this.groupCall.emit("participants_changed");
+        this.groupCall.emit(GroupCallEvent.ParticipantsChanged, this.groupCall.participants);
     };
 
     addCallFeed(callFeed: CallFeed) {
@@ -197,13 +207,13 @@ export class GroupCallParticipant extends EventEmitter {
     }
 
     onCallFeedSpeaking = (speaking: boolean) => {
-        this.emit("speaking");
+        this.emit(GroupCallParticipantEvent.Speaking, speaking);
     };
 
     onCallFeedVolumeChanged = (maxVolume: number) => {
         this.activeSpeakerSamples.shift();
         this.activeSpeakerSamples.push(maxVolume);
-        this.emit("volume_changed", maxVolume);
+        this.emit(GroupCallParticipantEvent.VolumeChanged, maxVolume);
     };
 
     onCallFeedMuteStateChanged = (audioMuted: boolean, videoMuted: boolean) => {
@@ -213,12 +223,12 @@ export class GroupCallParticipant extends EventEmitter {
             );
         }
 
-        this.emit("mute_state_changed", audioMuted, videoMuted);
+        this.emit(GroupCallParticipantEvent.MuteStateChanged, audioMuted, videoMuted);
     };
 
     onCallDataChannel = (dataChannel: RTCDataChannel) => {
         this.dataChannel = dataChannel;
-        this.emit("datachannel");
+        this.emit(GroupCallParticipantEvent.Datachannel, dataChannel);
     };
 }
 
@@ -232,6 +242,7 @@ export class GroupCall extends EventEmitter {
     private speakerMap: Map<RoomMember, number[]> = new Map();
     private presenceLoopTimeout?: number;
     private activeSpeakerLoopTimeout: number;
+    private reEmitter: ReEmitter;
 
     constructor(
         private client: MatrixClient,
@@ -243,6 +254,7 @@ export class GroupCall extends EventEmitter {
         super();
 
         this.room = this.client.getRoom(roomId);
+        this.reEmitter = new ReEmitter(this);
     }
 
     async initLocalParticipant() {
@@ -303,6 +315,7 @@ export class GroupCall extends EventEmitter {
 
         this.activeSpeaker = this.localParticipant;
         this.participants.push(this.localParticipant);
+        this.reEmitter.reEmit(this.localParticipant, Object.values(GroupCallParticipantEvent));
 
         // Announce to the other room members that we have entered the room.
         // Continue doing so every PARTICIPANT_TIMEOUT ms
@@ -323,8 +336,7 @@ export class GroupCall extends EventEmitter {
         this.client.on("RoomState.members", this.onRoomStateMembers);
         this.client.on("Call.incoming", this.onIncomingCall);
 
-        this.emit("entered");
-        this.emit("participants_changed");
+        this.emit(GroupCallEvent.Entered);
         this.onActiveSpeakerLoop();
     }
 
@@ -371,8 +383,7 @@ export class GroupCall extends EventEmitter {
         );
         this.client.removeListener("Call.incoming", this.onIncomingCall);
 
-        this.emit("participants_changed");
-        this.emit("left");
+        this.emit(GroupCallEvent.Left);
     }
 
     isLocalVideoMuted() {
@@ -412,8 +423,7 @@ export class GroupCall extends EventEmitter {
             }
         }
 
-        this.emit("participants_changed");
-        this.emit("audio_mute_state_changed");
+        this.emit(GroupCallEvent.LocalMuteStateChanged, muted, this.isLocalVideoMuted());
     }
 
     setLocalVideoMuted(muted) {
@@ -437,8 +447,7 @@ export class GroupCall extends EventEmitter {
             }
         }
 
-        this.emit("participants_changed");
-        this.emit("video_mute_state_changed");
+        this.emit(GroupCallEvent.LocalMuteStateChanged, this.isMicrophoneMuted(), muted);
     }
 
     public get localUsermediaFeed(): CallFeed {
@@ -494,13 +503,6 @@ export class GroupCall extends EventEmitter {
                 (memberStateContent[CONF_PARTICIPANT].expiresAt &&
                     memberStateContent[CONF_PARTICIPANT].expiresAt < now)
             ) {
-                this.emit(
-                    "debugstate",
-                    participant.member.userId,
-                    null,
-                    "inactive",
-                );
-
                 if (participant.call) {
                     // NOTE: This should remove the participant on the next tick
                     // since matrix-js-sdk awaits a promise before firing user_hangup
@@ -538,12 +540,14 @@ export class GroupCall extends EventEmitter {
             return;
         }
 
-        if (call.state !== "ringing") {
+        if (call.state !== CallState.Ringing) {
             logger.warn("Incoming call no longer in ringing state. Ignoring.");
             return;
         }
 
         const opponentMember = call.getOpponentMember();
+
+        logger.log(`GroupCall: incomming call from: ${opponentMember.userId}`);
 
         const memberStateEvent = this.room.currentState.getStateEvents(
             "m.room.member",
@@ -570,6 +574,7 @@ export class GroupCall extends EventEmitter {
             participant = existingParticipant;
             // This also fires the hangup event and triggers those side-effects
             existingParticipant.replaceCall(call, sessionId);
+            call.answer();
         } else {
             participant = new GroupCallParticipant(
                 this,
@@ -578,24 +583,23 @@ export class GroupCall extends EventEmitter {
                 call,
             );
             this.participants.push(participant);
+            call.answer();
+            this.reEmitter.reEmit(participant, Object.values(GroupCallParticipantEvent));
+            this.emit(GroupCallEvent.ParticipantsChanged, this.participants);
         }
-
-        call.answer();
-
-        this.emit("call", call);
-        this.emit("participants_changed");
     };
 
-    onRoomStateMembers = (_event, _state, member) => {
-        this.onMemberChanged(member);
-    };
-
-    onMemberChanged = (member) => {
+    onRoomStateMembers = (_event, _state, member: RoomMember) => {
         // The member events may be received for another room, which we will ignore.
         if (member.roomId !== this.room.roomId) {
             return;
         }
 
+        logger.log(`GroupCall member state changed: ${member.userId}`);
+        this.onMemberChanged(member);
+    };
+
+    onMemberChanged = (member: RoomMember) => {
         // Don't process your own member.
         const localUserId = this.client.getUserId();
 
@@ -626,7 +630,6 @@ export class GroupCall extends EventEmitter {
         const now = new Date().getTime();
 
         if (expiresAt < now) {
-            this.emit("debugstate", member.userId, null, "inactive");
             return;
         }
 
@@ -639,7 +642,6 @@ export class GroupCall extends EventEmitter {
 
         if (participant) {
             if (participant.sessionId !== sessionId) {
-                this.emit("debugstate", member.userId, null, "inactive");
                 participant.call.hangup(CallErrorCode.Replaced, false);
             } else {
                 return;
@@ -649,11 +651,24 @@ export class GroupCall extends EventEmitter {
         // Only initiate a call with a user who has a userId that is lexicographically
         // less than your own. Otherwise, that user will call you.
         if (member.userId < localUserId) {
-            this.emit("debugstate", member.userId, null, "waiting for invite");
             return;
         }
 
         const call = this.client.createCall(this.room.roomId, member.userId);
+
+        let callPromise;
+
+        if (this.type === CallType.Video) {
+            callPromise = call.placeVideoCall();
+        } else {
+            callPromise = call.placeVoiceCall();
+        }
+
+        callPromise.then(() => {
+            if (this.dataChannelsEnabled) {
+                call.createDataChannel("datachannel", this.dataChannelOptions);
+            }
+        });
 
         if (participant) {
             participant.replaceCall(call, sessionId);
@@ -669,25 +684,9 @@ export class GroupCall extends EventEmitter {
             // Does hiding a participant without a stream present a privacy problem because
             // a participant without a stream can still listen in on other user's streams?
             this.participants.push(participant);
+            this.reEmitter.reEmit(participant, Object.values(GroupCallParticipantEvent));
+            this.emit(GroupCallEvent.ParticipantsChanged), this.participants;
         }
-
-        let callPromise;
-
-        if (this.type === CallType.Video) {
-            callPromise = call.placeVideoCall();
-        } else {
-            callPromise = call.placeVoiceCall();
-        }
-
-        callPromise.then(() => {
-            if (this.dataChannelsEnabled) {
-                call.createDataChannel("datachannel", this.dataChannelOptions);
-            }
-
-            this.emit("call", call);
-        });
-
-        this.emit("participants_changed");
     };
 
     onActiveSpeakerLoop = () => {
@@ -715,7 +714,7 @@ export class GroupCall extends EventEmitter {
                 this.activeSpeaker.activeSpeaker = false;
                 nextActiveSpeaker.activeSpeaker = true;
                 this.activeSpeaker = nextActiveSpeaker;
-                this.emit("participants_changed");
+                this.emit(GroupCallEvent.ActiveSpeakerChanged, this.activeSpeaker);
             }
         }
 
@@ -731,11 +730,11 @@ export class GroupCall extends EventEmitter {
 
     // TODO: move this elsewhere or get rid of the retry logic. Do we need it?
     sendStateEventWithRetry(
-        roomId,
-        eventType,
-        content,
-        stateKey,
-        callback = undefined,
+        roomId: string,
+        eventType: string,
+        content: any,
+        stateKey?: string,
+        callback: Callback = undefined,
         maxAttempts = 5,
     ) {
         const sendStateEventWithRetry = async (attempt = 0) => {

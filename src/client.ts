@@ -144,7 +144,7 @@ import { IHierarchyRoom, ISpaceSummaryEvent, ISpaceSummaryRoom } from "./@types/
 import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, RuleId } from "./@types/PushRules";
 import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
-import { GroupCall, GroupCallEvent } from "./webrtc/groupCall";
+import { GroupCall } from "./webrtc/groupCall";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -1328,9 +1328,7 @@ export class MatrixClient extends EventEmitter {
         dataChannelsEnabled?: boolean,
         dataChannelOptions?: RTCDataChannelInit,
     ): GroupCall {
-        const groupCall = new GroupCall(this, roomId, type, dataChannelsEnabled, dataChannelOptions);
-        this.reEmitter.reEmit(groupCall, Object.values(GroupCallEvent));
-        return groupCall;
+        return new GroupCall(this, roomId, type, dataChannelsEnabled, dataChannelOptions);
     }
 
     /**
