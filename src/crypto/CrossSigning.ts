@@ -739,7 +739,7 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
     };
 }
 
-export type KeysDuringVerification = [[string, PkSigning], [string, PkSigning], [string, PkSigning], void] | void;
+export type KeysDuringVerification = [[string, PkSigning], [string, PkSigning], [string, PkSigning], void];
 
 /**
  * Request cross-signing keys from another device during verification.
@@ -752,7 +752,7 @@ export function requestKeysDuringVerification(
     baseApis: MatrixClient,
     userId: string,
     deviceId: string,
-): Promise<[[string, PkSigning], [string, PkSigning], [string, PkSigning], void] | void> {
+): Promise<KeysDuringVerification | void> {
     // If this is a self-verification, ask the other party for keys
     if (baseApis.getUserId() !== userId) {
         return;
@@ -760,7 +760,7 @@ export function requestKeysDuringVerification(
     logger.log("Cross-signing: Self-verification done; requesting keys");
     // This happens asynchronously, and we're not concerned about waiting for
     // it. We return here in order to test.
-    return new Promise<KeysDuringVerification>((resolve, reject) => {
+    return new Promise<KeysDuringVerification | void>((resolve, reject) => {
         const client = baseApis;
         const original = client.crypto.crossSigningInfo;
 
@@ -820,13 +820,13 @@ export function requestKeysDuringVerification(
         })();
 
         // We call getCrossSigningKey() for its side-effects
-        return Promise.race<KeysDuringVerification>([
+        return Promise.race<KeysDuringVerification | void>([
             Promise.all([
                 crossSigning.getCrossSigningKey("master"),
                 crossSigning.getCrossSigningKey("self_signing"),
                 crossSigning.getCrossSigningKey("user_signing"),
                 backupKeyPromise,
-            ]) as Promise<[[string, PkSigning], [string, PkSigning], [string, PkSigning], void]>,
+            ]) as Promise<KeysDuringVerification>,
             timeout,
         ]).then(resolve, reject);
     }).catch((e) => {

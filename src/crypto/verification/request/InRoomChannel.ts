@@ -325,15 +325,14 @@ export class InRoomRequests {
     }
 
     public setRequest(event: MatrixEvent, request: VerificationRequest): void {
-        this._setRequest(event.getRoomId(), InRoomChannel.getTransactionId(event), request);
+        this.doSetRequest(event.getRoomId(), InRoomChannel.getTransactionId(event), request);
     }
 
     public setRequestByChannel(channel: InRoomChannel, request: VerificationRequest): void {
-        this._setRequest(channel.roomId, channel.transactionId, request);
+        this.doSetRequest(channel.roomId, channel.transactionId, request);
     }
 
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    private _setRequest(roomId: string, txnId: string, request: VerificationRequest): void {
+    private doSetRequest(roomId: string, txnId: string, request: VerificationRequest): void {
         let requestsByTxnId = this.requestsByRoomId.get(roomId);
         if (!requestsByTxnId) {
             requestsByTxnId = new Map();
