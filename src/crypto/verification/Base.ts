@@ -202,7 +202,7 @@ export class VerificationBase extends EventEmitter {
         }
     }
 
-    public done(): Promise<KeysDuringVerification> {
+    public done(): Promise<KeysDuringVerification | void> {
         this.endTimer(); // always kill the activity timer
         if (!this._done) {
             this.request.onVerifierFinished();
