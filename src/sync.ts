@@ -704,6 +704,10 @@ export class SyncApi {
      */
     public stop(): void {
         debuglog("SyncApi.stop");
+        // It is necessary to check for the existance of
+        // global.window AND global.window.removeEventListener.
+        // Some platforms (e.g. React Native) register global.window,
+        // but do not have global.window.removeEventListener.
         if (global.window && global.window.removeEventListener) {
             global.window.removeEventListener("online", this.onOnline, false);
         }
