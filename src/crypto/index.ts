@@ -2757,11 +2757,21 @@ export class Crypto extends EventEmitter {
             delete content['m.relates_to'];
         }
 
+        // Treat element's performance metrics the same as `m.relates_to` (when present)
+        const elementPerfMetrics = content['io.element.performance_metrics'];
+        if (elementPerfMetrics) {
+            content = Object.assign({}, content);
+            delete content['io.element.performance_metrics'];
+        }
+
         const encryptedContent = await alg.encryptMessage(
             room, event.getType(), content);
 
         if (mRelatesTo) {
             encryptedContent['m.relates_to'] = mRelatesTo;
+        }
+        if (elementPerfMetrics) {
+            encryptedContent['io.element.performance_metrics'] = elementPerfMetrics;
         }
 
         event.makeEncrypted(
