@@ -69,7 +69,7 @@ describe("verification request integration tests with crypto layer", function() 
             bobVerifier.verify();
 
             // XXX: Private function access (but it's a test, so we're okay)
-            bobVerifier._endTimer();
+            bobVerifier.endTimer();
         });
         const aliceRequest = await alice.client.requestVerification("@bob:example.com");
         await aliceRequest.waitFor(r => r.started);
@@ -77,6 +77,6 @@ describe("verification request integration tests with crypto layer", function() 
         expect(aliceVerifier).toBeInstanceOf(SAS);
 
         // XXX: Private function access (but it's a test, so we're okay)
-        aliceVerifier._endTimer();
+        aliceVerifier.endTimer();
     });
 });

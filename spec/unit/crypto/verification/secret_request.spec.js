@@ -93,7 +93,7 @@ describe("self-verifications", () => {
             undefined, // startEvent
             request,
         );
-        verification._resolve = () => undefined;
+        verification.resolve = () => undefined;
 
         const result = await verification.done();
 
