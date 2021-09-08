@@ -52,8 +52,7 @@ export class ToDeviceChannel implements IVerificationChannel {
     public isToDevices(devices: string[]): boolean {
         if (devices.length === this.devices.length) {
             for (const device of devices) {
-                const d = this.devices.find(d => d.deviceId === device.deviceId);
-                if (!d) {
+                if (!this.devices.includes(device)) {
                     return false;
                 }
             }
@@ -169,7 +168,7 @@ export class ToDeviceChannel implements IVerificationChannel {
                 // also check that message came from the device we sent the request to earlier on
                 // and do send a cancel message to that device
                 // (but don't cancel the request for the device we should be talking to)
-                const cancelContent = this.completeContent(errorFromEvent(newUnexpectedMessageError()));
+                const cancelContent = this.completeContent(CANCEL_TYPE, errorFromEvent(newUnexpectedMessageError()));
                 return this.sendToDevices(CANCEL_TYPE, cancelContent, [deviceId]);
             }
         }
@@ -188,7 +187,7 @@ export class ToDeviceChannel implements IVerificationChannel {
                 d => d !== this.deviceId && d !== this.client.getDeviceId(),
             );
             if (nonChosenDevices.length) {
-                const message = this.completeContent({
+                const message = this.completeContent(CANCEL_TYPE, {
                     code: "m.accepted",
                     reason: "Verification request accepted by another device",
                 });
@@ -253,7 +252,7 @@ export class ToDeviceChannel implements IVerificationChannel {
      */
     public async sendCompleted(type: string, content: Record<string, any>): Promise<void> {
         let result;
-        if (type === REQUEST_TYPE || (type === CANCEL_TYPE && !this.__deviceId)) {
+        if (type === REQUEST_TYPE || (type === CANCEL_TYPE && !this.deviceId)) {
             result = await this.sendToDevices(type, content, this.devices);
         } else {
             result = await this.sendToDevices(type, content, [this.deviceId]);
