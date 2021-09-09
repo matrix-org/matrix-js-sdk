@@ -8489,6 +8489,13 @@ export class MatrixClient extends EventEmitter {
             publicise: isPublic,
         });
     }
+
+    /**
+     * @experimental
+     */
+    public supportsExperimentalThreads(): boolean {
+        return this.clientOpts?.experimentalThreadSupport || false;
+    }
 }
 
 /**

@@ -32,7 +32,7 @@ export class Thread extends EventEmitter {
      * A reference to all the events ID at the bottom of the threads
      */
     public readonly tail = new Set<string>();
-    private _timelineSet: EventTimelineSet;
+    public readonly timelineSet: EventTimelineSet;
 
     constructor(
         events: MatrixEvent[] = [],
@@ -40,7 +40,7 @@ export class Thread extends EventEmitter {
         public readonly client: MatrixClient,
     ) {
         super();
-        this._timelineSet = new EventTimelineSet(room, {
+        this.timelineSet = new EventTimelineSet(room, {
             unstableClientRelationAggregation: true,
             timelineSupport: true,
         });
@@ -54,7 +54,7 @@ export class Thread extends EventEmitter {
      * @param event The event to add
      */
     public async addEvent(event: MatrixEvent): Promise<void> {
-        if (this._timelineSet.findEventById(event.getId()) || event.status !== null) {
+        if (this.timelineSet.findEventById(event.getId()) || event.status !== null) {
             return;
         }
 
@@ -63,19 +63,17 @@ export class Thread extends EventEmitter {
         }
         this.tail.add(event.getId());
 
-        if (!event.replyEventId || !this._timelineSet.findEventById(event.replyEventId)) {
+        if (!event.replyEventId || !this.timelineSet.findEventById(event.replyEventId)) {
             this.root = event.getId();
         }
 
         event.setThread(this);
-        this._timelineSet.addLiveEvent(event);
+        this.timelineSet.addLiveEvent(event);
 
         if (this.ready) {
             this.client.decryptEventIfNeeded(event, {});
-            this.emit("Thread.update", this);
-        } else {
-            this.emit("Thread.update", this);
         }
+        this.emit("Thread.update", this);
     }
 
     /**
@@ -105,7 +103,7 @@ export class Thread extends EventEmitter {
 
     private async decryptEvents(): Promise<void> {
         await Promise.allSettled(
-            Array.from(this._timelineSet.getLiveTimeline().getEvents()).map(event => {
+            Array.from(this.timelineSet.getLiveTimeline().getEvents()).map(event => {
                 return this.client.decryptEventIfNeeded(event, {});
             }),
         );
@@ -127,7 +125,7 @@ export class Thread extends EventEmitter {
      * Finds an event by ID in the current thread
      */
     public findEventById(eventId: string) {
-        return this._timelineSet.findEventById(eventId);
+        return this.timelineSet.findEventById(eventId);
     }
 
     /**
@@ -170,13 +168,6 @@ export class Thread extends EventEmitter {
     }
 
     /**
-     * A read-only getter to access the timeline set
-     */
-    public get timelineSet(): EventTimelineSet {
-        return this._timelineSet;
-    }
-
-    /**
      * A getter for the last event added to the thread
      */
     public get replyToEvent(): MatrixEvent {
@@ -185,7 +176,7 @@ export class Thread extends EventEmitter {
     }
 
     public get events(): MatrixEvent[] {
-        return this._timelineSet.getLiveTimeline().getEvents();
+        return this.timelineSet.getLiveTimeline().getEvents();
     }
 
     public merge(thread: Thread): void {
@@ -193,5 +184,9 @@ export class Thread extends EventEmitter {
             this.addEvent(event);
         });
         this.events.forEach(event => event.setThread(this));
+    }
+
+    public has(eventId: string): boolean {
+        return this.timelineSet.findEventById(eventId) instanceof MatrixEvent;
     }
 }
