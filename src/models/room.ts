@@ -1311,6 +1311,9 @@ export class Room extends EventEmitter {
             thread.addEvent(event);
         } else {
             thread = new Thread([event], this, this.client);
+        }
+
+        if (!this.threads.has(thread)) {
             this.addThread(thread);
         }
     }
@@ -1411,6 +1414,13 @@ export class Room extends EventEmitter {
      * unique transaction id.
      */
     public addPendingEvent(event: MatrixEvent, txnId: string): void {
+        // TODO: Enable "pending events" for threads
+        // There's a fair few things to update to make them work with Threads
+        // Will get back to it when the plan is to build a more polished UI ready for production
+        if (this.client.supportsExperimentalThreads() && event.replyInThread) {
+            return;
+        }
+
         if (event.status !== EventStatus.SENDING && event.status !== EventStatus.NOT_SENT) {
             throw new Error("addPendingEvent called on an event with status " +
                 event.status);
@@ -1572,15 +1582,25 @@ export class Room extends EventEmitter {
         // any, which is good, because we don't want to try decoding it again).
         localEvent.handleRemoteEcho(remoteEvent.event);
 
-        for (let i = 0; i < this.timelineSets.length; i++) {
-            const timelineSet = this.timelineSets[i];
+        // Disables remote echo for threaded events as it would never
+        // work given the "pending events" are disabled for threads at the moment
+        const thread = this.findThreadByEventId(localEvent.getId());
+        if (!thread) {
+            for (let i = 0; i < this.timelineSets.length; i++) {
+                const timelineSet = this.timelineSets[i];
 
-            // if it's already in the timeline, update the timeline map. If it's not, add it.
-            timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
+                // if it's already in the timeline, update the timeline map. If it's not, add it.
+                timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
+            }
         }
+    }
 
-        this.emit("Room.localEchoUpdated", localEvent, this,
-            oldEventId, oldStatus);
+    public findThreadByEventId(eventId: string): Thread {
+        for (const thread of this.threads) {
+            if (thread.has(eventId)) {
+                return thread;
+            }
+        }
     }
 
     /**
