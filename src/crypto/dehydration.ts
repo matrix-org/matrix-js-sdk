@@ -20,6 +20,7 @@ import { decryptAES, encryptAES } from './aes';
 import anotherjson from "another-json";
 import { logger } from '../logger';
 import { ISecretStorageKeyInfo } from "./api";
+import { Crypto } from "./index";
 
 // FIXME: these types should eventually go in a different file
 type Signatures = Record<string, Record<string, string>>;
@@ -60,7 +61,7 @@ export class DehydrationManager {
     private key: Uint8Array;
     private keyInfo: {[props: string]: any};
     private deviceDisplayName: string;
-    constructor(private crypto) {
+    constructor(private readonly crypto: Crypto) {
         this.getDehydrationKeyFromCache();
     }
     async getDehydrationKeyFromCache(): Promise<void> {
@@ -73,7 +74,7 @@ export class DehydrationManager {
                     async (result) => {
                         if (result) {
                             const { key, keyInfo, deviceDisplayName, time } = result;
-                            const pickleKey = Buffer.from(this.crypto.olmDevice._pickleKey);
+                            const pickleKey = Buffer.from(this.crypto.olmDevice.pickleKey);
                             const decrypted = await decryptAES(key, pickleKey, DEHYDRATION_ALGORITHM);
                             this.key = decodeBase64(decrypted);
                             this.keyInfo = keyInfo;
@@ -158,7 +159,7 @@ export class DehydrationManager {
             this.timeoutId = undefined;
         }
         try {
-            const pickleKey = Buffer.from(this.crypto.olmDevice._pickleKey);
+            const pickleKey = Buffer.from(this.crypto.olmDevice.pickleKey);
 
             // update the crypto store with the timestamp
             const key = await encryptAES(encodeBase64(this.key), pickleKey, DEHYDRATION_ALGORITHM);

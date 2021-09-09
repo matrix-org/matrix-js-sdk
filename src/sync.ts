@@ -315,7 +315,7 @@ export class SyncApi {
     public partitionThreadedEvents(events: MatrixEvent[]): [MatrixEvent[], MatrixEvent[]] {
         if (this.opts.experimentalThreadSupport) {
             return events.reduce((memo, event: MatrixEvent) => {
-                memo[event.replyEventId ? 1 : 0].push(event);
+                memo[event.replyInThread ? 1 : 0].push(event);
                 return memo;
             }, [[], []]);
         } else {
@@ -704,7 +704,11 @@ export class SyncApi {
      */
     public stop(): void {
         debuglog("SyncApi.stop");
-        if (global.window) {
+        // It is necessary to check for the existance of
+        // global.window AND global.window.removeEventListener.
+        // Some platforms (e.g. React Native) register global.window,
+        // but do not have global.window.removeEventListener.
+        if (global.window && global.window.removeEventListener) {
             global.window.removeEventListener("online", this.onOnline, false);
         }
         this.running = false;
@@ -1718,10 +1722,26 @@ export class SyncApi {
      * @experimental
      */
     private processThreadEvents(room: Room, threadedEvents: MatrixEvent[]): void {
-        threadedEvents.forEach(event => {
-            room.addThreadedEvent(event);
-        });
+        threadedEvents
+            .sort((a, b) => a.getTs() - b.getTs())
+            .forEach(event => {
+                room.addThreadedEvent(event);
+            });
     }
+
+    // extractRelatedEvents(event: MatrixEvent, events: MatrixEvent[], relatedEvents: MatrixEvent[] = []): MatrixEvent[] {
+    //     relatedEvents.push(event);
+
+    //     const parentEventId = event.parentEventId;
+    //     const parentEventIndex = events.findIndex(event => event.getId() === parentEventId);
+
+    //     if (parentEventIndex > -1) {
+    //         const [relatedEvent] = events.splice(parentEventIndex, 1);
+    //         return this.extractRelatedEvents(relatedEvent, events, relatedEvents);
+    //     } else {
+    //         return relatedEvents;
+    //     }
+    // }
 
     /**
      * Takes a list of timelineEvents and adds and adds to notifEvents

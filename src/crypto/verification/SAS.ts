@@ -1,5 +1,5 @@
 /*
-Copyright 2018 New Vector Ltd
+Copyright 2018 - 2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@ import {
     newUserCancelledError,
 } from './Error';
 import { logger } from '../../logger';
+import { Utility, SAS as OlmSAS } from "@matrix-org/olm";
+import { IContent, MatrixEvent } from "../../models/event";
 
 const START_TYPE = "m.key.verification.start";
 
@@ -38,7 +40,7 @@ const EVENTS = [
     "m.key.verification.mac",
 ];
 
-let olmutil;
+let olmutil: Utility;
 
 const newMismatchedSASError = errorFactory(
     "m.mismatched_sas", "Mismatched short authentication string",
@@ -48,7 +50,7 @@ const newMismatchedCommitmentError = errorFactory(
     "m.mismatched_commitment", "Mismatched commitment",
 );
 
-function generateDecimalSas(sasBytes) {
+function generateDecimalSas(sasBytes: number[]): [number, number, number] {
     /**
      *      +--------+--------+--------+--------+--------+
      *      | Byte 0 | Byte 1 | Byte 2 | Byte 3 | Byte 4 |
@@ -64,7 +66,9 @@ function generateDecimalSas(sasBytes) {
     ];
 }
 
-const emojiMapping = [
+type EmojiMapping = [emoji: string, name: string];
+
+const emojiMapping: EmojiMapping[] = [
     ["🐶", "dog"],        //  0
     ["🐱", "cat"],        //  1
     ["🦁", "lion"],       //  2
@@ -131,7 +135,7 @@ const emojiMapping = [
     ["📌", "pin"],        // 63
 ];
 
-function generateEmojiSas(sasBytes) {
+function generateEmojiSas(sasBytes: number[]): EmojiMapping[] {
     const emojis = [
         // just like base64 encoding
         sasBytes[0] >> 2,
@@ -151,8 +155,13 @@ const sasGenerators = {
     emoji: generateEmojiSas,
 };
 
-function generateSas(sasBytes, methods) {
-    const sas = {};
+export interface IGeneratedSas {
+    decimal?: [number, number, number];
+    emoji?: EmojiMapping[];
+}
+
+function generateSas(sasBytes: number[], methods: string[]): IGeneratedSas {
+    const sas: IGeneratedSas = {};
     for (const method of methods) {
         if (method in sasGenerators) {
             sas[method] = sasGenerators[method](sasBytes);
@@ -166,7 +175,7 @@ const macMethods = {
     "hmac-sha256": "calculate_mac_long_kdf",
 };
 
-function calculateMAC(olmSAS, method) {
+function calculateMAC(olmSAS: OlmSAS, method: string) {
     return function(...args) {
         const macFunction = olmSAS[macMethods[method]];
         const mac = macFunction.apply(olmSAS, args);
@@ -176,23 +185,23 @@ function calculateMAC(olmSAS, method) {
 }
 
 const calculateKeyAgreement = {
-    "curve25519-hkdf-sha256": function(sas, olmSAS, bytes) {
-        const ourInfo = `${sas._baseApis.getUserId()}|${sas._baseApis.deviceId}|`
+    "curve25519-hkdf-sha256": function(sas: SAS, olmSAS: OlmSAS, bytes: number): Uint8Array {
+        const ourInfo = `${sas.baseApis.getUserId()}|${sas.baseApis.deviceId}|`
               + `${sas.ourSASPubKey}|`;
         const theirInfo = `${sas.userId}|${sas.deviceId}|${sas.theirSASPubKey}|`;
         const sasInfo =
             "MATRIX_KEY_VERIFICATION_SAS|"
               + (sas.initiatedByMe ? ourInfo + theirInfo : theirInfo + ourInfo)
-              + sas._channel.transactionId;
+              + sas.channel.transactionId;
         return olmSAS.generate_bytes(sasInfo, bytes);
     },
-    "curve25519": function(sas, olmSAS, bytes) {
-        const ourInfo = `${sas._baseApis.getUserId()}${sas._baseApis.deviceId}`;
+    "curve25519": function(sas: SAS, olmSAS: OlmSAS, bytes: number): Uint8Array {
+        const ourInfo = `${sas.baseApis.getUserId()}${sas.baseApis.deviceId}`;
         const theirInfo = `${sas.userId}${sas.deviceId}`;
         const sasInfo =
             "MATRIX_KEY_VERIFICATION_SAS"
               + (sas.initiatedByMe ? ourInfo + theirInfo : theirInfo + ourInfo)
-              + sas._channel.transactionId;
+              + sas.channel.transactionId;
         return olmSAS.generate_bytes(sasInfo, bytes);
     },
 };
@@ -211,7 +220,7 @@ const HASHES_SET = new Set(HASHES_LIST);
 const MAC_SET = new Set(MAC_LIST);
 const SAS_SET = new Set(SAS_LIST);
 
-function intersection(anArray, aSet) {
+function intersection<T>(anArray: T[], aSet: Set<T>): T[] {
     return anArray instanceof Array ? anArray.filter(x => aSet.has(x)) : [];
 }
 
@@ -220,28 +229,39 @@ function intersection(anArray, aSet) {
  * @extends {module:crypto/verification/Base}
  */
 export class SAS extends Base {
-    static get NAME() {
+    private waitingForAccept: boolean;
+    public ourSASPubKey: string;
+    public theirSASPubKey: string;
+    public sasEvent: {
+        sas: IGeneratedSas;
+        confirm(): Promise<void>;
+        cancel(): void;
+        mismatch(): void;
+    };
+
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    public static get NAME(): string {
         return "m.sas.v1";
     }
 
-    get events() {
+    public get events(): string[] {
         return EVENTS;
     }
 
-    async _doVerification() {
+    protected doVerification = async (): Promise<void> => {
         await global.Olm.init();
         olmutil = olmutil || new global.Olm.Utility();
 
         // make sure user's keys are downloaded
-        await this._baseApis.downloadKeys([this.userId]);
+        await this.baseApis.downloadKeys([this.userId]);
 
         let retry = false;
         do {
             try {
                 if (this.initiatedByMe) {
-                    return await this._doSendVerification();
+                    return await this.doSendVerification();
                 } else {
-                    return await this._doRespondVerification();
+                    return await this.doRespondVerification();
                 }
             } catch (err) {
                 if (err instanceof SwitchStartEventError) {
@@ -253,38 +273,37 @@ export class SAS extends Base {
                 }
             }
         } while (retry);
-    }
+    };
 
-    canSwitchStartEvent(event) {
+    public canSwitchStartEvent(event: MatrixEvent): boolean {
         if (event.getType() !== START_TYPE) {
             return false;
         }
         const content = event.getContent();
-        return content && content.method === SAS.NAME &&
-            this._waitingForAccept;
+        return content && content.method === SAS.NAME && this.waitingForAccept;
     }
 
-    async _sendStart() {
-        const startContent = this._channel.completeContent(START_TYPE, {
+    private async sendStart(): Promise<Record<string, any>> {
+        const startContent = this.channel.completeContent(START_TYPE, {
             method: SAS.NAME,
-            from_device: this._baseApis.deviceId,
+            from_device: this.baseApis.deviceId,
             key_agreement_protocols: KEY_AGREEMENT_LIST,
             hashes: HASHES_LIST,
             message_authentication_codes: MAC_LIST,
             // FIXME: allow app to specify what SAS methods can be used
             short_authentication_string: SAS_LIST,
         });
-        await this._channel.sendCompleted(START_TYPE, startContent);
+        await this.channel.sendCompleted(START_TYPE, startContent);
         return startContent;
     }
 
-    async _doSendVerification() {
-        this._waitingForAccept = true;
+    private async doSendVerification(): Promise<void> {
+        this.waitingForAccept = true;
         let startContent;
         if (this.startEvent) {
-            startContent = this._channel.completedContentFromEvent(this.startEvent);
+            startContent = this.channel.completedContentFromEvent(this.startEvent);
         } else {
-            startContent = await this._sendStart();
+            startContent = await this.sendStart();
         }
 
         // we might have switched to a different start event,
@@ -297,9 +316,9 @@ export class SAS extends Base {
 
         let e;
         try {
-            e = await this._waitForEvent("m.key.verification.accept");
+            e = await this.waitForEvent("m.key.verification.accept");
         } finally {
-            this._waitingForAccept = false;
+            this.waitingForAccept = false;
         }
         let content = e.getContent();
         const sasMethods
@@ -319,11 +338,11 @@ export class SAS extends Base {
         const olmSAS = new global.Olm.SAS();
         try {
             this.ourSASPubKey = olmSAS.get_pubkey();
-            await this._send("m.key.verification.key", {
+            await this.send("m.key.verification.key", {
                 key: this.ourSASPubKey,
             });
 
-            e = await this._waitForEvent("m.key.verification.key");
+            e = await this.waitForEvent("m.key.verification.key");
             // FIXME: make sure event is properly formed
             content = e.getContent();
             const commitmentStr = content.key + anotherjson.stringify(startContent);
@@ -335,12 +354,12 @@ export class SAS extends Base {
             olmSAS.set_their_key(content.key);
 
             const sasBytes = calculateKeyAgreement[keyAgreement](this, olmSAS, 6);
-            const verifySAS = new Promise((resolve, reject) => {
+            const verifySAS = new Promise<void>((resolve, reject) => {
                 this.sasEvent = {
                     sas: generateSas(sasBytes, sasMethods),
                     confirm: async () => {
                         try {
-                            await this._sendMAC(olmSAS, macMethod);
+                            await this.sendMAC(olmSAS, macMethod);
                             resolve();
                         } catch (err) {
                             reject(err);
@@ -353,54 +372,45 @@ export class SAS extends Base {
             });
 
             [e] = await Promise.all([
-                this._waitForEvent("m.key.verification.mac")
+                this.waitForEvent("m.key.verification.mac")
                     .then((e) => {
                         // we don't expect any more messages from the other
                         // party, and they may send a m.key.verification.done
                         // when they're done on their end
-                        this._expectedEvent = "m.key.verification.done";
+                        this.expectedEvent = "m.key.verification.done";
                         return e;
                     }),
                 verifySAS,
             ]);
             content = e.getContent();
-            await this._checkMAC(olmSAS, content, macMethod);
+            await this.checkMAC(olmSAS, content, macMethod);
         } finally {
             olmSAS.free();
         }
     }
 
-    async _doRespondVerification() {
+    private async doRespondVerification(): Promise<void> {
         // as m.related_to is not included in the encrypted content in e2e rooms,
         // we need to make sure it is added
-        let content = this._channel.completedContentFromEvent(this.startEvent);
+        let content = this.channel.completedContentFromEvent(this.startEvent);
 
         // Note: we intersect using our pre-made lists, rather than the sets,
         // so that the result will be in our order of preference.  Then
         // fetching the first element from the array will give our preferred
         // method out of the ones offered by the other party.
-        const keyAgreement
-              = intersection(
-                  KEY_AGREEMENT_LIST, new Set(content.key_agreement_protocols),
-              )[0];
-        const hashMethod
-              = intersection(HASHES_LIST, new Set(content.hashes))[0];
-        const macMethod
-              = intersection(MAC_LIST, new Set(content.message_authentication_codes))[0];
+        const keyAgreement = intersection(KEY_AGREEMENT_LIST, new Set(content.key_agreement_protocols))[0];
+        const hashMethod = intersection(HASHES_LIST, new Set(content.hashes))[0];
+        const macMethod = intersection(MAC_LIST, new Set(content.message_authentication_codes))[0];
         // FIXME: allow app to specify what SAS methods can be used
-        const sasMethods
-              = intersection(content.short_authentication_string, SAS_SET);
-        if (!(keyAgreement !== undefined
-              && hashMethod !== undefined
-              && macMethod !== undefined
-              && sasMethods.length)) {
+        const sasMethods = intersection(content.short_authentication_string, SAS_SET);
+        if (!(keyAgreement !== undefined && hashMethod !== undefined && macMethod !== undefined && sasMethods.length)) {
             throw newUnknownMethodError();
         }
 
         const olmSAS = new global.Olm.SAS();
         try {
             const commitmentStr = olmSAS.get_pubkey() + anotherjson.stringify(content);
-            await this._send("m.key.verification.accept", {
+            await this.send("m.key.verification.accept", {
                 key_agreement_protocol: keyAgreement,
                 hash: hashMethod,
                 message_authentication_code: macMethod,
@@ -409,23 +419,23 @@ export class SAS extends Base {
                 commitment: olmutil.sha256(commitmentStr),
             });
 
-            let e = await this._waitForEvent("m.key.verification.key");
+            let e = await this.waitForEvent("m.key.verification.key");
             // FIXME: make sure event is properly formed
             content = e.getContent();
             this.theirSASPubKey = content.key;
             olmSAS.set_their_key(content.key);
             this.ourSASPubKey = olmSAS.get_pubkey();
-            await this._send("m.key.verification.key", {
+            await this.send("m.key.verification.key", {
                 key: this.ourSASPubKey,
             });
 
             const sasBytes = calculateKeyAgreement[keyAgreement](this, olmSAS, 6);
-            const verifySAS = new Promise((resolve, reject) => {
+            const verifySAS = new Promise<void>((resolve, reject) => {
                 this.sasEvent = {
                     sas: generateSas(sasBytes, sasMethods),
                     confirm: async () => {
                         try {
-                            await this._sendMAC(olmSAS, macMethod);
+                            await this.sendMAC(olmSAS, macMethod);
                             resolve();
                         } catch (err) {
                             reject(err);
@@ -438,39 +448,39 @@ export class SAS extends Base {
             });
 
             [e] = await Promise.all([
-                this._waitForEvent("m.key.verification.mac")
+                this.waitForEvent("m.key.verification.mac")
                     .then((e) => {
                         // we don't expect any more messages from the other
                         // party, and they may send a m.key.verification.done
                         // when they're done on their end
-                        this._expectedEvent = "m.key.verification.done";
+                        this.expectedEvent = "m.key.verification.done";
                         return e;
                     }),
                 verifySAS,
             ]);
             content = e.getContent();
-            await this._checkMAC(olmSAS, content, macMethod);
+            await this.checkMAC(olmSAS, content, macMethod);
         } finally {
             olmSAS.free();
         }
     }
 
-    _sendMAC(olmSAS, method) {
+    private sendMAC(olmSAS: OlmSAS, method: string): Promise<void> {
         const mac = {};
         const keyList = [];
         const baseInfo = "MATRIX_KEY_VERIFICATION_MAC"
-              + this._baseApis.getUserId() + this._baseApis.deviceId
+              + this.baseApis.getUserId() + this.baseApis.deviceId
               + this.userId + this.deviceId
-              + this._channel.transactionId;
+              + this.channel.transactionId;
 
-        const deviceKeyId = `ed25519:${this._baseApis.deviceId}`;
+        const deviceKeyId = `ed25519:${this.baseApis.deviceId}`;
         mac[deviceKeyId] = calculateMAC(olmSAS, method)(
-            this._baseApis.getDeviceEd25519Key(),
+            this.baseApis.getDeviceEd25519Key(),
             baseInfo + deviceKeyId,
         );
         keyList.push(deviceKeyId);
 
-        const crossSigningId = this._baseApis.getCrossSigningId();
+        const crossSigningId = this.baseApis.getCrossSigningId();
         if (crossSigningId) {
             const crossSigningKeyId = `ed25519:${crossSigningId}`;
             mac[crossSigningKeyId] = calculateMAC(olmSAS, method)(
@@ -484,14 +494,14 @@ export class SAS extends Base {
             keyList.sort().join(","),
             baseInfo + "KEY_IDS",
         );
-        return this._send("m.key.verification.mac", { mac, keys });
+        return this.send("m.key.verification.mac", { mac, keys });
     }
 
-    async _checkMAC(olmSAS, content, method) {
+    private async checkMAC(olmSAS: OlmSAS, content: IContent, method: string): Promise<void> {
         const baseInfo = "MATRIX_KEY_VERIFICATION_MAC"
               + this.userId + this.deviceId
-              + this._baseApis.getUserId() + this._baseApis.deviceId
-              + this._channel.transactionId;
+              + this.baseApis.getUserId() + this.baseApis.deviceId
+              + this.channel.transactionId;
 
         if (content.keys !== calculateMAC(olmSAS, method)(
             Object.keys(content.mac).sort().join(","),
@@ -500,7 +510,7 @@ export class SAS extends Base {
             throw newKeyMismatchError();
         }
 
-        await this._verifyKeys(this.userId, content.mac, (keyId, device, keyInfo) => {
+        await this.verifyKeys(this.userId, content.mac, (keyId, device, keyInfo) => {
             if (keyInfo !== calculateMAC(olmSAS, method)(
                 device.keys[keyId],
                 baseInfo + keyId,

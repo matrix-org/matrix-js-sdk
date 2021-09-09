@@ -23,7 +23,7 @@ import { IRoomEncryption } from "../RoomList";
 import { IDevice } from "../deviceinfo";
 import { ICrossSigningInfo } from "../CrossSigning";
 import { PrefixedLogger } from "../../logger";
-import { InboundGroupSessionData } from "../../@types/partials";
+import { InboundGroupSessionData } from "../OlmDevice";
 import { IEncryptedPayload } from "../aes";
 
 /**
@@ -125,7 +125,7 @@ export interface CryptoStore {
     addSharedHistoryInboundGroupSession(roomId: string, senderKey: string, sessionId: string, txn?: unknown): void;
     getSharedHistoryInboundGroupSessions(
         roomId: string,
-        txn?: IDBTransaction,
+        txn?: unknown,
     ): Promise<[senderKey: string, sessionId: string][]>;
 
     // Session key backups

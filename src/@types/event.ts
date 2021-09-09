@@ -168,6 +168,11 @@ export const UNSTABLE_ELEMENT_FUNCTIONAL_USERS = new UnstableValue(
     "io.element.functional_members",
     "io.element.functional_members");
 
+export const UNSTABLE_ELEMENT_REPLY_IN_THREAD = new UnstableValue(
+    "m.in_thread",
+    "io.element.in_thread",
+);
+
 export interface IEncryptedFile {
     url: string;
     mimetype?: string;

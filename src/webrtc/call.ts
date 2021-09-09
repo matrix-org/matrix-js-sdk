@@ -130,6 +130,7 @@ export enum CallEvent {
     AssertedIdentityChanged = 'asserted_identity_changed',
 
     DataChannel = 'datachannel',
+    LengthChanged = 'length_changed'
 }
 
 export enum CallErrorCode {
@@ -327,6 +328,9 @@ export class MatrixCall extends EventEmitter {
     private remoteAssertedIdentity: AssertedIdentity;
 
     private remoteSDPStreamMetadata: SDPStreamMetadata;
+
+    private callLengthInterval: number;
+    private callLength = 0;
 
     constructor(opts: CallOpts) {
         super();
@@ -1507,6 +1511,10 @@ export class MatrixCall extends EventEmitter {
         if (this.peerConn.iceConnectionState == 'connected') {
             clearTimeout(this.iceDisconnectedTimeout);
             this.setState(CallState.Connected);
+            this.callLengthInterval = setInterval(() => {
+                this.callLength++;
+                this.emit(CallEvent.LengthChanged, this.callLength);
+            }, 1000);
         } else if (this.peerConn.iceConnectionState == 'failed') {
             this.hangup(CallErrorCode.IceFailed, false);
         } else if (this.peerConn.iceConnectionState == 'disconnected') {
@@ -1764,6 +1772,10 @@ export class MatrixCall extends EventEmitter {
         if (this.inviteTimeout) {
             clearTimeout(this.inviteTimeout);
             this.inviteTimeout = null;
+        }
+        if (this.callLengthInterval) {
+            clearInterval(this.callLengthInterval);
+            this.callLengthInterval = null;
         }
 
         // Order is important here: first we stopAllMedia() and only then we can deleteAllFeeds()
