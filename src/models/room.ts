@@ -1582,17 +1582,15 @@ export class Room extends EventEmitter {
         // any, which is good, because we don't want to try decoding it again).
         localEvent.handleRemoteEcho(remoteEvent.event);
 
-        // Disables remote echo for threaded events as it would never
-        // work given the "pending events" are disabled for threads at the moment
-        const thread = this.findThreadByEventId(localEvent.getId());
-        if (!thread) {
-            for (let i = 0; i < this.timelineSets.length; i++) {
-                const timelineSet = this.timelineSets[i];
+        for (let i = 0; i < this.timelineSets.length; i++) {
+            const timelineSet = this.timelineSets[i];
 
-                // if it's already in the timeline, update the timeline map. If it's not, add it.
-                timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
-            }
+            // if it's already in the timeline, update the timeline map. If it's not, add it.
+            timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
         }
+
+        this.emit("Room.localEchoUpdated", localEvent, this,
+            oldEventId, oldStatus);
     }
 
     public findThreadByEventId(eventId: string): Thread {
