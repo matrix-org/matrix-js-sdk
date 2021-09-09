@@ -1417,7 +1417,7 @@ export class Room extends EventEmitter {
         // TODO: Enable "pending events" for threads
         // There's a fair few things to update to make them work with Threads
         // Will get back to it when the plan is to build a more polished UI ready for production
-        if (this.client.supportsExperimentalThreads() && event.replyInThread) {
+        if (this.client?.supportsExperimentalThreads() && event.replyInThread) {
             return;
         }
 

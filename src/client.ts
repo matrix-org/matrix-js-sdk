@@ -8494,7 +8494,7 @@ export class MatrixClient extends EventEmitter {
      * @experimental
      */
     public supportsExperimentalThreads(): boolean {
-        return this.clientOpts.experimentalThreadSupport;
+        return this.clientOpts?.experimentalThreadSupport || false;
     }
 }
 
