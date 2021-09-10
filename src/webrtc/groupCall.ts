@@ -512,17 +512,13 @@ export class GroupCall extends EventEmitter {
 
             if (!topAvg || avg > topAvg) {
                 topAvg = avg;
-                nextActiveSpeaker = participant.member;
+                nextActiveSpeaker = participant;
             }
         }
 
-        if (nextActiveSpeaker && topAvg > this.speakingThreshold) {
-            if (nextActiveSpeaker && this.activeSpeaker !== nextActiveSpeaker) {
-                this.activeSpeaker.activeSpeaker = false;
-                nextActiveSpeaker.activeSpeaker = true;
-                this.activeSpeaker = nextActiveSpeaker;
-                this.emit(GroupCallEvent.ActiveSpeakerChanged, this.activeSpeaker);
-            }
+        if (nextActiveSpeaker && this.activeSpeaker !== nextActiveSpeaker && topAvg > this.speakingThreshold) {
+            this.activeSpeaker = nextActiveSpeaker;
+            this.emit(GroupCallEvent.ActiveSpeakerChanged, this.activeSpeaker);
         }
 
         this.activeSpeakerLoopTimeout = setTimeout(

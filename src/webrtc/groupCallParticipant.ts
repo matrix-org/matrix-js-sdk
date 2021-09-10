@@ -15,7 +15,6 @@ export enum GroupCallParticipantEvent {
 }
 
 export class GroupCallParticipant extends EventEmitter {
-    public activeSpeaker: boolean;
     public activeSpeakerSamples: number[];
     public dataChannel?: RTCDataChannel;
     private initializedUsermediaFeed?: CallFeed;
@@ -93,6 +92,10 @@ export class GroupCallParticipant extends EventEmitter {
         return feed.isVideoMuted();
     }
 
+    public isActiveSpeaker(): boolean {
+        return this.groupCall.activeSpeaker === this;
+    }
+
     public replaceCall(call: MatrixCall, sessionId: string) {
         const oldCall = this.call;
 
@@ -110,7 +113,6 @@ export class GroupCallParticipant extends EventEmitter {
 
         this.call = call;
         this.member = call.getOpponentMember();
-        this.activeSpeaker = false;
         this.sessionId = sessionId;
 
         this.call.on(CallEvent.State, this.onCallStateChanged);
@@ -207,7 +209,6 @@ export class GroupCallParticipant extends EventEmitter {
             this.groupCall.participants.length > 0
         ) {
             this.groupCall.activeSpeaker = this.groupCall.participants[0];
-            this.groupCall.activeSpeaker.activeSpeaker = true;
             this.groupCall.emit(GroupCallEvent.ActiveSpeakerChanged, this.groupCall.activeSpeaker);
         }
 
