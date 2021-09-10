@@ -145,7 +145,7 @@ export class GroupCallParticipant extends EventEmitter {
         }
     };
 
-    onCallFeedsChanged = () => {
+    private onCallFeedsChanged = () => {
         const nextUsermediaFeed = this.usermediaFeed;
 
         if (nextUsermediaFeed && nextUsermediaFeed !== this.initializedUsermediaFeed) {
@@ -167,7 +167,7 @@ export class GroupCallParticipant extends EventEmitter {
         this.emit(GroupCallParticipantEvent.CallFeedsChanged);
     };
 
-    initUserMediaFeed(callFeed: CallFeed) {
+    private initUserMediaFeed(callFeed: CallFeed) {
         this.initializedUsermediaFeed = callFeed;
         callFeed.setSpeakingThreshold(this.groupCall.speakingThreshold);
         callFeed.measureVolumeActivity(true);
@@ -186,12 +186,12 @@ export class GroupCallParticipant extends EventEmitter {
         );
     }
 
-    onCallReplaced = (newCall) => {
+    private onCallReplaced = (newCall) => {
         // TODO: Should we always reuse the sessionId?
         this.replaceCall(newCall, this.sessionId);
     };
 
-    onCallHangup = () => {
+    private onCallHangup = () => {
         if (this.call.hangupReason === CallErrorCode.Replaced) {
             return;
         }
@@ -215,17 +215,17 @@ export class GroupCallParticipant extends EventEmitter {
         this.groupCall.emit(GroupCallEvent.ParticipantsChanged, this.groupCall.participants);
     };
 
-    onCallFeedSpeaking = (speaking: boolean) => {
+    private onCallFeedSpeaking = (speaking: boolean) => {
         this.emit(GroupCallParticipantEvent.Speaking, speaking);
     };
 
-    onCallFeedVolumeChanged = (maxVolume: number) => {
+    private onCallFeedVolumeChanged = (maxVolume: number) => {
         this.activeSpeakerSamples.shift();
         this.activeSpeakerSamples.push(maxVolume);
         this.emit(GroupCallParticipantEvent.VolumeChanged, maxVolume);
     };
 
-    onCallFeedMuteStateChanged = (audioMuted: boolean, videoMuted: boolean) => {
+    private onCallFeedMuteStateChanged = (audioMuted: boolean, videoMuted: boolean) => {
         if (audioMuted) {
             this.activeSpeakerSamples = Array(this.groupCall.activeSpeakerSampleCount).fill(
                 -Infinity,
@@ -235,7 +235,7 @@ export class GroupCallParticipant extends EventEmitter {
         this.emit(GroupCallParticipantEvent.MuteStateChanged, audioMuted, videoMuted);
     };
 
-    onCallDataChannel = (dataChannel: RTCDataChannel) => {
+    private onCallDataChannel = (dataChannel: RTCDataChannel) => {
         this.dataChannel = dataChannel;
         this.emit(GroupCallParticipantEvent.Datachannel, dataChannel);
     };

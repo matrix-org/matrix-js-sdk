@@ -51,7 +51,7 @@ export class GroupCall extends EventEmitter {
         this.reEmitter = new ReEmitter(this);
     }
 
-    async initLocalParticipant() {
+    public async initLocalParticipant() {
         if (this.localParticipant) {
             return this.localParticipant;
         }
@@ -89,7 +89,7 @@ export class GroupCall extends EventEmitter {
         return this.localParticipant;
     }
 
-    async enter() {
+    public async enter() {
         if (!this.localParticipant) {
             await this.initLocalParticipant();
         }
@@ -135,7 +135,7 @@ export class GroupCall extends EventEmitter {
         this.onActiveSpeakerLoop();
     }
 
-    leave() {
+    public leave() {
         this.localParticipant = null;
         this.client.stopLocalMediaStream();
 
@@ -181,7 +181,7 @@ export class GroupCall extends EventEmitter {
         this.emit(GroupCallEvent.Left);
     }
 
-    isLocalVideoMuted() {
+    public isLocalVideoMuted() {
         if (this.localParticipant) {
             return this.localParticipant.isVideoMuted();
         }
@@ -189,7 +189,7 @@ export class GroupCall extends EventEmitter {
         return true;
     }
 
-    isMicrophoneMuted() {
+    public isMicrophoneMuted() {
         if (this.localParticipant) {
             return this.localParticipant.isAudioMuted();
         }
@@ -197,7 +197,7 @@ export class GroupCall extends EventEmitter {
         return true;
     }
 
-    setMicrophoneMuted(muted) {
+    public setMicrophoneMuted(muted) {
         if (this.localParticipant) {
             const usermediaFeed = this.localParticipant.usermediaFeed;
 
@@ -227,7 +227,7 @@ export class GroupCall extends EventEmitter {
         this.emit(GroupCallEvent.LocalMuteStateChanged, muted, this.isLocalVideoMuted());
     }
 
-    setLocalVideoMuted(muted) {
+    public setLocalVideoMuted(muted) {
         if (this.localParticipant) {
             const usermediaFeed = this.localParticipant.usermediaFeed;
 
@@ -269,7 +269,7 @@ export class GroupCall extends EventEmitter {
      * Call presence
      */
 
-    onPresenceLoop = () => {
+    private onPresenceLoop = () => {
         const userId = this.client.getUserId();
         const currentMemberState = this.room.currentState.getStateEvents(
             "m.room.member",
@@ -333,7 +333,7 @@ export class GroupCall extends EventEmitter {
      *    as they are observed by the RoomState.members event.
      */
 
-    processInitialCalls() {
+    private processInitialCalls() {
         const calls = this.client.callEventHandler.calls.values();
 
         for (const call of calls) {
@@ -341,7 +341,7 @@ export class GroupCall extends EventEmitter {
         }
     }
 
-    onIncomingCall = (call: MatrixCall) => {
+    private onIncomingCall = (call: MatrixCall) => {
         // The incoming calls may be for another room, which we will ignore.
         if (call.roomId !== this.room.roomId) {
             return;
@@ -396,7 +396,7 @@ export class GroupCall extends EventEmitter {
         }
     };
 
-    onRoomStateMembers = (_event, _state, member: RoomMember) => {
+    private onRoomStateMembers = (_event, _state, member: RoomMember) => {
         // The member events may be received for another room, which we will ignore.
         if (member.roomId !== this.room.roomId) {
             return;
@@ -406,7 +406,7 @@ export class GroupCall extends EventEmitter {
         this.onMemberChanged(member);
     };
 
-    onMemberChanged = (member: RoomMember) => {
+    private onMemberChanged = (member: RoomMember) => {
         // Don't process your own member.
         const localUserId = this.client.getUserId();
 
@@ -496,7 +496,7 @@ export class GroupCall extends EventEmitter {
         }
     };
 
-    onActiveSpeakerLoop = () => {
+    private onActiveSpeakerLoop = () => {
         let topAvg;
         let nextActiveSpeaker;
 
@@ -532,7 +532,7 @@ export class GroupCall extends EventEmitter {
      */
 
     // TODO: move this elsewhere or get rid of the retry logic. Do we need it?
-    sendStateEventWithRetry(
+    private sendStateEventWithRetry(
         roomId: string,
         eventType: string,
         content: any,

@@ -35,7 +35,7 @@ export class CallFeed extends EventEmitter {
     private analyser: AnalyserNode;
     private frequencyBinCount: Float32Array;
     private speakingThreshold = SPEAKING_THRESHOLD;
-    public speaking = false;
+    private speaking = false;
     private volumeLooperTimeout: number;
 
     constructor(
@@ -108,6 +108,10 @@ export class CallFeed extends EventEmitter {
     public isVideoMuted(): boolean {
         // We assume only one video track
         return this.stream.getVideoTracks().length === 0 || this.videoMuted;
+    }
+
+    public isSpeaking(): boolean {
+        return this.speaking;
     }
 
     /**
