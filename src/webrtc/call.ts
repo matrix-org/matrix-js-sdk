@@ -228,21 +228,6 @@ const FALLBACK_ICE_SERVER = 'stun:turn.matrix.org';
 /** The length of time a call can be ringing for. */
 const CALL_TIMEOUT_MS = 60000;
 
-/** Retrieves sources from desktopCapturer */
-export function getDesktopCapturerSources(): Promise<Array<DesktopCapturerSource>> {
-    const options: GetSourcesOptions = {
-        thumbnailSize: {
-            height: 176,
-            width: 312,
-        },
-        types: [
-            "screen",
-            "window",
-        ],
-    };
-    return window.electron.getDesktopCapturerSources(options);
-}
-
 export class CallError extends Error {
     code: string;
 
@@ -789,12 +774,11 @@ export class MatrixCall extends EventEmitter {
     /**
      * Starts/stops screensharing
      * @param enabled the desired screensharing state
-     * @param selectDesktopCapturerSource callBack to select a screensharing stream on desktop
+     * @param {string} desktopCapturerSourceId optional id of the desktop capturer source to use
      * @returns {boolean} new screensharing state
      */
     public async setScreensharingEnabled(
-        enabled: boolean,
-        selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>,
+        enabled: boolean, desktopCapturerSourceId?: string,
     ): Promise<boolean> {
         // Skip if there is nothing to do
         if (enabled && this.isScreensharing()) {
@@ -807,13 +791,13 @@ export class MatrixCall extends EventEmitter {
 
         // Fallback to replaceTrack()
         if (!this.opponentSupportsSDPStreamMetadata()) {
-            return await this.setScreensharingEnabledWithoutMetadataSupport(enabled, selectDesktopCapturerSource);
+            return await this.setScreensharingEnabledWithoutMetadataSupport(enabled, desktopCapturerSourceId);
         }
 
         logger.debug(`Set screensharing enabled? ${enabled}`);
         if (enabled) {
             try {
-                const stream = await getScreensharingStream(selectDesktopCapturerSource);
+                const stream = await getScreensharingStream(desktopCapturerSourceId);
                 if (!stream) return false;
                 this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Screenshare);
                 return true;
@@ -839,17 +823,16 @@ export class MatrixCall extends EventEmitter {
      * Starts/stops screensharing
      * Should be used ONLY if the opponent doesn't support SDPStreamMetadata
      * @param enabled the desired screensharing state
-     * @param selectDesktopCapturerSource callBack to select a screensharing stream on desktop
+     * @param {string} desktopCapturerSourceId optional id of the desktop capturer source to use
      * @returns {boolean} new screensharing state
      */
     private async setScreensharingEnabledWithoutMetadataSupport(
-        enabled: boolean,
-        selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>,
+        enabled: boolean, desktopCapturerSourceId?: string,
     ): Promise<boolean> {
         logger.debug(`Set screensharing enabled? ${enabled} using replaceTrack()`);
         if (enabled) {
             try {
-                const stream = await getScreensharingStream(selectDesktopCapturerSource);
+                const stream = await getScreensharingStream(desktopCapturerSourceId);
                 if (!stream) return false;
 
                 const track = stream.getTracks().find((track) => {
@@ -1939,13 +1922,11 @@ export class MatrixCall extends EventEmitter {
     }
 }
 
-async function getScreensharingStream(
-    selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>,
-): Promise<MediaStream> {
-    const screenshareConstraints = await getScreenshareContraints(selectDesktopCapturerSource);
+async function getScreensharingStream(desktopCapturerSourceId: string): Promise<MediaStream> {
+    const screenshareConstraints = getScreenshareContraints(desktopCapturerSourceId);
     if (!screenshareConstraints) return null;
 
-    if (window.electron?.getDesktopCapturerSources) {
+    if (desktopCapturerSourceId) {
         // We are using Electron
         logger.debug("Getting screen stream using getUserMedia()...");
         return await navigator.mediaDevices.getUserMedia(screenshareConstraints);
@@ -1993,27 +1974,20 @@ function getUserMediaContraints(type: ConstraintsType): MediaStreamConstraints {
     }
 }
 
-async function getScreenshareContraints(
-    selectDesktopCapturerSource?: () => Promise<DesktopCapturerSource>,
-): Promise<DesktopCapturerConstraints> {
-    if (window.electron?.getDesktopCapturerSources && selectDesktopCapturerSource) {
-        // We have access to getDesktopCapturerSources()
-        logger.debug("Electron getDesktopCapturerSources() is available...");
-        const selectedSource = await selectDesktopCapturerSource();
-        if (!selectedSource) return null;
+function getScreenshareContraints(desktopCapturerSourceId?: string): DesktopCapturerConstraints {
+    if (desktopCapturerSourceId) {
+        logger.debug("Using desktop capturer source", desktopCapturerSourceId);
         return {
             audio: false,
             video: {
                 mandatory: {
                     chromeMediaSource: "desktop",
-                    chromeMediaSourceId: selectedSource.id,
+                    chromeMediaSourceId: desktopCapturerSourceId,
                 },
             },
         };
     } else {
-        // We do not have access to the Electron desktop capturer,
-        // therefore we can assume we are on the web
-        logger.debug("Electron desktopCapturer is not available...");
+        logger.debug("Not using desktop capturer source");
         return {
             audio: false,
             video: true,
