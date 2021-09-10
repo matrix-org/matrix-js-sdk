@@ -6163,11 +6163,11 @@ export class MatrixClient extends EventEmitter {
     public register(
         username: string,
         password: string,
-        sessionId: string | null,
+        sessionId: string,
         auth: any,
-        bindThreepids?: any,
-        guestAccessToken?: string,
-        inhibitLogin?: boolean,
+        bindThreepids: any,
+        guestAccessToken: string,
+        inhibitLogin: boolean,
         callback?: Callback,
     ): Promise<any> { // TODO: Types (many)
         // backwards compat
