@@ -227,40 +227,61 @@ describe("MSC3089TreeSpace", () => {
                         [targetUser]: expectedPl,
                     },
                 });
+
+                // Store new power levels so the `getPermissions()` test passes
+                makePowerLevels(content);
+
                 return Promise.resolve();
             });
         client.sendStateEvent = fn;
         await tree.setPermissions(targetUser, role);
         expect(fn.mock.calls.length).toBe(1);
+
+        const finalPermissions = tree.getPermissions(targetUser);
+        expect(finalPermissions).toEqual(role);
     }
 
     it('should support setting Viewer permissions', () => {
         return evaluatePowerLevels({
             ...DEFAULT_TREE_POWER_LEVELS_TEMPLATE,
             users_default: 1024,
+            events_default: 1025,
+            events: {
+                [EventType.RoomPowerLevels]: 1026,
+            },
         }, TreePermissions.Viewer, 1024);
     });
 
     it('should support setting Editor permissions', () => {
         return evaluatePowerLevels({
             ...DEFAULT_TREE_POWER_LEVELS_TEMPLATE,
-            events_default: 1024,
-        }, TreePermissions.Editor, 1024);
+            users_default: 1024,
+            events_default: 1025,
+            events: {
+                [EventType.RoomPowerLevels]: 1026,
+            },
+        }, TreePermissions.Editor, 1025);
     });
 
     it('should support setting Owner permissions', () => {
         return evaluatePowerLevels({
             ...DEFAULT_TREE_POWER_LEVELS_TEMPLATE,
+            users_default: 1024,
+            events_default: 1025,
             events: {
-                [EventType.RoomPowerLevels]: 1024,
+                [EventType.RoomPowerLevels]: 1026,
             },
-        }, TreePermissions.Owner, 1024);
+        }, TreePermissions.Owner, 1026);
     });
 
     it('should support demoting permissions', () => {
         return evaluatePowerLevels({
             ...DEFAULT_TREE_POWER_LEVELS_TEMPLATE,
             users_default: 1024,
+            events_default: 1025,
+            events: {
+                [EventType.RoomPowerLevels]: 1026,
+            },
             users: {
                 [targetUser]: 2222,
             },
@@ -270,11 +291,15 @@ describe("MSC3089TreeSpace", () => {
     it('should support promoting permissions', () => {
         return evaluatePowerLevels({
             ...DEFAULT_TREE_POWER_LEVELS_TEMPLATE,
-            events_default: 1024,
+            users_default: 1024,
+            events_default: 1025,
+            events: {
+                [EventType.RoomPowerLevels]: 1026,
+            },
             users: {
                 [targetUser]: 5,
             },
-        }, TreePermissions.Editor, 1024);
+        }, TreePermissions.Editor, 1025);
     });
 
     it('should support defaults: Viewer', () => {
