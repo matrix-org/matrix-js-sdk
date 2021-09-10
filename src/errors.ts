@@ -1,6 +1,6 @@
 // can't just do InvalidStoreError extends Error
 // because of http://babeljs.io/docs/usage/caveats/#classes
-export function InvalidStoreError(reason, value) {
+export function InvalidStoreError(reason: string, value: boolean): void {
     const message = `Store is invalid because ${reason}, ` +
         `please stop the client, delete all data and start the client again`;
     const instance = Reflect.construct(Error, [message]);
@@ -13,16 +13,16 @@ export function InvalidStoreError(reason, value) {
 InvalidStoreError.TOGGLED_LAZY_LOADING = "TOGGLED_LAZY_LOADING";
 
 InvalidStoreError.prototype = Object.create(Error.prototype, {
-  constructor: {
-    value: Error,
-    enumerable: false,
-    writable: true,
-    configurable: true,
-  },
+    constructor: {
+        value: Error,
+        enumerable: false,
+        writable: true,
+        configurable: true,
+    },
 });
 Reflect.setPrototypeOf(InvalidStoreError, Error);
 
-export function InvalidCryptoStoreError(reason) {
+export function InvalidCryptoStoreError(reason: string): void {
     const message = `Crypto store is invalid because ${reason}, ` +
         `please stop the client, delete all data and start the client again`;
     const instance = Reflect.construct(Error, [message]);
@@ -35,18 +35,17 @@ export function InvalidCryptoStoreError(reason) {
 InvalidCryptoStoreError.TOO_NEW = "TOO_NEW";
 
 InvalidCryptoStoreError.prototype = Object.create(Error.prototype, {
-  constructor: {
-    value: Error,
-    enumerable: false,
-    writable: true,
-    configurable: true,
-  },
+    constructor: {
+        value: Error,
+        enumerable: false,
+        writable: true,
+        configurable: true,
+    },
 });
 Reflect.setPrototypeOf(InvalidCryptoStoreError, Error);
 
 export class KeySignatureUploadError extends Error {
-  constructor(message, value) {
-    super(message);
-    this.value = value;
-  }
+    constructor(message: string, public value: { failures: any }) { // TODO: types
+        super(message);
+    }
 }
