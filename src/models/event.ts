@@ -420,6 +420,11 @@ export class MatrixEvent extends EventEmitter {
             || this.thread instanceof Thread;
     }
 
+    public get parentEventId(): string {
+        return this.replyEventId
+            || this.getWireContent()["m.relates_to"]?.event_id;
+    }
+
     /**
      * Get the previous event content JSON. This will only return something for
      * state events which exist in the timeline.
