@@ -4,12 +4,12 @@ import { MatrixClient } from "../client";
 import { randomString } from "../randomstring";
 import { CallErrorCode, CallState, CallType, MatrixCall } from "./call";
 import { RoomMember } from "../models/room-member";
-import { SDPStreamMetadataPurpose } from "./callEventTypes";
 import { Room } from "../models/room";
 import { logger } from "../logger";
 import { Callback } from "../client";
 import { ReEmitter } from "../ReEmitter";
 import { GroupCallParticipant, GroupCallParticipantEvent } from "./groupCallParticipant";
+import { SDPStreamMetadataPurpose } from "./callEventTypes";
 
 export enum GroupCallEvent {
     Entered = "entered",
@@ -66,9 +66,11 @@ export class GroupCall extends EventEmitter {
 
         const userId = this.client.getUserId();
 
-        const localCallFeed = new CallFeed(
+        const member = this.room.getMember(userId);
+
+        const callFeed = new CallFeed(
             stream,
-            userId,
+            member.userId,
             SDPStreamMetadataPurpose.Usermedia,
             this.client,
             this.room.roomId,
@@ -76,14 +78,13 @@ export class GroupCall extends EventEmitter {
             false,
         );
 
-        const member = this.room.getMember(userId);
-
         this.localParticipant = new GroupCallParticipant(
             this,
             member,
             randomString(16),
         );
-        this.localParticipant.addCallFeed(localCallFeed);
+
+        this.localParticipant.setLocalUsermediaFeed(callFeed);
 
         return this.localParticipant;
     }
@@ -198,6 +199,12 @@ export class GroupCall extends EventEmitter {
 
     setMicrophoneMuted(muted) {
         if (this.localParticipant) {
+            const usermediaFeed = this.localParticipant.usermediaFeed;
+
+            if (usermediaFeed) {
+                usermediaFeed.setAudioMuted(muted);
+            }
+
             for (const { stream } of this.localParticipant.feeds) {
                 for (const track of stream.getTracks()) {
                     if (track.kind === "audio") {
@@ -222,6 +229,12 @@ export class GroupCall extends EventEmitter {
 
     setLocalVideoMuted(muted) {
         if (this.localParticipant) {
+            const usermediaFeed = this.localParticipant.usermediaFeed;
+
+            if (usermediaFeed) {
+                usermediaFeed.setVideoMuted(muted);
+            }
+
             for (const { stream } of this.localParticipant.feeds) {
                 for (const track of stream.getTracks()) {
                     if (track.kind === "video") {
