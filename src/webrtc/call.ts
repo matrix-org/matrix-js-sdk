@@ -129,7 +129,7 @@ export enum CallEvent {
 
     AssertedIdentityChanged = 'asserted_identity_changed',
 
-    DataChannel = 'datachannel',
+    Datachannel = 'datachannel',
     LengthChanged = 'length_changed'
 }
 
@@ -377,7 +377,7 @@ export class MatrixCall extends EventEmitter {
     public createDataChannel(label: string, options: RTCDataChannelInit) {
         logger.debug("createDataChannel");
         const dataChannel = this.peerConn.createDataChannel(label, options);
-        this.emit(CallEvent.DataChannel, dataChannel);
+        this.emit(CallEvent.Datachannel, dataChannel);
         return dataChannel;
     }
 
@@ -1543,7 +1543,7 @@ export class MatrixCall extends EventEmitter {
     };
 
     private onDataChannel = (ev: RTCDataChannelEvent): void => {
-        this.emit(CallEvent.DataChannel, ev.channel);
+        this.emit(CallEvent.Datachannel, ev.channel);
     };
 
     /**

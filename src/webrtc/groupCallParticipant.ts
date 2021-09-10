@@ -10,7 +10,8 @@ export enum GroupCallParticipantEvent {
     VolumeChanged = "volume_changed",
     MuteStateChanged = "mute_state_changed",
     Datachannel = "datachannel",
-    CallReplaced = "call_replaced"
+    CallReplaced = "call_replaced",
+    CallFeedsChanged = "call_feeds_changed"
 }
 
 export class GroupCallParticipant extends EventEmitter {
@@ -38,6 +39,7 @@ export class GroupCallParticipant extends EventEmitter {
             this.call.on(CallEvent.FeedsChanged, this.onCallFeedsChanged);
             this.call.on(CallEvent.Replaced, this.onCallReplaced);
             this.call.on(CallEvent.Hangup, this.onCallHangup);
+            this.call.on(CallEvent.Datachannel, this.onCallDataChannel);
         }
     }
 
@@ -53,7 +55,7 @@ export class GroupCallParticipant extends EventEmitter {
             );
             this.call.removeListener(CallEvent.Replaced, this.onCallReplaced);
             this.call.removeListener(CallEvent.Hangup, this.onCallHangup);
-            this.call.removeListener(CallEvent.DataChannel, this.onCallDataChannel);
+            this.call.removeListener(CallEvent.Datachannel, this.onCallDataChannel);
         }
 
         this.call = call;
@@ -65,7 +67,7 @@ export class GroupCallParticipant extends EventEmitter {
         this.call.on(CallEvent.FeedsChanged, this.onCallFeedsChanged);
         this.call.on(CallEvent.Replaced, this.onCallReplaced);
         this.call.on(CallEvent.Hangup, this.onCallHangup);
-        this.call.on(CallEvent.DataChannel, this.onCallDataChannel);
+        this.call.on(CallEvent.Datachannel, this.onCallDataChannel);
 
         this.groupCall.emit(GroupCallParticipantEvent.CallReplaced, this, oldCall, call);
     }
@@ -121,17 +123,15 @@ export class GroupCallParticipant extends EventEmitter {
 
     onCallFeedsChanged = () => {
         const oldFeeds = this.feeds;
-        const newFeeds = this.call.getRemoteFeeds();
+        this.feeds = this.call.getRemoteFeeds();
 
-        this.feeds = [];
-
-        for (const feed of newFeeds) {
-            if (oldFeeds.includes(feed)) {
-                continue;
+        for (const feed of this.feeds) {
+            if (!oldFeeds.includes(feed) && feed.purpose === SDPStreamMetadataPurpose.Usermedia) {
+                this.addUserMediaFeed(feed);
             }
-
-            this.addCallFeed(feed);
         }
+
+        this.emit(GroupCallParticipantEvent.CallFeedsChanged);
     };
 
     onCallReplaced = (newCall) => {
@@ -164,26 +164,34 @@ export class GroupCallParticipant extends EventEmitter {
         this.groupCall.emit(GroupCallEvent.ParticipantsChanged, this.groupCall.participants);
     };
 
-    addCallFeed(callFeed: CallFeed) {
+    addUserMediaFeed(callFeed: CallFeed) {
+        callFeed.setSpeakingThreshold(this.groupCall.speakingThreshold);
+        callFeed.measureVolumeActivity(true);
+        callFeed.on(CallFeedEvent.Speaking, this.onCallFeedSpeaking);
+        callFeed.on(
+            CallFeedEvent.VolumeChanged,
+            this.onCallFeedVolumeChanged,
+        );
+        callFeed.on(
+            CallFeedEvent.MuteStateChanged,
+            this.onCallFeedMuteStateChanged,
+        );
+        this.onCallFeedMuteStateChanged(
+            this.isAudioMuted(),
+            this.isVideoMuted(),
+        );
+    }
+
+    addCallFeed(callFeed: CallFeed, emitEvent?: boolean) {
         if (callFeed.purpose === SDPStreamMetadataPurpose.Usermedia) {
-            callFeed.setSpeakingThreshold(this.groupCall.speakingThreshold);
-            callFeed.measureVolumeActivity(true);
-            callFeed.on(CallFeedEvent.Speaking, this.onCallFeedSpeaking);
-            callFeed.on(
-                CallFeedEvent.VolumeChanged,
-                this.onCallFeedVolumeChanged,
-            );
-            callFeed.on(
-                CallFeedEvent.MuteStateChanged,
-                this.onCallFeedMuteStateChanged,
-            );
-            this.onCallFeedMuteStateChanged(
-                this.isAudioMuted(),
-                this.isVideoMuted(),
-            );
+            this.addUserMediaFeed(callFeed);
         }
 
         this.feeds.push(callFeed);
+
+        if (emitEvent) {
+            this.emit(GroupCallParticipantEvent.CallFeedsChanged);
+        }
     }
 
     onCallFeedSpeaking = (speaking: boolean) => {
