@@ -316,8 +316,18 @@ export class SyncApi {
         if (this.opts.experimentalThreadSupport) {
             return events.reduce((memo, event: MatrixEvent) => {
                 const room = this.client.getRoom(event.getRoomId());
-                const eventInThread = this.shouldLiveInThreadTimeline(event, room);
-                memo[eventInThread ? 1 : 0].push(event);
+                // An event should live in the thread timeline if
+                // - It's a reply in thread event
+                // - It's related to a reply in thread event
+                let shouldLiveInThreadTimeline = event.replyInThread;
+                if (!shouldLiveInThreadTimeline) {
+                    const parentEventId = event.getWireContent()["m.relates_to"]?.event_id;
+                    const parentEvent = room?.findEventById(parentEventId) || events.find((mxEv: MatrixEvent) => {
+                        return mxEv.getId() === parentEventId;
+                    });
+                    shouldLiveInThreadTimeline = parentEvent?.replyInThread;
+                }
+                memo[shouldLiveInThreadTimeline ? 1 : 0].push(event);
                 return memo;
             }, [[], []]);
         } else {
@@ -327,50 +337,6 @@ export class SyncApi {
                 events,
                 [],
             ];
-        }
-    }
-
-    /**
-     * @experimental
-     * An event should live in a thread if it's a threaded reply
-     * Or if it's related to an event that is a threaded reply
-     * Things like annotations, redactions, ...
-     */
-    private shouldLiveInThreadTimeline(event: MatrixEvent, room: Room): boolean {
-        let isThreadReply = event.replyInThread;
-
-        // If the message is sent from a client that does not support threads
-        // The relation body will not contain `UNSTABLE_ELEMENT_REPLY_IN_THREAD`
-        // We go up the reply chain looking for an event that has this property
-        // If we find one, we then decide to render this reply inside the thread
-        if (!isThreadReply && event.replyEventId) {
-            isThreadReply = this.ancestorInThread(event, room);
-        }
-
-        let isRelatedToThreadReply = false;
-        const relationEventId = event.getRelation()?.event_id;
-        if (relationEventId) {
-            const relatedEvent = room.findEventById(relationEventId);
-            isRelatedToThreadReply = relatedEvent.replyInThread;
-        }
-
-        return isThreadReply || isRelatedToThreadReply;
-    }
-
-    /**
-     * @experimental
-     * Checks whether an event up in the reply chain has
-     * the `UNSTABLE_ELEMENT_REPLY_IN_THREAD` property in its
-     * relations body
-     */
-    private ancestorInThread(event: MatrixEvent, room: Room): boolean {
-        const relatedEvent = room.findEventById(event.replyEventId);
-        if (relatedEvent.replyInThread) {
-            return true;
-        } else if (relatedEvent.replyEventId) {
-            return this.ancestorInThread(relatedEvent, room);
-        } else {
-            return false;
         }
     }
 
