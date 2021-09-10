@@ -36,6 +36,7 @@ export class CallFeed extends EventEmitter {
     private frequencyBinCount: Float32Array;
     private speakingThreshold = SPEAKING_THRESHOLD;
     private speaking = false;
+    private volumeLooperTimeout: number;
 
     constructor(
         public stream: MediaStream,
@@ -166,7 +167,7 @@ export class CallFeed extends EventEmitter {
     private volumeLooper(): void {
         if (!this.analyser) return;
 
-        setTimeout(() => {
+        this.volumeLooperTimeout = setTimeout(() => {
             if (!this.measuringVolumeActivity) return;
 
             this.analyser.getFloatFrequencyData(this.frequencyBinCount);
@@ -187,5 +188,9 @@ export class CallFeed extends EventEmitter {
 
             this.volumeLooper();
         }, POLLING_INTERVAL);
+    }
+
+    public dispose(): void {
+        clearTimeout(this.volumeLooperTimeout);
     }
 }
