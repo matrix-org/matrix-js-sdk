@@ -82,11 +82,3 @@ export enum HistoryVisibility {
     Shared = "shared",
     WorldReadable = "world_readable",
 }
-
-// XXX move to OlmDevice when converted
-export interface InboundGroupSessionData {
-    room_id: string; // eslint-disable-line camelcase
-    session: string;
-    keysClaimed: Record<string, string>;
-    forwardingCurve25519KeyChain: string[];
-}

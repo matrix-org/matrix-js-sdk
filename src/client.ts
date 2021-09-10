@@ -34,6 +34,7 @@ import { IActionsObject, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery } from "./autodiscovery";
 import * as olmlib from "./crypto/olmlib";
 import { decodeBase64, encodeBase64 } from "./crypto/olmlib";
+import { IExportedDevice as IOlmDevice } from "./crypto/OlmDevice";
 import { ReEmitter } from './ReEmitter';
 import { IRoomEncryption, RoomList } from './crypto/RoomList';
 import { logger } from './logger';
@@ -74,7 +75,6 @@ import {
     IKeyBackupPrepareOpts,
     IKeyBackupRestoreOpts,
     IKeyBackupRestoreResult,
-    IKeyBackupSession,
 } from "./crypto/keybackup";
 import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
 import type Request from "request";
@@ -92,7 +92,7 @@ import {
 import { SyncState } from "./sync.api";
 import { EventTimelineSet } from "./models/event-timeline-set";
 import { VerificationRequest } from "./crypto/verification/request/VerificationRequest";
-import { Base as Verification } from "./crypto/verification/Base";
+import { VerificationBase as Verification } from "./crypto/verification/Base";
 import * as ContentHelpers from "./content-helpers";
 import { CrossSigningInfo, DeviceTrustLevel, ICacheCallbacks, UserTrustLevel } from "./crypto/CrossSigning";
 import { Room } from "./models/room";
@@ -155,12 +155,6 @@ const SCROLLBACK_DELAY_MS = 3000;
 export const CRYPTO_ENABLED: boolean = isCryptoAvailable();
 const CAPABILITIES_CACHE_MS = 21600000; // 6 hours - an arbitrary value
 const TURN_CHECK_INTERVAL = 10 * 60 * 1000; // poll for turn credentials every 10 minutes
-
-interface IOlmDevice {
-    pickledAccount: string;
-    sessions: Array<Record<string, IKeyBackupSession>>;
-    pickleKey: string;
-}
 
 interface IExportedDevice {
     olmDevice: IOlmDevice;
@@ -678,7 +672,7 @@ export class MatrixClient extends EventEmitter {
     public static readonly RESTORE_BACKUP_ERROR_BAD_KEY = 'RESTORE_BACKUP_ERROR_BAD_KEY';
 
     public reEmitter = new ReEmitter(this);
-    public olmVersion: string = null; // populated after initCrypto
+    public olmVersion: [number, number, number] = null; // populated after initCrypto
     public usingExternalCrypto = false;
     public store: Store;
     public deviceId?: string;
@@ -8494,6 +8488,13 @@ export class MatrixClient extends EventEmitter {
         return this.http.authedRequest(undefined, "PUT", path, undefined, {
             publicise: isPublic,
         });
+    }
+
+    /**
+     * @experimental
+     */
+    public supportsExperimentalThreads(): boolean {
+        return this.clientOpts?.experimentalThreadSupport || false;
     }
 }
 

@@ -34,7 +34,7 @@ import { IRoomKeyRequestBody } from "../index";
 import { ICrossSigningKey } from "../../client";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
-import { InboundGroupSessionData } from "../../@types/partials";
+import { InboundGroupSessionData } from "../OlmDevice";
 import { IEncryptedPayload } from "../aes";
 
 /**

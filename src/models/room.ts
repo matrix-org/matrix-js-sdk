@@ -1104,16 +1104,17 @@ export class Room extends EventEmitter {
      * @experimental
      */
     private dedupeThreads = (readyThread): void => {
-        const threads = Array.from(this.threads);
-        if (threads.includes(readyThread)) {
-            this.threads = new Set(threads.filter(thread => {
-                if (readyThread.id === thread.id && readyThread !== thread) {
-                    return false;
-                } else {
-                    return true;
-                }
-            }));
-        }
+        const deduped = Array.from(this.threads).reduce((dedupedThreads, thread) => {
+            if (dedupedThreads.has(thread.id)) {
+                dedupedThreads.get(thread.id).merge(thread);
+            } else {
+                dedupedThreads.set(thread.id, thread);
+            }
+
+            return dedupedThreads;
+        }, new Map<string, Thread>());
+
+        this.threads = new Set<Thread>(deduped.values());
     };
 
     /**
@@ -1310,6 +1311,9 @@ export class Room extends EventEmitter {
             thread.addEvent(event);
         } else {
             thread = new Thread([event], this, this.client);
+        }
+
+        if (!this.threads.has(thread)) {
             this.addThread(thread);
         }
     }
@@ -1410,6 +1414,13 @@ export class Room extends EventEmitter {
      * unique transaction id.
      */
     public addPendingEvent(event: MatrixEvent, txnId: string): void {
+        // TODO: Enable "pending events" for threads
+        // There's a fair few things to update to make them work with Threads
+        // Will get back to it when the plan is to build a more polished UI ready for production
+        if (this.client?.supportsExperimentalThreads() && event.replyInThread) {
+            return;
+        }
+
         if (event.status !== EventStatus.SENDING && event.status !== EventStatus.NOT_SENT) {
             throw new Error("addPendingEvent called on an event with status " +
                 event.status);
@@ -1580,6 +1591,14 @@ export class Room extends EventEmitter {
 
         this.emit("Room.localEchoUpdated", localEvent, this,
             oldEventId, oldStatus);
+    }
+
+    public findThreadByEventId(eventId: string): Thread {
+        for (const thread of this.threads) {
+            if (thread.has(eventId)) {
+                return thread;
+            }
+        }
     }
 
     /**

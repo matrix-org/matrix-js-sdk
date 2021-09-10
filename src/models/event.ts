@@ -415,8 +415,9 @@ export class MatrixEvent extends EventEmitter {
         const replyTo = this.getWireContent()
             ?.["m.relates_to"]
             ?.["m.in_reply_to"];
-        return this.replyEventId
-            && replyTo[UNSTABLE_ELEMENT_REPLY_IN_THREAD.name];
+        return (this.replyEventId
+            && replyTo[UNSTABLE_ELEMENT_REPLY_IN_THREAD.name])
+            || this.thread instanceof Thread;
     }
 
     /**

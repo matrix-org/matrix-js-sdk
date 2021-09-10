@@ -20,7 +20,7 @@ import { IDeviceData, IProblem, ISession, ISessionInfo, IWithheld, Mode } from "
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { ICrossSigningKey } from "../../client";
-import { InboundGroupSessionData } from "../../@types/partials";
+import { InboundGroupSessionData } from "../OlmDevice";
 import { IEncryptedPayload } from "../aes";
 
 /**
