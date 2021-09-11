@@ -475,14 +475,27 @@ interface IServerVersions {
     unstable_features: Record<string, boolean>;
 }
 
-interface IClientWellKnown {
+export interface IClientWellKnown {
     [key: string]: any;
-    "m.homeserver": {
-        base_url: string;
-    };
-    "m.identity_server"?: {
-        base_url: string;
-    };
+    "m.homeserver"?: IWellKnownConfig;
+    "m.identity_server"?: IWellKnownConfig;
+}
+
+export interface IWellKnownConfig {
+    raw?: any; // todo typings
+    action?: AutoDiscoveryAction;
+    reason?: string;
+    error?: Error | string;
+    // eslint-disable-next-line
+    base_url?: string | null;
+}
+
+export enum AutoDiscoveryAction {
+    SUCCESS = "SUCCESS",
+    IGNORE = "IGNORE",
+    PROMPT = "PROMPT",
+    FAIL_PROMPT = "FAIL_PROMPT",
+    FAIL_ERROR = "FAIL_ERROR",
 }
 
 interface IKeyBackupPath {

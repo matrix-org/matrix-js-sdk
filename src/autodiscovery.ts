@@ -17,33 +17,12 @@ limitations under the License.
 
 /** @module auto-discovery */
 
+import { IClientWellKnown, IWellKnownConfig, AutoDiscoveryAction } from "./client";
 import { logger } from './logger';
 import { URL as NodeURL } from "url";
 
 // Dev note: Auto discovery is part of the spec.
 // See: https://matrix.org/docs/spec/client_server/r0.4.0.html#server-discovery
-
-enum AutoDiscoveryAction {
-    SUCCESS = "SUCCESS",
-    IGNORE = "IGNORE",
-    PROMPT = "PROMPT",
-    FAIL_PROMPT = "FAIL_PROMPT",
-    FAIL_ERROR = "FAIL_ERROR",
-}
-
-interface DiscoveredClientConfig {
-    "m.homeserver"?: WellKnownConfig;
-    "m.identity_server"?: WellKnownConfig;
-}
-
-interface WellKnownConfig {
-    raw?: any; // todo typings
-    action?: AutoDiscoveryAction;
-    reason?: string;
-    error?: Error | string;
-    // eslint-disable-next-line
-    base_url?: string | null;
-}
 
 /**
  * Utilities for automatically discovery resources, such as homeservers
@@ -133,7 +112,7 @@ export class AutoDiscovery {
      * configuration, which may include error states. Rejects on unexpected
      * failure, not when verification fails.
      */
-    public static async fromDiscoveryConfig(wellknown: string): Promise<DiscoveredClientConfig> {
+    public static async fromDiscoveryConfig(wellknown: string): Promise<IClientWellKnown> {
         // Step 1 is to get the config, which is provided to us here.
 
         // We default to an error state to make the first few checks easier to
@@ -293,7 +272,7 @@ export class AutoDiscovery {
      * configuration, which may include error states. Rejects on unexpected
      * failure, not when discovery fails.
      */
-    public static async findClientConfig(domain: string): Promise<DiscoveredClientConfig> {
+    public static async findClientConfig(domain: string): Promise<IClientWellKnown> {
         if (!domain || typeof(domain) !== "string" || domain.length === 0) {
             throw new Error("'domain' must be a string of non-zero length");
         }
@@ -361,7 +340,7 @@ export class AutoDiscovery {
      * @returns {Promise<object>} Resolves to the domain's client config. Can
      * be an empty object.
      */
-    public static async getRawClientConfig(domain: string): Promise<DiscoveredClientConfig> {
+    public static async getRawClientConfig(domain: string): Promise<IClientWellKnown> {
         if (!domain || typeof(domain) !== "string" || domain.length === 0) {
             throw new Error("'domain' must be a string of non-zero length");
         }
@@ -429,7 +408,7 @@ export class AutoDiscovery {
      * @return {Promise<object>} Resolves to the returned state.
      * @private
      */
-    private static async fetchWellKnownObject(url: string): Promise<WellKnownConfig> { // TODO: TYPES
+    private static async fetchWellKnownObject(url: string): Promise<IWellKnownConfig> { // TODO: TYPES
         return new Promise(function(resolve, reject) {
             // eslint-disable-next-line
             const request = require("./matrix").getRequest();

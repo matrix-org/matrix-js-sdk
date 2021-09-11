@@ -34,11 +34,16 @@ const TIMER_CHECK_PERIOD_MS = 1000;
 let count = 0;
 
 // the key for our callback with the real global.setTimeout
-let realCallbackKey;
+let realCallbackKey: NodeJS.Timeout | number;
 
 // a sorted list of the callbacks to be run.
 // each is an object with keys [runAt, func, params, key].
-const callbackList = [];
+const callbackList: {
+    runAt: number;
+    func: (...params: any[]) => void;
+    params: any[];
+    key: number;
+}[] = [];
 
 // var debuglog = logger.log.bind(logger);
 const debuglog = function(...params: any[]) {};
@@ -126,7 +131,7 @@ export function clearTimeout(key: number): void {
 // use the real global.setTimeout to schedule a callback to runCallbacks.
 function scheduleRealCallback(): void {
     if (realCallbackKey) {
-        global.clearTimeout(realCallbackKey);
+        global.clearTimeout(realCallbackKey as NodeJS.Timeout);
     }
 
     const first = callbackList[0];
@@ -182,7 +187,7 @@ function runCallbacks(): void {
  * returns the index of the last element for which func returns
  * greater than zero, or array.length if no such element exists.
  */
-function binarySearch<T>(array: T[], func: (T) => number): number {
+function binarySearch<T>(array: T[], func: (v: T) => number): number {
     // min is inclusive, max exclusive.
     let min = 0;
     let max = array.length;
