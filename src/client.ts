@@ -31,7 +31,7 @@ import { sleep } from './utils';
 import { Group } from "./models/group";
 import { Direction, EventTimeline } from "./models/event-timeline";
 import { IActionsObject, PushProcessor } from "./pushprocessor";
-import { AutoDiscovery } from "./autodiscovery";
+import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery";
 import * as olmlib from "./crypto/olmlib";
 import { decodeBase64, encodeBase64 } from "./crypto/olmlib";
 import { IExportedDevice as IOlmDevice } from "./crypto/OlmDevice";
@@ -488,14 +488,6 @@ export interface IWellKnownConfig {
     error?: Error | string;
     // eslint-disable-next-line
     base_url?: string | null;
-}
-
-export enum AutoDiscoveryAction {
-    SUCCESS = "SUCCESS",
-    IGNORE = "IGNORE",
-    PROMPT = "PROMPT",
-    FAIL_PROMPT = "FAIL_PROMPT",
-    FAIL_ERROR = "FAIL_ERROR",
 }
 
 interface IKeyBackupPath {
