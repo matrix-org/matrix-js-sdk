@@ -33,12 +33,7 @@ declare global {
     }
 
     interface Window {
-        electron?: Electron;
         webkitAudioContext: typeof AudioContext;
-    }
-
-    interface Electron {
-        getDesktopCapturerSources(options: GetSourcesOptions): Promise<Array<DesktopCapturerSource>>;
     }
 
     interface Crypto {
@@ -65,21 +60,6 @@ declare global {
                 chromeMediaSourceId: string;
             };
         };
-    }
-
-    interface DesktopCapturerSource {
-        id: string;
-        name: string;
-        thumbnailURL: string;
-    }
-
-    interface GetSourcesOptions {
-        types: Array<string>;
-        thumbnailSize?: {
-            height: number;
-            width: number;
-        };
-        fetchWindowIcons?: boolean;
     }
 
     interface HTMLAudioElement {

@@ -1305,8 +1305,7 @@ export class Room extends EventEmitter {
                 this.handleRemoteEcho(event, existingEvent);
             }
         }
-
-        let thread = this.findEventById(event.replyEventId)?.getThread();
+        let thread = this.findEventById(event.parentEventId)?.getThread();
         if (thread) {
             thread.addEvent(event);
         } else {
