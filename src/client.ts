@@ -2470,7 +2470,7 @@ export class MatrixClient extends EventEmitter {
      */
     // TODO: Verify types
     public async prepareKeyBackupVersion(
-        password: string,
+        password?: string,
         opts: IKeyBackupPrepareOpts = { secureSecretStorage: false },
     ): Promise<Pick<IPreparedKeyBackupVersion, "algorithm" | "auth_data" | "recovery_key">> {
         if (!this.crypto) {
