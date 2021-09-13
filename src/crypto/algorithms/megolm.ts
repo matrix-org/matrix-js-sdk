@@ -101,6 +101,13 @@ interface IPayload extends Partial<IMessage> {
 }
 /* eslint-enable camelcase */
 
+interface SharedWithData {
+    // The identity key of the device we shared with
+    deviceKey: string;
+    // The message index of the ratchet we shared with that device
+    messageIndex: number;
+}
+
 /**
  * @private
  * @constructor
@@ -115,12 +122,12 @@ interface IPayload extends Partial<IMessage> {
  *
  * @property {object} sharedWithDevices
  *    devices with which we have shared the session key
- *        userId -> {deviceId -> msgindex}
+ *        userId -> {deviceId -> SharedWithData}
  */
 class OutboundSessionInfo {
     public useCount = 0;
     public creationTime: number;
-    public sharedWithDevices: Record<string, Record<string, number>> = {};
+    public sharedWithDevices: Record<string, Record<string, SharedWithData>> = {};
     public blockedDevicesNotified: Record<string, Record<string, boolean>> = {};
 
     constructor(public readonly sessionId: string, public readonly sharedHistory = false) {
@@ -150,11 +157,11 @@ class OutboundSessionInfo {
         return false;
     }
 
-    public markSharedWithDevice(userId: string, deviceId: string, chainIndex: number): void {
+    public markSharedWithDevice(userId: string, deviceId: string, deviceKey: string, chainIndex: number): void {
         if (!this.sharedWithDevices[userId]) {
             this.sharedWithDevices[userId] = {};
         }
-        this.sharedWithDevices[userId][deviceId] = chainIndex;
+        this.sharedWithDevices[userId][deviceId] = { deviceKey, messageIndex: chainIndex };
     }
 
     public markNotifiedBlockedDevice(userId: string, deviceId: string): void {
@@ -572,6 +579,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
         payload: IPayload,
     ): Promise<void> {
         const contentMap = {};
+        const deviceInfoByDeviceId = new Map<string, DeviceInfo>();
 
         const promises = [];
         for (let i = 0; i < userDeviceMap.length; i++) {
@@ -584,6 +592,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
             const userId = val.userId;
             const deviceInfo = val.deviceInfo;
             const deviceId = deviceInfo.deviceId;
+            deviceInfoByDeviceId.set(deviceId, deviceInfo);
 
             if (!contentMap[userId]) {
                 contentMap[userId] = {};
@@ -636,7 +645,10 @@ class MegolmEncryption extends EncryptionAlgorithm {
                 for (const userId of Object.keys(contentMap)) {
                     for (const deviceId of Object.keys(contentMap[userId])) {
                         session.markSharedWithDevice(
-                            userId, deviceId, chainIndex,
+                            userId,
+                            deviceId,
+                            deviceInfoByDeviceId.get(deviceId).getIdentityKey(),
+                            chainIndex,
                         );
                     }
                 }
@@ -719,8 +731,8 @@ class MegolmEncryption extends EncryptionAlgorithm {
             logger.debug(`megolm session ${sessionId} never shared with user ${userId}`);
             return;
         }
-        const sentChainIndex = obSessionInfo.sharedWithDevices[userId][device.deviceId];
-        if (sentChainIndex === undefined) {
+        const sessionSharedData = obSessionInfo.sharedWithDevices[userId][device.deviceId];
+        if (sessionSharedData === undefined) {
             logger.debug(
                 "megolm session ID " + sessionId + " never shared with device " +
                 userId + ":" + device.deviceId,
@@ -728,10 +740,18 @@ class MegolmEncryption extends EncryptionAlgorithm {
             return;
         }
 
+        if (sessionSharedData.deviceKey !== device.getIdentityKey()) {
+            logger.warn(
+                `Session has been shared with device ${device.deviceId} but with identity ` +
+                `key ${sessionSharedData.deviceKey}. Key is now ${device.getIdentityKey()}!`,
+            );
+            return;
+        }
+
         // get the key from the inbound session: the outbound one will already
         // have been ratcheted to the next chain index.
         const key = await this.olmDevice.getInboundGroupSessionKey(
-            this.roomId, senderKey, sessionId, sentChainIndex,
+            this.roomId, senderKey, sessionId, sessionSharedData.messageIndex,
         );
 
         if (!key) {
@@ -882,7 +902,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
             const deviceId = deviceInfo.deviceId;
 
             session.markSharedWithDevice(
-                userId, deviceId, key.chain_index,
+                userId, deviceId, deviceInfo.getIdentityKey(), key.chain_index,
             );
         }
 
