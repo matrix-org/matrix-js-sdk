@@ -6107,17 +6107,17 @@ export class MatrixClient extends EventEmitter {
     public register(
         username: string,
         password: string,
-        sessionId: string,
-        auth: any,
-        bindThreepids: any,
-        guestAccessToken: string,
-        inhibitLogin: boolean,
+        sessionId: string | null,
+        auth: { session?: string, type: string },
+        bindThreepids?: boolean | null | { email?: boolean, msisdn?: boolean },
+        guestAccessToken?: string,
+        inhibitLogin?: boolean,
         callback?: Callback,
     ): Promise<any> { // TODO: Types (many)
         // backwards compat
         if (bindThreepids === true) {
             bindThreepids = { email: true };
-        } else if (bindThreepids === null || bindThreepids === undefined) {
+        } else if (bindThreepids === null || bindThreepids === undefined || bindThreepids === false) {
             bindThreepids = {};
         }
         if (typeof inhibitLogin === 'function') {
