@@ -6109,7 +6109,7 @@ export class MatrixClient extends EventEmitter {
         password: string,
         sessionId: string | null,
         auth: { session?: string, type: string },
-        bindThreepids?: boolean | null | { email?: boolean | boolean, msisdn?: boolean },
+        bindThreepids?: boolean | null | { email?: boolean, msisdn?: boolean },
         guestAccessToken?: string,
         inhibitLogin?: boolean,
         callback?: Callback,
