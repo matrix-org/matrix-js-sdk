@@ -78,6 +78,26 @@ export class MSC3089Branch {
     }
 
     /**
+     * Gets whether or not a file is locked.
+     * @returns {boolean} True if locked, false otherwise.
+     */
+    public isLocked(): boolean {
+        return this.indexEvent.getContent()['locked'] || false;
+    }
+
+    /**
+     * Sets a file as locked or unlocked.
+     * @param {boolean} locked True to lock the file, false otherwise.
+     * @returns {Promise<void>} Resolves when complete.
+     */
+    public async setLocked(locked: boolean): Promise<void> {
+        await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {
+            ...this.indexEvent.getContent(),
+            locked: locked,
+        }, this.id);
+    }
+
+    /**
      * Gets information about the file needed to download it.
      * @returns {Promise<{info: IEncryptedFile, httpUrl: string}>} Information about the file.
      */

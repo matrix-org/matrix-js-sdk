@@ -127,6 +127,45 @@ describe("MSC3089Branch", () => {
         expect(stateFn).toHaveBeenCalledTimes(1);
     });
 
+    it('should be unlocked by default', async () => {
+        indexEvent.getContent = () => ({ active: true });
+
+        const res = branch.isLocked();
+
+        expect(res).toEqual(false);
+    });
+
+    it('should use lock status from index event', async () => {
+        indexEvent.getContent = () => ({ active: true, locked: true });
+
+        const res = branch.isLocked();
+
+        expect(res).toEqual(true);
+    });
+
+    it('should be able to change its locked status', async () => {
+        const locked = true;
+        indexEvent.getContent = () => ({ active: true, retained: true });
+        const stateFn = jest.fn()
+            .mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
+                expect(roomId).toEqual(branchRoomId);
+                expect(eventType).toEqual(UNSTABLE_MSC3089_BRANCH.unstable); // test that we're definitely using the unstable value
+                expect(content).toMatchObject({
+                    retained: true, // canary for copying state
+                    active: true,
+                    locked: locked,
+                });
+                expect(stateKey).toEqual(fileEventId);
+
+                return Promise.resolve(); // return value not used
+            });
+        client.sendStateEvent = stateFn;
+
+        await branch.setLocked(locked);
+
+        expect(stateFn).toHaveBeenCalledTimes(1);
+    });
+
     it('should be able to return event information', async () => {
         const mxcLatter = "example.org/file";
         const fileContent = { isFile: "not quite", url: "mxc://" + mxcLatter };
