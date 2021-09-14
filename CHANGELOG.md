@@ -1,3 +1,15 @@
+Changes in [12.5.0](https://github.com/vector-im/element-desktop/releases/tag/v12.5.0) (2021-09-14)
+===================================================================================================
+
+## ✨ Features
+ * [Release] Exclude opt-in Element performance metrics from encryption ([\#1901](https://github.com/matrix-org/matrix-js-sdk/pull/1901)).
+ * Give `MatrixCall` the capability to emit `LengthChanged` events ([\#1873](https://github.com/matrix-org/matrix-js-sdk/pull/1873)). Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+ * Improve browser example ([\#1875](https://github.com/matrix-org/matrix-js-sdk/pull/1875)). Contributed by [psrpinto](https://github.com/psrpinto).
+ * Give `CallFeed` the capability to emit on volume changes ([\#1865](https://github.com/matrix-org/matrix-js-sdk/pull/1865)). Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+
+## 🐛 Bug Fixes
+ * Fix verification request cancellation ([\#1871](https://github.com/matrix-org/matrix-js-sdk/pull/1871)).
+
 Changes in [12.4.1](https://github.com/vector-im/element-desktop/releases/tag/v12.4.1) (2021-09-13)
 ===================================================================================================
 
