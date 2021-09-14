@@ -151,4 +151,21 @@ describe("MSC3089Branch", () => {
             httpUrl: expect.stringMatching(`.+${mxcLatter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
         });
     });
+
+    it('should be able to return the event object', async () => {
+        const mxcLatter = "example.org/file";
+        const fileContent = { isFile: "not quite", url: "mxc://" + mxcLatter };
+        const eventsArr = [
+            { getId: () => "$not-file", getContent: () => ({}) },
+            { getId: () => fileEventId, getContent: () => ({ file: fileContent }) },
+        ];
+        client.getEventTimeline = () => Promise.resolve({
+            getEvents: () => eventsArr,
+        }) as any as Promise<EventTimeline>; // partial
+        client.decryptEventIfNeeded = () => Promise.resolve();
+
+        const res = await branch.getFileEvent();
+        expect(res).toBeDefined();
+        expect(res).toBe(eventsArr[1]);
+    });
 });
