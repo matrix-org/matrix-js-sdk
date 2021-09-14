@@ -49,8 +49,6 @@ export * from "./content-repo";
 export * as ContentHelpers from "./content-helpers";
 export {
     createNewMatrixCall,
-    setAudioInput as setMatrixCallAudioInput,
-    setVideoInput as setMatrixCallVideoInput,
 } from "./webrtc/call";
 
 // expose the underlying request object so different environments can use

@@ -144,6 +144,7 @@ import { IHierarchyRoom, ISpaceSummaryEvent, ISpaceSummaryRoom } from "./@types/
 import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, RuleId } from "./@types/PushRules";
 import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
+import { MediaHandler } from "./webrtc/mediaHandler";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -733,6 +734,7 @@ export class MatrixClient extends EventEmitter {
     protected checkTurnServersIntervalID: number;
     protected exportedOlmDeviceToImport: IOlmDevice;
     protected txnCtr = 0;
+    protected mediaHandler = new MediaHandler();
 
     constructor(opts: IMatrixClientCreateOpts) {
         super();
@@ -1238,6 +1240,13 @@ export class MatrixClient extends EventEmitter {
      */
     public supportsVoip(): boolean {
         return this.canSupportVoip;
+    }
+
+    /**
+     * @returns {MediaHandler}
+     */
+    public getMediaHandler(): MediaHandler {
+        return this.mediaHandler;
     }
 
     /**
