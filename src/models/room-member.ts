@@ -103,7 +103,7 @@ export class RoomMember extends EventEmitter {
      * @fires module:client~MatrixClient#event:"RoomMember.name"
      * @fires module:client~MatrixClient#event:"RoomMember.membership"
      */
-    public setMembershipEvent(event: MatrixEvent, roomState: RoomState): void {
+    public setMembershipEvent(event: MatrixEvent, roomState?: RoomState): void {
         const displayName = event.getDirectionalContent().displayname;
 
         if (event.getType() !== "m.room.member") {
@@ -322,7 +322,7 @@ export class RoomMember extends EventEmitter {
 const MXID_PATTERN = /@.+:.+/;
 const LTR_RTL_PATTERN = /[\u200E\u200F\u202A-\u202F]/;
 
-function shouldDisambiguate(selfUserId: string, displayName: string, roomState: RoomState): boolean {
+function shouldDisambiguate(selfUserId: string, displayName: string, roomState?: RoomState): boolean {
     if (!displayName || displayName === selfUserId) return false;
 
     // First check if the displayname is something we consider truthy

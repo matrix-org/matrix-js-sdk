@@ -1,3 +1,10 @@
+Changes in [12.4.1](https://github.com/vector-im/element-desktop/releases/tag/v12.4.1) (2021-09-13)
+===================================================================================================
+
+## 🔒 SECURITY FIXES
+ * Fix a security issue with message key sharing. See https://matrix.org/blog/2021/09/13/vulnerability-disclosure-key-sharing
+   for details.
+
 Changes in [12.4.0](https://github.com/vector-im/element-desktop/releases/tag/v12.4.0) (2021-08-31)
 ===================================================================================================
 

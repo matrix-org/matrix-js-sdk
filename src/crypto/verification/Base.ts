@@ -103,6 +103,10 @@ export class VerificationBase extends EventEmitter {
             content.from_device === this.baseApis.getDeviceId();
     }
 
+    public get hasBeenCancelled(): boolean {
+        return this.cancelled;
+    }
+
     private resetTimer(): void {
         logger.info("Refreshing/starting the verification transaction timeout timer");
         if (this.transactionTimeoutTimer !== null) {
