@@ -256,97 +256,145 @@ describe("MegolmDecryption", function() {
             });
         });
 
-        it("re-uses sessions for sequential messages", async function() {
-            mockCrypto.backupManager = {
-                backupGroupSession: () => {},
-            };
-            const mockStorage = new MockStorageApi();
-            const cryptoStore = new MemoryCryptoStore(mockStorage);
+        describe("session reuse and key reshares", () => {
+            let megolmEncryption;
+            let aliceDeviceInfo;
+            let mockRoom;
+            let olmDevice;
 
-            const olmDevice = new OlmDevice(cryptoStore);
-            olmDevice.verifySignature = jest.fn();
-            await olmDevice.init();
+            beforeEach(async () => {
+                mockCrypto.backupManager = {
+                    backupGroupSession: () => {},
+                };
+                const mockStorage = new MockStorageApi();
+                const cryptoStore = new MemoryCryptoStore(mockStorage);
 
-            mockBaseApis.claimOneTimeKeys = jest.fn().mockReturnValue(Promise.resolve({
-                one_time_keys: {
-                    '@alice:home.server': {
-                        aliceDevice: {
-                            'signed_curve25519:flooble': {
-                                key: 'YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI',
-                                signatures: {
-                                    '@alice:home.server': {
-                                        'ed25519:aliceDevice': 'totally valid',
+                olmDevice = new OlmDevice(cryptoStore);
+                olmDevice.verifySignature = jest.fn();
+                await olmDevice.init();
+
+                mockBaseApis.claimOneTimeKeys = jest.fn().mockReturnValue(Promise.resolve({
+                    one_time_keys: {
+                        '@alice:home.server': {
+                            aliceDevice: {
+                                'signed_curve25519:flooble': {
+                                    key: 'YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI',
+                                    signatures: {
+                                        '@alice:home.server': {
+                                            'ed25519:aliceDevice': 'totally valid',
+                                        },
                                     },
                                 },
                             },
                         },
                     },
-                },
-            }));
-            mockBaseApis.sendToDevice = jest.fn().mockResolvedValue(undefined);
+                }));
+                mockBaseApis.sendToDevice = jest.fn().mockResolvedValue(undefined);
 
-            mockCrypto.downloadKeys.mockReturnValue(Promise.resolve({
-                '@alice:home.server': {
-                    aliceDevice: {
-                        deviceId: 'aliceDevice',
-                        isBlocked: jest.fn().mockReturnValue(false),
-                        isUnverified: jest.fn().mockReturnValue(false),
-                        getIdentityKey: jest.fn().mockReturnValue(
-                            'YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE',
-                        ),
-                        getFingerprint: jest.fn().mockReturnValue(''),
+                aliceDeviceInfo = {
+                    deviceId: 'aliceDevice',
+                    isBlocked: jest.fn().mockReturnValue(false),
+                    isUnverified: jest.fn().mockReturnValue(false),
+                    getIdentityKey: jest.fn().mockReturnValue(
+                        'YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE',
+                    ),
+                    getFingerprint: jest.fn().mockReturnValue(''),
+                };
+
+                mockCrypto.downloadKeys.mockReturnValue(Promise.resolve({
+                    '@alice:home.server': {
+                        aliceDevice: aliceDeviceInfo,
                     },
-                },
-            }));
+                }));
 
-            mockCrypto.checkDeviceTrust.mockReturnValue({
-                isVerified: () => false,
+                mockCrypto.checkDeviceTrust.mockReturnValue({
+                    isVerified: () => false,
+                });
+
+                megolmEncryption = new MegolmEncryption({
+                    userId: '@user:id',
+                    crypto: mockCrypto,
+                    olmDevice: olmDevice,
+                    baseApis: mockBaseApis,
+                    roomId: ROOM_ID,
+                    config: {
+                        rotation_period_ms: 9999999999999,
+                    },
+                });
+                mockRoom = {
+                    getEncryptionTargetMembers: jest.fn().mockReturnValue(
+                        [{ userId: "@alice:home.server" }],
+                    ),
+                    getBlacklistUnverifiedDevices: jest.fn().mockReturnValue(false),
+                };
             });
 
-            const megolmEncryption = new MegolmEncryption({
-                userId: '@user:id',
-                crypto: mockCrypto,
-                olmDevice: olmDevice,
-                baseApis: mockBaseApis,
-                roomId: ROOM_ID,
-                config: {
-                    rotation_period_ms: 9999999999999,
-                },
-            });
-            const mockRoom = {
-                getEncryptionTargetMembers: jest.fn().mockReturnValue(
-                    [{ userId: "@alice:home.server" }],
-                ),
-                getBlacklistUnverifiedDevices: jest.fn().mockReturnValue(false),
-            };
-            const ct1 = await megolmEncryption.encryptMessage(mockRoom, "a.fake.type", {
-                body: "Some text",
-            });
-            expect(mockRoom.getEncryptionTargetMembers).toHaveBeenCalled();
+            it("re-uses sessions for sequential messages", async function() {
+                const ct1 = await megolmEncryption.encryptMessage(mockRoom, "a.fake.type", {
+                    body: "Some text",
+                });
+                expect(mockRoom.getEncryptionTargetMembers).toHaveBeenCalled();
 
-            // this should have claimed a key for alice as it's starting a new session
-            expect(mockBaseApis.claimOneTimeKeys).toHaveBeenCalledWith(
-                [['@alice:home.server', 'aliceDevice']], 'signed_curve25519', 2000,
-            );
-            expect(mockCrypto.downloadKeys).toHaveBeenCalledWith(
-                ['@alice:home.server'], false,
-            );
-            expect(mockBaseApis.sendToDevice).toHaveBeenCalled();
-            expect(mockBaseApis.claimOneTimeKeys).toHaveBeenCalledWith(
-                [['@alice:home.server', 'aliceDevice']], 'signed_curve25519', 2000,
-            );
+                // this should have claimed a key for alice as it's starting a new session
+                expect(mockBaseApis.claimOneTimeKeys).toHaveBeenCalledWith(
+                    [['@alice:home.server', 'aliceDevice']], 'signed_curve25519', 2000,
+                );
+                expect(mockCrypto.downloadKeys).toHaveBeenCalledWith(
+                    ['@alice:home.server'], false,
+                );
+                expect(mockBaseApis.sendToDevice).toHaveBeenCalled();
+                expect(mockBaseApis.claimOneTimeKeys).toHaveBeenCalledWith(
+                    [['@alice:home.server', 'aliceDevice']], 'signed_curve25519', 2000,
+                );
 
-            mockBaseApis.claimOneTimeKeys.mockReset();
+                mockBaseApis.claimOneTimeKeys.mockReset();
 
-            const ct2 = await megolmEncryption.encryptMessage(mockRoom, "a.fake.type", {
-                body: "Some more text",
+                const ct2 = await megolmEncryption.encryptMessage(mockRoom, "a.fake.type", {
+                    body: "Some more text",
+                });
+
+                // this should *not* have claimed a key as it should be using the same session
+                expect(mockBaseApis.claimOneTimeKeys).not.toHaveBeenCalled();
+
+                // likewise they should show the same session ID
+                expect(ct2.session_id).toEqual(ct1.session_id);
             });
 
-            // this should *not* have claimed a key as it should be using the same session
-            expect(mockBaseApis.claimOneTimeKeys).not.toHaveBeenCalled();
+            it("re-shares keys to devices it's already sent to", async function() {
+                const ct1 = await megolmEncryption.encryptMessage(mockRoom, "a.fake.type", {
+                    body: "Some text",
+                });
 
-            // likewise they should show the same session ID
-            expect(ct2.session_id).toEqual(ct1.session_id);
+                mockBaseApis.sendToDevice.mockClear();
+                await megolmEncryption.reshareKeyWithDevice(
+                    olmDevice.deviceCurve25519Key,
+                    ct1.session_id,
+                    '@alice:home.server',
+                    aliceDeviceInfo,
+                );
+
+                expect(mockBaseApis.sendToDevice).toHaveBeenCalled();
+            });
+
+            it("does not re-share keys to devices whose keys have changed", async function() {
+                const ct1 = await megolmEncryption.encryptMessage(mockRoom, "a.fake.type", {
+                    body: "Some text",
+                });
+
+                aliceDeviceInfo.getIdentityKey = jest.fn().mockReturnValue(
+                    'YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWI',
+                );
+
+                mockBaseApis.sendToDevice.mockClear();
+                await megolmEncryption.reshareKeyWithDevice(
+                    olmDevice.deviceCurve25519Key,
+                    ct1.session_id,
+                    '@alice:home.server',
+                    aliceDeviceInfo,
+                );
+
+                expect(mockBaseApis.sendToDevice).not.toHaveBeenCalled();
+            });
         });
     });
 

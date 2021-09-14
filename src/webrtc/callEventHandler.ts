@@ -19,6 +19,7 @@ import { logger } from '../logger';
 import { createNewMatrixCall, MatrixCall, CallErrorCode, CallState, CallDirection } from './call';
 import { EventType } from '../@types/event';
 import { MatrixClient } from '../client';
+import { MCallAnswer, MCallHangupReject } from "./callEventTypes";
 
 // Don't ring unless we'd be ringing for at least 3 seconds: the user needs some
 // time to press the 'accept' button
@@ -252,9 +253,9 @@ export class CallEventHandler {
             } else {
                 if (call.state !== CallState.Ended) {
                     if (type === EventType.CallHangup) {
-                        call.onHangupReceived(content);
+                        call.onHangupReceived(content as MCallHangupReject);
                     } else {
-                        call.onRejectReceived(content);
+                        call.onRejectReceived(content as MCallHangupReject);
                     }
                     this.calls.delete(content.call_id);
                 }
@@ -274,7 +275,7 @@ export class CallEventHandler {
             case EventType.CallAnswer:
                 if (weSentTheEvent) {
                     if (call.state === CallState.Ringing) {
-                        call.onAnsweredElsewhere(content);
+                        call.onAnsweredElsewhere(content as MCallAnswer);
                     }
                 } else {
                     call.onAnswerReceived(event);

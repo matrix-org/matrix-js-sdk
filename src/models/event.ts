@@ -24,11 +24,18 @@ import { EventEmitter } from 'events';
 
 import { logger } from '../logger';
 import { VerificationRequest } from "../crypto/verification/request/VerificationRequest";
-import { EventType, MsgType, RelationType } from "../@types/event";
+import {
+    EventType,
+    MsgType,
+    RelationType,
+    UNSTABLE_ELEMENT_REPLY_IN_THREAD,
+} from "../@types/event";
 import { Crypto } from "../crypto";
 import { deepSortedObjectEntries } from "../utils";
 import { RoomMember } from "./room-member";
+import { Thread } from "./thread";
 import { IActionsObject } from '../pushprocessor';
+import { ReEmitter } from '../ReEmitter';
 
 /**
  * Enum for event statuses.
@@ -191,6 +198,12 @@ export class MatrixEvent extends EventEmitter {
      */
     private txnId: string = null;
 
+    /**
+     * @experimental
+     * A reference to the thread this event belongs to
+     */
+    private thread: Thread = null;
+
     /* Set an approximate timestamp for the event relative the local clock.
      * This will inherently be approximate because it doesn't take into account
      * the time between the server putting the 'age' field on the event as it sent
@@ -211,6 +224,8 @@ export class MatrixEvent extends EventEmitter {
      * so it can be easily accessed from the timeline.
      */
     public verificationRequest = null;
+
+    private readonly reEmitter: ReEmitter;
 
     /**
      * Construct a Matrix Event object
@@ -261,6 +276,7 @@ export class MatrixEvent extends EventEmitter {
 
         this.txnId = event.txn_id || null;
         this.localTimestamp = Date.now() - this.getAge();
+        this.reEmitter = new ReEmitter(this);
     }
 
     /**
@@ -379,6 +395,29 @@ export class MatrixEvent extends EventEmitter {
      */
     public getWireContent(): IContent {
         return this.event.content || {};
+    }
+
+    /**
+     * @experimental
+     * Get the event ID of the replied event
+     */
+    public get replyEventId(): string {
+        const relations = this.getWireContent()["m.relates_to"];
+        return relations?.["m.in_reply_to"]?.["event_id"];
+    }
+
+    /**
+     * @experimental
+     * Determines whether a reply should be rendered in a thread
+     * or in the main room timeline
+     */
+    public get replyInThread(): boolean {
+        const replyTo = this.getWireContent()
+            ?.["m.relates_to"]
+            ?.["m.in_reply_to"];
+        return (this.replyEventId
+            && replyTo[UNSTABLE_ELEMENT_REPLY_IN_THREAD.name])
+            || this.thread instanceof Thread;
     }
 
     /**
@@ -1270,6 +1309,21 @@ export class MatrixEvent extends EventEmitter {
 
     public getTxnId(): string | undefined {
         return this.txnId;
+    }
+
+    /**
+     * @experimental
+     */
+    public setThread(thread: Thread): void {
+        this.thread = thread;
+        this.reEmitter.reEmit(thread, ["Thread.ready", "Thread.update"]);
+    }
+
+    /**
+     * @experimental
+     */
+    public getThread(): Thread {
+        return this.thread;
     }
 }
 

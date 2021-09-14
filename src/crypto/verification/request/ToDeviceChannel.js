@@ -248,7 +248,7 @@ export class ToDeviceChannel {
      */
     async sendCompleted(type, content) {
         let result;
-        if (type === REQUEST_TYPE) {
+        if (type === REQUEST_TYPE || (type === CANCEL_TYPE && !this.__deviceId)) {
             result = await this._sendToDevices(type, content, this._devices);
         } else {
             result = await this._sendToDevices(type, content, [this._deviceId]);
