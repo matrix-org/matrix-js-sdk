@@ -135,6 +135,9 @@ export class MediaHandler {
                 track.stop();
             }
         }
+
+        this.userMediaStreams = [];
+        this.screensharingStreams = [];
     }
 
     private getUserMediaContraints(audio: boolean, video: boolean): MediaStreamConstraints {
