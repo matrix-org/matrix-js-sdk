@@ -1747,18 +1747,14 @@ export class MatrixCall extends EventEmitter {
         logger.debug(`stopAllMedia (stream=${this.localUsermediaStream})`);
 
         for (const feed of this.feeds) {
-            if (feed.isLocal()) {
-                if (feed.purpose === SDPStreamMetadataPurpose.Usermedia) {
-                    this.client.getMediaHandler().stopUserMediaStream(feed.stream);
-                    continue;
-                } else if (feed.purpose === SDPStreamMetadataPurpose.Screenshare) {
-                    this.client.getMediaHandler().stopScreensharingStream(feed.stream);
-                    continue;
+            if (feed.isLocal() && feed.purpose === SDPStreamMetadataPurpose.Usermedia) {
+                this.client.getMediaHandler().stopUserMediaStream(feed.stream);
+            } else if (feed.isLocal() && feed.purpose === SDPStreamMetadataPurpose.Screenshare) {
+                this.client.getMediaHandler().stopScreensharingStream(feed.stream);
+            } else {
+                for (const track of feed.stream.getTracks()) {
+                    track.stop();
                 }
-            }
-
-            for (const track of feed.stream.getTracks()) {
-                track.stop();
             }
         }
     }
