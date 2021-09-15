@@ -56,13 +56,7 @@ export class GroupCall extends EventEmitter {
             return this.localParticipant;
         }
 
-        let stream;
-
-        if (this.type === CallType.Video) {
-            stream = await this.client.getLocalVideoStream();
-        } else {
-            stream = await this.client.getLocalAudioStream();
-        }
+        const stream = await this.client.getMediaHandler().getUserMediaStream(true, this.type === CallType.Video);
 
         const userId = this.client.getUserId();
 
@@ -137,7 +131,7 @@ export class GroupCall extends EventEmitter {
 
     public leave() {
         this.localParticipant = null;
-        this.client.stopLocalMediaStream();
+        this.client.getMediaHandler().stopAllStreams();
 
         if (!this.entered) {
             return;

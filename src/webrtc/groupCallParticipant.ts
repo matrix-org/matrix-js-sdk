@@ -39,7 +39,7 @@ export class GroupCallParticipant extends EventEmitter {
             this.call.on(CallEvent.FeedsChanged, this.onCallFeedsChanged);
             this.call.on(CallEvent.Replaced, this.onCallReplaced);
             this.call.on(CallEvent.Hangup, this.onCallHangup);
-            this.call.on(CallEvent.Datachannel, this.onCallDataChannel);
+            this.call.on(CallEvent.DataChannel, this.onCallDataChannel);
 
             const usermediaFeed = this.usermediaFeed;
 
@@ -108,7 +108,7 @@ export class GroupCallParticipant extends EventEmitter {
             );
             this.call.removeListener(CallEvent.Replaced, this.onCallReplaced);
             this.call.removeListener(CallEvent.Hangup, this.onCallHangup);
-            this.call.removeListener(CallEvent.Datachannel, this.onCallDataChannel);
+            this.call.removeListener(CallEvent.DataChannel, this.onCallDataChannel);
         }
 
         this.call = call;
@@ -119,7 +119,7 @@ export class GroupCallParticipant extends EventEmitter {
         this.call.on(CallEvent.FeedsChanged, this.onCallFeedsChanged);
         this.call.on(CallEvent.Replaced, this.onCallReplaced);
         this.call.on(CallEvent.Hangup, this.onCallHangup);
-        this.call.on(CallEvent.Datachannel, this.onCallDataChannel);
+        this.call.on(CallEvent.DataChannel, this.onCallDataChannel);
 
         this.groupCall.emit(GroupCallParticipantEvent.CallReplaced, this, oldCall, call);
     }
