@@ -129,8 +129,9 @@ export enum CallEvent {
 
     AssertedIdentityChanged = 'asserted_identity_changed',
 
-    Datachannel = 'datachannel',
-    LengthChanged = 'length_changed'
+    LengthChanged = 'length_changed',
+
+    DataChannel = 'datachannel',
 }
 
 export enum CallErrorCode {
@@ -345,6 +346,18 @@ export class MatrixCall extends EventEmitter {
      */
     public async placeVideoCall(): Promise<void> {
         await this.placeCall(true, true);
+    }
+
+    /**
+     * Create a datachannel using this call's peer connection.
+     * @param label A human readable label for this datachannel
+     * @param options An object providing configuration options for the data channel.
+     */
+    public createDataChannel(label: string, options: RTCDataChannelInit) {
+        const dataChannel = this.peerConn.createDataChannel(label, options);
+        this.emit(CallEvent.DataChannel, dataChannel);
+        logger.debug("created data channel");
+        return dataChannel;
     }
 
     public getOpponentMember(): RoomMember {
@@ -1510,7 +1523,7 @@ export class MatrixCall extends EventEmitter {
     };
 
     private onDataChannel = (ev: RTCDataChannelEvent): void => {
-        this.emit(CallEvent.Datachannel, ev.channel);
+        this.emit(CallEvent.DataChannel, ev.channel);
     };
 
     /**
