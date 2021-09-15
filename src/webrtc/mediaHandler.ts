@@ -22,6 +22,8 @@ import { logger } from "../logger";
 export class MediaHandler {
     private audioInput: string;
     private videoInput: string;
+    private userMediaStreams: MediaStream[] = [];
+    private screensharingStreams: MediaStream[] = [];
 
     /**
      * Set an audio input device to use for MatrixCalls
@@ -45,27 +47,97 @@ export class MediaHandler {
      * @returns {MediaStream} based on passed parameters
      */
     public async getUserMediaStream(audio: boolean, video: boolean): Promise<MediaStream> {
-        const constraints = this.getUserMediaContraints(audio, video);
-        logger.log("Getting user media with constraints", constraints);
-        return await navigator.mediaDevices.getUserMedia(constraints);
+        let stream: MediaStream;
+
+        if (this.userMediaStreams.length === 0) {
+            const constraints = this.getUserMediaContraints(audio, video);
+            logger.log("Getting user media with constraints", constraints);
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } else {
+            stream = this.userMediaStreams[this.userMediaStreams.length - 1].clone();
+        }
+
+        this.userMediaStreams.push(stream);
+
+        return stream;
+    }
+
+    /**
+     * Stops all tracks on the provided usermedia stream
+     */
+    public stopUserMediaStream(mediaStream: MediaStream) {
+        for (const track of mediaStream.getTracks()) {
+            track.stop();
+        }
+
+        const index = this.userMediaStreams.indexOf(mediaStream);
+
+        if (index !== -1) {
+            this.userMediaStreams.splice(index, 0);
+        }
     }
 
     /**
      * @returns {MediaStream} based on passed parameters
      */
-    public async getScreensharingStream(desktopCapturerSourceId: string): Promise<MediaStream> {
-        const screenshareConstraints = this.getScreenshareContraints(desktopCapturerSourceId);
-        if (!screenshareConstraints) return null;
+    public async getScreensharingStream(desktopCapturerSourceId: string): Promise<MediaStream | null> {
+        let stream: MediaStream;
 
-        if (desktopCapturerSourceId) {
-            // We are using Electron
-            logger.debug("Getting screen stream using getUserMedia()...");
-            return await navigator.mediaDevices.getUserMedia(screenshareConstraints);
+        if (this.screensharingStreams.length === 0) {
+            const screenshareConstraints = this.getScreenshareContraints(desktopCapturerSourceId);
+            if (!screenshareConstraints) return null;
+
+            if (desktopCapturerSourceId) {
+                // We are using Electron
+                logger.debug("Getting screen stream using getUserMedia()...");
+                stream = await navigator.mediaDevices.getUserMedia(screenshareConstraints);
+            } else {
+                // We are not using Electron
+                logger.debug("Getting screen stream using getDisplayMedia()...");
+                stream = await navigator.mediaDevices.getDisplayMedia(screenshareConstraints);
+            }
         } else {
-            // We are not using Electron
-            logger.debug("Getting screen stream using getDisplayMedia()...");
-            return await navigator.mediaDevices.getDisplayMedia(screenshareConstraints);
+            stream = this.screensharingStreams[this.screensharingStreams.length - 1].clone();
         }
+
+        this.screensharingStreams.push(stream);
+
+        return stream;
+    }
+
+    /**
+     * Stops all tracks on the provided screensharing stream
+     */
+    public stopScreensharingStream(mediaStream: MediaStream) {
+        for (const track of mediaStream.getTracks()) {
+            track.stop();
+        }
+
+        const index = this.userMediaStreams.indexOf(mediaStream);
+
+        if (index !== -1) {
+            this.userMediaStreams.splice(index, 0);
+        }
+    }
+
+    /**
+     * Stops all local media tracks
+     */
+    public stopAllStreams() {
+        for (const stream of this.userMediaStreams) {
+            for (const track of stream.getTracks()) {
+                track.stop();
+            }
+        }
+
+        for (const stream of this.screensharingStreams) {
+            for (const track of stream.getTracks()) {
+                track.stop();
+            }
+        }
+
+        this.userMediaStreams = [];
+        this.screensharingStreams = [];
     }
 
     private getUserMediaContraints(audio: boolean, video: boolean): MediaStreamConstraints {

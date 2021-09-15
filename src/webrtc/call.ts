@@ -816,9 +816,7 @@ export class MatrixCall extends EventEmitter {
             for (const sender of this.screensharingSenders) {
                 this.peerConn.removeTrack(sender);
             }
-            for (const track of this.localScreensharingStream.getTracks()) {
-                track.stop();
-            }
+            this.client.getMediaHandler().stopScreensharingStream(this.localScreensharingStream);
             this.deleteFeedByStream(this.localScreensharingStream);
             return false;
         }
@@ -866,9 +864,7 @@ export class MatrixCall extends EventEmitter {
             });
             sender.replaceTrack(track);
 
-            for (const track of this.localScreensharingStream.getTracks()) {
-                track.stop();
-            }
+            this.client.getMediaHandler().stopScreensharingStream(this.localScreensharingStream);
             this.deleteFeedByStream(this.localScreensharingStream);
 
             return false;
@@ -1751,8 +1747,14 @@ export class MatrixCall extends EventEmitter {
         logger.debug(`stopAllMedia (stream=${this.localUsermediaStream})`);
 
         for (const feed of this.feeds) {
-            for (const track of feed.stream.getTracks()) {
-                track.stop();
+            if (feed.isLocal() && feed.purpose === SDPStreamMetadataPurpose.Usermedia) {
+                this.client.getMediaHandler().stopUserMediaStream(feed.stream);
+            } else if (feed.isLocal() && feed.purpose === SDPStreamMetadataPurpose.Screenshare) {
+                this.client.getMediaHandler().stopScreensharingStream(feed.stream);
+            } else {
+                for (const track of feed.stream.getTracks()) {
+                    track.stop();
+                }
             }
         }
     }
