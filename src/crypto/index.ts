@@ -506,7 +506,7 @@ export class Crypto extends EventEmitter {
      *     recovery key which should be disposed of after displaying to the user,
      *     and raw private key to avoid round tripping if needed.
      */
-    public async createRecoveryKeyFromPassphrase(password: string): Promise<IRecoveryKey> {
+    public async createRecoveryKeyFromPassphrase(password?: string): Promise<IRecoveryKey> {
         const decryption = new global.Olm.PkDecryption();
         try {
             const keyInfo: Partial<IRecoveryKey["keyInfo"]> = {};

@@ -2036,7 +2036,7 @@ export class MatrixClient extends EventEmitter {
      *     recovery key which should be disposed of after displaying to the user,
      *     and raw private key to avoid round tripping if needed.
      */
-    public createRecoveryKeyFromPassphrase(password: string): Promise<IRecoveryKey> {
+    public createRecoveryKeyFromPassphrase(password?: string): Promise<IRecoveryKey> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2479,7 +2479,7 @@ export class MatrixClient extends EventEmitter {
      */
     // TODO: Verify types
     public async prepareKeyBackupVersion(
-        password: string,
+        password?: string,
         opts: IKeyBackupPrepareOpts = { secureSecretStorage: false },
     ): Promise<Pick<IPreparedKeyBackupVersion, "algorithm" | "auth_data" | "recovery_key">> {
         if (!this.crypto) {
@@ -7460,7 +7460,7 @@ export class MatrixClient extends EventEmitter {
         return this.http.authedRequest(undefined, "GET", path, qps, undefined);
     }
 
-    public uploadDeviceSigningKeys(auth: any, keys: CrossSigningKeys): Promise<{}> { // TODO: types
+    public uploadDeviceSigningKeys(auth: any, keys?: CrossSigningKeys): Promise<{}> { // TODO: types
         const data = Object.assign({}, keys);
         if (auth) Object.assign(data, { auth });
         return this.http.authedRequest(
