@@ -88,4 +88,11 @@ declare global {
     interface PromiseConstructor {
         allSettled<T>(promises: Promise<T>[]): Promise<Array<ISettledFulfilled<T> | ISettledRejected>>;
     }
+
+    interface RTCRtpTransceiver {
+        // This has been removed from TS
+        // (https://github.com/microsoft/TypeScript-DOM-lib-generator/issues/1029),
+        // but we still need this for MatrixCall::getRidOfRTXCodecs()
+        setCodecPreferences(codecs: RTCRtpCodecCapability[]): void;
+    }
 }
