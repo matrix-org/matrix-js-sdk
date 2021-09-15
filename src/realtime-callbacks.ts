@@ -31,17 +31,22 @@ import { logger } from './logger';
 const TIMER_CHECK_PERIOD_MS = 1000;
 
 // counter, for making up ids to return from setTimeout
-let _count = 0;
+let count = 0;
 
 // the key for our callback with the real global.setTimeout
-let _realCallbackKey;
+let realCallbackKey: NodeJS.Timeout | number;
 
 // a sorted list of the callbacks to be run.
 // each is an object with keys [runAt, func, params, key].
-const _callbackList = [];
+const callbackList: {
+    runAt: number;
+    func: (...params: any[]) => void;
+    params: any[];
+    key: number;
+}[] = [];
 
 // var debuglog = logger.log.bind(logger);
-const debuglog = function() {};
+const debuglog = function(...params: any[]) {};
 
 /**
  * Replace the function used by this module to get the current time.
@@ -52,10 +57,10 @@ const debuglog = function() {};
  *
  * @internal
  */
-export function setNow(f) {
-    _now = f || Date.now;
+export function setNow(f: () => number): void {
+    now = f || Date.now;
 }
-let _now = Date.now;
+let now = Date.now;
 
 /**
  * reimplementation of window.setTimeout, which will call the callback if
@@ -67,17 +72,16 @@ let _now = Date.now;
  * @return {Number} an identifier for this callback, which may be passed into
  *                   clearTimeout later.
  */
-export function setTimeout(func, delayMs) {
+export function setTimeout(func: (...params: any[]) => void, delayMs: number, ...params: any[]): number {
     delayMs = delayMs || 0;
     if (delayMs < 0) {
         delayMs = 0;
     }
 
-    const params = Array.prototype.slice.call(arguments, 2);
-    const runAt = _now() + delayMs;
-    const key = _count++;
+    const runAt = now() + delayMs;
+    const key = count++;
     debuglog("setTimeout: scheduling cb", key, "at", runAt,
-             "(delay", delayMs, ")");
+        "(delay", delayMs, ")");
     const data = {
         runAt: runAt,
         func: func,
@@ -87,13 +91,13 @@ export function setTimeout(func, delayMs) {
 
     // figure out where it goes in the list
     const idx = binarySearch(
-        _callbackList, function(el) {
+        callbackList, function(el) {
             return el.runAt - runAt;
         },
     );
 
-    _callbackList.splice(idx, 0, data);
-    _scheduleRealCallback();
+    callbackList.splice(idx, 0, data);
+    scheduleRealCallback();
 
     return key;
 }
@@ -103,68 +107,69 @@ export function setTimeout(func, delayMs) {
  *
  * @param {Number} key   result from an earlier setTimeout call
  */
-export function clearTimeout(key) {
-    if (_callbackList.length === 0) {
+export function clearTimeout(key: number): void {
+    if (callbackList.length === 0) {
         return;
     }
 
     // remove the element from the list
     let i;
-    for (i = 0; i < _callbackList.length; i++) {
-        const cb = _callbackList[i];
+    for (i = 0; i < callbackList.length; i++) {
+        const cb = callbackList[i];
         if (cb.key == key) {
-            _callbackList.splice(i, 1);
+            callbackList.splice(i, 1);
             break;
         }
     }
 
     // iff it was the first one in the list, reschedule our callback.
     if (i === 0) {
-        _scheduleRealCallback();
+        scheduleRealCallback();
     }
 }
 
-// use the real global.setTimeout to schedule a callback to _runCallbacks.
-function _scheduleRealCallback() {
-    if (_realCallbackKey) {
-        global.clearTimeout(_realCallbackKey);
+// use the real global.setTimeout to schedule a callback to runCallbacks.
+function scheduleRealCallback(): void {
+    if (realCallbackKey) {
+        global.clearTimeout(realCallbackKey as NodeJS.Timeout);
     }
 
-    const first = _callbackList[0];
+    const first = callbackList[0];
 
     if (!first) {
-        debuglog("_scheduleRealCallback: no more callbacks, not rescheduling");
+        debuglog("scheduleRealCallback: no more callbacks, not rescheduling");
         return;
     }
 
-    const now = _now();
-    const delayMs = Math.min(first.runAt - now, TIMER_CHECK_PERIOD_MS);
+    const timestamp = now();
+    const delayMs = Math.min(first.runAt - timestamp, TIMER_CHECK_PERIOD_MS);
 
-    debuglog("_scheduleRealCallback: now:", now, "delay:", delayMs);
-    _realCallbackKey = global.setTimeout(_runCallbacks, delayMs);
+    debuglog("scheduleRealCallback: now:", timestamp, "delay:", delayMs);
+    realCallbackKey = global.setTimeout(runCallbacks, delayMs);
 }
 
-function _runCallbacks() {
+function runCallbacks(): void {
     let cb;
-    const now = _now();
-    debuglog("_runCallbacks: now:", now);
+    const timestamp = now();
+    debuglog("runCallbacks: now:", timestamp);
 
     // get the list of things to call
     const callbacksToRun = [];
+    // eslint-disable-next-line
     while (true) {
-        const first = _callbackList[0];
-        if (!first || first.runAt > now) {
+        const first = callbackList[0];
+        if (!first || first.runAt > timestamp) {
             break;
         }
-        cb = _callbackList.shift();
-        debuglog("_runCallbacks: popping", cb.key);
+        cb = callbackList.shift();
+        debuglog("runCallbacks: popping", cb.key);
         callbacksToRun.push(cb);
     }
 
     // reschedule the real callback before running our functions, to
     // keep the codepaths the same whether or not our functions
     // register their own setTimeouts.
-    _scheduleRealCallback();
+    scheduleRealCallback();
 
     for (let i = 0; i < callbacksToRun.length; i++) {
         cb = callbacksToRun[i];
@@ -172,7 +177,7 @@ function _runCallbacks() {
             cb.func.apply(global, cb.params);
         } catch (e) {
             logger.error("Uncaught exception in callback function",
-                          e.stack || e);
+                e.stack || e);
         }
     }
 }
@@ -182,7 +187,7 @@ function _runCallbacks() {
  * returns the index of the last element for which func returns
  * greater than zero, or array.length if no such element exists.
  */
-function binarySearch(array, func) {
+function binarySearch<T>(array: T[], func: (v: T) => number): number {
     // min is inclusive, max exclusive.
     let min = 0;
     let max = array.length;

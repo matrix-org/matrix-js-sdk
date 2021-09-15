@@ -149,6 +149,10 @@ export class Thread extends EventEmitter {
         return this.findEventById(this.root);
     }
 
+    public get roomId(): string {
+        return this.rootEvent.getRoomId();
+    }
+
     /**
      * The number of messages in the thread
      */

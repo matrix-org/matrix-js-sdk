@@ -23,7 +23,7 @@ import { EventEmitter } from "events";
 import { ISyncStateData, SyncApi } from "./sync";
 import { EventStatus, IContent, IDecryptOptions, IEvent, MatrixEvent } from "./models/event";
 import { StubStore } from "./store/stub";
-import { createNewMatrixCall, MatrixCall, ConstraintsType, getUserMediaContraints, CallType } from "./webrtc/call";
+import { createNewMatrixCall, MatrixCall, CallType } from "./webrtc/call";
 import { Filter, IFilterDefinition } from "./filter";
 import { CallEventHandler } from './webrtc/callEventHandler';
 import * as utils from './utils';
@@ -31,7 +31,7 @@ import { sleep } from './utils';
 import { Group } from "./models/group";
 import { Direction, EventTimeline } from "./models/event-timeline";
 import { IActionsObject, PushProcessor } from "./pushprocessor";
-import { AutoDiscovery } from "./autodiscovery";
+import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery";
 import * as olmlib from "./crypto/olmlib";
 import { decodeBase64, encodeBase64 } from "./crypto/olmlib";
 import { IExportedDevice as IOlmDevice } from "./crypto/OlmDevice";
@@ -145,6 +145,7 @@ import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, Rule
 import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
 import { GroupCall } from "./webrtc/groupCall";
+import { MediaHandler } from "./webrtc/mediaHandler";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -476,14 +477,19 @@ interface IServerVersions {
     unstable_features: Record<string, boolean>;
 }
 
-interface IClientWellKnown {
+export interface IClientWellKnown {
     [key: string]: any;
-    "m.homeserver": {
-        base_url: string;
-    };
-    "m.identity_server"?: {
-        base_url: string;
-    };
+    "m.homeserver"?: IWellKnownConfig;
+    "m.identity_server"?: IWellKnownConfig;
+}
+
+export interface IWellKnownConfig {
+    raw?: any; // todo typings
+    action?: AutoDiscoveryAction;
+    reason?: string;
+    error?: Error | string;
+    // eslint-disable-next-line
+    base_url?: string | null;
 }
 
 interface IKeyBackupPath {
@@ -695,8 +701,6 @@ export class MatrixClient extends EventEmitter {
     public iceCandidatePoolSize = 0; // XXX: Intended private, used in code.
     public idBaseUrl: string;
     public baseUrl: string;
-    private localAVStreamType: ConstraintsType;
-    private localAVStream: MediaStream;
 
     // Note: these are all `protected` to let downstream consumers make mistakes if they want to.
     // We don't technically support this usage, but have reasons to do this.
@@ -736,6 +740,7 @@ export class MatrixClient extends EventEmitter {
     protected checkTurnServersIntervalID: number;
     protected exportedOlmDeviceToImport: IOlmDevice;
     protected txnCtr = 0;
+    protected mediaHandler = new MediaHandler();
 
     constructor(opts: IMatrixClientCreateOpts) {
         super();
@@ -1244,6 +1249,13 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
+     * @returns {MediaHandler}
+     */
+    public getMediaHandler(): MediaHandler {
+        return this.mediaHandler;
+    }
+
+    /**
      * Set whether VoIP calls are forced to use only TURN
      * candidates. This is the same as the forceTURN option
      * when creating the client.
@@ -1259,43 +1271,6 @@ export class MatrixClient extends EventEmitter {
      */
     public setSupportsCallTransfer(support: boolean) {
         this.supportsCallTransfer = support;
-    }
-
-    public async getLocalVideoStream() {
-        if (this.localAVStreamType === ConstraintsType.Video) {
-            return this.localAVStream.clone();
-        }
-
-        const constraints = getUserMediaContraints(ConstraintsType.Video);
-        logger.log("Getting user media with constraints", constraints);
-        const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-        this.localAVStreamType = ConstraintsType.Video;
-        this.localAVStream = mediaStream;
-        return mediaStream;
-    }
-
-    public async getLocalAudioStream() {
-        if (this.localAVStreamType === ConstraintsType.Audio) {
-            return this.localAVStream.clone();
-        }
-
-        const constraints = getUserMediaContraints(ConstraintsType.Audio);
-        logger.log("Getting user media with constraints", constraints);
-        const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-        this.localAVStreamType = ConstraintsType.Audio;
-        this.localAVStream = mediaStream;
-        return mediaStream;
-    }
-
-    public stopLocalMediaStream() {
-        if (this.localAVStream) {
-            for (const track of this.localAVStream.getTracks()) {
-                track.stop();
-            }
-
-            this.localAVStreamType = null;
-            this.localAVStream = null;
-        }
     }
 
     /**
@@ -2083,7 +2058,7 @@ export class MatrixClient extends EventEmitter {
      *     recovery key which should be disposed of after displaying to the user,
      *     and raw private key to avoid round tripping if needed.
      */
-    public createRecoveryKeyFromPassphrase(password: string): Promise<IRecoveryKey> {
+    public createRecoveryKeyFromPassphrase(password?: string): Promise<IRecoveryKey> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2526,7 +2501,7 @@ export class MatrixClient extends EventEmitter {
      */
     // TODO: Verify types
     public async prepareKeyBackupVersion(
-        password: string,
+        password?: string,
         opts: IKeyBackupPrepareOpts = { secureSecretStorage: false },
     ): Promise<Pick<IPreparedKeyBackupVersion, "algorithm" | "auth_data" | "recovery_key">> {
         if (!this.crypto) {
@@ -6163,17 +6138,17 @@ export class MatrixClient extends EventEmitter {
     public register(
         username: string,
         password: string,
-        sessionId: string,
-        auth: any,
-        bindThreepids: any,
-        guestAccessToken: string,
-        inhibitLogin: boolean,
+        sessionId: string | null,
+        auth: { session?: string, type: string },
+        bindThreepids?: boolean | null | { email?: boolean, msisdn?: boolean },
+        guestAccessToken?: string,
+        inhibitLogin?: boolean,
         callback?: Callback,
     ): Promise<any> { // TODO: Types (many)
         // backwards compat
         if (bindThreepids === true) {
             bindThreepids = { email: true };
-        } else if (bindThreepids === null || bindThreepids === undefined) {
+        } else if (bindThreepids === null || bindThreepids === undefined || bindThreepids === false) {
             bindThreepids = {};
         }
         if (typeof inhibitLogin === 'function') {
@@ -7507,7 +7482,7 @@ export class MatrixClient extends EventEmitter {
         return this.http.authedRequest(undefined, "GET", path, qps, undefined);
     }
 
-    public uploadDeviceSigningKeys(auth: any, keys: CrossSigningKeys): Promise<{}> { // TODO: types
+    public uploadDeviceSigningKeys(auth: any, keys?: CrossSigningKeys): Promise<{}> { // TODO: types
         const data = Object.assign({}, keys);
         if (auth) Object.assign(data, { auth });
         return this.http.authedRequest(

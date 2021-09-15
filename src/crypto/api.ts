@@ -58,7 +58,7 @@ export interface IEncryptedEventInfo {
 }
 
 export interface IRecoveryKey {
-    keyInfo: {
+    keyInfo?: {
         pubkey: string;
         passphrase?: {
             algorithm: string;
@@ -67,7 +67,7 @@ export interface IRecoveryKey {
         };
     };
     privateKey: Uint8Array;
-    encodedPrivateKey: string;
+    encodedPrivateKey?: string;
 }
 
 export interface ICreateSecretStorageOpts {

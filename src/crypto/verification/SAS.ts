@@ -160,6 +160,13 @@ export interface IGeneratedSas {
     emoji?: EmojiMapping[];
 }
 
+export interface ISasEvent {
+    sas: IGeneratedSas;
+    confirm(): Promise<void>;
+    cancel(): void;
+    mismatch(): void;
+}
+
 function generateSas(sasBytes: number[], methods: string[]): IGeneratedSas {
     const sas: IGeneratedSas = {};
     for (const method of methods) {
@@ -232,12 +239,7 @@ export class SAS extends Base {
     private waitingForAccept: boolean;
     public ourSASPubKey: string;
     public theirSASPubKey: string;
-    public sasEvent: {
-        sas: IGeneratedSas;
-        confirm(): Promise<void>;
-        cancel(): void;
-        mismatch(): void;
-    };
+    public sasEvent: ISasEvent;
 
     // eslint-disable-next-line @typescript-eslint/naming-convention
     public static get NAME(): string {

@@ -33,12 +33,7 @@ declare global {
     }
 
     interface Window {
-        electron?: Electron;
         webkitAudioContext: typeof AudioContext;
-    }
-
-    interface Electron {
-        getDesktopCapturerSources(options: GetSourcesOptions): Promise<Array<DesktopCapturerSource>>;
     }
 
     interface Crypto {
@@ -67,21 +62,6 @@ declare global {
         };
     }
 
-    interface DesktopCapturerSource {
-        id: string;
-        name: string;
-        thumbnailURL: string;
-    }
-
-    interface GetSourcesOptions {
-        types: Array<string>;
-        thumbnailSize?: {
-            height: number;
-            width: number;
-        };
-        fetchWindowIcons?: boolean;
-    }
-
     interface HTMLAudioElement {
         // sinkId & setSinkId are experimental and typescript doesn't know about them
         sinkId: string;
@@ -107,5 +87,12 @@ declare global {
 
     interface PromiseConstructor {
         allSettled<T>(promises: Promise<T>[]): Promise<Array<ISettledFulfilled<T> | ISettledRejected>>;
+    }
+
+    interface RTCRtpTransceiver {
+        // This has been removed from TS
+        // (https://github.com/microsoft/TypeScript-DOM-lib-generator/issues/1029),
+        // but we still need this for MatrixCall::getRidOfRTXCodecs()
+        setCodecPreferences(codecs: RTCRtpCodecCapability[]): void;
     }
 }

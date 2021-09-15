@@ -47,12 +47,7 @@ export * from "./crypto/store/memory-crypto-store";
 export * from "./crypto/store/indexeddb-crypto-store";
 export * from "./content-repo";
 export * as ContentHelpers from "./content-helpers";
-export {
-    createNewMatrixCall,
-    setAudioInput as setMatrixCallAudioInput,
-    setVideoInput as setMatrixCallVideoInput,
-    CallType,
-} from "./webrtc/call";
+export { createNewMatrixCall } from "./webrtc/call";
 
 // expose the underlying request object so different environments can use
 // different request libs (e.g. request or browser-request)
