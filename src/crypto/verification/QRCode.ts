@@ -192,6 +192,10 @@ export class QRCodeData {
         return this.sharedSecret;
     }
 
+    public getBuffer(): Buffer {
+        return this.buffer;
+    }
+
     private static generateSharedSecret(): string {
         const secretBytes = new Uint8Array(11);
         global.crypto.getRandomValues(secretBytes);
