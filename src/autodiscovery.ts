@@ -416,7 +416,7 @@ export class AutoDiscovery {
      * @return {Promise<object>} Resolves to the returned state.
      * @private
      */
-    private static async fetchWellKnownObject(url: string): Promise<IWellKnownConfig> { // TODO: TYPES
+    private static async fetchWellKnownObject(url: string): Promise<IWellKnownConfig> {
         return new Promise(function(resolve, reject) {
             // eslint-disable-next-line
             const request = require("./matrix").getRequest();
