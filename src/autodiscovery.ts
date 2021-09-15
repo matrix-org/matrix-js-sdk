@@ -114,13 +114,13 @@ export class AutoDiscovery {
      * and identity server URL the client would want. Additional details
      * may also be included, and will be transparently brought into the
      * response object unaltered.
-     * @param {string} wellknown The configuration object itself, as returned
+     * @param {object} wellknown The configuration object itself, as returned
      * by the .well-known auto-discovery endpoint.
      * @return {Promise<DiscoveredClientConfig>} Resolves to the verified
      * configuration, which may include error states. Rejects on unexpected
      * failure, not when verification fails.
      */
-    public static async fromDiscoveryConfig(wellknown: string): Promise<IClientWellKnown> {
+    public static async fromDiscoveryConfig(wellknown: any): Promise<IClientWellKnown> {
         // Step 1 is to get the config, which is provided to us here.
 
         // We default to an error state to make the first few checks easier to
