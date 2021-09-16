@@ -20,6 +20,11 @@ import { MatrixEvent } from "./event";
 import { EventTimelineSet } from './event-timeline-set';
 import { Room } from './room';
 
+export enum THREAD_EVENTS {
+    ready = "Thread.ready",
+    update = "Thread.update"
+}
+
 /**
  * @experimental
  */
@@ -73,7 +78,7 @@ export class Thread extends EventEmitter {
         if (this.ready) {
             this.client.decryptEventIfNeeded(event, {});
         }
-        this.emit("Thread.update", this);
+        this.emit(THREAD_EVENTS.ready, this);
     }
 
     /**
@@ -96,7 +101,7 @@ export class Thread extends EventEmitter {
                 await this.fetchReplyChain();
             } else {
                 await this.decryptEvents();
-                this.emit("Thread.ready", this);
+                this.emit(THREAD_EVENTS.ready, this);
             }
         }
     }
@@ -192,5 +197,26 @@ export class Thread extends EventEmitter {
 
     public has(eventId: string): boolean {
         return this.timelineSet.findEventById(eventId) instanceof MatrixEvent;
+    }
+
+    public on(event: THREAD_EVENTS, listener: (...args: any[]) => void): this {
+        super.on(event, listener);
+        return this;
+    }
+    public once(event: THREAD_EVENTS, listener: (...args: any[]) => void): this {
+        super.once(event, listener);
+        return this;
+    }
+    public off(event: THREAD_EVENTS, listener: (...args: any[]) => void): this {
+        super.off(event, listener);
+        return this;
+    }
+    public addListener(event: THREAD_EVENTS, listener: (...args: any[]) => void): this {
+        super.addListener(event, listener);
+        return this;
+    }
+    public removeListener(event: THREAD_EVENTS, listener: (...args: any[]) => void): this {
+        super.removeListener(event, listener);
+        return this;
     }
 }
