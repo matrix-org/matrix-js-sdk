@@ -112,7 +112,6 @@ export class GroupCallParticipant extends EventEmitter {
         }
 
         this.call = call;
-        this.member = call.getOpponentMember();
         this.sessionId = sessionId;
 
         this.call.on(CallEvent.State, this.onCallStateChanged);
