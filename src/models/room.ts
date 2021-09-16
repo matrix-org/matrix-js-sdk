@@ -35,7 +35,7 @@ import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersio
 import { JoinRule, ResizeMethod } from "../@types/partials";
 import { Filter } from "../filter";
 import { RoomState } from "./room-state";
-import { Thread, THREAD_EVENTS } from "./thread";
+import { Thread, ThreadEvents } from "./thread";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -1074,9 +1074,9 @@ export class Room extends EventEmitter {
     public addThread(thread: Thread): Set<Thread> {
         this.threads.add(thread);
         if (!thread.ready) {
-            thread.once(THREAD_EVENTS.ready, this.dedupeThreads);
-            this.emit(THREAD_EVENTS.update, thread);
-            this.reEmitter.reEmit(thread, [THREAD_EVENTS.update, THREAD_EVENTS.ready]);
+            thread.once(ThreadEvents.Ready, this.dedupeThreads);
+            this.emit(ThreadEvents.Update, thread);
+            this.reEmitter.reEmit(thread, [ThreadEvents.Update, ThreadEvents.Ready]);
         }
         return this.threads;
     }
