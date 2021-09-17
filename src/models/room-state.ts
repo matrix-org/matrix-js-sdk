@@ -578,7 +578,7 @@ export class RoomState extends EventEmitter {
      * @param {number} powerLevel The power level of the member
      * @return {boolean} true if the given power level is sufficient
      */
-    private hasSufficientPowerLevelFor(action: string, powerLevel: number): boolean {
+    public hasSufficientPowerLevelFor(action: string, powerLevel: number): boolean {
         const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, "");
 
         let powerLevels = {};
