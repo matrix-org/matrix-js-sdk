@@ -4288,7 +4288,16 @@ export class MatrixClient extends EventEmitter {
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public kick(roomId: string, userId: string, reason?: string, callback?: Callback): Promise<{}> {
-        return this.setMembershipState(roomId, userId, "leave", reason, callback);
+        const path = utils.encodeUri("/rooms/$roomId/kick", {
+            $roomId: roomId,
+        });
+        const data = {
+            user_id: userId,
+            reason: reason,
+        };
+        return this.http.authedRequest(
+            callback, "POST", path, undefined, data,
+        );
     }
 
     /**
