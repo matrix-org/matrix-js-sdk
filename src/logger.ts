@@ -60,7 +60,7 @@ log.methodFactory = function(methodName, logLevel, loggerName) {
  * Can be tailored down to specific use cases if needed.
  */
 export const logger: PrefixedLogger = log.getLogger(DEFAULT_NAMESPACE);
-logger.setLevel(log.levels.DEBUG);
+logger.setLevel(log.levels.DEBUG, false);
 
 export interface PrefixedLogger extends Logger {
     withPrefix?: (prefix: string) => PrefixedLogger;
@@ -82,7 +82,7 @@ function getPrefixedLogger(prefix): PrefixedLogger {
         // Only do this setup work the first time through, as loggers are saved by name.
         extendLogger(prefixLogger);
         prefixLogger.prefix = prefix;
-        prefixLogger.setLevel(log.levels.DEBUG);
+        prefixLogger.setLevel(log.levels.DEBUG, false);
     }
     return prefixLogger;
 }
