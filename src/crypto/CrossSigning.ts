@@ -807,7 +807,7 @@ export function requestKeysDuringVerification(
                 logger.info("Got key backup key, decoding...");
                 const decodedKey = decodeBase64(base64Key);
                 logger.info("Decoded backup key, storing...");
-                client.crypto.storeSessionBackupPrivateKey(
+                await client.crypto.storeSessionBackupPrivateKey(
                     Uint8Array.from(decodedKey),
                 );
                 logger.info("Backup key stored. Starting backup restore...");
