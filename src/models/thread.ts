@@ -20,7 +20,7 @@ import { MatrixEvent } from "./event";
 import { EventTimelineSet } from './event-timeline-set';
 import { Room } from './room';
 
-export enum ThreadEvents {
+export enum ThreadEvent {
     Ready = "Thread.ready",
     Update = "Thread.update"
 }
@@ -78,7 +78,7 @@ export class Thread extends EventEmitter {
         if (this.ready) {
             this.client.decryptEventIfNeeded(event, {});
         }
-        this.emit(ThreadEvents.Ready, this);
+        this.emit(ThreadEvent.Update, this);
     }
 
     /**
@@ -101,7 +101,7 @@ export class Thread extends EventEmitter {
                 await this.fetchReplyChain();
             } else {
                 await this.decryptEvents();
-                this.emit(ThreadEvents.Ready, this);
+                this.emit(ThreadEvent.Ready, this);
             }
         }
     }
@@ -199,23 +199,23 @@ export class Thread extends EventEmitter {
         return this.timelineSet.findEventById(eventId) instanceof MatrixEvent;
     }
 
-    public on(event: ThreadEvents, listener: (...args: any[]) => void): this {
+    public on(event: ThreadEvent, listener: (...args: any[]) => void): this {
         super.on(event, listener);
         return this;
     }
-    public once(event: ThreadEvents, listener: (...args: any[]) => void): this {
+    public once(event: ThreadEvent, listener: (...args: any[]) => void): this {
         super.once(event, listener);
         return this;
     }
-    public off(event: ThreadEvents, listener: (...args: any[]) => void): this {
+    public off(event: ThreadEvent, listener: (...args: any[]) => void): this {
         super.off(event, listener);
         return this;
     }
-    public addListener(event: ThreadEvents, listener: (...args: any[]) => void): this {
+    public addListener(event: ThreadEvent, listener: (...args: any[]) => void): this {
         super.addListener(event, listener);
         return this;
     }
-    public removeListener(event: ThreadEvents, listener: (...args: any[]) => void): this {
+    public removeListener(event: ThreadEvent, listener: (...args: any[]) => void): this {
         super.removeListener(event, listener);
         return this;
     }
