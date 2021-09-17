@@ -22,8 +22,14 @@ ask you to make any refinements needed or merge it and make them ourselves.
 Things that should go into your PR description:
  * A changelog entry in the `Notes` section (see below)
  * References to any bugs fixed by the change (in GitHub's `Fixes` notation)
- * Notes for the reviewer that might help them to understand why the change is
-   necessary or how they might better review it.
+ * Describe the why and what is changing in the PR description so it's easy for
+   onlookers and reviewers to onboard and context switch.
+ * Include both **before** and **after** screenshots to easily compare and discuss
+   what's changing.
+ * Include a step-by-step testing strategy so that a reviewer can check out the
+   code locally and easily get to the point of testing your change.
+ * Add comments to the diff for the reviewer that might help them to understand
+   why the change is necessary or how they might better understand and review it.
 
 Things that should *not* go into your PR description:
  * Any information on how the code works or why you chose to do it the way
