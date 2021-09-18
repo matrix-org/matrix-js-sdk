@@ -49,12 +49,18 @@ export class MediaHandler {
     public async getUserMediaStream(audio: boolean, video: boolean): Promise<MediaStream> {
         let stream: MediaStream;
 
-        if (this.userMediaStreams.length === 0) {
+        // Find a stream with matching tracks
+        const matchingStream = this.userMediaStreams.find((stream) => {
+            if (audio !== (stream.getAudioTracks().length > 0)) return false;
+            if (video !== (stream.getVideoTracks().length > 0)) return false;
+        });
+
+        if (matchingStream) {
+            stream = matchingStream.clone();
+        } else {
             const constraints = this.getUserMediaContraints(audio, video);
             logger.log("Getting user media with constraints", constraints);
             stream = await navigator.mediaDevices.getUserMedia(constraints);
-        } else {
-            stream = this.userMediaStreams[this.userMediaStreams.length - 1].clone();
         }
 
         this.userMediaStreams.push(stream);
