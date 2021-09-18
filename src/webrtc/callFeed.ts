@@ -48,6 +48,7 @@ export class CallFeed extends EventEmitter {
         private videoMuted: boolean,
     ) {
         super();
+        this.updateStream(null, stream);
 
         if (this.hasAudioTrack) {
             this.initVolumeMeasuring();
@@ -56,6 +57,25 @@ export class CallFeed extends EventEmitter {
 
     private get hasAudioTrack(): boolean {
         return this.stream.getAudioTracks().length > 0;
+    }
+
+    private updateStream(oldStream: MediaStream, newStream: MediaStream): void {
+        if (oldStream) {
+            oldStream.removeEventListener("addtrack", this.onAddTrack);
+            this.measureVolumeActivity(false);
+        }
+        if (newStream) {
+            this.stream = newStream;
+            newStream.addEventListener("addtrack", this.onAddTrack);
+
+            if (this.hasAudioTrack) {
+                this.initVolumeMeasuring();
+            } else {
+                this.measureVolumeActivity(false);
+            }
+        }
+
+        this.emit(CallFeedEvent.NewStream, this.stream);
     }
 
     private initVolumeMeasuring(): void {
@@ -73,6 +93,10 @@ export class CallFeed extends EventEmitter {
 
         this.frequencyBinCount = new Float32Array(this.analyser.frequencyBinCount);
     }
+
+    private onAddTrack = (): void => {
+        this.emit(CallFeedEvent.NewStream, this.stream);
+    };
 
     /**
      * Returns callRoom member
@@ -116,14 +140,7 @@ export class CallFeed extends EventEmitter {
      * @param newStream new stream with which to replace the current one
      */
     public setNewStream(newStream: MediaStream): void {
-        this.stream = newStream;
-        this.emit(CallFeedEvent.NewStream, this.stream);
-
-        if (this.hasAudioTrack) {
-            this.initVolumeMeasuring();
-        } else {
-            this.measureVolumeActivity(false);
-        }
+        this.updateStream(this.stream, newStream);
     }
 
     /**
