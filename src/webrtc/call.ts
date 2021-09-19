@@ -800,7 +800,7 @@ export class MatrixCall extends EventEmitter {
         try {
             const upgradeAudio = audio && !this.hasLocalUserMediaAudioTrack;
             const upgradeVideo = video && !this.hasLocalUserMediaVideoTrack;
-            logger.debug(`Upgrading call audio=${upgradeAudio} video=${upgradeVideo}`);
+            logger.debug(`Upgrading call: audio?=${upgradeAudio} video?=${upgradeVideo}`);
 
             const stream = await this.client.getMediaHandler().getUserMediaStream(upgradeAudio, upgradeVideo);
             if (upgradeAudio && upgradeVideo) {
