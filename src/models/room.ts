@@ -32,7 +32,7 @@ import { logger } from '../logger';
 import { ReEmitter } from '../ReEmitter';
 import { EventType, RoomCreateTypeField, RoomType, UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../@types/event";
 import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
-import { HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
+import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
 import { Filter } from "../filter";
 import { RoomState } from "./room-state";
 import { Thread, ThreadEvent } from "./thread";
@@ -2090,6 +2090,14 @@ export class Room extends EventEmitter {
      */
     public getHistoryVisibility(): HistoryVisibility {
         return this.currentState.getHistoryVisibility();
+    }
+
+    /**
+     * Returns the history visibility based on the m.room.history_visibility state event, defaulting to `shared`.
+     * @returns {HistoryVisibility} the history_visibility applied to this room
+     */
+    public getGuestAccess(): GuestAccess {
+        return this.currentState.getGuestAccess();
     }
 
     /**

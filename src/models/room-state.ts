@@ -26,7 +26,7 @@ import * as utils from "../utils";
 import { EventType } from "../@types/event";
 import { MatrixEvent } from "./event";
 import { MatrixClient } from "../client";
-import { HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
+import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
 
 // possible statuses for out-of-band member loading
 enum OobStatus {
@@ -743,6 +743,16 @@ export class RoomState extends EventEmitter {
         const historyVisibilityEvent = this.getStateEvents(EventType.RoomHistoryVisibility, "");
         const historyVisibilityContent = historyVisibilityEvent?.getContent() ?? {};
         return historyVisibilityContent["history_visibility"] || HistoryVisibility.Shared;
+    }
+
+    /**
+     * Returns the guest access based on the m.room.guest_access state event, defaulting to `shared`.
+     * @returns {GuestAccess} the guest_access applied to this room
+     */
+    public getGuestAccess(): GuestAccess {
+        const guestAccessEvent = this.getStateEvents(EventType.RoomGuestAccess, "");
+        const guestAccessContent = guestAccessEvent?.getContent() ?? {};
+        return guestAccessContent["guest_access"] || GuestAccess.Forbidden;
     }
 
     private updateThirdPartyTokenCache(memberEvent: MatrixEvent): void {
