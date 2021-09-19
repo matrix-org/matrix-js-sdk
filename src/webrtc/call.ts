@@ -788,8 +788,7 @@ export class MatrixCall extends EventEmitter {
     }
 
     /**
-     * Adds a video track to a voice call
-     * @returns new mute state
+     * Adds an audio and/or video track - upgrades the call
      */
     private async upgradeCall(
         audio: boolean, video: boolean,
