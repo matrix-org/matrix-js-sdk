@@ -789,6 +789,8 @@ export class MatrixCall extends EventEmitter {
 
     /**
      * Adds an audio and/or video track - upgrades the call
+     * @param {boolean} audio should add an audio track
+     * @param {boolean} video should add an video track
      */
     private async upgradeCall(
         audio: boolean, video: boolean,
