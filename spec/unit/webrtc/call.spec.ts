@@ -83,6 +83,17 @@ class MockRTCPeerConnection {
     getStats() { return []; }
 }
 
+class MockMediaStream {
+    constructor(
+        public id,
+    ) {}
+
+    getTracks() { return []; }
+    getAudioTracks() { return [{ enabled: true }]; }
+    getVideoTracks() { return [{ enabled: true }]; }
+    addEventListener() {}
+}
+
 describe('Call', function() {
     let client;
     let call;
@@ -98,13 +109,7 @@ describe('Call', function() {
         global.navigator = {
             mediaDevices: {
                 // @ts-ignore Mock
-                getUserMedia: () => {
-                    return {
-                        getTracks: () => [],
-                        getAudioTracks: () => [],
-                        getVideoTracks: () => [],
-                    };
-                },
+                getUserMedia: () => new MockMediaStream("local_stream"),
             },
         };
 
@@ -115,7 +120,7 @@ describe('Call', function() {
             RTCSessionDescription: {},
             // @ts-ignore Mock
             RTCIceCandidate: {},
-            getUserMedia: {},
+            getUserMedia: () => new MockMediaStream("local_stream"),
         };
         // @ts-ignore Mock
         global.document = {};
@@ -319,7 +324,7 @@ describe('Call', function() {
                         sdp: DUMMY_SDP,
                     },
                     [SDPStreamMetadataKey]: {
-                        "stream_id": {
+                        "remote_stream": {
                             purpose: SDPStreamMetadataPurpose.Usermedia,
                             audio_muted: true,
                             video_muted: false,
@@ -329,8 +334,8 @@ describe('Call', function() {
             },
         });
 
-        call.pushRemoteFeed({ id: "stream_id", getAudioTracks: () => ["track1"], getVideoTracks: () => ["track1"] });
-        const feed = call.getFeeds().find((feed) => feed.stream.id === "stream_id");
+        call.pushRemoteFeed(new MockMediaStream("remote_stream"));
+        const feed = call.getFeeds().find((feed) => feed.stream.id === "remote_stream");
         expect(feed?.purpose).toBe(SDPStreamMetadataPurpose.Usermedia);
         expect(feed?.isAudioMuted()).toBeTruthy();
         expect(feed?.isVideoMuted()).not.toBeTruthy();
