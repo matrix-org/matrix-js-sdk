@@ -3201,6 +3201,10 @@ export class Crypto extends EventEmitter {
         createRequest: any, // TODO types
         isLiveEvent = true,
     ): Promise<void> {
+        // Wait for event to get its final ID with pendingEventOrdering: "chronological", since DM channels depend on it.
+        if (event.isSending()) {
+            await new Promise(resolve => event.once("Event.localEventIdReplaced", resolve));
+        }
         let request = requestsMap.getRequest(event);
         let isNewRequest = false;
         if (!request) {
