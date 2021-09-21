@@ -25,4 +25,5 @@ export interface IThreepid {
     address: string;
     validated_at: number; // eslint-disable-line camelcase
     added_at: number; // eslint-disable-line camelcase
+    bound?: boolean;
 }
