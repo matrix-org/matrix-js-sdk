@@ -348,7 +348,7 @@ export class GroupCall extends EventEmitter {
 
         const opponentMember = call.getOpponentMember();
 
-        logger.log(`GroupCall: incomming call from: ${opponentMember.userId}`);
+        logger.log(`GroupCall: incoming call from: ${opponentMember.userId}`);
 
         const memberStateEvent = this.room.currentState.getStateEvents(
             "m.room.member",
