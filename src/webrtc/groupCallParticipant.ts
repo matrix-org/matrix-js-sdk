@@ -195,6 +195,10 @@ export class GroupCallParticipant extends EventEmitter {
             return;
         }
 
+        this.remove();
+    };
+
+    public remove() {
         const participantIndex = this.groupCall.participants.indexOf(this);
 
         if (participantIndex === -1) {
@@ -235,7 +239,7 @@ export class GroupCallParticipant extends EventEmitter {
         }
 
         this.groupCall.emit(GroupCallEvent.ParticipantsChanged, this.groupCall.participants);
-    };
+    }
 
     private onCallFeedSpeaking = (speaking: boolean) => {
         this.emit(GroupCallParticipantEvent.Speaking, speaking);

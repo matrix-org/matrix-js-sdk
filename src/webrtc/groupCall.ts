@@ -153,14 +153,21 @@ export class GroupCall extends EventEmitter {
             userId,
         );
 
-        for (const participant of this.participants) {
+        // Clean up participant event listeners and hangup calls
+        // Reverse iteration because participant.remove() removes the participant from the participants array.
+        for (let i = this.participants.length - 1; i >= 0; i--) {
+            const participant = this.participants[i];
+
+            participant.remove();
+
+            // Hangup is async, so we call remove which removes all the call event listeners
+            // that reference this group call
             if (participant.call) {
                 participant.call.hangup(CallErrorCode.UserHangup, false);
             }
         }
 
         this.entered = false;
-        this.participants = [];
         this.activeSpeaker = null;
         this.speakerMap.clear();
         clearTimeout(this.presenceLoopTimeout);
@@ -304,9 +311,9 @@ export class GroupCall extends EventEmitter {
                 (memberStateContent[CONF_PARTICIPANT].expiresAt &&
                     memberStateContent[CONF_PARTICIPANT].expiresAt < now)
             ) {
+                participant.remove();
+
                 if (participant.call) {
-                    // NOTE: This should remove the participant on the next tick
-                    // since matrix-js-sdk awaits a promise before firing user_hangup
                     participant.call.hangup(CallErrorCode.UserHangup, false);
                 }
             }
