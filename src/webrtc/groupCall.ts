@@ -97,7 +97,7 @@ export class GroupCall extends EventEmitter {
             this.sendStateEventWithRetry(
                 this.room.roomId,
                 CONF_ROOM,
-                { active: true },
+                { active: true, callType: this.type },
                 "",
             );
         }
