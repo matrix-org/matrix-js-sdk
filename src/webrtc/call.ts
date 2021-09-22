@@ -395,6 +395,19 @@ export class MatrixCall extends EventEmitter {
         });
     }
 
+    public get hasLocalUserMediaAudioTrack(): boolean {
+        return this.localUsermediaStream?.getAudioTracks().length > 0;
+    }
+
+    public get hasRemoteUserMediaAudioTrack(): boolean {
+        return this.getRemoteFeeds().some((feed) => {
+            return (
+                feed.purpose === SDPStreamMetadataPurpose.Usermedia &&
+                feed.stream.getAudioTracks().length > 0
+            );
+        });
+    }
+
     public get localUsermediaFeed(): CallFeed {
         return this.getLocalFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Usermedia);
     }
@@ -779,6 +792,50 @@ export class MatrixCall extends EventEmitter {
     }
 
     /**
+     * Adds an audio and/or video track - upgrades the call
+     * @param {boolean} audio should add an audio track
+     * @param {boolean} video should add an video track
+     */
+    private async upgradeCall(
+        audio: boolean, video: boolean,
+    ): Promise<void> {
+        // We don't do call downgrades
+        if (!audio && !video) return;
+        if (!this.opponentSupportsSDPStreamMetadata()) return;
+
+        try {
+            const upgradeAudio = audio && !this.hasLocalUserMediaAudioTrack;
+            const upgradeVideo = video && !this.hasLocalUserMediaVideoTrack;
+            logger.debug(`Upgrading call: audio?=${upgradeAudio} video?=${upgradeVideo}`);
+
+            const stream = await this.client.getMediaHandler().getUserMediaStream(upgradeAudio, upgradeVideo);
+            if (upgradeAudio && upgradeVideo) {
+                if (this.hasLocalUserMediaAudioTrack) return;
+                if (this.hasLocalUserMediaVideoTrack) return;
+
+                this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
+            } else if (upgradeAudio) {
+                if (this.hasLocalUserMediaAudioTrack) return;
+
+                const audioTrack = stream.getAudioTracks()[0];
+                this.localUsermediaStream.addTrack(audioTrack);
+                this.peerConn.addTrack(audioTrack, this.localUsermediaStream);
+            } else if (upgradeVideo) {
+                if (this.hasLocalUserMediaVideoTrack) return;
+
+                const videoTrack = stream.getVideoTracks()[0];
+                this.localUsermediaStream.addTrack(videoTrack);
+                this.peerConn.addTrack(videoTrack, this.localUsermediaStream);
+            }
+        } catch (error) {
+            logger.error("Failed to upgrade the call", error);
+            this.emit(CallEvent.Error,
+                new CallError(CallErrorCode.NoUserMedia, "Failed to get camera access: ", error),
+            );
+        }
+    }
+
+    /**
      * Returns true if this.remoteSDPStreamMetadata is defined, otherwise returns false
      * @returns {boolean} can screenshare
      */
@@ -892,10 +949,16 @@ export class MatrixCall extends EventEmitter {
     /**
      * Set whether our outbound video should be muted or not.
      * @param {boolean} muted True to mute the outbound video.
+     * @returns the new mute state
      */
-    public setLocalVideoMuted(muted: boolean): void {
+    public async setLocalVideoMuted(muted: boolean): Promise<boolean> {
+        if (!this.hasLocalUserMediaVideoTrack && !muted) {
+            await this.upgradeCall(false, true);
+            return this.isLocalVideoMuted();
+        }
         this.localUsermediaFeed?.setVideoMuted(muted);
         this.updateMuteStatus();
+        return this.isLocalVideoMuted();
     }
 
     /**
@@ -914,8 +977,13 @@ export class MatrixCall extends EventEmitter {
     /**
      * Set whether the microphone should be muted or not.
      * @param {boolean} muted True to mute the mic.
+     * @returns the new mute state
      */
-    public setMicrophoneMuted(muted: boolean): void {
+    public async setMicrophoneMuted(muted: boolean): Promise<boolean> {
+        if (!this.hasLocalUserMediaAudioTrack && !muted) {
+            await this.upgradeCall(false, true);
+            return this.isMicrophoneMuted();
+        }
         this.localUsermediaFeed?.setAudioMuted(muted);
         this.updateMuteStatus();
     }

@@ -49,12 +49,19 @@ export class MediaHandler {
     public async getUserMediaStream(audio: boolean, video: boolean): Promise<MediaStream> {
         let stream: MediaStream;
 
-        if (this.userMediaStreams.length === 0) {
+        // Find a stream with matching tracks
+        const matchingStream = this.userMediaStreams.find((stream) => {
+            if (audio !== (stream.getAudioTracks().length > 0)) return false;
+            if (video !== (stream.getVideoTracks().length > 0)) return false;
+        });
+
+        if (matchingStream) {
+            logger.log("Cloning user media stream", matchingStream.id);
+            stream = matchingStream.clone();
+        } else {
             const constraints = this.getUserMediaContraints(audio, video);
             logger.log("Getting user media with constraints", constraints);
             stream = await navigator.mediaDevices.getUserMedia(constraints);
-        } else {
-            stream = this.userMediaStreams[this.userMediaStreams.length - 1].clone();
         }
 
         this.userMediaStreams.push(stream);
@@ -66,6 +73,7 @@ export class MediaHandler {
      * Stops all tracks on the provided usermedia stream
      */
     public stopUserMediaStream(mediaStream: MediaStream) {
+        logger.debug("Stopping usermedia stream", mediaStream.id);
         for (const track of mediaStream.getTracks()) {
             track.stop();
         }
@@ -73,7 +81,8 @@ export class MediaHandler {
         const index = this.userMediaStreams.indexOf(mediaStream);
 
         if (index !== -1) {
-            this.userMediaStreams.splice(index, 0);
+            logger.debug("Splicing usermedia stream out stream array", mediaStream.id);
+            this.userMediaStreams.splice(index, 1);
         }
     }
 
@@ -89,15 +98,17 @@ export class MediaHandler {
 
             if (desktopCapturerSourceId) {
                 // We are using Electron
-                logger.debug("Getting screen stream using getUserMedia()...");
+                logger.debug("Getting screensharing stream using getUserMedia()", desktopCapturerSourceId);
                 stream = await navigator.mediaDevices.getUserMedia(screenshareConstraints);
             } else {
                 // We are not using Electron
-                logger.debug("Getting screen stream using getDisplayMedia()...");
+                logger.debug("Getting screensharing stream using getDisplayMedia()");
                 stream = await navigator.mediaDevices.getDisplayMedia(screenshareConstraints);
             }
         } else {
-            stream = this.screensharingStreams[this.screensharingStreams.length - 1].clone();
+            const matchingStream = this.screensharingStreams[this.screensharingStreams.length - 1];
+            logger.log("Cloning screensharing stream", matchingStream.id);
+            stream = matchingStream.clone();
         }
 
         this.screensharingStreams.push(stream);
@@ -109,14 +120,16 @@ export class MediaHandler {
      * Stops all tracks on the provided screensharing stream
      */
     public stopScreensharingStream(mediaStream: MediaStream) {
+        logger.debug("Stopping screensharing stream", mediaStream.id);
         for (const track of mediaStream.getTracks()) {
             track.stop();
         }
 
-        const index = this.userMediaStreams.indexOf(mediaStream);
+        const index = this.screensharingStreams.indexOf(mediaStream);
 
         if (index !== -1) {
-            this.userMediaStreams.splice(index, 0);
+            logger.debug("Splicing screensharing stream out stream array", mediaStream.id);
+            this.screensharingStreams.splice(index, 1);
         }
     }
 
