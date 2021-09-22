@@ -19,7 +19,7 @@ export enum GroupCallEvent {
     LocalMuteStateChanged = "local_mute_state_changed",
 }
 
-const CONF_ROOM = "me.robertlong.conf";
+export const CONF_ROOM = "me.robertlong.conf";
 const CONF_PARTICIPANT = "me.robertlong.conf.participant";
 
 export class GroupCall extends EventEmitter {
@@ -48,6 +48,9 @@ export class GroupCall extends EventEmitter {
         super();
 
         this.room = this.client.getRoom(roomId);
+        if (!this.room) {
+            throw new Error("Can't find the room");
+        }
         this.reEmitter = new ReEmitter(this);
     }
 

@@ -146,6 +146,7 @@ import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
 import { GroupCall } from "./webrtc/groupCall";
 import { MediaHandler } from "./webrtc/mediaHandler";
+import { GroupCallEventHandler } from "./webrtc/groupCallEventHandler";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -696,6 +697,7 @@ export class MatrixClient extends EventEmitter {
     public crypto: Crypto; // XXX: Intended private, used in code.
     public cryptoCallbacks: ICryptoCallbacks; // XXX: Intended private, used in code.
     public callEventHandler: CallEventHandler; // XXX: Intended private, used in code.
+    private groupCallEventHandler: GroupCallEventHandler;
     public supportsCallTransfer = false; // XXX: Intended private, used in code.
     public forceTURN = false; // XXX: Intended private, used in code.
     public iceCandidatePoolSize = 0; // XXX: Intended private, used in code.
@@ -815,6 +817,7 @@ export class MatrixClient extends EventEmitter {
         const call = createNewMatrixCall(this, undefined, undefined);
         if (call) {
             this.callEventHandler = new CallEventHandler(this);
+            this.groupCallEventHandler = new GroupCallEventHandler(this);
             this.canSupportVoip = true;
             // Start listening for calls after the initial sync is done
             // We do not need to backfill the call event buffer
@@ -1005,6 +1008,7 @@ export class MatrixClient extends EventEmitter {
         this.peekSync?.stopPeeking();
 
         this.callEventHandler?.stop();
+        this.groupCallEventHandler?.stop();
         this.callEventHandler = null;
 
         global.clearInterval(this.checkTurnServersIntervalID);
@@ -5591,6 +5595,7 @@ export class MatrixClient extends EventEmitter {
     private startCallEventHandler = (): void => {
         if (this.isInitialSyncComplete()) {
             this.callEventHandler.start();
+            this.groupCallEventHandler.start();
             this.off("sync", this.startCallEventHandler);
         }
     };
