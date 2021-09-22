@@ -73,6 +73,10 @@ export class Thread extends EventEmitter {
             this.root = event.getId();
         }
 
+        // all the relevant membership info to hydrate events with a sender
+        // is held in the main room timeline
+        // We want to fetch the room state from there and pass it down to this thread
+        // timeline set to let it reconcile an event with its relevant RoomMember
         const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
 
         event.setThread(this);

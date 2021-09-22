@@ -515,7 +515,7 @@ export class EventTimelineSet extends EventEmitter {
      * @param {MatrixEvent} event Event to be added
      * @param {string?} duplicateStrategy 'ignore' or 'replace'
      * @param {boolean} fromCache whether the sync response came from cache
-     * @param {boolean} fromCache whether the sync response came from cache
+     * @param roomState the state events to reconcile metadata from
      */
     public addLiveEvent(
         event: MatrixEvent,
