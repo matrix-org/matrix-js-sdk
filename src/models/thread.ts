@@ -25,6 +25,11 @@ export enum ThreadEvent {
     Update = "Thread.update"
 }
 
+interface ISerialisedThread {
+    id: string;
+    tails: string[];
+}
+
 /**
  * @experimental
  */
@@ -197,6 +202,13 @@ export class Thread extends EventEmitter {
 
     public has(eventId: string): boolean {
         return this.timelineSet.findEventById(eventId) instanceof MatrixEvent;
+    }
+
+    public toJson(): ISerialisedThread {
+        return {
+            id: this.id,
+            tails: Array.from(this.tail),
+        };
     }
 
     public on(event: ThreadEvent, listener: (...args: any[]) => void): this {
