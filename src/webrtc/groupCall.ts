@@ -19,7 +19,7 @@ export enum GroupCallEvent {
     LocalMuteStateChanged = "local_mute_state_changed",
 }
 
-const CONF_ROOM = "me.robertlong.conf";
+export const CONF_ROOM = "me.robertlong.conf";
 const CONF_PARTICIPANT = "me.robertlong.conf.participant";
 
 export class GroupCall extends EventEmitter {
