@@ -48,6 +48,9 @@ export class GroupCall extends EventEmitter {
         super();
 
         this.room = this.client.getRoom(roomId);
+        if (!this.room) {
+            throw new Error("Can't find the room");
+        }
         this.reEmitter = new ReEmitter(this);
     }
 
