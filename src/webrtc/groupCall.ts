@@ -175,6 +175,15 @@ export class GroupCall extends EventEmitter {
         this.emit(GroupCallEvent.Left);
     }
 
+    public async endCall() {
+        await this.sendStateEventWithRetry(
+            this.room.roomId,
+            CONF_ROOM,
+            { active: false },
+            "",
+        );
+    }
+
     public isLocalVideoMuted() {
         if (this.localParticipant) {
             return this.localParticipant.isVideoMuted();
