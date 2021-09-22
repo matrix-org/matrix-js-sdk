@@ -532,7 +532,7 @@ export class EventTimelineSet extends EventEmitter {
 
         const timeline = this._eventIdToTimeline[event.getId()];
         if (timeline) {
-            if (duplicateStrategy === "replace") {
+            if (duplicateStrategy === DuplicateStrategy.Replace) {
                 debuglog("EventTimelineSet.addLiveEvent: replacing duplicate event " +
                     event.getId());
                 const tlEvents = timeline.getEvents();
@@ -540,7 +540,7 @@ export class EventTimelineSet extends EventEmitter {
                     if (tlEvents[j].getId() === event.getId()) {
                         // still need to set the right metadata on this event
                         if (!roomState) {
-                            timeline.getState(EventTimeline.FORWARDS);
+                            roomState = timeline.getState(EventTimeline.FORWARDS);
                         }
                         EventTimeline.setEventMetadata(
                             event,
