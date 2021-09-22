@@ -195,6 +195,10 @@ export class GroupCallParticipant extends EventEmitter {
             return;
         }
 
+        this.remove();
+    };
+
+    public remove() {
         const participantIndex = this.groupCall.participants.indexOf(this);
 
         if (participantIndex === -1) {
@@ -202,6 +206,29 @@ export class GroupCallParticipant extends EventEmitter {
         }
 
         this.groupCall.participants.splice(participantIndex, 1);
+
+        if (this.call) {
+            this.call.removeListener(CallEvent.State, this.onCallStateChanged);
+            this.call.removeListener(
+                CallEvent.FeedsChanged,
+                this.onCallFeedsChanged,
+            );
+            this.call.removeListener(CallEvent.Replaced, this.onCallReplaced);
+            this.call.removeListener(CallEvent.Hangup, this.onCallHangup);
+            this.call.removeListener(CallEvent.DataChannel, this.onCallDataChannel);
+        }
+
+        if (this.initializedUsermediaFeed) {
+            this.initializedUsermediaFeed.removeListener(CallFeedEvent.Speaking, this.onCallFeedSpeaking);
+            this.initializedUsermediaFeed.removeListener(
+                CallFeedEvent.VolumeChanged,
+                this.onCallFeedVolumeChanged,
+            );
+            this.initializedUsermediaFeed.removeListener(
+                CallFeedEvent.MuteStateChanged,
+                this.onCallFeedMuteStateChanged,
+            );
+        }
 
         if (
             this.groupCall.activeSpeaker === this &&
@@ -212,7 +239,7 @@ export class GroupCallParticipant extends EventEmitter {
         }
 
         this.groupCall.emit(GroupCallEvent.ParticipantsChanged, this.groupCall.participants);
-    };
+    }
 
     private onCallFeedSpeaking = (speaking: boolean) => {
         this.emit(GroupCallParticipantEvent.Speaking, speaking);
