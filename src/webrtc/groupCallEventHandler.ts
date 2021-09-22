@@ -16,12 +16,13 @@ limitations under the License.
 
 import { MatrixEvent } from '../models/event';
 import { MatrixClient } from '../client';
-import { CONF_ROOM, GroupCall } from "./groupCall";
+import { CONF_ROOM, GroupCall, IGroupCallDataChannelOptions } from "./groupCall";
 import { RoomState } from "../models/room-state";
 import { CallType } from "./call";
+import { logger } from '../logger';
 
 export class GroupCallEventHandler {
-    private groupCalls = new Map<string, GroupCall>(); // roomId -> GroupCall
+    public groupCalls = new Map<string, GroupCall>(); // roomId -> GroupCall
 
     constructor(private client: MatrixClient) { }
 
@@ -41,9 +42,14 @@ export class GroupCallEventHandler {
             content = confEvents[0].getContent();
         }
 
-        if (groupCall && !content?.active) {
+        if (groupCall && content?.type !== groupCall.type) {
+            // TODO: Handle the callType changing when the room state changes
+            logger.warn(`The group call type changed for room: ${
+                state.roomId}. Changing the group call type is currently unsupported.`);
+        } if (groupCall && !content?.active) {
             groupCall.leave();
             this.groupCalls.delete(state.roomId);
+            this.client.emit("GroupCall.ended", groupCall);
         } else if (!groupCall && content?.active) {
             let callType: CallType;
 
@@ -53,7 +59,28 @@ export class GroupCallEventHandler {
                 callType = CallType.Video;
             }
 
-            const groupCall = this.client.createGroupCall(state.roomId, callType);
+            const room = this.client.getRoom(state.roomId);
+
+            if (!room) {
+                logger.error(`Couldn't find room ${state.roomId} for GroupCall`);
+                return;
+            }
+
+            let dataChannelOptions: IGroupCallDataChannelOptions | undefined;
+
+            if (content?.dataChannelsEnabled && content?.dataChannelOptions) {
+                // Pull out just the dataChannelOptions we want to support.
+                const { ordered, maxPacketLifeTime, maxRetransmits, protocol } = content.dataChannelOptions;
+                dataChannelOptions = { ordered, maxPacketLifeTime, maxRetransmits, protocol };
+            }
+
+            const groupCall = new GroupCall(
+                this.client,
+                room,
+                callType,
+                content?.dataChannelsEnabled,
+                dataChannelOptions,
+            );
             this.groupCalls.set(state.roomId, groupCall);
             this.client.emit("GroupCall.incoming", groupCall);
         }
