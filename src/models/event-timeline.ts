@@ -347,8 +347,11 @@ export class EventTimeline {
      * @param {MatrixEvent} event   new event
      * @param {boolean}  atStart     true to insert new event at the start
      */
-    public addEvent(event: MatrixEvent, atStart: boolean): void {
-        const stateContext = atStart ? this.startState : this.endState;
+    public addEvent(event: MatrixEvent, atStart: boolean, stateContext?: RoomState): void {
+        if (!stateContext) {
+            stateContext = atStart ? this.startState : this.endState;
+        }
+
         const timelineSet = this.getTimelineSet();
 
         if (timelineSet.room) {
