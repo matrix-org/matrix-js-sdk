@@ -420,8 +420,24 @@ export class MatrixCall extends EventEmitter {
         return this.localUsermediaFeed?.stream;
     }
 
-    private get localScreensharingStream(): MediaStream {
+    public get localScreensharingStream(): MediaStream {
         return this.localScreensharingFeed?.stream;
+    }
+
+    public get remoteUsermediaFeed(): CallFeed {
+        return this.getRemoteFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Usermedia);
+    }
+
+    public get remoteScreensharingFeed(): CallFeed {
+        return this.getRemoteFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
+    }
+
+    public get remoteUsermediaStream(): MediaStream {
+        return this.remoteUsermediaFeed?.stream;
+    }
+
+    public get remoteScreensharingStream(): MediaStream {
+        return this.remoteScreensharingFeed?.stream;
     }
 
     private getFeedByStreamId(streamId: string): CallFeed {
