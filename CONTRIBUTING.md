@@ -98,6 +98,21 @@ We use continuous integration, and all pull requests get automatically tested:
 if your change breaks the build, then the PR will show that there are failed
 checks, so please check back after a few minutes.
 
+Tests
+-----
+If your PR is a feature (ie. if it's being labelled with the 'T-Enhancement'
+label) then we require that the PR also includes tests. These need to test that
+your feature works as expected and ideally test edge cases too. For the js-sdk
+itself, your tests should generally be unit tests. matrix-react-sdk also uses
+these guidelines, so for that your tests can be unit tests using
+react-test-utils, snapshot tests or screenshot tests.
+
+We don't require tests for bug fixes (T-Defect) but strongly encourage regression
+tests for the bug itself wherever possible.
+
+In the future we may formalise this more with a minimum test coverage
+percentage for the diff.
+
 Code style
 ----------
 The js-sdk aims to target TypeScript/ES6. All new files should be written in
