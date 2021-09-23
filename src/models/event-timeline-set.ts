@@ -27,6 +27,7 @@ import { Relations } from './relations';
 import { Room } from "./room";
 import { Filter } from "../filter";
 import { EventType, RelationType } from "../@types/event";
+import { RoomState } from "./room-state";
 
 // var DEBUG = false;
 const DEBUG = true;
@@ -43,6 +44,11 @@ interface IOpts {
     timelineSupport?: boolean;
     filter?: Filter;
     unstableClientRelationAggregation?: boolean;
+}
+
+export enum DuplicateStrategy {
+    Ignore = "ignore",
+    Replace = "replace",
 }
 
 export class EventTimelineSet extends EventEmitter {
@@ -509,8 +515,14 @@ export class EventTimelineSet extends EventEmitter {
      * @param {MatrixEvent} event Event to be added
      * @param {string?} duplicateStrategy 'ignore' or 'replace'
      * @param {boolean} fromCache whether the sync response came from cache
+     * @param roomState the state events to reconcile metadata from
      */
-    public addLiveEvent(event: MatrixEvent, duplicateStrategy?: "ignore" | "replace", fromCache = false): void {
+    public addLiveEvent(
+        event: MatrixEvent,
+        duplicateStrategy: DuplicateStrategy = DuplicateStrategy.Ignore,
+        fromCache = false,
+        roomState?: RoomState,
+    ): void {
         if (this.filter) {
             const events = this.filter.filterRoomTimeline([event]);
             if (!events.length) {
@@ -520,16 +532,19 @@ export class EventTimelineSet extends EventEmitter {
 
         const timeline = this._eventIdToTimeline[event.getId()];
         if (timeline) {
-            if (duplicateStrategy === "replace") {
+            if (duplicateStrategy === DuplicateStrategy.Replace) {
                 debuglog("EventTimelineSet.addLiveEvent: replacing duplicate event " +
                     event.getId());
                 const tlEvents = timeline.getEvents();
                 for (let j = 0; j < tlEvents.length; j++) {
                     if (tlEvents[j].getId() === event.getId()) {
                         // still need to set the right metadata on this event
+                        if (!roomState) {
+                            roomState = timeline.getState(EventTimeline.FORWARDS);
+                        }
                         EventTimeline.setEventMetadata(
                             event,
-                            timeline.getState(EventTimeline.FORWARDS),
+                            roomState,
                             false,
                         );
                         tlEvents[j] = event;
@@ -545,7 +560,7 @@ export class EventTimelineSet extends EventEmitter {
             return;
         }
 
-        this.addEventToTimeline(event, this.liveTimeline, false, fromCache);
+        this.addEventToTimeline(event, this.liveTimeline, false, fromCache, roomState);
     }
 
     /**
@@ -566,9 +581,10 @@ export class EventTimelineSet extends EventEmitter {
         timeline: EventTimeline,
         toStartOfTimeline: boolean,
         fromCache = false,
+        roomState?: RoomState,
     ) {
         const eventId = event.getId();
-        timeline.addEvent(event, toStartOfTimeline);
+        timeline.addEvent(event, toStartOfTimeline, roomState);
         this._eventIdToTimeline[eventId] = timeline;
 
         this.setRelationsTarget(event);
