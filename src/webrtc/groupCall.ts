@@ -55,7 +55,7 @@ export class GroupCall extends EventEmitter {
     private userMediaFeedHandlers: Map<string, IUserMediaFeedHandlers> = new Map();
     private callHandlers: Map<string, ICallHandlers> = new Map();
     private sessionIds: Map<string, string> = new Map(); // userId -> sessionId
-    private activeSpeakerSamples: Map<string, number[]>;
+    private activeSpeakerSamples: Map<string, number[]> = new Map();
 
     private presenceLoopTimeout?: number;
     private activeSpeakerLoopTimeout?: number;
