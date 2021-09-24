@@ -1337,7 +1337,32 @@ export class MatrixClient extends EventEmitter {
      * @returns {GroupCall} The group call or null if it doesn't already exist.
      */
     public getGroupCallForRoom(roomId: string): GroupCall | null {
-        return this.groupCallEventHandler.groupCalls.get(roomId) || null;
+        const groupCall = this.groupCallEventHandler.groupCalls.get(roomId);
+
+        if (groupCall) {
+            return groupCall;
+        }
+
+        const room = this.getRoom(roomId);
+
+        if (!room) {
+            return null;
+        }
+
+        const stateEvents = room.currentState.getStateEvents(CONF_ROOM);
+
+        if (stateEvents.length === 0) {
+            return null;
+        }
+
+        const stateEvent = stateEvents[0];
+        const content = stateEvent.getContent();
+
+        if (content.active) {
+            return this.groupCallEventHandler.createGroupCallFromRoomStateEvent(stateEvent);
+        }
+
+        return null;
     }
 
     /**

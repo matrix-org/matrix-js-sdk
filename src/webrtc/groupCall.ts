@@ -10,8 +10,7 @@ import { ReEmitter } from "../ReEmitter";
 import { SDPStreamMetadataPurpose } from "./callEventTypes";
 
 export enum GroupCallEvent {
-    Entered = "entered",
-    Left = "left",
+    GroupCallStateChanged = "group_call_state_changed",
     ActiveSpeakerChanged = "active_speaker_changed",
     CallsChanged = "calls_changed",
     UserMediaFeedsChanged = "user_media_feeds_changed",
@@ -28,6 +27,15 @@ export interface IGroupCallDataChannelOptions {
     protocol: string;
 }
 
+export enum GroupCallState {
+    LocalCallFeedUninitialized = "local_call_feed_uninitialized",
+    InitializingLocalCallFeed = "initializing_local_call_feed",
+    LocalCallFeedInitialized = "local_call_feed_initialized",
+    Entering = "entering",
+    Entered = "entered",
+    Ended = "ended",
+}
+
 interface IUserMediaFeedHandlers {
     onCallFeedVolumeChanged: (maxVolume: number) => void;
     onCallFeedMuteStateChanged: (audioMuted: boolean) => void;
@@ -39,6 +47,10 @@ interface ICallHandlers {
     onCallHangup: (call: MatrixCall) => void;
 }
 
+function getCallUserId(call: MatrixCall): string | null {
+    return call.getOpponentMember()?.userId || call.invitee || null;
+}
+
 export class GroupCall extends EventEmitter {
     // Config
     public activeSpeakerSampleCount = 8;
@@ -46,7 +58,7 @@ export class GroupCall extends EventEmitter {
     public speakingThreshold = -80;
     public participantTimeout = 1000 * 15;
 
-    public entered = false;
+    public state = GroupCallState.LocalCallFeedUninitialized;
     public activeSpeaker: string; // userId
     public localCallFeed: CallFeed;
     public calls: MatrixCall[] = [];
@@ -73,9 +85,11 @@ export class GroupCall extends EventEmitter {
     }
 
     public async initLocalCallFeed(): Promise<CallFeed> {
-        if (this.localCallFeed) {
-            return this.localCallFeed;
+        if (this.state !== GroupCallState.LocalCallFeedUninitialized) {
+            throw new Error(`Cannot initialize local call feed in the "${this.state}" state.`);
         }
+
+        this.state = GroupCallState.InitializingLocalCallFeed;
 
         const stream = await this.client.getMediaHandler().getUserMediaStream(true, this.type === CallType.Video);
 
@@ -102,7 +116,12 @@ export class GroupCall extends EventEmitter {
     }
 
     public async enter() {
-        if (!this.localCallFeed) {
+        if (!(this.state === GroupCallState.LocalCallFeedUninitialized ||
+            this.state === GroupCallState.LocalCallFeedInitialized)) {
+            throw new Error(`Cannot enter call in the "${this.state}" state`);
+        }
+
+        if (this.state === GroupCallState.LocalCallFeedUninitialized) {
             await this.initLocalCallFeed();
         }
 
@@ -112,7 +131,7 @@ export class GroupCall extends EventEmitter {
         // Continue doing so every PARTICIPANT_TIMEOUT ms
         this.onPresenceLoop();
 
-        this.entered = true;
+        this.state = GroupCallState.Entered;
 
         this.processInitialCalls();
 
@@ -127,11 +146,11 @@ export class GroupCall extends EventEmitter {
         this.client.on("RoomState.members", this.onRoomStateMembers);
         this.client.on("Call.incoming", this.onIncomingCall);
 
-        this.emit(GroupCallEvent.Entered);
+        this.emit(GroupCallEvent.GroupCallStateChanged, this.state);
         this.onActiveSpeakerLoop();
     }
 
-    public leave() {
+    private dispose() {
         if (this.localCallFeed) {
             this.removeUserMediaFeed(this.localCallFeed);
             this.localCallFeed = null;
@@ -139,7 +158,7 @@ export class GroupCall extends EventEmitter {
 
         this.client.getMediaHandler().stopAllStreams();
 
-        if (!this.entered) {
+        if (this.state !== GroupCallState.Entered) {
             return;
         }
 
@@ -160,11 +179,9 @@ export class GroupCall extends EventEmitter {
         );
 
         while (this.calls.length > 0) {
-            const call = this.calls.pop();
-            this.removeCall(call, CallErrorCode.UserHangup);
+            this.removeCall(this.calls[this.calls.length - 1], CallErrorCode.UserHangup);
         }
 
-        this.entered = false;
         this.activeSpeaker = null;
         clearTimeout(this.presenceLoopTimeout);
         clearTimeout(this.activeSpeakerLoopTimeout);
@@ -174,23 +191,31 @@ export class GroupCall extends EventEmitter {
             this.onRoomStateMembers,
         );
         this.client.removeListener("Call.incoming", this.onIncomingCall);
-
-        this.emit(GroupCallEvent.Left);
     }
 
-    public async endCall() {
-        this.leave();
+    public leave() {
+        this.dispose();
+        this.state = GroupCallState.LocalCallFeedUninitialized;
+        this.emit(GroupCallEvent.GroupCallStateChanged, this.state);
+    }
+
+    public async endCall(emitStateEvent = true) {
+        this.dispose();
+        this.state = GroupCallState.Ended;
 
         this.client.groupCallEventHandler.groupCalls.delete(this.room.roomId);
 
-        this.client.emit("GroupCall.ended", this);
+        if (emitStateEvent) {
+            await this.client.sendStateEvent(
+                this.room.roomId,
+                CONF_ROOM,
+                { active: false },
+                "",
+            );
+        }
 
-        await this.client.sendStateEvent(
-            this.room.roomId,
-            CONF_ROOM,
-            { active: false },
-            "",
-        );
+        this.client.emit("GroupCall.ended", this);
+        this.emit(GroupCallEvent.GroupCallStateChanged, this.state);
     }
 
     /**
@@ -269,7 +294,12 @@ export class GroupCall extends EventEmitter {
         for (let i = this.calls.length - 1; i >= 0; i--) {
             const call = this.calls[i];
 
-            const opponentUserId = call.getOpponentMember().userId;
+            const opponentUserId = getCallUserId(call);
+
+            if (!opponentUserId) {
+                continue;
+            }
+
             const memberStateEvent = this.room.currentState.getStateEvents(
                 "m.room.member",
                 opponentUserId,
@@ -435,7 +465,7 @@ export class GroupCall extends EventEmitter {
      */
 
     public getCallByUserId(userId: string): MatrixCall {
-        return this.calls.find((call) => call.getOpponentMember().userId === userId);
+        return this.calls.find((call) => getCallUserId(call) === userId);
     }
 
     private addCall(call: MatrixCall, sessionId: string) {
@@ -474,9 +504,13 @@ export class GroupCall extends EventEmitter {
     }
 
     private initCall(call: MatrixCall, sessionId: string) {
-        const opponentMemberId = call.getOpponentMember().userId;
+        const opponentMemberId = getCallUserId(call);
 
-        const onCallFeedsChanged = (feeds: CallFeed[]) => this.onCallFeedsChanged(call, feeds);
+        if (!opponentMemberId) {
+            throw new Error("Cannot init call without user id");
+        }
+
+        const onCallFeedsChanged = () => this.onCallFeedsChanged(call);
         const onCallStateChanged =
             (state: CallState, oldState: CallState) => this.onCallStateChanged(call, state, oldState);
         const onCallHangup = this.onCallHangup;
@@ -499,7 +533,11 @@ export class GroupCall extends EventEmitter {
     }
 
     private disposeCall(call: MatrixCall, hangupReason: CallErrorCode) {
-        const opponentMemberId = call.getOpponentMember().userId;
+        const opponentMemberId = getCallUserId(call);
+
+        if (!opponentMemberId) {
+            throw new Error("Cannot dispose call without user id");
+        }
 
         const {
             onCallFeedsChanged,
@@ -527,23 +565,26 @@ export class GroupCall extends EventEmitter {
         this.sessionIds.delete(opponentMemberId);
     }
 
-    private onCallFeedsChanged = (call: MatrixCall, feeds: CallFeed[]) => {
-        const opponentMemberId = call.getOpponentMember().userId;
-        const currentUserMediaFeed = this.getUserMediaFeedByUserId(opponentMemberId);
+    private onCallFeedsChanged = (call: MatrixCall) => {
+        const opponentMemberId = getCallUserId(call);
 
-        let newUserMediaFeed: CallFeed;
-
-        for (const feed of feeds) {
-            if (feed.purpose === SDPStreamMetadataPurpose.Usermedia && feed !== currentUserMediaFeed) {
-                newUserMediaFeed = feed;
-            }
+        if (!opponentMemberId) {
+            throw new Error("Cannot change call feeds without user id");
         }
 
-        if (!currentUserMediaFeed && newUserMediaFeed) {
-            this.addUserMediaFeed(newUserMediaFeed);
-        } else if (currentUserMediaFeed && newUserMediaFeed) {
-            this.replaceUserMediaFeed(currentUserMediaFeed, newUserMediaFeed);
-        } else if (currentUserMediaFeed && !newUserMediaFeed) {
+        const currentUserMediaFeed = this.getUserMediaFeedByUserId(opponentMemberId);
+        const remoteUsermediaFeed = call.remoteUsermediaFeed;
+        const remoteFeedChanged = remoteUsermediaFeed !== currentUserMediaFeed;
+
+        if (!remoteFeedChanged) {
+            return;
+        }
+
+        if (!currentUserMediaFeed && remoteUsermediaFeed) {
+            this.addUserMediaFeed(remoteUsermediaFeed);
+        } else if (currentUserMediaFeed && remoteUsermediaFeed) {
+            this.replaceUserMediaFeed(currentUserMediaFeed, remoteUsermediaFeed);
+        } else if (currentUserMediaFeed && !remoteUsermediaFeed) {
             this.removeUserMediaFeed(currentUserMediaFeed);
         }
     };

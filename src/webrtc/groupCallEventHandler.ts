@@ -34,53 +34,56 @@ export class GroupCallEventHandler {
         this.client.removeListener("RoomState.events", this.onRoomStateChanged);
     }
 
+    public createGroupCallFromRoomStateEvent(event: MatrixEvent) {
+        const roomId = event.getRoomId();
+        const content = event.getContent();
+
+        let callType: CallType;
+
+        if (content.callType === "voice") {
+            callType = CallType.Voice;
+        } else {
+            callType = CallType.Video;
+        }
+
+        const room = this.client.getRoom(event.getRoomId());
+
+        if (!room) {
+            logger.error(`Couldn't find room ${roomId} for GroupCall`);
+            return;
+        }
+
+        let dataChannelOptions: IGroupCallDataChannelOptions | undefined;
+
+        if (content?.dataChannelsEnabled && content?.dataChannelOptions) {
+            // Pull out just the dataChannelOptions we want to support.
+            const { ordered, maxPacketLifeTime, maxRetransmits, protocol } = content.dataChannelOptions;
+            dataChannelOptions = { ordered, maxPacketLifeTime, maxRetransmits, protocol };
+        }
+
+        return new GroupCall(
+            this.client,
+            room,
+            callType,
+            content?.dataChannelsEnabled,
+            dataChannelOptions,
+        );
+    }
+
     private onRoomStateChanged = (_event: MatrixEvent, state: RoomState): void => {
         const groupCall = this.groupCalls.get(state.roomId);
         const confEvents = state.getStateEvents(CONF_ROOM);
-        let content;
-        if (confEvents.length > 0) {
-            content = confEvents[0].getContent();
-        }
+        const confEvent = confEvents.length > 0 ? confEvents[0] : null;
+        const content = confEvent ? confEvent.getContent() : null;
 
         if (groupCall && content?.type !== groupCall.type) {
             // TODO: Handle the callType changing when the room state changes
             logger.warn(`The group call type changed for room: ${
                 state.roomId}. Changing the group call type is currently unsupported.`);
         } if (groupCall && !content?.active) {
-            groupCall.leave();
-            this.groupCalls.delete(state.roomId);
-            this.client.emit("GroupCall.ended", groupCall);
+            groupCall.endCall(false);
         } else if (!groupCall && content?.active) {
-            let callType: CallType;
-
-            if (content.callType === "voice") {
-                callType = CallType.Voice;
-            } else {
-                callType = CallType.Video;
-            }
-
-            const room = this.client.getRoom(state.roomId);
-
-            if (!room) {
-                logger.error(`Couldn't find room ${state.roomId} for GroupCall`);
-                return;
-            }
-
-            let dataChannelOptions: IGroupCallDataChannelOptions | undefined;
-
-            if (content?.dataChannelsEnabled && content?.dataChannelOptions) {
-                // Pull out just the dataChannelOptions we want to support.
-                const { ordered, maxPacketLifeTime, maxRetransmits, protocol } = content.dataChannelOptions;
-                dataChannelOptions = { ordered, maxPacketLifeTime, maxRetransmits, protocol };
-            }
-
-            const groupCall = new GroupCall(
-                this.client,
-                room,
-                callType,
-                content?.dataChannelsEnabled,
-                dataChannelOptions,
-            );
+            const groupCall = this.createGroupCallFromRoomStateEvent(confEvent);
             this.groupCalls.set(state.roomId, groupCall);
             this.client.emit("GroupCall.incoming", groupCall);
         }
