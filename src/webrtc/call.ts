@@ -2041,7 +2041,7 @@ export class MatrixCall extends EventEmitter {
             this.opponentPartyId = msg.party_id || null;
         }
         this.opponentCaps = msg.capabilities || {} as CallCapabilities;
-        this.opponentMember = ev.sender;
+        this.opponentMember = this.client.getRoom(this.roomId).getMember(ev.getSender());
     }
 
     private async addBufferedIceCandidates(): Promise<void> {
