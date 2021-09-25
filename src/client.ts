@@ -1325,7 +1325,7 @@ export class MatrixClient extends EventEmitter {
                 CONF_ROOM,
                 {
                     active: true,
-                    callType: type,
+                    ["m.type"]: type,
                     conf_id: groupCall.groupCallId,
                     dataChannelsEnabled,
                     dataChannelOptions,
