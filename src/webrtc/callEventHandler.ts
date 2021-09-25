@@ -20,6 +20,7 @@ import { createNewMatrixCall, MatrixCall, CallErrorCode, CallState, CallDirectio
 import { EventType } from '../@types/event';
 import { MatrixClient } from '../client';
 import { MCallAnswer, MCallHangupReject } from "./callEventTypes";
+import { SyncState } from "../sync.api";
 
 // Don't ring unless we'd be ringing for at least 3 seconds: the user needs some
 // time to press the 'accept' button
@@ -30,6 +31,8 @@ export class CallEventHandler {
     calls: Map<string, MatrixCall>;
     callEventBuffer: MatrixEvent[];
     candidateEventsByCall: Map<string, Array<MatrixEvent>>;
+
+    private toDeviceCallEventBuffer: MatrixEvent[] = [];
 
     constructor(client: MatrixClient) {
         this.client = client;
@@ -47,17 +50,24 @@ export class CallEventHandler {
     }
 
     public start() {
-        this.client.on("sync", this.evaluateEventBuffer);
+        this.client.on("sync", this.onSync);
         this.client.on("Room.timeline", this.onRoomTimeline);
+        this.client.on("toDeviceEvent", this.onToDeviceEvent);
     }
 
     public stop() {
-        this.client.removeListener("sync", this.evaluateEventBuffer);
+        this.client.removeListener("sync", this.onSync);
         this.client.removeListener("Room.timeline", this.onRoomTimeline);
+        this.client.removeListener("toDeviceEvent", this.onToDeviceEvent);
     }
 
-    private evaluateEventBuffer = async () => {
-        if (this.client.getSyncState() === "SYNCING") {
+    private onSync = (): void => {
+        this.evaluateEventBuffer();
+        this.evaluateToDeviceEventBuffer();
+    };
+
+    private async evaluateEventBuffer() {
+        if (this.client.getSyncState() === SyncState.Syncing) {
             await Promise.all(this.callEventBuffer.map(event => {
                 this.client.decryptEventIfNeeded(event);
             }));
@@ -88,7 +98,7 @@ export class CallEventHandler {
             }
             this.callEventBuffer = [];
         }
-    };
+    }
 
     private onRoomTimeline = (event: MatrixEvent) => {
         this.client.decryptEventIfNeeded(event);
@@ -120,6 +130,25 @@ export class CallEventHandler {
         }
     };
 
+    private onToDeviceEvent = (event: MatrixEvent): void => {
+        if (!this.eventIsACall(event)) return;
+
+        this.toDeviceCallEventBuffer.push(event);
+    };
+
+    private async evaluateToDeviceEventBuffer(): Promise<void> {
+        if (this.client.getSyncState() !== SyncState.Syncing) return;
+
+        for (const event of this.toDeviceCallEventBuffer) {
+            try {
+                await this.handleCallEvent(event, true);
+            } catch (e) {
+                logger.error("Caught exception handling call event", e);
+            }
+        }
+        this.toDeviceCallEventBuffer = [];
+    }
+
     private eventIsACall(event: MatrixEvent): boolean {
         const type = event.getType();
         /**
@@ -129,12 +158,15 @@ export class CallEventHandler {
         return type.startsWith("m.call.") || type.startsWith("org.matrix.call.");
     }
 
-    private async handleCallEvent(event: MatrixEvent) {
+    private async handleCallEvent(event: MatrixEvent, isToDevice?: boolean) {
         const content = event.getContent();
+        const callRoomId = event.getRoomId() || content.call_room_id;
         const type = event.getType() as EventType;
         const weSentTheEvent = event.getSender() === this.client.credentials.userId;
         let call = content.call_id ? this.calls.get(content.call_id) : undefined;
         //console.info("RECV %s content=%s", type, JSON.stringify(content));
+
+        if (!callRoomId) return;
 
         if (type === EventType.CallInvite) {
             // ignore invites you send
@@ -159,8 +191,8 @@ export class CallEventHandler {
             logger.info("Current turn creds expire in " + timeUntilTurnCresExpire + " ms");
             call = createNewMatrixCall(
                 this.client,
-                event.getRoomId(),
-                { forceTURN: this.client.forceTURN },
+                callRoomId,
+                { forceTURN: this.client.forceTURN, useToDevice: isToDevice },
             );
             if (!call) {
                 logger.log(
@@ -249,7 +281,9 @@ export class CallEventHandler {
                 // if not live, store the fact that the call has ended because
                 // we're probably getting events backwards so
                 // the hangup will come before the invite
-                call = createNewMatrixCall(this.client, event.getRoomId());
+                call = createNewMatrixCall(
+                    this.client, callRoomId, { useToDevice: isToDevice },
+                );
                 if (call) {
                     call.callId = content.call_id;
                     call.initWithHangup(event);
