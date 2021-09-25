@@ -84,12 +84,18 @@ export class GroupCall extends EventEmitter {
         this.reEmitter = new ReEmitter(this);
     }
 
+    private setState(newState: GroupCallState): void {
+        const oldState = this.state;
+        this.state = newState;
+        this.emit(GroupCallEvent.GroupCallStateChanged, newState, oldState);
+    }
+
     public async initLocalCallFeed(): Promise<CallFeed> {
         if (this.state !== GroupCallState.LocalCallFeedUninitialized) {
             throw new Error(`Cannot initialize local call feed in the "${this.state}" state.`);
         }
 
-        this.state = GroupCallState.InitializingLocalCallFeed;
+        this.setState(GroupCallState.InitializingLocalCallFeed);
 
         const stream = await this.client.getMediaHandler().getUserMediaStream(true, this.type === CallType.Video);
 
@@ -131,7 +137,7 @@ export class GroupCall extends EventEmitter {
         // Continue doing so every PARTICIPANT_TIMEOUT ms
         this.onPresenceLoop();
 
-        this.state = GroupCallState.Entered;
+        this.setState(GroupCallState.Entered);
 
         this.processInitialCalls();
 
@@ -146,7 +152,6 @@ export class GroupCall extends EventEmitter {
         this.client.on("RoomState.members", this.onRoomStateMembers);
         this.client.on("Call.incoming", this.onIncomingCall);
 
-        this.emit(GroupCallEvent.GroupCallStateChanged, this.state);
         this.onActiveSpeakerLoop();
     }
 
@@ -195,13 +200,11 @@ export class GroupCall extends EventEmitter {
 
     public leave() {
         this.dispose();
-        this.state = GroupCallState.LocalCallFeedUninitialized;
-        this.emit(GroupCallEvent.GroupCallStateChanged, this.state);
+        this.setState(GroupCallState.LocalCallFeedUninitialized);
     }
 
     public async endCall(emitStateEvent = true) {
         this.dispose();
-        this.state = GroupCallState.Ended;
 
         this.client.groupCallEventHandler.groupCalls.delete(this.room.roomId);
 
@@ -215,7 +218,7 @@ export class GroupCall extends EventEmitter {
         }
 
         this.client.emit("GroupCall.ended", this);
-        this.emit(GroupCallEvent.GroupCallStateChanged, this.state);
+        this.setState(GroupCallState.Ended);
     }
 
     /**
