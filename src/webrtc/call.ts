@@ -982,6 +982,7 @@ export class MatrixCall extends EventEmitter {
         }
         this.localUsermediaFeed?.setAudioMuted(muted);
         this.updateMuteStatus();
+        return this.isMicrophoneMuted();
     }
 
     /**
