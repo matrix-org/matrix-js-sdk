@@ -238,7 +238,7 @@ export class CallError extends Error {
     }
 }
 
-function genCallID(): string {
+export function genCallID(): string {
     return Date.now().toString() + randomString(16);
 }
 

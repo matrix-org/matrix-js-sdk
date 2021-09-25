@@ -2,7 +2,7 @@ import EventEmitter from "events";
 import { CallFeed, CallFeedEvent } from "./callFeed";
 import { MatrixClient } from "../client";
 import { randomString } from "../randomstring";
-import { CallErrorCode, CallEvent, CallState, CallType, MatrixCall, setTracksEnabled } from "./call";
+import { CallErrorCode, CallEvent, CallState, CallType, genCallID, MatrixCall, setTracksEnabled } from "./call";
 import { RoomMember } from "../models/room-member";
 import { Room } from "../models/room";
 import { logger } from "../logger";
@@ -63,6 +63,7 @@ export class GroupCall extends EventEmitter {
     public localCallFeed: CallFeed;
     public calls: MatrixCall[] = [];
     public userMediaFeeds: CallFeed[] = [];
+    public groupCallId: string;
 
     private userMediaFeedHandlers: Map<string, IUserMediaFeedHandlers> = new Map();
     private callHandlers: Map<string, ICallHandlers> = new Map();
@@ -82,6 +83,7 @@ export class GroupCall extends EventEmitter {
     ) {
         super();
         this.reEmitter = new ReEmitter(this);
+        this.groupCallId = genCallID();
     }
 
     private setState(newState: GroupCallState): void {

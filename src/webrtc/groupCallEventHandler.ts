@@ -61,13 +61,16 @@ export class GroupCallEventHandler {
             dataChannelOptions = { ordered, maxPacketLifeTime, maxRetransmits, protocol };
         }
 
-        return new GroupCall(
+        const groupCall = new GroupCall(
             this.client,
             room,
             callType,
             content?.dataChannelsEnabled,
             dataChannelOptions,
         );
+        groupCall.groupCallId = content["conf_id"];
+
+        return groupCall;
     }
 
     private onRoomStateChanged = (_event: MatrixEvent, state: RoomState): void => {

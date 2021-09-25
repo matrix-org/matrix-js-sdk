@@ -1323,7 +1323,13 @@ export class MatrixClient extends EventEmitter {
             await this.sendStateEvent(
                 room.roomId,
                 CONF_ROOM,
-                { active: true, callType: type, dataChannelsEnabled, dataChannelOptions },
+                {
+                    active: true,
+                    callType: type,
+                    conf_id: groupCall.groupCallId,
+                    dataChannelsEnabled,
+                    dataChannelOptions,
+                },
                 "",
             );
         }
