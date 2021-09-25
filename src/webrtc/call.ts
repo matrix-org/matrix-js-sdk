@@ -1750,12 +1750,23 @@ export class MatrixCall extends EventEmitter {
      * @param {Object} content
      * @return {Promise}
      */
-    private sendVoipEvent(eventType: string, content: object): Promise<ISendEventResponse> {
-        return this.client.sendEvent(this.roomId, eventType, Object.assign({}, content, {
+    private sendVoipEvent(eventType: string, content: object): Promise<ISendEventResponse | {}> {
+        const realContent = Object.assign({}, content, {
             version: VOIP_PROTO_VERSION,
             call_id: this.callId,
             party_id: this.ourPartyId,
-        }));
+            call_room_id: this.roomId,
+        });
+
+        if (this.useToDevice) {
+            return this.client.sendToDevice(eventType, {
+                [this.invitee || this.getOpponentMember().userId]: {
+                    "*": realContent,
+                },
+            });
+        } else {
+            return this.client.sendEvent(this.roomId, eventType, realContent);
+        }
     }
 
     private queueCandidate(content: RTCIceCandidate): void {
