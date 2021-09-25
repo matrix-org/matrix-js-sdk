@@ -696,13 +696,34 @@ export class MatrixCall extends EventEmitter {
         this.setState(CallState.Ended);
     }
 
+    private shouldAnswerWithMediaType(
+        wantedValue: boolean, valueOfTheOtherSide: boolean, type: "audio" | "video",
+    ): boolean {
+        if (wantedValue && !valueOfTheOtherSide) {
+            // TODO: Figure out how to do this
+            logger.warn(`Unable to answer with ${type} because the other side isn't sending it either.`);
+            return false;
+        } else if (
+            !utils.isNullOrUndefined(wantedValue) &&
+            wantedValue !== valueOfTheOtherSide &&
+            !this.opponentSupportsSDPStreamMetadata()
+        ) {
+            logger.warn(
+                `Unable to answer with ${type}=${wantedValue} because the other side doesn't support it. ` +
+                `Answering with ${type}=${valueOfTheOtherSide}.`,
+            );
+            return valueOfTheOtherSide;
+        }
+        return wantedValue ?? valueOfTheOtherSide;
+    }
+
     /**
      * Answer a call.
      */
-    public async answer(): Promise<void> {
-        if (this.inviteOrAnswerSent) {
-            return;
-        }
+    public async answer(audio?: boolean, video?: boolean): Promise<void> {
+        if (this.inviteOrAnswerSent) return;
+        // TODO: Figure out how to do this
+        if (audio === false && video === false) throw new Error("You CANNOT answer a call without media");
 
         logger.debug(`Answering call ${this.callId}`);
 
@@ -712,8 +733,8 @@ export class MatrixCall extends EventEmitter {
 
             try {
                 const mediaStream = await this.client.getMediaHandler().getUserMediaStream(
-                    true,
-                    this.hasRemoteUserMediaVideoTrack,
+                    this.shouldAnswerWithMediaType(audio, this.hasRemoteUserMediaAudioTrack, "audio"),
+                    this.shouldAnswerWithMediaType(video, this.hasRemoteUserMediaVideoTrack, "video"),
                 );
                 this.waitForLocalAVStream = false;
                 this.gotUserMediaForAnswer(mediaStream);
