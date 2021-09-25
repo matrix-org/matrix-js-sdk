@@ -160,7 +160,11 @@ export class CallEventHandler {
 
     private async handleCallEvent(event: MatrixEvent, isToDevice?: boolean) {
         const content = event.getContent();
-        const callRoomId = event.getRoomId() || content.call_room_id;
+        const callRoomId = (
+            event.getRoomId() ||
+            this.client.groupCallEventHandler.getGroupCallById(content.conf_id)?.room?.roomId
+        );
+        const groupCallId = content.conf_id;
         const type = event.getType() as EventType;
         const weSentTheEvent = event.getSender() === this.client.credentials.userId;
         let call = content.call_id ? this.calls.get(content.call_id) : undefined;
@@ -192,7 +196,7 @@ export class CallEventHandler {
             call = createNewMatrixCall(
                 this.client,
                 callRoomId,
-                { forceTURN: this.client.forceTURN, useToDevice: isToDevice },
+                { forceTURN: this.client.forceTURN, useToDevice: isToDevice, groupCallId },
             );
             if (!call) {
                 logger.log(

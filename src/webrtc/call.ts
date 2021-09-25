@@ -72,6 +72,7 @@ interface CallOpts {
     forceTURN?: boolean;
     turnServers?: Array<TurnServer>;
     useToDevice?: boolean;
+    groupCallId?: string;
 }
 
 interface TurnServer {
@@ -314,6 +315,7 @@ export class MatrixCall extends EventEmitter {
     private callLength = 0;
 
     private useToDevice: boolean;
+    private groupCallId: string;
 
     constructor(opts: CallOpts) {
         super();
@@ -323,6 +325,7 @@ export class MatrixCall extends EventEmitter {
         this.forceTURN = opts.forceTURN;
         this.ourPartyId = this.client.deviceId;
         this.useToDevice = opts.useToDevice;
+        this.groupCallId = opts.groupCallId;
         // Array of Objects with urls, username, credential keys
         this.turnServers = opts.turnServers || [];
         if (this.turnServers.length === 0 && this.client.isFallbackICEServerAllowed()) {
@@ -1755,7 +1758,7 @@ export class MatrixCall extends EventEmitter {
             version: VOIP_PROTO_VERSION,
             call_id: this.callId,
             party_id: this.ourPartyId,
-            call_room_id: this.roomId,
+            conf_id: this.groupCallId,
         });
 
         if (this.useToDevice) {
@@ -2149,6 +2152,7 @@ export function createNewMatrixCall(client: any, roomId: string, options?: CallO
         // call level options
         forceTURN: client.forceTURN || optionsForceTURN,
         useToDevice: options?.useToDevice,
+        groupCallId: options?.groupCallId,
     };
     const call = new MatrixCall(opts);
 

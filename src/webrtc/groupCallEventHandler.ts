@@ -34,6 +34,10 @@ export class GroupCallEventHandler {
         this.client.removeListener("RoomState.events", this.onRoomStateChanged);
     }
 
+    public getGroupCallById(groupCallId: string): GroupCall {
+        return [...this.groupCalls.values()].find((groupCall) => groupCall.groupCallId === groupCallId);
+    }
+
     public createGroupCallFromRoomStateEvent(event: MatrixEvent) {
         const roomId = event.getRoomId();
         const content = event.getContent();

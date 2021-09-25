@@ -447,7 +447,7 @@ export class GroupCall extends EventEmitter {
             return;
         }
 
-        const newCall = this.client.createCall(this.room.roomId, member.userId, true);
+        const newCall = this.client.createCall(this.room.roomId, member.userId, true, this.groupCallId);
 
         // TODO: Move to call.placeCall()
         const callPromise = this.type === CallType.Video ? newCall.placeVideoCall() : newCall.placeVoiceCall();
