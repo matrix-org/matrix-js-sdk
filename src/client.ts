@@ -1285,8 +1285,8 @@ export class MatrixClient extends EventEmitter {
      * @param {string} invitee The user to call in the given room.
      * @return {MatrixCall} the call or null if the browser doesn't support calling.
      */
-    public createCall(roomId: string, invitee?: string): MatrixCall {
-        return createNewMatrixCall(this, roomId, { invitee });
+    public createCall(roomId: string, invitee?: string, useToDevice?: boolean): MatrixCall {
+        return createNewMatrixCall(this, roomId, { invitee, useToDevice });
     }
 
     /**

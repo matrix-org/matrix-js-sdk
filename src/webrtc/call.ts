@@ -71,6 +71,7 @@ interface CallOpts {
     client?: any; // Fix when client is TSified
     forceTURN?: boolean;
     turnServers?: Array<TurnServer>;
+    useToDevice?: boolean;
 }
 
 interface TurnServer {
@@ -312,6 +313,8 @@ export class MatrixCall extends EventEmitter {
     private callLengthInterval: number;
     private callLength = 0;
 
+    private useToDevice: boolean;
+
     constructor(opts: CallOpts) {
         super();
         this.roomId = opts.roomId;
@@ -319,6 +322,7 @@ export class MatrixCall extends EventEmitter {
         this.client = opts.client;
         this.forceTURN = opts.forceTURN;
         this.ourPartyId = this.client.deviceId;
+        this.useToDevice = opts.useToDevice;
         // Array of Objects with urls, username, credential keys
         this.turnServers = opts.turnServers || [];
         if (this.turnServers.length === 0 && this.client.isFallbackICEServerAllowed()) {
@@ -2126,13 +2130,14 @@ export function createNewMatrixCall(client: any, roomId: string, options?: CallO
 
     const optionsForceTURN = options ? options.forceTURN : false;
 
-    const opts = {
+    const opts: CallOpts = {
         client: client,
         roomId: roomId,
-        invitee: options && options.invitee,
+        invitee: options?.invitee,
         turnServers: client.getTurnServers(),
         // call level options
         forceTURN: client.forceTURN || optionsForceTURN,
+        useToDevice: options?.useToDevice,
     };
     const call = new MatrixCall(opts);
 
