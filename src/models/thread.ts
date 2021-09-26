@@ -17,12 +17,18 @@ limitations under the License.
 import { EventEmitter } from "events";
 import { MatrixClient } from "../matrix";
 import { MatrixEvent } from "./event";
-import { EventTimelineSet } from './event-timeline-set';
+import { EventTimeline } from "./event-timeline";
+import { EventTimelineSet, DuplicateStrategy } from './event-timeline-set';
 import { Room } from './room';
 
 export enum ThreadEvent {
     Ready = "Thread.ready",
     Update = "Thread.update"
+}
+
+interface ISerialisedThread {
+    id: string;
+    tails: string[];
 }
 
 /**
@@ -72,8 +78,14 @@ export class Thread extends EventEmitter {
             this.root = event.getId();
         }
 
+        // all the relevant membership info to hydrate events with a sender
+        // is held in the main room timeline
+        // We want to fetch the room state from there and pass it down to this thread
+        // timeline set to let it reconcile an event with its relevant RoomMember
+        const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+
         event.setThread(this);
-        this.timelineSet.addLiveEvent(event);
+        this.timelineSet.addLiveEvent(event, DuplicateStrategy.Ignore, false, roomState);
 
         if (this.ready) {
             this.client.decryptEventIfNeeded(event, {});
@@ -197,6 +209,13 @@ export class Thread extends EventEmitter {
 
     public has(eventId: string): boolean {
         return this.timelineSet.findEventById(eventId) instanceof MatrixEvent;
+    }
+
+    public toJson(): ISerialisedThread {
+        return {
+            id: this.id,
+            tails: Array.from(this.tail),
+        };
     }
 
     public on(event: ThreadEvent, listener: (...args: any[]) => void): this {

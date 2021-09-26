@@ -20,7 +20,7 @@ limitations under the License.
 
 import { EventEmitter } from "events";
 
-import { EventTimelineSet } from "./event-timeline-set";
+import { EventTimelineSet, DuplicateStrategy } from "./event-timeline-set";
 import { EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
@@ -1327,7 +1327,7 @@ export class Room extends EventEmitter {
      * @fires module:client~MatrixClient#event:"Room.timeline"
      * @private
      */
-    private addLiveEvent(event: MatrixEvent, duplicateStrategy?: "ignore" | "replace", fromCache = false): void {
+    private addLiveEvent(event: MatrixEvent, duplicateStrategy?: DuplicateStrategy, fromCache = false): void {
         if (event.isRedaction()) {
             const redactId = event.event.redacts;
 
@@ -1713,7 +1713,7 @@ export class Room extends EventEmitter {
      * @param {boolean} fromCache whether the sync response came from cache
      * @throws If <code>duplicateStrategy</code> is not falsey, 'replace' or 'ignore'.
      */
-    public addLiveEvents(events: MatrixEvent[], duplicateStrategy?: "replace" | "ignore", fromCache = false): void {
+    public addLiveEvents(events: MatrixEvent[], duplicateStrategy?: DuplicateStrategy, fromCache = false): void {
         let i;
         if (duplicateStrategy && ["replace", "ignore"].indexOf(duplicateStrategy) === -1) {
             throw new Error("duplicateStrategy MUST be either 'replace' or 'ignore'");
