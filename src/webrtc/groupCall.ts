@@ -8,6 +8,7 @@ import { Room } from "../models/room";
 import { logger } from "../logger";
 import { ReEmitter } from "../ReEmitter";
 import { SDPStreamMetadataPurpose } from "./callEventTypes";
+import { createNewMatrixCall } from "./call";
 
 export enum GroupCallEvent {
     GroupCallStateChanged = "group_call_state_changed",
@@ -447,7 +448,11 @@ export class GroupCall extends EventEmitter {
             return;
         }
 
-        const newCall = this.client.createCall(this.room.roomId, member.userId, true, this.groupCallId);
+        const newCall = createNewMatrixCall(
+            this.client,
+            this.room.roomId,
+            { invitee: member.userId, useToDevice: true, groupCallId: this.groupCallId },
+        );
 
         // TODO: Move to call.placeCall()
         const callPromise = this.type === CallType.Video ? newCall.placeVideoCall() : newCall.placeVoiceCall();
