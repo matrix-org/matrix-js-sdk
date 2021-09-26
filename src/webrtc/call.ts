@@ -697,7 +697,7 @@ export class MatrixCall extends EventEmitter {
     }
 
     private shouldAnswerWithMediaType(
-        wantedValue: boolean, valueOfTheOtherSide: boolean, type: "audio" | "video",
+        wantedValue: boolean | undefined, valueOfTheOtherSide: boolean | undefined, type: "audio" | "video",
     ): boolean {
         if (wantedValue && !valueOfTheOtherSide) {
             // TODO: Figure out how to do this
