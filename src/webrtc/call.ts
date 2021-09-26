@@ -317,6 +317,11 @@ export class MatrixCall extends EventEmitter {
     private useToDevice: boolean;
     private groupCallId: string;
 
+    // Whether to stop local media when the call ends. We do not want to do this
+    // in group calls where the media is supplied by the group call. Doing this
+    // in a group call would result in breaking all the other calls
+    private stopLocalMediaOnEnd = true;
+
     constructor(opts: CallOpts) {
         super();
         this.roomId = opts.roomId;
@@ -603,7 +608,9 @@ export class MatrixCall extends EventEmitter {
 
     private deleteAllFeeds(): void {
         for (const feed of this.feeds) {
-            feed.dispose();
+            if (!feed.isLocal() || this.stopLocalMediaOnEnd) {
+                feed.dispose();
+            }
         }
 
         this.feeds = [];
@@ -1899,14 +1906,22 @@ export class MatrixCall extends EventEmitter {
     }
 
     private stopAllMedia(): void {
-        logger.debug(`stopAllMedia (stream=${this.localUsermediaStream})`);
+        logger.debug(this.stopLocalMediaOnEnd ? "Stopping all media" : "Stopping all media except local feeds" );
 
         for (const feed of this.feeds) {
-            if (feed.isLocal() && feed.purpose === SDPStreamMetadataPurpose.Usermedia) {
+            if (
+                feed.isLocal() &&
+                feed.purpose === SDPStreamMetadataPurpose.Usermedia &&
+                this.stopLocalMediaOnEnd
+            ) {
                 this.client.getMediaHandler().stopUserMediaStream(feed.stream);
-            } else if (feed.isLocal() && feed.purpose === SDPStreamMetadataPurpose.Screenshare) {
+            } else if (
+                feed.isLocal() &&
+                feed.purpose === SDPStreamMetadataPurpose.Screenshare &&
+                this.stopLocalMediaOnEnd
+            ) {
                 this.client.getMediaHandler().stopScreensharingStream(feed.stream);
-            } else {
+            } else if (!feed.isLocal() || this.stopLocalMediaOnEnd) {
                 for (const track of feed.stream.getTracks()) {
                     track.stop();
                 }
