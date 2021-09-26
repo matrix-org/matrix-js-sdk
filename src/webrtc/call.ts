@@ -606,6 +606,43 @@ export class MatrixCall extends EventEmitter {
         logger.info(`Pushed local stream (id="${stream.id}", active="${stream.active}", purpose="${purpose}")`);
     }
 
+    /**
+     * Pushes supplied feed to the call
+     * @param {CallFeed} callFeed to push
+     * @param {boolean} addToPeerConnection whether to add the tracks to the peer connection
+     */
+    public pushLocalFeed(callFeed: CallFeed, addToPeerConnection = true): void {
+        this.feeds.push(callFeed);
+        this.emit(CallEvent.FeedsChanged, this.feeds);
+
+        if (addToPeerConnection) {
+            const senderArray = callFeed.purpose === SDPStreamMetadataPurpose.Usermedia ?
+                this.usermediaSenders : this.screensharingSenders;
+            // Empty the array
+            senderArray.splice(0, senderArray.length);
+
+            this.emit(CallEvent.FeedsChanged, this.feeds);
+            for (const track of callFeed.stream.getTracks()) {
+                logger.info(
+                    `Adding track (` +
+                    `id="${track.id}", ` +
+                    `kind="${track.kind}", ` +
+                    `streamId="${callFeed.stream}", ` +
+                    `streamPurpose="${callFeed.purpose}"` +
+                    `) to peer connection`,
+                );
+                senderArray.push(this.peerConn.addTrack(track, callFeed.stream));
+            }
+        }
+
+        logger.info(
+            `Pushed local stream `+
+            `(id="${callFeed.stream.id}", `+
+            `active="${callFeed.stream.active}", `+
+            `purpose="${callFeed.purpose}")`,
+        );
+    }
+
     private deleteAllFeeds(): void {
         for (const feed of this.feeds) {
             if (!feed.isLocal() || this.stopLocalMediaOnEnd) {
@@ -781,6 +818,28 @@ export class MatrixCall extends EventEmitter {
         }
     }
 
+    public answerWithCallFeed(callFeed: CallFeed): void {
+        this.stopLocalMediaOnEnd = false;
+        if (this.inviteOrAnswerSent) return;
+
+        logger.debug(`Answering call ${this.callId}`);
+
+        if (!this.localUsermediaStream && !this.waitForLocalAVStream) {
+            this.setState(CallState.WaitLocalMedia);
+            this.waitForLocalAVStream = true;
+
+            try {
+                this.waitForLocalAVStream = false;
+                this.gotCallFeedForAnswer(callFeed);
+            } catch (e) {
+                this.getUserMediaFailed(e);
+                return;
+            }
+        } else if (this.waitForLocalAVStream) {
+            this.setState(CallState.WaitLocalMedia);
+        }
+    }
+
     /**
      * Replace this call with a new call, e.g. for glare resolution. Used by
      * MatrixClient.
@@ -792,7 +851,11 @@ export class MatrixCall extends EventEmitter {
             newCall.waitForLocalAVStream = true;
         } else if ([CallState.CreateOffer, CallState.InviteSent].includes(this.state)) {
             logger.debug("Handing local stream to new call");
-            newCall.gotUserMediaForAnswer(this.localUsermediaStream);
+            if (this.stopLocalMediaOnEnd) {
+                newCall.gotUserMediaForAnswer(this.localUsermediaStream);
+            } else {
+                newCall.gotCallFeedForAnswer(this.localUsermediaFeed);
+            }
         }
         this.successor = newCall;
         this.emit(CallEvent.Replaced, newCall);
@@ -1145,6 +1208,23 @@ export class MatrixCall extends EventEmitter {
         // Now we wait for the negotiationneeded event
     };
 
+    private gotCallFeedForInvite(callFeed: CallFeed): void {
+        if (this.successor) {
+            this.successor.gotCallFeedForAnswer(callFeed);
+            return;
+        }
+        if (this.callHasEnded()) {
+            this.stopAllMedia();
+            return;
+        }
+
+        this.pushLocalFeed(callFeed);
+        this.setState(CallState.CreateOffer);
+
+        logger.debug("gotUserMediaForInvite");
+        // Now we wait for the negotiationneeded event
+    }
+
     private async sendAnswer(): Promise<void> {
         const answerContent = {
             answer: {
@@ -1226,6 +1306,41 @@ export class MatrixCall extends EventEmitter {
             return;
         }
     };
+
+    private async gotCallFeedForAnswer(callFeed: CallFeed): Promise<void> {
+        if (this.callHasEnded()) return;
+
+        this.waitForLocalAVStream = false;
+
+        this.pushLocalFeed(callFeed);
+        this.setState(CallState.CreateAnswer);
+
+        let myAnswer;
+        try {
+            this.getRidOfRTXCodecs();
+            myAnswer = await this.peerConn.createAnswer();
+        } catch (err) {
+            logger.debug("Failed to create answer: ", err);
+            this.terminate(CallParty.Local, CallErrorCode.CreateAnswer, true);
+            return;
+        }
+
+        try {
+            await this.peerConn.setLocalDescription(myAnswer);
+            this.setState(CallState.Connecting);
+
+            // Allow a short time for initial candidates to be gathered
+            await new Promise(resolve => {
+                setTimeout(resolve, 200);
+            });
+
+            this.sendAnswer();
+        } catch (err) {
+            logger.debug("Error setting local description!", err);
+            this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);
+            return;
+        }
+    }
 
     /**
      * Internal
@@ -2016,6 +2131,39 @@ export class MatrixCall extends EventEmitter {
         try {
             const mediaStream = await this.client.getMediaHandler().getUserMediaStream(audio, video);
             this.gotUserMediaForInvite(mediaStream);
+        } catch (e) {
+            this.getUserMediaFailed(e);
+            return;
+        }
+    }
+
+    /**
+     * Place a call to this room with call feed.
+     * @param {CallFeed} callFeed to use
+     * @throws if you have not specified a listener for 'error' events.
+     * @throws if have passed audio=false.
+     */
+    public async placeCallWithCallFeed(callFeed: CallFeed): Promise<void> {
+        this.stopLocalMediaOnEnd = false;
+        this.checkForErrorListener();
+        // XXX Find a better way to do this
+        this.client.callEventHandler.calls.set(this.callId, this);
+        this.setState(CallState.WaitLocalMedia);
+        this.direction = CallDirection.Outbound;
+
+        // make sure we have valid turn creds. Unless something's gone wrong, it should
+        // poll and keep the credentials valid so this should be instant.
+        const haveTurnCreds = await this.client.checkTurnServers();
+        if (!haveTurnCreds) {
+            logger.warn("Failed to get TURN credentials! Proceeding with call anyway...");
+        }
+
+        // create the peer connection now so it can be gathering candidates while we get user
+        // media (assuming a candidate pool size is configured)
+        this.peerConn = this.createPeerConnection();
+
+        try {
+            this.gotCallFeedForInvite(callFeed);
         } catch (e) {
             this.getUserMediaFailed(e);
             return;

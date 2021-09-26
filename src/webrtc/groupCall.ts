@@ -386,7 +386,7 @@ export class GroupCall extends EventEmitter {
             this.addCall(newCall, sessionId);
         }
 
-        newCall.answer();
+        newCall.answerWithCallFeed(this.localCallFeed);
     };
 
     private onRoomStateMembers = (_event, _state, member: RoomMember) => {
@@ -454,14 +454,11 @@ export class GroupCall extends EventEmitter {
             { invitee: member.userId, useToDevice: true, groupCallId: this.groupCallId },
         );
 
-        // TODO: Move to call.placeCall()
-        const callPromise = this.type === CallType.Video ? newCall.placeVideoCall() : newCall.placeVoiceCall();
+        newCall.placeCallWithCallFeed(this.localCallFeed);
 
-        callPromise.then(() => {
-            if (this.dataChannelsEnabled) {
-                newCall.createDataChannel("datachannel", this.dataChannelOptions);
-            }
-        });
+        if (this.dataChannelsEnabled) {
+            newCall.createDataChannel("datachannel", this.dataChannelOptions);
+        }
 
         if (existingCall) {
             this.replaceCall(existingCall, newCall, sessionId);
