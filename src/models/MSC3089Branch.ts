@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { MatrixClient } from "../client";
-import { EventType, IEncryptedFile, RelationType, UNSTABLE_MSC3089_BRANCH } from "../@types/event";
+import { IEncryptedFile, RelationType, UNSTABLE_MSC3089_BRANCH } from "../@types/event";
 import { IContent, MatrixEvent } from "./event";
 import { MSC3089TreeSpace } from "./MSC3089TreeSpace";
 
@@ -211,7 +211,7 @@ export class MSC3089Branch {
                     break; // prevent infinite loop
                 }
             }
-        } while(!!childEvent);
+        } while (childEvent);
 
         return fileHistory;
     }

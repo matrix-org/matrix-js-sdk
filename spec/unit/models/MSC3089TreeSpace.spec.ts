@@ -933,7 +933,7 @@ describe("MSC3089TreeSpace", () => {
         const buf = Uint8Array.from(Array.from(fileContents).map((_, i) => fileContents.charCodeAt(i)));
 
         // We clone the file info just to make sure it doesn't get mutated for the test.
-        const result = await tree.createFile(fileName, buf, Object.assign({}, fileInfo), {metadata: true});
+        const result = await tree.createFile(fileName, buf, Object.assign({}, fileInfo), { metadata: true });
         expect(result).toMatchObject({ event_id: fileEventId });
 
         expect(uploadFn).toHaveBeenCalledTimes(1);
@@ -1000,7 +1000,7 @@ describe("MSC3089TreeSpace", () => {
         const buf = Uint8Array.from(Array.from(fileContents).map((_, i) => fileContents.charCodeAt(i)));
 
         // We clone the file info just to make sure it doesn't get mutated for the test.
-        const result = await tree.createFile(fileName, buf, Object.assign({}, fileInfo), {"m.new_content": true});
+        const result = await tree.createFile(fileName, buf, Object.assign({}, fileInfo), { "m.new_content": true });
         expect(result).toMatchObject({ event_id: fileEventId });
 
         expect(uploadFn).toHaveBeenCalledTimes(1);

@@ -247,7 +247,7 @@ describe("MSC3089Branch", () => {
         const fileContents = "contents go here";
         const canaryContents = Uint8Array.from(Array.from(fileContents).map((_, i) => fileContents.charCodeAt(i)));
         const canaryFile = {} as IEncryptedFile;
-        const canaryAddl = {canary: true};
+        const canaryAddl = { canary: true };
         indexEvent.getContent = () => ({ active: true, retained: true });
         const stateKeyOrder = [fileEventId2, fileEventId];
         const stateFn = jest.fn()
@@ -316,7 +316,7 @@ describe("MSC3089Branch", () => {
             replacingEventId: () => null,
             getId: () => "$unknown",
         }];
-        staticRoom.getLiveTimeline = () => ({getEvents: () => events}) as EventTimeline;
+        staticRoom.getLiveTimeline = () => ({ getEvents: () => events }) as EventTimeline;
 
         directory.getFile = (evId: string) => {
             expect(evId).toEqual(fileEventId);
