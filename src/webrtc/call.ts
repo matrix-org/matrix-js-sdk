@@ -567,7 +567,7 @@ export class MatrixCall extends EventEmitter {
         logger.info(`Pushed remote stream (id="${stream.id}", active="${stream.active}")`);
     }
 
-    private pushLocalFeed(stream: MediaStream, purpose: SDPStreamMetadataPurpose, addToPeerConnection = true): void {
+    private pushNewLocalFeed(stream: MediaStream, purpose: SDPStreamMetadataPurpose, addToPeerConnection = true): void {
         const userId = this.client.getUserId();
 
         // We try to replace an existing feed if there already is one with the same purpose
@@ -864,7 +864,7 @@ export class MatrixCall extends EventEmitter {
                 if (this.hasLocalUserMediaAudioTrack) return;
                 if (this.hasLocalUserMediaVideoTrack) return;
 
-                this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
+                this.pushNewLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
             } else if (upgradeAudio) {
                 if (this.hasLocalUserMediaAudioTrack) return;
 
@@ -930,7 +930,7 @@ export class MatrixCall extends EventEmitter {
             try {
                 const stream = await this.client.getMediaHandler().getScreensharingStream(desktopCapturerSourceId);
                 if (!stream) return false;
-                this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Screenshare);
+                this.pushNewLocalFeed(stream, SDPStreamMetadataPurpose.Screenshare);
                 return true;
             } catch (err) {
                 this.emit(CallEvent.Error,
@@ -972,7 +972,7 @@ export class MatrixCall extends EventEmitter {
                 });
                 sender.replaceTrack(track);
 
-                this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Screenshare, false);
+                this.pushNewLocalFeed(stream, SDPStreamMetadataPurpose.Screenshare, false);
 
                 return true;
             } catch (err) {
@@ -1138,7 +1138,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
+        this.pushNewLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
         this.setState(CallState.CreateOffer);
 
         logger.debug("gotUserMediaForInvite");
@@ -1197,7 +1197,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
+        this.pushNewLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
         this.setState(CallState.CreateAnswer);
 
         let myAnswer;
