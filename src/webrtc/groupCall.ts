@@ -386,7 +386,7 @@ export class GroupCall extends EventEmitter {
             this.addCall(newCall, sessionId);
         }
 
-        newCall.answerWithCallFeed(this.localCallFeed);
+        newCall.answerWithCallFeeds([this.localCallFeed]);
     };
 
     private onRoomStateMembers = (_event, _state, member: RoomMember) => {
@@ -454,7 +454,7 @@ export class GroupCall extends EventEmitter {
             { invitee: member.userId, useToDevice: true, groupCallId: this.groupCallId },
         );
 
-        newCall.placeCallWithCallFeed(this.localCallFeed);
+        newCall.placeCallWithCallFeeds([this.localCallFeed]);
 
         if (this.dataChannelsEnabled) {
             newCall.createDataChannel("datachannel", this.dataChannelOptions);

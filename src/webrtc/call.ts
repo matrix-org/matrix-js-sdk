@@ -818,7 +818,7 @@ export class MatrixCall extends EventEmitter {
         }
     }
 
-    public answerWithCallFeed(callFeed: CallFeed): void {
+    public answerWithCallFeeds(callFeeds: CallFeed[]): void {
         this.stopLocalMediaOnEnd = false;
         if (this.inviteOrAnswerSent) return;
 
@@ -830,7 +830,7 @@ export class MatrixCall extends EventEmitter {
 
             try {
                 this.waitForLocalAVStream = false;
-                this.gotCallFeedForAnswer(callFeed);
+                this.gotCallFeedsForAnswer(callFeeds);
             } catch (e) {
                 this.getUserMediaFailed(e);
                 return;
@@ -854,7 +854,7 @@ export class MatrixCall extends EventEmitter {
             if (this.stopLocalMediaOnEnd) {
                 newCall.gotUserMediaForAnswer(this.localUsermediaStream);
             } else {
-                newCall.gotCallFeedForAnswer(this.localUsermediaFeed);
+                newCall.gotCallFeedsForAnswer(this.getLocalFeeds());
             }
         }
         this.successor = newCall;
@@ -1208,9 +1208,9 @@ export class MatrixCall extends EventEmitter {
         // Now we wait for the negotiationneeded event
     };
 
-    private gotCallFeedForInvite(callFeed: CallFeed): void {
+    private gotCallFeedsForInvite(callFeeds: CallFeed[]): void {
         if (this.successor) {
-            this.successor.gotCallFeedForAnswer(callFeed);
+            this.successor.gotCallFeedsForAnswer(callFeeds);
             return;
         }
         if (this.callHasEnded()) {
@@ -1218,7 +1218,9 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        this.pushLocalFeed(callFeed);
+        for (const feed of callFeeds) {
+            this.pushLocalFeed(feed);
+        }
         this.setState(CallState.CreateOffer);
 
         logger.debug("gotUserMediaForInvite");
@@ -1307,12 +1309,15 @@ export class MatrixCall extends EventEmitter {
         }
     };
 
-    private async gotCallFeedForAnswer(callFeed: CallFeed): Promise<void> {
+    private async gotCallFeedsForAnswer(callFeeds: CallFeed[]): Promise<void> {
         if (this.callHasEnded()) return;
 
         this.waitForLocalAVStream = false;
 
-        this.pushLocalFeed(callFeed);
+        for (const feed of callFeeds) {
+            this.pushLocalFeed(feed);
+        }
+
         this.setState(CallState.CreateAnswer);
 
         let myAnswer;
@@ -2139,11 +2144,11 @@ export class MatrixCall extends EventEmitter {
 
     /**
      * Place a call to this room with call feed.
-     * @param {CallFeed} callFeed to use
+     * @param {CallFeed[]} callFeeds to use
      * @throws if you have not specified a listener for 'error' events.
      * @throws if have passed audio=false.
      */
-    public async placeCallWithCallFeed(callFeed: CallFeed): Promise<void> {
+    public async placeCallWithCallFeeds(callFeeds: CallFeed[]): Promise<void> {
         this.stopLocalMediaOnEnd = false;
         this.checkForErrorListener();
         // XXX Find a better way to do this
@@ -2163,7 +2168,7 @@ export class MatrixCall extends EventEmitter {
         this.peerConn = this.createPeerConnection();
 
         try {
-            this.gotCallFeedForInvite(callFeed);
+            this.gotCallFeedsForInvite(callFeeds);
         } catch (e) {
             this.getUserMediaFailed(e);
             return;
