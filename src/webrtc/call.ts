@@ -613,7 +613,6 @@ export class MatrixCall extends EventEmitter {
      */
     public pushLocalFeed(callFeed: CallFeed, addToPeerConnection = true): void {
         this.feeds.push(callFeed);
-        this.emit(CallEvent.FeedsChanged, this.feeds);
 
         if (addToPeerConnection) {
             const senderArray = callFeed.purpose === SDPStreamMetadataPurpose.Usermedia ?
@@ -621,7 +620,6 @@ export class MatrixCall extends EventEmitter {
             // Empty the array
             senderArray.splice(0, senderArray.length);
 
-            this.emit(CallEvent.FeedsChanged, this.feeds);
             for (const track of callFeed.stream.getTracks()) {
                 logger.info(
                     `Adding track (` +
@@ -641,6 +639,8 @@ export class MatrixCall extends EventEmitter {
             `active="${callFeed.stream.active}", `+
             `purpose="${callFeed.purpose}")`,
         );
+
+        this.emit(CallEvent.FeedsChanged, this.feeds);
     }
 
     private deleteAllFeeds(): void {
