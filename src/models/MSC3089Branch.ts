@@ -15,8 +15,9 @@ limitations under the License.
 */
 
 import { MatrixClient } from "../client";
-import { IEncryptedFile, UNSTABLE_MSC3089_BRANCH } from "../@types/event";
-import { MatrixEvent } from "./event";
+import { IEncryptedFile, RelationType, UNSTABLE_MSC3089_BRANCH } from "../@types/event";
+import { IContent, MatrixEvent } from "./event";
+import { MSC3089TreeSpace } from "./MSC3089TreeSpace";
 
 /**
  * Represents a [MSC3089](https://github.com/matrix-org/matrix-doc/pull/3089) branch - a reference
@@ -24,7 +25,11 @@ import { MatrixEvent } from "./event";
  * without notice.
  */
 export class MSC3089Branch {
-    public constructor(private client: MatrixClient, public readonly indexEvent: MatrixEvent) {
+    public constructor(
+        private client: MatrixClient,
+        public readonly indexEvent: MatrixEvent,
+        public readonly directory: MSC3089TreeSpace,
+    ) {
         // Nothing to do
     }
 
@@ -42,19 +47,27 @@ export class MSC3089Branch {
         return this.indexEvent.getContent()["active"] === true;
     }
 
+    /**
+     * Version for the file, one-indexed.
+     */
+    public get version(): number {
+        return this.indexEvent.getContent()["version"] ?? 1;
+    }
+
     private get roomId(): string {
         return this.indexEvent.getRoomId();
     }
 
     /**
-     * Deletes the file from the tree.
+     * Deletes the file from the tree, including all prior edits/versions.
      * @returns {Promise<void>} Resolves when complete.
      */
     public async delete(): Promise<void> {
         await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {}, this.id);
         await this.client.redactEvent(this.roomId, this.id);
 
-        // TODO: Delete edit history as well
+        const nextVersion = (await this.getVersionHistory())[1]; // [0] will be us
+        if (nextVersion) await nextVersion.delete(); // implicit recursion
     }
 
     /**
@@ -104,7 +117,7 @@ export class MSC3089Branch {
     public async getFileInfo(): Promise<{ info: IEncryptedFile, httpUrl: string }> {
         const event = await this.getFileEvent();
 
-        const file = event.getContent()['file'];
+        const file = event.getOriginalContent()['file'];
         const httpUrl = this.client.mxcUrlToHttp(file['url']);
 
         return { info: file, httpUrl: httpUrl };
@@ -118,15 +131,88 @@ export class MSC3089Branch {
         const room = this.client.getRoom(this.roomId);
         if (!room) throw new Error("Unknown room");
 
-        const timeline = await this.client.getEventTimeline(room.getUnfilteredTimelineSet(), this.id);
-        if (!timeline) throw new Error("Failed to get timeline for room event");
-
-        const event = timeline.getEvents().find(e => e.getId() === this.id);
+        const event = room.getUnfilteredTimelineSet().findEventById(this.id);
         if (!event) throw new Error("Failed to find event");
 
-        // Sometimes the event context doesn't decrypt for us, so do that.
-        await this.client.decryptEventIfNeeded(event, { emit: false, isRetry: false });
+        // Sometimes the event isn't decrypted for us, so do that. We specifically set `emit: true`
+        // to ensure that the relations system in the sdk will function.
+        await this.client.decryptEventIfNeeded(event, { emit: true, isRetry: true });
 
         return event;
+    }
+
+    /**
+     * Creates a new version of this file.
+     * @param {string} name The name of the file.
+     * @param {ArrayBuffer} encryptedContents The encrypted contents.
+     * @param {Partial<IEncryptedFile>} info The encrypted file information.
+     * @param {IContent} additionalContent Optional event content fields to include in the message.
+     * @returns {Promise<void>} Resolves when uploaded.
+     */
+    public async createNewVersion(
+        name: string,
+        encryptedContents: ArrayBuffer,
+        info: Partial<IEncryptedFile>,
+        additionalContent?: IContent,
+    ): Promise<void> {
+        const fileEventResponse = await this.directory.createFile(name, encryptedContents, info, {
+            ...(additionalContent ?? {}),
+            "m.new_content": true,
+            "m.relates_to": {
+                "rel_type": RelationType.Replace,
+                "event_id": this.id,
+            },
+        });
+
+        // Update the version of the new event
+        await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {
+            active: true,
+            name: name,
+            version: this.version + 1,
+        }, fileEventResponse['event_id']);
+
+        // Deprecate ourselves
+        await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {
+            ...(this.indexEvent.getContent()),
+            active: false,
+        }, this.id);
+    }
+
+    /**
+     * Gets the file's version history, starting at this file.
+     * @returns {Promise<MSC3089Branch[]>} Resolves to the file's version history, with the
+     * first element being the current version and the last element being the first version.
+     */
+    public async getVersionHistory(): Promise<MSC3089Branch[]> {
+        const fileHistory: MSC3089Branch[] = [];
+        fileHistory.push(this); // start with ourselves
+
+        const room = this.client.getRoom(this.roomId);
+        if (!room) throw new Error("Invalid or unknown room");
+
+        // Clone the timeline to reverse it, getting most-recent-first ordering, hopefully
+        // shortening the awful loop below. Without the clone, we can unintentionally mutate
+        // the timeline.
+        const timelineEvents = [...room.getLiveTimeline().getEvents()].reverse();
+
+        // XXX: This is a very inefficient search, but it's the best we can do with the
+        // relations structure we have in the SDK. As of writing, it is not worth the
+        // investment in improving the structure.
+        let childEvent: MatrixEvent;
+        let parentEvent = await this.getFileEvent();
+        do {
+            childEvent = timelineEvents.find(e => e.replacingEventId() === parentEvent.getId());
+            if (childEvent) {
+                const branch = this.directory.getFile(childEvent.getId());
+                if (branch) {
+                    fileHistory.push(branch);
+                    parentEvent = childEvent;
+                } else {
+                    break; // prevent infinite loop
+                }
+            }
+        } while (childEvent);
+
+        return fileHistory;
     }
 }
