@@ -1282,11 +1282,10 @@ export class MatrixClient extends EventEmitter {
      * The place*Call methods on the returned call can be used to actually place a call
      *
      * @param {string} roomId The room the call is to be placed in.
-     * @param {string} invitee The user to call in the given room.
      * @return {MatrixCall} the call or null if the browser doesn't support calling.
      */
-    public createCall(roomId: string, invitee?: string): MatrixCall {
-        return createNewMatrixCall(this, roomId, { invitee });
+    public createCall(roomId: string): MatrixCall {
+        return createNewMatrixCall(this, roomId);
     }
 
     /**
@@ -1323,7 +1322,13 @@ export class MatrixClient extends EventEmitter {
             await this.sendStateEvent(
                 room.roomId,
                 CONF_ROOM,
-                { active: true, callType: type, dataChannelsEnabled, dataChannelOptions },
+                {
+                    active: true,
+                    ["m.type"]: type,
+                    conf_id: groupCall.groupCallId,
+                    dataChannelsEnabled,
+                    dataChannelOptions,
+                },
                 "",
             );
         }

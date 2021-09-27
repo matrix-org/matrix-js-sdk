@@ -2,12 +2,13 @@ import EventEmitter from "events";
 import { CallFeed, CallFeedEvent } from "./callFeed";
 import { MatrixClient } from "../client";
 import { randomString } from "../randomstring";
-import { CallErrorCode, CallEvent, CallState, CallType, MatrixCall, setTracksEnabled } from "./call";
+import { CallErrorCode, CallEvent, CallState, CallType, genCallID, MatrixCall, setTracksEnabled } from "./call";
 import { RoomMember } from "../models/room-member";
 import { Room } from "../models/room";
 import { logger } from "../logger";
 import { ReEmitter } from "../ReEmitter";
 import { SDPStreamMetadataPurpose } from "./callEventTypes";
+import { createNewMatrixCall } from "./call";
 
 export enum GroupCallEvent {
     GroupCallStateChanged = "group_call_state_changed",
@@ -63,6 +64,7 @@ export class GroupCall extends EventEmitter {
     public localCallFeed: CallFeed;
     public calls: MatrixCall[] = [];
     public userMediaFeeds: CallFeed[] = [];
+    public groupCallId: string;
 
     private userMediaFeedHandlers: Map<string, IUserMediaFeedHandlers> = new Map();
     private callHandlers: Map<string, ICallHandlers> = new Map();
@@ -82,6 +84,13 @@ export class GroupCall extends EventEmitter {
     ) {
         super();
         this.reEmitter = new ReEmitter(this);
+        this.groupCallId = genCallID();
+    }
+
+    private setState(newState: GroupCallState): void {
+        const oldState = this.state;
+        this.state = newState;
+        this.emit(GroupCallEvent.GroupCallStateChanged, newState, oldState);
     }
 
     public async initLocalCallFeed(): Promise<CallFeed> {
@@ -89,7 +98,7 @@ export class GroupCall extends EventEmitter {
             throw new Error(`Cannot initialize local call feed in the "${this.state}" state.`);
         }
 
-        this.state = GroupCallState.InitializingLocalCallFeed;
+        this.setState(GroupCallState.InitializingLocalCallFeed);
 
         const stream = await this.client.getMediaHandler().getUserMediaStream(true, this.type === CallType.Video);
 
@@ -131,7 +140,7 @@ export class GroupCall extends EventEmitter {
         // Continue doing so every PARTICIPANT_TIMEOUT ms
         this.onPresenceLoop();
 
-        this.state = GroupCallState.Entered;
+        this.setState(GroupCallState.Entered);
 
         this.processInitialCalls();
 
@@ -146,7 +155,6 @@ export class GroupCall extends EventEmitter {
         this.client.on("RoomState.members", this.onRoomStateMembers);
         this.client.on("Call.incoming", this.onIncomingCall);
 
-        this.emit(GroupCallEvent.GroupCallStateChanged, this.state);
         this.onActiveSpeakerLoop();
     }
 
@@ -195,13 +203,11 @@ export class GroupCall extends EventEmitter {
 
     public leave() {
         this.dispose();
-        this.state = GroupCallState.LocalCallFeedUninitialized;
-        this.emit(GroupCallEvent.GroupCallStateChanged, this.state);
+        this.setState(GroupCallState.LocalCallFeedUninitialized);
     }
 
     public async endCall(emitStateEvent = true) {
         this.dispose();
-        this.state = GroupCallState.Ended;
 
         this.client.groupCallEventHandler.groupCalls.delete(this.room.roomId);
 
@@ -215,7 +221,7 @@ export class GroupCall extends EventEmitter {
         }
 
         this.client.emit("GroupCall.ended", this);
-        this.emit(GroupCallEvent.GroupCallStateChanged, this.state);
+        this.setState(GroupCallState.Ended);
     }
 
     /**
@@ -380,7 +386,7 @@ export class GroupCall extends EventEmitter {
             this.addCall(newCall, sessionId);
         }
 
-        newCall.answer();
+        newCall.answerWithCallFeeds([this.localCallFeed]);
     };
 
     private onRoomStateMembers = (_event, _state, member: RoomMember) => {
@@ -442,16 +448,17 @@ export class GroupCall extends EventEmitter {
             return;
         }
 
-        const newCall = this.client.createCall(this.room.roomId, member.userId);
+        const newCall = createNewMatrixCall(
+            this.client,
+            this.room.roomId,
+            { invitee: member.userId, useToDevice: true, groupCallId: this.groupCallId },
+        );
 
-        // TODO: Move to call.placeCall()
-        const callPromise = this.type === CallType.Video ? newCall.placeVideoCall() : newCall.placeVoiceCall();
+        newCall.placeCallWithCallFeeds([this.localCallFeed]);
 
-        callPromise.then(() => {
-            if (this.dataChannelsEnabled) {
-                newCall.createDataChannel("datachannel", this.dataChannelOptions);
-            }
-        });
+        if (this.dataChannelsEnabled) {
+            newCall.createDataChannel("datachannel", this.dataChannelOptions);
+        }
 
         if (existingCall) {
             this.replaceCall(existingCall, newCall, sessionId);
