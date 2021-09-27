@@ -1018,7 +1018,7 @@ export class MatrixCall extends EventEmitter {
      */
     public async setMicrophoneMuted(muted: boolean): Promise<boolean> {
         if (!this.hasLocalUserMediaAudioTrack && !muted) {
-            await this.upgradeCall(false, true);
+            await this.upgradeCall(true, false);
             return this.isMicrophoneMuted();
         }
         this.localUsermediaFeed?.setAudioMuted(muted);

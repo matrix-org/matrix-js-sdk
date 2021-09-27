@@ -1,3 +1,35 @@
+Changes in [13.0.0](https://github.com/vector-im/element-desktop/releases/tag/v13.0.0) (2021-09-27)
+===================================================================================================
+
+## ✨ Features
+ * Add `getHistoryVisibility()` and `getGuestAccess()` ([\#1940](https://github.com/matrix-org/matrix-js-sdk/pull/1940)). Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+ * Add `getBuffer()` to `QRCodeData` ([\#1927](https://github.com/matrix-org/matrix-js-sdk/pull/1927)). Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+ * Added `createDataChannel()` and `CallEvent.DataChannel` to `MatrixCall` for creating and listening for WebRTC datachannels. ([\#1929](https://github.com/matrix-org/matrix-js-sdk/pull/1929)). Contributed by [robertlong](https://github.com/robertlong).
+ * Add file locking to MSC3089 branches ([\#1909](https://github.com/matrix-org/matrix-js-sdk/pull/1909)).
+ * Add `hasBeenCancelled` to `VerificationBase` ([\#1915](https://github.com/matrix-org/matrix-js-sdk/pull/1915)). Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+ * Add `ISasEvent` ([\#1908](https://github.com/matrix-org/matrix-js-sdk/pull/1908)). Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+ * Count notifications in encrypted rooms client-side ([\#1872](https://github.com/matrix-org/matrix-js-sdk/pull/1872)). Fixes vector-im/element-web#15393 and vector-im/element-web#15393. Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+ * Exclude opt-in Element performance metrics from encryption ([\#1897](https://github.com/matrix-org/matrix-js-sdk/pull/1897)).
+
+## 🐛 Bug Fixes
+ * Fix race on automatic backup restore ([\#1936](https://github.com/matrix-org/matrix-js-sdk/pull/1936)). Fixes vector-im/element-web#17781 and vector-im/element-web#17781.
+
+Changes in [13.0.0-rc.1](https://github.com/vector-im/element-desktop/releases/tag/v13.0.0-rc.1) (2021-09-21)
+=============================================================================================================
+
+## ✨ Features
+ * Add `getHistoryVisibility()` and `getGuestAccess()` ([\#1940](https://github.com/matrix-org/matrix-js-sdk/pull/1940)). Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+ * Add `getBuffer()` to `QRCodeData` ([\#1927](https://github.com/matrix-org/matrix-js-sdk/pull/1927)). Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+ * Added `createDataChannel()` and `CallEvent.DataChannel` to `MatrixCall` for creating and listening for WebRTC datachannels. ([\#1929](https://github.com/matrix-org/matrix-js-sdk/pull/1929)). Contributed by [robertlong](https://github.com/robertlong).
+ * Add file locking to MSC3089 branches ([\#1909](https://github.com/matrix-org/matrix-js-sdk/pull/1909)).
+ * Add `hasBeenCancelled` to `VerificationBase` ([\#1915](https://github.com/matrix-org/matrix-js-sdk/pull/1915)). Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+ * Add `ISasEvent` ([\#1908](https://github.com/matrix-org/matrix-js-sdk/pull/1908)). Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+ * Count notifications in encrypted rooms client-side ([\#1872](https://github.com/matrix-org/matrix-js-sdk/pull/1872)). Fixes vector-im/element-web#15393 and vector-im/element-web#15393. Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+ * Exclude opt-in Element performance metrics from encryption ([\#1897](https://github.com/matrix-org/matrix-js-sdk/pull/1897)).
+
+## 🐛 Bug Fixes
+ * Fix race on automatic backup restore ([\#1936](https://github.com/matrix-org/matrix-js-sdk/pull/1936)). Fixes vector-im/element-web#17781 and vector-im/element-web#17781.
+
 Changes in [12.5.0](https://github.com/vector-im/element-desktop/releases/tag/v12.5.0) (2021-09-14)
 ===================================================================================================
 
