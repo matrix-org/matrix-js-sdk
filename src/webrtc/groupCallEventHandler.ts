@@ -16,9 +16,8 @@ limitations under the License.
 
 import { MatrixEvent } from '../models/event';
 import { MatrixClient } from '../client';
-import { CONF_ROOM, GroupCall, IGroupCallDataChannelOptions } from "./groupCall";
+import { CALL_EVENT, GroupCall, GroupCallIntent, GroupCallType, IGroupCallDataChannelOptions } from "./groupCall";
 import { RoomState } from "../models/room-state";
-import { CallType } from "./call";
 import { logger } from '../logger';
 
 export class GroupCallEventHandler {
@@ -42,18 +41,26 @@ export class GroupCallEventHandler {
         const roomId = event.getRoomId();
         const content = event.getContent();
 
-        let callType: CallType;
-
-        if (content.callType === "voice") {
-            callType = CallType.Voice;
-        } else {
-            callType = CallType.Video;
-        }
-
         const room = this.client.getRoom(event.getRoomId());
 
         if (!room) {
             logger.error(`Couldn't find room ${roomId} for GroupCall`);
+            return;
+        }
+
+        const groupCallId = event.getStateKey();
+
+        const callType = content.type;
+
+        if (!Object.values(GroupCallType).includes(callType)) {
+            logger.error(`Received invalid group call type ${callType} for room ${roomId}.`);
+            return;
+        }
+
+        const callIntent = content.intent;
+
+        if (!Object.values(GroupCallIntent).includes(callIntent)) {
+            logger.error(`Received invalid group call intent ${callType} for room ${roomId}.`);
             return;
         }
 
@@ -69,30 +76,41 @@ export class GroupCallEventHandler {
             this.client,
             room,
             callType,
+            callIntent,
             content?.dataChannelsEnabled,
             dataChannelOptions,
         );
-        groupCall.groupCallId = content["conf_id"];
+        groupCall.groupCallId = groupCallId;
 
         return groupCall;
     }
 
-    private onRoomStateChanged = (_event: MatrixEvent, state: RoomState): void => {
-        const groupCall = this.groupCalls.get(state.roomId);
-        const confEvents = state.getStateEvents(CONF_ROOM);
-        const confEvent = confEvents.length > 0 ? confEvents[0] : null;
-        const content = confEvent ? confEvent.getContent() : null;
+    private onRoomStateChanged = (event: MatrixEvent, state: RoomState): void => {
+        if (event.getType() !== CALL_EVENT) {
+            return;
+        }
 
-        if (groupCall && content?.type !== groupCall.type) {
-            // TODO: Handle the callType changing when the room state changes
-            logger.warn(`The group call type changed for room: ${
-                state.roomId}. Changing the group call type is currently unsupported.`);
-        } if (groupCall && !content?.active) {
-            groupCall.endCall(false);
-        } else if (!groupCall && content?.active) {
-            const groupCall = this.createGroupCallFromRoomStateEvent(confEvent);
+        const groupCallId = event.getStateKey();
+        const content = event.getContent();
+
+        const currentGroupCall = this.groupCalls.get(state.roomId);
+
+        if (!currentGroupCall && !content["m.terminated"]) {
+            const groupCall = this.createGroupCallFromRoomStateEvent(event);
             this.groupCalls.set(state.roomId, groupCall);
             this.client.emit("GroupCall.incoming", groupCall);
+        } else if (currentGroupCall && currentGroupCall.groupCallId === groupCallId) {
+            if (content["m.terminated"]) {
+                currentGroupCall.terminate(false);
+            } else if (content["m.type"] !== currentGroupCall.type) {
+                // TODO: Handle the callType changing when the room state changes
+                logger.warn(`The group call type changed for room: ${
+                    state.roomId}. Changing the group call type is currently unsupported.`);
+            }
+        } else if (currentGroupCall && currentGroupCall.groupCallId !== groupCallId) {
+            // TODO: Handle new group calls and multiple group calls
+            logger.warn(`Multiple group calls detected for room: ${
+                state.roomId}. Multiple group calls are currently unsupported.`);
         }
     };
 }

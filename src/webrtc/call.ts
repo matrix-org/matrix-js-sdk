@@ -315,7 +315,7 @@ export class MatrixCall extends EventEmitter {
     private callLength = 0;
 
     private useToDevice: boolean;
-    private groupCallId: string;
+    public groupCallId: string;
 
     // Whether to stop local media when the call ends. We do not want to do this
     // in group calls where the media is supplied by the group call. Doing this

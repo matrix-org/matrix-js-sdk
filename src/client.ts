@@ -23,7 +23,7 @@ import { EventEmitter } from "events";
 import { ISyncStateData, SyncApi } from "./sync";
 import { EventStatus, IContent, IDecryptOptions, IEvent, MatrixEvent } from "./models/event";
 import { StubStore } from "./store/stub";
-import { createNewMatrixCall, MatrixCall, CallType } from "./webrtc/call";
+import { createNewMatrixCall, MatrixCall } from "./webrtc/call";
 import { Filter, IFilterDefinition } from "./filter";
 import { CallEventHandler } from './webrtc/callEventHandler';
 import * as utils from './utils';
@@ -144,7 +144,13 @@ import { IHierarchyRoom, ISpaceSummaryEvent, ISpaceSummaryRoom } from "./@types/
 import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, RuleId } from "./@types/PushRules";
 import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
-import { CONF_ROOM, GroupCall, IGroupCallDataChannelOptions } from "./webrtc/groupCall";
+import {
+    CALL_EVENT,
+    GroupCall,
+    IGroupCallDataChannelOptions,
+    GroupCallIntent,
+    GroupCallType,
+} from "./webrtc/groupCall";
 import { MediaHandler } from "./webrtc/mediaHandler";
 import { GroupCallEventHandler } from "./webrtc/groupCallEventHandler";
 
@@ -1297,7 +1303,8 @@ export class MatrixClient extends EventEmitter {
      */
     public async createGroupCall(
         roomId: string,
-        type: CallType,
+        type: GroupCallType,
+        intent: GroupCallIntent,
         dataChannelsEnabled?: boolean,
         dataChannelOptions?: IGroupCallDataChannelOptions,
     ): Promise<GroupCall> {
@@ -1311,27 +1318,21 @@ export class MatrixClient extends EventEmitter {
             throw new Error(`Cannot find room ${roomId}`);
         }
 
-        const groupCall = new GroupCall(this, room, type, dataChannelsEnabled, dataChannelOptions);
+        const groupCall = new GroupCall(this, room, type, intent, dataChannelsEnabled, dataChannelOptions);
         this.groupCallEventHandler.groupCalls.set(roomId, groupCall);
 
-        const activeConf = room.currentState
-            .getStateEvents(CONF_ROOM, "")
-            ?.getContent()?.active;
-
-        if (!activeConf) {
-            await this.sendStateEvent(
-                room.roomId,
-                CONF_ROOM,
-                {
-                    active: true,
-                    ["m.type"]: type,
-                    conf_id: groupCall.groupCallId,
-                    dataChannelsEnabled,
-                    dataChannelOptions,
-                },
-                "",
-            );
-        }
+        await this.sendStateEvent(
+            room.roomId,
+            CALL_EVENT,
+            {
+                "m.intent": intent,
+                "m.type": type,
+                // TODO: Specify datachannels
+                dataChannelsEnabled,
+                dataChannelOptions,
+            },
+            groupCall.groupCallId,
+        );
 
         return groupCall;
     }
@@ -1354,17 +1355,22 @@ export class MatrixClient extends EventEmitter {
             return null;
         }
 
-        const stateEvents = room.currentState.getStateEvents(CONF_ROOM);
+        const callEvents = room.currentState.getStateEvents(CALL_EVENT);
 
-        if (stateEvents.length === 0) {
+        if (callEvents.length === 0) {
             return null;
         }
 
-        const stateEvent = stateEvents[0];
-        const content = stateEvent.getContent();
+        const sortedCallEvents = callEvents.sort((a, b) => a.getTs() - b.getTs());
 
-        if (content.active) {
-            return this.groupCallEventHandler.createGroupCallFromRoomStateEvent(stateEvent);
+        for (const callEvent of sortedCallEvents) {
+            const content = callEvent.getContent();
+
+            if (content["m.terminated"]) {
+                continue;
+            }
+
+            return this.groupCallEventHandler.createGroupCallFromRoomStateEvent(callEvent);
         }
 
         return null;
