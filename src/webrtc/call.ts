@@ -581,7 +581,6 @@ export class MatrixCall extends EventEmitter {
         } else {
             const callFeed = new CallFeed(stream, userId, purpose, this.client, this.roomId, false, false);
             this.pushLocalFeed(callFeed, addToPeerConnection);
-            this.emit(CallEvent.FeedsChanged, this.feeds);
         }
     }
 
