@@ -570,40 +570,19 @@ export class MatrixCall extends EventEmitter {
     private pushNewLocalFeed(stream: MediaStream, purpose: SDPStreamMetadataPurpose, addToPeerConnection = true): void {
         const userId = this.client.getUserId();
 
+        // TODO: Find out what is going on here
+        // why do we enable audio (and only audio) tracks here? -- matthew
+        setTracksEnabled(stream.getAudioTracks(), true);
+
         // We try to replace an existing feed if there already is one with the same purpose
         const existingFeed = this.getLocalFeeds().find((feed) => feed.purpose === purpose);
         if (existingFeed) {
             existingFeed.setNewStream(stream);
         } else {
-            this.feeds.push(new CallFeed(stream, userId, purpose, this.client, this.roomId, false, false));
+            const callFeed = new CallFeed(stream, userId, purpose, this.client, this.roomId, false, false);
             this.emit(CallEvent.FeedsChanged, this.feeds);
+            this.pushLocalFeed(callFeed, addToPeerConnection);
         }
-
-        // TODO: Find out what is going on here
-        // why do we enable audio (and only audio) tracks here? -- matthew
-        setTracksEnabled(stream.getAudioTracks(), true);
-
-        if (addToPeerConnection) {
-            const senderArray = purpose === SDPStreamMetadataPurpose.Usermedia ?
-                this.usermediaSenders : this.screensharingSenders;
-            // Empty the array
-            senderArray.splice(0, senderArray.length);
-
-            this.emit(CallEvent.FeedsChanged, this.feeds);
-            for (const track of stream.getTracks()) {
-                logger.info(
-                    `Adding track (` +
-                    `id="${track.id}", ` +
-                    `kind="${track.kind}", ` +
-                    `streamId="${stream.id}", ` +
-                    `streamPurpose="${purpose}"` +
-                    `) to peer connection`,
-                );
-                senderArray.push(this.peerConn.addTrack(track, stream));
-            }
-        }
-
-        logger.info(`Pushed local stream (id="${stream.id}", active="${stream.active}", purpose="${purpose}")`);
     }
 
     /**
