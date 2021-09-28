@@ -920,7 +920,18 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
      * @return {boolean} True if this event is encrypted.
      */
     public isEncrypted(): boolean {
-        return !this.isState() && this.event.type === EventType.RoomMessageEncrypted;
+        if (this.isState()) return false;
+
+        if (this.event.type !== EventType.RoomMessageEncrypted) return false;
+
+        // an encrypted event can never have an empty content, in such a case
+        // it is probably a redacted event and we can treat it as unencrypted
+        // (see MSC2228)
+        if (!this.event.content || Object.entries(this.event.content).length === 0) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

@@ -68,6 +68,9 @@ describe("MegolmDecryption", function() {
             // 'crypto' implementation.
             const event = new MatrixEvent({
                 type: 'm.room.encrypted',
+                content: {
+                    algorithm: 'm.megolm.v1.aes-sha2',
+                },
             });
             const decryptedData = {
                 clearEvent: {

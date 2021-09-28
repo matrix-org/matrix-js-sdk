@@ -83,6 +83,7 @@ import { ISyncStateData } from "../sync";
 import { CryptoStore } from "./store/base";
 import { IVerificationChannel } from "./verification/request/Channel";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { UNSTABLE_MSC2228_SELF_DESTRUCT_AFTER } from "../@types/event";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -2827,6 +2828,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         await this.roomDeviceTrackingState[roomId];
 
         let content = event.getContent();
+
+        // MSC2228's self destruction fields must be outside of the
+        // encrypted event, given the server needs to be able to act on it.
+        const selfDestructAfter = content[UNSTABLE_MSC2228_SELF_DESTRUCT_AFTER.name];
+        if (selfDestructAfter) {
+            delete content[UNSTABLE_MSC2228_SELF_DESTRUCT_AFTER.name];
+        }
+
         // If event has an m.relates_to then we need
         // to put this on the wrapping event instead
         const mRelatesTo = content['m.relates_to'];
@@ -2850,6 +2859,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
         if (elementPerfMetrics) {
             encryptedContent['io.element.performance_metrics'] = elementPerfMetrics;
+        }
+        if (selfDestructAfter) {
+            encryptedContent[UNSTABLE_MSC2228_SELF_DESTRUCT_AFTER.name] = selfDestructAfter;
         }
 
         event.makeEncrypted(
