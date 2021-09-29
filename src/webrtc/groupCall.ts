@@ -135,6 +135,8 @@ export class GroupCall extends EventEmitter {
         this.localCallFeed = callFeed;
         this.addUserMediaFeed(callFeed);
 
+        this.setState(GroupCallState.LocalCallFeedInitialized);
+
         return callFeed;
     }
 
