@@ -150,18 +150,30 @@ export class GroupCall extends EventEmitter {
             await this.initLocalCallFeed();
         }
 
+        logger.log(`Sending member state event with current call.`);
+
         this.sendEnteredMemberStateEvent();
 
         this.activeSpeaker = this.client.getUserId();
 
         this.setState(GroupCallState.Entered);
 
-        this.processInitialCalls();
+        logger.log(`Entered group call ${this.groupCallId}`);
+
+        logger.log("processing initial calls");
+
+        const calls = this.client.callEventHandler.calls.values();
+
+        for (const call of calls) {
+            this.onIncomingCall(call);
+        }
 
         // Set up participants for the members currently in the room.
         // Other members will be picked up by the RoomState.members event.
         const roomState = this.room.currentState;
         const memberStateEvents = roomState.getStateEvents("m.room.member");
+
+        logger.log("Processing initial members");
 
         for (const stateEvent of memberStateEvents) {
             const member = this.room.getMember(stateEvent.getStateKey());
@@ -285,14 +297,6 @@ export class GroupCall extends EventEmitter {
      *    as they are observed by the RoomState.members event.
      */
 
-    private processInitialCalls() {
-        const calls = this.client.callEventHandler.calls.values();
-
-        for (const call of calls) {
-            this.onIncomingCall(call);
-        }
-    }
-
     private onIncomingCall = (newCall: MatrixCall) => {
         // The incoming calls may be for another room, which we will ignore.
         if (newCall.roomId !== this.room.roomId) {
@@ -305,6 +309,8 @@ export class GroupCall extends EventEmitter {
         }
 
         if (!newCall.groupCallId || newCall.groupCallId !== this.groupCallId) {
+            logger.log(`Incoming call with groupCallId ${
+                newCall.groupCallId} ignored because it doesn't match the current group call`);
             newCall.reject();
             return;
         }
@@ -329,7 +335,7 @@ export class GroupCall extends EventEmitter {
      */
 
     private sendEnteredMemberStateEvent(): Promise<ISendEventResponse> {
-        return this.updateMemberState([
+        return this.updateMemberCallsState([
             {
                 "m.call_id": this.groupCallId,
             },
@@ -337,10 +343,10 @@ export class GroupCall extends EventEmitter {
     }
 
     private sendLeftMemberStateEvent(): Promise<ISendEventResponse> {
-        return this.updateMemberState([]);
+        return this.updateMemberCallsState([]);
     }
 
-    private async updateMemberState(state: any): Promise<ISendEventResponse> {
+    private async updateMemberCallsState(state: any): Promise<ISendEventResponse> {
         const localUserId = this.client.getUserId();
 
         const currentStateEvent = this.room.currentState.getStateEvents("m.room.member", localUserId);
@@ -366,7 +372,8 @@ export class GroupCall extends EventEmitter {
 
         const callsState = event.getContent()[CALL_MEMBER_KEY];
 
-        if (!callsState || !Array.isArray(callsState) || this.calls.length === 0) {
+        if (!callsState || !Array.isArray(callsState) || callsState.length === 0) {
+            logger.log(`Ignoring member state from ${member.userId} member not in any calls.`);
             return;
         }
 
@@ -381,6 +388,7 @@ export class GroupCall extends EventEmitter {
         }
 
         if (callId !== this.groupCallId) {
+            logger.log(`Call id does not match group call id, ignoring.`);
             return;
         }
 
@@ -393,10 +401,9 @@ export class GroupCall extends EventEmitter {
         // Only initiate a call with a user who has a userId that is lexicographically
         // less than your own. Otherwise, that user will call you.
         if (member.userId < localUserId) {
+            logger.log(`Waiting for ${member.userId} to send call invite.`);
             return;
         }
-
-        logger.log(`GroupCall member state changed: ${member.userId}`);
 
         const newCall = createNewMatrixCall(
             this.client,
@@ -410,6 +417,7 @@ export class GroupCall extends EventEmitter {
             newCall.createDataChannel("datachannel", this.dataChannelOptions);
         }
 
+        // TODO: This existingCall code path is never reached, do we still need it?
         if (existingCall) {
             this.replaceCall(existingCall, newCall);
         } else {

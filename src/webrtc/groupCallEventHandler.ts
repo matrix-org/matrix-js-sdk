@@ -26,6 +26,28 @@ export class GroupCallEventHandler {
     constructor(private client: MatrixClient) { }
 
     public start(): void {
+        const rooms = this.client.getRooms();
+
+        for (const room of rooms) {
+            const callEvents = room.currentState.getStateEvents(CALL_EVENT);
+            const sortedCallEvents = callEvents.sort((a, b) => b.getTs() - a.getTs());
+
+            for (const callEvent of sortedCallEvents) {
+                const content = callEvent.getContent();
+
+                if (content["m.terminated"]) {
+                    continue;
+                }
+
+                const groupCall = this.createGroupCallFromRoomStateEvent(callEvent);
+
+                if (groupCall) {
+                    this.groupCalls.set(room.roomId, groupCall);
+                    this.client.emit("GroupCall.incoming", groupCall);
+                }
+            }
+        }
+
         this.client.on("RoomState.events", this.onRoomStateChanged);
     }
 
@@ -41,7 +63,9 @@ export class GroupCallEventHandler {
         const roomId = event.getRoomId();
         const content = event.getContent();
 
-        const room = this.client.getRoom(event.getRoomId());
+        logger.log("createGroupCallFromRoomStateEvent", roomId);
+
+        const room = this.client.getRoom(roomId);
 
         if (!room) {
             logger.error(`Couldn't find room ${roomId} for GroupCall`);
@@ -97,8 +121,11 @@ export class GroupCallEventHandler {
 
         if (!currentGroupCall && !content["m.terminated"]) {
             const groupCall = this.createGroupCallFromRoomStateEvent(event);
-            this.groupCalls.set(state.roomId, groupCall);
-            this.client.emit("GroupCall.incoming", groupCall);
+
+            if (groupCall) {
+                this.groupCalls.set(state.roomId, groupCall);
+                this.client.emit("GroupCall.incoming", groupCall);
+            }
         } else if (currentGroupCall && currentGroupCall.groupCallId === groupCallId) {
             if (content["m.terminated"]) {
                 currentGroupCall.terminate(false);

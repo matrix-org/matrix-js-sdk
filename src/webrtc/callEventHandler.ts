@@ -131,6 +131,7 @@ export class CallEventHandler {
     };
 
     private onToDeviceEvent = (event: MatrixEvent): void => {
+        logger.log("onToDeviceEvent", event);
         if (!this.eventIsACall(event)) return;
 
         this.toDeviceCallEventBuffer.push(event);
@@ -139,6 +140,8 @@ export class CallEventHandler {
     private async evaluateToDeviceEventBuffer(): Promise<void> {
         if (this.client.getSyncState() !== SyncState.Syncing) return;
 
+        logger.log("processing to device events");
+
         for (const event of this.toDeviceCallEventBuffer) {
             try {
                 await this.handleCallEvent(event, true);
@@ -146,6 +149,9 @@ export class CallEventHandler {
                 logger.error("Caught exception handling call event", e);
             }
         }
+
+        logger.log("processing to device events finished");
+
         this.toDeviceCallEventBuffer = [];
     }
 
@@ -169,6 +175,8 @@ export class CallEventHandler {
         const weSentTheEvent = event.getSender() === this.client.credentials.userId;
         let call = content.call_id ? this.calls.get(content.call_id) : undefined;
         //console.info("RECV %s content=%s", type, JSON.stringify(content));
+
+        logger.log("handleCallEvent", callRoomId, groupCallId, type, event);
 
         if (!callRoomId) return;
 
