@@ -3,7 +3,7 @@
   "version": "13.0.0",
   "description": "Matrix Client-Server SDK for Javascript",
   "scripts": {
-    "prepare": "yarn build",
+    "prepack": "yarn build",
     "start": "echo THIS IS FOR LEGACY PURPOSES ONLY. && babel src -w -s -d lib --verbose --extensions \".ts,.js\"",
     "dist": "echo 'This is for the release script so it can make assets (browser bundle).' && yarn build",
     "clean": "rimraf lib dist",
