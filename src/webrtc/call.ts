@@ -1572,10 +1572,13 @@ export class MatrixCall extends EventEmitter {
         // chrome doesn't implement any of the 'onstarted' events yet
         if (this.peerConn.iceConnectionState == 'connected') {
             this.setState(CallState.Connected);
-            this.callLengthInterval = setInterval(() => {
-                this.callLength++;
-                this.emit(CallEvent.LengthChanged, this.callLength);
-            }, 1000);
+
+            if (!this.callLengthInterval) {
+                this.callLengthInterval = setInterval(() => {
+                    this.callLength++;
+                    this.emit(CallEvent.LengthChanged, this.callLength);
+                }, 1000);
+            }
         } else if (this.peerConn.iceConnectionState == 'failed') {
             this.hangup(CallErrorCode.IceFailed, false);
         }
