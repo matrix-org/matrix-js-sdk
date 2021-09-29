@@ -1923,6 +1923,10 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         // MSC2228: is a self destruction time defined?
         // https://github.com/matrix-org/matrix-doc/pull/2228)
         if (
+            (
+                event.getType() === EventType.RoomMessage ||
+                event.getType() === EventType.RoomMessageEncrypted
+            ) &&
             event.getWireContent()[UNSTABLE_MSC2228_SELF_DESTRUCT_AFTER.name] &&
             !event.isSending() &&
             !event.isRedacted()
@@ -1934,7 +1938,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                     this.unstable_selfDestructEvent(event);
                 }, remainingTime);
             } else {
-                // time already expired, destruct immediatly
+                // time already expired, redact immediately
                 this.unstable_selfDestructEvent(event);
             }
         }
