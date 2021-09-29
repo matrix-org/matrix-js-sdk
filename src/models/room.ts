@@ -2013,8 +2013,11 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         event.markLocallyRedacted(redactionEvent);
         event.makeRedacted(redactionEvent);
 
+        // redact also stored event
+        await this.client.store.replaceEvent(event);
+        this.client.store.save(true);
+
         this.emit("Room.redaction", redactionEvent, this);
-        // TODO: remove from stored sync data
     }
 
     /**

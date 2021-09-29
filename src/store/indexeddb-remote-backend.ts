@@ -126,6 +126,16 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     }
 
     /**
+     * Replaces an event
+     * This is currently only used for redacting events from the stored state.
+     * see [MSC2228](https://github.com/matrix-org/matrix-doc/pull/2228)
+     * @param {event} event the new event
+     */
+    public async replaceEvent(event: IEvent): Promise<void> {
+        return this.doCmd('replaceEvent', [event]);
+    }
+
+    /**
      * Load all user presence events from the database. This is not cached.
      * @return {Promise<Object[]>} A list of presence events in their raw form.
      */

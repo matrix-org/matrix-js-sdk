@@ -278,6 +278,17 @@ export class IndexedDBStore extends MemoryStore {
     }, "storeClientOptions");
 
     /**
+     * Replaces an event
+     * This is currently only used for redacting events from the stored state.
+     * see [MSC2228](https://github.com/matrix-org/matrix-doc/pull/2228)
+     * @param {MatrixEvent} event the new event
+     */
+    public replaceEvent = this.degradable((event: MatrixEvent): Promise<void> => {
+        const e: IEvent = event.isEncrypted() ? (event.toJSON() as any).encrypted : event.toJSON();
+        return this.backend.replaceEvent(e);
+    }, "replaceEvent");
+
+    /**
      * All member functions of `IndexedDBStore` that access the backend use this wrapper to
      * watch for failures after initial store startup, including `QuotaExceededError` as
      * free disk space changes, etc.

@@ -420,4 +420,10 @@ export class MemoryStore implements IStore {
         this.clientOptions = Object.assign({}, options);
         return Promise.resolve();
     }
+
+    public async replaceEvent(event: MatrixEvent): Promise<void> {
+        throw new Error(`MemoryStore.replaceEvent() is not implemented yet. 
+            Event will stay in memory as it is. Potential redaction did not succeed.`,
+        );
+    }
 }

@@ -103,6 +103,9 @@ export class IndexedDBStoreWorker {
             case 'storeClientOptions':
                 prom = this.backend.storeClientOptions(msg.args[0]);
                 break;
+            case 'replaceEvent':
+                prom = this.backend.replaceEvent(msg.args[0]);
+                break;
         }
 
         if (prom === undefined) {

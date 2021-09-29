@@ -262,4 +262,8 @@ export class StubStore implements IStore {
     public storeClientOptions(options: object): Promise<void> {
         return Promise.resolve();
     }
+
+    public replaceEvent(event: MatrixEvent): Promise<void> {
+        return Promise.resolve();
+    }
 }

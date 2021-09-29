@@ -218,4 +218,6 @@ export interface IStore {
     getClientOptions(): Promise<IStartClientOpts>;
 
     storeClientOptions(options: IStartClientOpts): Promise<void>;
+
+    replaceEvent(event: MatrixEvent): Promise<void>;
 }

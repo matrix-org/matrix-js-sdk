@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IMinimalEvent, ISyncData, ISyncResponse, SyncAccumulator } from "../sync-accumulator";
+import { IMinimalEvent, IRoomEvent, ISyncData, ISyncResponse, SyncAccumulator } from "../sync-accumulator";
 import * as utils from "../utils";
 import * as IndexedDBHelpers from "../indexeddb-helpers";
 import { logger } from '../logger';
@@ -560,5 +560,18 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             options: options,
         }); // put == UPSERT
         await txnAsPromise(txn);
+    }
+
+    /**
+     * Replaces an event
+     * This is currently only used for redacting events from the stored state.
+     * see [MSC2228](https://github.com/matrix-org/matrix-doc/pull/2228)
+     * @param {event} event the new event
+     */
+    public async replaceEvent(event: IEvent): Promise<void> {
+        const minimalEvent: IRoomEvent = Object.assign({}, event);
+        delete minimalEvent['room_id'];
+
+        this.syncAccumulator.replaceEvent(event.room_id, minimalEvent);
     }
 }
