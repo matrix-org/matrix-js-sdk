@@ -35,7 +35,25 @@ export enum GroupCallEvent {
     ActiveSpeakerChanged = "active_speaker_changed",
     CallsChanged = "calls_changed",
     UserMediaFeedsChanged = "user_media_feeds_changed",
+    ScreenshareFeedsChanged = "screenshare_feeds_changed",
+    LocalScreenshareStateChanged = "local_screenshare_state_changed",
     LocalMuteStateChanged = "local_mute_state_changed",
+    Error = "error"
+}
+
+export enum GroupCallErrorCode {
+    NoUserMedia = "no_user_media"
+}
+
+export class GroupCallError extends Error {
+    code: string;
+
+    constructor(code: GroupCallErrorCode, msg: string, err: Error) {
+        // Still don't think there's any way to have proper nested errors
+        super(msg + ": " + err);
+
+        this.code = code;
+    }
 }
 
 export interface IGroupCallDataChannelOptions {
@@ -77,10 +95,13 @@ export class GroupCall extends EventEmitter {
     public participantTimeout = 1000 * 15;
 
     public state = GroupCallState.LocalCallFeedUninitialized;
-    public activeSpeaker: string; // userId
-    public localCallFeed: CallFeed;
+    public activeSpeaker?: string; // userId
+    public localCallFeed?: CallFeed;
+    public localScreenshareFeed?: CallFeed;
+    public localDesktopCapturerSourceId?: string;
     public calls: MatrixCall[] = [];
     public userMediaFeeds: CallFeed[] = [];
+    public screenshareFeeds: CallFeed[] = [];
     public groupCallId: string;
 
     private userMediaFeedHandlers: Map<string, IUserMediaFeedHandlers> = new Map();
@@ -199,6 +220,13 @@ export class GroupCall extends EventEmitter {
             this.localCallFeed = null;
         }
 
+        if (this.localScreenshareFeed) {
+            this.client.getMediaHandler().stopScreensharingStream(this.localScreenshareFeed.stream);
+            this.removeScreenshareFeed(this.localScreenshareFeed);
+            this.localScreenshareFeed = undefined;
+            this.localDesktopCapturerSourceId = undefined;
+        }
+
         this.client.getMediaHandler().stopAllStreams();
 
         if (this.state !== GroupCallState.Entered) {
@@ -293,6 +321,70 @@ export class GroupCall extends EventEmitter {
         }
 
         this.emit(GroupCallEvent.LocalMuteStateChanged, this.isMicrophoneMuted(), muted);
+    }
+
+    public async setScreensharingEnabled(
+        enabled: boolean, desktopCapturerSourceId?: string,
+    ): Promise<boolean> {
+        if (enabled === this.isScreensharing()) {
+            return enabled;
+        }
+
+        if (enabled) {
+            try {
+                logger.log("Asking for screensharing permissions...");
+
+                const stream = await this.client.getMediaHandler().getScreensharingStream(desktopCapturerSourceId);
+
+                logger.log("Screensharing permissions granted. Setting screensharing enabled on all calls");
+
+                const callFeed = new CallFeed(
+                    stream,
+                    this.client.getUserId(),
+                    SDPStreamMetadataPurpose.Screenshare,
+                    this.client,
+                    this.room.roomId,
+                    false,
+                    false,
+                );
+
+                this.localScreenshareFeed = callFeed;
+                this.localDesktopCapturerSourceId = desktopCapturerSourceId;
+                this.addScreenshareFeed(callFeed);
+
+                this.emit(
+                    GroupCallEvent.LocalScreenshareStateChanged,
+                    true,
+                    this.localScreenshareFeed,
+                    this.localDesktopCapturerSourceId,
+                );
+
+                // TODO: handle errors
+                await Promise.all(this.calls.map(call => call.setScreensharingEnabled(true, desktopCapturerSourceId)));
+
+                logger.log("screensharing enabled on all calls");
+
+                return true;
+            } catch (error) {
+                logger.error("enabling screensharing error", error);
+                this.emit(GroupCallEvent.Error,
+                    new GroupCallError(GroupCallErrorCode.NoUserMedia, "Failed to get screen-sharing stream: ", error),
+                );
+                return false;
+            }
+        } else {
+            await Promise.all(this.calls.map(call => call.setScreensharingEnabled(false, desktopCapturerSourceId)));
+            this.client.getMediaHandler().stopScreensharingStream(this.localScreenshareFeed.stream);
+            this.removeScreenshareFeed(this.localScreenshareFeed);
+            this.localScreenshareFeed = undefined;
+            this.localDesktopCapturerSourceId = undefined;
+            this.emit(GroupCallEvent.LocalScreenshareStateChanged, false, undefined, undefined);
+            return false;
+        }
+    }
+
+    public isScreensharing(): boolean {
+        return !!this.localScreenshareFeed;
     }
 
     /**
@@ -497,6 +589,10 @@ export class GroupCall extends EventEmitter {
         call.on(CallEvent.State, onCallStateChanged);
         call.on(CallEvent.Hangup, onCallHangup);
 
+        if (this.isScreensharing()) {
+            call.setScreensharingEnabled(true, this.localDesktopCapturerSourceId);
+        }
+
         this.activeSpeakerSamples.set(opponentMemberId, Array(this.activeSpeakerSampleCount).fill(
             -Infinity,
         ));
@@ -532,6 +628,12 @@ export class GroupCall extends EventEmitter {
             this.removeUserMediaFeed(usermediaFeed);
         }
 
+        const screenshareFeed = this.getScreenshareFeedByUserId(opponentMemberId);
+
+        if (screenshareFeed) {
+            this.removeScreenshareFeed(screenshareFeed);
+        }
+
         this.activeSpeakerSamples.delete(opponentMemberId);
     }
 
@@ -546,16 +648,28 @@ export class GroupCall extends EventEmitter {
         const remoteUsermediaFeed = call.remoteUsermediaFeed;
         const remoteFeedChanged = remoteUsermediaFeed !== currentUserMediaFeed;
 
-        if (!remoteFeedChanged) {
-            return;
+        if (remoteFeedChanged) {
+            if (!currentUserMediaFeed && remoteUsermediaFeed) {
+                this.addUserMediaFeed(remoteUsermediaFeed);
+            } else if (currentUserMediaFeed && remoteUsermediaFeed) {
+                this.replaceUserMediaFeed(currentUserMediaFeed, remoteUsermediaFeed);
+            } else if (currentUserMediaFeed && !remoteUsermediaFeed) {
+                this.removeUserMediaFeed(currentUserMediaFeed);
+            }
         }
 
-        if (!currentUserMediaFeed && remoteUsermediaFeed) {
-            this.addUserMediaFeed(remoteUsermediaFeed);
-        } else if (currentUserMediaFeed && remoteUsermediaFeed) {
-            this.replaceUserMediaFeed(currentUserMediaFeed, remoteUsermediaFeed);
-        } else if (currentUserMediaFeed && !remoteUsermediaFeed) {
-            this.removeUserMediaFeed(currentUserMediaFeed);
+        const currentScreenshareFeed = this.getScreenshareFeedByUserId(opponentMemberId);
+        const remoteScreensharingFeed = call.remoteScreensharingFeed;
+        const remoteScreenshareFeedChanged = remoteScreensharingFeed !== currentScreenshareFeed;
+
+        if (remoteScreenshareFeedChanged) {
+            if (!currentScreenshareFeed && remoteScreensharingFeed) {
+                this.addScreenshareFeed(remoteScreensharingFeed);
+            } else if (currentScreenshareFeed && remoteScreensharingFeed) {
+                this.replaceScreenshareFeed(currentScreenshareFeed, remoteScreensharingFeed);
+            } else if (currentScreenshareFeed && !remoteScreensharingFeed) {
+                this.removeScreenshareFeed(currentScreenshareFeed);
+            }
         }
     };
 
@@ -705,4 +819,46 @@ export class GroupCall extends EventEmitter {
             this.activeSpeakerInterval,
         );
     };
+
+    /**
+     * Screenshare Call Feed Event Handlers
+     */
+
+    public getScreenshareFeedByUserId(userId: string) {
+        return this.screenshareFeeds.find((feed) => feed.userId === userId);
+    }
+
+    private addScreenshareFeed(callFeed: CallFeed) {
+        logger.log("added screenshare feed");
+        this.screenshareFeeds.push(callFeed);
+        this.emit(GroupCallEvent.ScreenshareFeedsChanged, this.screenshareFeeds);
+    }
+
+    private replaceScreenshareFeed(existingFeed: CallFeed, replacementFeed: CallFeed) {
+        logger.log("replaced screenshare feed");
+        const feedIndex = this.screenshareFeeds.findIndex((feed) => feed.userId === existingFeed.userId);
+
+        if (feedIndex === -1) {
+            throw new Error("Couldn't find screenshare feed to replace");
+        }
+
+        this.screenshareFeeds.splice(feedIndex, 1, replacementFeed);
+
+        existingFeed.dispose();
+        this.emit(GroupCallEvent.ScreenshareFeedsChanged, this.screenshareFeeds);
+    }
+
+    private removeScreenshareFeed(callFeed: CallFeed) {
+        logger.log("removed screenshare feed");
+        const feedIndex = this.screenshareFeeds.findIndex((feed) => feed.userId === callFeed.userId);
+
+        if (feedIndex === -1) {
+            throw new Error("Couldn't find screenshare feed to remove");
+        }
+
+        this.screenshareFeeds.splice(feedIndex, 1);
+
+        callFeed.dispose();
+        this.emit(GroupCallEvent.ScreenshareFeedsChanged, this.screenshareFeeds);
+    }
 }

@@ -90,7 +90,7 @@ export class MediaHandler {
     /**
      * @returns {MediaStream} based on passed parameters
      */
-    public async getScreensharingStream(desktopCapturerSourceId: string): Promise<MediaStream | null> {
+    public async getScreensharingStream(desktopCapturerSourceId?: string): Promise<MediaStream | null> {
         let stream: MediaStream;
 
         if (this.screensharingStreams.length === 0) {
