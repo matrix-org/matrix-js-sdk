@@ -115,7 +115,14 @@ export class GroupCall extends EventEmitter {
 
         this.setState(GroupCallState.InitializingLocalCallFeed);
 
-        const stream = await this.client.getMediaHandler().getUserMediaStream(true, this.type === GroupCallType.Video);
+        let stream: MediaStream;
+
+        try {
+            stream = await this.client.getMediaHandler().getUserMediaStream(true, this.type === GroupCallType.Video);
+        } catch (error) {
+            this.setState(GroupCallState.LocalCallFeedUninitialized);
+            throw error;
+        }
 
         const userId = this.client.getUserId();
 
