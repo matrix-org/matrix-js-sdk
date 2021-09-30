@@ -53,6 +53,7 @@ export class MediaHandler {
         const matchingStream = this.userMediaStreams.find((stream) => {
             if (audio !== (stream.getAudioTracks().length > 0)) return false;
             if (video !== (stream.getVideoTracks().length > 0)) return false;
+            return true;
         });
 
         if (matchingStream) {
