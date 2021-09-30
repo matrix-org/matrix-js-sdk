@@ -17,6 +17,7 @@ limitations under the License.
 import { MatrixEvent } from '../models/event';
 import { MatrixClient } from '../client';
 import { CALL_EVENT, GroupCall, GroupCallIntent, GroupCallType, IGroupCallDataChannelOptions } from "./groupCall";
+import { Room } from "../models/room";
 import { RoomState } from "../models/room-state";
 import { logger } from '../logger';
 
@@ -29,25 +30,10 @@ export class GroupCallEventHandler {
         const rooms = this.client.getRooms();
 
         for (const room of rooms) {
-            const callEvents = room.currentState.getStateEvents(CALL_EVENT);
-            const sortedCallEvents = callEvents.sort((a, b) => b.getTs() - a.getTs());
-
-            for (const callEvent of sortedCallEvents) {
-                const content = callEvent.getContent();
-
-                if (content["m.terminated"]) {
-                    continue;
-                }
-
-                const groupCall = this.createGroupCallFromRoomStateEvent(callEvent);
-
-                if (groupCall) {
-                    this.groupCalls.set(room.roomId, groupCall);
-                    this.client.emit("GroupCall.incoming", groupCall);
-                }
-            }
+            this.createGroupCallForRoom(room);
         }
 
+        this.client.on("Room", this.onRoomsChanged);
         this.client.on("RoomState.events", this.onRoomStateChanged);
     }
 
@@ -59,7 +45,22 @@ export class GroupCallEventHandler {
         return [...this.groupCalls.values()].find((groupCall) => groupCall.groupCallId === groupCallId);
     }
 
-    public createGroupCallFromRoomStateEvent(event: MatrixEvent) {
+    private createGroupCallForRoom(room: Room): GroupCall | undefined {
+        const callEvents = room.currentState.getStateEvents(CALL_EVENT);
+        const sortedCallEvents = callEvents.sort((a, b) => b.getTs() - a.getTs());
+
+        for (const callEvent of sortedCallEvents) {
+            const content = callEvent.getContent();
+
+            if (content["m.terminated"]) {
+                continue;
+            }
+
+            return this.createGroupCallFromRoomStateEvent(callEvent);
+        }
+    }
+
+    private createGroupCallFromRoomStateEvent(event: MatrixEvent): GroupCall | undefined {
         const roomId = event.getRoomId();
         const content = event.getContent();
 
@@ -106,8 +107,15 @@ export class GroupCallEventHandler {
         );
         groupCall.groupCallId = groupCallId;
 
+        this.groupCalls.set(room.roomId, groupCall);
+        this.client.emit("GroupCall.incoming", groupCall);
+
         return groupCall;
     }
+
+    private onRoomsChanged = (room: Room) => {
+        this.createGroupCallForRoom(room);
+    };
 
     private onRoomStateChanged = (event: MatrixEvent, state: RoomState): void => {
         if (event.getType() !== CALL_EVENT) {
@@ -120,12 +128,7 @@ export class GroupCallEventHandler {
         const currentGroupCall = this.groupCalls.get(state.roomId);
 
         if (!currentGroupCall && !content["m.terminated"]) {
-            const groupCall = this.createGroupCallFromRoomStateEvent(event);
-
-            if (groupCall) {
-                this.groupCalls.set(state.roomId, groupCall);
-                this.client.emit("GroupCall.incoming", groupCall);
-            }
+            this.createGroupCallFromRoomStateEvent(event);
         } else if (currentGroupCall && currentGroupCall.groupCallId === groupCallId) {
             if (content["m.terminated"]) {
                 currentGroupCall.terminate(false);
