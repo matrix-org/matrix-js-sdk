@@ -58,7 +58,7 @@ import { BackupManager } from "./backup";
 import { IStore } from "../store";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
-import { MatrixEvent } from "../models/event";
+import { MatrixEvent, EventStatus } from "../models/event";
 import { MatrixClient, IKeysUploadResponse, SessionStore, ISignedKey } from "../client";
 import type { EncryptionAlgorithm, DecryptionAlgorithm } from "./algorithms/base";
 import type { IRoomEncryption, RoomList } from "./RoomList";
@@ -3202,8 +3202,27 @@ export class Crypto extends EventEmitter {
         isLiveEvent = true,
     ): Promise<void> {
         // Wait for event to get its final ID with pendingEventOrdering: "chronological", since DM channels depend on it.
-        if (event.isSending()) {
-            await new Promise(resolve => event.once("Event.localEventIdReplaced", resolve));
+        if (event.isSending() && event.status != EventStatus.SENT) {
+            let eventIdListener;
+            let statusListener;
+            try {
+                await new Promise((resolve, reject) => {
+                    eventIdListener = resolve;
+                    statusListener = () => {
+                        if (event.status == EventStatus.CANCELLED) {
+                            reject(new Error("Event status set to CANCELLED."));
+                        }
+                    };
+                    event.once("Event.localEventIdReplaced", eventIdListener);
+                    event.on("Event.status", statusListener);
+                });
+            } catch (err) {
+                logger.error("error while waiting for the verification event to be sent: " + err.message);
+                return;
+            } finally {
+                event.removeListener("Event.localEventIdReplaced", eventIdListener);
+                event.removeListener("Event.status", statusListener);
+            }
         }
         let request = requestsMap.getRequest(event);
         let isNewRequest = false;
