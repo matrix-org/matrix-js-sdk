@@ -18,7 +18,7 @@ import { EventEmitter } from "events";
 import { MatrixClient } from "../matrix";
 import { MatrixEvent } from "./event";
 import { EventTimeline } from "./event-timeline";
-import { EventTimelineSet, DuplicateStrategy } from './event-timeline-set';
+import { EventTimelineSet } from './event-timeline-set';
 import { Room } from './room';
 
 export enum ThreadEvent {
@@ -64,7 +64,7 @@ export class Thread extends EventEmitter {
      * Will fire "Thread.update"
      * @param event The event to add
      */
-    public async addEvent(event: MatrixEvent): Promise<void> {
+    public async addEvent(event: MatrixEvent, toStartOfTimeline = false): Promise<void> {
         if (this.timelineSet.findEventById(event.getId()) || event.status !== null) {
             return;
         }
@@ -85,7 +85,13 @@ export class Thread extends EventEmitter {
         const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
 
         event.setThread(this);
-        this.timelineSet.addLiveEvent(event, DuplicateStrategy.Ignore, false, roomState);
+        this.timelineSet.addEventToTimeline(
+            event,
+            this.timelineSet.getLiveTimeline(),
+            toStartOfTimeline,
+            false,
+            roomState,
+        );
 
         if (this.ready) {
             this.client.decryptEventIfNeeded(event, {});
@@ -108,7 +114,7 @@ export class Thread extends EventEmitter {
                 );
             }
 
-            this.addEvent(mxEvent);
+            this.addEvent(mxEvent, true);
             if (mxEvent.replyEventId) {
                 await this.fetchReplyChain();
             } else {
