@@ -1298,13 +1298,6 @@ export class Room extends EventEmitter {
      * @experimental
      */
     public addThreadedEvent(event: MatrixEvent): void {
-        if (event.getUnsigned().transaction_id) {
-            const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id];
-            if (existingEvent) {
-                // remote echo of an event we sent earlier
-                this.handleRemoteEcho(event, existingEvent);
-            }
-        }
         let thread = this.findEventById(event.parentEventId)?.getThread();
         if (thread) {
             thread.addEvent(event);
@@ -1332,7 +1325,7 @@ export class Room extends EventEmitter {
             const redactId = event.event.redacts;
 
             // if we know about this event, redact its contents now.
-            const redactedEvent = this.getUnfilteredTimelineSet().findEventById(redactId);
+            const redactedEvent = this.findEventById(redactId);
             if (redactedEvent) {
                 redactedEvent.makeRedacted(event);
 
