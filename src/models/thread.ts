@@ -18,7 +18,7 @@ import { EventEmitter } from "events";
 import { MatrixClient } from "../matrix";
 import { MatrixEvent } from "./event";
 import { EventTimeline } from "./event-timeline";
-import { EventTimelineSet, DuplicateStrategy } from './event-timeline-set';
+import { EventTimelineSet } from './event-timeline-set';
 import { Room } from './room';
 
 export enum ThreadEvent {
