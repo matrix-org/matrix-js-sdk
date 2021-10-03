@@ -143,6 +143,15 @@ export class GroupCall extends EventEmitter {
         this.emit(GroupCallEvent.GroupCallStateChanged, newState, oldState);
     }
 
+    public getLocalFeeds(): CallFeed[] {
+        const feeds = [];
+
+        if (this.localCallFeed) feeds.push(this.localCallFeed);
+        if (this.localScreenshareFeed) feeds.push(this.localScreenshareFeed);
+
+        return feeds;
+    }
+
     public async initLocalCallFeed(): Promise<CallFeed> {
         if (this.state !== GroupCallState.LocalCallFeedUninitialized) {
             throw new Error(`Cannot initialize local call feed in the "${this.state}" state.`);
@@ -440,7 +449,7 @@ export class GroupCall extends EventEmitter {
             this.addCall(newCall);
         }
 
-        newCall.answerWithCallFeeds([this.localCallFeed]);
+        newCall.answerWithCallFeeds(this.getLocalFeeds());
     };
 
     /**
@@ -533,7 +542,7 @@ export class GroupCall extends EventEmitter {
             { invitee: member.userId, useToDevice: true, groupCallId: this.groupCallId },
         );
 
-        newCall.placeCallWithCallFeeds([this.localCallFeed]);
+        newCall.placeCallWithCallFeeds(this.getLocalFeeds());
 
         if (this.dataChannelsEnabled) {
             newCall.createDataChannel("datachannel", this.dataChannelOptions);
