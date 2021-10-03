@@ -361,7 +361,8 @@ export class GroupCall extends EventEmitter {
 
                 logger.log("Screensharing permissions granted. Setting screensharing enabled on all calls");
 
-                const callFeed = new CallFeed(
+                this.localDesktopCapturerSourceId = desktopCapturerSourceId;
+                this.localScreenshareFeed = new CallFeed(
                     stream,
                     this.client.getUserId(),
                     SDPStreamMetadataPurpose.Screenshare,
@@ -370,10 +371,7 @@ export class GroupCall extends EventEmitter {
                     false,
                     false,
                 );
-
-                this.localScreenshareFeed = callFeed;
-                this.localDesktopCapturerSourceId = desktopCapturerSourceId;
-                this.addScreenshareFeed(callFeed);
+                this.addScreenshareFeed(this.localScreenshareFeed);
 
                 this.emit(
                     GroupCallEvent.LocalScreenshareStateChanged,
@@ -383,7 +381,7 @@ export class GroupCall extends EventEmitter {
                 );
 
                 // TODO: handle errors
-                await Promise.all(this.calls.map(call => call.setScreensharingEnabled(true, desktopCapturerSourceId)));
+                await Promise.all(this.calls.map(call => call.pushLocalFeed(this.localScreenshareFeed)));
 
                 logger.log("screensharing enabled on all calls");
 
@@ -396,7 +394,7 @@ export class GroupCall extends EventEmitter {
                 return false;
             }
         } else {
-            await Promise.all(this.calls.map(call => call.setScreensharingEnabled(false, desktopCapturerSourceId)));
+            await Promise.all(this.calls.map(call => call.removeLocalFeed(this.localScreenshareFeed)));
             this.client.getMediaHandler().stopScreensharingStream(this.localScreenshareFeed.stream);
             this.removeScreenshareFeed(this.localScreenshareFeed);
             this.localScreenshareFeed = undefined;
