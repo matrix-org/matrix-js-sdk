@@ -38,6 +38,7 @@ export enum GroupCallEvent {
     ScreenshareFeedsChanged = "screenshare_feeds_changed",
     LocalScreenshareStateChanged = "local_screenshare_state_changed",
     LocalMuteStateChanged = "local_mute_state_changed",
+    ParticipantsChanged = "participants_changed",
     Error = "error"
 }
 
@@ -100,6 +101,7 @@ export class GroupCall extends EventEmitter {
     public localScreenshareFeed?: CallFeed;
     public localDesktopCapturerSourceId?: string;
     public calls: MatrixCall[] = [];
+    public participants: RoomMember[] = [];
     public userMediaFeeds: CallFeed[] = [];
     public screenshareFeeds: CallFeed[] = [];
     public groupCallId: string;
@@ -121,6 +123,18 @@ export class GroupCall extends EventEmitter {
         super();
         this.reEmitter = new ReEmitter(this);
         this.groupCallId = genCallID();
+
+        const roomState = this.room.currentState;
+        const memberStateEvents = roomState.getStateEvents("m.room.member");
+
+        logger.log("Processing initial members", memberStateEvents);
+
+        for (const stateEvent of memberStateEvents) {
+            const member = this.room.getMember(stateEvent.getStateKey());
+            this.onMemberStateChanged(stateEvent, roomState, member);
+        }
+
+        this.client.on("RoomState.members", this.onMemberStateChanged);
     }
 
     private setState(newState: GroupCallState): void {
@@ -208,7 +222,6 @@ export class GroupCall extends EventEmitter {
             this.onMemberStateChanged(stateEvent, roomState, member);
         }
 
-        this.client.on("RoomState.members", this.onMemberStateChanged);
         this.client.on("Call.incoming", this.onIncomingCall);
 
         this.onActiveSpeakerLoop();
@@ -241,11 +254,6 @@ export class GroupCall extends EventEmitter {
 
         this.activeSpeaker = null;
         clearTimeout(this.activeSpeakerLoopTimeout);
-
-        this.client.removeListener(
-            "RoomState.members",
-            this.onMemberStateChanged,
-        );
         this.client.removeListener("Call.incoming", this.onIncomingCall);
     }
 
@@ -256,6 +264,12 @@ export class GroupCall extends EventEmitter {
 
     public async terminate(emitStateEvent = true) {
         this.dispose();
+
+        this.participants = [];
+        this.client.removeListener(
+            "RoomState.members",
+            this.onMemberStateChanged,
+        );
 
         this.client.groupCallEventHandler.groupCalls.delete(this.room.roomId);
 
@@ -473,6 +487,7 @@ export class GroupCall extends EventEmitter {
 
         if (!callsState || !Array.isArray(callsState) || callsState.length === 0) {
             logger.log(`Ignoring member state from ${member.userId} member not in any calls.`);
+            this.removeParticipant(member);
             return;
         }
 
@@ -483,11 +498,19 @@ export class GroupCall extends EventEmitter {
 
         if (!callId) {
             logger.warn(`Room member ${member.userId} does not have a valid m.call_id set. Ignoring.`);
+            this.removeParticipant(member);
             return;
         }
 
         if (callId !== this.groupCallId) {
             logger.log(`Call id does not match group call id, ignoring.`);
+            this.removeParticipant(member);
+            return;
+        }
+
+        this.addParticipant(member);
+
+        if (this.state !== GroupCallState.Entered) {
             return;
         }
 
@@ -860,5 +883,33 @@ export class GroupCall extends EventEmitter {
 
         callFeed.dispose();
         this.emit(GroupCallEvent.ScreenshareFeedsChanged, this.screenshareFeeds);
+    }
+
+    /**
+     * Participant Management
+     */
+
+    private addParticipant(member: RoomMember) {
+        if (this.participants.find((m) => m.userId === member.userId)) {
+            return;
+        }
+
+        this.participants.push(member);
+
+        this.emit(GroupCallEvent.ParticipantsChanged, this.participants);
+        this.client.emit("GroupCall.participants", this.participants, this);
+    }
+
+    private removeParticipant(member: RoomMember) {
+        const index = this.participants.findIndex((m) => m.userId === member.userId);
+
+        if (index === -1) {
+            return;
+        }
+
+        this.participants.splice(index, 1);
+
+        this.emit(GroupCallEvent.ParticipantsChanged, this.participants);
+        this.client.emit("GroupCall.participants", this.participants, this);
     }
 }
