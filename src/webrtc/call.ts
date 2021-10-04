@@ -2055,8 +2055,6 @@ export class MatrixCall extends EventEmitter {
      * @throws if have passed audio=false.
      */
     public async placeCallWithCallFeeds(callFeeds: CallFeed[], stopLocalMediaOnEnd?: boolean): Promise<void> {
-        logger.debug("Placing call with", callFeeds);
-
         this.checkForErrorListener();
         this.stopLocalMediaOnEnd = stopLocalMediaOnEnd;
         this.direction = CallDirection.Outbound;
