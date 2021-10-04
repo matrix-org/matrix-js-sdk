@@ -497,7 +497,15 @@ export class MatrixCall extends EventEmitter {
         if (existingFeed) {
             existingFeed.setNewStream(stream);
         } else {
-            this.feeds.push(new CallFeed(stream, userId, purpose, this.client, this.roomId, audioMuted, videoMuted));
+            this.feeds.push(new CallFeed({
+                client: this.client,
+                roomId: this.roomId,
+                userId,
+                stream,
+                purpose,
+                audioMuted,
+                videoMuted,
+            }));
             this.emit(CallEvent.FeedsChanged, this.feeds);
         }
 
@@ -528,7 +536,15 @@ export class MatrixCall extends EventEmitter {
         if (feed) {
             feed.setNewStream(stream);
         } else {
-            this.feeds.push(new CallFeed(stream, userId, purpose, this.client, this.roomId, false, false));
+            this.feeds.push(new CallFeed({
+                client: this.client,
+                roomId: this.roomId,
+                audioMuted: false,
+                videoMuted: false,
+                userId,
+                stream,
+                purpose,
+            }));
             this.emit(CallEvent.FeedsChanged, this.feeds);
         }
 
@@ -543,7 +559,15 @@ export class MatrixCall extends EventEmitter {
         if (existingFeed) {
             existingFeed.setNewStream(stream);
         } else {
-            this.feeds.push(new CallFeed(stream, userId, purpose, this.client, this.roomId, false, false));
+            this.feeds.push(new CallFeed({
+                client: this.client,
+                roomId: this.roomId,
+                audioMuted: false,
+                videoMuted: false,
+                userId,
+                stream,
+                purpose,
+            }));
             this.emit(CallEvent.FeedsChanged, this.feeds);
         }
 
