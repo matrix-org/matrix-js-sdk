@@ -161,15 +161,15 @@ export class GroupCall extends EventEmitter {
 
         const userId = this.client.getUserId();
 
-        const callFeed = new CallFeed(
-            stream,
+        const callFeed = new CallFeed({
+            client: this.client,
+            roomId: this.room.roomId,
             userId,
-            SDPStreamMetadataPurpose.Usermedia,
-            this.client,
-            this.room.roomId,
-            false,
-            false,
-        );
+            stream,
+            purpose: SDPStreamMetadataPurpose.Usermedia,
+            audioMuted: false,
+            videoMuted: false,
+        });
 
         this.activeSpeakerSamples.set(userId, Array(this.activeSpeakerSampleCount).fill(
             -Infinity,
@@ -352,15 +352,15 @@ export class GroupCall extends EventEmitter {
 
                 logger.log("Screensharing permissions granted. Setting screensharing enabled on all calls");
 
-                const callFeed = new CallFeed(
+                const callFeed = new CallFeed({
+                    client: this.client,
+                    roomId: this.room.roomId,
+                    userId: this.client.getUserId(),
                     stream,
-                    this.client.getUserId(),
-                    SDPStreamMetadataPurpose.Screenshare,
-                    this.client,
-                    this.room.roomId,
-                    false,
-                    false,
-                );
+                    purpose: SDPStreamMetadataPurpose.Screenshare,
+                    audioMuted: false,
+                    videoMuted: false,
+                });
 
                 this.localScreenshareFeed = callFeed;
                 this.localDesktopCapturerSourceId = desktopCapturerSourceId;
