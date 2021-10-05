@@ -10,14 +10,13 @@ import { SDPStreamMetadataPurpose } from "./callEventTypes";
 import { createNewMatrixCall } from "./call";
 import { ISendEventResponse } from "../@types/requests";
 import { MatrixEvent } from "../models/event";
-import { RoomState } from "../models/room-state";
 
-export const CALL_EVENT = "org.matrix.msc3401.call";
-export const CALL_MEMBER_KEY = "org.matrix.msc3401.calls";
+export const GROUP_CALL_ROOM_EVENT = "org.matrix.msc3401.call";
+export const GROUP_CALL_MEMBER_EVENT = "org.matrix.msc3401.call.member";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
-    Prompt = "m.propmt",
+    Prompt = "m.prompt",
     Room = "m.room",
 }
 
@@ -62,6 +61,16 @@ export interface IGroupCallDataChannelOptions {
     maxPacketLifeTime: number;
     maxRetransmits: number;
     protocol: string;
+}
+
+export interface IGroupCallRoomMemberCallState {
+    "m.call_id": string;
+    "m.foci"?: string[];
+    "m.sources"?: any[];
+}
+
+export interface IGroupCallRoomMemberState {
+    "m.calls": IGroupCallRoomMemberCallState[];
 }
 
 export enum GroupCallState {
@@ -125,16 +134,32 @@ export class GroupCall extends EventEmitter {
         this.groupCallId = genCallID();
 
         const roomState = this.room.currentState;
-        const memberStateEvents = roomState.getStateEvents("m.room.member");
+        const memberStateEvents = roomState.getStateEvents(GROUP_CALL_MEMBER_EVENT);
 
         logger.log("Processing initial members", memberStateEvents);
 
         for (const stateEvent of memberStateEvents) {
-            const member = this.room.getMember(stateEvent.getStateKey());
-            this.onMemberStateChanged(stateEvent, roomState, member);
+            this.onMemberStateChanged(stateEvent);
         }
+    }
 
-        this.client.on("RoomState.members", this.onMemberStateChanged);
+    public async create() {
+        this.client.groupCallEventHandler.groupCalls.set(this.room.roomId, this);
+
+        await this.client.sendStateEvent(
+            this.room.roomId,
+            GROUP_CALL_ROOM_EVENT,
+            {
+                "m.intent": this.intent,
+                "m.type": this.type,
+                // TODO: Specify datachannels
+                "dataChannelsEnabled": this.dataChannelsEnabled,
+                "dataChannelOptions": this.dataChannelOptions,
+            },
+            this.groupCallId,
+        );
+
+        return this;
     }
 
     private setState(newState: GroupCallState): void {
@@ -222,13 +247,12 @@ export class GroupCall extends EventEmitter {
         // Set up participants for the members currently in the room.
         // Other members will be picked up by the RoomState.members event.
         const roomState = this.room.currentState;
-        const memberStateEvents = roomState.getStateEvents("m.room.member");
+        const memberStateEvents = roomState.getStateEvents(GROUP_CALL_MEMBER_EVENT);
 
         logger.log("Processing initial members");
 
         for (const stateEvent of memberStateEvents) {
-            const member = this.room.getMember(stateEvent.getStateKey());
-            this.onMemberStateChanged(stateEvent, roomState, member);
+            this.onMemberStateChanged(stateEvent);
         }
 
         this.client.on("Call.incoming", this.onIncomingCall);
@@ -283,11 +307,11 @@ export class GroupCall extends EventEmitter {
         this.client.groupCallEventHandler.groupCalls.delete(this.room.roomId);
 
         if (emitStateEvent) {
-            const existingStateEvent = this.room.currentState.getStateEvents(CALL_EVENT, this.groupCallId);
+            const existingStateEvent = this.room.currentState.getStateEvents(GROUP_CALL_ROOM_EVENT, this.groupCallId);
 
             await this.client.sendStateEvent(
                 this.room.roomId,
-                CALL_EVENT,
+                GROUP_CALL_ROOM_EVENT,
                 {
                     ...existingStateEvent.getContent(),
                     ["m.terminated"]: GroupCallTerminationReason.CallEnded,
@@ -455,31 +479,48 @@ export class GroupCall extends EventEmitter {
      */
 
     private sendEnteredMemberStateEvent(): Promise<ISendEventResponse> {
-        return this.updateMemberCallsState([
-            {
-                "m.call_id": this.groupCallId,
-            },
-        ]);
+        return this.updateMemberCallState({
+            "m.call_id": this.groupCallId,
+            // TODO "m.foci"
+            // TODO "m.sources"
+        });
     }
 
     private sendLeftMemberStateEvent(): Promise<ISendEventResponse> {
-        return this.updateMemberCallsState([]);
+        return this.updateMemberCallState(undefined);
     }
 
-    private async updateMemberCallsState(state: any): Promise<ISendEventResponse> {
+    private async updateMemberCallState(memberCallState?: IGroupCallRoomMemberCallState): Promise<ISendEventResponse> {
         const localUserId = this.client.getUserId();
 
-        const currentStateEvent = this.room.currentState.getStateEvents("m.room.member", localUserId);
+        const currentStateEvent = this.room.currentState.getStateEvents(GROUP_CALL_MEMBER_EVENT, localUserId);
 
-        return this.client.sendStateEvent(this.room.roomId, "m.room.member", {
-            ...currentStateEvent.getContent(),
-            [CALL_MEMBER_KEY]: state,
+        const calls = currentStateEvent?.getContent<IGroupCallRoomMemberState>()["m.calls"] || [];
+
+        const existingCallIndex = calls.findIndex((call) => call["m.call_id"] === this.groupCallId);
+
+        if (existingCallIndex === -1) {
+            calls.push(memberCallState);
+        } else if (memberCallState) {
+            calls.splice(existingCallIndex, 1, memberCallState);
+        } else {
+            calls.splice(existingCallIndex, 1);
+        }
+
+        return this.client.sendStateEvent(this.room.roomId, GROUP_CALL_MEMBER_EVENT, {
+            "m.calls": calls,
         }, localUserId);
     }
 
-    private onMemberStateChanged = (event: MatrixEvent, state: RoomState, member: RoomMember) => {
+    public onMemberStateChanged = (event: MatrixEvent) => {
         // The member events may be received for another room, which we will ignore.
         if (event.getRoomId() !== this.room.roomId) {
+            return;
+        }
+
+        const member = this.room.getMember(event.getStateKey());
+
+        if (!member) {
             return;
         }
 
@@ -490,7 +531,7 @@ export class GroupCall extends EventEmitter {
             return;
         }
 
-        const callsState = event.getContent()[CALL_MEMBER_KEY];
+        const callsState = event.getContent<IGroupCallRoomMemberState>()["m.calls"];
 
         if (!callsState || !Array.isArray(callsState) || callsState.length === 0) {
             logger.log(`Ignoring member state from ${member.userId} member not in any calls.`);

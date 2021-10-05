@@ -145,7 +145,6 @@ import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, Rule
 import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
 import {
-    CALL_EVENT,
     GroupCall,
     IGroupCallDataChannelOptions,
     GroupCallIntent,
@@ -1322,23 +1321,14 @@ export class MatrixClient extends EventEmitter {
             throw new Error(`Cannot find room ${roomId}`);
         }
 
-        const groupCall = new GroupCall(this, room, type, intent, dataChannelsEnabled, dataChannelOptions);
-        this.groupCallEventHandler.groupCalls.set(roomId, groupCall);
-
-        await this.sendStateEvent(
-            room.roomId,
-            CALL_EVENT,
-            {
-                "m.intent": intent,
-                "m.type": type,
-                // TODO: Specify datachannels
-                dataChannelsEnabled,
-                dataChannelOptions,
-            },
-            groupCall.groupCallId,
-        );
-
-        return groupCall;
+        return new GroupCall(
+            this,
+            room,
+            type,
+            intent,
+            dataChannelsEnabled,
+            dataChannelOptions,
+        ).create();
     }
 
     /**
