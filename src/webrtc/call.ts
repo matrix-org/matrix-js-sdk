@@ -529,7 +529,15 @@ export class MatrixCall extends EventEmitter {
         if (existingFeed) {
             existingFeed.setNewStream(stream);
         } else {
-            this.feeds.push(new CallFeed(stream, userId, purpose, this.client, this.roomId, audioMuted, videoMuted));
+            this.feeds.push(new CallFeed({
+                client: this.client,
+                roomId: this.roomId,
+                userId,
+                stream,
+                purpose,
+                audioMuted,
+                videoMuted,
+            }));
             this.emit(CallEvent.FeedsChanged, this.feeds);
         }
 
@@ -560,7 +568,15 @@ export class MatrixCall extends EventEmitter {
         if (feed) {
             feed.setNewStream(stream);
         } else {
-            this.feeds.push(new CallFeed(stream, userId, purpose, this.client, this.roomId, false, false));
+            this.feeds.push(new CallFeed({
+                client: this.client,
+                roomId: this.roomId,
+                audioMuted: false,
+                videoMuted: false,
+                userId,
+                stream,
+                purpose,
+            }));
             this.emit(CallEvent.FeedsChanged, this.feeds);
         }
 
@@ -579,8 +595,16 @@ export class MatrixCall extends EventEmitter {
         if (existingFeed) {
             existingFeed.setNewStream(stream);
         } else {
-            const callFeed = new CallFeed(stream, userId, purpose, this.client, this.roomId, false, false);
-            this.pushLocalFeed(callFeed, addToPeerConnection);
+            this.pushLocalFeed(new CallFeed({
+                client: this.client,
+                roomId: this.roomId,
+                audioMuted: false,
+                videoMuted: false,
+                userId,
+                stream,
+                purpose,
+            }));
+            this.emit(CallEvent.FeedsChanged, this.feeds);
         }
     }
 
@@ -779,20 +803,20 @@ export class MatrixCall extends EventEmitter {
             this.waitForLocalAVStream = true;
 
             try {
-                const mediaStream = await this.client.getMediaHandler().getUserMediaStream(
+                const stream = await this.client.getMediaHandler().getUserMediaStream(
                     this.shouldAnswerWithMediaType(audio, this.hasRemoteUserMediaAudioTrack, "audio"),
                     this.shouldAnswerWithMediaType(video, this.hasRemoteUserMediaVideoTrack, "video"),
                 );
                 this.waitForLocalAVStream = false;
-                const callFeed = new CallFeed(
-                    mediaStream,
-                    this.client.getUserId(),
-                    SDPStreamMetadataPurpose.Usermedia,
-                    this.client,
-                    this.roomId,
-                    audio,
-                    video,
-                );
+                const callFeed = new CallFeed({
+                    client: this.client,
+                    roomId: this.roomId,
+                    userId: this.client.getUserId(),
+                    stream,
+                    purpose: SDPStreamMetadataPurpose.Usermedia,
+                    audioMuted: false,
+                    videoMuted: false,
+                });
                 this.answerWithCallFeeds([callFeed], true);
             } catch (e) {
                 this.getUserMediaFailed(e);
@@ -1644,10 +1668,13 @@ export class MatrixCall extends EventEmitter {
         if (this.peerConn.iceConnectionState == 'connected') {
             clearTimeout(this.iceDisconnectedTimeout);
             this.setState(CallState.Connected);
-            this.callLengthInterval = setInterval(() => {
-                this.callLength++;
-                this.emit(CallEvent.LengthChanged, this.callLength);
-            }, 1000);
+
+            if (!this.callLengthInterval) {
+                this.callLengthInterval = setInterval(() => {
+                    this.callLength++;
+                    this.emit(CallEvent.LengthChanged, this.callLength);
+                }, 1000);
+            }
         } else if (this.peerConn.iceConnectionState == 'failed') {
             this.hangup(CallErrorCode.IceFailed, false);
         } else if (this.peerConn.iceConnectionState == 'disconnected') {
@@ -2031,16 +2058,16 @@ export class MatrixCall extends EventEmitter {
         this.setState(CallState.WaitLocalMedia);
 
         try {
-            const mediaStream = await this.client.getMediaHandler().getUserMediaStream(audio, video);
-            const callFeed = new CallFeed(
-                mediaStream,
-                this.client.getUserId(),
-                SDPStreamMetadataPurpose.Usermedia,
-                this.client,
-                this.roomId,
-                false,
-                false,
-            );
+            const stream = await this.client.getMediaHandler().getUserMediaStream(audio, video);
+            const callFeed = new CallFeed({
+                client: this.client,
+                roomId: this.roomId,
+                userId: this.client.getUserId(),
+                stream,
+                purpose: SDPStreamMetadataPurpose.Usermedia,
+                audioMuted: false,
+                videoMuted: false,
+            });
             await this.placeCallWithCallFeeds([callFeed], true);
         } catch (e) {
             this.getUserMediaFailed(e);
