@@ -143,6 +143,15 @@ export class GroupCall extends EventEmitter {
         this.emit(GroupCallEvent.GroupCallStateChanged, newState, oldState);
     }
 
+    public getLocalFeeds(): CallFeed[] {
+        const feeds = [];
+
+        if (this.localCallFeed) feeds.push(this.localCallFeed);
+        if (this.localScreenshareFeed) feeds.push(this.localScreenshareFeed);
+
+        return feeds;
+    }
+
     public async initLocalCallFeed(): Promise<CallFeed> {
         if (this.state !== GroupCallState.LocalCallFeedUninitialized) {
             throw new Error(`Cannot initialize local call feed in the "${this.state}" state.`);
@@ -352,7 +361,8 @@ export class GroupCall extends EventEmitter {
 
                 logger.log("Screensharing permissions granted. Setting screensharing enabled on all calls");
 
-                const callFeed = new CallFeed({
+                this.localDesktopCapturerSourceId = desktopCapturerSourceId;
+                this.localScreenshareFeed = new CallFeed({
                     client: this.client,
                     roomId: this.room.roomId,
                     userId: this.client.getUserId(),
@@ -361,10 +371,7 @@ export class GroupCall extends EventEmitter {
                     audioMuted: false,
                     videoMuted: false,
                 });
-
-                this.localScreenshareFeed = callFeed;
-                this.localDesktopCapturerSourceId = desktopCapturerSourceId;
-                this.addScreenshareFeed(callFeed);
+                this.addScreenshareFeed(this.localScreenshareFeed);
 
                 this.emit(
                     GroupCallEvent.LocalScreenshareStateChanged,
@@ -374,7 +381,7 @@ export class GroupCall extends EventEmitter {
                 );
 
                 // TODO: handle errors
-                await Promise.all(this.calls.map(call => call.setScreensharingEnabled(true, desktopCapturerSourceId)));
+                await Promise.all(this.calls.map(call => call.pushLocalFeed(this.localScreenshareFeed)));
 
                 logger.log("screensharing enabled on all calls");
 
@@ -387,7 +394,7 @@ export class GroupCall extends EventEmitter {
                 return false;
             }
         } else {
-            await Promise.all(this.calls.map(call => call.setScreensharingEnabled(false, desktopCapturerSourceId)));
+            await Promise.all(this.calls.map(call => call.removeLocalFeed(this.localScreenshareFeed)));
             this.client.getMediaHandler().stopScreensharingStream(this.localScreenshareFeed.stream);
             this.removeScreenshareFeed(this.localScreenshareFeed);
             this.localScreenshareFeed = undefined;
@@ -440,7 +447,7 @@ export class GroupCall extends EventEmitter {
             this.addCall(newCall);
         }
 
-        newCall.answerWithCallFeeds([this.localCallFeed]);
+        newCall.answerWithCallFeeds(this.getLocalFeeds());
     };
 
     /**
@@ -533,7 +540,7 @@ export class GroupCall extends EventEmitter {
             { invitee: member.userId, useToDevice: true, groupCallId: this.groupCallId },
         );
 
-        newCall.placeCallWithCallFeeds([this.localCallFeed]);
+        newCall.placeCallWithCallFeeds(this.getLocalFeeds());
 
         if (this.dataChannelsEnabled) {
             newCall.createDataChannel("datachannel", this.dataChannelOptions);
