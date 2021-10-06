@@ -1,5 +1,5 @@
 import EventEmitter from "events";
-import { CallFeed, CallFeedEvent } from "./callFeed";
+import { CallFeed, CallFeedEvent, SPEAKING_THRESHOLD } from "./callFeed";
 import { MatrixClient } from "../client";
 import { CallErrorCode, CallEvent, CallState, genCallID, MatrixCall, setTracksEnabled } from "./call";
 import { RoomMember } from "../models/room-member";
@@ -101,7 +101,7 @@ export class GroupCall extends EventEmitter {
     // Config
     public activeSpeakerSampleCount = 8;
     public activeSpeakerInterval = 1000;
-    public speakingThreshold = -80;
+    public speakingThreshold = SPEAKING_THRESHOLD;
     public participantTimeout = 1000 * 15;
 
     public state = GroupCallState.LocalCallFeedUninitialized;
