@@ -47,7 +47,7 @@ export class RoomHierarchy {
      * @constructor
      */
     constructor(
-        private readonly root: Room,
+        public readonly root: Room,
         private readonly pageSize?: number,
         private readonly maxDepth?: number,
         private readonly suggestedOnly = false,
@@ -59,6 +59,10 @@ export class RoomHierarchy {
 
     public get canLoadMore(): boolean {
         return !!this.serverSupportError || !!this.nextBatch || !this._rooms;
+    }
+
+    public get loading(): boolean {
+        return !!this.loadRequest;
     }
 
     public get rooms(): IHierarchyRoom[] {
