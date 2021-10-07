@@ -20,6 +20,7 @@ limitations under the License.
 import { IClientWellKnown, IWellKnownConfig } from "./client";
 import { logger } from './logger';
 import { URL as NodeURL } from "url";
+import { getRequest } from "./matrix";
 
 // Dev note: Auto discovery is part of the spec.
 // See: https://matrix.org/docs/spec/client_server/r0.4.0.html#server-discovery
@@ -419,7 +420,7 @@ export class AutoDiscovery {
     private static async fetchWellKnownObject(url: string): Promise<IWellKnownConfig> {
         return new Promise(function(resolve, reject) {
             // eslint-disable-next-line
-            const request = require("./matrix").getRequest();
+            const request = getRequest();
             if (!request) throw new Error("No request library available");
             request(
                 { method: "GET", uri: url, timeout: 5000 },

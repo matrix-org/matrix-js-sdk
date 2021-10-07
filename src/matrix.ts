@@ -152,7 +152,7 @@ export function createClient(opts: ICreateClientOpts | string) {
     }
     opts.request = opts.request || requestInstance;
     opts.store = opts.store || new MemoryStore({
-        localStorage: global.localStorage,
+        localStorage: localStorage,
     });
     opts.scheduler = opts.scheduler || new MatrixScheduler();
     opts.cryptoStore = opts.cryptoStore || cryptoStoreFactory();
