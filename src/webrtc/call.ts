@@ -598,8 +598,8 @@ export class MatrixCall extends EventEmitter {
             this.pushLocalFeed(new CallFeed({
                 client: this.client,
                 roomId: this.roomId,
-                audioMuted: false,
-                videoMuted: false,
+                audioMuted: stream.getAudioTracks().length === 0,
+                videoMuted: stream.getVideoTracks().length === 0,
                 userId,
                 stream,
                 purpose,
@@ -832,8 +832,8 @@ export class MatrixCall extends EventEmitter {
                     userId: this.client.getUserId(),
                     stream,
                     purpose: SDPStreamMetadataPurpose.Usermedia,
-                    audioMuted: false,
-                    videoMuted: false,
+                    audioMuted: stream.getAudioTracks().length === 0,
+                    videoMuted: stream.getVideoTracks().length === 0,
                 });
                 this.answerWithCallFeeds([callFeed], true);
             } catch (e) {
@@ -1077,6 +1077,10 @@ export class MatrixCall extends EventEmitter {
      * @returns the new mute state
      */
     public async setLocalVideoMuted(muted: boolean): Promise<boolean> {
+        if (!await this.client.getMediaHandler().hasVideoDevice()) {
+            return this.isLocalVideoMuted();
+        }
+
         if (!this.hasLocalUserMediaVideoTrack && !muted) {
             await this.upgradeCall(false, true);
             return this.isLocalVideoMuted();
@@ -1105,6 +1109,10 @@ export class MatrixCall extends EventEmitter {
      * @returns the new mute state
      */
     public async setMicrophoneMuted(muted: boolean): Promise<boolean> {
+        if (!await this.client.getMediaHandler().hasAudioDevice()) {
+            return this.isMicrophoneMuted();
+        }
+
         if (!this.hasLocalUserMediaAudioTrack && !muted) {
             await this.upgradeCall(true, false);
             return this.isMicrophoneMuted();
@@ -2083,8 +2091,8 @@ export class MatrixCall extends EventEmitter {
                 userId: this.client.getUserId(),
                 stream,
                 purpose: SDPStreamMetadataPurpose.Usermedia,
-                audioMuted: false,
-                videoMuted: false,
+                audioMuted: stream.getAudioTracks().length === 0,
+                videoMuted: stream.getVideoTracks().length === 0,
             });
             await this.placeCallWithCallFeeds([callFeed], true);
         } catch (e) {

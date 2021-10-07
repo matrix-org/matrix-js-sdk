@@ -201,8 +201,8 @@ export class GroupCall extends EventEmitter {
             userId,
             stream,
             purpose: SDPStreamMetadataPurpose.Usermedia,
-            audioMuted: false,
-            videoMuted: false,
+            audioMuted: stream.getAudioTracks().length === 0,
+            videoMuted: stream.getVideoTracks().length === 0,
         });
 
         this.activeSpeakerSamples.set(userId, Array(this.activeSpeakerSampleCount).fill(
@@ -344,7 +344,11 @@ export class GroupCall extends EventEmitter {
         return true;
     }
 
-    public setMicrophoneMuted(muted) {
+    public async setMicrophoneMuted(muted) {
+        if (!await this.client.getMediaHandler().hasAudioDevice()) {
+            return false;
+        }
+
         if (this.localCallFeed) {
             this.localCallFeed.setAudioMuted(muted);
             setTracksEnabled(this.localCallFeed.stream.getAudioTracks(), !muted);
@@ -357,7 +361,11 @@ export class GroupCall extends EventEmitter {
         this.emit(GroupCallEvent.LocalMuteStateChanged, muted, this.isLocalVideoMuted());
     }
 
-    public setLocalVideoMuted(muted) {
+    public async setLocalVideoMuted(muted) {
+        if (!await this.client.getMediaHandler().hasVideoDevice()) {
+            return false;
+        }
+
         if (this.localCallFeed) {
             this.localCallFeed.setVideoMuted(muted);
             setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);
