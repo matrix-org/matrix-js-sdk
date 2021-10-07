@@ -43,23 +43,42 @@ export class MediaHandler {
         this.videoInput = deviceId;
     }
 
+    public async hasAudioDevice() {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        return devices.filter(device => device.kind === "audioinput").length > 0;
+    }
+
+    public async hasVideoDevice() {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        return devices.filter(device => device.kind === "videoinput").length > 0;
+    }
+
     /**
      * @returns {MediaStream} based on passed parameters
      */
     public async getUserMediaStream(audio: boolean, video: boolean): Promise<MediaStream> {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+
+        const audioDevices = devices.filter(device => device.kind === "audioinput");
+        const videoDevices = devices.filter(device => device.kind === "videoinput");
+
+        const shouldRequestAudio = audio && audioDevices.length > 0;
+        const shouldRequestVideo = video && videoDevices.length > 0;
+
         let stream: MediaStream;
 
         // Find a stream with matching tracks
         const matchingStream = this.userMediaStreams.find((stream) => {
-            if (audio !== (stream.getAudioTracks().length > 0)) return false;
-            if (video !== (stream.getVideoTracks().length > 0)) return false;
+            if (shouldRequestAudio !== (stream.getAudioTracks().length > 0)) return false;
+            if (shouldRequestVideo !== (stream.getVideoTracks().length > 0)) return false;
+            return true;
         });
 
         if (matchingStream) {
             logger.log("Cloning user media stream", matchingStream.id);
             stream = matchingStream.clone();
         } else {
-            const constraints = this.getUserMediaContraints(audio, video);
+            const constraints = this.getUserMediaContraints(shouldRequestAudio, shouldRequestVideo);
             logger.log("Getting user media with constraints", constraints);
             stream = await navigator.mediaDevices.getUserMedia(constraints);
         }
