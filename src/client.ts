@@ -4043,10 +4043,8 @@ export class MatrixClient extends EventEmitter {
         // Work backwards first, looking at create events.
         let createEvent = currentRoom.currentState.getStateEvents(EventType.RoomCreate, "");
         while (createEvent) {
-            logger.log(`Looking at ${createEvent.getId()}`);
             const predecessor = createEvent.getContent()['predecessor'];
             if (predecessor && predecessor['room_id']) {
-                logger.log(`Looking at predecessor ${predecessor['room_id']}`);
                 const refRoom = this.getRoom(predecessor['room_id']);
                 if (!refRoom) break; // end of the chain
 
