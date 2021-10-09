@@ -768,6 +768,7 @@ export class MatrixCall extends EventEmitter {
             } catch (e) {
                 if (answerWithVideo) {
                     // Try to answer without video
+                    logger.warn("Failed to getUserMedia(), trying to getUserMedia() without video");
                     this.setState(prevState);
                     this.waitForLocalAVStream = false;
                     await this.answer(answerWithAudio, false);
