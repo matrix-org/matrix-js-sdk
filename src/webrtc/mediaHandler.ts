@@ -43,12 +43,12 @@ export class MediaHandler {
         this.videoInput = deviceId;
     }
 
-    public async hasAudioDevice() {
+    public async hasAudioDevice(): Promise<boolean> {
         const devices = await navigator.mediaDevices.enumerateDevices();
         return devices.filter(device => device.kind === "audioinput").length > 0;
     }
 
-    public async hasVideoDevice() {
+    public async hasVideoDevice(): Promise<boolean> {
         const devices = await navigator.mediaDevices.enumerateDevices();
         return devices.filter(device => device.kind === "videoinput").length > 0;
     }
@@ -57,13 +57,8 @@ export class MediaHandler {
      * @returns {MediaStream} based on passed parameters
      */
     public async getUserMediaStream(audio: boolean, video: boolean): Promise<MediaStream> {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-
-        const audioDevices = devices.filter(device => device.kind === "audioinput");
-        const videoDevices = devices.filter(device => device.kind === "videoinput");
-
-        const shouldRequestAudio = audio && audioDevices.length > 0;
-        const shouldRequestVideo = video && videoDevices.length > 0;
+        const shouldRequestAudio = audio && await this.hasAudioDevice();
+        const shouldRequestVideo = video && await this.hasVideoDevice();
 
         let stream: MediaStream;
 
