@@ -94,6 +94,12 @@ class MockMediaStream {
     addEventListener() {}
 }
 
+class MockMediaDeviceInfo {
+    constructor(
+        public kind: "audio" | "video",
+    ) {}
+}
+
 describe('Call', function() {
     let client;
     let call;
@@ -110,6 +116,8 @@ describe('Call', function() {
             mediaDevices: {
                 // @ts-ignore Mock
                 getUserMedia: () => new MockMediaStream("local_stream"),
+                // @ts-ignore Mock
+                enumerateDevices: async () => [new MockMediaDeviceInfo("audio"), new MockMediaDeviceInfo("video")],
             },
         };
 
