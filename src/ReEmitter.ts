@@ -44,7 +44,7 @@ export class ReEmitter {
                 if (eventName === 'error' && this.target.listenerCount('error') === 0) return;
                 this.target.emit(eventName, ...args, source);
             };
-            source.on(eventName, forSource);
+            source.once(eventName, forSource);
         }
     }
 }
