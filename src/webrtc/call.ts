@@ -752,19 +752,29 @@ export class MatrixCall extends EventEmitter {
         logger.debug(`Answering call ${this.callId}`);
 
         if (!this.localUsermediaStream && !this.waitForLocalAVStream) {
+            const prevState = this.state;
+            const answerWithAudio = this.shouldAnswerWithMediaType(audio, this.hasRemoteUserMediaAudioTrack, "audio");
+            const answerWithVideo = this.shouldAnswerWithMediaType(video, this.hasRemoteUserMediaVideoTrack, "video");
+
             this.setState(CallState.WaitLocalMedia);
             this.waitForLocalAVStream = true;
 
             try {
                 const mediaStream = await this.client.getMediaHandler().getUserMediaStream(
-                    this.shouldAnswerWithMediaType(audio, this.hasRemoteUserMediaAudioTrack, "audio"),
-                    this.shouldAnswerWithMediaType(video, this.hasRemoteUserMediaVideoTrack, "video"),
+                    answerWithAudio, answerWithVideo,
                 );
                 this.waitForLocalAVStream = false;
                 this.gotUserMediaForAnswer(mediaStream);
             } catch (e) {
-                this.getUserMediaFailed(e);
-                return;
+                if (answerWithVideo) {
+                    // Try to answer without video
+                    this.setState(prevState);
+                    this.waitForLocalAVStream = false;
+                    await this.answer(answerWithAudio, false);
+                } else {
+                    this.getUserMediaFailed(e);
+                    return;
+                }
             }
         } else if (this.waitForLocalAVStream) {
             this.setState(CallState.WaitLocalMedia);
