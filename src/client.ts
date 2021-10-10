@@ -2374,7 +2374,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} a promise which resolves when the keys
      *    have been imported
      */
-    public importRoomKeys(keys: IMegolmSessionData[], opts: IImportRoomKeysOpts): Promise<void> {
+    public importRoomKeys(keys: IMegolmSessionData[], opts?: IImportRoomKeysOpts): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
