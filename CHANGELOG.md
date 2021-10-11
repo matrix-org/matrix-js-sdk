@@ -1,3 +1,21 @@
+Changes in [14.0.0](https://github.com/vector-im/element-desktop/releases/tag/v14.0.0) (2021-10-11)
+===================================================================================================
+
+## 🚨 BREAKING CHANGES
+ * Support for call upgrades. `setLocalVideoMuted()` and `setMicrophoneMuted()` are now `async` and return the new mute state ([\#1827](https://github.com/matrix-org/matrix-js-sdk/pull/1827)). Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+
+## ✨ Features
+ * Implement file versioning for tree spaces ([\#1952](https://github.com/matrix-org/matrix-js-sdk/pull/1952)).
+ * Allow answering calls without audio/video ([\#1950](https://github.com/matrix-org/matrix-js-sdk/pull/1950)). Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+ * Add `bound` to `IThreepid` ([\#1941](https://github.com/matrix-org/matrix-js-sdk/pull/1941)). Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+ * Add `trusted_locally` to `TrustInfo` ([\#1942](https://github.com/matrix-org/matrix-js-sdk/pull/1942)). Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+
+## 🐛 Bug Fixes
+ * Fix incorrect return value type in getJoinedRooms() ([\#1959](https://github.com/matrix-org/matrix-js-sdk/pull/1959)). Contributed by [psrpinto](https://github.com/psrpinto).
+ * Make sure to set `callLengthInterval` only once ([\#1958](https://github.com/matrix-org/matrix-js-sdk/pull/1958)). Fixes vector-im/element-web#19221 and vector-im/element-web#19221. Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+ * Fix event partitioning from non threading ready clients ([\#1948](https://github.com/matrix-org/matrix-js-sdk/pull/1948)).
+ * Ensure unencrypted fields get exposed by getEffectiveEvent() ([\#1938](https://github.com/matrix-org/matrix-js-sdk/pull/1938)). Fixes vector-im/element-web#19062 and vector-im/element-web#19062.
+
 Changes in [13.0.0](https://github.com/vector-im/element-desktop/releases/tag/v13.0.0) (2021-09-27)
 ===================================================================================================
 
