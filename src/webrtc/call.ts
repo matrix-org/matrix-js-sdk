@@ -391,6 +391,19 @@ export class MatrixCall extends EventEmitter {
         });
     }
 
+    public get hasLocalUserMediaAudioTrack(): boolean {
+        return this.localUsermediaStream?.getAudioTracks().length > 0;
+    }
+
+    public get hasRemoteUserMediaAudioTrack(): boolean {
+        return this.getRemoteFeeds().some((feed) => {
+            return (
+                feed.purpose === SDPStreamMetadataPurpose.Usermedia &&
+                feed.stream.getAudioTracks().length > 0
+            );
+        });
+    }
+
     public get localUsermediaFeed(): CallFeed {
         return this.getLocalFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Usermedia);
     }
@@ -683,13 +696,34 @@ export class MatrixCall extends EventEmitter {
         this.setState(CallState.Ended);
     }
 
+    private shouldAnswerWithMediaType(
+        wantedValue: boolean | undefined, valueOfTheOtherSide: boolean | undefined, type: "audio" | "video",
+    ): boolean {
+        if (wantedValue && !valueOfTheOtherSide) {
+            // TODO: Figure out how to do this
+            logger.warn(`Unable to answer with ${type} because the other side isn't sending it either.`);
+            return false;
+        } else if (
+            !utils.isNullOrUndefined(wantedValue) &&
+            wantedValue !== valueOfTheOtherSide &&
+            !this.opponentSupportsSDPStreamMetadata()
+        ) {
+            logger.warn(
+                `Unable to answer with ${type}=${wantedValue} because the other side doesn't support it. ` +
+                `Answering with ${type}=${valueOfTheOtherSide}.`,
+            );
+            return valueOfTheOtherSide;
+        }
+        return wantedValue ?? valueOfTheOtherSide;
+    }
+
     /**
      * Answer a call.
      */
-    public async answer(): Promise<void> {
-        if (this.inviteOrAnswerSent) {
-            return;
-        }
+    public async answer(audio?: boolean, video?: boolean): Promise<void> {
+        if (this.inviteOrAnswerSent) return;
+        // TODO: Figure out how to do this
+        if (audio === false && video === false) throw new Error("You CANNOT answer a call without media");
 
         logger.debug(`Answering call ${this.callId}`);
 
@@ -699,8 +733,8 @@ export class MatrixCall extends EventEmitter {
 
             try {
                 const mediaStream = await this.client.getMediaHandler().getUserMediaStream(
-                    true,
-                    this.hasRemoteUserMediaVideoTrack,
+                    this.shouldAnswerWithMediaType(audio, this.hasRemoteUserMediaAudioTrack, "audio"),
+                    this.shouldAnswerWithMediaType(video, this.hasRemoteUserMediaVideoTrack, "video"),
                 );
                 this.waitForLocalAVStream = false;
                 this.gotUserMediaForAnswer(mediaStream);
@@ -772,6 +806,50 @@ export class MatrixCall extends EventEmitter {
         logger.debug("Rejecting call: " + this.callId);
         this.terminate(CallParty.Local, CallErrorCode.UserHangup, true);
         this.sendVoipEvent(EventType.CallReject, {});
+    }
+
+    /**
+     * Adds an audio and/or video track - upgrades the call
+     * @param {boolean} audio should add an audio track
+     * @param {boolean} video should add an video track
+     */
+    private async upgradeCall(
+        audio: boolean, video: boolean,
+    ): Promise<void> {
+        // We don't do call downgrades
+        if (!audio && !video) return;
+        if (!this.opponentSupportsSDPStreamMetadata()) return;
+
+        try {
+            const upgradeAudio = audio && !this.hasLocalUserMediaAudioTrack;
+            const upgradeVideo = video && !this.hasLocalUserMediaVideoTrack;
+            logger.debug(`Upgrading call: audio?=${upgradeAudio} video?=${upgradeVideo}`);
+
+            const stream = await this.client.getMediaHandler().getUserMediaStream(upgradeAudio, upgradeVideo);
+            if (upgradeAudio && upgradeVideo) {
+                if (this.hasLocalUserMediaAudioTrack) return;
+                if (this.hasLocalUserMediaVideoTrack) return;
+
+                this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
+            } else if (upgradeAudio) {
+                if (this.hasLocalUserMediaAudioTrack) return;
+
+                const audioTrack = stream.getAudioTracks()[0];
+                this.localUsermediaStream.addTrack(audioTrack);
+                this.peerConn.addTrack(audioTrack, this.localUsermediaStream);
+            } else if (upgradeVideo) {
+                if (this.hasLocalUserMediaVideoTrack) return;
+
+                const videoTrack = stream.getVideoTracks()[0];
+                this.localUsermediaStream.addTrack(videoTrack);
+                this.peerConn.addTrack(videoTrack, this.localUsermediaStream);
+            }
+        } catch (error) {
+            logger.error("Failed to upgrade the call", error);
+            this.emit(CallEvent.Error,
+                new CallError(CallErrorCode.NoUserMedia, "Failed to get camera access: ", error),
+            );
+        }
     }
 
     /**
@@ -888,10 +966,16 @@ export class MatrixCall extends EventEmitter {
     /**
      * Set whether our outbound video should be muted or not.
      * @param {boolean} muted True to mute the outbound video.
+     * @returns the new mute state
      */
-    public setLocalVideoMuted(muted: boolean): void {
+    public async setLocalVideoMuted(muted: boolean): Promise<boolean> {
+        if (!this.hasLocalUserMediaVideoTrack && !muted) {
+            await this.upgradeCall(false, true);
+            return this.isLocalVideoMuted();
+        }
         this.localUsermediaFeed?.setVideoMuted(muted);
         this.updateMuteStatus();
+        return this.isLocalVideoMuted();
     }
 
     /**
@@ -910,10 +994,16 @@ export class MatrixCall extends EventEmitter {
     /**
      * Set whether the microphone should be muted or not.
      * @param {boolean} muted True to mute the mic.
+     * @returns the new mute state
      */
-    public setMicrophoneMuted(muted: boolean): void {
+    public async setMicrophoneMuted(muted: boolean): Promise<boolean> {
+        if (!this.hasLocalUserMediaAudioTrack && !muted) {
+            await this.upgradeCall(true, false);
+            return this.isMicrophoneMuted();
+        }
         this.localUsermediaFeed?.setAudioMuted(muted);
         this.updateMuteStatus();
+        return this.isMicrophoneMuted();
     }
 
     /**
@@ -1482,10 +1572,13 @@ export class MatrixCall extends EventEmitter {
         // chrome doesn't implement any of the 'onstarted' events yet
         if (this.peerConn.iceConnectionState == 'connected') {
             this.setState(CallState.Connected);
-            this.callLengthInterval = setInterval(() => {
-                this.callLength++;
-                this.emit(CallEvent.LengthChanged, this.callLength);
-            }, 1000);
+
+            if (!this.callLengthInterval) {
+                this.callLengthInterval = setInterval(() => {
+                    this.callLength++;
+                    this.emit(CallEvent.LengthChanged, this.callLength);
+                }, 1000);
+            }
         } else if (this.peerConn.iceConnectionState == 'failed') {
             this.hangup(CallErrorCode.IceFailed, false);
         }

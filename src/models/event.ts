@@ -285,8 +285,28 @@ export class MatrixEvent extends EventEmitter {
      * @returns {IEvent} The event in wire format.
      */
     public getEffectiveEvent(): IEvent {
-        // clearEvent doesn't have all the fields, so we'll copy what we can from this.event
-        return Object.assign({}, this.event, this.clearEvent) as IEvent;
+        const content = Object.assign({}, this.getContent()); // clone for mutation
+
+        if (this.getWireType() === EventType.RoomMessageEncrypted) {
+            // Encrypted events sometimes aren't symmetrical on the `content` so we'll copy
+            // that over too, but only for missing properties. We don't copy over mismatches
+            // between the plain and decrypted copies of `content` because we assume that the
+            // app is relying on the decrypted version, so we want to expose that as a source
+            // of truth here too.
+            for (const [key, value] of Object.entries(this.getWireContent())) {
+                // Skip fields from the encrypted event schema though - we don't want to leak
+                // these.
+                if (["algorithm", "ciphertext", "device_id", "sender_key", "session_id"].includes(key)) {
+                    continue;
+                }
+
+                if (content[key] === undefined) content[key] = value;
+            }
+        }
+
+        // clearEvent doesn't have all the fields, so we'll copy what we can from this.event.
+        // We also copy over our "fixed" content key.
+        return Object.assign({}, this.event, this.clearEvent, { content }) as IEvent;
     }
 
     /**
@@ -412,11 +432,19 @@ export class MatrixEvent extends EventEmitter {
      * or in the main room timeline
      */
     public get replyInThread(): boolean {
-        const replyTo = this.getWireContent()
-            ?.["m.relates_to"]
-            ?.["m.in_reply_to"];
-        return (this.replyEventId
-            && replyTo[UNSTABLE_ELEMENT_REPLY_IN_THREAD.name])
+        /**
+         * UNSTABLE_ELEMENT_REPLY_IN_THREAD can live either
+         * at the m.relates_to and m.in_reply_to level
+         * This will likely change once we settle on a
+         * way to achieve threads
+         * TODO: Clean this up once we have a clear way forward
+         */
+
+        const relatesTo = this.getWireContent()?.["m.relates_to"];
+        const replyTo = relatesTo?.["m.in_reply_to"];
+
+        return relatesTo?.[UNSTABLE_ELEMENT_REPLY_IN_THREAD.name]
+            || (this.replyEventId && replyTo[UNSTABLE_ELEMENT_REPLY_IN_THREAD.name])
             || this.thread instanceof Thread;
     }
 

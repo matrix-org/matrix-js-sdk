@@ -17,12 +17,18 @@ limitations under the License.
 import { EventEmitter } from "events";
 import { MatrixClient } from "../matrix";
 import { MatrixEvent } from "./event";
+import { EventTimeline } from "./event-timeline";
 import { EventTimelineSet } from './event-timeline-set';
 import { Room } from './room';
 
 export enum ThreadEvent {
     Ready = "Thread.ready",
     Update = "Thread.update"
+}
+
+interface ISerialisedThread {
+    id: string;
+    tails: string[];
 }
 
 /**
@@ -58,7 +64,7 @@ export class Thread extends EventEmitter {
      * Will fire "Thread.update"
      * @param event The event to add
      */
-    public async addEvent(event: MatrixEvent): Promise<void> {
+    public async addEvent(event: MatrixEvent, toStartOfTimeline = false): Promise<void> {
         if (this.timelineSet.findEventById(event.getId()) || event.status !== null) {
             return;
         }
@@ -72,8 +78,20 @@ export class Thread extends EventEmitter {
             this.root = event.getId();
         }
 
+        // all the relevant membership info to hydrate events with a sender
+        // is held in the main room timeline
+        // We want to fetch the room state from there and pass it down to this thread
+        // timeline set to let it reconcile an event with its relevant RoomMember
+        const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+
         event.setThread(this);
-        this.timelineSet.addLiveEvent(event);
+        this.timelineSet.addEventToTimeline(
+            event,
+            this.timelineSet.getLiveTimeline(),
+            toStartOfTimeline,
+            false,
+            roomState,
+        );
 
         if (this.ready) {
             this.client.decryptEventIfNeeded(event, {});
@@ -96,7 +114,7 @@ export class Thread extends EventEmitter {
                 );
             }
 
-            this.addEvent(mxEvent);
+            this.addEvent(mxEvent, true);
             if (mxEvent.replyEventId) {
                 await this.fetchReplyChain();
             } else {
@@ -197,6 +215,13 @@ export class Thread extends EventEmitter {
 
     public has(eventId: string): boolean {
         return this.timelineSet.findEventById(eventId) instanceof MatrixEvent;
+    }
+
+    public toJson(): ISerialisedThread {
+        return {
+            id: this.id,
+            tails: Array.from(this.tail),
+        };
     }
 
     public on(event: ThreadEvent, listener: (...args: any[]) => void): this {

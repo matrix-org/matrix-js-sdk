@@ -49,6 +49,8 @@ type SigInfo = {
 export type TrustInfo = {
     usable: boolean; // is the backup trusted, true iff there is a sig that is valid & from a trusted device
     sigs: SigInfo[];
+    // eslint-disable-next-line camelcase
+    trusted_locally?: boolean;
 };
 
 export interface IKeyBackupCheck {

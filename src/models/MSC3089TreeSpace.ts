@@ -30,6 +30,7 @@ import {
 import { MSC3089Branch } from "./MSC3089Branch";
 import promiseRetry from "p-retry";
 import { isRoomSharedHistory } from "../crypto/algorithms/megolm";
+import { ISendEventResponse } from "../@types/requests";
 
 /**
  * The recommended defaults for a tree space's power levels. Note that this
@@ -452,26 +453,38 @@ export class MSC3089TreeSpace {
      * @param {ArrayBuffer} encryptedContents The encrypted contents.
      * @param {Partial<IEncryptedFile>} info The encrypted file information.
      * @param {IContent} additionalContent Optional event content fields to include in the message.
-     * @returns {Promise<void>} Resolves when uploaded.
+     * @returns {Promise<ISendEventResponse>} Resolves to the file event's sent response.
      */
     public async createFile(
         name: string,
         encryptedContents: ArrayBuffer,
         info: Partial<IEncryptedFile>,
         additionalContent?: IContent,
-    ): Promise<void> {
+    ): Promise<ISendEventResponse> {
         const mxc = await this.client.uploadContent(new Blob([encryptedContents]), {
             includeFilename: false,
             onlyContentUri: true,
         });
         info.url = mxc;
 
-        const res = await this.client.sendMessage(this.roomId, {
-            ...(additionalContent ?? {}),
+        const fileContent = {
             msgtype: MsgType.File,
             body: name,
             url: mxc,
             file: info,
+        };
+
+        additionalContent = additionalContent ?? {};
+        if (additionalContent["m.new_content"]) {
+            // We do the right thing according to the spec, but due to how relations are
+            // handled we also end up duplicating this information to the regular `content`
+            // as well.
+            additionalContent["m.new_content"] = fileContent;
+        }
+
+        const res = await this.client.sendMessage(this.roomId, {
+            ...additionalContent,
+            ...fileContent,
             [UNSTABLE_MSC3089_LEAF.name]: {},
         });
 
@@ -479,6 +492,8 @@ export class MSC3089TreeSpace {
             active: true,
             name: name,
         }, res['event_id']);
+
+        return res;
     }
 
     /**
@@ -488,7 +503,7 @@ export class MSC3089TreeSpace {
      */
     public getFile(fileEventId: string): MSC3089Branch {
         const branch = this.room.currentState.getStateEvents(UNSTABLE_MSC3089_BRANCH.name, fileEventId);
-        return branch ? new MSC3089Branch(this.client, branch) : null;
+        return branch ? new MSC3089Branch(this.client, branch, this) : null;
     }
 
     /**
@@ -496,7 +511,15 @@ export class MSC3089TreeSpace {
      * @returns {MSC3089Branch[]} The known files. May be empty, but not null.
      */
     public listFiles(): MSC3089Branch[] {
+        return this.listAllFiles().filter(b => b.isActive);
+    }
+
+    /**
+     * Gets an array of all known files for the tree, including inactive/invalid ones.
+     * @returns {MSC3089Branch[]} The known files. May be empty, but not null.
+     */
+    public listAllFiles(): MSC3089Branch[] {
         const branches = this.room.currentState.getStateEvents(UNSTABLE_MSC3089_BRANCH.name) ?? [];
-        return branches.map(e => new MSC3089Branch(this.client, e)).filter(b => b.isActive);
+        return branches.map(e => new MSC3089Branch(this.client, e, this));
     }
 }

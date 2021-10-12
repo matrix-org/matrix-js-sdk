@@ -20,7 +20,7 @@ limitations under the License.
 
 import { EventEmitter } from "events";
 
-import { EventTimelineSet } from "./event-timeline-set";
+import { EventTimelineSet, DuplicateStrategy } from "./event-timeline-set";
 import { EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
@@ -1298,13 +1298,6 @@ export class Room extends EventEmitter {
      * @experimental
      */
     public addThreadedEvent(event: MatrixEvent): void {
-        if (event.getUnsigned().transaction_id) {
-            const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id];
-            if (existingEvent) {
-                // remote echo of an event we sent earlier
-                this.handleRemoteEcho(event, existingEvent);
-            }
-        }
         let thread = this.findEventById(event.parentEventId)?.getThread();
         if (thread) {
             thread.addEvent(event);
@@ -1327,12 +1320,12 @@ export class Room extends EventEmitter {
      * @fires module:client~MatrixClient#event:"Room.timeline"
      * @private
      */
-    private addLiveEvent(event: MatrixEvent, duplicateStrategy?: "ignore" | "replace", fromCache = false): void {
+    private addLiveEvent(event: MatrixEvent, duplicateStrategy?: DuplicateStrategy, fromCache = false): void {
         if (event.isRedaction()) {
             const redactId = event.event.redacts;
 
             // if we know about this event, redact its contents now.
-            const redactedEvent = this.getUnfilteredTimelineSet().findEventById(redactId);
+            const redactedEvent = this.findEventById(redactId);
             if (redactedEvent) {
                 redactedEvent.makeRedacted(event);
 
@@ -1713,7 +1706,7 @@ export class Room extends EventEmitter {
      * @param {boolean} fromCache whether the sync response came from cache
      * @throws If <code>duplicateStrategy</code> is not falsey, 'replace' or 'ignore'.
      */
-    public addLiveEvents(events: MatrixEvent[], duplicateStrategy?: "replace" | "ignore", fromCache = false): void {
+    public addLiveEvents(events: MatrixEvent[], duplicateStrategy?: DuplicateStrategy, fromCache = false): void {
         let i;
         if (duplicateStrategy && ["replace", "ignore"].indexOf(duplicateStrategy) === -1) {
             throw new Error("duplicateStrategy MUST be either 'replace' or 'ignore'");

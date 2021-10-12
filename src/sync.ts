@@ -321,7 +321,7 @@ export class SyncApi {
                 // - It's related to a reply in thread event
                 let shouldLiveInThreadTimeline = event.replyInThread;
                 if (!shouldLiveInThreadTimeline) {
-                    const parentEventId = event.getWireContent()["m.relates_to"]?.event_id;
+                    const parentEventId = event.parentEventId;
                     const parentEvent = room?.findEventById(parentEventId) || events.find((mxEv: MatrixEvent) => {
                         return mxEv.getId() === parentEventId;
                     });

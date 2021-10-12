@@ -1,5 +1,5 @@
 import * as utils from "../test-utils";
-import { EventStatus, MatrixEvent } from "../../src";
+import { DuplicateStrategy, EventStatus, MatrixEvent } from "../../src";
 import { EventTimeline } from "../../src/models/event-timeline";
 import { RoomState } from "../../src";
 import { Room } from "../../src";
@@ -113,7 +113,7 @@ describe("Room", function() {
             dupe.event.event_id = events[0].getId();
             room.addLiveEvents(events);
             expect(room.timeline[0]).toEqual(events[0]);
-            room.addLiveEvents([dupe], "replace");
+            room.addLiveEvents([dupe], DuplicateStrategy.Replace);
             expect(room.timeline[0]).toEqual(dupe);
         });
 
