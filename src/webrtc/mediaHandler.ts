@@ -17,6 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { MatrixClient } from "../client";
 import { logger } from "../logger";
 
 export class MediaHandler {
@@ -25,13 +26,19 @@ export class MediaHandler {
     private userMediaStreams: MediaStream[] = [];
     private screensharingStreams: MediaStream[] = [];
 
+    constructor(private client: MatrixClient) {}
+
     /**
      * Set an audio input device to use for MatrixCalls
      * @param {string} deviceId the identifier for the device
      * undefined treated as unset
      */
-    public setAudioInput(deviceId: string): void {
+    public async setAudioInput(deviceId: string): Promise<void> {
         this.audioInput = deviceId;
+
+        await Promise.all(Array.from(this.client.callEventHandler.calls.values()).map((call) => {
+            return call.updateLocalUsermediaStream();
+        }));
     }
 
     /**
@@ -39,8 +46,12 @@ export class MediaHandler {
      * @param {string} deviceId the identifier for the device
      * undefined treated as unset
      */
-    public setVideoInput(deviceId: string): void {
+    public async setVideoInput(deviceId: string): Promise<void> {
         this.videoInput = deviceId;
+
+        await Promise.all(Array.from(this.client.callEventHandler.calls.values()).map((call) => {
+            return call.updateLocalUsermediaStream();
+        }));
     }
 
     public async hasAudioDevice(): Promise<boolean> {
@@ -56,7 +67,7 @@ export class MediaHandler {
     /**
      * @returns {MediaStream} based on passed parameters
      */
-    public async getUserMediaStream(audio: boolean, video: boolean): Promise<MediaStream> {
+    public async getUserMediaStream(audio: boolean, video: boolean, forceNewStream = false): Promise<MediaStream> {
         const shouldRequestAudio = audio && await this.hasAudioDevice();
         const shouldRequestVideo = video && await this.hasVideoDevice();
 
@@ -69,7 +80,7 @@ export class MediaHandler {
             return true;
         });
 
-        if (matchingStream) {
+        if (matchingStream && !forceNewStream) {
             logger.log("Cloning user media stream", matchingStream.id);
             stream = matchingStream.clone();
         } else {
