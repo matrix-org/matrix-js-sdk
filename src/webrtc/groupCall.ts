@@ -216,6 +216,16 @@ export class GroupCall extends EventEmitter {
         return callFeed;
     }
 
+    public async updateLocalUsermediaStream() {
+        if (this.localCallFeed) {
+            const mediaHandler = this.client.getMediaHandler();
+            const oldStream = this.localCallFeed.stream;
+            const stream = await mediaHandler.getUserMediaStream(true, this.type === GroupCallType.Video, true);
+            this.localCallFeed.setNewStream(stream);
+            mediaHandler.stopUserMediaStream(oldStream);
+        }
+    }
+
     public async enter() {
         if (!(this.state === GroupCallState.LocalCallFeedUninitialized ||
             this.state === GroupCallState.LocalCallFeedInitialized)) {

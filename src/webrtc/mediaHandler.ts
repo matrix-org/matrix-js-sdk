@@ -39,6 +39,10 @@ export class MediaHandler {
         await Promise.all(Array.from(this.client.callEventHandler.calls.values()).map((call) => {
             return call.updateLocalUsermediaStream();
         }));
+
+        await Promise.all(Array.from(this.client.groupCallEventHandler.groupCalls.values()).map((groupCall) => {
+            return groupCall.updateLocalUsermediaStream();
+        }));
     }
 
     /**
@@ -51,6 +55,10 @@ export class MediaHandler {
 
         await Promise.all(Array.from(this.client.callEventHandler.calls.values()).map((call) => {
             return call.updateLocalUsermediaStream();
+        }));
+
+        await Promise.all(Array.from(this.client.groupCallEventHandler.groupCalls.values()).map((groupCall) => {
+            return groupCall.updateLocalUsermediaStream();
         }));
     }
 
