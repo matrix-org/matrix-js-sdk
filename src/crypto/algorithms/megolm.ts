@@ -348,7 +348,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
                 (async () => {
                     logger.debug(
                         `Sharing keys (start phase 1) with new Olm sessions in ${this.roomId}`,
-                        devicesWithoutSession
+                        devicesWithoutSession,
                     );
                     const errorDevices = [];
 
