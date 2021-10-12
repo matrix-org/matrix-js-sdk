@@ -539,7 +539,7 @@ export interface IRequestTokenResponse {
     submit_url?: string;
 }
 
-interface IRequestMsisdnTokenResponse extends IRequestTokenResponse {
+export interface IRequestMsisdnTokenResponse extends IRequestTokenResponse {
     msisdn: string;
     success: boolean;
     intl_fmt: string;
@@ -574,6 +574,10 @@ interface IRoomInitialSyncResponse {
     visibility: Visibility;
     account_data?: IMinimalEvent[];
     presence: Partial<IEvent>; // legacy and undocumented, api is deprecated so this won't get attention
+}
+
+interface IJoinedRoomsResponse {
+    joined_rooms: string[];
 }
 
 interface IJoinedMembersResponse {
@@ -4102,10 +4106,8 @@ export class MatrixClient extends EventEmitter {
         // Work backwards first, looking at create events.
         let createEvent = currentRoom.currentState.getStateEvents(EventType.RoomCreate, "");
         while (createEvent) {
-            logger.log(`Looking at ${createEvent.getId()}`);
             const predecessor = createEvent.getContent()['predecessor'];
             if (predecessor && predecessor['room_id']) {
-                logger.log(`Looking at predecessor ${predecessor['room_id']}`);
                 const refRoom = this.getRoom(predecessor['room_id']);
                 if (!refRoom) break; // end of the chain
 
@@ -5094,7 +5096,7 @@ export class MatrixClient extends EventEmitter {
         email: string,
         clientSecret: string,
         sendAttempt: number,
-        nextLink: string,
+        nextLink?: string,
     ): Promise<IRequestTokenResponse> {
         return this.requestTokenFromEndpoint(
             "/account/3pid/email/requestToken",
@@ -5126,7 +5128,7 @@ export class MatrixClient extends EventEmitter {
         phoneNumber: string,
         clientSecret: string,
         sendAttempt: number,
-        nextLink: string,
+        nextLink?: string,
     ): Promise<IRequestMsisdnTokenResponse> {
         return this.requestTokenFromEndpoint(
             "/account/3pid/msisdn/requestToken",
@@ -6738,7 +6740,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: A list of the user's current rooms
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getJoinedRooms(): Promise<string[]> {
+    public getJoinedRooms(): Promise<IJoinedRoomsResponse> {
         const path = utils.encodeUri("/joined_rooms", {});
         return this.http.authedRequest(undefined, "GET", path);
     }

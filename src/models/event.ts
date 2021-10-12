@@ -432,11 +432,19 @@ export class MatrixEvent extends EventEmitter {
      * or in the main room timeline
      */
     public get replyInThread(): boolean {
-        const replyTo = this.getWireContent()
-            ?.["m.relates_to"]
-            ?.["m.in_reply_to"];
-        return (this.replyEventId
-            && replyTo[UNSTABLE_ELEMENT_REPLY_IN_THREAD.name])
+        /**
+         * UNSTABLE_ELEMENT_REPLY_IN_THREAD can live either
+         * at the m.relates_to and m.in_reply_to level
+         * This will likely change once we settle on a
+         * way to achieve threads
+         * TODO: Clean this up once we have a clear way forward
+         */
+
+        const relatesTo = this.getWireContent()?.["m.relates_to"];
+        const replyTo = relatesTo?.["m.in_reply_to"];
+
+        return relatesTo?.[UNSTABLE_ELEMENT_REPLY_IN_THREAD.name]
+            || (this.replyEventId && replyTo[UNSTABLE_ELEMENT_REPLY_IN_THREAD.name])
             || this.thread instanceof Thread;
     }
 

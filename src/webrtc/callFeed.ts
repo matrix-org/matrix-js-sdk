@@ -22,6 +22,16 @@ import { RoomMember } from "../models/room-member";
 const POLLING_INTERVAL = 250; // ms
 const SPEAKING_THRESHOLD = -60; // dB
 
+export interface ICallFeedOpts {
+    client: MatrixClient;
+    roomId: string;
+    userId: string;
+    stream: MediaStream;
+    purpose: SDPStreamMetadataPurpose;
+    audioMuted: boolean;
+    videoMuted: boolean;
+}
+
 export enum CallFeedEvent {
     NewStream = "new_stream",
     MuteStateChanged = "mute_state_changed",
@@ -30,6 +40,14 @@ export enum CallFeedEvent {
 }
 
 export class CallFeed extends EventEmitter {
+    public stream: MediaStream;
+    public userId: string;
+    public purpose: SDPStreamMetadataPurpose;
+
+    private client: MatrixClient;
+    private roomId: string;
+    private audioMuted: boolean;
+    private videoMuted: boolean;
     private measuringVolumeActivity = false;
     private audioContext: AudioContext;
     private analyser: AnalyserNode;
@@ -38,17 +56,17 @@ export class CallFeed extends EventEmitter {
     private speaking = false;
     private volumeLooperTimeout: number;
 
-    constructor(
-        public stream: MediaStream,
-        public userId: string,
-        public purpose: SDPStreamMetadataPurpose,
-        private client: MatrixClient,
-        private roomId: string,
-        private audioMuted: boolean,
-        private videoMuted: boolean,
-    ) {
+    constructor(opts: ICallFeedOpts) {
         super();
-        this.updateStream(null, stream);
+
+        this.client = opts.client;
+        this.roomId = opts.roomId;
+        this.userId = opts.userId;
+        this.purpose = opts.purpose;
+        this.audioMuted = opts.audioMuted;
+        this.videoMuted = opts.videoMuted;
+
+        this.updateStream(null, opts.stream);
 
         if (this.hasAudioTrack) {
             this.initVolumeMeasuring();
