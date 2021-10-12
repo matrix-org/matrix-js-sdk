@@ -595,7 +595,7 @@ export class MatrixCall extends EventEmitter {
         if (existingFeed) {
             existingFeed.setNewStream(stream);
         } else {
-            this.feeds.push(new CallFeed({
+            this.pushLocalFeed(new CallFeed({
                 client: this.client,
                 roomId: this.roomId,
                 audioMuted: stream.getAudioTracks().length === 0,
@@ -643,6 +643,24 @@ export class MatrixCall extends EventEmitter {
         );
 
         this.emit(CallEvent.FeedsChanged, this.feeds);
+    }
+
+    /**
+     * Removes local call feed from the call and its tracks from the peer
+     * connection
+     * @param callFeed to remove
+     */
+    public removeLocalFeed(callFeed: CallFeed): void {
+        const senderArray = callFeed.purpose === SDPStreamMetadataPurpose.Usermedia
+            ? this.usermediaSenders
+            : this.screensharingSenders;
+
+        for (const sender of senderArray) {
+            this.peerConn.removeTrack(sender);
+        }
+        // Empty the array
+        senderArray.splice(0, senderArray.length);
+        this.deleteFeedByStream(callFeed.stream);
     }
 
     private deleteAllFeeds(): void {
@@ -812,11 +830,11 @@ export class MatrixCall extends EventEmitter {
                 );
                 this.waitForLocalAVStream = false;
                 const callFeed = new CallFeed({
-                    stream,
-                    userId: this.client.getUserId(),
-                    purpose: SDPStreamMetadataPurpose.Usermedia,
                     client: this.client,
                     roomId: this.roomId,
+                    userId: this.client.getUserId(),
+                    stream,
+                    purpose: SDPStreamMetadataPurpose.Usermedia,
                     audioMuted: stream.getAudioTracks().length === 0,
                     videoMuted: stream.getVideoTracks().length === 0,
                 });
@@ -2079,11 +2097,11 @@ export class MatrixCall extends EventEmitter {
         try {
             const stream = await this.client.getMediaHandler().getUserMediaStream(audio, video);
             const callFeed = new CallFeed({
-                stream,
-                userId: this.client.getUserId(),
-                purpose: SDPStreamMetadataPurpose.Usermedia,
                 client: this.client,
                 roomId: this.roomId,
+                userId: this.client.getUserId(),
+                stream,
+                purpose: SDPStreamMetadataPurpose.Usermedia,
                 audioMuted: stream.getAudioTracks().length === 0,
                 videoMuted: stream.getVideoTracks().length === 0,
             });

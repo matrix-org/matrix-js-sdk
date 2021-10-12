@@ -1,5 +1,5 @@
 import EventEmitter from "events";
-import { CallFeed, CallFeedEvent } from "./callFeed";
+import { CallFeed, CallFeedEvent, SPEAKING_THRESHOLD } from "./callFeed";
 import { MatrixClient } from "../client";
 import { CallErrorCode, CallEvent, CallState, genCallID, MatrixCall, setTracksEnabled } from "./call";
 import { RoomMember } from "../models/room-member";
@@ -10,14 +10,13 @@ import { SDPStreamMetadataPurpose } from "./callEventTypes";
 import { createNewMatrixCall } from "./call";
 import { ISendEventResponse } from "../@types/requests";
 import { MatrixEvent } from "../models/event";
-import { RoomState } from "../models/room-state";
 
-export const CALL_EVENT = "org.matrix.msc3401.call";
-export const CALL_MEMBER_KEY = "org.matrix.msc3401.calls";
+export const GROUP_CALL_ROOM_EVENT = "org.matrix.msc3401.call";
+export const GROUP_CALL_MEMBER_EVENT = "org.matrix.msc3401.call.member";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
-    Prompt = "m.propmt",
+    Prompt = "m.prompt",
     Room = "m.room",
 }
 
@@ -64,6 +63,16 @@ export interface IGroupCallDataChannelOptions {
     protocol: string;
 }
 
+export interface IGroupCallRoomMemberCallState {
+    "m.call_id": string;
+    "m.foci"?: string[];
+    "m.sources"?: any[];
+}
+
+export interface IGroupCallRoomMemberState {
+    "m.calls": IGroupCallRoomMemberCallState[];
+}
+
 export enum GroupCallState {
     LocalCallFeedUninitialized = "local_call_feed_uninitialized",
     InitializingLocalCallFeed = "initializing_local_call_feed",
@@ -92,7 +101,7 @@ export class GroupCall extends EventEmitter {
     // Config
     public activeSpeakerSampleCount = 8;
     public activeSpeakerInterval = 1000;
-    public speakingThreshold = -80;
+    public speakingThreshold = SPEAKING_THRESHOLD;
     public participantTimeout = 1000 * 15;
 
     public state = GroupCallState.LocalCallFeedUninitialized;
@@ -125,22 +134,47 @@ export class GroupCall extends EventEmitter {
         this.groupCallId = genCallID();
 
         const roomState = this.room.currentState;
-        const memberStateEvents = roomState.getStateEvents("m.room.member");
+        const memberStateEvents = roomState.getStateEvents(GROUP_CALL_MEMBER_EVENT);
 
         logger.log("Processing initial members", memberStateEvents);
 
         for (const stateEvent of memberStateEvents) {
-            const member = this.room.getMember(stateEvent.getStateKey());
-            this.onMemberStateChanged(stateEvent, roomState, member);
+            this.onMemberStateChanged(stateEvent);
         }
+    }
 
-        this.client.on("RoomState.members", this.onMemberStateChanged);
+    public async create() {
+        this.client.groupCallEventHandler.groupCalls.set(this.room.roomId, this);
+
+        await this.client.sendStateEvent(
+            this.room.roomId,
+            GROUP_CALL_ROOM_EVENT,
+            {
+                "m.intent": this.intent,
+                "m.type": this.type,
+                // TODO: Specify datachannels
+                "dataChannelsEnabled": this.dataChannelsEnabled,
+                "dataChannelOptions": this.dataChannelOptions,
+            },
+            this.groupCallId,
+        );
+
+        return this;
     }
 
     private setState(newState: GroupCallState): void {
         const oldState = this.state;
         this.state = newState;
         this.emit(GroupCallEvent.GroupCallStateChanged, newState, oldState);
+    }
+
+    public getLocalFeeds(): CallFeed[] {
+        const feeds = [];
+
+        if (this.localCallFeed) feeds.push(this.localCallFeed);
+        if (this.localScreenshareFeed) feeds.push(this.localScreenshareFeed);
+
+        return feeds;
     }
 
     public async initLocalCallFeed(): Promise<CallFeed> {
@@ -161,15 +195,15 @@ export class GroupCall extends EventEmitter {
 
         const userId = this.client.getUserId();
 
-        const callFeed = new CallFeed(
-            stream,
+        const callFeed = new CallFeed({
+            client: this.client,
+            roomId: this.room.roomId,
             userId,
-            SDPStreamMetadataPurpose.Usermedia,
-            this.client,
-            this.room.roomId,
-            false,
-            false,
-        );
+            stream,
+            purpose: SDPStreamMetadataPurpose.Usermedia,
+            audioMuted: stream.getAudioTracks().length === 0,
+            videoMuted: stream.getVideoTracks().length === 0,
+        });
 
         this.activeSpeakerSamples.set(userId, Array(this.activeSpeakerSampleCount).fill(
             -Infinity,
@@ -213,13 +247,12 @@ export class GroupCall extends EventEmitter {
         // Set up participants for the members currently in the room.
         // Other members will be picked up by the RoomState.members event.
         const roomState = this.room.currentState;
-        const memberStateEvents = roomState.getStateEvents("m.room.member");
+        const memberStateEvents = roomState.getStateEvents(GROUP_CALL_MEMBER_EVENT);
 
         logger.log("Processing initial members");
 
         for (const stateEvent of memberStateEvents) {
-            const member = this.room.getMember(stateEvent.getStateKey());
-            this.onMemberStateChanged(stateEvent, roomState, member);
+            this.onMemberStateChanged(stateEvent);
         }
 
         this.client.on("Call.incoming", this.onIncomingCall);
@@ -274,11 +307,11 @@ export class GroupCall extends EventEmitter {
         this.client.groupCallEventHandler.groupCalls.delete(this.room.roomId);
 
         if (emitStateEvent) {
-            const existingStateEvent = this.room.currentState.getStateEvents(CALL_EVENT, this.groupCallId);
+            const existingStateEvent = this.room.currentState.getStateEvents(GROUP_CALL_ROOM_EVENT, this.groupCallId);
 
             await this.client.sendStateEvent(
                 this.room.roomId,
-                CALL_EVENT,
+                GROUP_CALL_ROOM_EVENT,
                 {
                     ...existingStateEvent.getContent(),
                     ["m.terminated"]: GroupCallTerminationReason.CallEnded,
@@ -311,7 +344,11 @@ export class GroupCall extends EventEmitter {
         return true;
     }
 
-    public setMicrophoneMuted(muted) {
+    public async setMicrophoneMuted(muted) {
+        if (!await this.client.getMediaHandler().hasAudioDevice()) {
+            return false;
+        }
+
         if (this.localCallFeed) {
             this.localCallFeed.setAudioMuted(muted);
             setTracksEnabled(this.localCallFeed.stream.getAudioTracks(), !muted);
@@ -324,7 +361,11 @@ export class GroupCall extends EventEmitter {
         this.emit(GroupCallEvent.LocalMuteStateChanged, muted, this.isLocalVideoMuted());
     }
 
-    public setLocalVideoMuted(muted) {
+    public async setLocalVideoMuted(muted) {
+        if (!await this.client.getMediaHandler().hasVideoDevice()) {
+            return false;
+        }
+
         if (this.localCallFeed) {
             this.localCallFeed.setVideoMuted(muted);
             setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);
@@ -352,19 +393,17 @@ export class GroupCall extends EventEmitter {
 
                 logger.log("Screensharing permissions granted. Setting screensharing enabled on all calls");
 
-                const callFeed = new CallFeed(
-                    stream,
-                    this.client.getUserId(),
-                    SDPStreamMetadataPurpose.Screenshare,
-                    this.client,
-                    this.room.roomId,
-                    false,
-                    false,
-                );
-
-                this.localScreenshareFeed = callFeed;
                 this.localDesktopCapturerSourceId = desktopCapturerSourceId;
-                this.addScreenshareFeed(callFeed);
+                this.localScreenshareFeed = new CallFeed({
+                    client: this.client,
+                    roomId: this.room.roomId,
+                    userId: this.client.getUserId(),
+                    stream,
+                    purpose: SDPStreamMetadataPurpose.Screenshare,
+                    audioMuted: false,
+                    videoMuted: false,
+                });
+                this.addScreenshareFeed(this.localScreenshareFeed);
 
                 this.emit(
                     GroupCallEvent.LocalScreenshareStateChanged,
@@ -374,7 +413,7 @@ export class GroupCall extends EventEmitter {
                 );
 
                 // TODO: handle errors
-                await Promise.all(this.calls.map(call => call.setScreensharingEnabled(true, desktopCapturerSourceId)));
+                await Promise.all(this.calls.map(call => call.pushLocalFeed(this.localScreenshareFeed)));
 
                 logger.log("screensharing enabled on all calls");
 
@@ -387,7 +426,7 @@ export class GroupCall extends EventEmitter {
                 return false;
             }
         } else {
-            await Promise.all(this.calls.map(call => call.setScreensharingEnabled(false, desktopCapturerSourceId)));
+            await Promise.all(this.calls.map(call => call.removeLocalFeed(this.localScreenshareFeed)));
             this.client.getMediaHandler().stopScreensharingStream(this.localScreenshareFeed.stream);
             this.removeScreenshareFeed(this.localScreenshareFeed);
             this.localScreenshareFeed = undefined;
@@ -440,7 +479,7 @@ export class GroupCall extends EventEmitter {
             this.addCall(newCall);
         }
 
-        newCall.answerWithCallFeeds([this.localCallFeed]);
+        newCall.answerWithCallFeeds(this.getLocalFeeds());
     };
 
     /**
@@ -448,31 +487,48 @@ export class GroupCall extends EventEmitter {
      */
 
     private sendEnteredMemberStateEvent(): Promise<ISendEventResponse> {
-        return this.updateMemberCallsState([
-            {
-                "m.call_id": this.groupCallId,
-            },
-        ]);
+        return this.updateMemberCallState({
+            "m.call_id": this.groupCallId,
+            // TODO "m.foci"
+            // TODO "m.sources"
+        });
     }
 
     private sendLeftMemberStateEvent(): Promise<ISendEventResponse> {
-        return this.updateMemberCallsState([]);
+        return this.updateMemberCallState(undefined);
     }
 
-    private async updateMemberCallsState(state: any): Promise<ISendEventResponse> {
+    private async updateMemberCallState(memberCallState?: IGroupCallRoomMemberCallState): Promise<ISendEventResponse> {
         const localUserId = this.client.getUserId();
 
-        const currentStateEvent = this.room.currentState.getStateEvents("m.room.member", localUserId);
+        const currentStateEvent = this.room.currentState.getStateEvents(GROUP_CALL_MEMBER_EVENT, localUserId);
 
-        return this.client.sendStateEvent(this.room.roomId, "m.room.member", {
-            ...currentStateEvent.getContent(),
-            [CALL_MEMBER_KEY]: state,
+        const calls = currentStateEvent?.getContent<IGroupCallRoomMemberState>()["m.calls"] || [];
+
+        const existingCallIndex = calls.findIndex((call) => call["m.call_id"] === this.groupCallId);
+
+        if (existingCallIndex === -1) {
+            calls.push(memberCallState);
+        } else if (memberCallState) {
+            calls.splice(existingCallIndex, 1, memberCallState);
+        } else {
+            calls.splice(existingCallIndex, 1);
+        }
+
+        return this.client.sendStateEvent(this.room.roomId, GROUP_CALL_MEMBER_EVENT, {
+            "m.calls": calls,
         }, localUserId);
     }
 
-    private onMemberStateChanged = (event: MatrixEvent, state: RoomState, member: RoomMember) => {
+    public onMemberStateChanged = (event: MatrixEvent) => {
         // The member events may be received for another room, which we will ignore.
         if (event.getRoomId() !== this.room.roomId) {
+            return;
+        }
+
+        const member = this.room.getMember(event.getStateKey());
+
+        if (!member) {
             return;
         }
 
@@ -483,7 +539,7 @@ export class GroupCall extends EventEmitter {
             return;
         }
 
-        const callsState = event.getContent()[CALL_MEMBER_KEY];
+        const callsState = event.getContent<IGroupCallRoomMemberState>()["m.calls"];
 
         if (!callsState || !Array.isArray(callsState) || callsState.length === 0) {
             logger.log(`Ignoring member state from ${member.userId} member not in any calls.`);
@@ -533,7 +589,7 @@ export class GroupCall extends EventEmitter {
             { invitee: member.userId, useToDevice: true, groupCallId: this.groupCallId },
         );
 
-        newCall.placeCallWithCallFeeds([this.localCallFeed]);
+        newCall.placeCallWithCallFeeds(this.getLocalFeeds());
 
         if (this.dataChannelsEnabled) {
             newCall.createDataChannel("datachannel", this.dataChannelOptions);

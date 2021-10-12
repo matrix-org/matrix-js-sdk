@@ -16,7 +16,14 @@ limitations under the License.
 
 import { MatrixEvent } from '../models/event';
 import { MatrixClient } from '../client';
-import { CALL_EVENT, GroupCall, GroupCallIntent, GroupCallType, IGroupCallDataChannelOptions } from "./groupCall";
+import {
+    GROUP_CALL_ROOM_EVENT,
+    GROUP_CALL_MEMBER_EVENT,
+    GroupCall,
+    GroupCallIntent,
+    GroupCallType,
+    IGroupCallDataChannelOptions,
+} from "./groupCall";
 import { Room } from "../models/room";
 import { RoomState } from "../models/room-state";
 import { logger } from '../logger';
@@ -46,7 +53,7 @@ export class GroupCallEventHandler {
     }
 
     private createGroupCallForRoom(room: Room): GroupCall | undefined {
-        const callEvents = room.currentState.getStateEvents(CALL_EVENT);
+        const callEvents = room.currentState.getStateEvents(GROUP_CALL_ROOM_EVENT);
         const sortedCallEvents = callEvents.sort((a, b) => b.getTs() - a.getTs());
 
         for (const callEvent of sortedCallEvents) {
@@ -118,29 +125,37 @@ export class GroupCallEventHandler {
     };
 
     private onRoomStateChanged = (event: MatrixEvent, state: RoomState): void => {
-        if (event.getType() !== CALL_EVENT) {
-            return;
-        }
+        const eventType = event.getType();
 
-        const groupCallId = event.getStateKey();
-        const content = event.getContent();
+        if (eventType === GROUP_CALL_ROOM_EVENT) {
+            const groupCallId = event.getStateKey();
+            const content = event.getContent();
 
-        const currentGroupCall = this.groupCalls.get(state.roomId);
+            const currentGroupCall = this.groupCalls.get(state.roomId);
 
-        if (!currentGroupCall && !content["m.terminated"]) {
-            this.createGroupCallFromRoomStateEvent(event);
-        } else if (currentGroupCall && currentGroupCall.groupCallId === groupCallId) {
-            if (content["m.terminated"]) {
-                currentGroupCall.terminate(false);
-            } else if (content["m.type"] !== currentGroupCall.type) {
-                // TODO: Handle the callType changing when the room state changes
-                logger.warn(`The group call type changed for room: ${
-                    state.roomId}. Changing the group call type is currently unsupported.`);
+            if (!currentGroupCall && !content["m.terminated"]) {
+                this.createGroupCallFromRoomStateEvent(event);
+            } else if (currentGroupCall && currentGroupCall.groupCallId === groupCallId) {
+                if (content["m.terminated"]) {
+                    currentGroupCall.terminate(false);
+                } else if (content["m.type"] !== currentGroupCall.type) {
+                    // TODO: Handle the callType changing when the room state changes
+                    logger.warn(`The group call type changed for room: ${
+                        state.roomId}. Changing the group call type is currently unsupported.`);
+                }
+            } else if (currentGroupCall && currentGroupCall.groupCallId !== groupCallId) {
+                // TODO: Handle new group calls and multiple group calls
+                logger.warn(`Multiple group calls detected for room: ${
+                    state.roomId}. Multiple group calls are currently unsupported.`);
             }
-        } else if (currentGroupCall && currentGroupCall.groupCallId !== groupCallId) {
-            // TODO: Handle new group calls and multiple group calls
-            logger.warn(`Multiple group calls detected for room: ${
-                state.roomId}. Multiple group calls are currently unsupported.`);
+        } else if (eventType === GROUP_CALL_MEMBER_EVENT) {
+            const groupCall = this.groupCalls.get(state.roomId);
+
+            if (!groupCall) {
+                return;
+            }
+
+            groupCall.onMemberStateChanged(event);
         }
     };
 }

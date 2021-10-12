@@ -20,7 +20,7 @@ import { MatrixClient } from "../client";
 import { RoomMember } from "../models/room-member";
 
 const POLLING_INTERVAL = 250; // ms
-const SPEAKING_THRESHOLD = -60; // dB
+export const SPEAKING_THRESHOLD = -60; // dB
 
 export interface ICallFeedOpts {
     client: MatrixClient;
