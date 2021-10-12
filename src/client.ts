@@ -751,7 +751,7 @@ export class MatrixClient extends EventEmitter {
     protected checkTurnServersIntervalID: number;
     protected exportedOlmDeviceToImport: IOlmDevice;
     protected txnCtr = 0;
-    protected mediaHandler = new MediaHandler();
+    protected mediaHandler = new MediaHandler(this);
 
     constructor(opts: IMatrixClientCreateOpts) {
         super();

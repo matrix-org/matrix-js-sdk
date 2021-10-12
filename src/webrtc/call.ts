@@ -1083,6 +1083,23 @@ export class MatrixCall extends EventEmitter {
     }
 
     /**
+     * Request a new local usermedia stream with the current device id.
+     */
+    public async updateLocalUsermediaStream() {
+        const oldStream = this.localUsermediaStream;
+
+        const stream = await this.client.getMediaHandler().getUserMediaStream(
+            this.hasLocalUserMediaAudioTrack,
+            this.hasLocalUserMediaVideoTrack,
+            true,
+        );
+
+        this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia, true);
+
+        this.client.getMediaHandler().stopUserMediaStream(oldStream);
+    }
+
+    /**
      * Set whether our outbound video should be muted or not.
      * @param {boolean} muted True to mute the outbound video.
      * @returns the new mute state
