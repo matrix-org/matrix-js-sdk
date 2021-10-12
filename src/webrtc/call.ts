@@ -1010,7 +1010,46 @@ export class MatrixCall extends EventEmitter {
             true,
         );
 
-        this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia, true);
+        const callFeed = this.localUsermediaFeed;
+
+        callFeed.setNewStream(stream);
+
+        const newSenders = [];
+
+        for (const track of stream.getTracks()) {
+            const oldSender = this.usermediaSenders.find((sender) => {
+                return sender.track?.kind === track.kind;
+            });
+
+            let newSender: RTCRtpSender;
+
+            try {
+                logger.info(
+                    `Replacing track (` +
+                    `id="${track.id}", ` +
+                    `kind="${track.kind}", ` +
+                    `streamId="${stream}", ` +
+                    `streamPurpose="${callFeed.purpose}"` +
+                    `) to peer connection`,
+                );
+                await oldSender.replaceTrack(track);
+                newSender = oldSender;
+            } catch (error) {
+                logger.info(
+                    `Adding track (` +
+                    `id="${track.id}", ` +
+                    `kind="${track.kind}", ` +
+                    `streamId="${stream}", ` +
+                    `streamPurpose="${callFeed.purpose}"` +
+                    `) to peer connection`,
+                );
+                newSender = this.peerConn.addTrack(track, stream);
+            }
+
+            newSenders.push(newSender);
+        }
+
+        this.usermediaSenders = newSenders;
 
         this.client.getMediaHandler().stopUserMediaStream(oldStream);
     }
