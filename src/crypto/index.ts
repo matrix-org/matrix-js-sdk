@@ -40,7 +40,7 @@ import {
     ISecretRequest,
     SecretStorageKeyObject,
 } from './SecretStorage';
-import { IAddSecretStorageKeyOpts, ISecretStorageKeyInfo } from "./api";
+import { IAddSecretStorageKeyOpts, IImportRoomKeysOpts, ISecretStorageKeyInfo } from "./api";
 import { OutgoingRoomKeyRequestManager } from './OutgoingRoomKeyRequestManager';
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { ReciprocateQRCode, SCAN_QR_CODE_METHOD, SHOW_QR_CODE_METHOD } from './verification/QRCode';
@@ -2658,7 +2658,7 @@ export class Crypto extends EventEmitter {
      * @param {Function} opts.progressCallback called with an object which has a stage param
      * @return {Promise} a promise which resolves once the keys have been imported
      */
-    public importRoomKeys(keys: IMegolmSessionData[], opts: any = {}): Promise<any> { // TODO types
+    public importRoomKeys(keys: IMegolmSessionData[], opts: IImportRoomKeysOpts = {}): Promise<any> { // TODO types
         let successes = 0;
         let failures = 0;
         const total = keys.length;
