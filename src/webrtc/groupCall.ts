@@ -219,10 +219,8 @@ export class GroupCall extends EventEmitter {
     public async updateLocalUsermediaStream() {
         if (this.localCallFeed) {
             const mediaHandler = this.client.getMediaHandler();
-            const oldStream = this.localCallFeed.stream;
             const stream = await mediaHandler.getUserMediaStream(true, this.type === GroupCallType.Video, true);
             this.localCallFeed.setNewStream(stream);
-            mediaHandler.stopUserMediaStream(oldStream);
         }
     }
 

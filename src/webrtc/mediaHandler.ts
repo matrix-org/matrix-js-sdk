@@ -36,6 +36,12 @@ export class MediaHandler {
     public async setAudioInput(deviceId: string): Promise<void> {
         this.audioInput = deviceId;
 
+        for (const stream of this.userMediaStreams) {
+            for (const track of stream.getTracks()) {
+                track.stop();
+            }
+        }
+
         await Promise.all(Array.from(this.client.callEventHandler.calls.values()).map((call) => {
             return call.updateLocalUsermediaStream();
         }));
@@ -52,6 +58,12 @@ export class MediaHandler {
      */
     public async setVideoInput(deviceId: string): Promise<void> {
         this.videoInput = deviceId;
+
+        for (const stream of this.userMediaStreams) {
+            for (const track of stream.getTracks()) {
+                track.stop();
+            }
+        }
 
         await Promise.all(Array.from(this.client.callEventHandler.calls.values()).map((call) => {
             return call.updateLocalUsermediaStream();

@@ -1086,8 +1086,6 @@ export class MatrixCall extends EventEmitter {
      * Request a new local usermedia stream with the current device id.
      */
     public async updateLocalUsermediaStream() {
-        const oldStream = this.localUsermediaStream;
-
         const stream = await this.client.getMediaHandler().getUserMediaStream(
             this.hasLocalUserMediaAudioTrack,
             this.hasLocalUserMediaVideoTrack,
@@ -1134,8 +1132,6 @@ export class MatrixCall extends EventEmitter {
         }
 
         this.usermediaSenders = newSenders;
-
-        this.client.getMediaHandler().stopUserMediaStream(oldStream);
     }
 
     /**
