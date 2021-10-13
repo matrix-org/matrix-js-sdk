@@ -78,6 +78,10 @@ export class CallFeed extends EventEmitter {
     }
 
     private updateStream(oldStream: MediaStream, newStream: MediaStream): void {
+        if (newStream === oldStream) {
+            return;
+        }
+
         if (oldStream) {
             oldStream.removeEventListener("addtrack", this.onAddTrack);
             this.measureVolumeActivity(false);
