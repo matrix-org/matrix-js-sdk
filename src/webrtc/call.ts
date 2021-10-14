@@ -562,8 +562,8 @@ export class MatrixCall extends EventEmitter {
             this.feeds.push(new CallFeed({
                 client: this.client,
                 roomId: this.roomId,
-                audioMuted: false,
-                videoMuted: false,
+                audioMuted: stream.getAudioTracks().length === 0,
+                videoMuted: stream.getVideoTracks().length === 0,
                 userId,
                 stream,
                 purpose,
@@ -752,19 +752,30 @@ export class MatrixCall extends EventEmitter {
         logger.debug(`Answering call ${this.callId}`);
 
         if (!this.localUsermediaStream && !this.waitForLocalAVStream) {
+            const prevState = this.state;
+            const answerWithAudio = this.shouldAnswerWithMediaType(audio, this.hasRemoteUserMediaAudioTrack, "audio");
+            const answerWithVideo = this.shouldAnswerWithMediaType(video, this.hasRemoteUserMediaVideoTrack, "video");
+
             this.setState(CallState.WaitLocalMedia);
             this.waitForLocalAVStream = true;
 
             try {
                 const mediaStream = await this.client.getMediaHandler().getUserMediaStream(
-                    this.shouldAnswerWithMediaType(audio, this.hasRemoteUserMediaAudioTrack, "audio"),
-                    this.shouldAnswerWithMediaType(video, this.hasRemoteUserMediaVideoTrack, "video"),
+                    answerWithAudio, answerWithVideo,
                 );
                 this.waitForLocalAVStream = false;
                 this.gotUserMediaForAnswer(mediaStream);
             } catch (e) {
-                this.getUserMediaFailed(e);
-                return;
+                if (answerWithVideo) {
+                    // Try to answer without video
+                    logger.warn("Failed to getUserMedia(), trying to getUserMedia() without video");
+                    this.setState(prevState);
+                    this.waitForLocalAVStream = false;
+                    await this.answer(answerWithAudio, false);
+                } else {
+                    this.getUserMediaFailed(e);
+                    return;
+                }
             }
         } else if (this.waitForLocalAVStream) {
             this.setState(CallState.WaitLocalMedia);
@@ -993,6 +1004,10 @@ export class MatrixCall extends EventEmitter {
      * @returns the new mute state
      */
     public async setLocalVideoMuted(muted: boolean): Promise<boolean> {
+        if (!await this.client.getMediaHandler().hasVideoDevice()) {
+            return this.isLocalVideoMuted();
+        }
+
         if (!this.hasLocalUserMediaVideoTrack && !muted) {
             await this.upgradeCall(false, true);
             return this.isLocalVideoMuted();
@@ -1021,6 +1036,10 @@ export class MatrixCall extends EventEmitter {
      * @returns the new mute state
      */
     public async setMicrophoneMuted(muted: boolean): Promise<boolean> {
+        if (!await this.client.getMediaHandler().hasAudioDevice()) {
+            return this.isMicrophoneMuted();
+        }
+
         if (!this.hasLocalUserMediaAudioTrack && !muted) {
             await this.upgradeCall(true, false);
             return this.isMicrophoneMuted();
