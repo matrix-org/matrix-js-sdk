@@ -319,13 +319,13 @@ export class SyncApi {
                 // An event should live in the thread timeline if
                 // - It's a reply in thread event
                 // - It's related to a reply in thread event
-                let shouldLiveInThreadTimeline = event.replyInThread;
+                let shouldLiveInThreadTimeline = event.isThreadRelation;
                 if (!shouldLiveInThreadTimeline) {
                     const parentEventId = event.parentEventId;
                     const parentEvent = room?.findEventById(parentEventId) || events.find((mxEv: MatrixEvent) => {
                         return mxEv.getId() === parentEventId;
                     });
-                    shouldLiveInThreadTimeline = parentEvent?.replyInThread;
+                    shouldLiveInThreadTimeline = parentEvent?.isThreadRelation;
                 }
                 memo[shouldLiveInThreadTimeline ? 1 : 0].push(event);
                 return memo;

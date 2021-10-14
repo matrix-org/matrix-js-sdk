@@ -149,7 +149,7 @@ export class Room extends EventEmitter {
     /**
      * @experimental
      */
-    public threads = new Set<Thread>();
+    public threads = new Map<string, Thread>();
 
     /**
      * Construct a new Room.
@@ -1071,19 +1071,6 @@ export class Room extends EventEmitter {
     /**
      * @experimental
      */
-    public addThread(thread: Thread): Set<Thread> {
-        this.threads.add(thread);
-        if (!thread.ready) {
-            thread.once(ThreadEvent.Ready, this.dedupeThreads);
-            this.emit(ThreadEvent.Update, thread);
-            this.reEmitter.reEmit(thread, [ThreadEvent.Update, ThreadEvent.Ready]);
-        }
-        return this.threads;
-    }
-
-    /**
-     * @experimental
-     */
     public getThread(eventId: string): Thread {
         return this.getThreads().find(thread => {
             return thread.id === eventId;
@@ -1096,26 +1083,6 @@ export class Room extends EventEmitter {
     public getThreads(): Thread[] {
         return Array.from(this.threads.values());
     }
-
-    /**
-     * Two threads starting from a different child event can end up
-     * with the same event root. This method ensures that the duplicates
-     * are removed
-     * @experimental
-     */
-    private dedupeThreads = (readyThread): void => {
-        const deduped = Array.from(this.threads).reduce((dedupedThreads, thread) => {
-            if (dedupedThreads.has(thread.id)) {
-                dedupedThreads.get(thread.id).merge(thread);
-            } else {
-                dedupedThreads.set(thread.id, thread);
-            }
-
-            return dedupedThreads;
-        }, new Map<string, Thread>());
-
-        this.threads = new Set<Thread>(deduped.values());
-    };
 
     /**
      * Get a member from the current room state.
@@ -1293,21 +1260,33 @@ export class Room extends EventEmitter {
         }
     }
 
+    public findThreadForEvent(event: MatrixEvent): Thread {
+        if (!event) {
+            return null;
+        }
+        if (event.isThreadRelation) {
+            return this.threads.get(event.threadRootId);
+        } else {
+            const parentEvent = this.findEventById(event.parentEventId);
+            return this.findThreadForEvent(parentEvent);
+        }
+    }
+
     /**
      * Add an event to a thread's timeline. Will fire "Thread.update"
      * @experimental
      */
     public addThreadedEvent(event: MatrixEvent): void {
-        let thread = this.findEventById(event.parentEventId)?.getThread();
+        let thread = this.findThreadForEvent(event);
         if (thread) {
             thread.addEvent(event);
         } else {
-            thread = new Thread([event], this, this.client);
+            const rootEvent = this.findEventById(event.threadRootId);
+            thread = new Thread([rootEvent, event], this, this.client);
+            this.reEmitter.reEmit(thread, [ThreadEvent.Update, ThreadEvent.Ready]);
+            this.threads.set(thread.id, thread);
         }
-
-        if (!this.threads.has(thread)) {
-            this.addThread(thread);
-        }
+        this.emit(ThreadEvent.Update, thread);
     }
 
     /**
@@ -1409,7 +1388,7 @@ export class Room extends EventEmitter {
         // TODO: Enable "pending events" for threads
         // There's a fair few things to update to make them work with Threads
         // Will get back to it when the plan is to build a more polished UI ready for production
-        if (this.client?.supportsExperimentalThreads() && event.replyInThread) {
+        if (this.client?.supportsExperimentalThreads() && event.threadRootId) {
             return;
         }
 
@@ -1583,14 +1562,6 @@ export class Room extends EventEmitter {
 
         this.emit("Room.localEchoUpdated", localEvent, this,
             oldEventId, oldStatus);
-    }
-
-    public findThreadByEventId(eventId: string): Thread {
-        for (const thread of this.threads) {
-            if (thread.has(eventId)) {
-                return thread;
-            }
-        }
     }
 
     /**
