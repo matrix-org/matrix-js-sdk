@@ -23,6 +23,8 @@ limitations under the License.
 
 import * as utils from "../../utils";
 import { logger } from '../../logger';
+import { Room } from "../../models/room";
+import { ISessionInfo } from "../../crypto/store/base";
 
 const DEBUG = false;  // set true to enable console logging.
 const E2E_PREFIX = "session.e2e.";
@@ -38,16 +40,13 @@ const E2E_PREFIX = "session.e2e.";
  */
 
 export class WebStorageSessionStore {
-    private store: Storage;
-
-    constructor(webStore) {
-        this.store = webStore;
+    constructor(private store: Storage) {
         if (
-            !utils.isFunction(webStore.getItem) ||
-            !utils.isFunction(webStore.setItem) ||
-            !utils.isFunction(webStore.removeItem) ||
-            !utils.isFunction(webStore.key) ||
-            typeof(webStore.length) !== 'number'
+            !utils.isFunction(store.getItem) ||
+            !utils.isFunction(store.setItem) ||
+            !utils.isFunction(store.removeItem) ||
+            !utils.isFunction(store.key) ||
+            typeof(store.length) !== 'number'
         ) {
             throw new Error("Supplied webStore does not meet the WebStorage API interface");
         }
@@ -80,7 +79,7 @@ export class WebStorageSessionStore {
         for (let i = 0; i < this.store.length; ++i) {
             const key = this.store.key(i);
             const userId = key.substr(prefix.length);
-            if (key.startsWith(prefix)) devices[userId] = getJsonItem(this.store, key);
+            if (key.startsWith(prefix)) devices[userId] = getJsonItem<ISessionInfo>(this.store, key);
         }
         return devices;
     }
@@ -122,12 +121,13 @@ export class WebStorageSessionStore {
      * devices.
      * @return {object} A map of {deviceKey -> {sessionId -> session pickle}}
      */
-    getAllEndToEndSessions(): Record<string, any | null> {
+    getAllEndToEndSessions(): Record<string, ISessionInfo> {
         const deviceKeys = getKeysWithPrefix(this.store, keyEndToEndSessions(''));
-        const results = {};
+        const results: Record<string, ISessionInfo> = {};
         for (const k of deviceKeys) {
             const unprefixedKey = k.substr(keyEndToEndSessions('').length);
-            results[unprefixedKey] = getJsonItem(this.store, k);
+            const sessionInfo: ISessionInfo = getJsonItem(this.store, k);
+            results[unprefixedKey] = sessionInfo;
         }
         return results;
     }
@@ -181,9 +181,9 @@ export class WebStorageSessionStore {
      * Get the end-to-end state for all rooms
      * @return {object} roomId -> object with the end-to-end info for the room.
      */
-    public getAllEndToEndRooms(): Record<string, any | null> {
+    public getAllEndToEndRooms(): Record<string, Room> {
         const roomKeys = getKeysWithPrefix(this.store, keyEndToEndRoom(''));
-        const results = {};
+        const results: Record<string, Room> = {};
         for (const k of roomKeys) {
             const unprefixedKey = k.substr(keyEndToEndRoom('').length);
             results[unprefixedKey] = getJsonItem(this.store, k);
@@ -195,7 +195,7 @@ export class WebStorageSessionStore {
         removeByPrefix(this.store, keyEndToEndRoom(''));
     }
 
-    public setLocalTrustedBackupPubKey(pubkey): void {
+    public setLocalTrustedBackupPubKey(pubkey: string): void {
         this.store.setItem(KEY_END_TO_END_TRUSTED_BACKUP_PUBKEY, pubkey);
     }
 
@@ -211,23 +211,23 @@ const KEY_END_TO_END_DEVICE_SYNC_TOKEN = E2E_PREFIX + "device_sync_token";
 const KEY_END_TO_END_DEVICE_LIST_TRACKING_STATUS = E2E_PREFIX + "device_tracking";
 const KEY_END_TO_END_TRUSTED_BACKUP_PUBKEY = E2E_PREFIX + "trusted_backup_pubkey";
 
-function keyEndToEndDevicesForUser(userId): string {
+function keyEndToEndDevicesForUser(userId: string): string {
     return E2E_PREFIX + "devices/" + userId;
 }
 
-function keyEndToEndSessions(deviceKey): string {
+function keyEndToEndSessions(deviceKey: string): string {
     return E2E_PREFIX + "sessions/" + deviceKey;
 }
 
-function keyEndToEndInboundGroupSession(senderKey, sessionId): string {
+function keyEndToEndInboundGroupSession(senderKey: string, sessionId: string): string {
     return E2E_PREFIX + "inboundgroupsessions/" + senderKey + "/" + sessionId;
 }
 
-function keyEndToEndRoom(roomId): string {
+function keyEndToEndRoom(roomId: string): string {
     return E2E_PREFIX + "rooms/" + roomId;
 }
 
-function getJsonItem(store, key): Record<string, any> | null {
+function getJsonItem<T extends unknown>(store: Storage, key: string): T | null {
     try {
         // if the key is absent, store.getItem() returns null, and
         // JSON.parse(null) === null, so this returns null.
@@ -239,8 +239,8 @@ function getJsonItem(store, key): Record<string, any> | null {
     return null;
 }
 
-function getKeysWithPrefix(store, prefix): Record<string, any>[] {
-    const results = [];
+function getKeysWithPrefix(store: Storage, prefix: string): String[] {
+    const results: String[] = [];
     for (let i = 0; i < store.length; ++i) {
         const key = store.key(i);
         if (key.startsWith(prefix)) results.push(key);
@@ -248,7 +248,7 @@ function getKeysWithPrefix(store, prefix): Record<string, any>[] {
     return results;
 }
 
-function removeByPrefix(store, prefix): void {
+function removeByPrefix(store: Storage, prefix: string): void {
     const toRemove = [];
     for (let i = 0; i < store.length; ++i) {
         const key = store.key(i);
