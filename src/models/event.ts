@@ -439,7 +439,7 @@ export class MatrixEvent extends EventEmitter {
      */
     public get isThreadRoot(): boolean {
         const thread = this.getThread();
-        return thread.id === this.getId();
+        return thread?.id === this.getId();
     }
 
     public get parentEventId(): string {
