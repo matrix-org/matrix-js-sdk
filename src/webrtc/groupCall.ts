@@ -1,5 +1,5 @@
 import EventEmitter from "events";
-import { CallFeed, CallFeedEvent, SPEAKING_THRESHOLD } from "./callFeed";
+import { CallFeed, SPEAKING_THRESHOLD } from "./callFeed";
 import { MatrixClient } from "../client";
 import { CallErrorCode, CallEvent, CallState, genCallID, MatrixCall, setTracksEnabled } from "./call";
 import { RoomMember } from "../models/room-member";
@@ -82,11 +82,6 @@ export enum GroupCallState {
     Ended = "ended",
 }
 
-interface IUserMediaFeedHandlers {
-    onCallFeedVolumeChanged: (maxVolume: number) => void;
-    onCallFeedMuteStateChanged: (audioMuted: boolean) => void;
-}
-
 interface ICallHandlers {
     onCallFeedsChanged: (feeds: CallFeed[]) => void;
     onCallStateChanged: (state: CallState, oldState: CallState) => void;
@@ -99,9 +94,7 @@ function getCallUserId(call: MatrixCall): string | null {
 
 export class GroupCall extends EventEmitter {
     // Config
-    public activeSpeakerSampleCount = 8;
     public activeSpeakerInterval = 1000;
-    public speakingThreshold = SPEAKING_THRESHOLD;
     public participantTimeout = 1000 * 15;
 
     public state = GroupCallState.LocalCallFeedUninitialized;
@@ -115,9 +108,7 @@ export class GroupCall extends EventEmitter {
     public screenshareFeeds: CallFeed[] = [];
     public groupCallId: string;
 
-    private userMediaFeedHandlers: Map<string, IUserMediaFeedHandlers> = new Map();
     private callHandlers: Map<string, ICallHandlers> = new Map();
-    private activeSpeakerSamples: Map<string, number[]> = new Map();
     private activeSpeakerLoopTimeout?: number;
     private reEmitter: ReEmitter;
 
@@ -205,9 +196,6 @@ export class GroupCall extends EventEmitter {
             videoMuted: stream.getVideoTracks().length === 0,
         });
 
-        this.activeSpeakerSamples.set(userId, Array(this.activeSpeakerSampleCount).fill(
-            -Infinity,
-        ));
         this.localCallFeed = callFeed;
         this.addUserMediaFeed(callFeed);
 
@@ -680,9 +668,6 @@ export class GroupCall extends EventEmitter {
             call.setScreensharingEnabled(true, this.localDesktopCapturerSourceId);
         }
 
-        this.activeSpeakerSamples.set(opponentMemberId, Array(this.activeSpeakerSampleCount).fill(
-            -Infinity,
-        ));
         this.reEmitter.reEmit(call, Object.values(CallEvent));
     }
 
@@ -720,8 +705,6 @@ export class GroupCall extends EventEmitter {
         if (screenshareFeed) {
             this.removeScreenshareFeed(screenshareFeed);
         }
-
-        this.activeSpeakerSamples.delete(opponentMemberId);
     }
 
     private onCallFeedsChanged = (call: MatrixCall) => {
@@ -798,7 +781,7 @@ export class GroupCall extends EventEmitter {
 
     private addUserMediaFeed(callFeed: CallFeed) {
         this.userMediaFeeds.push(callFeed);
-        this.initUserMediaFeed(callFeed);
+        callFeed.measureVolumeActivity(true);
         this.emit(GroupCallEvent.UserMediaFeedsChanged, this.userMediaFeeds);
     }
 
@@ -811,8 +794,8 @@ export class GroupCall extends EventEmitter {
 
         this.userMediaFeeds.splice(feedIndex, 1, replacementFeed);
 
-        this.disposeUserMediaFeed(existingFeed);
-        this.initUserMediaFeed(replacementFeed);
+        existingFeed.dispose();
+        replacementFeed.measureVolumeActivity(true);
         this.emit(GroupCallEvent.UserMediaFeedsChanged, this.userMediaFeeds);
     }
 
@@ -825,7 +808,7 @@ export class GroupCall extends EventEmitter {
 
         this.userMediaFeeds.splice(feedIndex, 1);
 
-        this.disposeUserMediaFeed(callFeed);
+        callFeed.dispose();
         this.emit(GroupCallEvent.UserMediaFeedsChanged, this.userMediaFeeds);
 
         if (
@@ -837,66 +820,27 @@ export class GroupCall extends EventEmitter {
         }
     }
 
-    private initUserMediaFeed(callFeed: CallFeed) {
-        callFeed.setSpeakingThreshold(this.speakingThreshold);
-        callFeed.measureVolumeActivity(true);
-
-        const onCallFeedVolumeChanged = (maxVolume: number) => this.onCallFeedVolumeChanged(callFeed, maxVolume);
-        const onCallFeedMuteStateChanged =
-            (audioMuted: boolean) => this.onCallFeedMuteStateChanged(callFeed, audioMuted);
-
-        this.userMediaFeedHandlers.set(callFeed.userId, {
-            onCallFeedVolumeChanged,
-            onCallFeedMuteStateChanged,
-        });
-
-        callFeed.on(CallFeedEvent.VolumeChanged, onCallFeedVolumeChanged);
-        callFeed.on(CallFeedEvent.MuteStateChanged, onCallFeedMuteStateChanged);
-    }
-
-    private disposeUserMediaFeed(callFeed: CallFeed) {
-        const { onCallFeedVolumeChanged, onCallFeedMuteStateChanged } = this.userMediaFeedHandlers.get(callFeed.userId);
-        callFeed.removeListener(CallFeedEvent.VolumeChanged, onCallFeedVolumeChanged);
-        callFeed.removeListener(CallFeedEvent.MuteStateChanged, onCallFeedMuteStateChanged);
-        this.userMediaFeedHandlers.delete(callFeed.userId);
-        callFeed.dispose();
-    }
-
-    private onCallFeedVolumeChanged = (callFeed: CallFeed, maxVolume: number) => {
-        const activeSpeakerSamples = this.activeSpeakerSamples.get(callFeed.userId);
-        activeSpeakerSamples.shift();
-        activeSpeakerSamples.push(maxVolume);
-    };
-
-    private onCallFeedMuteStateChanged = (callFeed: CallFeed, audioMuted: boolean) => {
-        if (audioMuted) {
-            this.activeSpeakerSamples.get(callFeed.userId).fill(
-                -Infinity,
-            );
-        }
-    };
-
     private onActiveSpeakerLoop = () => {
         let topAvg: number;
         let nextActiveSpeaker: string;
 
-        for (const [userId, samples] of this.activeSpeakerSamples) {
+        for (const callFeed of this.userMediaFeeds) {
             let total = 0;
 
-            for (let i = 0; i < samples.length; i++) {
-                const volume = samples[i];
-                total += Math.max(volume, this.speakingThreshold);
+            for (let i = 0; i < callFeed.speakingVolumeSamples.length; i++) {
+                const volume = callFeed.speakingVolumeSamples[i];
+                total += Math.max(volume, SPEAKING_THRESHOLD);
             }
 
-            const avg = total / this.activeSpeakerSampleCount;
+            const avg = total / callFeed.speakingVolumeSamples.length;
 
             if (!topAvg || avg > topAvg) {
                 topAvg = avg;
-                nextActiveSpeaker = userId;
+                nextActiveSpeaker = callFeed.userId;
             }
         }
 
-        if (nextActiveSpeaker && this.activeSpeaker !== nextActiveSpeaker && topAvg > this.speakingThreshold) {
+        if (nextActiveSpeaker && this.activeSpeaker !== nextActiveSpeaker && topAvg > SPEAKING_THRESHOLD) {
             this.activeSpeaker = nextActiveSpeaker;
             this.emit(GroupCallEvent.ActiveSpeakerChanged, this.activeSpeaker);
         }
