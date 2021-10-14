@@ -28,7 +28,6 @@ import {
     EventType,
     MsgType,
     RelationType,
-    UNSTABLE_ELEMENT_THREAD_RELATION,
 } from "../@types/event";
 import { Crypto } from "../crypto";
 import { deepSortedObjectEntries } from "../utils";
@@ -423,7 +422,7 @@ export class MatrixEvent extends EventEmitter {
      */
     public get threadRootId(): string {
         const relatesTo = this.getWireContent()?.["m.relates_to"];
-        if (relatesTo?.rel_type === UNSTABLE_ELEMENT_THREAD_RELATION.name) {
+        if (relatesTo?.rel_type === RelationType.Thread) {
             return relatesTo.event_id;
         }
     }
