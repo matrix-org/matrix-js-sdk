@@ -42,15 +42,14 @@ export class WebStorageSessionStore {
 
     constructor(webStore) {
         this.store = webStore;
-        if (!utils.isFunction(webStore.getItem) ||
-        !utils.isFunction(webStore.setItem) ||
-        !utils.isFunction(webStore.removeItem) ||
-        !utils.isFunction(webStore.key) ||
-        typeof(webStore.length) !== 'number'
+        if (
+            !utils.isFunction(webStore.getItem) ||
+            !utils.isFunction(webStore.setItem) ||
+            !utils.isFunction(webStore.removeItem) ||
+            !utils.isFunction(webStore.key) ||
+            typeof(webStore.length) !== 'number'
         ) {
-            throw new Error(
-                "Supplied webStore does not meet the WebStorage API interface",
-            );
+            throw new Error("Supplied webStore does not meet the WebStorage API interface");
         }
     }
     /**
