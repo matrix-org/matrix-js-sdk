@@ -100,6 +100,11 @@ class MockMediaDeviceInfo {
     ) {}
 }
 
+class MockMediaHandler {
+    getUserMediaStream() { return new MockMediaStream("mock_stream_from_media_handler"); }
+    stopUserMediaStream() {}
+}
+
 describe('Call', function() {
     let client;
     let call;
@@ -137,6 +142,8 @@ describe('Call', function() {
         // We just stub out sendEvent: we're not interested in testing the client's
         // event sending code here
         client.client.sendEvent = () => {};
+        client.client.mediaHandler = new MockMediaHandler;
+        client.client.getMediaHandler = () => client.client.mediaHandler;
         client.httpBackend.when("GET", "/voip/turnServer").respond(200, {});
         call = new MatrixCall({
             client: client.client,
@@ -375,5 +382,17 @@ describe('Call', function() {
 
         call.setScreensharingEnabled(true);
         expect(call.setScreensharingEnabledWithoutMetadataSupport).toHaveBeenCalled();
+    });
+
+    it("should fallback to answering with no video", async () => {
+        await client.httpBackend.flush();
+
+        call.shouldAnswerWithMediaType = (wantedValue: boolean) => wantedValue;
+        client.client.mediaHandler.getUserMediaStream = jest.fn().mockRejectedValue("reject");
+
+        await call.answer(true, true);
+
+        expect(client.client.mediaHandler.getUserMediaStream).toHaveBeenNthCalledWith(1, true, true);
+        expect(client.client.mediaHandler.getUserMediaStream).toHaveBeenNthCalledWith(2, true, false);
     });
 });
