@@ -26,7 +26,6 @@ import { logger } from '../../logger';
 import { Room } from "../../models/room";
 import { ISessionInfo } from "../../crypto/store/base";
 
-const DEBUG = false;  // set true to enable console logging.
 const E2E_PREFIX = "session.e2e.";
 
 /**
@@ -73,7 +72,7 @@ export class WebStorageSessionStore {
      * Retrieves the known devices for all users.
      * @return {object} A map from user ID to map of device ID to keys for the device.
      */
-    getAllEndToEndDevices(): Record<string, any | null> {
+    getAllEndToEndDevices(): unknown | null {
         const prefix = keyEndToEndDevicesForUser('');
         const devices = {};
         for (let i = 0; i < this.store.length; ++i) {
@@ -84,7 +83,7 @@ export class WebStorageSessionStore {
         return devices;
     }
 
-    getEndToEndDeviceTrackingStatus(): Record<string, any> | null {
+    getEndToEndDeviceTrackingStatus(): unknown | null {
         return getJsonItem(this.store, KEY_END_TO_END_DEVICE_LIST_TRACKING_STATUS);
     }
 
@@ -93,8 +92,8 @@ export class WebStorageSessionStore {
      *
      * @return {String?} token
      */
-    getEndToEndDeviceSyncToken(): Record<string, any> | null {
-        return getJsonItem(this.store, KEY_END_TO_END_DEVICE_SYNC_TOKEN);
+    getEndToEndDeviceSyncToken(): string | null {
+        return getJsonItem<string>(this.store, KEY_END_TO_END_DEVICE_SYNC_TOKEN);
     }
 
     /**
@@ -112,7 +111,7 @@ export class WebStorageSessionStore {
      * @param {string} deviceKey The public key of the other device.
      * @return {object} A map from sessionId to Base64 end-to-end session.
      */
-    getEndToEndSessions(deviceKey: string): Record<string, any> | null {
+    getEndToEndSessions(deviceKey: string): unknown | null {
         return getJsonItem(this.store, keyEndToEndSessions(deviceKey));
     }
 
@@ -126,7 +125,7 @@ export class WebStorageSessionStore {
         const results: Record<string, ISessionInfo> = {};
         for (const k of deviceKeys) {
             const unprefixedKey = k.substr(keyEndToEndSessions('').length);
-            const sessionInfo: ISessionInfo = getJsonItem(this.store, k);
+            const sessionInfo: ISessionInfo = getJsonItem<ISessionInfo>(this.store, k);
             results[unprefixedKey] = sessionInfo;
         }
         return results;
@@ -233,14 +232,14 @@ function getJsonItem<T extends unknown>(store: Storage, key: string): T | null {
         // JSON.parse(null) === null, so this returns null.
         return JSON.parse(store.getItem(key));
     } catch (e) {
-        debuglog("Failed to get key %s: %s", key, e);
-        debuglog(e.stack);
+        logger.error("Failed to get key %s: %s", key, e);
+        logger.error(e.stack);
     }
     return null;
 }
 
-function getKeysWithPrefix(store: Storage, prefix: string): String[] {
-    const results: String[] = [];
+function getKeysWithPrefix(store: Storage, prefix: string): string[] {
+    const results: string[] = [];
     for (let i = 0; i < store.length; ++i) {
         const key = store.key(i);
         if (key.startsWith(prefix)) results.push(key);
@@ -256,11 +255,5 @@ function removeByPrefix(store: Storage, prefix: string): void {
     }
     for (const key of toRemove) {
         store.removeItem(key);
-    }
-}
-
-function debuglog(...args: any): void {
-    if (DEBUG) {
-        logger.log(...args);
     }
 }
