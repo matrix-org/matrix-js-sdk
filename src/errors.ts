@@ -42,9 +42,14 @@ InvalidCryptoStoreError.prototype = Object.create(Error.prototype, {
 });
 Reflect.setPrototypeOf(InvalidCryptoStoreError, Error);
 
+type KeySignatureError = Record<string, Record<string, {
+    errcode: string;
+    error: string;
+}>>;
+
 export class KeySignatureUploadError extends Error {
-    value: any;
-    constructor(message, value) {
+    public value: KeySignatureError;
+    constructor(message: string, value: KeySignatureError) {
         super(message);
         this.value = value;
     }

@@ -53,7 +53,7 @@ export class WebStorageSessionStore {
     /**
      * Remove the stored end to end account for the logged-in user.
      */
-    removeEndToEndAccount(): void {
+    public removeEndToEndAccount(): void {
         this.store.removeItem(KEY_END_TO_END_ACCOUNT);
     }
 
@@ -64,7 +64,7 @@ export class WebStorageSessionStore {
      * old sessions can be migrated out of the session store.
      * @return {?string} Base64 encoded account.
      */
-    getEndToEndAccount(): string | undefined {
+    public getEndToEndAccount(): string | undefined {
         return this.store.getItem(KEY_END_TO_END_ACCOUNT);
     }
 
@@ -72,7 +72,7 @@ export class WebStorageSessionStore {
      * Retrieves the known devices for all users.
      * @return {object} A map from user ID to map of device ID to keys for the device.
      */
-    getAllEndToEndDevices(): unknown | null {
+    public getAllEndToEndDevices(): unknown | null {
         const prefix = keyEndToEndDevicesForUser('');
         const devices = {};
         for (let i = 0; i < this.store.length; ++i) {
@@ -83,7 +83,7 @@ export class WebStorageSessionStore {
         return devices;
     }
 
-    getEndToEndDeviceTrackingStatus(): unknown | null {
+    public getEndToEndDeviceTrackingStatus(): unknown | null {
         return getJsonItem(this.store, KEY_END_TO_END_DEVICE_LIST_TRACKING_STATUS);
     }
 
@@ -92,14 +92,14 @@ export class WebStorageSessionStore {
      *
      * @return {String?} token
      */
-    getEndToEndDeviceSyncToken(): string | null {
+    public getEndToEndDeviceSyncToken(): string | null {
         return getJsonItem<string>(this.store, KEY_END_TO_END_DEVICE_SYNC_TOKEN);
     }
 
     /**
      * Removes all end to end device data from the store
      */
-    removeEndToEndDeviceData(): void {
+    public removeEndToEndDeviceData(): void {
         removeByPrefix(this.store, keyEndToEndDevicesForUser(''));
         removeByPrefix(this.store, KEY_END_TO_END_DEVICE_LIST_TRACKING_STATUS);
         removeByPrefix(this.store, KEY_END_TO_END_DEVICE_SYNC_TOKEN);
@@ -111,7 +111,7 @@ export class WebStorageSessionStore {
      * @param {string} deviceKey The public key of the other device.
      * @return {object} A map from sessionId to Base64 end-to-end session.
      */
-    getEndToEndSessions(deviceKey: string): unknown | null {
+    public getEndToEndSessions(deviceKey: string): unknown | null {
         return getJsonItem(this.store, keyEndToEndSessions(deviceKey));
     }
 
@@ -120,7 +120,7 @@ export class WebStorageSessionStore {
      * devices.
      * @return {object} A map of {deviceKey -> {sessionId -> session pickle}}
      */
-    getAllEndToEndSessions(): Record<string, ISessionInfo> {
+    public getAllEndToEndSessions(): Record<string, ISessionInfo> {
         const deviceKeys = getKeysWithPrefix(this.store, keyEndToEndSessions(''));
         const results: Record<string, ISessionInfo> = {};
         for (const k of deviceKeys) {
