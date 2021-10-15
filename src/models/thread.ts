@@ -22,8 +22,9 @@ import { EventTimelineSet } from './event-timeline-set';
 import { Room } from './room';
 
 export enum ThreadEvent {
+    New = "Thread.new",
     Ready = "Thread.ready",
-    Update = "Thread.update"
+    Update = "Thread.update",
 }
 
 /**
