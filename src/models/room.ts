@@ -1281,8 +1281,12 @@ export class Room extends EventEmitter {
         if (thread) {
             thread.addEvent(event);
         } else {
+            const events = [event];
             const rootEvent = this.findEventById(event.threadRootId);
-            thread = new Thread([rootEvent, event], this, this.client);
+            if (rootEvent) {
+                events.unshift(rootEvent);
+            }
+            thread = new Thread(events, this, this.client);
             this.reEmitter.reEmit(thread, [ThreadEvent.Update, ThreadEvent.Ready]);
             this.threads.set(thread.id, thread);
         }
@@ -1704,6 +1708,11 @@ export class Room extends EventEmitter {
             // TODO: We should have a filter to say "only add state event
             // types X Y Z to the timeline".
             this.addLiveEvent(events[i], duplicateStrategy, fromCache);
+            const thread = this.threads.get(events[i].getId());
+            if (thread && !thread.ready) {
+                console.error("Thread: adding root event", events[i].getId());
+                thread.addEvent(events[i], true);
+            }
         }
     }
 
