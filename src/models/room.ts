@@ -1289,6 +1289,7 @@ export class Room extends EventEmitter {
             thread = new Thread(events, this, this.client);
             this.reEmitter.reEmit(thread, [ThreadEvent.Update, ThreadEvent.Ready]);
             this.threads.set(thread.id, thread);
+            this.emit(ThreadEvent.New, thread);
         }
         this.emit(ThreadEvent.Update, thread);
     }
