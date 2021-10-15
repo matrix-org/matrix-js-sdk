@@ -226,7 +226,7 @@ export class GroupCall extends EventEmitter {
 
         this.sendEnteredMemberStateEvent();
 
-        this.activeSpeaker = this.client.getUserId();
+        this.activeSpeaker = null;
 
         this.setState(GroupCallState.Entered);
 
@@ -825,6 +825,10 @@ export class GroupCall extends EventEmitter {
         let nextActiveSpeaker: string;
 
         for (const callFeed of this.userMediaFeeds) {
+            if (callFeed.userId === this.client.getUserId() && this.userMediaFeeds.length > 1) {
+                continue;
+            }
+
             let total = 0;
 
             for (let i = 0; i < callFeed.speakingVolumeSamples.length; i++) {
