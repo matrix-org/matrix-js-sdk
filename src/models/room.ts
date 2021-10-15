@@ -1710,7 +1710,6 @@ export class Room extends EventEmitter {
             this.addLiveEvent(events[i], duplicateStrategy, fromCache);
             const thread = this.threads.get(events[i].getId());
             if (thread && !thread.ready) {
-                console.error("Thread: adding root event", events[i].getId());
                 thread.addEvent(events[i], true);
             }
         }
