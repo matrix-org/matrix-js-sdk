@@ -664,10 +664,6 @@ export class GroupCall extends EventEmitter {
         call.on(CallEvent.State, onCallStateChanged);
         call.on(CallEvent.Hangup, onCallHangup);
 
-        if (this.isScreensharing()) {
-            call.setScreensharingEnabled(true, this.localDesktopCapturerSourceId);
-        }
-
         this.reEmitter.reEmit(call, Object.values(CallEvent));
     }
 
