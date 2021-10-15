@@ -67,6 +67,7 @@ export class CallFeed extends EventEmitter {
         this.purpose = opts.purpose;
         this.audioMuted = opts.audioMuted;
         this.videoMuted = opts.videoMuted;
+        this.speakingVolumeSamples = new Array(SPEAKING_SAMPLE_COUNT).fill(-Infinity);
 
         this.updateStream(null, opts.stream);
 
@@ -116,7 +117,6 @@ export class CallFeed extends EventEmitter {
         mediaStreamAudioSourceNode.connect(this.analyser);
 
         this.frequencyBinCount = new Float32Array(this.analyser.frequencyBinCount);
-        this.speakingVolumeSamples = new Array(SPEAKING_SAMPLE_COUNT).fill(-Infinity);
     }
 
     private onAddTrack = (): void => {
