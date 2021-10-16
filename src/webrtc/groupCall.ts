@@ -10,9 +10,7 @@ import { SDPStreamMetadataPurpose } from "./callEventTypes";
 import { createNewMatrixCall } from "./call";
 import { ISendEventResponse } from "../@types/requests";
 import { MatrixEvent } from "../models/event";
-
-export const GROUP_CALL_ROOM_EVENT = "org.matrix.msc3401.call";
-export const GROUP_CALL_MEMBER_EVENT = "org.matrix.msc3401.call.member";
+import { EventType } from "../@types/event";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -129,7 +127,7 @@ export class GroupCall extends EventEmitter {
         this.sessionId = genCallID();
 
         const roomState = this.room.currentState;
-        const memberStateEvents = roomState.getStateEvents(GROUP_CALL_MEMBER_EVENT);
+        const memberStateEvents = roomState.getStateEvents(EventType.GroupCallMemberPrefix);
 
         logger.log("Processing initial members", memberStateEvents);
 
@@ -143,7 +141,7 @@ export class GroupCall extends EventEmitter {
 
         await this.client.sendStateEvent(
             this.room.roomId,
-            GROUP_CALL_ROOM_EVENT,
+            EventType.GroupCallPrefix,
             {
                 "m.intent": this.intent,
                 "m.type": this.type,
@@ -247,7 +245,7 @@ export class GroupCall extends EventEmitter {
         // Set up participants for the members currently in the room.
         // Other members will be picked up by the RoomState.members event.
         const roomState = this.room.currentState;
-        const memberStateEvents = roomState.getStateEvents(GROUP_CALL_MEMBER_EVENT);
+        const memberStateEvents = roomState.getStateEvents(EventType.GroupCallMemberPrefix);
 
         logger.log("Processing initial members");
 
@@ -307,11 +305,13 @@ export class GroupCall extends EventEmitter {
         this.client.groupCallEventHandler.groupCalls.delete(this.room.roomId);
 
         if (emitStateEvent) {
-            const existingStateEvent = this.room.currentState.getStateEvents(GROUP_CALL_ROOM_EVENT, this.groupCallId);
+            const existingStateEvent = this.room.currentState.getStateEvents(
+                EventType.GroupCallPrefix, this.groupCallId,
+            );
 
             await this.client.sendStateEvent(
                 this.room.roomId,
-                GROUP_CALL_ROOM_EVENT,
+                EventType.GroupCallPrefix,
                 {
                     ...existingStateEvent.getContent(),
                     ["m.terminated"]: GroupCallTerminationReason.CallEnded,
@@ -502,7 +502,7 @@ export class GroupCall extends EventEmitter {
     private async updateMemberCallState(memberCallState?: IGroupCallRoomMemberCallState): Promise<ISendEventResponse> {
         const localUserId = this.client.getUserId();
 
-        const currentStateEvent = this.room.currentState.getStateEvents(GROUP_CALL_MEMBER_EVENT, localUserId);
+        const currentStateEvent = this.room.currentState.getStateEvents(EventType.GroupCallMemberPrefix, localUserId);
 
         const calls = currentStateEvent?.getContent<IGroupCallRoomMemberState>()["m.calls"] || [];
 
@@ -516,7 +516,7 @@ export class GroupCall extends EventEmitter {
             calls.splice(existingCallIndex, 1);
         }
 
-        return this.client.sendStateEvent(this.room.roomId, GROUP_CALL_MEMBER_EVENT, {
+        return this.client.sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, {
             "m.calls": calls,
         }, localUserId);
     }
