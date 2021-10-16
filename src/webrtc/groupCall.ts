@@ -224,8 +224,6 @@ export class GroupCall extends EventEmitter {
             await this.initLocalCallFeed();
         }
 
-        logger.log(`Sending member state event with current call.`);
-
         this.sendEnteredMemberStateEvent();
 
         this.activeSpeaker = null;
@@ -516,9 +514,11 @@ export class GroupCall extends EventEmitter {
             calls.splice(existingCallIndex, 1);
         }
 
-        return this.client.sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, {
+        const content = {
             "m.calls": calls,
-        }, localUserId);
+        };
+        logger.log("Sending group call member state event", content);
+        return this.client.sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, content, localUserId);
     }
 
     public onMemberStateChanged = (event: MatrixEvent) => {
