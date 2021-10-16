@@ -501,10 +501,16 @@ export class GroupCall extends EventEmitter {
         const localUserId = this.client.getUserId();
 
         const currentStateEvent = this.room.currentState.getStateEvents(EventType.GroupCallMemberPrefix, localUserId);
+        const memberStateEvent = currentStateEvent?.getContent<IGroupCallRoomMemberState>();
 
-        const calls = currentStateEvent?.getContent<IGroupCallRoomMemberState>()["m.calls"] || [];
-
-        const existingCallIndex = calls.findIndex((call) => call["m.call_id"] === this.groupCallId);
+        let calls: IGroupCallRoomMemberCallState[] = [];
+        let existingCallIndex: number;
+        if (memberCallState) {
+            calls = memberStateEvent["m.calls"] || [];
+            existingCallIndex = calls.findIndex((call) => call && call["m.call_id"] === this.groupCallId);
+        } else {
+            existingCallIndex = 0;
+        }
 
         if (existingCallIndex === -1) {
             calls.push(memberCallState);
