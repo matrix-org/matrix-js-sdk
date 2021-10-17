@@ -454,7 +454,7 @@ export class InteractiveAuth {
             if (
                 !this.emailSid &&
                 !this.requestingEmailToken &&
-                this.chosenFlow.stages.includes(AuthType.Email)
+                this.chosenFlow?.stages.includes(AuthType.Email)
             ) {
                 // If we've picked a flow with email auth, we send the email
                 // now because we want the request to fail as soon as possible
