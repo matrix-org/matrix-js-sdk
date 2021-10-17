@@ -2374,7 +2374,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} a promise which resolves when the keys
      *    have been imported
      */
-    public importRoomKeys(keys: IMegolmSessionData[], opts: IImportRoomKeysOpts): Promise<void> {
+    public importRoomKeys(keys: IMegolmSessionData[], opts?: IImportRoomKeysOpts): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -4043,10 +4043,8 @@ export class MatrixClient extends EventEmitter {
         // Work backwards first, looking at create events.
         let createEvent = currentRoom.currentState.getStateEvents(EventType.RoomCreate, "");
         while (createEvent) {
-            logger.log(`Looking at ${createEvent.getId()}`);
             const predecessor = createEvent.getContent()['predecessor'];
             if (predecessor && predecessor['room_id']) {
-                logger.log(`Looking at predecessor ${predecessor['room_id']}`);
                 const refRoom = this.getRoom(predecessor['room_id']);
                 if (!refRoom) break; // end of the chain
 

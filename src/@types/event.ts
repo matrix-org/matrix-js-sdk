@@ -92,6 +92,14 @@ export enum EventType {
 export enum RelationType {
     Annotation = "m.annotation",
     Replace = "m.replace",
+    /**
+     * Note, "io.element.thread" is hardcoded
+     * Should be replaced with "m.thread" once MSC3440 lands
+     * Can not use `UnstableValue` as TypeScript does not
+     * allow computed values in enums
+     * https://github.com/microsoft/TypeScript/issues/27976
+     */
+    Thread = "io.element.thread",
 }
 
 export enum MsgType {
@@ -167,11 +175,6 @@ export const UNSTABLE_MSC3089_BRANCH = new UnstableValue("m.branch", "org.matrix
 export const UNSTABLE_ELEMENT_FUNCTIONAL_USERS = new UnstableValue(
     "io.element.functional_members",
     "io.element.functional_members");
-
-export const UNSTABLE_ELEMENT_REPLY_IN_THREAD = new UnstableValue(
-    "m.in_thread",
-    "io.element.in_thread",
-);
 
 export interface IEncryptedFile {
     url: string;

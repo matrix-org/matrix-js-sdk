@@ -28,7 +28,6 @@ import {
     EventType,
     MsgType,
     RelationType,
-    UNSTABLE_ELEMENT_REPLY_IN_THREAD,
 } from "../@types/event";
 import { Crypto } from "../crypto";
 import { deepSortedObjectEntries } from "../utils";
@@ -119,7 +118,7 @@ interface IAggregatedRelation {
     key?: string;
 }
 
-interface IEventRelation {
+export interface IEventRelation {
     rel_type: RelationType | string;
     event_id: string;
     key?: string;
@@ -419,38 +418,39 @@ export class MatrixEvent extends EventEmitter {
 
     /**
      * @experimental
-     * Get the event ID of the replied event
+     * Get the event ID of the thread head
      */
-    public get replyEventId(): string {
-        const relations = this.getWireContent()["m.relates_to"];
-        return relations?.["m.in_reply_to"]?.["event_id"];
+    public get threadRootId(): string {
+        const relatesTo = this.getWireContent()?.["m.relates_to"];
+        if (relatesTo?.rel_type === RelationType.Thread) {
+            return relatesTo.event_id;
+        }
     }
 
     /**
      * @experimental
-     * Determines whether a reply should be rendered in a thread
-     * or in the main room timeline
      */
-    public get replyInThread(): boolean {
-        /**
-         * UNSTABLE_ELEMENT_REPLY_IN_THREAD can live either
-         * at the m.relates_to and m.in_reply_to level
-         * This will likely change once we settle on a
-         * way to achieve threads
-         * TODO: Clean this up once we have a clear way forward
-         */
+    public get isThreadRelation(): boolean {
+        return !!this.threadRootId;
+    }
 
-        const relatesTo = this.getWireContent()?.["m.relates_to"];
-        const replyTo = relatesTo?.["m.in_reply_to"];
-
-        return relatesTo?.[UNSTABLE_ELEMENT_REPLY_IN_THREAD.name]
-            || (this.replyEventId && replyTo[UNSTABLE_ELEMENT_REPLY_IN_THREAD.name])
-            || this.thread instanceof Thread;
+    /**
+     * @experimental
+     */
+    public get isThreadRoot(): boolean {
+        const thread = this.getThread();
+        return thread?.id === this.getId();
     }
 
     public get parentEventId(): string {
-        return this.replyEventId
-            || this.getWireContent()["m.relates_to"]?.event_id;
+        const relations = this.getWireContent()["m.relates_to"];
+        return relations?.["m.in_reply_to"]?.["event_id"]
+            || relations?.event_id;
+    }
+
+    public get replyEventId(): string {
+        const relations = this.getWireContent()["m.relates_to"];
+        return relations?.["m.in_reply_to"]?.["event_id"];
     }
 
     /**

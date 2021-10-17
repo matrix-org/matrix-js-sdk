@@ -40,7 +40,7 @@ import {
     ISecretRequest,
     SecretStorageKeyObject,
 } from './SecretStorage';
-import { IAddSecretStorageKeyOpts, ISecretStorageKeyInfo } from "./api";
+import { IAddSecretStorageKeyOpts, IImportRoomKeysOpts, ISecretStorageKeyInfo } from "./api";
 import { OutgoingRoomKeyRequestManager } from './OutgoingRoomKeyRequestManager';
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { ReciprocateQRCode, SCAN_QR_CODE_METHOD, SHOW_QR_CODE_METHOD } from './verification/QRCode';
@@ -58,7 +58,7 @@ import { BackupManager } from "./backup";
 import { IStore } from "../store";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
-import { MatrixEvent } from "../models/event";
+import { MatrixEvent, EventStatus } from "../models/event";
 import { MatrixClient, IKeysUploadResponse, SessionStore, ISignedKey } from "../client";
 import type { EncryptionAlgorithm, DecryptionAlgorithm } from "./algorithms/base";
 import type { IRoomEncryption, RoomList } from "./RoomList";
@@ -2658,7 +2658,7 @@ export class Crypto extends EventEmitter {
      * @param {Function} opts.progressCallback called with an object which has a stage param
      * @return {Promise} a promise which resolves once the keys have been imported
      */
-    public importRoomKeys(keys: IMegolmSessionData[], opts: any = {}): Promise<any> { // TODO types
+    public importRoomKeys(keys: IMegolmSessionData[], opts: IImportRoomKeysOpts = {}): Promise<any> { // TODO types
         let successes = 0;
         let failures = 0;
         const total = keys.length;
@@ -3201,6 +3201,29 @@ export class Crypto extends EventEmitter {
         createRequest: any, // TODO types
         isLiveEvent = true,
     ): Promise<void> {
+        // Wait for event to get its final ID with pendingEventOrdering: "chronological", since DM channels depend on it.
+        if (event.isSending() && event.status != EventStatus.SENT) {
+            let eventIdListener;
+            let statusListener;
+            try {
+                await new Promise((resolve, reject) => {
+                    eventIdListener = resolve;
+                    statusListener = () => {
+                        if (event.status == EventStatus.CANCELLED) {
+                            reject(new Error("Event status set to CANCELLED."));
+                        }
+                    };
+                    event.once("Event.localEventIdReplaced", eventIdListener);
+                    event.on("Event.status", statusListener);
+                });
+            } catch (err) {
+                logger.error("error while waiting for the verification event to be sent: " + err.message);
+                return;
+            } finally {
+                event.removeListener("Event.localEventIdReplaced", eventIdListener);
+                event.removeListener("Event.status", statusListener);
+            }
+        }
         let request = requestsMap.getRequest(event);
         let isNewRequest = false;
         if (!request) {
