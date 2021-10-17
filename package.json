@@ -111,6 +111,7 @@
     ],
     "coverageReporters": [
       "text"
-    ]
+    ],
+    "silent": true
   }
 }

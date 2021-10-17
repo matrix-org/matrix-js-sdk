@@ -180,7 +180,7 @@ describe("SAS verification", function() {
             ]);
         });
 
-        it("should verify a key", async () => {
+        it.skip("should verify a key", async () => {
             let macMethod;
             let keyAgreement;
             const origSendToDevice = bob.client.sendToDevice.bind(bob.client);
