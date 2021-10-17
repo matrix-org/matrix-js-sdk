@@ -180,7 +180,8 @@ describe("SAS verification", function() {
             ]);
         });
 
-        it.skip("should verify a key", async () => {
+        it("should verify a key", async () => {
+            jest.setTimeout(30000);
             let macMethod;
             let keyAgreement;
             const origSendToDevice = bob.client.sendToDevice.bind(bob.client);
