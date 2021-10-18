@@ -3033,7 +3033,7 @@ export class Crypto extends EventEmitter {
     /**
      * @private
      * Encrypts and sends a given object via Olm to-device message to a given
-     * set of devices.  Heavily derived from encryptAndSendKeysToDevices in
+     * set of devices.  Factored out from encryptAndSendKeysToDevices in
      * megolm.ts.
      *
      * @param {object<userId, deviceInfo>} userDeviceMap
