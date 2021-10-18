@@ -71,8 +71,6 @@ export class GroupCallEventHandler {
         const roomId = event.getRoomId();
         const content = event.getContent();
 
-        logger.log("createGroupCallFromRoomStateEvent", roomId);
-
         const room = this.client.getRoom(roomId);
 
         if (!room) {
