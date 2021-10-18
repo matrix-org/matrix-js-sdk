@@ -27,6 +27,7 @@ import { EventEmitter } from 'events';
 import { ReEmitter } from '../ReEmitter';
 import { logger } from '../logger';
 import { IExportedDevice, OlmDevice } from "./OlmDevice";
+import { IOlmDevice } from "./algorithms/megolm";
 import * as olmlib from "./olmlib";
 import { DeviceInfoMap, DeviceList } from "./DeviceList";
 import { DeviceInfo, IDevice } from "./deviceinfo";
@@ -3031,7 +3032,6 @@ export class Crypto extends EventEmitter {
     }
 
     /**
-     * @private
      * Encrypts and sends a given object via Olm to-device message to a given
      * set of devices.  Factored out from encryptAndSendKeysToDevices in
      * megolm.ts.
@@ -3040,14 +3040,17 @@ export class Crypto extends EventEmitter {
      *   mapping from userId to deviceInfo
      *
      * @param {object} payload fields to include in the encrypted payload
+     * 
+     * @param function to call on each message after it's successfully sent
      *
      * @return {Promise} Promise which resolves once the key sharing
      *     for the given userDeviceMap is generated and has been sent.
      */
-    private encryptAndSendToDevices(
-        userDeviceMap: IExportedDevice[],
+    encryptAndSendToDevices(
+        userDeviceMap: IOlmDevice<DeviceInfo>[],
         payload: object,
-    ): Promise<{}> {
+        afterwards: (contentMap: {}, deviceInfoByDeviceId: Map<string, DeviceInfo>) => void,
+    ): Promise<void> {
         const contentMap = {};
         const deviceInfoByDeviceId = new Map<string, DeviceInfo>();
 
@@ -3110,7 +3113,9 @@ export class Crypto extends EventEmitter {
                 return;
             }
 
-            return this.baseApis.sendToDevice("m.room.encrypted", contentMap);
+            return this.baseApis.sendToDevice("m.room.encrypted", contentMap).then(
+                afterwards.bind(contentMap, deviceInfoByDeviceId)
+            );
         });
     }
 

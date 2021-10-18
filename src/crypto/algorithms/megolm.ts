@@ -578,22 +578,23 @@ class MegolmEncryption extends EncryptionAlgorithm {
         userDeviceMap: IOlmDevice[],
         payload: IPayload,
     ): Promise<void> {
-        this.crypto.encryptAndSendToDevices(
+        return this.crypto.encryptAndSendToDevices(
             userDeviceMap,
-            payload
-        ).then(() => {
-            // store that we successfully uploaded the keys of the current slice
-            for (const userId of Object.keys(contentMap)) {
-                for (const deviceId of Object.keys(contentMap[userId])) {
-                    session.markSharedWithDevice(
-                        userId,
-                        deviceId,
-                        deviceInfoByDeviceId.get(deviceId).getIdentityKey(),
-                        chainIndex,
-                    );
+            payload,
+            (contentMap, deviceInfoByDeviceId) => {
+                // store that we successfully uploaded the keys of the current slice
+                for (const userId of Object.keys(contentMap)) {
+                    for (const deviceId of Object.keys(contentMap[userId])) {
+                        session.markSharedWithDevice(
+                            userId,
+                            deviceId,
+                            deviceInfoByDeviceId.get(deviceId).getIdentityKey(),
+                            chainIndex,
+                        );
+                    }
                 }
             }
-        });
+        );
     }
 
     /**
