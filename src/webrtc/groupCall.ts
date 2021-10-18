@@ -65,6 +65,7 @@ export interface IGroupCallDataChannelOptions {
 
 export interface IGroupCallRoomMemberCallState {
     "m.call_id": string;
+    "m.session_id": string;
     "m.foci"?: string[];
     "m.sources"?: any[];
 }
@@ -108,6 +109,8 @@ export class GroupCall extends EventEmitter {
     public screenshareFeeds: CallFeed[] = [];
     public groupCallId: string;
 
+    private sessionId: string;
+    private sessionIds: Map<string, string> = new Map();
     private callHandlers: Map<string, ICallHandlers> = new Map();
     private activeSpeakerLoopTimeout?: number;
     private reEmitter: ReEmitter;
@@ -123,6 +126,7 @@ export class GroupCall extends EventEmitter {
         super();
         this.reEmitter = new ReEmitter(this);
         this.groupCallId = genCallID();
+        this.sessionId = genCallID();
 
         const roomState = this.room.currentState;
         const memberStateEvents = roomState.getStateEvents(GROUP_CALL_MEMBER_EVENT);
@@ -485,6 +489,7 @@ export class GroupCall extends EventEmitter {
     private sendEnteredMemberStateEvent(): Promise<ISendEventResponse> {
         return this.updateMemberCallState({
             "m.call_id": this.groupCallId,
+            "m.session_id": this.sessionId,
             // TODO "m.foci"
             // TODO "m.sources"
         });
@@ -524,6 +529,8 @@ export class GroupCall extends EventEmitter {
 
         const member = this.room.getMember(event.getStateKey());
 
+        logger.log("Processing member state", member);
+
         if (!member) {
             return;
         }
@@ -560,15 +567,15 @@ export class GroupCall extends EventEmitter {
             return;
         }
 
-        this.addParticipant(member);
+        const sessionId = callState["m.session_id"];
 
-        if (this.state !== GroupCallState.Entered) {
+        if (!sessionId || sessionId === this.sessionIds.get(member.userId)) {
             return;
         }
 
-        const existingCall = this.getCallByUserId(member.userId);
+        this.addParticipant(member, sessionId);
 
-        if (existingCall) {
+        if (this.state !== GroupCallState.Entered) {
             return;
         }
 
@@ -578,6 +585,8 @@ export class GroupCall extends EventEmitter {
             logger.log(`Waiting for ${member.userId} to send call invite.`);
             return;
         }
+
+        const existingCall = this.getCallByUserId(member.userId);
 
         const newCall = createNewMatrixCall(
             this.client,
@@ -591,7 +600,6 @@ export class GroupCall extends EventEmitter {
             newCall.createDataChannel("datachannel", this.dataChannelOptions);
         }
 
-        // TODO: This existingCall code path is never reached, do we still need it?
         if (existingCall) {
             this.replaceCall(existingCall, newCall);
         } else {
@@ -897,12 +905,13 @@ export class GroupCall extends EventEmitter {
      * Participant Management
      */
 
-    private addParticipant(member: RoomMember) {
+    private addParticipant(member: RoomMember, sessionId: string) {
         if (this.participants.find((m) => m.userId === member.userId)) {
             return;
         }
 
         this.participants.push(member);
+        this.sessionIds.set(member.userId, sessionId);
 
         this.emit(GroupCallEvent.ParticipantsChanged, this.participants);
         this.client.emit("GroupCall.participants", this.participants, this);
@@ -916,6 +925,7 @@ export class GroupCall extends EventEmitter {
         }
 
         this.participants.splice(index, 1);
+        this.sessionIds.delete(member.userId);
 
         this.emit(GroupCallEvent.ParticipantsChanged, this.participants);
         this.client.emit("GroupCall.participants", this.participants, this);
