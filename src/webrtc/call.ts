@@ -2149,7 +2149,7 @@ export class MatrixCall extends EventEmitter {
                 audioMuted: stream.getAudioTracks().length === 0,
                 videoMuted: stream.getVideoTracks().length === 0,
             });
-            await this.placeCallWithCallFeeds([callFeed], true);
+            await this.placeCallWithCallFeeds([callFeed]);
         } catch (e) {
             this.getUserMediaFailed(e);
             return;
