@@ -17,8 +17,6 @@ limitations under the License.
 import { MatrixEvent } from '../models/event';
 import { MatrixClient } from '../client';
 import {
-    GROUP_CALL_ROOM_EVENT,
-    GROUP_CALL_MEMBER_EVENT,
     GroupCall,
     GroupCallIntent,
     GroupCallType,
@@ -27,6 +25,7 @@ import {
 import { Room } from "../models/room";
 import { RoomState } from "../models/room-state";
 import { logger } from '../logger';
+import { EventType } from "../@types/event";
 
 export class GroupCallEventHandler {
     public groupCalls = new Map<string, GroupCall>(); // roomId -> GroupCall
@@ -53,7 +52,7 @@ export class GroupCallEventHandler {
     }
 
     private createGroupCallForRoom(room: Room): GroupCall | undefined {
-        const callEvents = room.currentState.getStateEvents(GROUP_CALL_ROOM_EVENT);
+        const callEvents = room.currentState.getStateEvents(EventType.GroupCallPrefix);
         const sortedCallEvents = callEvents.sort((a, b) => b.getTs() - a.getTs());
 
         for (const callEvent of sortedCallEvents) {
@@ -125,7 +124,7 @@ export class GroupCallEventHandler {
     private onRoomStateChanged = (event: MatrixEvent, state: RoomState): void => {
         const eventType = event.getType();
 
-        if (eventType === GROUP_CALL_ROOM_EVENT) {
+        if (eventType === EventType.GroupCallPrefix) {
             const groupCallId = event.getStateKey();
             const content = event.getContent();
 
@@ -146,7 +145,7 @@ export class GroupCallEventHandler {
                 logger.warn(`Multiple group calls detected for room: ${
                     state.roomId}. Multiple group calls are currently unsupported.`);
             }
-        } else if (eventType === GROUP_CALL_MEMBER_EVENT) {
+        } else if (eventType === EventType.GroupCallMemberPrefix) {
             const groupCall = this.groupCalls.get(state.roomId);
 
             if (!groupCall) {
