@@ -22,13 +22,9 @@ import { EventTimelineSet } from './event-timeline-set';
 import { Room } from './room';
 
 export enum ThreadEvent {
+    New = "Thread.new",
     Ready = "Thread.ready",
-    Update = "Thread.update"
-}
-
-interface ISerialisedThread {
-    id: string;
-    tails: string[];
+    Update = "Thread.update",
 }
 
 /**
@@ -42,7 +38,6 @@ export class Thread extends EventEmitter {
     /**
      * A reference to all the events ID at the bottom of the threads
      */
-    public readonly tail = new Set<string>();
     public readonly timelineSet: EventTimelineSet;
 
     constructor(
@@ -69,13 +64,12 @@ export class Thread extends EventEmitter {
             return;
         }
 
-        if (this.tail.has(event.replyEventId)) {
-            this.tail.delete(event.replyEventId);
-        }
-        this.tail.add(event.getId());
-
-        if (!event.replyEventId || !this.timelineSet.findEventById(event.replyEventId)) {
-            this.root = event.getId();
+        if (!this.root) {
+            if (event.isThreadRelation) {
+                this.root = event.threadRootId;
+            } else {
+                this.root = event.getId();
+            }
         }
 
         // all the relevant membership info to hydrate events with a sender
@@ -99,49 +93,12 @@ export class Thread extends EventEmitter {
         this.emit(ThreadEvent.Update, this);
     }
 
-    /**
-     * Completes the reply chain with all events
-     * missing from the current sync data
-     * Will fire "Thread.ready"
-     */
-    public async fetchReplyChain(): Promise<void> {
-        if (!this.ready) {
-            let mxEvent = this.room.findEventById(this.rootEvent.replyEventId);
-            if (!mxEvent) {
-                mxEvent = await this.fetchEventById(
-                    this.rootEvent.getRoomId(),
-                    this.rootEvent.replyEventId,
-                );
-            }
-
-            this.addEvent(mxEvent, true);
-            if (mxEvent.replyEventId) {
-                await this.fetchReplyChain();
-            } else {
-                await this.decryptEvents();
-                this.emit(ThreadEvent.Ready, this);
-            }
-        }
-    }
-
     private async decryptEvents(): Promise<void> {
         await Promise.allSettled(
             Array.from(this.timelineSet.getLiveTimeline().getEvents()).map(event => {
                 return this.client.decryptEventIfNeeded(event, {});
             }),
         );
-    }
-
-    /**
-     * Fetches an event over the network
-     */
-    private async fetchEventById(roomId: string, eventId: string): Promise<MatrixEvent> {
-        const response = await this.client.http.authedRequest(
-            undefined,
-            "GET",
-            `/rooms/${roomId}/event/${eventId}`,
-        );
-        return new MatrixEvent(response);
     }
 
     /**
@@ -155,7 +112,7 @@ export class Thread extends EventEmitter {
      * Determines thread's ready status
      */
     public get ready(): boolean {
-        return this.rootEvent.replyEventId === undefined;
+        return this.rootEvent !== undefined;
     }
 
     /**
@@ -217,29 +174,26 @@ export class Thread extends EventEmitter {
         return this.timelineSet.findEventById(eventId) instanceof MatrixEvent;
     }
 
-    public toJson(): ISerialisedThread {
-        return {
-            id: this.id,
-            tails: Array.from(this.tail),
-        };
-    }
-
     public on(event: ThreadEvent, listener: (...args: any[]) => void): this {
         super.on(event, listener);
         return this;
     }
+
     public once(event: ThreadEvent, listener: (...args: any[]) => void): this {
         super.once(event, listener);
         return this;
     }
+
     public off(event: ThreadEvent, listener: (...args: any[]) => void): this {
         super.off(event, listener);
         return this;
     }
+
     public addListener(event: ThreadEvent, listener: (...args: any[]) => void): this {
         super.addListener(event, listener);
         return this;
     }
+
     public removeListener(event: ThreadEvent, listener: (...args: any[]) => void): this {
         super.removeListener(event, listener);
         return this;

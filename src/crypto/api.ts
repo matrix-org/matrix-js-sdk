@@ -142,7 +142,7 @@ export interface IImportOpts {
 }
 
 export interface IImportRoomKeysOpts {
-    progressCallback: (stage: IImportOpts) => void;
+    progressCallback?: (stage: IImportOpts) => void;
     untrusted?: boolean;
     source?: string; // TODO: Enum
 }

@@ -678,6 +678,12 @@ interface IThirdPartyUser {
     protocol: string;
     fields: object;
 }
+
+interface IRoomSummary extends Omit<IPublicRoomsChunkRoom, "canonical_alias" | "aliases"> {
+    room_type?: RoomType;
+    membership?: string;
+    is_encrypted: boolean;
+}
 /* eslint-enable camelcase */
 
 /**
@@ -2427,7 +2433,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} a promise which resolves when the keys
      *    have been imported
      */
-    public importRoomKeys(keys: IMegolmSessionData[], opts: IImportRoomKeysOpts): Promise<void> {
+    public importRoomKeys(keys: IMegolmSessionData[], opts?: IImportRoomKeysOpts): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -8574,6 +8580,20 @@ export class MatrixClient extends EventEmitter {
      */
     public supportsExperimentalThreads(): boolean {
         return this.clientOpts?.experimentalThreadSupport || false;
+    }
+
+    /**
+     * Fetches the summary of a room as defined by an initial version of MSC3266 and implemented in Synapse
+     * Proposed at https://github.com/matrix-org/matrix-doc/pull/3266
+     * @param {string} roomIdOrAlias The ID or alias of the room to get the summary of.
+     * @param {string[]?} via The list of servers which know about the room if only an ID was provided.
+     */
+    public async getRoomSummary(roomIdOrAlias: string, via?: string[]): Promise<IRoomSummary> {
+        const path = utils.encodeUri("/rooms/$roomid/summary", { $roomid: roomIdOrAlias });
+        return this.http.authedRequest(undefined, "GET", path, { via }, null, {
+            qsStringifyOptions: { arrayFormat: 'repeat' },
+            prefix: "/_matrix/client/unstable/im.nheko.summary",
+        });
     }
 }
 
