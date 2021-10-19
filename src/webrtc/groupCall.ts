@@ -84,6 +84,7 @@ interface ICallHandlers {
     onCallFeedsChanged: (feeds: CallFeed[]) => void;
     onCallStateChanged: (state: CallState, oldState: CallState) => void;
     onCallHangup: (call: MatrixCall) => void;
+    onCallReplaced: (newCall: MatrixCall) => void;
 }
 
 function getCallUserId(call: MatrixCall): string | null {
@@ -464,6 +465,10 @@ export class GroupCall extends EventEmitter {
         const opponentMemberId = newCall.getOpponentMember().userId;
         const existingCall = this.getCallByUserId(opponentMemberId);
 
+        if (existingCall && existingCall.callId === newCall.callId) {
+            return;
+        }
+
         logger.log(`GroupCall: incoming call from: ${opponentMemberId}`);
 
         // Check if the user calling has an existing call and use this call instead.
@@ -574,14 +579,11 @@ export class GroupCall extends EventEmitter {
             return;
         }
 
-        // Only initiate a call with a user who has a userId that is lexicographically
-        // less than your own. Otherwise, that user will call you.
-        if (member.userId < localUserId) {
-            logger.log(`Waiting for ${member.userId} to send call invite.`);
+        const existingCall = this.getCallByUserId(member.userId);
+
+        if (existingCall) {
             return;
         }
-
-        const existingCall = this.getCallByUserId(member.userId);
 
         const newCall = createNewMatrixCall(
             this.client,
@@ -595,11 +597,7 @@ export class GroupCall extends EventEmitter {
             newCall.createDataChannel("datachannel", this.dataChannelOptions);
         }
 
-        if (existingCall) {
-            this.replaceCall(existingCall, newCall);
-        } else {
-            this.addCall(newCall);
-        }
+        this.addCall(newCall);
     };
 
     /**
@@ -656,18 +654,23 @@ export class GroupCall extends EventEmitter {
         const onCallStateChanged =
             (state: CallState, oldState: CallState) => this.onCallStateChanged(call, state, oldState);
         const onCallHangup = this.onCallHangup;
+        const onCallReplaced = (newCall: MatrixCall) => this.replaceCall(call, newCall);
 
         this.callHandlers.set(opponentMemberId, {
             onCallFeedsChanged,
             onCallStateChanged,
             onCallHangup,
+            onCallReplaced,
         });
 
         call.on(CallEvent.FeedsChanged, onCallFeedsChanged);
         call.on(CallEvent.State, onCallStateChanged);
         call.on(CallEvent.Hangup, onCallHangup);
+        call.on(CallEvent.Replaced, onCallReplaced);
 
         this.reEmitter.reEmit(call, Object.values(CallEvent));
+
+        onCallFeedsChanged();
     }
 
     private disposeCall(call: MatrixCall, hangupReason: CallErrorCode) {
@@ -681,11 +684,13 @@ export class GroupCall extends EventEmitter {
             onCallFeedsChanged,
             onCallStateChanged,
             onCallHangup,
+            onCallReplaced,
         } = this.callHandlers.get(opponentMemberId);
 
         call.removeListener(CallEvent.FeedsChanged, onCallFeedsChanged);
         call.removeListener(CallEvent.State, onCallStateChanged);
         call.removeListener(CallEvent.Hangup, onCallHangup);
+        call.removeListener(CallEvent.Replaced, onCallReplaced);
 
         this.callHandlers.delete(opponentMemberId);
 

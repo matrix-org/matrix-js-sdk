@@ -231,7 +231,7 @@ export class CallEventHandler {
                 if (
                     call.roomId === thisCall.roomId &&
                     thisCall.direction === CallDirection.Outbound &&
-                    call.invitee === thisCall.invitee &&
+                    call.getOpponentMember().userId === thisCall.invitee &&
                     isCalling
                 ) {
                     existingCall = thisCall;

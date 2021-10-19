@@ -317,11 +317,6 @@ export class MatrixCall extends EventEmitter {
     private useToDevice: boolean;
     public groupCallId: string;
 
-    // Whether to stop local media when the call ends. We do not want to do this
-    // in group calls where the media is supplied by the group call. Doing this
-    // in a group call would result in breaking all the other calls
-    private stopLocalMediaOnEnd = true;
-
     constructor(opts: CallOpts) {
         super();
         this.roomId = opts.roomId;
@@ -665,7 +660,7 @@ export class MatrixCall extends EventEmitter {
 
     private deleteAllFeeds(): void {
         for (const feed of this.feeds) {
-            if (!feed.isLocal() || this.stopLocalMediaOnEnd) {
+            if (!feed.isLocal() || !this.groupCallId) {
                 feed.dispose();
             }
         }
@@ -838,7 +833,7 @@ export class MatrixCall extends EventEmitter {
                     audioMuted: stream.getAudioTracks().length === 0,
                     videoMuted: stream.getVideoTracks().length === 0,
                 });
-                this.answerWithCallFeeds([callFeed], true);
+                this.answerWithCallFeeds([callFeed]);
             } catch (e) {
                 if (answerWithVideo) {
                     // Try to answer without video
@@ -856,12 +851,10 @@ export class MatrixCall extends EventEmitter {
         }
     }
 
-    public answerWithCallFeeds(callFeeds: CallFeed[], stopLocalMediaOnEnd?: boolean): void {
+    public answerWithCallFeeds(callFeeds: CallFeed[]): void {
         if (this.inviteOrAnswerSent) return;
 
         logger.debug(`Answering call ${this.callId}`);
-
-        this.stopLocalMediaOnEnd = stopLocalMediaOnEnd;
 
         this.gotCallFeedsForAnswer(callFeeds);
     }
@@ -2055,22 +2048,21 @@ export class MatrixCall extends EventEmitter {
     }
 
     private stopAllMedia(): void {
-        logger.debug(this.stopLocalMediaOnEnd ? "Stopping all media" : "Stopping all media except local feeds" );
-
+        logger.debug(!this.groupCallId ? "Stopping all media" : "Stopping all media except local feeds" );
         for (const feed of this.feeds) {
             if (
                 feed.isLocal() &&
                 feed.purpose === SDPStreamMetadataPurpose.Usermedia &&
-                this.stopLocalMediaOnEnd
+                !this.groupCallId
             ) {
                 this.client.getMediaHandler().stopUserMediaStream(feed.stream);
             } else if (
                 feed.isLocal() &&
                 feed.purpose === SDPStreamMetadataPurpose.Screenshare &&
-                this.stopLocalMediaOnEnd
+                !this.groupCallId
             ) {
                 this.client.getMediaHandler().stopScreensharingStream(feed.stream);
-            } else if (!feed.isLocal() || this.stopLocalMediaOnEnd) {
+            } else if (!feed.isLocal() || !this.groupCallId) {
                 for (const track of feed.stream.getTracks()) {
                     track.stop();
                 }
@@ -2170,9 +2162,8 @@ export class MatrixCall extends EventEmitter {
      * @throws if you have not specified a listener for 'error' events.
      * @throws if have passed audio=false.
      */
-    public async placeCallWithCallFeeds(callFeeds: CallFeed[], stopLocalMediaOnEnd?: boolean): Promise<void> {
+    public async placeCallWithCallFeeds(callFeeds: CallFeed[]): Promise<void> {
         this.checkForErrorListener();
-        this.stopLocalMediaOnEnd = stopLocalMediaOnEnd;
         this.direction = CallDirection.Outbound;
 
         // XXX Find a better way to do this
