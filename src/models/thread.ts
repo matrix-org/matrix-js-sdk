@@ -46,7 +46,7 @@ export class Thread extends EventEmitter {
         public readonly client: MatrixClient,
     ) {
         super();
-        this.timelineSet = new EventTimelineSet(room, {
+        this.timelineSet = new EventTimelineSet(null, {
             unstableClientRelationAggregation: true,
             timelineSupport: true,
         });
@@ -135,9 +135,13 @@ export class Thread extends EventEmitter {
 
     /**
      * The number of messages in the thread
+     * Only count rel_type=m.thread as we want to
+     * exclude annotations from that number
      */
     public get length(): number {
-        return this.events.length;
+        return this.events
+            .filter(event => event.isThreadRelation)
+            .length;
     }
 
     /**
