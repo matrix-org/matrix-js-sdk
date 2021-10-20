@@ -141,7 +141,7 @@ export class CallEventHandler {
 
         for (const event of this.toDeviceCallEventBuffer) {
             try {
-                await this.handleCallEvent(event, true);
+                await this.handleCallEvent(event);
             } catch (e) {
                 logger.error("Caught exception handling call event", e);
             }
@@ -159,7 +159,7 @@ export class CallEventHandler {
         return type.startsWith("m.call.") || type.startsWith("org.matrix.call.");
     }
 
-    private async handleCallEvent(event: MatrixEvent, isToDevice?: boolean) {
+    private async handleCallEvent(event: MatrixEvent) {
         const content = event.getContent();
         const callRoomId = (
             event.getRoomId() ||
@@ -167,9 +167,28 @@ export class CallEventHandler {
         );
         const groupCallId = content.conf_id;
         const type = event.getType() as EventType;
-        const weSentTheEvent = event.getSender() === this.client.credentials.userId;
+        const senderId = event.getSender();
+        const weSentTheEvent = senderId === this.client.credentials.userId;
         let call = content.call_id ? this.calls.get(content.call_id) : undefined;
         //console.info("RECV %s content=%s", type, JSON.stringify(content));
+
+        let opponentDeviceId: string | undefined;
+
+        if (groupCallId) {
+            const groupCall = this.client.groupCallEventHandler.getGroupCallById(groupCallId);
+
+            if (!groupCall) {
+                logger.warn(`Cannot find a group call ${groupCallId} for event ${type}. Ignoring event.`);
+                return;
+            }
+
+            opponentDeviceId = groupCall.getDeviceIdForMember(senderId);
+
+            if (!opponentDeviceId) {
+                logger.warn(`Cannot find a device id for ${senderId}. Ignoring event.`);
+                return;
+            }
+        }
 
         if (!callRoomId) return;
 
@@ -197,7 +216,7 @@ export class CallEventHandler {
             call = createNewMatrixCall(
                 this.client,
                 callRoomId,
-                { forceTURN: this.client.forceTURN, useToDevice: isToDevice, groupCallId },
+                { forceTURN: this.client.forceTURN, opponentDeviceId, groupCallId },
             );
             if (!call) {
                 logger.log(
@@ -287,7 +306,7 @@ export class CallEventHandler {
                 // we're probably getting events backwards so
                 // the hangup will come before the invite
                 call = createNewMatrixCall(
-                    this.client, callRoomId, { useToDevice: isToDevice },
+                    this.client, callRoomId, { opponentDeviceId },
                 );
                 if (call) {
                     call.callId = content.call_id;

@@ -61,10 +61,14 @@ export interface IGroupCallDataChannelOptions {
     protocol: string;
 }
 
+export interface IGroupCallRoomMemberSource {
+    "device_id": string;
+}
+
 export interface IGroupCallRoomMemberCallState {
     "m.call_id": string;
     "m.foci"?: string[];
-    "m.sources"?: any[];
+    "m.sources": IGroupCallRoomMemberSource[];
 }
 
 export interface IGroupCallRoomMemberState {
@@ -488,8 +492,13 @@ export class GroupCall extends EventEmitter {
     private sendEnteredMemberStateEvent(): Promise<ISendEventResponse> {
         return this.updateMemberCallState({
             "m.call_id": this.groupCallId,
+            "m.sources": [
+                {
+                    "device_id": this.client.getDeviceId(),
+                    // TODO rest of the source properties
+                },
+            ],
             // TODO "m.foci"
-            // TODO "m.sources"
         });
     }
 
@@ -585,10 +594,17 @@ export class GroupCall extends EventEmitter {
             return;
         }
 
+        const opponentDeviceId = this.getDeviceIdForMember(member.userId);
+
+        if (!opponentDeviceId) {
+            logger.warn(`No opponent device id found for ${member.userId}, ignoring.`);
+            return;
+        }
+
         const newCall = createNewMatrixCall(
             this.client,
             this.room.roomId,
-            { invitee: member.userId, useToDevice: true, groupCallId: this.groupCallId },
+            { invitee: member.userId, opponentDeviceId, groupCallId: this.groupCallId },
         );
 
         newCall.placeCallWithCallFeeds(this.getLocalFeeds());
@@ -599,6 +615,29 @@ export class GroupCall extends EventEmitter {
 
         this.addCall(newCall);
     };
+
+    public getDeviceIdForMember(userId: string): string | undefined {
+        const memberStateEvent = this.room.currentState.getStateEvents(EventType.GroupCallMemberPrefix, userId);
+
+        if (!memberStateEvent) {
+            return undefined;
+        }
+
+        const memberState = memberStateEvent.getContent<IGroupCallRoomMemberState>();
+        const memberGroupCallState = memberState["m.calls"]?.find((call) => call["m.call_id"] === this.groupCallId);
+
+        if (!memberGroupCallState) {
+            return undefined;
+        }
+
+        const memberSources = memberGroupCallState["m.sources"];
+
+        if (!memberSources || memberSources.length === 0) {
+            return undefined;
+        }
+
+        return memberSources[0].device_id;
+    }
 
     /**
      * Call Event Handlers

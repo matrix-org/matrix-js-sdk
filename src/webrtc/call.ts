@@ -71,7 +71,7 @@ interface CallOpts {
     client?: any; // Fix when client is TSified
     forceTURN?: boolean;
     turnServers?: Array<TurnServer>;
-    useToDevice?: boolean;
+    opponentDeviceId?: string;
     groupCallId?: string;
 }
 
@@ -314,7 +314,7 @@ export class MatrixCall extends EventEmitter {
     private callLengthInterval: number;
     private callLength = 0;
 
-    private useToDevice: boolean;
+    private opponentDeviceId: string;
     public groupCallId: string;
 
     constructor(opts: CallOpts) {
@@ -324,7 +324,7 @@ export class MatrixCall extends EventEmitter {
         this.client = opts.client;
         this.forceTURN = opts.forceTURN;
         this.ourPartyId = this.client.deviceId;
-        this.useToDevice = opts.useToDevice;
+        this.opponentDeviceId = opts.opponentDeviceId;
         this.groupCallId = opts.groupCallId;
         // Array of Objects with urls, username, credential keys
         this.turnServers = opts.turnServers || [];
@@ -1910,10 +1910,10 @@ export class MatrixCall extends EventEmitter {
             conf_id: this.groupCallId,
         });
 
-        if (this.useToDevice) {
+        if (this.opponentDeviceId) {
             return this.client.sendToDevice(eventType, {
                 [this.invitee || this.getOpponentMember().userId]: {
-                    "*": realContent,
+                    [this.opponentDeviceId]: realContent,
                 },
             });
         } else {
@@ -2326,7 +2326,7 @@ export function createNewMatrixCall(client: any, roomId: string, options?: CallO
         turnServers: client.getTurnServers(),
         // call level options
         forceTURN: client.forceTURN || optionsForceTURN,
-        useToDevice: options?.useToDevice,
+        opponentDeviceId: options?.opponentDeviceId,
         groupCallId: options?.groupCallId,
     };
     const call = new MatrixCall(opts);
