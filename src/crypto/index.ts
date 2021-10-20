@@ -3046,7 +3046,7 @@ export class Crypto extends EventEmitter {
      *     userDeviceMap, and returns the { contentMap, deviceInfoByDeviceId }
      *     of the successfully sent messages.
      */
-    encryptAndSendToDevices(
+    public encryptAndSendToDevices(
         userDeviceMap: IOlmDevice<DeviceInfo>[],
         payload: object,
     ): Promise<{contentMap, deviceInfoByDeviceId}> {
@@ -3121,7 +3121,7 @@ export class Crypto extends EventEmitter {
             }
 
             return this.baseApis.sendToDevice("m.room.encrypted", contentMap).then(
-                (response)=>({ contentMap, deviceInfoByDeviceId })
+                (response)=>({ contentMap, deviceInfoByDeviceId }),
             );
         });
     }
