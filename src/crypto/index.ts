@@ -3079,16 +3079,17 @@ export class Crypto extends EventEmitter {
                     this.olmDevice,
                     this.baseApis,
                     devicesByUser,
-                ),
-                olmlib.encryptMessageForDevice(
-                    encryptedContent.ciphertext,
-                    this.userId,
-                    this.deviceId,
-                    this.olmDevice,
-                    userId,
-                    deviceInfo,
-                    payload,
-                ),
+                ).then(()=>
+                    olmlib.encryptMessageForDevice(
+                        encryptedContent.ciphertext,
+                        this.userId,
+                        this.deviceId,
+                        this.olmDevice,
+                        userId,
+                        deviceInfo,
+                        payload,
+                    )
+                )
             );
         }
 
@@ -3122,7 +3123,13 @@ export class Crypto extends EventEmitter {
 
             return this.baseApis.sendToDevice("m.room.encrypted", contentMap).then(
                 (response)=>({ contentMap, deviceInfoByDeviceId }),
-            );
+            ).catch(error=>{
+                console.error("sendToDevice failed", error);
+                throw error;
+            });
+        }).catch(error=>{
+            console.error("encryptAndSendToDevices promises failed", error);
+            throw error;
         });
     }
 
