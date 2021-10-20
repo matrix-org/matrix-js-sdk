@@ -321,6 +321,12 @@ describe("MegolmDecryption", function() {
                         rotation_period_ms: 9999999999999,
                     },
                 });
+
+                // Fix the mock to call the stuff we need it to
+                mockCrypto.encryptAndSendToDevices = Crypto.prototype.encryptAndSendToDevices;
+                mockCrypto.olmDevice = olmDevice;
+                mockCrypto.baseApis = mockBaseApis;
+
                 mockRoom = {
                     getEncryptionTargetMembers: jest.fn().mockReturnValue(
                         [{ userId: "@alice:home.server" }],
