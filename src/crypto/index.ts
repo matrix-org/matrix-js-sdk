@@ -3040,17 +3040,16 @@ export class Crypto extends EventEmitter {
      *   mapping from userId to deviceInfo
      *
      * @param {object} payload fields to include in the encrypted payload
-     * 
-     * @param function to call on each message after it's successfully sent
-     *
-     * @return {Promise} Promise which resolves once the key sharing
-     *     for the given userDeviceMap is generated and has been sent.
+     *      *
+     * @return {Promise<{contentMap, deviceInfoByDeviceId}>} Promise which
+     *     resolves once the message has been encrypted and sent to the given
+     *     userDeviceMap, and returns the { contentMap, deviceInfoByDeviceId }
+     *     of the successfully sent messages.
      */
     encryptAndSendToDevices(
         userDeviceMap: IOlmDevice<DeviceInfo>[],
         payload: object,
-        afterwards: (contentMap: {}, deviceInfoByDeviceId: Map<string, DeviceInfo>) => void,
-    ): Promise<void> {
+    ): Promise<{contentMap, deviceInfoByDeviceId}> {
         const contentMap = {};
         const deviceInfoByDeviceId = new Map<string, DeviceInfo>();
 
@@ -3072,7 +3071,15 @@ export class Crypto extends EventEmitter {
             }
             contentMap[userId][deviceId] = encryptedContent;
 
+            const devicesByUser = {};
+            devicesByUser[userId] = [deviceInfo];
+
             promises.push(
+                olmlib.ensureOlmSessionsForDevices(
+                    this.olmDevice,
+                    this.baseApis,
+                    devicesByUser,
+                ),
                 olmlib.encryptMessageForDevice(
                     encryptedContent.ciphertext,
                     this.userId,
@@ -3114,7 +3121,7 @@ export class Crypto extends EventEmitter {
             }
 
             return this.baseApis.sendToDevice("m.room.encrypted", contentMap).then(
-                afterwards.bind(contentMap, deviceInfoByDeviceId)
+                (response)=>({ contentMap, deviceInfoByDeviceId })
             );
         });
     }
