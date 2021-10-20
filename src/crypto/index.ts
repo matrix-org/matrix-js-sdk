@@ -3088,8 +3088,8 @@ export class Crypto extends EventEmitter {
                         userId,
                         deviceInfo,
                         payload,
-                    )
-                )
+                    ),
+                ),
             );
         }
 
@@ -3124,11 +3124,11 @@ export class Crypto extends EventEmitter {
             return this.baseApis.sendToDevice("m.room.encrypted", contentMap).then(
                 (response)=>({ contentMap, deviceInfoByDeviceId }),
             ).catch(error=>{
-                console.error("sendToDevice failed", error);
+                logger.error("sendToDevice failed", error);
                 throw error;
             });
         }).catch(error=>{
-            console.error("encryptAndSendToDevices promises failed", error);
+            logger.error("encryptAndSendToDevices promises failed", error);
             throw error;
         });
     }
