@@ -46,7 +46,7 @@ export class Thread extends EventEmitter {
         public readonly client: MatrixClient,
     ) {
         super();
-        this.timelineSet = new EventTimelineSet(room, {
+        this.timelineSet = new EventTimelineSet(null, {
             unstableClientRelationAggregation: true,
             timelineSupport: true,
         });
