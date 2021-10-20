@@ -601,7 +601,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
                 }
             }
         }).catch((error) => {
-            console.error("failed to encryptAndSendToDevices", error);
+            logger.error("failed to encryptAndSendToDevices", error);
             throw error;
         });
     }
