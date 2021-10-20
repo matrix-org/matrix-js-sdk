@@ -578,13 +578,10 @@ class MegolmEncryption extends EncryptionAlgorithm {
         userDeviceMap: IOlmDevice[],
         payload: IPayload,
     ): Promise<void> {
-        const p = this.crypto.encryptAndSendToDevices(
+        return this.crypto.encryptAndSendToDevices(
             userDeviceMap,
             payload,
-        );
-        if (!p) return;
-        return p.then((result) => {
-            if (!result) return;
+        ).then((result) => {
             const { contentMap, deviceInfoByDeviceId } = result;
             // store that we successfully uploaded the keys of the current slice
             for (const userId of Object.keys(contentMap)) {
@@ -597,6 +594,9 @@ class MegolmEncryption extends EncryptionAlgorithm {
                     );
                 }
             }
+        }).catch((error) => {
+            console.error("failed to encryptAndSendToDevices", error);
+            throw error;
         });
     }
 
