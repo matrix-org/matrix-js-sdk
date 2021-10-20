@@ -586,9 +586,9 @@ class MegolmEncryption extends EncryptionAlgorithm {
     ): Promise<void> {
         return this.crypto.encryptAndSendToDevices(
             userDeviceMap,
-            payload
+            payload,
         ).then((result) => {
-            const {contentMap, deviceInfoByDeviceId} = result;
+            const { contentMap, deviceInfoByDeviceId } = result;
             // store that we successfully uploaded the keys of the current slice
             for (const userId of Object.keys(contentMap)) {
                 for (const deviceId of Object.keys(contentMap[userId])) {
