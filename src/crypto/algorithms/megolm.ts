@@ -580,21 +580,21 @@ class MegolmEncryption extends EncryptionAlgorithm {
     ): Promise<void> {
         return this.crypto.encryptAndSendToDevices(
             userDeviceMap,
-            payload,
-            (contentMap, deviceInfoByDeviceId) => {
-                // store that we successfully uploaded the keys of the current slice
-                for (const userId of Object.keys(contentMap)) {
-                    for (const deviceId of Object.keys(contentMap[userId])) {
-                        session.markSharedWithDevice(
-                            userId,
-                            deviceId,
-                            deviceInfoByDeviceId.get(deviceId).getIdentityKey(),
-                            chainIndex,
-                        );
-                    }
+            payload
+        ).then((result) => {
+            const {contentMap, deviceInfoByDeviceId} = result;
+            // store that we successfully uploaded the keys of the current slice
+            for (const userId of Object.keys(contentMap)) {
+                for (const deviceId of Object.keys(contentMap[userId])) {
+                    session.markSharedWithDevice(
+                        userId,
+                        deviceId,
+                        deviceInfoByDeviceId.get(deviceId).getIdentityKey(),
+                        chainIndex,
+                    );
                 }
             }
-        );
+        });
     }
 
     /**
@@ -1487,6 +1487,9 @@ class MegolmDecryption extends DecryptionAlgorithm {
                     return;
                 }
             }
+
+            // XXX: switch this to use encryptAndSendToDevices() rather than duplicating it?
+
             await olmlib.ensureOlmSessionsForDevices(
                 this.olmDevice, this.baseApis, { [sender]: [device] }, false,
             );
@@ -1543,6 +1546,8 @@ class MegolmDecryption extends DecryptionAlgorithm {
         const deviceId = keyRequest.deviceId;
         const deviceInfo = this.crypto.getStoredDevice(userId, deviceId);
         const body = keyRequest.requestBody;
+
+        // XXX: switch this to use encryptAndSendToDevices()?
 
         this.olmlib.ensureOlmSessionsForDevices(
             this.olmDevice, this.baseApis, {
@@ -1725,6 +1730,8 @@ class MegolmDecryption extends DecryptionAlgorithm {
         logger.log("shared-history sessions", sharedHistorySessions);
         for (const [senderKey, sessionId] of sharedHistorySessions) {
             const payload = await this.buildKeyForwardingMessage(this.roomId, senderKey, sessionId);
+
+            // FIXME: use encryptAndSendToDevices() rather than duplicating it here.
 
             const promises = [];
             const contentMap = {};
