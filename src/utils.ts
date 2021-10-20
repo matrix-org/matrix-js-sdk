@@ -387,6 +387,18 @@ export function removeHiddenChars(str: string): string {
     return "";
 }
 
+/**
+ * Removes the direction override characters from a string
+ * @param {string} input
+ * @returns string with chars removed
+ */
+export function removeDirectionOverrideChars(str: string): string {
+    if (typeof str === "string") {
+        return str.replace(/[\u202d-\u202e]/g, '');
+    }
+    return "";
+}
+
 export function normalize(str: string): string {
     // Note: we have to match the filter with the removeHiddenChars() because the
     // function strips spaces and other characters (M becomes RN for example, in lowercase).
