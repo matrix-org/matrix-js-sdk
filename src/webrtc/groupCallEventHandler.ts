@@ -106,10 +106,10 @@ export class GroupCallEventHandler {
             room,
             callType,
             callIntent,
+            groupCallId,
             content?.dataChannelsEnabled,
             dataChannelOptions,
         );
-        groupCall.groupCallId = groupCallId;
 
         this.groupCalls.set(room.roomId, groupCall);
         this.client.emit("GroupCall.incoming", groupCall);

@@ -126,12 +126,13 @@ export class GroupCall extends EventEmitter {
         public room: Room,
         public type: GroupCallType,
         public intent: GroupCallIntent,
+        groupCallId?: string,
         private dataChannelsEnabled?: boolean,
         private dataChannelOptions?: IGroupCallDataChannelOptions,
     ) {
         super();
         this.reEmitter = new ReEmitter(this);
-        this.groupCallId = genCallID();
+        this.groupCallId = groupCallId || genCallID();
 
         const roomState = this.room.currentState;
         const memberStateEvents = roomState.getStateEvents(EventType.GroupCallMemberPrefix);
@@ -175,6 +176,11 @@ export class GroupCall extends EventEmitter {
         if (this.localScreenshareFeed) feeds.push(this.localScreenshareFeed);
 
         return feeds;
+    }
+
+    public hasLocalParticipant(): boolean {
+        const userId = this.client.getUserId();
+        return this.participants.some((member) => member.userId === userId);
     }
 
     public async initLocalCallFeed(): Promise<CallFeed> {
@@ -231,6 +237,8 @@ export class GroupCall extends EventEmitter {
             await this.initLocalCallFeed();
         }
 
+        this.addParticipant(this.room.getMember(this.client.getUserId()));
+
         this.sendMemberStateEvent();
 
         this.activeSpeaker = null;
@@ -281,6 +289,8 @@ export class GroupCall extends EventEmitter {
         if (this.state !== GroupCallState.Entered) {
             return;
         }
+
+        this.removeParticipant(this.room.getMember(this.client.getUserId()));
 
         this.removeMemberStateEvent();
 
@@ -564,13 +574,6 @@ export class GroupCall extends EventEmitter {
             return;
         }
 
-        // Don't process your own member.
-        const localUserId = this.client.getUserId();
-
-        if (member.userId === localUserId) {
-            return;
-        }
-
         const callsState = event.getContent<IGroupCallRoomMemberState>()["m.calls"];
 
         if (!callsState || !Array.isArray(callsState) || callsState.length === 0) {
@@ -578,6 +581,8 @@ export class GroupCall extends EventEmitter {
             this.removeParticipant(member);
             return;
         }
+
+        logger.log(callsState);
 
         // Currently we only support a single call per room. So grab the first call.
         const callState = callsState[0];
@@ -591,12 +596,19 @@ export class GroupCall extends EventEmitter {
         }
 
         if (callId !== this.groupCallId) {
-            logger.log(`Call id does not match group call id, ignoring.`);
+            logger.log(`Call id ${callId} does not match group call id ${this.groupCallId}, ignoring.`);
             this.removeParticipant(member);
             return;
         }
 
         this.addParticipant(member);
+
+        // Don't process your own member.
+        const localUserId = this.client.getUserId();
+
+        if (member.userId === localUserId) {
+            return;
+        }
 
         if (this.state !== GroupCallState.Entered) {
             return;

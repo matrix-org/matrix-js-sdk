@@ -1332,6 +1332,7 @@ export class MatrixClient extends EventEmitter {
             room,
             type,
             intent,
+            undefined,
             dataChannelsEnabled,
             dataChannelOptions,
         ).create();
