@@ -1755,6 +1755,7 @@ export class MatrixClient extends EventEmitter {
      * @param {string} deviceId the device to verify
      *
      * @returns {Verification} a verification object
+     * @deprecated Use `requestVerification` instead.
      */
     public beginKeyVerification(method: string, userId: string, deviceId: string): Verification {
         if (!this.crypto) {
@@ -1917,6 +1918,7 @@ export class MatrixClient extends EventEmitter {
         return this.crypto.checkCrossSigningPrivateKey(privateKey, expectedPublicKey);
     }
 
+    // deprecated: use requestVerification instead
     public legacyDeviceVerification(
         userId: string,
         deviceId: string,
