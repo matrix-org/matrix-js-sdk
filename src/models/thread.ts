@@ -38,7 +38,10 @@ export class Thread extends EventEmitter {
     /**
      * A reference to all the events ID at the bottom of the threads
      */
-    public readonly timelineSet: EventTimelineSet;
+    public readonly timelineSet = new EventTimelineSet(null, {
+        unstableClientRelationAggregation: true,
+        timelineSupport: true,
+    });
 
     public readonly room: Room;
 
@@ -50,10 +53,6 @@ export class Thread extends EventEmitter {
         if (events.length === 0) {
             throw new Error("Can't create an empty thread");
         }
-        this.timelineSet = new EventTimelineSet(null, {
-            unstableClientRelationAggregation: true,
-            timelineSupport: true,
-        });
         this.room = this.client.getRoom(events[0].getRoomId());
         this.room.threads.set(this.root, this);
         events.forEach(event => this.addEvent(event));
