@@ -824,7 +824,7 @@ export class MatrixCall extends EventEmitter {
                     answerWithAudio, answerWithVideo,
                 );
                 this.waitForLocalAVStream = false;
-                const callFeed = new CallFeed({
+                const usermediaFeed = new CallFeed({
                     client: this.client,
                     roomId: this.roomId,
                     userId: this.client.getUserId(),
@@ -833,7 +833,14 @@ export class MatrixCall extends EventEmitter {
                     audioMuted: stream.getAudioTracks().length === 0,
                     videoMuted: stream.getVideoTracks().length === 0,
                 });
-                this.answerWithCallFeeds([callFeed]);
+
+                const feeds = [usermediaFeed];
+
+                if (this.localScreensharingFeed) {
+                    feeds.push(this.localScreensharingFeed);
+                }
+
+                this.answerWithCallFeeds(feeds);
             } catch (e) {
                 if (answerWithVideo) {
                     // Try to answer without video
@@ -1262,7 +1269,7 @@ export class MatrixCall extends EventEmitter {
         setTracksEnabled(this.localUsermediaStream.getVideoTracks(), !vidShouldBeMuted);
     }
 
-    private gotCallFeedsForInvite(callFeeds: CallFeed[]): void {
+    private gotCallFeedsForInvite(callFeeds: CallFeed[], requestScreenshareFeed = false): void {
         if (this.successor) {
             this.successor.gotCallFeedsForAnswer(callFeeds);
             return;
@@ -1275,6 +1282,13 @@ export class MatrixCall extends EventEmitter {
         for (const feed of callFeeds) {
             this.pushLocalFeed(feed);
         }
+
+        if (requestScreenshareFeed) {
+            this.peerConn.addTransceiver("video", {
+                direction: "recvonly",
+            });
+        }
+
         this.setState(CallState.CreateOffer);
 
         logger.debug("gotUserMediaForInvite");
@@ -1339,18 +1353,9 @@ export class MatrixCall extends EventEmitter {
 
         this.setState(CallState.CreateAnswer);
 
-        let myAnswer;
         try {
             this.getRidOfRTXCodecs();
-            myAnswer = await this.peerConn.createAnswer();
-        } catch (err) {
-            logger.debug("Failed to create answer: ", err);
-            this.terminate(CallParty.Local, CallErrorCode.CreateAnswer, true);
-            return;
-        }
-
-        try {
-            await this.peerConn.setLocalDescription(myAnswer);
+            await this.peerConn.setLocalDescription();
             this.setState(CallState.Connecting);
 
             // Allow a short time for initial candidates to be gathered
@@ -1559,8 +1564,7 @@ export class MatrixCall extends EventEmitter {
 
             if (description.type === 'offer') {
                 this.getRidOfRTXCodecs();
-                const localDescription = await this.peerConn.createAnswer();
-                await this.peerConn.setLocalDescription(localDescription);
+                await this.peerConn.setLocalDescription();
 
                 this.sendVoipEvent(EventType.CallNegotiate, {
                     description: this.peerConn.localDescription,
@@ -1613,8 +1617,8 @@ export class MatrixCall extends EventEmitter {
         return this.state === CallState.Ended;
     }
 
-    private gotLocalOffer = async (description: RTCSessionDescriptionInit): Promise<void> => {
-        logger.debug("Created offer: ", description);
+    private gotLocalOffer = async (): Promise<void> => {
+        logger.debug("Setting local description");
 
         if (this.callHasEnded()) {
             logger.debug("Ignoring newly created offer on call ID " + this.callId +
@@ -1623,7 +1627,7 @@ export class MatrixCall extends EventEmitter {
         }
 
         try {
-            await this.peerConn.setLocalDescription(description);
+            await this.peerConn.setLocalDescription();
         } catch (err) {
             logger.debug("Error setting local description!", err);
             this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);
@@ -1840,8 +1844,7 @@ export class MatrixCall extends EventEmitter {
         this.makingOffer = true;
         try {
             this.getRidOfRTXCodecs();
-            const myOffer = await this.peerConn.createOffer();
-            await this.gotLocalOffer(myOffer);
+            await this.gotLocalOffer();
         } catch (e) {
             this.getLocalOfferFailed(e);
             return;
@@ -2162,7 +2165,7 @@ export class MatrixCall extends EventEmitter {
      * @throws if you have not specified a listener for 'error' events.
      * @throws if have passed audio=false.
      */
-    public async placeCallWithCallFeeds(callFeeds: CallFeed[]): Promise<void> {
+    public async placeCallWithCallFeeds(callFeeds: CallFeed[], requestScreenshareFeed = false): Promise<void> {
         this.checkForErrorListener();
         this.direction = CallDirection.Outbound;
 
@@ -2179,7 +2182,7 @@ export class MatrixCall extends EventEmitter {
         // create the peer connection now so it can be gathering candidates while we get user
         // media (assuming a candidate pool size is configured)
         this.peerConn = this.createPeerConnection();
-        this.gotCallFeedsForInvite(callFeeds);
+        this.gotCallFeedsForInvite(callFeeds, requestScreenshareFeed);
     }
 
     private createPeerConnection(): RTCPeerConnection {

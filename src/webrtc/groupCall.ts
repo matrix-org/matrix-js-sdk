@@ -61,14 +61,20 @@ export interface IGroupCallDataChannelOptions {
     protocol: string;
 }
 
-export interface IGroupCallRoomMemberSource {
+export interface IGroupCallRoomMemberFeed {
+    purpose: SDPStreamMetadataPurpose;
+    // TODO: Sources for adaptive bitrate
+}
+
+export interface IGroupCallRoomMemberDevice {
     "device_id": string;
+    "feeds": IGroupCallRoomMemberFeed[];
 }
 
 export interface IGroupCallRoomMemberCallState {
     "m.call_id": string;
     "m.foci"?: string[];
-    "m.sources": IGroupCallRoomMemberSource[];
+    "m.devices": IGroupCallRoomMemberDevice[];
 }
 
 export interface IGroupCallRoomMemberState {
@@ -225,7 +231,7 @@ export class GroupCall extends EventEmitter {
             await this.initLocalCallFeed();
         }
 
-        this.sendEnteredMemberStateEvent();
+        this.sendMemberStateEvent();
 
         this.activeSpeaker = null;
 
@@ -276,7 +282,7 @@ export class GroupCall extends EventEmitter {
             return;
         }
 
-        this.sendLeftMemberStateEvent();
+        this.removeMemberStateEvent();
 
         while (this.calls.length > 0) {
             this.removeCall(this.calls[this.calls.length - 1], CallErrorCode.UserHangup);
@@ -414,6 +420,8 @@ export class GroupCall extends EventEmitter {
                 // TODO: handle errors
                 await Promise.all(this.calls.map(call => call.pushLocalFeed(this.localScreenshareFeed)));
 
+                await this.sendMemberStateEvent();
+
                 logger.log("screensharing enabled on all calls");
 
                 return true;
@@ -430,6 +438,7 @@ export class GroupCall extends EventEmitter {
             this.removeScreenshareFeed(this.localScreenshareFeed);
             this.localScreenshareFeed = undefined;
             this.localDesktopCapturerSourceId = undefined;
+            await this.sendMemberStateEvent();
             this.emit(GroupCallEvent.LocalScreenshareStateChanged, false, undefined, undefined);
             return false;
         }
@@ -489,20 +498,25 @@ export class GroupCall extends EventEmitter {
      * Room Member State
      */
 
-    private sendEnteredMemberStateEvent(): Promise<ISendEventResponse> {
+    private sendMemberStateEvent(): Promise<ISendEventResponse> {
+        const deviceId = this.client.getDeviceId();
+
         return this.updateMemberCallState({
             "m.call_id": this.groupCallId,
-            "m.sources": [
+            "m.devices": [
                 {
-                    "device_id": this.client.getDeviceId(),
-                    // TODO rest of the source properties
+                    "device_id": deviceId,
+                    "feeds": this.getLocalFeeds().map((feed) => ({
+                        purpose: feed.purpose,
+                    })),
+                    // TODO: Add data channels
                 },
             ],
             // TODO "m.foci"
         });
     }
 
-    private sendLeftMemberStateEvent(): Promise<ISendEventResponse> {
+    private removeMemberStateEvent(): Promise<ISendEventResponse> {
         return this.updateMemberCallState(undefined);
     }
 
@@ -594,20 +608,23 @@ export class GroupCall extends EventEmitter {
             return;
         }
 
-        const opponentDeviceId = this.getDeviceIdForMember(member.userId);
+        const opponentDevice = this.getDeviceForMember(member.userId);
 
-        if (!opponentDeviceId) {
-            logger.warn(`No opponent device id found for ${member.userId}, ignoring.`);
+        if (!opponentDevice) {
+            logger.warn(`No opponent device found for ${member.userId}, ignoring.`);
             return;
         }
 
         const newCall = createNewMatrixCall(
             this.client,
             this.room.roomId,
-            { invitee: member.userId, opponentDeviceId, groupCallId: this.groupCallId },
+            { invitee: member.userId, opponentDeviceId: opponentDevice.device_id, groupCallId: this.groupCallId },
         );
 
-        newCall.placeCallWithCallFeeds(this.getLocalFeeds());
+        const requestScreenshareFeed = opponentDevice.feeds.some(
+            (feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
+
+        newCall.placeCallWithCallFeeds(this.getLocalFeeds(), requestScreenshareFeed);
 
         if (this.dataChannelsEnabled) {
             newCall.createDataChannel("datachannel", this.dataChannelOptions);
@@ -616,7 +633,7 @@ export class GroupCall extends EventEmitter {
         this.addCall(newCall);
     };
 
-    public getDeviceIdForMember(userId: string): string | undefined {
+    public getDeviceForMember(userId: string): IGroupCallRoomMemberDevice {
         const memberStateEvent = this.room.currentState.getStateEvents(EventType.GroupCallMemberPrefix, userId);
 
         if (!memberStateEvent) {
@@ -630,13 +647,14 @@ export class GroupCall extends EventEmitter {
             return undefined;
         }
 
-        const memberSources = memberGroupCallState["m.sources"];
+        const memberDevices = memberGroupCallState["m.devices"];
 
-        if (!memberSources || memberSources.length === 0) {
+        if (!memberDevices || memberDevices.length === 0) {
             return undefined;
         }
 
-        return memberSources[0].device_id;
+        // NOTE: For now we only support one device so we use the device id in the first source.
+        return memberDevices[0];
     }
 
     /**
