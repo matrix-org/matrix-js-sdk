@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import { EventEmitter } from "events";
-import { logger } from "../logger";
 import { MatrixClient } from "../matrix";
 import { MatrixEvent } from "./event";
 import { EventTimeline } from "./event-timeline";
@@ -97,14 +96,6 @@ export class Thread extends EventEmitter {
             this.client.decryptEventIfNeeded(event, {});
         }
         this.emit(ThreadEvent.Update, this);
-    }
-
-    private async decryptEvents(): Promise<void> {
-        await Promise.allSettled(
-            Array.from(this.timelineSet.getLiveTimeline().getEvents()).map(event => {
-                return this.client.decryptEventIfNeeded(event, {});
-            }),
-        );
     }
 
     /**
