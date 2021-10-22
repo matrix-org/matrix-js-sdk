@@ -538,11 +538,11 @@ export class GroupCall extends EventEmitter {
 
         let calls: IGroupCallRoomMemberCallState[] = [];
         let existingCallIndex: number;
-        if (memberCallState) {
+        if (memberStateEvent) {
             calls = memberStateEvent["m.calls"] || [];
             existingCallIndex = calls.findIndex((call) => call && call["m.call_id"] === this.groupCallId);
         } else {
-            existingCallIndex = 0;
+            existingCallIndex = -1;
         }
 
         if (existingCallIndex === -1) {
