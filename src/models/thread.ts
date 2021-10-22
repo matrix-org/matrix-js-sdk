@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { EventEmitter } from "events";
+import { logger } from "../logger";
 import { MatrixClient } from "../matrix";
 import { MatrixEvent } from "./event";
 import { EventTimeline } from "./event-timeline";
@@ -38,23 +39,23 @@ export class Thread extends EventEmitter {
     /**
      * A reference to all the events ID at the bottom of the threads
      */
-    public readonly timelineSet = new EventTimelineSet(null, {
-        unstableClientRelationAggregation: true,
-        timelineSupport: true,
-    });
-
-    public readonly room: Room;
+    public readonly timelineSet;
 
     constructor(
         events: MatrixEvent[] = [],
+        public readonly room: Room,
         public readonly client: MatrixClient,
     ) {
         super();
         if (events.length === 0) {
             throw new Error("Can't create an empty thread");
         }
-        this.room = this.client.getRoom(events[0].getRoomId());
-        this.room.threads.set(this.root, this);
+
+        this.timelineSet = new EventTimelineSet(this.room, {
+            unstableClientRelationAggregation: true,
+            timelineSupport: true,
+            pendingEvents: false,
+        });
         events.forEach(event => this.addEvent(event));
     }
 
