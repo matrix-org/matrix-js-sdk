@@ -672,7 +672,13 @@ export class Room extends EventEmitter {
         // were the members loaded from the server?
         let fromServer = false;
         let rawMembersEvents = await this.client.store.getOutOfBandMembers(this.roomId);
-        if (rawMembersEvents === null) {
+        // If the room is encrypted, we always fetch members from the server at
+        // least once, in case the latest state wasn't persisted properly.  Note
+        // that this function is only called once (unless loading the members
+        // fails), since loadMembersIfNeeded always returns this.membersPromise
+        // if set, which will be the result of the first (successful) call.
+        if (rawMembersEvents === null ||
+            (this.client.isCryptoEnabled() && this.client.isRoomEncrypted(this.roomId))) {
             fromServer = true;
             rawMembersEvents = await this.loadMembersFromServer();
             logger.log(`LL: got ${rawMembersEvents.length} ` +
