@@ -3413,15 +3413,12 @@ export class MatrixClient extends EventEmitter {
     private sendCompleteEvent(
         roomId: string,
         eventObject: any,
-        txnIdOrCallback?: string|Callback,
+        txnId?: string,
         callback?: Callback,
     ): Promise<ISendEventResponse> {
-        let txnId?: string;
-        if (utils.isFunction(txnIdOrCallback)) {
-            callback = txnIdOrCallback; // convert for legacy
+        if (utils.isFunction(txnId)) {
+            callback = txnId as any as Callback; // convert for legacy
             txnId = undefined;
-        } else {
-            txnId = txnIdOrCallback;
         }
 
         if (!txnId) {
