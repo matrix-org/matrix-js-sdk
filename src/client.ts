@@ -3405,7 +3405,7 @@ export class MatrixClient extends EventEmitter {
     /**
      * @param {string} roomId
      * @param {object} eventObject An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
-     * @param {string} txnId the txnId.
+     * @param {string} txnId Optional.
      * @param {module:client.callback} callback Optional.
      * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
@@ -3413,12 +3413,15 @@ export class MatrixClient extends EventEmitter {
     private sendCompleteEvent(
         roomId: string,
         eventObject: any,
-        txnId: string,
+        txnIdOrCallback?: string|Callback,
         callback?: Callback,
     ): Promise<ISendEventResponse> {
-        if (utils.isFunction(txnId)) {
-            callback = txnId as any as Callback; // convert for legacy
+        let txnId?: string;
+        if (utils.isFunction(txnIdOrCallback)) {
+            callback = txnIdOrCallback; // convert for legacy
             txnId = undefined;
+        } else {
+            txnId = txnIdOrCallback;
         }
 
         if (!txnId) {
