@@ -239,7 +239,7 @@ export class GroupCall extends EventEmitter {
 
         this.addParticipant(this.room.getMember(this.client.getUserId()));
 
-        this.sendMemberStateEvent();
+        const sendMemberStateEventPromise = this.sendMemberStateEvent();
 
         this.activeSpeaker = null;
 
@@ -262,9 +262,14 @@ export class GroupCall extends EventEmitter {
 
         logger.log("Processing initial members");
 
-        for (const stateEvent of memberStateEvents) {
-            this.onMemberStateChanged(stateEvent);
-        }
+        // This avoids a race condition where the other side would first receive
+        // the to-device messages and only then the member state event which
+        // would result in the call being ignored
+        sendMemberStateEventPromise.then(() => {
+            for (const stateEvent of memberStateEvents) {
+                this.onMemberStateChanged(stateEvent);
+            }
+        });
 
         this.client.on("Call.incoming", this.onIncomingCall);
 
