@@ -154,6 +154,10 @@ export class CallFeed extends EventEmitter {
         return this.stream.getVideoTracks().length === 0 || this.videoMuted;
     }
 
+    public isSpeaking(): boolean {
+        return this.speaking;
+    }
+
     /**
      * Replaces the current MediaStream with a new one.
      * This method should be only used by MatrixCall.
