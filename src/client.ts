@@ -1321,6 +1321,29 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
+     * Stops the sync object from syncing.
+     */
+    public stopSync(): void {
+        if (this.syncApi == null) {
+            logger.error("Calling stopSync() while no sync object, this should not happen, nothing to stop.");
+            return;
+        }
+        this.syncApi.stop();
+    }
+
+    /**
+     * Resumes syncing from where it stopped when stopSync() was called.
+     * This method is only intended to be used following a call to stopSync().
+     */
+    public resumeSync(): void {
+        if (this.syncApi == null) {
+            logger.error("Calling resumeSync() while no sync object, this should not happen, nothing to resume.");
+            return;
+        }
+        this.syncApi.resume();
+    }
+
+    /**
      * Whether the initial sync has completed.
      * @return {boolean} True if at least one sync has happened.
      */

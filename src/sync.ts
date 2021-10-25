@@ -139,6 +139,7 @@ export class SyncApi {
     private running = false;
     private keepAliveTimer: number = null;
     private connectionReturnedDefer: IDeferred<boolean> = null;
+    private filterId: string = null;
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
     private failedSyncCount = 0; // Number of consecutive failed /sync requests
     private storeIsInvalid = false; // flag set if the store needs to be cleared before we can start
@@ -651,9 +652,8 @@ export class SyncApi {
                 filter = buildDefaultFilter();
             }
 
-            let filterId;
             try {
-                filterId = await client.getOrCreateFilter(getFilterName(client.credentials.userId), filter);
+                this.filterId = await client.getOrCreateFilter(getFilterName(client.credentials.userId), filter);
             } catch (err) {
                 logger.error("Getting filter failed", err);
                 if (this.shouldAbortSync(err)) return;
@@ -674,13 +674,13 @@ export class SyncApi {
                 // Send this first sync request here so we can then wait for the saved
                 // sync data to finish processing before we process the results of this one.
                 debuglog("Sending first sync request...");
-                this.currentSyncRequest = this.doSyncRequest({ filterId }, savedSyncToken);
+                this.currentSyncRequest = this.doSyncRequest({ filterId: this.filterId }, savedSyncToken);
             }
 
             // Now wait for the saved sync to finish...
             debuglog("Waiting for saved sync before starting sync processing...");
             await savedSyncPromise;
-            this.doSync({ filterId });
+            this.doSync({ filterId: this.filterId });
         };
 
         if (client.isGuest()) {
@@ -730,6 +730,29 @@ export class SyncApi {
         if (this.keepAliveTimer) {
             clearTimeout(this.keepAliveTimer);
             this.keepAliveTimer = null;
+        }
+    }
+
+    /**
+     * Resumes syncing from where it stopped when stop() was called.
+     * This method is only intended to be used following a call to stop().
+     */
+    public resume(): void {
+        debuglog("SyncApi.resume");
+
+        this.running = true;
+
+        if (global.window && global.window.addEventListener) {
+            global.window.addEventListener("online", this.onOnline, false);
+        }
+
+        if (this.client.isGuest()) {
+            this.doSync({});
+        } else if (this.filterId != null) {
+            this.doSync({ filterId: this.filterId, hasSyncedBefore: true });
+        } else {
+            logger.warn("Failed to resume sync from where it stopped, starting full sync.");
+            this.sync();
         }
     }
 
