@@ -614,6 +614,24 @@ export class MatrixCall extends EventEmitter {
         logger.info(`Pushed local stream (id="${stream.id}", active="${stream.active}", purpose="${purpose}")`);
     }
 
+    /**
+     * Removes local call feed from the call and its tracks from the peer
+     * connection
+     * @param callFeed to remove
+     */
+    public removeLocalFeed(callFeed: CallFeed): void {
+        const senderArray = callFeed.purpose === SDPStreamMetadataPurpose.Usermedia
+            ? this.usermediaSenders
+            : this.screensharingSenders;
+
+        for (const sender of senderArray) {
+            this.peerConn.removeTrack(sender);
+        }
+        // Empty the array
+        senderArray.splice(0, senderArray.length);
+        this.deleteFeedByStream(callFeed.stream);
+    }
+
     private deleteAllFeeds(): void {
         for (const feed of this.feeds) {
             feed.dispose();
