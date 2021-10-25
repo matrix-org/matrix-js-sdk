@@ -1,3 +1,33 @@
+Changes in [15.0.0](https://github.com/vector-im/element-desktop/releases/tag/v15.0.0) (2021-10-25)
+===================================================================================================
+
+## 🚨 BREAKING CHANGES
+ * Use `ICallFeedOpts` in the `CallFeed` constructor. To construct a new `CallFeed` object you have to pass `ICallFeedOpts` e.g. `const callFeed = new CallFeed({client ([\#1964](https://github.com/matrix-org/matrix-js-sdk/pull/1964)). Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+
+## ✨ Features
+ * Make threads use 'm.thread' relation ([\#1980](https://github.com/matrix-org/matrix-js-sdk/pull/1980)).
+ * Try to answer a call without video if we can't access the camera  ([\#1972](https://github.com/matrix-org/matrix-js-sdk/pull/1972)). Fixes vector-im/element-web#17975 and vector-im/element-web#17975. Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+ * Make `opts` in `importRoomKeys()` optional ([\#1974](https://github.com/matrix-org/matrix-js-sdk/pull/1974)). Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+ * Enable TypeScript declaration maps ([\#1966](https://github.com/matrix-org/matrix-js-sdk/pull/1966)). Contributed by [Alexendoo](https://github.com/Alexendoo).
+
+## 🐛 Bug Fixes
+ * Fix `requestVerificationDM` with chronological `pendingEventOrdering` ([\#1943](https://github.com/matrix-org/matrix-js-sdk/pull/1943)). Contributed by [freaktechnik](https://github.com/freaktechnik).
+
+Changes in [15.0.0-rc.1](https://github.com/vector-im/element-desktop/releases/tag/v15.0.0-rc.1) (2021-10-19)
+=============================================================================================================
+
+## 🚨 BREAKING CHANGES
+ * Use `ICallFeedOpts` in the `CallFeed` constructor. To construct a new `CallFeed` object you have to pass `ICallFeedOpts` e.g. `const callFeed = new CallFeed({client ([\#1964](https://github.com/matrix-org/matrix-js-sdk/pull/1964)). Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+
+## ✨ Features
+ * Make threads use 'm.thread' relation ([\#1980](https://github.com/matrix-org/matrix-js-sdk/pull/1980)).
+ * Try to answer a call without video if we can't access the camera  ([\#1972](https://github.com/matrix-org/matrix-js-sdk/pull/1972)). Fixes vector-im/element-web#17975 and vector-im/element-web#17975. Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+ * Make `opts` in `importRoomKeys()` optional ([\#1974](https://github.com/matrix-org/matrix-js-sdk/pull/1974)). Contributed by [SimonBrandner](https://github.com/SimonBrandner).
+ * Enable TypeScript declaration maps ([\#1966](https://github.com/matrix-org/matrix-js-sdk/pull/1966)). Contributed by [Alexendoo](https://github.com/Alexendoo).
+
+## 🐛 Bug Fixes
+ * Fix `requestVerificationDM` with chronological `pendingEventOrdering` ([\#1943](https://github.com/matrix-org/matrix-js-sdk/pull/1943)). Contributed by [freaktechnik](https://github.com/freaktechnik).
+
 Changes in [14.0.1](https://github.com/vector-im/element-desktop/releases/tag/v14.0.1) (2021-10-12)
 ===================================================================================================
 
