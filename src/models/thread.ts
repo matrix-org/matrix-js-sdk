@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventEmitter } from "events";
 import { MatrixClient } from "../matrix";
 import { MatrixEvent } from "./event";
 import { EventTimeline } from "./event-timeline";
 import { EventTimelineSet } from './event-timeline-set';
 import { Room } from './room';
+import { Receipt } from './receipt';
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -30,7 +30,7 @@ export enum ThreadEvent {
 /**
  * @experimental
  */
-export class Thread extends EventEmitter {
+export class Thread extends Receipt {
     /**
      * A reference to the event ID at the top of the thread
      */
@@ -96,6 +96,18 @@ export class Thread extends EventEmitter {
             this.client.decryptEventIfNeeded(event, {});
         }
         this.emit(ThreadEvent.Update, this);
+    }
+
+    public getUnfilteredTimelineSet(): EventTimelineSet {
+        return this.timelineSet;
+    }
+
+    public hasPendingEvent(): boolean {
+        return false;
+    }
+
+    public get timeline(): MatrixEvent[] {
+        return this.timelineSet.getLiveTimeline().getEvents();
     }
 
     /**
