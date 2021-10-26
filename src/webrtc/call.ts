@@ -614,7 +614,7 @@ export class MatrixCall extends EventEmitter {
                     `Adding track (` +
                     `id="${track.id}", ` +
                     `kind="${track.kind}", ` +
-                    `streamId="${callFeed.stream}", ` +
+                    `streamId="${callFeed.stream.id}", ` +
                     `streamPurpose="${callFeed.purpose}"` +
                     `) to peer connection`,
                 );
