@@ -17,14 +17,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { GroupCallType } from "../webrtc/groupCall";
 import { MatrixClient } from "../client";
 import { logger } from "../logger";
+import { CallState } from "./call";
 
 export class MediaHandler {
     private audioInput: string;
     private videoInput: string;
-    private userMediaStreams: MediaStream[] = [];
-    private screensharingStreams: MediaStream[] = [];
+    private localUserMediaStream?: MediaStream;
+    public userMediaStreams: MediaStream[] = [];
+    public screensharingStreams: MediaStream[] = [];
 
     constructor(private client: MatrixClient) {}
 
@@ -35,20 +38,7 @@ export class MediaHandler {
      */
     public async setAudioInput(deviceId: string): Promise<void> {
         this.audioInput = deviceId;
-
-        for (const stream of this.userMediaStreams) {
-            for (const track of stream.getTracks()) {
-                track.stop();
-            }
-        }
-
-        await Promise.all(Array.from(this.client.callEventHandler.calls.values()).map((call) => {
-            return call.updateLocalUsermediaStream();
-        }));
-
-        await Promise.all(Array.from(this.client.groupCallEventHandler.groupCalls.values()).map((groupCall) => {
-            return groupCall.updateLocalUsermediaStream();
-        }));
+        await this.updateLocalUsermediaStreams();
     }
 
     /**
@@ -58,20 +48,26 @@ export class MediaHandler {
      */
     public async setVideoInput(deviceId: string): Promise<void> {
         this.videoInput = deviceId;
+        await this.updateLocalUsermediaStreams();
+    }
 
-        for (const stream of this.userMediaStreams) {
-            for (const track of stream.getTracks()) {
-                track.stop();
-            }
-        }
+    public async updateLocalUsermediaStreams(): Promise<void> {
+        this.localUserMediaStream = undefined;
 
-        await Promise.all(Array.from(this.client.callEventHandler.calls.values()).map((call) => {
-            return call.updateLocalUsermediaStream();
-        }));
+        await Promise.all(Array.from(this.client.callEventHandler.calls.values())
+            .filter((call) => call.state !== CallState.Ended)
+            .map((call) => {
+                return this.getUserMediaStream(
+                    call.hasLocalUserMediaAudioTrack,
+                    call.hasLocalUserMediaVideoTrack,
+                ).then(stream => call.updateLocalUsermediaStream(stream));
+            }));
 
-        await Promise.all(Array.from(this.client.groupCallEventHandler.groupCalls.values()).map((groupCall) => {
-            return groupCall.updateLocalUsermediaStream();
-        }));
+        await Promise.all(Array.from(this.client.groupCallEventHandler.groupCalls.values())
+            .map((groupCall) => {
+                return this.getUserMediaStream(true, groupCall.type === GroupCallType.Video)
+                    .then(stream => groupCall.updateLocalUsermediaStream(stream));
+            }));
     }
 
     public async hasAudioDevice(): Promise<boolean> {
@@ -87,26 +83,35 @@ export class MediaHandler {
     /**
      * @returns {MediaStream} based on passed parameters
      */
-    public async getUserMediaStream(audio: boolean, video: boolean, forceNewStream = false): Promise<MediaStream> {
+    public async getUserMediaStream(audio: boolean, video: boolean): Promise<MediaStream> {
         const shouldRequestAudio = audio && await this.hasAudioDevice();
         const shouldRequestVideo = video && await this.hasVideoDevice();
 
         let stream: MediaStream;
 
-        // Find a stream with matching tracks
-        const matchingStream = this.userMediaStreams.find((stream) => {
-            if (shouldRequestAudio !== (stream.getAudioTracks().length > 0)) return false;
-            if (shouldRequestVideo !== (stream.getVideoTracks().length > 0)) return false;
-            return true;
-        });
-
-        if (matchingStream && !forceNewStream) {
-            logger.log("Cloning user media stream", matchingStream.id);
-            stream = matchingStream.clone();
-        } else {
+        if (
+            !this.localUserMediaStream ||
+            (this.localUserMediaStream.getAudioTracks().length === 0 && shouldRequestAudio) ||
+            (this.localUserMediaStream.getVideoTracks().length === 0 && shouldRequestVideo)
+        ) {
             const constraints = this.getUserMediaContraints(shouldRequestAudio, shouldRequestVideo);
             logger.log("Getting user media with constraints", constraints);
             stream = await navigator.mediaDevices.getUserMedia(constraints);
+            this.localUserMediaStream = stream;
+        } else {
+            stream = this.localUserMediaStream.clone();
+
+            if (!shouldRequestAudio) {
+                for (const track of stream.getAudioTracks()) {
+                    stream.removeTrack(track);
+                }
+            }
+
+            if (!shouldRequestVideo) {
+                for (const track of stream.getVideoTracks()) {
+                    stream.removeTrack(track);
+                }
+            }
         }
 
         this.userMediaStreams.push(stream);

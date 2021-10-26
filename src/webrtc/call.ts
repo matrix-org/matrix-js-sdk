@@ -228,6 +228,8 @@ const FALLBACK_ICE_SERVER = 'stun:turn.matrix.org';
 /** The length of time a call can be ringing for. */
 const CALL_TIMEOUT_MS = 60000;
 
+const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
 export class CallError extends Error {
     code: string;
 
@@ -877,7 +879,7 @@ export class MatrixCall extends EventEmitter {
             newCall.waitForLocalAVStream = true;
         } else if ([CallState.CreateOffer, CallState.InviteSent].includes(this.state)) {
             logger.debug("Handing local stream to new call");
-            newCall.gotCallFeedsForAnswer(this.getLocalFeeds());
+            newCall.gotCallFeedsForAnswer(this.getLocalFeeds().map((feed) => feed.clone()));
         }
         this.successor = newCall;
         this.emit(CallEvent.Replaced, newCall);
@@ -1085,15 +1087,10 @@ export class MatrixCall extends EventEmitter {
     /**
      * Request a new local usermedia stream with the current device id.
      */
-    public async updateLocalUsermediaStream() {
-        const stream = await this.client.getMediaHandler().getUserMediaStream(
-            this.hasLocalUserMediaAudioTrack,
-            this.hasLocalUserMediaVideoTrack,
-            true,
-        );
+    public async updateLocalUsermediaStream(stream: MediaStream) {
+        const oldStream = this.localUsermediaStream;
 
         const callFeed = this.localUsermediaFeed;
-
         callFeed.setNewStream(stream);
 
         const newSenders = [];
@@ -1110,7 +1107,7 @@ export class MatrixCall extends EventEmitter {
                     `Replacing track (` +
                     `id="${track.id}", ` +
                     `kind="${track.kind}", ` +
-                    `streamId="${stream}", ` +
+                    `streamId="${stream.id}", ` +
                     `streamPurpose="${callFeed.purpose}"` +
                     `) to peer connection`,
                 );
@@ -1121,7 +1118,7 @@ export class MatrixCall extends EventEmitter {
                     `Adding track (` +
                     `id="${track.id}", ` +
                     `kind="${track.kind}", ` +
-                    `streamId="${stream}", ` +
+                    `streamId="${stream.id}", ` +
                     `streamPurpose="${callFeed.purpose}"` +
                     `) to peer connection`,
                 );
@@ -1132,6 +1129,8 @@ export class MatrixCall extends EventEmitter {
         }
 
         this.usermediaSenders = newSenders;
+
+        this.client.getMediaHandler().stopUserMediaStream(oldStream);
     }
 
     /**
@@ -1364,6 +1363,18 @@ export class MatrixCall extends EventEmitter {
             });
 
             this.sendAnswer();
+
+            // HACK: Safari doesn't like it when we reuse MediaStreams. In most cases
+            // we can get around this by calling MediaStream.clone(), however inbound
+            // calls seem to still be broken unless we getUserMedia again and replace
+            // all MediaStreams using sender.replaceTrack
+            if (isSafari) {
+                await new Promise(resolve => {
+                    setTimeout(resolve, 200);
+                });
+
+                await this.client.getMediaHandler().updateLocalUsermediaStreams();
+            }
         } catch (err) {
             logger.debug("Error setting local description!", err);
             this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);

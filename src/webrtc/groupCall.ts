@@ -219,11 +219,11 @@ export class GroupCall extends EventEmitter {
         return callFeed;
     }
 
-    public async updateLocalUsermediaStream() {
+    public async updateLocalUsermediaStream(stream: MediaStream) {
         if (this.localCallFeed) {
-            const mediaHandler = this.client.getMediaHandler();
-            const stream = await mediaHandler.getUserMediaStream(true, this.type === GroupCallType.Video, true);
+            const oldStream = this.localCallFeed.stream;
             this.localCallFeed.setNewStream(stream);
+            this.client.getMediaHandler().stopUserMediaStream(oldStream);
         }
     }
 
@@ -433,7 +433,7 @@ export class GroupCall extends EventEmitter {
                 );
 
                 // TODO: handle errors
-                await Promise.all(this.calls.map(call => call.pushLocalFeed(this.localScreenshareFeed)));
+                await Promise.all(this.calls.map(call => call.pushLocalFeed(this.localScreenshareFeed.clone())));
 
                 await this.sendMemberStateEvent();
 
@@ -506,7 +506,8 @@ export class GroupCall extends EventEmitter {
             this.addCall(newCall);
         }
 
-        newCall.answerWithCallFeeds(this.getLocalFeeds());
+        // Safari can't send a MediaStream to multiple sources, so clone it
+        newCall.answerWithCallFeeds(this.getLocalFeeds().map((feed) => feed.clone()));
     };
 
     /**
@@ -641,7 +642,8 @@ export class GroupCall extends EventEmitter {
         const requestScreenshareFeed = opponentDevice.feeds.some(
             (feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
 
-        newCall.placeCallWithCallFeeds(this.getLocalFeeds(), requestScreenshareFeed);
+        // Safari can't send a MediaStream to multiple sources, so clone it
+        newCall.placeCallWithCallFeeds(this.getLocalFeeds().map(feed => feed.clone()), requestScreenshareFeed);
 
         if (this.dataChannelsEnabled) {
             newCall.createDataChannel("datachannel", this.dataChannelOptions);

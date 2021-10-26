@@ -250,6 +250,27 @@ export class CallFeed extends EventEmitter {
         this.volumeLooperTimeout = setTimeout(this.volumeLooper, POLLING_INTERVAL);
     };
 
+    public clone(): CallFeed {
+        const mediaHandler = this.client.getMediaHandler();
+        const stream = this.stream.clone();
+
+        if (this.purpose === SDPStreamMetadataPurpose.Usermedia) {
+            mediaHandler.userMediaStreams.push(stream);
+        } else {
+            mediaHandler.screensharingStreams.push(stream);
+        }
+
+        return new CallFeed({
+            client: this.client,
+            roomId: this.roomId,
+            userId: this.userId,
+            stream,
+            purpose: this.purpose,
+            audioMuted: this.audioMuted,
+            videoMuted: this.videoMuted,
+        });
+    }
+
     public dispose(): void {
         clearTimeout(this.volumeLooperTimeout);
     }
