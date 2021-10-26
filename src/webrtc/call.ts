@@ -1209,7 +1209,7 @@ export class MatrixCall extends EventEmitter {
         setTracksEnabled(this.localUsermediaStream.getVideoTracks(), !vidShouldBeMuted);
     }
 
-    private gotCallFeedsForInvite(callFeeds: CallFeed[], requestScreenshareFeed = false): void {
+    private gotCallFeedsForInvite(callFeeds: CallFeed[]): void {
         if (this.successor) {
             this.successor.gotCallFeedsForAnswer(callFeeds);
             return;
@@ -2083,7 +2083,7 @@ export class MatrixCall extends EventEmitter {
      * @throws if you have not specified a listener for 'error' events.
      * @throws if have passed audio=false.
      */
-    public async placeCallWithCallFeeds(callFeeds: CallFeed[], requestScreenshareFeed = false): Promise<void> {
+    public async placeCallWithCallFeeds(callFeeds: CallFeed[]): Promise<void> {
         this.checkForErrorListener();
         this.direction = CallDirection.Outbound;
 
@@ -2100,7 +2100,7 @@ export class MatrixCall extends EventEmitter {
         // create the peer connection now so it can be gathering candidates while we get user
         // media (assuming a candidate pool size is configured)
         this.peerConn = this.createPeerConnection();
-        this.gotCallFeedsForInvite(callFeeds, requestScreenshareFeed);
+        this.gotCallFeedsForInvite(callFeeds);
     }
 
     private createPeerConnection(): RTCPeerConnection {
