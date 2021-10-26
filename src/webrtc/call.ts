@@ -1919,7 +1919,7 @@ export class MatrixCall extends EventEmitter {
      * @param {Object} content
      * @return {Promise}
      */
-    private sendVoipEvent(eventType: string, content: object): Promise<ISendEventResponse | {}> {
+    private async sendVoipEvent(eventType: string, content: object): Promise<ISendEventResponse | {}> {
         const realContent = Object.assign({}, content, {
             version: VOIP_PROTO_VERSION,
             call_id: this.callId,
@@ -1928,11 +1928,22 @@ export class MatrixCall extends EventEmitter {
         });
 
         if (this.opponentDeviceId) {
-            return this.client.sendToDevice(eventType, {
-                [this.invitee || this.getOpponentMember().userId]: {
-                    [this.opponentDeviceId]: realContent,
-                },
-            });
+            const userId = this.invitee || this.getOpponentMember().userId;
+
+            if (!this.client.crypto) {
+                return this.client.sendToDevice(eventType, {
+                    [userId]: {
+                        [this.opponentDeviceId]: realContent,
+                    },
+                });
+            } else {
+                const deviceInfoMap = await this.client.crypto.deviceList.downloadKeys([userId], false);
+                const deviceInfo = deviceInfoMap[userId][this.opponentDeviceId];
+                const userDeviceMap = [{ userId, deviceInfo }];
+                const event = new MatrixEvent({ type: eventType, content: realContent });
+                const payload = event.toJSON();
+                return this.client.crypto.encryptAndSendToDevices(userDeviceMap, payload);
+            }
         } else {
             return this.client.sendEvent(this.roomId, eventType, realContent);
         }
