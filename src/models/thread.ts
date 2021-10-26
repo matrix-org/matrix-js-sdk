@@ -38,7 +38,7 @@ export class Thread extends EventEmitter {
     /**
      * A reference to all the events ID at the bottom of the threads
      */
-    public readonly timelineSet: EventTimelineSet;
+    public readonly timelineSet;
 
     constructor(
         events: MatrixEvent[] = [],
@@ -46,9 +46,14 @@ export class Thread extends EventEmitter {
         public readonly client: MatrixClient,
     ) {
         super();
-        this.timelineSet = new EventTimelineSet(null, {
+        if (events.length === 0) {
+            throw new Error("Can't create an empty thread");
+        }
+
+        this.timelineSet = new EventTimelineSet(this.room, {
             unstableClientRelationAggregation: true,
             timelineSupport: true,
+            pendingEvents: false,
         });
         events.forEach(event => this.addEvent(event));
     }
@@ -91,14 +96,6 @@ export class Thread extends EventEmitter {
             this.client.decryptEventIfNeeded(event, {});
         }
         this.emit(ThreadEvent.Update, this);
-    }
-
-    private async decryptEvents(): Promise<void> {
-        await Promise.allSettled(
-            Array.from(this.timelineSet.getLiveTimeline().getEvents()).map(event => {
-                return this.client.decryptEventIfNeeded(event, {});
-            }),
-        );
     }
 
     /**

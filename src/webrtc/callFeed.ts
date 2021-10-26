@@ -21,7 +21,7 @@ import { RoomMember } from "../models/room-member";
 
 const POLLING_INTERVAL = 200; // ms
 export const SPEAKING_THRESHOLD = -60; // dB
-const SPEAKING_SAMPLE_COUNT = 8;
+const SPEAKING_SAMPLE_COUNT = 8; // samples
 
 export interface ICallFeedOpts {
     client: MatrixClient;
@@ -44,6 +44,7 @@ export class CallFeed extends EventEmitter {
     public stream: MediaStream;
     public userId: string;
     public purpose: SDPStreamMetadataPurpose;
+    public speakingVolumeSamples: number[];
 
     private client: MatrixClient;
     private roomId: string;
@@ -56,7 +57,6 @@ export class CallFeed extends EventEmitter {
     private speakingThreshold = SPEAKING_THRESHOLD;
     private speaking = false;
     private volumeLooperTimeout: number;
-    public speakingVolumeSamples: number[];
 
     constructor(opts: ICallFeedOpts) {
         super();
@@ -81,9 +81,7 @@ export class CallFeed extends EventEmitter {
     }
 
     private updateStream(oldStream: MediaStream, newStream: MediaStream): void {
-        if (newStream === oldStream) {
-            return;
-        }
+        if (newStream === oldStream) return;
 
         if (oldStream) {
             oldStream.removeEventListener("addtrack", this.onAddTrack);

@@ -44,6 +44,7 @@ interface IOpts {
     timelineSupport?: boolean;
     filter?: Filter;
     unstableClientRelationAggregation?: boolean;
+    pendingEvents?: boolean;
 }
 
 export enum DuplicateStrategy {
@@ -54,6 +55,7 @@ export enum DuplicateStrategy {
 export class EventTimelineSet extends EventEmitter {
     private readonly timelineSupport: boolean;
     private unstableClientRelationAggregation: boolean;
+    private displayPendingEvents: boolean;
     private liveTimeline: EventTimeline;
     private timelines: EventTimeline[];
     private _eventIdToTimeline: Record<string, EventTimeline>;
@@ -102,6 +104,7 @@ export class EventTimelineSet extends EventEmitter {
         this.timelineSupport = Boolean(opts.timelineSupport);
         this.liveTimeline = new EventTimeline(this);
         this.unstableClientRelationAggregation = !!opts.unstableClientRelationAggregation;
+        this.displayPendingEvents = opts.pendingEvents !== false;
 
         // just a list - *not* ordered.
         this.timelines = [this.liveTimeline];
@@ -151,7 +154,7 @@ export class EventTimelineSet extends EventEmitter {
      * @throws If <code>opts.pendingEventOrdering</code> was not 'detached'
      */
     public getPendingEvents(): MatrixEvent[] {
-        if (!this.room) {
+        if (!this.room || !this.displayPendingEvents) {
             return [];
         }
 

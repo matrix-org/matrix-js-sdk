@@ -27,6 +27,7 @@ import { EventEmitter } from 'events';
 import { ReEmitter } from '../ReEmitter';
 import { logger } from '../logger';
 import { IExportedDevice, OlmDevice } from "./OlmDevice";
+import { IOlmDevice } from "./algorithms/megolm";
 import * as olmlib from "./olmlib";
 import { DeviceInfoMap, DeviceList } from "./DeviceList";
 import { DeviceInfo, IDevice } from "./deviceinfo";
@@ -3027,6 +3028,108 @@ export class Crypto extends EventEmitter {
             // ignore any rooms which we have left
             const myMembership = room.getMyMembership();
             return myMembership === "join" || myMembership === "invite";
+        });
+    }
+
+    /**
+     * Encrypts and sends a given object via Olm to-device message to a given
+     * set of devices.  Factored out from encryptAndSendKeysToDevices in
+     * megolm.ts.
+     *
+     * @param {object<userId, deviceInfo>} userDeviceMap
+     *   mapping from userId to deviceInfo
+     *
+     * @param {object} payload fields to include in the encrypted payload
+     *      *
+     * @return {Promise<{contentMap, deviceInfoByDeviceId}>} Promise which
+     *     resolves once the message has been encrypted and sent to the given
+     *     userDeviceMap, and returns the { contentMap, deviceInfoByDeviceId }
+     *     of the successfully sent messages.
+     */
+    public encryptAndSendToDevices(
+        userDeviceMap: IOlmDevice<DeviceInfo>[],
+        payload: object,
+    ): Promise<{contentMap, deviceInfoByDeviceId}> {
+        const contentMap = {};
+        const deviceInfoByDeviceId = new Map<string, DeviceInfo>();
+
+        const promises = [];
+        for (let i = 0; i < userDeviceMap.length; i++) {
+            const encryptedContent = {
+                algorithm: olmlib.OLM_ALGORITHM,
+                sender_key: this.olmDevice.deviceCurve25519Key,
+                ciphertext: {},
+            };
+            const val = userDeviceMap[i];
+            const userId = val.userId;
+            const deviceInfo = val.deviceInfo;
+            const deviceId = deviceInfo.deviceId;
+            deviceInfoByDeviceId.set(deviceId, deviceInfo);
+
+            if (!contentMap[userId]) {
+                contentMap[userId] = {};
+            }
+            contentMap[userId][deviceId] = encryptedContent;
+
+            const devicesByUser = {};
+            devicesByUser[userId] = [deviceInfo];
+
+            promises.push(
+                olmlib.ensureOlmSessionsForDevices(
+                    this.olmDevice,
+                    this.baseApis,
+                    devicesByUser,
+                ).then(()=>
+                    olmlib.encryptMessageForDevice(
+                        encryptedContent.ciphertext,
+                        this.userId,
+                        this.deviceId,
+                        this.olmDevice,
+                        userId,
+                        deviceInfo,
+                        payload,
+                    ),
+                ),
+            );
+        }
+
+        return Promise.all(promises).then(() => {
+            // prune out any devices that encryptMessageForDevice could not encrypt for,
+            // in which case it will have just not added anything to the ciphertext object.
+            // There's no point sending messages to devices if we couldn't encrypt to them,
+            // since that's effectively a blank message.
+            for (const userId of Object.keys(contentMap)) {
+                for (const deviceId of Object.keys(contentMap[userId])) {
+                    if (Object.keys(contentMap[userId][deviceId].ciphertext).length === 0) {
+                        logger.log(
+                            "No ciphertext for device " +
+                            userId + ":" + deviceId + ": pruning",
+                        );
+                        delete contentMap[userId][deviceId];
+                    }
+                }
+                // No devices left for that user? Strip that too.
+                if (Object.keys(contentMap[userId]).length === 0) {
+                    logger.log("Pruned all devices for user " + userId);
+                    delete contentMap[userId];
+                }
+            }
+
+            // Is there anything left?
+            if (Object.keys(contentMap).length === 0) {
+                logger.log("No users left to send to: aborting");
+                return;
+            }
+
+            return this.baseApis.sendToDevice("m.room.encrypted", contentMap).then(
+                (response)=>({ contentMap, deviceInfoByDeviceId }),
+            ).catch(error=>{
+                logger.error("sendToDevice failed", error);
+                throw error;
+            });
+        }).catch(error=>{
+            logger.error("encryptAndSendToDevices promises failed", error);
+            throw error;
         });
     }
 

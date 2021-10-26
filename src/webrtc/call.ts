@@ -592,15 +592,18 @@ export class MatrixCall extends EventEmitter {
         if (existingFeed) {
             existingFeed.setNewStream(stream);
         } else {
-            this.pushLocalFeed(new CallFeed({
-                client: this.client,
-                roomId: this.roomId,
-                audioMuted: stream.getAudioTracks().length === 0,
-                videoMuted: stream.getVideoTracks().length === 0,
-                userId,
-                stream,
-                purpose,
-            }));
+            this.pushLocalFeed(
+                new CallFeed({
+                    client: this.client,
+                    roomId: this.roomId,
+                    audioMuted: stream.getAudioTracks().length === 0,
+                    videoMuted: stream.getVideoTracks().length === 0,
+                    userId,
+                    stream,
+                    purpose,
+                }),
+                addToPeerConnection,
+            );
             this.emit(CallEvent.FeedsChanged, this.feeds);
         }
     }
@@ -624,7 +627,7 @@ export class MatrixCall extends EventEmitter {
                     `Adding track (` +
                     `id="${track.id}", ` +
                     `kind="${track.kind}", ` +
-                    `streamId="${callFeed.stream}", ` +
+                    `streamId="${callFeed.stream.id}", ` +
                     `streamPurpose="${callFeed.purpose}"` +
                     `) to peer connection`,
                 );
