@@ -28,6 +28,7 @@ import { Room } from "./room";
 import { Filter } from "../filter";
 import { EventType, RelationType } from "../@types/event";
 import { RoomState } from "./room-state";
+import { Receipt } from "./receipt";
 
 // var DEBUG = false;
 const DEBUG = true;
@@ -45,6 +46,7 @@ interface IOpts {
     filter?: Filter;
     unstableClientRelationAggregation?: boolean;
     pendingEvents?: boolean;
+    context?: Receipt;
 }
 
 export enum DuplicateStrategy {
@@ -61,6 +63,7 @@ export class EventTimelineSet extends EventEmitter {
     private _eventIdToTimeline: Record<string, EventTimeline>;
     private filter?: Filter;
     private relations: Record<string, Record<string, Record<RelationType, Relations>>>;
+    public readonly context: Receipt;
 
     /**
      * Construct a set of EventTimeline objects, typically on behalf of a given
@@ -117,6 +120,10 @@ export class EventTimelineSet extends EventEmitter {
             // this.relations[relatesToEventId][relationType][relationEventType]
             this.relations = {};
         }
+
+        // the context in which this EventTimelineSet will be used
+        // Can be a room or a thread for example
+        this.context = opts.context ? opts.context : room;
     }
 
     /**

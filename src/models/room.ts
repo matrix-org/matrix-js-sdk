@@ -35,6 +35,7 @@ import { Filter } from "../filter";
 import { RoomState } from "./room-state";
 import { Thread, ThreadEvent } from "./thread";
 import { Receipt, synthesizeReceipt } from "./receipt";
+import { NotificationCountType } from "../@types/receipt";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -59,16 +60,10 @@ export interface IRecommendedVersion {
     urgent: boolean;
 }
 
-export enum NotificationCountType {
-    Highlight = "highlight",
-    Total = "total",
-}
-
 export class Room extends Receipt {
     private readonly reEmitter: ReEmitter;
     private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
 
-    private notificationCounts: Partial<Record<NotificationCountType, number>> = {};
     private readonly timelineSets: EventTimelineSet[];
     // any filtered timeline sets we're maintaining for this room
     private readonly filteredTimelineSets: Record<string, EventTimelineSet> = {}; // filter_id: timelineSet
@@ -840,16 +835,19 @@ export class Room extends Receipt {
      *                  for this type.
      */
     public getUnreadNotificationCount(type = NotificationCountType.Total): number | undefined {
-        return this.notificationCounts[type];
+        const roomNotificationCount = super.getUnreadNotificationCount(type);
+        const threadsNotificationCount = this.getThreadsUnreadNotificationCount(type);
+        return roomNotificationCount + threadsNotificationCount;
     }
 
-    /**
-     * Set one of the notification counts for this room
-     * @param {String} type The type of notification count to set.
-     * @param {Number} count The new count
-     */
-    public setUnreadNotificationCount(type: NotificationCountType, count: number): void {
-        this.notificationCounts[type] = count;
+    public getThreadsUnreadNotificationCount(type = NotificationCountType.Total): number | undefined {
+        let threadsNotificationsTotal = 0;
+
+        for (const [, thread] of this.threads) {
+            threadsNotificationsTotal += thread.getUnreadNotificationCount(type);
+        }
+
+        return threadsNotificationsTotal;
     }
 
     public setSummary(summary: IRoomSummary): void {

@@ -23,6 +23,9 @@ limitations under the License.
 import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
 import type NodeCrypto from "crypto";
+import { MatrixClient } from "./client";
+import { MatrixEvent } from "./models/event";
+import { NotificationCountType } from "./@types/receipt";
 
 /**
  * Encode a dictionary of query parameters.
@@ -727,4 +730,62 @@ export function recursivelyAssign(target: Object, source: Object, ignoreNullish 
         }
     }
     return target;
+}
+
+export function setTotalCount(client: MatrixClient, event: MatrixEvent): void {
+    const room = client.getRoom(event.getRoomId());
+    if (!room) return;
+
+    const context = room.findThreadForEvent(event) ?? room;
+
+    const typesThatTriggerACountIncrement = [
+        "m.room.encrypted",
+        "m.room.message",
+    ];
+
+    const isOwnEvent = event.getSender() === client.getUserId();
+
+    if (typesThatTriggerACountIncrement.includes(event.getType()) && !isOwnEvent) {
+        const currentCount = context.getUnreadNotificationCount(NotificationCountType.Total);
+        context.setUnreadNotificationCount(
+            NotificationCountType.Total,
+            currentCount + 1,
+        );
+    }
+}
+
+export function setHighlightBadgeForEncryptedRooms(client: MatrixClient, event: MatrixEvent): void {
+    const oldActions = event.getPushActions();
+    const actions = client.pushProcessor.actionsForEvent(event);
+    event.setPushActions(actions); // Might as well while we're here
+
+    const room = client.getRoom(event.getRoomId());
+    if (!room) return;
+
+    const context = room.findThreadForEvent(event) ?? room;
+    const currentCount = context.getUnreadNotificationCount(NotificationCountType.Highlight);
+
+    // Ensure the unread counts are kept up to date if the event is encrypted
+    // We also want to make sure that the notification count goes up if we already
+    // have encrypted events to avoid other code from resetting 'highlight' to zero.
+    const oldHighlight = oldActions && oldActions.tweaks
+        ? !!oldActions.tweaks.highlight : false;
+    const newHighlight = actions && actions.tweaks
+        ? !!actions.tweaks.highlight : false;
+    if (oldHighlight !== newHighlight || currentCount > 0) {
+        // TODO: Handle mentions received while the client is offline
+        // See also https://github.com/vector-im/element-web/issues/9069
+        if (!context.hasUserReadEvent(client.getUserId(), event.getId())) {
+            let newCount = currentCount;
+            if (newHighlight && !oldHighlight) newCount++;
+            if (!newHighlight && oldHighlight) newCount--;
+            context.setUnreadNotificationCount(NotificationCountType.Highlight, newCount);
+
+            // Fix 'Mentions Only' rooms from not having the right badge count
+            const totalCount = context.getUnreadNotificationCount(NotificationCountType.Total);
+            if (totalCount < newCount) {
+                context.setUnreadNotificationCount(NotificationCountType.Total, newCount);
+            }
+        }
+    }
 }

@@ -79,7 +79,7 @@ import {
 import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
 import type Request from "request";
 import { MatrixScheduler } from "./scheduler";
-import { ICryptoCallbacks, IMinimalEvent, IRoomEvent, IStateEvent, NotificationCountType } from "./matrix";
+import { ICryptoCallbacks, IMinimalEvent, IRoomEvent, IStateEvent } from "./matrix";
 import {
     CrossSigningKey,
     IAddSecretStorageKeyOpts,
@@ -732,7 +732,7 @@ export class MatrixClient extends EventEmitter {
     protected canResetTimelineCallback: ResetTimelineCallback;
 
     // The pushprocessor caches useful things, so keep one and re-use it
-    protected pushProcessor = new PushProcessor(this);
+    public readonly pushProcessor = new PushProcessor(this);
 
     // Promise to a response of the server's /versions response
     // TODO: This should expire: https://github.com/matrix-org/matrix-js-sdk/issues/1020
@@ -854,38 +854,7 @@ export class MatrixClient extends EventEmitter {
         // We do this so that push rules are correctly executed on events in their decrypted
         // state, such as highlights when the user's name is mentioned.
         this.on("Event.decrypted", (event) => {
-            const oldActions = event.getPushActions();
-            const actions = this.pushProcessor.actionsForEvent(event);
-            event.setPushActions(actions); // Might as well while we're here
-
-            const room = this.getRoom(event.getRoomId());
-            if (!room) return;
-
-            const currentCount = room.getUnreadNotificationCount(NotificationCountType.Highlight);
-
-            // Ensure the unread counts are kept up to date if the event is encrypted
-            // We also want to make sure that the notification count goes up if we already
-            // have encrypted events to avoid other code from resetting 'highlight' to zero.
-            const oldHighlight = oldActions && oldActions.tweaks
-                ? !!oldActions.tweaks.highlight : false;
-            const newHighlight = actions && actions.tweaks
-                ? !!actions.tweaks.highlight : false;
-            if (oldHighlight !== newHighlight || currentCount > 0) {
-                // TODO: Handle mentions received while the client is offline
-                // See also https://github.com/vector-im/element-web/issues/9069
-                if (!room.hasUserReadEvent(this.getUserId(), event.getId())) {
-                    let newCount = currentCount;
-                    if (newHighlight && !oldHighlight) newCount++;
-                    if (!newHighlight && oldHighlight) newCount--;
-                    room.setUnreadNotificationCount(NotificationCountType.Highlight, newCount);
-
-                    // Fix 'Mentions Only' rooms from not having the right badge count
-                    const totalCount = room.getUnreadNotificationCount(NotificationCountType.Total);
-                    if (totalCount < newCount) {
-                        room.setUnreadNotificationCount(NotificationCountType.Total, newCount);
-                    }
-                }
-            }
+            utils.setHighlightBadgeForEncryptedRooms(this, event);
         });
 
         // Like above, we have to listen for read receipts from ourselves in order to
@@ -905,7 +874,9 @@ export class MatrixClient extends EventEmitter {
                 // a limit for how back we'll look to avoid spinning CPU for too long.
                 // If we hit the limit, we assume the count is unchanged.
                 const maxHistory = 20;
-                const events = room.getLiveTimeline().getEvents();
+
+                const context = event.getThread() ?? room;
+                const events = context.getLiveTimeline().getEvents();
 
                 let highlightCount = 0;
 
@@ -914,7 +885,7 @@ export class MatrixClient extends EventEmitter {
 
                     const event = events[i];
 
-                    if (room.hasUserReadEvent(this.getUserId(), event.getId())) {
+                    if (context.hasUserReadEvent(this.getUserId(), event.getId())) {
                         // If the user has read the event, then the counting is done.
                         break;
                     }
@@ -926,7 +897,7 @@ export class MatrixClient extends EventEmitter {
 
                 // Note: we don't need to handle 'total' notifications because the counts
                 // will come from the server.
-                room.setUnreadNotificationCount("highlight", highlightCount);
+                context.setUnreadNotificationCount("highlight", highlightCount);
             }
         });
     }
@@ -3935,7 +3906,11 @@ export class MatrixClient extends EventEmitter {
         opts: { hidden?: boolean },
     ): Promise<{}> {
         const room = this.getRoom(roomId);
-        if (room && room.hasPendingEvent(rmEventId)) {
+
+        const rmEvent = room.findEventById(rmEventId);
+        const context = rmEvent.getThread() ?? room;
+
+        if (context && context.hasPendingEvent(rmEventId)) {
             throw new Error(`Cannot set read marker to a pending event (${rmEventId})`);
         }
 
@@ -3943,11 +3918,11 @@ export class MatrixClient extends EventEmitter {
         let rrEventId;
         if (rrEvent) {
             rrEventId = rrEvent.getId();
-            if (room && room.hasPendingEvent(rrEventId)) {
+            if (context && context.hasPendingEvent(rrEventId)) {
                 throw new Error(`Cannot set read receipt to a pending event (${rrEventId})`);
             }
-            if (room) {
-                room.addLocalEchoReceipt(this.credentials.userId, rrEvent, "m.read");
+            if (context) {
+                context.addLocalEchoReceipt(this.credentials.userId, rrEvent, "m.read");
             }
         }
 

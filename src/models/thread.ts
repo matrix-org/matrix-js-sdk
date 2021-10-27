@@ -54,6 +54,7 @@ export class Thread extends Receipt {
             unstableClientRelationAggregation: true,
             timelineSupport: true,
             pendingEvents: false,
+            context: this,
         });
         events.forEach(event => this.addEvent(event));
     }
@@ -139,7 +140,7 @@ export class Thread extends Receipt {
     }
 
     public get roomId(): string {
-        return this.rootEvent.getRoomId();
+        return this.events[0].getRoomId();
     }
 
     /**

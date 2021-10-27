@@ -1,6 +1,7 @@
 import { EventEmitter } from "events";
-import { EventTimelineSet } from "..";
+import { EventTimelineSet } from "./event-timeline-set";
 import { MatrixEvent } from "./event";
+import { NotificationCountType } from "../@types/receipt";
 
 interface IReceipt {
     ts: number;
@@ -59,6 +60,8 @@ export abstract class Receipt extends EventEmitter {
     public abstract timeline: MatrixEvent[];
     public abstract getUnfilteredTimelineSet(): EventTimelineSet;
     public abstract hasPendingEvent(eventId: string): boolean;
+
+    private notificationCounts: Partial<Record<NotificationCountType, number>> = {};
 
     /**
      * Get a list of receipts for the given event.
@@ -234,5 +237,23 @@ export abstract class Receipt extends EventEmitter {
         }).map(function(receipt) {
             return receipt.userId;
         });
+    }
+
+    /**
+     * Get one of the notification counts for this context
+     * @param {String} type The type of notification count to get. default: 'total'
+     * @return {Number} The notification count
+     */
+    public getUnreadNotificationCount(type = NotificationCountType.Total): number {
+        return this.notificationCounts[type] ?? 0;
+    }
+
+    /**
+     * Set one of the notification counts for this context
+     * @param {String} type The type of notification count to set.
+     * @param {Number} count The new count
+     */
+    public setUnreadNotificationCount(type: NotificationCountType, count: number): void {
+        this.notificationCounts[type] = count;
     }
 }

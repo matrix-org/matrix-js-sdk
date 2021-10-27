@@ -24,7 +24,8 @@ limitations under the License.
  */
 
 import { User } from "./models/user";
-import { NotificationCountType, Room } from "./models/room";
+import { Room } from "./models/room";
+import { NotificationCountType } from "./@types/receipt";
 import { Group } from "./models/group";
 import * as utils from "./utils";
 import { IDeferred } from "./utils";
@@ -1238,8 +1239,9 @@ export class SyncApi {
             const accountDataEvents = this.mapSyncEventsFormat(joinObj.account_data);
 
             const encrypted = client.isRoomEncrypted(room.roomId);
+
             // we do this first so it's correct when any of the events fire
-            if (joinObj.unread_notifications) {
+            if (joinObj.unread_notifications && !this.client.supportsExperimentalThreads) {
                 room.setUnreadNotificationCount(
                     NotificationCountType.Total,
                     joinObj.unread_notifications.notification_count,
@@ -1250,12 +1252,26 @@ export class SyncApi {
                 // server's for this case, and therefore will assume that our non-zero
                 // count is accurate.
                 if (!encrypted
-                    || (encrypted && room.getUnreadNotificationCount(NotificationCountType.Highlight) <= 0)) {
+                        || (encrypted && room.getUnreadNotificationCount(NotificationCountType.Highlight) <= 0)) {
                     room.setUnreadNotificationCount(
                         NotificationCountType.Highlight,
                         joinObj.unread_notifications.highlight_count,
                     );
                 }
+            }
+
+            // Until homeservers make read receipts threads aware clients have
+            // to implement their own way of counting
+            if (this.client.supportsExperimentalThreads) {
+                events.forEach(event => {
+                    utils.setTotalCount(this.client, event);
+
+                    // This will be automatically called on event decryption
+                    // for encrypted rooms
+                    if (!encrypted) {
+                        utils.setHighlightBadgeForEncryptedRooms(this.client, event);
+                    }
+                });
             }
 
             joinObj.timeline = joinObj.timeline || {} as ITimeline;
