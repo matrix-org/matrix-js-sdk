@@ -21,8 +21,9 @@ limitations under the License.
  * @module webrtc/call
  */
 
-import { logger } from '../logger';
 import { EventEmitter } from 'events';
+
+import { logger } from '../logger';
 import * as utils from '../utils';
 import { MatrixEvent } from '../models/event';
 import { EventType } from '../@types/event';

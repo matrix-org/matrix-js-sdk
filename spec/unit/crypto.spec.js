@@ -1,4 +1,6 @@
 import '../olm-loader';
+import { EventEmitter } from "events";
+
 import { Crypto } from "../../src/crypto";
 import { WebStorageSessionStore } from "../../src/store/session/webstorage";
 import { MemoryCryptoStore } from "../../src/crypto/store/memory-crypto-store";
@@ -8,7 +10,6 @@ import { MatrixEvent } from "../../src/models/event";
 import { Room } from "../../src/models/room";
 import * as olmlib from "../../src/crypto/olmlib";
 import { sleep } from "../../src/utils";
-import { EventEmitter } from "events";
 import { CRYPTO_ENABLED } from "../../src/client";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
 

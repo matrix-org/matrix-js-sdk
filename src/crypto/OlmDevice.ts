@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { Account, InboundGroupSession, OutboundGroupSession, Session, Utility } from "@matrix-org/olm";
+import { Logger } from "loglevel";
+
 import { logger } from '../logger';
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import * as algorithms from './algorithms';
 import { CryptoStore, IProblem, ISessionInfo, IWithheld } from "./store/base";
-import { Account, InboundGroupSession, OutboundGroupSession, Session, Utility } from "@matrix-org/olm";
-import { Logger } from "loglevel";
 import { IOlmDevice, IOutboundGroupSessionKey } from "./algorithms/megolm";
 import { IMegolmSessionData } from "./index";
 

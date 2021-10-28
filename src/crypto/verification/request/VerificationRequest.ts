@@ -14,8 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from '../../../logger';
 import { EventEmitter } from 'events';
+
+import { logger } from '../../../logger';
 import {
     errorFactory,
     errorFromEvent,

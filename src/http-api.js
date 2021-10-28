@@ -21,6 +21,7 @@ limitations under the License.
  */
 
 import { parse as parseContentType } from "content-type";
+
 import * as utils from "./utils";
 import { logger } from './logger';
 

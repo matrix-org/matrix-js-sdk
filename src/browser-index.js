@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as matrixcs from "./matrix";
 import request from "browser-request";
 import queryString from "qs";
+
+import * as matrixcs from "./matrix";
 
 matrixcs.request(function(opts, fn) {
     // We manually fix the query string for browser-request because

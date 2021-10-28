@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { EventEmitter } from "events";
+
 import { MatrixClient } from "../matrix";
 import { MatrixEvent } from "./event";
 import { EventTimeline } from "./event-timeline";
