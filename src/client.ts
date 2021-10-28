@@ -1321,6 +1321,17 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
+     * Main entry point for starting sync.
+     */
+    public startSync(): void {
+        if (this.syncApi == null) {
+            logger.error("Calling sync() while no sync object, this should not happen, cannot start.");
+            return;
+        }
+        this.syncApi.sync();
+    }
+
+    /**
      * Stops the sync object from syncing.
      */
     public stopSync(): void {
