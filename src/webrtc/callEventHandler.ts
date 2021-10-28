@@ -131,15 +131,48 @@ export class CallEventHandler {
     };
 
     private onToDeviceEvent = (event: MatrixEvent): void => {
-        if (!this.eventIsACall(event)) return;
+        this.client.decryptEventIfNeeded(event);
 
-        this.toDeviceCallEventBuffer.push(event);
+        // any call events or ones that might be once they're decrypted
+        if (this.eventIsACall(event) || event.isBeingDecrypted()) {
+            // queue up for processing once all events from this sync have been
+            // processed (see above).
+            this.toDeviceCallEventBuffer.push(event);
+        }
+
+        if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
+            // add an event listener for once the event is decrypted.
+            event.once("Event.decrypted", async () => {
+                if (!this.eventIsACall(event)) return;
+
+                if (this.toDeviceCallEventBuffer.includes(event)) {
+                    // we were waiting for that event to decrypt, so recheck the buffer
+                    this.evaluateToDeviceEventBuffer();
+                } else {
+                    // This one wasn't buffered so just run the event handler for it
+                    // straight away
+                    try {
+                        await this.handleCallEvent(event);
+                    } catch (e) {
+                        logger.error("Caught exception handling call event", e);
+                    }
+                }
+            });
+        }
     };
 
     private async evaluateToDeviceEventBuffer(): Promise<void> {
         if (this.client.getSyncState() !== SyncState.Syncing) return;
 
+        await Promise.all(this.toDeviceCallEventBuffer.map(event => {
+            this.client.decryptEventIfNeeded(event);
+        }));
+
         for (const event of this.toDeviceCallEventBuffer) {
+            if (!this.eventIsACall(event)) {
+                continue;
+            }
+
             try {
                 await this.handleCallEvent(event);
             } catch (e) {
