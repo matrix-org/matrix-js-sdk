@@ -934,9 +934,7 @@ export class MatrixCall extends EventEmitter {
                 this.pushLocalFeed(stream, SDPStreamMetadataPurpose.Screenshare);
                 return true;
             } catch (err) {
-                this.emit(CallEvent.Error,
-                    new CallError(CallErrorCode.NoUserMedia, "Failed to get screen-sharing stream: ", err),
-                );
+                logger.error("Failed to get screen-sharing stream:", err);
                 return false;
             }
         } else {
@@ -977,9 +975,7 @@ export class MatrixCall extends EventEmitter {
 
                 return true;
             } catch (err) {
-                this.emit(CallEvent.Error,
-                    new CallError(CallErrorCode.NoUserMedia, "Failed to get screen-sharing stream: ", err),
-                );
+                logger.error("Failed to get screen-sharing stream:", err);
                 return false;
             }
         } else {
