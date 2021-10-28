@@ -543,22 +543,22 @@ export class GroupCall extends EventEmitter {
         const memberStateEvent = currentStateEvent?.getContent<IGroupCallRoomMemberState>();
 
         let calls: IGroupCallRoomMemberCallState[] = [];
-        let existingCallIndex: number;
-        if (memberStateEvent) {
-            calls = memberStateEvent["m.calls"] || [];
-            existingCallIndex = calls.findIndex((call) => call && call["m.call_id"] === this.groupCallId);
-        } else {
-            existingCallIndex = -1;
+
+        // Sanitize existing member state event
+        if (memberStateEvent && Array.isArray(memberStateEvent["m.calls"])) {
+            calls = memberStateEvent["m.calls"].filter((call) => !!call);
         }
 
-        if (memberCallState) {
-            if (existingCallIndex !== -1) {
+        const existingCallIndex = calls.findIndex((call) => call && call["m.call_id"] === this.groupCallId);
+
+        if (existingCallIndex !== -1) {
+            if (memberCallState) {
                 calls.splice(existingCallIndex, 1, memberCallState);
             } else {
-                calls.push(memberCallState);
+                calls.splice(existingCallIndex, 1);
             }
-        } else if (existingCallIndex !== -1) {
-            calls.splice(existingCallIndex, 1);
+        } else if (memberCallState) {
+            calls.push(memberCallState);
         }
 
         const content = {
@@ -582,9 +582,13 @@ export class GroupCall extends EventEmitter {
             return;
         }
 
-        const callsState = event.getContent<IGroupCallRoomMemberState>()["m.calls"];
+        let callsState = event.getContent<IGroupCallRoomMemberState>()["m.calls"];
 
-        if (!callsState || !Array.isArray(callsState) || callsState.length === 0 || !callsState[0]) {
+        if (Array.isArray(callsState)) {
+            callsState = callsState.filter((call) => !!call);
+        }
+
+        if (!Array.isArray(callsState) || callsState.length === 0) {
             logger.log(`Ignoring member state from ${member.userId} member not in any calls.`);
             this.removeParticipant(member);
             return;
