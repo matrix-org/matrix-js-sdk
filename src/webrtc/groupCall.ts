@@ -660,7 +660,8 @@ export class GroupCall extends EventEmitter {
         }
 
         const memberState = memberStateEvent.getContent<IGroupCallRoomMemberState>();
-        const memberGroupCallState = memberState["m.calls"]?.find((call) => call["m.call_id"] === this.groupCallId);
+        const memberGroupCallState = memberState["m.calls"]?.find(
+            (call) => call && call["m.call_id"] === this.groupCallId);
 
         if (!memberGroupCallState) {
             return undefined;
