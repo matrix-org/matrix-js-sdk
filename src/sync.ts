@@ -734,7 +734,7 @@ export class SyncApi {
     }
 
     /**
-     * Resumes syncing from where it stopped when stop() was called.
+     * Resumes syncing from the store sync token.
      * This method is only intended to be used following a call to stop().
      */
     public resume(): void {
