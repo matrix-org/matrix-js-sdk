@@ -551,11 +551,13 @@ export class GroupCall extends EventEmitter {
             existingCallIndex = -1;
         }
 
-        if (existingCallIndex === -1) {
-            calls.push(memberCallState);
-        } else if (memberCallState) {
-            calls.splice(existingCallIndex, 1, memberCallState);
-        } else {
+        if (memberCallState) {
+            if (existingCallIndex !== -1) {
+                calls.splice(existingCallIndex, 1, memberCallState);
+            } else {
+                calls.push(memberCallState);
+            }
+        } else if (existingCallIndex !== -1) {
             calls.splice(existingCallIndex, 1);
         }
 
@@ -582,13 +584,11 @@ export class GroupCall extends EventEmitter {
 
         const callsState = event.getContent<IGroupCallRoomMemberState>()["m.calls"];
 
-        if (!callsState || !Array.isArray(callsState) || callsState.length === 0) {
+        if (!callsState || !Array.isArray(callsState) || callsState.length === 0 || !callsState[0]) {
             logger.log(`Ignoring member state from ${member.userId} member not in any calls.`);
             this.removeParticipant(member);
             return;
         }
-
-        logger.log(callsState);
 
         // Currently we only support a single call per room. So grab the first call.
         const callState = callsState[0];
