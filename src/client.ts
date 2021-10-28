@@ -5422,6 +5422,14 @@ export class MatrixClient extends EventEmitter {
         const resultsLength = roomEvents.results ? roomEvents.results.length : 0;
         for (let i = 0; i < resultsLength; i++) {
             const sr = SearchResult.fromJson(roomEvents.results[i], this.getEventMapper());
+            const room = this.getRoom(sr.context.getEvent().getRoomId());
+            if (room) {
+                // Copy over a known event sender if we can
+                for (const ev of sr.context.getTimeline()) {
+                    const sender = room.getMember(ev.getSender());
+                    if (!ev.sender && sender) ev.sender = sender;
+                }
+            }
             searchResults.results.push(sr);
         }
         return searchResults;
