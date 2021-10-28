@@ -740,6 +740,11 @@ export class SyncApi {
     public resume(): void {
         debuglog("SyncApi.resume");
 
+        if (this.running === true) {
+            logger.error("Calling resume() while sync is already running, this should not happen.");
+            return;
+        }
+
         this.running = true;
 
         if (global.window && global.window.addEventListener) {
