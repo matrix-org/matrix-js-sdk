@@ -201,6 +201,7 @@ export class MediaHandler {
 
         this.userMediaStreams = [];
         this.screensharingStreams = [];
+        this.localUserMediaStream = undefined;
     }
 
     private getUserMediaContraints(audio: boolean, video: boolean): MediaStreamConstraints {
