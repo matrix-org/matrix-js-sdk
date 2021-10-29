@@ -133,7 +133,15 @@ export class Thread extends Receipt {
      * The thread root event
      */
     public get rootEvent(): MatrixEvent {
-        return this.findEventById(this.root);
+        let event = this.findEventById(this.root);
+        // TODO: Remove the following when we have a proper Client<>Server
+        // integration as homeservers will feed a list of root events back to
+        // the clients
+        if (!event) {
+            event = this.room.findEventById(this.root);
+            this.addEvent(event);
+        }
+        return event;
     }
 
     public get roomId(): string {
