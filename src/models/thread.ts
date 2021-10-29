@@ -34,7 +34,7 @@ export class Thread extends Receipt {
     /**
      * A reference to the event ID at the top of the thread
      */
-    private root: string;
+    public readonly root: string;
     /**
      * A reference to all the events ID at the bottom of the threads
      */
@@ -49,6 +49,11 @@ export class Thread extends Receipt {
         if (events.length === 0) {
             throw new Error("Can't create an empty thread");
         }
+
+        const event = events[0];
+        this.root = event.isThreadRelation
+            ? event.threadRootId
+            : event.getId();
 
         this.timelineSet = new EventTimelineSet(this.room, {
             unstableClientRelationAggregation: true,
@@ -68,14 +73,6 @@ export class Thread extends Receipt {
     public async addEvent(event: MatrixEvent, toStartOfTimeline = false): Promise<void> {
         if (this.timelineSet.findEventById(event.getId()) || event.status !== null) {
             return;
-        }
-
-        if (!this.root) {
-            if (event.isThreadRelation) {
-                this.root = event.threadRootId;
-            } else {
-                this.root = event.getId();
-            }
         }
 
         // all the relevant membership info to hydrate events with a sender
