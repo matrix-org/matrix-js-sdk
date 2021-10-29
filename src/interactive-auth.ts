@@ -449,6 +449,7 @@ export class InteractiveAuth {
             } catch (e) {
                 this.attemptAuthDeferred.reject(e);
                 this.attemptAuthDeferred = null;
+                return;
             }
 
             if (
