@@ -1359,6 +1359,11 @@ export class MatrixCall extends EventEmitter {
             this.getRidOfRTXCodecs();
             await this.peerConn.setLocalDescription();
             this.setState(CallState.Connecting);
+        } catch (err) {
+            logger.debug("Error setting local description!", err);
+            this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);
+            return;
+        }
 
             // Allow a short time for initial candidates to be gathered
             await new Promise(resolve => {
@@ -1376,12 +1381,11 @@ export class MatrixCall extends EventEmitter {
                     setTimeout(resolve, 200);
                 });
 
-                await this.client.getMediaHandler().updateLocalUsermediaStreams();
+            if (this.state === CallState.Ended) {
+                return;
             }
-        } catch (err) {
-            logger.debug("Error setting local description!", err);
-            this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);
-            return;
+
+                await this.client.getMediaHandler().updateLocalUsermediaStreams();
         }
     }
 
