@@ -1282,16 +1282,20 @@ export class Room extends EventEmitter {
      * Add an event to a thread's timeline. Will fire "Thread.update"
      * @experimental
      */
-    public addThreadedEvent(event: MatrixEvent): void {
+    public async addThreadedEvent(event: MatrixEvent): Promise<void> {
         let thread = this.findThreadForEvent(event);
         if (thread) {
             thread.addEvent(event);
         } else {
             const events = [event];
-            const rootEvent = this.findEventById(event.threadRootId);
-            if (rootEvent) {
-                events.unshift(rootEvent);
+            let rootEvent = this.findEventById(event.threadRootId);
+            // If the rootEvent does not exist in the current sync, then look for
+            // it over the network
+            if (!rootEvent) {
+                const eventData = await this.client.fetchRoomEvent(this.roomId, event.threadRootId);
+                rootEvent = new MatrixEvent(eventData);
             }
+            events.unshift(rootEvent);
             thread = new Thread(events, this, this.client);
             this.threads.set(thread.id, thread);
             this.reEmitter.reEmit(thread, [ThreadEvent.Update, ThreadEvent.Ready]);
