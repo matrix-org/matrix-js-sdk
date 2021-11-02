@@ -273,7 +273,6 @@ export class CallEventHandler {
                         " and canceling outgoing call " + existingCall.callId,
                     );
                     existingCall.replacedBy(call);
-                    call.answer();
                 } else {
                     logger.log(
                         "Glare detected: rejecting incoming call " + call.callId +
