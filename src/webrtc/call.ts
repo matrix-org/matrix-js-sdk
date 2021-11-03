@@ -1355,15 +1355,19 @@ export class MatrixCall extends EventEmitter {
 
         this.setState(CallState.CreateAnswer);
 
+        let myAnswer;
         try {
             this.getRidOfRTXCodecs();
-            await this.peerConn.setLocalDescription();
-            this.setState(CallState.Connecting);
+            myAnswer = await this.peerConn.createAnswer();
         } catch (err) {
-            logger.debug("Error setting local description!", err);
-            this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);
+            logger.debug("Failed to create answer: ", err);
+            this.terminate(CallParty.Local, CallErrorCode.CreateAnswer, true);
             return;
         }
+
+        try {
+            await this.peerConn.setLocalDescription(myAnswer);
+            this.setState(CallState.Connecting);
 
             // Allow a short time for initial candidates to be gathered
             await new Promise(resolve => {
@@ -1371,6 +1375,11 @@ export class MatrixCall extends EventEmitter {
             });
 
             this.sendAnswer();
+        } catch (err) {
+            logger.debug("Error setting local description!", err);
+            this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);
+            return;
+        }
 
             // HACK: Safari doesn't like it when we reuse MediaStreams. In most cases
             // we can get around this by calling MediaStream.clone(), however inbound
