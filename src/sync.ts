@@ -285,7 +285,7 @@ export class SyncApi {
                 }
                 leaveObj.timeline = leaveObj.timeline || {};
                 const events = this.mapSyncEventsFormat(leaveObj.timeline, room);
-                const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(events);
+                const [timelineEvents, threadedEvents] = this.client.partitionThreadedEvents(events);
 
                 const stateEvents = this.mapSyncEventsFormat(leaveObj.state, room);
 
@@ -305,39 +305,6 @@ export class SyncApi {
             });
             return rooms;
         });
-    }
-
-    /**
-     * Split events between the ones that will end up in the main
-     * room timeline versus the one that need to be processed in a thread
-     * @experimental
-     */
-    public partitionThreadedEvents(events: MatrixEvent[]): [MatrixEvent[], MatrixEvent[]] {
-        if (this.opts.experimentalThreadSupport) {
-            return events.reduce((memo, event: MatrixEvent) => {
-                const room = this.client.getRoom(event.getRoomId());
-                // An event should live in the thread timeline if
-                // - It's a reply in thread event
-                // - It's related to a reply in thread event
-                let shouldLiveInThreadTimeline = event.isThreadRelation;
-                if (!shouldLiveInThreadTimeline) {
-                    const parentEventId = event.parentEventId;
-                    const parentEvent = room?.findEventById(parentEventId) || events.find((mxEv: MatrixEvent) => {
-                        return mxEv.getId() === parentEventId;
-                    });
-                    shouldLiveInThreadTimeline = parentEvent?.isThreadRelation;
-                }
-                memo[shouldLiveInThreadTimeline ? 1 : 0].push(event);
-                return memo;
-            }, [[], []]);
-        } else {
-            // When `experimentalThreadSupport` is disabled
-            // treat all events as timelineEvents
-            return [
-                events,
-                [],
-            ];
-        }
     }
 
     /**
@@ -1320,7 +1287,7 @@ export class SyncApi {
                 }
             }
 
-            const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(events);
+            const [timelineEvents, threadedEvents] = this.client.partitionThreadedEvents(events);
 
             this.processRoomEvents(room, stateEvents, timelineEvents, syncEventData.fromCache);
             this.processThreadEvents(room, threadedEvents);
@@ -1388,7 +1355,7 @@ export class SyncApi {
             const events = this.mapSyncEventsFormat(leaveObj.timeline, room);
             const accountDataEvents = this.mapSyncEventsFormat(leaveObj.account_data);
 
-            const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(events);
+            const [timelineEvents, threadedEvents] = this.client.partitionThreadedEvents(events);
 
             this.processRoomEvents(room, stateEvents, timelineEvents);
             this.processThreadEvents(room, threadedEvents);
@@ -1734,11 +1701,7 @@ export class SyncApi {
      * @experimental
      */
     private processThreadEvents(room: Room, threadedEvents: MatrixEvent[]): void {
-        threadedEvents
-            .sort((a, b) => a.getTs() - b.getTs())
-            .forEach(event => {
-                room.addThreadedEvent(event);
-            });
+        return this.client.processThreadEvents(room, threadedEvents);
     }
 
     // extractRelatedEvents(event: MatrixEvent, events: MatrixEvent[], relatedEvents: MatrixEvent[] = []): MatrixEvent[] {
