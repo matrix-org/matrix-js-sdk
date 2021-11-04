@@ -19,8 +19,9 @@ import { SDPStreamMetadataPurpose } from "./callEventTypes";
 import { MatrixClient } from "../client";
 import { RoomMember } from "../models/room-member";
 
-const POLLING_INTERVAL = 250; // ms
-const SPEAKING_THRESHOLD = -60; // dB
+const POLLING_INTERVAL = 200; // ms
+export const SPEAKING_THRESHOLD = -60; // dB
+const SPEAKING_SAMPLE_COUNT = 8; // samples
 
 export interface ICallFeedOpts {
     client: MatrixClient;
@@ -43,6 +44,7 @@ export class CallFeed extends EventEmitter {
     public stream: MediaStream;
     public userId: string;
     public purpose: SDPStreamMetadataPurpose;
+    public speakingVolumeSamples: number[];
 
     private client: MatrixClient;
     private roomId: string;
@@ -65,6 +67,7 @@ export class CallFeed extends EventEmitter {
         this.purpose = opts.purpose;
         this.audioMuted = opts.audioMuted;
         this.videoMuted = opts.videoMuted;
+        this.speakingVolumeSamples = new Array(SPEAKING_SAMPLE_COUNT).fill(-Infinity);
 
         this.updateStream(null, opts.stream);
 
@@ -78,6 +81,8 @@ export class CallFeed extends EventEmitter {
     }
 
     private updateStream(oldStream: MediaStream, newStream: MediaStream): void {
+        if (newStream === oldStream) return;
+
         if (oldStream) {
             oldStream.removeEventListener("addtrack", this.onAddTrack);
             this.measureVolumeActivity(false);
@@ -152,6 +157,10 @@ export class CallFeed extends EventEmitter {
         return this.stream.getVideoTracks().length === 0 || this.videoMuted;
     }
 
+    public isSpeaking(): boolean {
+        return this.speaking;
+    }
+
     /**
      * Replaces the current MediaStream with a new one.
      * This method should be only used by MatrixCall.
@@ -167,6 +176,7 @@ export class CallFeed extends EventEmitter {
      */
     public setAudioMuted(muted: boolean): void {
         this.audioMuted = muted;
+        this.speakingVolumeSamples.fill(-Infinity);
         this.emit(CallFeedEvent.MuteStateChanged, this.audioMuted, this.videoMuted);
     }
 
@@ -191,6 +201,7 @@ export class CallFeed extends EventEmitter {
             this.volumeLooper();
         } else {
             this.measuringVolumeActivity = false;
+            this.speakingVolumeSamples.fill(-Infinity);
             this.emit(CallFeedEvent.VolumeChanged, -Infinity);
         }
     }
@@ -199,31 +210,43 @@ export class CallFeed extends EventEmitter {
         this.speakingThreshold = threshold;
     }
 
-    private volumeLooper(): void {
+    private volumeLooper = () => {
         if (!this.analyser) return;
 
-        this.volumeLooperTimeout = setTimeout(() => {
-            if (!this.measuringVolumeActivity) return;
+        if (!this.measuringVolumeActivity) return;
 
-            this.analyser.getFloatFrequencyData(this.frequencyBinCount);
+        this.analyser.getFloatFrequencyData(this.frequencyBinCount);
 
-            let maxVolume = -Infinity;
-            for (let i = 0; i < this.frequencyBinCount.length; i++) {
-                if (this.frequencyBinCount[i] > maxVolume) {
-                    maxVolume = this.frequencyBinCount[i];
-                }
+        let maxVolume = -Infinity;
+        for (let i = 0; i < this.frequencyBinCount.length; i++) {
+            if (this.frequencyBinCount[i] > maxVolume) {
+                maxVolume = this.frequencyBinCount[i];
             }
+        }
 
-            this.emit(CallFeedEvent.VolumeChanged, maxVolume);
-            const newSpeaking = maxVolume > this.speakingThreshold;
-            if (this.speaking !== newSpeaking) {
-                this.speaking = newSpeaking;
-                this.emit(CallFeedEvent.Speaking, this.speaking);
+        this.speakingVolumeSamples.shift();
+        this.speakingVolumeSamples.push(maxVolume);
+
+        this.emit(CallFeedEvent.VolumeChanged, maxVolume);
+
+        let newSpeaking = false;
+
+        for (let i = 0; i < this.speakingVolumeSamples.length; i++) {
+            const volume = this.speakingVolumeSamples[i];
+
+            if (volume > this.speakingThreshold) {
+                newSpeaking = true;
+                break;
             }
+        }
 
-            this.volumeLooper();
-        }, POLLING_INTERVAL);
-    }
+        if (this.speaking !== newSpeaking) {
+            this.speaking = newSpeaking;
+            this.emit(CallFeedEvent.Speaking, this.speaking);
+        }
+
+        this.volumeLooperTimeout = setTimeout(this.volumeLooper, POLLING_INTERVAL);
+    };
 
     public dispose(): void {
         clearTimeout(this.volumeLooperTimeout);
