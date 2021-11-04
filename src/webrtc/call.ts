@@ -2125,6 +2125,9 @@ export class MatrixCall extends EventEmitter {
             // reset our retry count if we have successfully sent our candidates
             // otherwise queueCandidate() will refuse to try to flush the queue
             this.candidateSendTries = 0;
+
+            // Try to send candidates again just in case we received more candidates while sending.
+            this.sendCandidateQueue();
         } catch (error) {
             // don't retry this event: we'll send another one later as we might
             // have more candidates by then.
