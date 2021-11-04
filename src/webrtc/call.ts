@@ -1381,20 +1381,20 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-            // HACK: Safari doesn't like it when we reuse MediaStreams. In most cases
-            // we can get around this by calling MediaStream.clone(), however inbound
-            // calls seem to still be broken unless we getUserMedia again and replace
-            // all MediaStreams using sender.replaceTrack
-            if (isSafari) {
-                await new Promise(resolve => {
-                    setTimeout(resolve, 200);
-                });
+        // HACK: Safari doesn't like it when we reuse MediaStreams. In most cases
+        // we can get around this by calling MediaStream.clone(), however inbound
+        // calls seem to still be broken unless we getUserMedia again and replace
+        // all MediaStreams using sender.replaceTrack
+        if (isSafari) {
+            await new Promise(resolve => {
+                setTimeout(resolve, 200);
+            });
 
             if (this.state === CallState.Ended) {
                 return;
             }
 
-                await this.client.getMediaHandler().updateLocalUsermediaStreams();
+            await this.client.getMediaHandler().updateLocalUsermediaStreams();
         }
     }
 
