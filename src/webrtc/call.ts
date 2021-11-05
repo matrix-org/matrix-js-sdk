@@ -1095,6 +1095,10 @@ export class MatrixCall extends EventEmitter {
 
         const callFeed = this.localUsermediaFeed;
         callFeed.setNewStream(stream);
+        const micShouldBeMuted = callFeed.isAudioMuted() || this.remoteOnHold;
+        const vidShouldBeMuted = callFeed.isVideoMuted() || this.remoteOnHold;
+        setTracksEnabled(stream.getAudioTracks(), !micShouldBeMuted);
+        setTracksEnabled(stream.getVideoTracks(), !vidShouldBeMuted);
 
         const newSenders = [];
 
