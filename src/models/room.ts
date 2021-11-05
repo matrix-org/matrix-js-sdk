@@ -1270,8 +1270,11 @@ export class Room extends EventEmitter {
         if (!event) {
             return null;
         }
+
         if (event.isThreadRelation) {
             return this.threads.get(event.threadRootId);
+        } else if (event.isThreadRoot) {
+            return this.threads.get(event.getId());
         } else {
             const parentEvent = this.findEventById(event.parentEventId);
             return this.findThreadForEvent(parentEvent);
