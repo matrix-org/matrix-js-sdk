@@ -8840,6 +8840,10 @@ export class MatrixClient extends EventEmitter {
     }
 
     public partitionThreadedEvents(events: MatrixEvent[]): [MatrixEvent[], MatrixEvent[]] {
+        // Indices to the events array, for readibility
+        const ROOM = 0;
+        const THREAD = 1;
+        const threadRoots = new Set<string>();
         if (this.supportsExperimentalThreads) {
             return events.reduce((memo, event: MatrixEvent) => {
                 const room = this.getRoom(event.getRoomId());
@@ -8847,14 +8851,25 @@ export class MatrixClient extends EventEmitter {
                 // - It's a reply in thread event
                 // - It's related to a reply in thread event
                 let shouldLiveInThreadTimeline = event.isThreadRelation;
-                if (!shouldLiveInThreadTimeline) {
+                if (shouldLiveInThreadTimeline) {
+                    threadRoots.add(event.relationEventId);
+                } else {
                     const parentEventId = event.parentEventId;
                     const parentEvent = room?.findEventById(parentEventId) || events.find((mxEv: MatrixEvent) => {
                         return mxEv.getId() === parentEventId;
                     });
                     shouldLiveInThreadTimeline = parentEvent?.isThreadRelation;
+
+                    // Copy all the reactions and annotations to the root event
+                    // to the thread timeline. They will end up living in both
+                    // timelines at the same time
+                    const targetingThreadRoot = parentEvent?.isThreadRoot || threadRoots.has(event.relationEventId);
+                    if (targetingThreadRoot && !event.isThreadRelation && event.relationEventId) {
+                        memo[THREAD].push(event);
+                    }
                 }
-                memo[shouldLiveInThreadTimeline ? 1 : 0].push(event);
+                const targetTimeline = shouldLiveInThreadTimeline ? THREAD : ROOM;
+                memo[targetTimeline].push(event);
                 return memo;
             }, [[], []]);
         } else {
