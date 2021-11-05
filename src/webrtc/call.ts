@@ -1395,7 +1395,7 @@ export class MatrixCall extends EventEmitter {
         // all MediaStreams using sender.replaceTrack
         if (isSafari) {
             await new Promise(resolve => {
-                setTimeout(resolve, 200);
+                setTimeout(resolve, 2000);
             });
 
             if (this.state === CallState.Ended) {
