@@ -225,12 +225,6 @@ export class Room extends EventEmitter {
         this.reEmitter = new ReEmitter(this);
 
         opts.pendingEventOrdering = opts.pendingEventOrdering || PendingEventOrdering.Chronological;
-        if (["chronological", "detached"].indexOf(opts.pendingEventOrdering) === -1) {
-            throw new Error(
-                "opts.pendingEventOrdering MUST be either 'chronological' or " +
-                "'detached'. Got: '" + opts.pendingEventOrdering + "'",
-            );
-        }
 
         this.name = roomId;
 
@@ -241,7 +235,7 @@ export class Room extends EventEmitter {
 
         this.fixUpLegacyTimelineFields();
 
-        if (this.opts.pendingEventOrdering == "detached") {
+        if (this.opts.pendingEventOrdering === PendingEventOrdering.Detached) {
             this.pendingEventList = [];
             const serializedPendingEventList = client.sessionStore.store.getItem(pendingEventsKey(this.roomId));
             if (serializedPendingEventList) {
@@ -453,7 +447,7 @@ export class Room extends EventEmitter {
      * @throws If <code>opts.pendingEventOrdering</code> was not 'detached'
      */
     public getPendingEvents(): MatrixEvent[] {
-        if (this.opts.pendingEventOrdering !== "detached") {
+        if (this.opts.pendingEventOrdering !== PendingEventOrdering.Detached) {
             throw new Error(
                 "Cannot call getPendingEvents with pendingEventOrdering == " +
                 this.opts.pendingEventOrdering);
@@ -469,7 +463,7 @@ export class Room extends EventEmitter {
      * @return {boolean} True if an element was removed.
      */
     public removePendingEvent(eventId: string): boolean {
-        if (this.opts.pendingEventOrdering !== "detached") {
+        if (this.opts.pendingEventOrdering !== PendingEventOrdering.Detached) {
             throw new Error(
                 "Cannot call removePendingEvent with pendingEventOrdering == " +
                 this.opts.pendingEventOrdering);
@@ -495,7 +489,7 @@ export class Room extends EventEmitter {
      * @return {boolean}
      */
     public hasPendingEvent(eventId: string): boolean {
-        if (this.opts.pendingEventOrdering !== "detached") {
+        if (this.opts.pendingEventOrdering !== PendingEventOrdering.Detached) {
             return false;
         }
 
@@ -509,7 +503,7 @@ export class Room extends EventEmitter {
      * @return {MatrixEvent}
      */
     public getPendingEvent(eventId: string): MatrixEvent | null {
-        if (this.opts.pendingEventOrdering !== "detached") {
+        if (this.opts.pendingEventOrdering !== PendingEventOrdering.Detached) {
             return null;
         }
 
@@ -1427,7 +1421,7 @@ export class Room extends EventEmitter {
 
         this.txnToEvent[txnId] = event;
 
-        if (this.opts.pendingEventOrdering == "detached") {
+        if (this.opts.pendingEventOrdering === PendingEventOrdering.Detached) {
             if (this.pendingEventList.some((e) => e.status === EventStatus.NOT_SENT)) {
                 logger.warn("Setting event as NOT_SENT due to messages in the same state");
                 event.setStatus(EventStatus.NOT_SENT);
