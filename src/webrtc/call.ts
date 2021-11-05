@@ -481,10 +481,14 @@ export class MatrixCall extends EventEmitter {
      * Generates and returns localSDPStreamMetadata
      * @returns {SDPStreamMetadata} localSDPStreamMetadata
      */
-    private getLocalSDPStreamMetadata(): SDPStreamMetadata {
+    private getLocalSDPStreamMetadata(updateStreamIds = false): SDPStreamMetadata {
         const metadata: SDPStreamMetadata = {};
         for (const localFeed of this.getLocalFeeds()) {
-            metadata[localFeed.stream.id] = {
+            if (updateStreamIds) {
+                localFeed.sdpMetadataStreamId = localFeed.stream.id;
+            }
+
+            metadata[localFeed.sdpMetadataStreamId] = {
                 purpose: localFeed.purpose,
                 audio_muted: localFeed.isAudioMuted(),
                 video_muted: localFeed.isVideoMuted(),
@@ -1309,7 +1313,7 @@ export class MatrixCall extends EventEmitter {
                 // required to still be sent for backwards compat
                 type: this.peerConn.localDescription.type,
             },
-            [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(),
+            [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(true),
         } as MCallAnswer;
 
         answerContent.capabilities = {
@@ -1599,7 +1603,7 @@ export class MatrixCall extends EventEmitter {
 
                 this.sendVoipEvent(EventType.CallNegotiate, {
                     description: this.peerConn.localDescription,
-                    [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(),
+                    [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(true),
                 });
             }
         } catch (err) {
@@ -1696,7 +1700,7 @@ export class MatrixCall extends EventEmitter {
             'm.call.dtmf': false,
         };
 
-        content[SDPStreamMetadataKey] = this.getLocalSDPStreamMetadata();
+        content[SDPStreamMetadataKey] = this.getLocalSDPStreamMetadata(true);
 
         // Get rid of any candidates waiting to be sent: they'll be included in the local
         // description we just got and will send in the offer.

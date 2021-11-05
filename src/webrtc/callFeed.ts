@@ -42,6 +42,7 @@ export enum CallFeedEvent {
 
 export class CallFeed extends EventEmitter {
     public stream: MediaStream;
+    public sdpMetadataStreamId: string;
     public userId: string;
     public purpose: SDPStreamMetadataPurpose;
     public speakingVolumeSamples: number[];
@@ -68,6 +69,7 @@ export class CallFeed extends EventEmitter {
         this.audioMuted = opts.audioMuted;
         this.videoMuted = opts.videoMuted;
         this.speakingVolumeSamples = new Array(SPEAKING_SAMPLE_COUNT).fill(-Infinity);
+        this.sdpMetadataStreamId = opts.stream.id;
 
         this.updateStream(null, opts.stream);
 
