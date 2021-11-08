@@ -6015,7 +6015,9 @@ export class MatrixClient extends EventEmitter {
         if (fetchedEventType === EventType.RoomMessageEncrypted) {
             const allEvents = originalEvent ? events.concat(originalEvent) : events;
             await Promise.all(allEvents.map(e => {
-                return new Promise(resolve => e.once("Event.decrypted", resolve));
+                if (e.isEncrypted()) {
+                    return new Promise(resolve => e.once("Event.decrypted", resolve));
+                }
             }));
             events = events.filter(e => e.getType() === eventType);
         }
