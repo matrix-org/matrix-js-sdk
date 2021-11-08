@@ -228,7 +228,7 @@ const FALLBACK_ICE_SERVER = 'stun:turn.matrix.org';
 /** The length of time a call can be ringing for. */
 const CALL_TIMEOUT_MS = 60000;
 
-const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+// const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
 export class CallError extends Error {
     code: string;
@@ -481,10 +481,14 @@ export class MatrixCall extends EventEmitter {
      * Generates and returns localSDPStreamMetadata
      * @returns {SDPStreamMetadata} localSDPStreamMetadata
      */
-    private getLocalSDPStreamMetadata(): SDPStreamMetadata {
+    private getLocalSDPStreamMetadata(updateStreamIds = false): SDPStreamMetadata {
         const metadata: SDPStreamMetadata = {};
         for (const localFeed of this.getLocalFeeds()) {
-            metadata[localFeed.stream.id] = {
+            if (updateStreamIds) {
+                localFeed.sdpMetadataStreamId = localFeed.stream.id;
+            }
+
+            metadata[localFeed.sdpMetadataStreamId] = {
                 purpose: localFeed.purpose,
                 audio_muted: localFeed.isAudioMuted(),
                 video_muted: localFeed.isVideoMuted(),
@@ -1095,6 +1099,10 @@ export class MatrixCall extends EventEmitter {
 
         const callFeed = this.localUsermediaFeed;
         callFeed.setNewStream(stream);
+        const micShouldBeMuted = callFeed.isAudioMuted() || this.remoteOnHold;
+        const vidShouldBeMuted = callFeed.isVideoMuted() || this.remoteOnHold;
+        setTracksEnabled(stream.getAudioTracks(), !micShouldBeMuted);
+        setTracksEnabled(stream.getVideoTracks(), !vidShouldBeMuted);
 
         const newSenders = [];
 
@@ -1305,7 +1313,7 @@ export class MatrixCall extends EventEmitter {
                 // required to still be sent for backwards compat
                 type: this.peerConn.localDescription.type,
             },
-            [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(),
+            [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(true),
         } as MCallAnswer;
 
         answerContent.capabilities = {
@@ -1595,7 +1603,7 @@ export class MatrixCall extends EventEmitter {
 
                 this.sendVoipEvent(EventType.CallNegotiate, {
                     description: this.peerConn.localDescription,
-                    [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(),
+                    [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(true),
                 });
             }
         } catch (err) {
@@ -1692,7 +1700,7 @@ export class MatrixCall extends EventEmitter {
             'm.call.dtmf': false,
         };
 
-        content[SDPStreamMetadataKey] = this.getLocalSDPStreamMetadata();
+        content[SDPStreamMetadataKey] = this.getLocalSDPStreamMetadata(true);
 
         // Get rid of any candidates waiting to be sent: they'll be included in the local
         // description we just got and will send in the offer.
@@ -2125,6 +2133,9 @@ export class MatrixCall extends EventEmitter {
             // reset our retry count if we have successfully sent our candidates
             // otherwise queueCandidate() will refuse to try to flush the queue
             this.candidateSendTries = 0;
+
+            // Try to send candidates again just in case we received more candidates while sending.
+            this.sendCandidateQueue();
         } catch (error) {
             // don't retry this event: we'll send another one later as we might
             // have more candidates by then.

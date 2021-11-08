@@ -54,20 +54,27 @@ export class MediaHandler {
     public async updateLocalUsermediaStreams(): Promise<void> {
         this.localUserMediaStream = undefined;
 
-        await Promise.all(Array.from(this.client.callEventHandler.calls.values())
-            .filter((call) => call.state !== CallState.Ended)
-            .map((call) => {
-                return this.getUserMediaStream(
-                    call.hasLocalUserMediaAudioTrack,
-                    call.hasLocalUserMediaVideoTrack,
-                ).then(stream => call.updateLocalUsermediaStream(stream));
-            }));
+        for (const call of this.client.callEventHandler.calls.values()) {
+            if (call.state === CallState.Ended) {
+                continue;
+            }
 
-        await Promise.all(Array.from(this.client.groupCallEventHandler.groupCalls.values())
-            .map((groupCall) => {
-                return this.getUserMediaStream(true, groupCall.type === GroupCallType.Video)
-                    .then(stream => groupCall.updateLocalUsermediaStream(stream));
-            }));
+            const stream = await this.getUserMediaStream(
+                call.hasLocalUserMediaAudioTrack,
+                call.hasLocalUserMediaVideoTrack,
+            );
+
+            await call.updateLocalUsermediaStream(stream);
+        }
+
+        for (const groupCall of this.client.groupCallEventHandler.groupCalls.values()) {
+            const stream = await this.getUserMediaStream(
+                true,
+                groupCall.type === GroupCallType.Video,
+            );
+
+            await groupCall.updateLocalUsermediaStream(stream);
+        }
     }
 
     public async hasAudioDevice(): Promise<boolean> {
