@@ -1,3 +1,35 @@
+Changes in [15.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.1.0) (2021-11-08)
+==================================================================================================
+
+## 🦖 Deprecations
+ * Mark old verification methods as deprecated ([\#1994](https://github.com/matrix-org/matrix-js-sdk/pull/1994)).
+
+## ✨ Features
+ * Try to set a sender on search result events if possible ([\#2004](https://github.com/matrix-org/matrix-js-sdk/pull/2004)).
+ * Port some changes from group calls branch to develop ([\#2001](https://github.com/matrix-org/matrix-js-sdk/pull/2001)). Contributed by @SimonBrandner.
+ * Fetch room membership from server rather than relying on stored data ([\#1998](https://github.com/matrix-org/matrix-js-sdk/pull/1998)).
+ * Add method to fetch the MSC3266 Room Summary of a Room ([\#1988](https://github.com/matrix-org/matrix-js-sdk/pull/1988)).
+
+## 🐛 Bug Fixes
+ * Don't show `Unable to access microphone` when cancelling screensharing dialog ([\#2005](https://github.com/matrix-org/matrix-js-sdk/pull/2005)). Fixes vector-im/element-web#19533 and vector-im/element-web#19533. Contributed by @SimonBrandner.
+ * Strip direction override characters from display names ([\#1992](https://github.com/matrix-org/matrix-js-sdk/pull/1992)). Fixes vector-im/element-web#1712 and vector-im/element-web#1712.
+
+Changes in [15.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.1.0-rc.1) (2021-11-02)
+============================================================================================================
+
+## 🦖 Deprecations
+ * Mark old verification methods as deprecated ([\#1994](https://github.com/matrix-org/matrix-js-sdk/pull/1994)).
+
+## ✨ Features
+ * Try to set a sender on search result events if possible ([\#2004](https://github.com/matrix-org/matrix-js-sdk/pull/2004)).
+ * Port some changes from group calls branch to develop ([\#2001](https://github.com/matrix-org/matrix-js-sdk/pull/2001)). Contributed by @SimonBrandner.
+ * Fetch room membership from server rather than relying on stored data ([\#1998](https://github.com/matrix-org/matrix-js-sdk/pull/1998)).
+ * Add method to fetch the MSC3266 Room Summary of a Room ([\#1988](https://github.com/matrix-org/matrix-js-sdk/pull/1988)).
+
+## 🐛 Bug Fixes
+ * Don't show `Unable to access microphone` when cancelling screensharing dialog ([\#2005](https://github.com/matrix-org/matrix-js-sdk/pull/2005)). Fixes vector-im/element-web#19533 and vector-im/element-web#19533. Contributed by @SimonBrandner.
+ * Strip direction override characters from display names ([\#1992](https://github.com/matrix-org/matrix-js-sdk/pull/1992)). Fixes vector-im/element-web#1712 and vector-im/element-web#1712.
+
 Changes in [15.0.0](https://github.com/vector-im/element-desktop/releases/tag/v15.0.0) (2021-10-25)
 ===================================================================================================
 
