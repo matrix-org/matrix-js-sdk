@@ -228,7 +228,7 @@ const FALLBACK_ICE_SERVER = 'stun:turn.matrix.org';
 /** The length of time a call can be ringing for. */
 const CALL_TIMEOUT_MS = 60000;
 
-// const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
 export class CallError extends Error {
     code: string;
@@ -1393,17 +1393,17 @@ export class MatrixCall extends EventEmitter {
         // we can get around this by calling MediaStream.clone(), however inbound
         // calls seem to still be broken unless we getUserMedia again and replace
         // all MediaStreams using sender.replaceTrack
-        // if (isSafari) {
-        //     await new Promise(resolve => {
-        //         setTimeout(resolve, 200);
-        //     });
+        if (isSafari) {
+            await new Promise(resolve => {
+                setTimeout(resolve, 200);
+            });
 
-        //     if (this.state === CallState.Ended) {
-        //         return;
-        //     }
+            if (this.state === CallState.Ended) {
+                return;
+            }
 
-        //     await this.client.getMediaHandler().updateLocalUsermediaStreams();
-        // }
+            await this.client.getMediaHandler().updateLocalUsermediaStreams();
+        }
     }
 
     /**
