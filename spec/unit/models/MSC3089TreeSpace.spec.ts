@@ -1000,6 +1000,7 @@ describe("MSC3089TreeSpace", () => {
         const buf = Uint8Array.from(Array.from(fileContents).map((_, i) => fileContents.charCodeAt(i)));
 
         // We clone the file info just to make sure it doesn't get mutated for the test.
+        // TODO: use non-deprecated function
         const result = await tree.createFile(fileName, buf, Object.assign({}, fileInfo), { "m.new_content": true });
         expect(result).toMatchObject({ event_id: fileEventId });
 

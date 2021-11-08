@@ -244,8 +244,7 @@ describe("MSC3089Branch", () => {
 
     it('should create new versions of itself', async () => {
         const canaryName = "canary";
-        const fileContents = "contents go here";
-        const canaryContents = Uint8Array.from(Array.from(fileContents).map((_, i) => fileContents.charCodeAt(i)));
+        const canaryContents = "contents go here";
         const canaryFile = {} as IEncryptedFile;
         const canaryAddl = { canary: true };
         indexEvent.getContent = () => ({ active: true, retained: true });
@@ -294,9 +293,9 @@ describe("MSC3089Branch", () => {
 
             return Promise.resolve({ event_id: fileEventId2 });
         });
-        directory.createFile = createFn;
+        directory.createFileCompat = createFn;
 
-        await branch.createNewVersion(canaryName, canaryContents, canaryFile, canaryAddl);
+        await branch.createNewVersionCompat(canaryName, canaryContents, canaryFile, canaryAddl);
 
         expect(stateFn).toHaveBeenCalledTimes(2);
         expect(createFn).toHaveBeenCalledTimes(1);
