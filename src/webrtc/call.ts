@@ -886,7 +886,7 @@ export class MatrixCall extends EventEmitter {
             newCall.waitForLocalAVStream = true;
         } else if ([CallState.CreateOffer, CallState.InviteSent].includes(this.state)) {
             logger.debug("Handing local stream to new call");
-            newCall.gotCallFeedsForAnswer(this.getLocalFeeds().map((feed) => feed.clone()));
+            newCall.gotCallFeedsForAnswer(this.getLocalFeeds());
         }
         this.successor = newCall;
         this.emit(CallEvent.Replaced, newCall);
@@ -1402,7 +1402,54 @@ export class MatrixCall extends EventEmitter {
                 return;
             }
 
-            await this.client.getMediaHandler().updateLocalUsermediaStreams();
+            const callFeed = this.localUsermediaFeed;
+            const stream = callFeed.stream;
+
+            if (!stream.active) {
+                throw new Error(`Call ${this.callId} has an inactive stream ${
+                    stream.id} and its tracks cannot be replaced`);
+            }
+
+            const newSenders = [];
+
+            for (const track of this.localUsermediaStream.getTracks()) {
+                const oldSender = this.usermediaSenders.find((sender) => {
+                    return sender.track?.kind === track.kind;
+                });
+
+                if (track.readyState === "ended") {
+                    throw new Error(`Call ${this.callId} tried to replace track ${track.id} in the ended state`);
+                }
+
+                let newSender: RTCRtpSender;
+
+                try {
+                    logger.info(
+                        `Replacing track (` +
+                        `id="${track.id}", ` +
+                        `kind="${track.kind}", ` +
+                        `streamId="${stream.id}", ` +
+                        `streamPurpose="${callFeed.purpose}"` +
+                        `) to peer connection`,
+                    );
+                    await oldSender.replaceTrack(track);
+                    newSender = oldSender;
+                } catch (error) {
+                    logger.info(
+                        `Adding track (` +
+                        `id="${track.id}", ` +
+                        `kind="${track.kind}", ` +
+                        `streamId="${stream.id}", ` +
+                        `streamPurpose="${callFeed.purpose}"` +
+                        `) to peer connection`,
+                    );
+                    newSender = this.peerConn.addTrack(track, stream);
+                }
+
+                newSenders.push(newSender);
+            }
+
+            this.usermediaSenders = newSenders;
         }
     }
 
@@ -2058,7 +2105,9 @@ export class MatrixCall extends EventEmitter {
     private async terminate(hangupParty: CallParty, hangupReason: CallErrorCode, shouldEmit: boolean): Promise<void> {
         if (this.callHasEnded()) return;
 
-        this.callStatsAtEnd = await this.collectCallStats();
+        this.hangupParty = hangupParty;
+        this.hangupReason = hangupReason;
+        this.setState(CallState.Ended);
 
         if (this.inviteTimeout) {
             clearTimeout(this.inviteTimeout);
@@ -2069,14 +2118,13 @@ export class MatrixCall extends EventEmitter {
             this.callLengthInterval = null;
         }
 
+        this.callStatsAtEnd = await this.collectCallStats();
+
         // Order is important here: first we stopAllMedia() and only then we can deleteAllFeeds()
         // We don't stop media if the call was replaced as we want to re-use streams in the successor
         if (hangupReason !== CallErrorCode.Replaced) this.stopAllMedia();
         this.deleteAllFeeds();
 
-        this.hangupParty = hangupParty;
-        this.hangupReason = hangupReason;
-        this.setState(CallState.Ended);
         if (this.peerConn && this.peerConn.signalingState !== 'closed') {
             this.peerConn.close();
         }

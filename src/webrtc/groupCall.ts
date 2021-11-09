@@ -775,6 +775,10 @@ export class GroupCall extends EventEmitter {
 
         this.callHandlers.delete(opponentMemberId);
 
+        if (call.hangupReason === CallErrorCode.Replaced) {
+            return;
+        }
+
         if (call.state !== CallState.Ended) {
             call.hangup(hangupReason, false);
         }
