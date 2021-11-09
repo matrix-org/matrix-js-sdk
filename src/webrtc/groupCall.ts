@@ -104,6 +104,7 @@ function getCallUserId(call: MatrixCall): string | null {
 export class GroupCall extends EventEmitter {
     // Config
     public activeSpeakerInterval = 1000;
+    public retryCallInterval = 5000;
     public participantTimeout = 1000 * 15;
 
     public state = GroupCallState.LocalCallFeedUninitialized;
@@ -119,6 +120,8 @@ export class GroupCall extends EventEmitter {
 
     private callHandlers: Map<string, ICallHandlers> = new Map();
     private activeSpeakerLoopTimeout?: number;
+    private retryCallLoopTimeout?: number;
+    private retryCallCounts: Map<string, number> = new Map();
     private reEmitter: ReEmitter;
 
     constructor(
@@ -274,6 +277,7 @@ export class GroupCall extends EventEmitter {
         this.client.on("Call.incoming", this.onIncomingCall);
 
         this.onActiveSpeakerLoop();
+        this.onRetryCallLoop();
     }
 
     private dispose() {
@@ -305,6 +309,10 @@ export class GroupCall extends EventEmitter {
 
         this.activeSpeaker = null;
         clearTimeout(this.activeSpeakerLoopTimeout);
+
+        this.retryCallCounts.clear();
+        clearTimeout(this.retryCallLoopTimeout);
+
         this.client.removeListener("Call.incoming", this.onIncomingCall);
     }
 
@@ -681,6 +689,24 @@ export class GroupCall extends EventEmitter {
         return memberDevices[0];
     }
 
+    private onRetryCallLoop = () => {
+        const roomState = this.room.currentState;
+        const memberStateEvents = roomState.getStateEvents(EventType.GroupCallMemberPrefix);
+
+        for (const event of memberStateEvents) {
+            const memberId = event.getStateKey();
+            const existingCall = this.calls.find((call) => getCallUserId(call) === memberId);
+            const retryCallCount = this.retryCallCounts.get(memberId) || 0;
+
+            if (!existingCall && retryCallCount < 3) {
+                this.retryCallCounts.set(memberId, retryCallCount + 1);
+                this.onMemberStateChanged(event);
+            }
+        }
+
+        this.retryCallLoopTimeout = setTimeout(this.onRetryCallLoop, this.retryCallInterval);
+    };
+
     /**
      * Call Event Handlers
      */
@@ -832,7 +858,7 @@ export class GroupCall extends EventEmitter {
         }
     };
 
-    private onCallStateChanged = (call: MatrixCall, _state: CallState, _oldState: CallState) => {
+    private onCallStateChanged = (call: MatrixCall, state: CallState, _oldState: CallState) => {
         const audioMuted = this.localCallFeed.isAudioMuted();
 
         if (
@@ -849,6 +875,10 @@ export class GroupCall extends EventEmitter {
             call.isLocalVideoMuted() !== videoMuted
         ) {
             call.setLocalVideoMuted(videoMuted);
+        }
+
+        if (state === CallState.Connected) {
+            this.retryCallCounts.delete(getCallUserId(call));
         }
     };
 
