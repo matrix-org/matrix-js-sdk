@@ -62,4 +62,4 @@ if (indexedDB) {
 // It's awkward, but required.
 export * from "./matrix";
 export default matrixcs; // keep export for browserify package deps
-(global as any).matrixcs = matrixcs;
+(global as NodeJS.Global && { matrixcs }).matrixcs = matrixcs;
