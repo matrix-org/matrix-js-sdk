@@ -16,9 +16,21 @@ limitations under the License.
 
 import * as matrixcs from "./matrix";
 import request from "browser-request";
-import queryString from "qs";
+import queryString, { IStringifyOptions } from "qs";
 
-matrixcs.request(function(opts, fn) {
+interface RequestOptions {
+    qs: string | Record<string | number | symbol, string>;
+    qsStringifyOptions: IStringifyOptions;
+}
+
+enum IndexedDBStoreName {
+    crypto = "matrix-js-sdk:crypto"
+}
+
+matrixcs.request(function(
+    opts: RequestOptions,
+    fn: (er: Error, response: any, body: any) => any,
+) {
     // We manually fix the query string for browser-request because
     // it doesn't correctly handle cases like ?via=one&via=two. Instead
     // we mimic `request`'s query string interface to make it all work
@@ -31,24 +43,23 @@ matrixcs.request(function(opts, fn) {
 
 // just *accessing* indexedDB throws an exception in firefox with
 // indexeddb disabled.
-let indexedDB;
+let indexedDB: IDBFactory;
 try {
     indexedDB = global.indexedDB;
 } catch (e) {}
 
 // if our browser (appears to) support indexeddb, use an indexeddb crypto store.
 if (indexedDB) {
-    matrixcs.setCryptoStoreFactory(
-        function() {
-            return new matrixcs.IndexedDBCryptoStore(
-                indexedDB, "matrix-js-sdk:crypto",
-            );
-        },
-    );
+    matrixcs.setCryptoStoreFactory(function() {
+        return new matrixcs.IndexedDBCryptoStore(
+            indexedDB,
+            IndexedDBStoreName.crypto,
+        );
+    });
 }
 
 // We export 3 things to make browserify happy as well as downstream projects.
 // It's awkward, but required.
 export * from "./matrix";
 export default matrixcs; // keep export for browserify package deps
-global.matrixcs = matrixcs;
+(global as any).matrixcs = matrixcs;
