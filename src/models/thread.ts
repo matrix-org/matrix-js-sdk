@@ -128,6 +128,15 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
     }
 
     /**
+     * Determines thread's ready status
+     */
+    public get lastReply(): MatrixEvent {
+        const threadReplies = this.events
+            .filter(event => event.isThreadRelation);
+        return threadReplies[threadReplies.length - 1];
+    }
+
+    /**
      * The thread ID, which is the same as the root event ID
      */
     public get id(): string {
