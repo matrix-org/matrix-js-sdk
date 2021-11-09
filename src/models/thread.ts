@@ -106,6 +106,15 @@ export class Thread extends EventEmitter {
     }
 
     /**
+     * Return last reply to the thread
+     */
+    public get lastReply(): MatrixEvent {
+        const threadReplies = this.events
+            .filter(event => event.isThreadRelation);
+        return threadReplies[threadReplies.length - 1];
+    }
+
+    /**
      * Determines thread's ready status
      */
     public get ready(): boolean {
