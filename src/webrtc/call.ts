@@ -1844,7 +1844,7 @@ export class MatrixCall extends EventEmitter {
                 }, 1000);
             }
         } else if (this.peerConn.iceConnectionState == 'failed') {
-            this.hangup(CallErrorCode.IceFailed, false);
+            this.peerConn.restartIce();
         } else if (this.peerConn.iceConnectionState == 'disconnected') {
             this.iceDisconnectedTimeout = setTimeout(() => {
                 this.hangup(CallErrorCode.IceFailed, false);
