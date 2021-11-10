@@ -27,6 +27,8 @@ enum IndexedDBStoreName {
     crypto = "matrix-js-sdk:crypto"
 }
 
+type GlobalObject = NodeJS.Global & typeof globalThis & Record<"matrixcs", typeof matrixcs>;
+
 matrixcs.request(function(
     opts: RequestOptions,
     fn: (er: Error, response: any, body: any) => any,
@@ -62,4 +64,4 @@ if (indexedDB) {
 // It's awkward, but required.
 export * from "./matrix";
 export default matrixcs; // keep export for browserify package deps
-(global as NodeJS.Global && { matrixcs }).matrixcs = matrixcs;
+(global as GlobalObject).matrixcs = matrixcs;
