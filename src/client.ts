@@ -8575,7 +8575,7 @@ export class MatrixClient extends EventEmitter {
         const ROOM = 0;
         const THREAD = 1;
         const threadRoots = new Set<string>();
-        if (this.supportsExperimentalThreads) {
+        if (this.supportsExperimentalThreads()) {
             return events.reduce((memo, event: MatrixEvent) => {
                 const room = this.getRoom(event.getRoomId());
                 // An event should live in the thread timeline if
