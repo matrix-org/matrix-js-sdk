@@ -485,6 +485,7 @@ export class MSC3089TreeSpace {
         const mxc = await this.client.uploadContent(encryptedContents, {
             includeFilename: false,
             onlyContentUri: true,
+            rawResponse: false, // make this explicit otherwise behaviour is different on browser vs NodeJS
         });
         info.url = mxc;
 
