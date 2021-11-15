@@ -365,7 +365,6 @@ export class MatrixCall extends EventEmitter {
     public createDataChannel(label: string, options: RTCDataChannelInit) {
         const dataChannel = this.peerConn.createDataChannel(label, options);
         this.emit(CallEvent.DataChannel, dataChannel);
-        logger.debug("created data channel");
         return dataChannel;
     }
 
@@ -494,7 +493,6 @@ export class MatrixCall extends EventEmitter {
                 video_muted: localFeed.isVideoMuted(),
             };
         }
-        logger.debug("Got local SDPStreamMetadata", metadata);
         return metadata;
     }
 
@@ -679,8 +677,6 @@ export class MatrixCall extends EventEmitter {
     }
 
     private deleteFeedByStream(stream: MediaStream): void {
-        logger.debug(`Removing feed with stream id ${stream.id}`);
-
         const feed = this.getFeedByStreamId(stream.id);
         if (!feed) {
             logger.warn(`Didn't find the feed with stream id ${stream.id} to delete`);

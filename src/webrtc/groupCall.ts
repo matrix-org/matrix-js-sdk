@@ -140,8 +140,6 @@ export class GroupCall extends EventEmitter {
         const roomState = this.room.currentState;
         const memberStateEvents = roomState.getStateEvents(EventType.GroupCallMemberPrefix);
 
-        logger.log("Processing initial members", memberStateEvents);
-
         for (const stateEvent of memberStateEvents) {
             this.onMemberStateChanged(stateEvent);
         }
@@ -250,8 +248,6 @@ export class GroupCall extends EventEmitter {
 
         logger.log(`Entered group call ${this.groupCallId}`);
 
-        logger.log("processing initial calls");
-
         const calls = this.client.callEventHandler.calls.values();
 
         for (const call of calls) {
@@ -262,8 +258,6 @@ export class GroupCall extends EventEmitter {
         // Other members will be picked up by the RoomState.members event.
         const roomState = this.room.currentState;
         const memberStateEvents = roomState.getStateEvents(EventType.GroupCallMemberPrefix);
-
-        logger.log("Processing initial members");
 
         // This avoids a race condition where the other side would first receive
         // the to-device messages and only then the member state event which
@@ -446,11 +440,9 @@ export class GroupCall extends EventEmitter {
 
                 await this.sendMemberStateEvent();
 
-                logger.log("screensharing enabled on all calls");
-
                 return true;
             } catch (error) {
-                logger.error("enabling screensharing error", error);
+                logger.error("Enabling screensharing error", error);
                 this.emit(GroupCallEvent.Error,
                     new GroupCallError(GroupCallErrorCode.NoUserMedia, "Failed to get screen-sharing stream: ", error),
                 );
@@ -573,7 +565,7 @@ export class GroupCall extends EventEmitter {
         const content = {
             "m.calls": calls,
         };
-        logger.log("Sending group call member state event", content);
+
         return this.client.sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, content, localUserId);
     }
 
@@ -584,8 +576,6 @@ export class GroupCall extends EventEmitter {
         }
 
         const member = this.room.getMember(event.getStateKey());
-
-        logger.log("Processing member state", member);
 
         if (!member) {
             return;
@@ -598,7 +588,7 @@ export class GroupCall extends EventEmitter {
         }
 
         if (!Array.isArray(callsState) || callsState.length === 0) {
-            logger.log(`Ignoring member state from ${member.userId} member not in any calls.`);
+            logger.warn(`Ignoring member state from ${member.userId} member not in any calls.`);
             this.removeParticipant(member);
             return;
         }
@@ -615,7 +605,7 @@ export class GroupCall extends EventEmitter {
         }
 
         if (callId !== this.groupCallId) {
-            logger.log(`Call id ${callId} does not match group call id ${this.groupCallId}, ignoring.`);
+            logger.warn(`Call id ${callId} does not match group call id ${this.groupCallId}, ignoring.`);
             this.removeParticipant(member);
             return;
         }
@@ -984,13 +974,11 @@ export class GroupCall extends EventEmitter {
     }
 
     private addScreenshareFeed(callFeed: CallFeed) {
-        logger.log("added screenshare feed");
         this.screenshareFeeds.push(callFeed);
         this.emit(GroupCallEvent.ScreenshareFeedsChanged, this.screenshareFeeds);
     }
 
     private replaceScreenshareFeed(existingFeed: CallFeed, replacementFeed: CallFeed) {
-        logger.log("replaced screenshare feed");
         const feedIndex = this.screenshareFeeds.findIndex((feed) => feed.userId === existingFeed.userId);
 
         if (feedIndex === -1) {
@@ -1004,7 +992,6 @@ export class GroupCall extends EventEmitter {
     }
 
     private removeScreenshareFeed(callFeed: CallFeed) {
-        logger.log("removed screenshare feed");
         const feedIndex = this.screenshareFeeds.findIndex((feed) => feed.userId === callFeed.userId);
 
         if (feedIndex === -1) {

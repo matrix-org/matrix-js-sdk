@@ -73,7 +73,7 @@ export class GroupCallEventHandler {
         const room = this.client.getRoom(roomId);
 
         if (!room) {
-            logger.error(`Couldn't find room ${roomId} for GroupCall`);
+            logger.warn(`Couldn't find room ${roomId} for GroupCall`);
             return;
         }
 
@@ -82,14 +82,14 @@ export class GroupCallEventHandler {
         const callType = content["m.type"];
 
         if (!Object.values(GroupCallType).includes(callType)) {
-            logger.error(`Received invalid group call type ${callType} for room ${roomId}.`);
+            logger.warn(`Received invalid group call type ${callType} for room ${roomId}.`);
             return;
         }
 
         const callIntent = content["m.intent"];
 
         if (!Object.values(GroupCallIntent).includes(callIntent)) {
-            logger.error(`Received invalid group call intent ${callType} for room ${roomId}.`);
+            logger.warn(`Received invalid group call intent ${callType} for room ${roomId}.`);
             return;
         }
 
