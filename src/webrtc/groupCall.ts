@@ -277,7 +277,8 @@ export class GroupCall extends EventEmitter {
         this.client.on("Call.incoming", this.onIncomingCall);
 
         this.onActiveSpeakerLoop();
-        this.onRetryCallLoop();
+
+        this.retryCallLoopTimeout = setTimeout(this.onRetryCallLoop, this.retryCallInterval);
     }
 
     private dispose() {
