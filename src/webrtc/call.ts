@@ -662,7 +662,7 @@ export class MatrixCall extends EventEmitter {
         }
         // Empty the array
         senderArray.splice(0, senderArray.length);
-        this.deleteFeedByStream(callFeed.stream);
+        this.deleteFeed(callFeed);
     }
 
     private deleteAllFeeds(): void {
@@ -682,7 +682,10 @@ export class MatrixCall extends EventEmitter {
             logger.warn(`Didn't find the feed with stream id ${stream.id} to delete`);
             return;
         }
+        this.deleteFeed(feed);
+    }
 
+    private deleteFeed(feed: CallFeed): void {
         feed.dispose();
         this.feeds.splice(this.feeds.indexOf(feed), 1);
         this.emit(CallEvent.FeedsChanged, this.feeds);
@@ -1863,7 +1866,10 @@ export class MatrixCall extends EventEmitter {
 
         const stream = ev.streams[0];
         this.pushRemoteFeed(stream);
-        stream.addEventListener("removetrack", () => this.deleteFeedByStream(stream));
+        stream.addEventListener("removetrack", () => {
+            logger.log(`Removing track streamId: ${stream.id}`);
+            this.deleteFeedByStream(stream);
+        });
     };
 
     private onDataChannel = (ev: RTCDataChannelEvent): void => {
