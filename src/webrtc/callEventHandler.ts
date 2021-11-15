@@ -21,6 +21,7 @@ import { EventType } from '../@types/event';
 import { MatrixClient } from '../client';
 import { MCallAnswer, MCallHangupReject } from "./callEventTypes";
 import { SyncState } from "../sync.api";
+import { GroupCallError, GroupCallErrorCode, GroupCallEvent } from './groupCall';
 
 // Don't ring unless we'd be ringing for at least 3 seconds: the user needs some
 // time to press the 'accept' button
@@ -186,6 +187,13 @@ export class CallEventHandler {
 
             if (!opponentDeviceId) {
                 logger.warn(`Cannot find a device id for ${senderId}. Ignoring event.`);
+                groupCall.emit(
+                    GroupCallEvent.Error,
+                    new GroupCallError(
+                        GroupCallErrorCode.UnknownDevice,
+                        `No opponent device found for ${senderId}, ignoring.`,
+                    ),
+                );
                 return;
             }
         }

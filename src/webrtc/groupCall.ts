@@ -40,15 +40,20 @@ export enum GroupCallEvent {
 }
 
 export enum GroupCallErrorCode {
-    NoUserMedia = "no_user_media"
+    NoUserMedia = "no_user_media",
+    UnknownDevice = "unknown_device"
 }
 
 export class GroupCallError extends Error {
     code: string;
 
-    constructor(code: GroupCallErrorCode, msg: string, err: Error) {
+    constructor(code: GroupCallErrorCode, msg: string, err?: Error) {
         // Still don't think there's any way to have proper nested errors
-        super(msg + ": " + err);
+        if (err) {
+            super(msg + ": " + err);
+        } else {
+            super(msg);
+        }
 
         this.code = code;
     }
@@ -633,6 +638,13 @@ export class GroupCall extends EventEmitter {
 
         if (!opponentDevice) {
             logger.warn(`No opponent device found for ${member.userId}, ignoring.`);
+            this.emit(
+                GroupCallEvent.Error,
+                new GroupCallError(
+                    GroupCallErrorCode.UnknownDevice,
+                    `No opponent device found for ${member.userId}, ignoring.`,
+                ),
+            );
             return;
         }
 
