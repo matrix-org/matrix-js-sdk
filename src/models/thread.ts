@@ -19,7 +19,7 @@ import { MatrixEvent } from "./event";
 import { EventTimeline } from "./event-timeline";
 import { EventTimelineSet } from './event-timeline-set';
 import { Room } from './room';
-import { TypedEventEmitter } from "./typed-event-emitter";
+import { BaseModel } from "./base-model";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -30,7 +30,7 @@ export enum ThreadEvent {
 /**
  * @experimental
  */
-export class Thread extends TypedEventEmitter<ThreadEvent> {
+export class Thread extends BaseModel<ThreadEvent> {
     /**
      * A reference to the event ID at the top of the thread
      */
@@ -186,9 +186,5 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
 
     public has(eventId: string): boolean {
         return this.timelineSet.findEventById(eventId) instanceof MatrixEvent;
-    }
-
-    public get hasCurrentUserParticipated(): boolean {
-        return this._currentUserParticipated;
     }
 }
