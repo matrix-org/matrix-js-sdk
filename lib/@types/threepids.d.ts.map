@@ -1,0 +1,1 @@
+{"version":3,"file":"threepids.d.ts","sourceRoot":"","sources":["../../src/@types/threepids.ts"],"names":[],"mappings":"AAgBA,oBAAY,cAAc;IACtB,KAAK,UAAU;IACf,KAAK,WAAW;CACnB;AAGD,MAAM,WAAW,SAAS;IACtB,MAAM,EAAE,cAAc,CAAC;IACvB,OAAO,EAAE,MAAM,CAAC;IAChB,YAAY,EAAE,MAAM,CAAC;IACrB,QAAQ,EAAE,MAAM,CAAC;IACjB,KAAK,CAAC,EAAE,OAAO,CAAC;CACnB"}

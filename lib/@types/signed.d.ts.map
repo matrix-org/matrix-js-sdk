@@ -1,0 +1,1 @@
+{"version":3,"file":"signed.d.ts","sourceRoot":"","sources":["../../src/@types/signed.ts"],"names":[],"mappings":"AAgBA,MAAM,WAAW,WAAW;IACxB,CAAC,MAAM,EAAE,MAAM,GAAG;QACd,CAAC,KAAK,EAAE,MAAM,GAAG,MAAM,CAAC;KAC3B,CAAC;CACL;AAED,MAAM,WAAW,OAAO;IACpB,UAAU,CAAC,EAAE,WAAW,CAAC;CAC5B"}

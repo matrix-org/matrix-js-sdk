@@ -1,0 +1,1 @@
+{"version":3,"file":"indexeddb-store-worker.d.ts","sourceRoot":"","sources":["../../src/store/indexeddb-store-worker.ts"],"names":[],"mappings":"AAyBA;;;;;;;;;;;;;;GAcG;AACH,qBAAa,oBAAoB;IAOjB,OAAO,CAAC,QAAQ,CAAC,WAAW;IANxC,OAAO,CAAC,OAAO,CAAoC;IAEnD;;;OAGG;gBAC0B,WAAW,EAAE,YAAY,CAAC,OAAO,MAAM,CAAC,CAAC,aAAa,CAAC;IAEpF;;;;;OAKG;IACI,SAAS,OAAQ,YAAY,KAAG,IAAI,CAiFzC;CACL"}

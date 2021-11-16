@@ -1,0 +1,1 @@
+{"version":3,"file":"logger.d.ts","sourceRoot":"","sources":["../src/logger.ts"],"names":[],"mappings":"AAiBA;;GAEG;AAEH,OAAY,EAAE,MAAM,EAAE,MAAM,UAAU,CAAC;AAoCvC;;;GAGG;AACH,eAAO,MAAM,MAAM,EAAE,cAAiD,CAAC;AAGvE,MAAM,WAAW,cAAe,SAAQ,MAAM;IAC1C,UAAU,CAAC,EAAE,CAAC,MAAM,EAAE,MAAM,KAAK,cAAc,CAAC;IAChD,MAAM,CAAC,EAAE,MAAM,CAAC;CACnB"}
