@@ -583,8 +583,8 @@ export class MatrixCall extends EventEmitter {
                 new CallFeed({
                     client: this.client,
                     roomId: this.roomId,
-                    audioMuted: stream.getAudioTracks().length === 0,
-                    videoMuted: stream.getVideoTracks().length === 0,
+                    audioMuted: false,
+                    videoMuted: false,
                     userId,
                     stream,
                     purpose,
@@ -822,8 +822,8 @@ export class MatrixCall extends EventEmitter {
                     userId: this.client.getUserId(),
                     stream,
                     purpose: SDPStreamMetadataPurpose.Usermedia,
-                    audioMuted: stream.getAudioTracks().length === 0,
-                    videoMuted: stream.getVideoTracks().length === 0,
+                    audioMuted: false,
+                    videoMuted: false,
                 });
 
                 const feeds = [usermediaFeed];
@@ -2063,8 +2063,8 @@ export class MatrixCall extends EventEmitter {
                 userId: this.client.getUserId(),
                 stream,
                 purpose: SDPStreamMetadataPurpose.Usermedia,
-                audioMuted: stream.getAudioTracks().length === 0,
-                videoMuted: stream.getVideoTracks().length === 0,
+                audioMuted: false,
+                videoMuted: false,
             });
             await this.placeCallWithCallFeeds([callFeed]);
         } catch (e) {
