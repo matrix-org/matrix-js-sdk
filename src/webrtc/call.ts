@@ -660,6 +660,11 @@ export class MatrixCall extends EventEmitter {
         for (const sender of senderArray) {
             this.peerConn.removeTrack(sender);
         }
+
+        if (callFeed.purpose === SDPStreamMetadataPurpose.Screenshare) {
+            this.client.getMediaHandler().stopScreensharingStream(callFeed.stream);
+        }
+
         // Empty the array
         senderArray.splice(0, senderArray.length);
         this.deleteFeed(callFeed);

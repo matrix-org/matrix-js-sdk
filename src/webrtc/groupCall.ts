@@ -454,7 +454,7 @@ export class GroupCall extends EventEmitter {
                 return false;
             }
         } else {
-            await Promise.all(this.calls.map(call => call.removeLocalFeed(this.localScreenshareFeed)));
+            await Promise.all(this.calls.map(call => call.removeLocalFeed(call.localScreensharingFeed)));
             this.client.getMediaHandler().stopScreensharingStream(this.localScreenshareFeed.stream);
             this.removeScreenshareFeed(this.localScreenshareFeed);
             this.localScreenshareFeed = undefined;
