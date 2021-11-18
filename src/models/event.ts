@@ -438,19 +438,25 @@ export class MatrixEvent extends EventEmitter {
      * @experimental
      */
     public get isThreadRoot(): boolean {
+        // TODO, change the inner working of this getter for it to use the
+        // bundled relationship return on the event, view MSC3440
         const thread = this.getThread();
         return thread?.id === this.getId();
     }
 
     public get parentEventId(): string {
-        const relations = this.getWireContent()["m.relates_to"];
-        return relations?.["m.in_reply_to"]?.["event_id"]
-            || relations?.event_id;
+        return this.replyEventId || this.relationEventId;
     }
 
     public get replyEventId(): string {
         const relations = this.getWireContent()["m.relates_to"];
         return relations?.["m.in_reply_to"]?.["event_id"];
+    }
+
+    public get relationEventId(): string {
+        return this.getWireContent()
+            ?.["m.relates_to"]
+            ?.event_id;
     }
 
     /**

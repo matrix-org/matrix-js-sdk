@@ -4632,7 +4632,12 @@ export class MatrixClient extends EventEmitter {
                     const stateEvents = res.state.map(this.getEventMapper());
                     room.currentState.setUnknownStateEvents(stateEvents);
                 }
-                room.addEventsToTimeline(matrixEvents, true, room.getLiveTimeline());
+
+                const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(matrixEvents);
+
+                room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
+                this.processThreadEvents(room, threadedEvents);
+
                 room.oldState.paginationToken = res.end;
                 if (res.chunk.length === 0) {
                     room.oldState.paginationToken = null;
@@ -4738,7 +4743,11 @@ export class MatrixClient extends EventEmitter {
                 const stateEvents = res.state.map(this.getEventMapper());
                 timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(stateEvents);
             }
-            timelineSet.addEventsToTimeline(matrixEvents, true, timeline, res.start);
+
+            const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(matrixEvents);
+
+            timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
+            this.processThreadEvents(timelineSet.room, threadedEvents);
 
             // there is no guarantee that the event ended up in "timeline" (we
             // might have switched to a neighbouring timeline) - so check the
@@ -4871,8 +4880,11 @@ export class MatrixClient extends EventEmitter {
                     matrixEvents[i] = event;
                 }
 
-                eventTimeline.getTimelineSet()
-                    .addEventsToTimeline(matrixEvents, backwards, eventTimeline, token);
+                const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(matrixEvents);
+
+                const timelineSet = eventTimeline.getTimelineSet();
+                timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
+                this.processThreadEvents(timelineSet.room, threadedEvents);
 
                 // if we've hit the end of the timeline, we need to stop trying to
                 // paginate. We need to keep the 'forwards' token though, to make sure
@@ -4905,8 +4917,12 @@ export class MatrixClient extends EventEmitter {
                 }
                 const token = res.end;
                 const matrixEvents = res.chunk.map(this.getEventMapper());
+
+                const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(matrixEvents);
+
                 eventTimeline.getTimelineSet()
-                    .addEventsToTimeline(matrixEvents, backwards, eventTimeline, token);
+                    .addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
+                this.processThreadEvents(room, threadedEvents);
 
                 // if we've hit the end of the timeline, we need to stop trying to
                 // paginate. We need to keep the 'forwards' token though, to make sure
@@ -5476,6 +5492,14 @@ export class MatrixClient extends EventEmitter {
         const resultsLength = roomEvents.results ? roomEvents.results.length : 0;
         for (let i = 0; i < resultsLength; i++) {
             const sr = SearchResult.fromJson(roomEvents.results[i], this.getEventMapper());
+            const room = this.getRoom(sr.context.getEvent().getRoomId());
+            if (room) {
+                // Copy over a known event sender if we can
+                for (const ev of sr.context.getTimeline()) {
+                    const sender = room.getMember(ev.getSender());
+                    if (!ev.sender && sender) ev.sender = sender;
+                }
+            }
             searchResults.results.push(sr);
         }
         return searchResults;
@@ -6046,7 +6070,9 @@ export class MatrixClient extends EventEmitter {
         if (fetchedEventType === EventType.RoomMessageEncrypted) {
             const allEvents = originalEvent ? events.concat(originalEvent) : events;
             await Promise.all(allEvents.map(e => {
-                return new Promise(resolve => e.once("Event.decrypted", resolve));
+                if (e.isEncrypted()) {
+                    return new Promise(resolve => e.once("Event.decrypted", resolve));
+                }
             }));
             events = events.filter(e => e.getType() === eventType);
         }
@@ -8597,6 +8623,60 @@ export class MatrixClient extends EventEmitter {
             qsStringifyOptions: { arrayFormat: 'repeat' },
             prefix: "/_matrix/client/unstable/im.nheko.summary",
         });
+    }
+
+    public partitionThreadedEvents(events: MatrixEvent[]): [MatrixEvent[], MatrixEvent[]] {
+        // Indices to the events array, for readibility
+        const ROOM = 0;
+        const THREAD = 1;
+        const threadRoots = new Set<string>();
+        if (this.supportsExperimentalThreads()) {
+            return events.reduce((memo, event: MatrixEvent) => {
+                const room = this.getRoom(event.getRoomId());
+                // An event should live in the thread timeline if
+                // - It's a reply in thread event
+                // - It's related to a reply in thread event
+                let shouldLiveInThreadTimeline = event.isThreadRelation;
+                if (shouldLiveInThreadTimeline) {
+                    threadRoots.add(event.relationEventId);
+                } else {
+                    const parentEventId = event.parentEventId;
+                    const parentEvent = room?.findEventById(parentEventId) || events.find((mxEv: MatrixEvent) => {
+                        return mxEv.getId() === parentEventId;
+                    });
+                    shouldLiveInThreadTimeline = parentEvent?.isThreadRelation;
+
+                    // Copy all the reactions and annotations to the root event
+                    // to the thread timeline. They will end up living in both
+                    // timelines at the same time
+                    const targetingThreadRoot = parentEvent?.isThreadRoot || threadRoots.has(event.relationEventId);
+                    if (targetingThreadRoot && !event.isThreadRelation && event.relationEventId) {
+                        memo[THREAD].push(event);
+                    }
+                }
+                const targetTimeline = shouldLiveInThreadTimeline ? THREAD : ROOM;
+                memo[targetTimeline].push(event);
+                return memo;
+            }, [[], []]);
+        } else {
+            // When `experimentalThreadSupport` is disabled
+            // treat all events as timelineEvents
+            return [
+                events,
+                [],
+            ];
+        }
+    }
+
+    /**
+     * @experimental
+     */
+    public processThreadEvents(room: Room, threadedEvents: MatrixEvent[]): void {
+        threadedEvents
+            .sort((a, b) => a.getTs() - b.getTs())
+            .forEach(event => {
+                room.addThreadedEvent(event);
+            });
     }
 }
 
