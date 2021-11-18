@@ -3411,7 +3411,7 @@ export class MatrixClient extends EventEmitter {
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     private sendCompleteEvent(
-        roomId: string,
+        compoundId: string,
         eventObject: any,
         txnId?: string,
         callback?: Callback,
@@ -3425,6 +3425,8 @@ export class MatrixClient extends EventEmitter {
             txnId = this.makeTxnId();
         }
 
+        const [roomId, threadId] = compoundId.split("::");
+
         // we always construct a MatrixEvent when sending because the store and
         // scheduler use them. We'll extract the params back out if it turns out
         // the client has no scheduler or store.
@@ -3437,6 +3439,11 @@ export class MatrixClient extends EventEmitter {
         }));
 
         const room = this.getRoom(roomId);
+
+        const thread = room.threads.get(threadId);
+        if (thread) {
+            localEvent.setThread(thread);
+        }
 
         // if this is a relation or redaction of an event
         // that hasn't been sent yet (e.g. with a local id starting with a ~)
