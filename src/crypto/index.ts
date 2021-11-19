@@ -1864,8 +1864,15 @@ export class Crypto extends EventEmitter {
                 }
 
                 if (this.getNeedsNewFallback()) {
-                    logger.info("generating fallback key");
-                    await this.olmDevice.generateFallbackKey();
+                    const fallbackKeys = await this.olmDevice.getFallbackKey();
+                    // if fallbackKeys is non-empty, we've already generated a
+                    // fallback key, but it hasn't been published yet, so we
+                    // can use that instead of generating a new one
+                    if (!fallbackKeys.curve25519 ||
+                        [...Object.keys(fallbackKeys.curve25519)].length == 0) {
+                        logger.info("generating fallback key");
+                        await this.olmDevice.generateFallbackKey();
+                    }
                 }
 
                 logger.info("calling uploadOneTimeKeys");

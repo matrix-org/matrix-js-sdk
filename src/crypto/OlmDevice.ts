@@ -542,7 +542,7 @@ export class OlmDevice {
             'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
                 this.getAccount(txn, (account: Account) => {
-                    result = JSON.parse(account.fallback_key());
+                    result = JSON.parse(account.unpublished_fallback_key());
                 });
             },
         );
