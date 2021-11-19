@@ -419,6 +419,15 @@ export class GroupCall extends EventEmitter {
 
                 const stream = await this.client.getMediaHandler().getScreensharingStream(desktopCapturerSourceId);
 
+                for (const track of stream.getTracks()) {
+                    const onTrackEnded = () => {
+                        this.setScreensharingEnabled(false);
+                        track.removeEventListener("ended", onTrackEnded);
+                    };
+
+                    track.addEventListener("ended", onTrackEnded);
+                }
+
                 logger.log("Screensharing permissions granted. Setting screensharing enabled on all calls");
 
                 this.localDesktopCapturerSourceId = desktopCapturerSourceId;
