@@ -99,7 +99,7 @@ export class TimelineWindow {
      *
      * @return {Promise}
      */
-    public load(initialEventId: string, initialWindowSize = 20): Promise<any> {
+    public load(initialEventId?: string, initialWindowSize = 20): Promise<any> {
         // given an EventTimeline, find the event we were looking for, and initialise our
         // fields so that the event in question is in the middle of the window.
         const initFields = (timeline: EventTimeline) => {
