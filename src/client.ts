@@ -3759,7 +3759,7 @@ export class MatrixClient extends EventEmitter {
         }
         return this.sendEvent(
             roomId,
-            threadId as string,
+            threadId as (string | null),
             EventType.RoomMessage,
             content as IContent,
             txnId as string,
