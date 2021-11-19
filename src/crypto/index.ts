@@ -2592,12 +2592,16 @@ export class Crypto extends EventEmitter {
      * the given users.
      *
      * @param {string[]} users list of user ids
+     * @param {boolean} force If true, force a new Olm session to be created. Default false.
      *
      * @return {Promise} resolves once the sessions are complete, to
      *    an Object mapping from userId to deviceId to
      *    {@link module:crypto~OlmSessionResult}
      */
-    ensureOlmSessionsForUsers(users: string[]): Promise<Record<string, Record<string, olmlib.IOlmSessionResult>>> {
+    public ensureOlmSessionsForUsers(
+        users: string[],
+        force?: boolean,
+    ): Promise<Record<string, Record<string, olmlib.IOlmSessionResult>>> {
         const devicesByUser = {};
 
         for (let i = 0; i < users.length; ++i) {
@@ -2622,7 +2626,7 @@ export class Crypto extends EventEmitter {
             }
         }
 
-        return olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, devicesByUser);
+        return olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, devicesByUser, force);
     }
 
     /**
