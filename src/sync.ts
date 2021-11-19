@@ -505,6 +505,7 @@ export class SyncApi {
             // The logout already happened, we just need to stop.
             logger.warn("Token no longer valid - assuming logout");
             this.stop();
+            this.updateSyncState(SyncState.Error, { error });
             return true;
         }
         return false;
