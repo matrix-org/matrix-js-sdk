@@ -3463,8 +3463,7 @@ export class MatrixClient extends EventEmitter {
         }));
 
         const room = this.getRoom(roomId);
-
-        const thread = room.threads.get(threadId);
+        const thread = room?.threads.get(threadId);
         if (thread) {
             localEvent.setThread(thread);
         }
@@ -3801,6 +3800,7 @@ export class MatrixClient extends EventEmitter {
             callback = txnId as Callback;
             txnId = body;
             body = threadId;
+            threadId = null;
         }
         const content = ContentHelpers.makeTextMessage(body);
         return this.sendMessage(roomId, threadId, content, txnId as string, callback);
@@ -3839,6 +3839,7 @@ export class MatrixClient extends EventEmitter {
             callback = txnId as Callback;
             txnId = body;
             body = threadId;
+            threadId = null;
         }
         const content = ContentHelpers.makeNotice(body);
         return this.sendMessage(roomId, threadId, content, txnId as string, callback);
@@ -3877,6 +3878,7 @@ export class MatrixClient extends EventEmitter {
             callback = txnId as Callback;
             txnId = body;
             body = threadId;
+            threadId = null;
         }
         const content = ContentHelpers.makeEmoteMessage(body);
         return this.sendMessage(roomId, threadId, content, txnId as string, callback);
@@ -3920,6 +3922,7 @@ export class MatrixClient extends EventEmitter {
             text = info as string || "Image";
             info = url as IImageInfo;
             url = threadId as string;
+            threadId = null;
         }
         if (utils.isFunction(text)) {
             callback = text as any as Callback; // legacy
@@ -3972,6 +3975,7 @@ export class MatrixClient extends EventEmitter {
             text = info as string || "Sticker";
             info = url as IImageInfo;
             url = threadId as string;
+            threadId = null;
         }
         if (utils.isFunction(text)) {
             callback = text as any as Callback; // legacy
