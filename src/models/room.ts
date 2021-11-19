@@ -111,7 +111,7 @@ export enum NotificationCountType {
 
 export class Room extends EventEmitter {
     private readonly reEmitter: ReEmitter;
-    public txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
+    private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
     // receipts should clobber based on receipt_type and user_id pairs hence
     // the form of this structure. This is sub-optimal for the exposed APIs
     // which pass in an event ID and get back some receipts, so we also store
@@ -454,7 +454,7 @@ export class Room extends EventEmitter {
         }
 
         return this.pendingEventList.filter(event => {
-            return !thread || thread === event.getThread();
+            return !thread || thread.id === event.threadRootId;
         });
     }
 
@@ -1554,7 +1554,7 @@ export class Room extends EventEmitter {
      * @fires module:client~MatrixClient#event:"Room.localEchoUpdated"
      * @private
      */
-    public handleRemoteEcho(remoteEvent: MatrixEvent, localEvent: MatrixEvent): void {
+    private handleRemoteEcho(remoteEvent: MatrixEvent, localEvent: MatrixEvent): void {
         const oldEventId = localEvent.getId();
         const newEventId = remoteEvent.getId();
         const oldStatus = localEvent.status;
