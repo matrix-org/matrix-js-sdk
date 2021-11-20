@@ -191,7 +191,7 @@ export class CallEventHandler {
                     GroupCallEvent.Error,
                     new GroupCallError(
                         GroupCallErrorCode.UnknownDevice,
-                        `No opponent device found for ${senderId}, ignoring.`,
+                        `Incoming Call: No opponent device found for ${senderId}, ignoring.`,
                     ),
                 );
                 return;

@@ -651,7 +651,7 @@ export class GroupCall extends EventEmitter {
                 GroupCallEvent.Error,
                 new GroupCallError(
                     GroupCallErrorCode.UnknownDevice,
-                    `No opponent device found for ${member.userId}, ignoring.`,
+                    `Outgoing Call: No opponent device found for ${member.userId}, ignoring.`,
                 ),
             );
             return;
