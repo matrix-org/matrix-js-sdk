@@ -271,13 +271,13 @@ export class GroupCall extends EventEmitter {
             for (const stateEvent of memberStateEvents) {
                 this.onMemberStateChanged(stateEvent);
             }
+
+            this.retryCallLoopTimeout = setTimeout(this.onRetryCallLoop, this.retryCallInterval);
         });
 
         this.client.on("Call.incoming", this.onIncomingCall);
 
         this.onActiveSpeakerLoop();
-
-        this.retryCallLoopTimeout = setTimeout(this.onRetryCallLoop, this.retryCallInterval);
     }
 
     private dispose() {
