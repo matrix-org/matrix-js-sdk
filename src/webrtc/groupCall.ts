@@ -245,13 +245,15 @@ export class GroupCall extends EventEmitter {
 
         this.addParticipant(this.room.getMember(this.client.getUserId()));
 
-        const sendMemberStateEventPromise = this.sendMemberStateEvent();
+        await this.sendMemberStateEvent();
 
         this.activeSpeaker = null;
 
         this.setState(GroupCallState.Entered);
 
         logger.log(`Entered group call ${this.groupCallId}`);
+
+        this.client.on("Call.incoming", this.onIncomingCall);
 
         const calls = this.client.callEventHandler.calls.values();
 
@@ -264,18 +266,11 @@ export class GroupCall extends EventEmitter {
         const roomState = this.room.currentState;
         const memberStateEvents = roomState.getStateEvents(EventType.GroupCallMemberPrefix);
 
-        // This avoids a race condition where the other side would first receive
-        // the to-device messages and only then the member state event which
-        // would result in the call being ignored
-        sendMemberStateEventPromise.then(() => {
-            for (const stateEvent of memberStateEvents) {
-                this.onMemberStateChanged(stateEvent);
-            }
+        for (const stateEvent of memberStateEvents) {
+            this.onMemberStateChanged(stateEvent);
+        }
 
-            this.retryCallLoopTimeout = setTimeout(this.onRetryCallLoop, this.retryCallInterval);
-        });
-
-        this.client.on("Call.incoming", this.onIncomingCall);
+        this.retryCallLoopTimeout = setTimeout(this.onRetryCallLoop, this.retryCallInterval);
 
         this.onActiveSpeakerLoop();
     }
