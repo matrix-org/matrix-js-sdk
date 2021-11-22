@@ -40,7 +40,7 @@ import {
     ISecretRequest,
     SecretStorageKeyObject,
 } from './SecretStorage';
-import { IAddSecretStorageKeyOpts, IImportRoomKeysOpts, ISecretStorageKeyInfo } from "./api";
+import { IAddSecretStorageKeyOpts, ICreateSecretStorageOpts, IImportRoomKeysOpts, ISecretStorageKeyInfo } from "./api";
 import { OutgoingRoomKeyRequestManager } from './OutgoingRoomKeyRequestManager';
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { ReciprocateQRCode, SCAN_QR_CODE_METHOD, SHOW_QR_CODE_METHOD } from './verification/QRCode';
@@ -59,7 +59,7 @@ import { IStore } from "../store";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
 import { MatrixEvent, EventStatus } from "../models/event";
-import { MatrixClient, IKeysUploadResponse, SessionStore, ISignedKey } from "../client";
+import { MatrixClient, IKeysUploadResponse, SessionStore, ISignedKey, ICrossSigningKey } from "../client";
 import type { EncryptionAlgorithm, DecryptionAlgorithm } from "./algorithms/base";
 import type { IRoomEncryption, RoomList } from "./RoomList";
 import { IRecoveryKey, IEncryptedEventInfo } from "./api";
@@ -106,17 +106,6 @@ interface IInitOpts {
 export interface IBootstrapCrossSigningOpts {
     setupNewCrossSigning?: boolean;
     authUploadDeviceSigningKeys?(makeRequest: (authData: any) => {}): Promise<void>;
-}
-
-interface IBootstrapSecretStorageOpts {
-    keyBackupInfo?: any; // TODO types
-    setupNewKeyBackup?: boolean;
-    setupNewSecretStorage?: boolean;
-    createSecretStorageKey?(): Promise<{
-        keyInfo?: any; // TODO types
-        privateKey?: Uint8Array;
-    }>;
-    getKeyBackupPassphrase?(): Promise<Uint8Array | null>;
 }
 
 /* eslint-disable camelcase */
@@ -762,12 +751,12 @@ export class Crypto extends EventEmitter {
      */
     // TODO this does not resolve with what it says it does
     public async bootstrapSecretStorage({
-        createSecretStorageKey = async () => ({ }),
+        createSecretStorageKey = async () => ({} as IRecoveryKey),
         keyBackupInfo,
         setupNewKeyBackup,
         setupNewSecretStorage,
         getKeyBackupPassphrase,
-    }: IBootstrapSecretStorageOpts = {}) {
+    }: ICreateSecretStorageOpts = {}) {
         logger.log("Bootstrapping Secure Secret Storage");
         const delegateCryptoCallbacks = this.baseApis.cryptoCallbacks;
         const builder = new EncryptionSetupBuilder(
@@ -783,8 +772,7 @@ export class Crypto extends EventEmitter {
         let newKeyId = null;
 
         // create a new SSSS key and set it as default
-        const createSSSS = async (opts, privateKey: Uint8Array) => {
-            opts = opts || {};
+        const createSSSS = async (opts: IAddSecretStorageKeyOpts, privateKey: Uint8Array) => {
             if (privateKey) {
                 opts.key = privateKey;
             }
@@ -800,7 +788,7 @@ export class Crypto extends EventEmitter {
             return keyId;
         };
 
-        const ensureCanCheckPassphrase = async (keyId, keyInfo) => {
+        const ensureCanCheckPassphrase = async (keyId: string, keyInfo: ISecretStorageKeyInfo) => {
             if (!keyInfo.mac) {
                 const key = await this.baseApis.cryptoCallbacks.getSecretStorageKey(
                     { keys: { [keyId]: keyInfo } }, "",
@@ -880,7 +868,7 @@ export class Crypto extends EventEmitter {
             const backupKey = await this.getSessionBackupPrivateKey() || await getKeyBackupPassphrase();
 
             // create a new SSSS key and use the backup key as the new SSSS key
-            const opts: any = {}; // TODO types
+            const opts = {} as IAddSecretStorageKeyOpts;
 
             if (
                 keyBackupInfo.auth_data.private_key_salt &&
@@ -898,9 +886,7 @@ export class Crypto extends EventEmitter {
             newKeyId = await createSSSS(opts, backupKey);
 
             // store the backup key in secret storage
-            await secretStorage.store(
-                "m.megolm_backup.v1", olmlib.encodeBase64(backupKey), [newKeyId],
-            );
+            await secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(backupKey), [newKeyId]);
 
             // The backup is trusted because the user provided the private key.
             // Sign the backup with the cross-signing key so the key backup can
@@ -1274,7 +1260,7 @@ export class Crypto extends EventEmitter {
      */
     private async checkForValidDeviceSignature(
         userId: string,
-        key: any, // TODO types
+        key: ICrossSigningKey,
         devices: Record<string, IDevice>,
     ): Promise<string[]> {
         const deviceIds: string[] = [];
@@ -1609,7 +1595,7 @@ export class Crypto extends EventEmitter {
      *
      * @param {object} keys The new trusted set of keys
      */
-    private async storeTrustedSelfKeys(keys: any): Promise<void> { // TODO types
+    private async storeTrustedSelfKeys(keys: Record<string, ICrossSigningKey>): Promise<void> {
         if (keys) {
             this.crossSigningInfo.setKeys(keys);
         } else {
@@ -2592,12 +2578,16 @@ export class Crypto extends EventEmitter {
      * the given users.
      *
      * @param {string[]} users list of user ids
+     * @param {boolean} force If true, force a new Olm session to be created. Default false.
      *
      * @return {Promise} resolves once the sessions are complete, to
      *    an Object mapping from userId to deviceId to
      *    {@link module:crypto~OlmSessionResult}
      */
-    ensureOlmSessionsForUsers(users: string[]): Promise<Record<string, Record<string, olmlib.IOlmSessionResult>>> {
+    public ensureOlmSessionsForUsers(
+        users: string[],
+        force?: boolean,
+    ): Promise<Record<string, Record<string, olmlib.IOlmSessionResult>>> {
         const devicesByUser = {};
 
         for (let i = 0; i < users.length; ++i) {
@@ -2622,7 +2612,7 @@ export class Crypto extends EventEmitter {
             }
         }
 
-        return olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, devicesByUser);
+        return olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, devicesByUser, force);
     }
 
     /**
@@ -2658,7 +2648,7 @@ export class Crypto extends EventEmitter {
      * @param {Function} opts.progressCallback called with an object which has a stage param
      * @return {Promise} a promise which resolves once the keys have been imported
      */
-    public importRoomKeys(keys: IMegolmSessionData[], opts: IImportRoomKeysOpts = {}): Promise<any> { // TODO types
+    public importRoomKeys(keys: IMegolmSessionData[], opts: IImportRoomKeysOpts = {}): Promise<void> {
         let successes = 0;
         let failures = 0;
         const total = keys.length;
@@ -2685,7 +2675,7 @@ export class Crypto extends EventEmitter {
                 successes++;
                 if (opts.progressCallback) { updateProgress(); }
             });
-        }));
+        })).then();
     }
 
     /**

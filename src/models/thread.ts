@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventEmitter } from "events";
 import { MatrixClient } from "../matrix";
 import { MatrixEvent } from "./event";
 import { EventTimeline } from "./event-timeline";
 import { EventTimelineSet } from './event-timeline-set';
 import { Room } from './room';
+import { BaseModel } from "./base-model";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -30,7 +30,7 @@ export enum ThreadEvent {
 /**
  * @experimental
  */
-export class Thread extends EventEmitter {
+export class Thread extends BaseModel<ThreadEvent> {
     /**
      * A reference to the event ID at the top of the thread
      */
@@ -106,6 +106,15 @@ export class Thread extends EventEmitter {
     }
 
     /**
+     * Return last reply to the thread
+     */
+    public get lastReply(): MatrixEvent {
+        const threadReplies = this.events
+            .filter(event => event.isThreadRelation);
+        return threadReplies[threadReplies.length - 1];
+    }
+
+    /**
      * Determines thread's ready status
      */
     public get ready(): boolean {
@@ -173,30 +182,5 @@ export class Thread extends EventEmitter {
 
     public has(eventId: string): boolean {
         return this.timelineSet.findEventById(eventId) instanceof MatrixEvent;
-    }
-
-    public on(event: ThreadEvent, listener: (...args: any[]) => void): this {
-        super.on(event, listener);
-        return this;
-    }
-
-    public once(event: ThreadEvent, listener: (...args: any[]) => void): this {
-        super.once(event, listener);
-        return this;
-    }
-
-    public off(event: ThreadEvent, listener: (...args: any[]) => void): this {
-        super.off(event, listener);
-        return this;
-    }
-
-    public addListener(event: ThreadEvent, listener: (...args: any[]) => void): this {
-        super.addListener(event, listener);
-        return this;
-    }
-
-    public removeListener(event: ThreadEvent, listener: (...args: any[]) => void): this {
-        super.removeListener(event, listener);
-        return this;
     }
 }
