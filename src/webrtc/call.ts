@@ -1095,8 +1095,6 @@ export class MatrixCall extends EventEmitter {
      * Request a new local usermedia stream with the current device id.
      */
     public async updateLocalUsermediaStream(stream: MediaStream) {
-        const oldStream = this.localUsermediaStream;
-
         const callFeed = this.localUsermediaFeed;
         callFeed.setNewStream(stream);
         const micShouldBeMuted = callFeed.isAudioMuted() || this.remoteOnHold;
@@ -1140,8 +1138,6 @@ export class MatrixCall extends EventEmitter {
         }
 
         this.usermediaSenders = newSenders;
-
-        this.client.getMediaHandler().stopUserMediaStream(oldStream);
     }
 
     /**

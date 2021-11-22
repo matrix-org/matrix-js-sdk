@@ -52,17 +52,31 @@ export class MediaHandler {
     }
 
     public async updateLocalUsermediaStreams(): Promise<void> {
+        const callMediaStreamParams: Map<string, { audio: boolean, video: boolean }> = new Map();
+        for (const call of this.client.callEventHandler.calls.values()) {
+            callMediaStreamParams.set(call.callId, {
+                audio: call.hasLocalUserMediaAudioTrack,
+                video: call.hasLocalUserMediaVideoTrack,
+            });
+        }
+
+        for (const stream of this.userMediaStreams) {
+            for (const track of stream.getTracks()) {
+                track.stop();
+            }
+        }
+
+        this.userMediaStreams = [];
         this.localUserMediaStream = undefined;
 
         for (const call of this.client.callEventHandler.calls.values()) {
-            if (call.state === CallState.Ended) {
+            if (call.state === CallState.Ended || !callMediaStreamParams.has(call.callId)) {
                 continue;
             }
 
-            const stream = await this.getUserMediaStream(
-                call.hasLocalUserMediaAudioTrack,
-                call.hasLocalUserMediaVideoTrack,
-            );
+            const { audio, video } = callMediaStreamParams.get(call.callId);
+
+            const stream = await this.getUserMediaStream(audio, video);
 
             await call.updateLocalUsermediaStream(stream);
         }
