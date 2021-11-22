@@ -1,3 +1,17 @@
+Changes in [15.1.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.1.1) (2021-11-22)
+==================================================================================================
+
+## 🐛 Bug Fixes
+ * Fix edit history being broken after editing an unencrypted event with an encrypted event ([\#2013](https://github.com/matrix-org/matrix-js-sdk/pull/2013)). Fixes vector-im/element-web#19651 and vector-im/element-web#19651. Contributed by @aaronraimist.
+ * Make events pagination responses parse threads ([\#2011](https://github.com/matrix-org/matrix-js-sdk/pull/2011)). Fixes vector-im/element-web#19587 and vector-im/element-web#19587.
+
+Changes in [15.1.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.1.1-rc.1) (2021-11-17)
+============================================================================================================
+
+## 🐛 Bug Fixes
+ * Fix edit history being broken after editing an unencrypted event with an encrypted event ([\#2013](https://github.com/matrix-org/matrix-js-sdk/pull/2013)). Fixes vector-im/element-web#19651 and vector-im/element-web#19651. Contributed by @aaronraimist.
+ * Make events pagination responses parse threads ([\#2011](https://github.com/matrix-org/matrix-js-sdk/pull/2011)). Fixes vector-im/element-web#19587 and vector-im/element-web#19587.
+
 Changes in [15.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.1.0) (2021-11-08)
 ==================================================================================================
 
