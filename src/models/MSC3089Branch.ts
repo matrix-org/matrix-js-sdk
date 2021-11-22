@@ -143,25 +143,6 @@ export class MSC3089Branch {
     }
 
     /**
-     * Creates a new version of this file.
-     * @param {string} name The name of the file.
-     * @param {ArrayBuffer} encryptedContents The encrypted contents.
-     * @param {Partial<IEncryptedFile>} info The encrypted file information.
-     * @param {IContent} additionalContent Optional event content fields to include in the message.
-     * @returns {Promise<void>} Resolves when uploaded.
-     * @deprecated Use #createNewVersionCompat() instead which works in browser + NodeJS and uses more sensible types.
-     */
-    public async createNewVersion(
-        name: string,
-        encryptedContents: ArrayBuffer,
-        info: Partial<IEncryptedFile>,
-        additionalContent?: IContent,
-    ): Promise<void> {
-        // this will fail in NodeJS as Blob doesn't exist but is provided for compatibility:
-        return this.createNewVersionCompat(name, new Blob([encryptedContents]), info, additionalContent);
-    }
-
-    /**
      * Creates a new version of this file with contents in a type that is compatible with MatrixClient.uploadContent().
      * @param {string} name The name of the file.
      * @param {File | String | Buffer | ReadStream | Blob} encryptedContents The encrypted contents.
@@ -169,13 +150,13 @@ export class MSC3089Branch {
      * @param {IContent} additionalContent Optional event content fields to include in the message.
      * @returns {Promise<void>} Resolves when uploaded.
      */
-    public async createNewVersionCompat(
+    public async createNewVersion(
         name: string,
         encryptedContents: File | String | Buffer | ReadStream | Blob,
         info: Partial<IEncryptedFile>,
         additionalContent?: IContent,
     ): Promise<void> {
-        const fileEventResponse = await this.directory.createFileCompat(name, encryptedContents, info, {
+        const fileEventResponse = await this.directory.createFile(name, encryptedContents, info, {
             ...(additionalContent ?? {}),
             "m.new_content": true,
             "m.relates_to": {

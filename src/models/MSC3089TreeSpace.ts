@@ -450,25 +450,6 @@ export class MSC3089TreeSpace {
 
     /**
      * Creates (uploads) a new file to this tree. The file must have already been encrypted for the room.
-     * @param {string} name The name of the file.
-     * @param {ArrayBuffer} encryptedContents The encrypted contents.
-     * @param {Partial<IEncryptedFile>} info The encrypted file information.
-     * @param {IContent} additionalContent Optional event content fields to include in the message.
-     * @returns {Promise<ISendEventResponse>} Resolves to the file event's sent response.
-     * @deprecated Use #createFileCompat() instead which works in browser + NodeJS and uses more sensible types.
-     */
-    public async createFile(
-        name: string,
-        encryptedContents: ArrayBuffer,
-        info: Partial<IEncryptedFile>,
-        additionalContent?: IContent,
-    ): Promise<ISendEventResponse> {
-        // this will fail in NodeJS as Blob doesn't exist but is provided for compatibility:
-        return this.createFileCompat(name, new Blob([encryptedContents]), info, additionalContent);
-    }
-
-    /**
-     * Creates (uploads) a new file to this tree. The file must have already been encrypted for the room.
      * The file contents are in a type that is compatible with MatrixClient.uploadContent().
      * @param {string} name The name of the file.
      * @param {File | String | Buffer | ReadStream | Blob} encryptedContents The encrypted contents.
@@ -476,7 +457,7 @@ export class MSC3089TreeSpace {
      * @param {IContent} additionalContent Optional event content fields to include in the message.
      * @returns {Promise<ISendEventResponse>} Resolves to the file event's sent response.
      */
-    public async createFileCompat(
+    public async createFile(
         name: string,
         encryptedContents: File | String | Buffer | ReadStream | Blob,
         info: Partial<IEncryptedFile>,

@@ -293,9 +293,9 @@ describe("MSC3089Branch", () => {
 
             return Promise.resolve({ event_id: fileEventId2 });
         });
-        directory.createFileCompat = createFn;
+        directory.createFile = createFn;
 
-        await branch.createNewVersionCompat(canaryName, canaryContents, canaryFile, canaryAddl);
+        await branch.createNewVersion(canaryName, canaryContents, canaryFile, canaryAddl);
 
         expect(stateFn).toHaveBeenCalledTimes(2);
         expect(createFn).toHaveBeenCalledTimes(1);
