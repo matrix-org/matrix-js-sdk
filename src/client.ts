@@ -6613,7 +6613,7 @@ export class MatrixClient extends EventEmitter {
         eventType: string,
         stateKey: string,
         callback?: Callback,
-    ): Promise<any> {
+    ): Promise<Record<string, any>> {
         const pathParams = {
             $roomId: roomId,
             $eventType: eventType,
