@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { BaseModel } from "../models/base-model";
+import { TypedEventEmitter } from "../models/typed-event-emitter";
 
 export enum LocalStorageErrors {
     Global = 'Global',
@@ -33,5 +33,5 @@ export enum LocalStorageErrors {
  * maybe you should check out your disk, as it's probably dying and your session may die with it.
  * See: https://github.com/vector-im/element-web/issues/18423
  */
-class LocalStorageErrorsEventsEmitter extends BaseModel<LocalStorageErrors> {}
+class LocalStorageErrorsEventsEmitter extends TypedEventEmitter<LocalStorageErrors> {}
 export const localStorageErrorsEventsEmitter = new LocalStorageErrorsEventsEmitter();
