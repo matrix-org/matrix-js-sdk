@@ -16,6 +16,11 @@ limitations under the License.
 
 import { EventEmitter } from "events";
 
+enum EventEmitterEvents {
+    NewListener = "newListener",
+    RemoveListener = "removeListener",
+}
+
 /**
  * Typed Event Emitter class which can act as a Base Model for all our model
  * and communication events.
@@ -24,55 +29,55 @@ import { EventEmitter } from "events";
  * to silly typos.
  */
 export abstract class TypedEventEmitter<Events extends string> extends EventEmitter {
-    public addListener(event: Events, listener: (...args: any[]) => void): this {
+    public addListener(event: Events | EventEmitterEvents, listener: (...args: any[]) => void): this {
         return super.addListener(event, listener);
     }
 
-    public emit(event: Events, ...args: any[]): boolean {
+    public emit(event: Events | EventEmitterEvents, ...args: any[]): boolean {
         return super.emit(event, ...args);
     }
 
-    public eventNames(): Events[] {
+    public eventNames(): (Events | EventEmitterEvents)[] {
         return super.eventNames() as Events[];
     }
 
-    public listenerCount(event: Events): number {
+    public listenerCount(event: Events | EventEmitterEvents): number {
         return super.listenerCount(event);
     }
 
-    public listeners(event: Events): Function[] {
+    public listeners(event: Events | EventEmitterEvents): Function[] {
         return super.listeners(event);
     }
 
-    public off(event: Events, listener: (...args: any[]) => void): this {
+    public off(event: Events | EventEmitterEvents, listener: (...args: any[]) => void): this {
         return super.off(event, listener);
     }
 
-    public on(event: Events, listener: (...args: any[]) => void): this {
+    public on(event: Events | EventEmitterEvents, listener: (...args: any[]) => void): this {
         return super.on(event, listener);
     }
 
-    public once(event: Events, listener: (...args: any[]) => void): this {
+    public once(event: Events | EventEmitterEvents, listener: (...args: any[]) => void): this {
         return super.once(event, listener);
     }
 
-    public prependListener(event: Events, listener: (...args: any[]) => void): this {
+    public prependListener(event: Events | EventEmitterEvents, listener: (...args: any[]) => void): this {
         return super.prependListener(event, listener);
     }
 
-    public prependOnceListener(event: Events, listener: (...args: any[]) => void): this {
+    public prependOnceListener(event: Events | EventEmitterEvents, listener: (...args: any[]) => void): this {
         return super.prependOnceListener(event, listener);
     }
 
-    public removeAllListeners(event?: Events): this {
+    public removeAllListeners(event?: Events | EventEmitterEvents): this {
         return super.removeAllListeners(event);
     }
 
-    public removeListener(event: Events, listener: (...args: any[]) => void): this {
+    public removeListener(event: Events | EventEmitterEvents, listener: (...args: any[]) => void): this {
         return super.removeListener(event, listener);
     }
 
-    public rawListeners(event: Events): Function[] {
+    public rawListeners(event: Events | EventEmitterEvents): Function[] {
         return super.rawListeners(event);
     }
 }
