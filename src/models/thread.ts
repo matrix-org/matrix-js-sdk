@@ -19,7 +19,7 @@ import { MatrixEvent } from "./event";
 import { EventTimeline } from "./event-timeline";
 import { EventTimelineSet } from './event-timeline-set';
 import { Room } from './room';
-import { BaseModel } from "./base-model";
+import { TypedEventEmitter } from "./typed-event-emitter";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -30,7 +30,7 @@ export enum ThreadEvent {
 /**
  * @experimental
  */
-export class Thread extends BaseModel<ThreadEvent> {
+export class Thread extends TypedEventEmitter<ThreadEvent> {
     /**
      * A reference to the event ID at the top of the thread
      */
