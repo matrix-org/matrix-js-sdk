@@ -259,6 +259,7 @@ export class Crypto extends EventEmitter {
 
     private oneTimeKeyCount: number;
     private needsNewFallback: boolean;
+    private fallbackCleanup?: number; // setTimeout ID
 
     /**
      * Cryptography bits
@@ -1871,6 +1872,14 @@ export class Crypto extends EventEmitter {
                     if (!fallbackKeys.curve25519 ||
                         [...Object.keys(fallbackKeys.curve25519)].length == 0) {
                         logger.info("generating fallback key");
+                        if (this.fallbackCleanup) {
+                            // cancel any pending fallback cleanup because generating
+                            // a new fallback key will already drop the old fallback
+                            // that would have been dropped, and we don't want to kill
+                            // the current key
+                            clearTimeout(this.fallbackCleanup);
+                            delete this.fallbackCleanup;
+                        }
                         await this.olmDevice.generateFallbackKey();
                     }
                 }
@@ -1949,6 +1958,11 @@ export class Crypto extends EventEmitter {
             "one_time_keys": oneTimeJson,
             "org.matrix.msc2732.fallback_keys": fallbackJson,
         });
+
+        this.fallbackCleanup = setTimeout(() => {
+            delete this.fallbackCleanup;
+            this.olmDevice.forgetOldFallbackKey();
+        }, 5*60*1000);
 
         await this.olmDevice.markKeysAsPublished();
         return res;

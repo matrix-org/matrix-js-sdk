@@ -549,6 +549,18 @@ export class OlmDevice {
         return result;
     }
 
+    public async forgetOldFallbackKey(): Promise<void> {
+        await this.cryptoStore.doTxn(
+            'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
+            (txn) => {
+                this.getAccount(txn, (account: Account) => {
+                    account.forget_old_fallback_key();
+                    this.storeAccount(txn, account);
+                });
+            },
+        );
+    }
+
     /**
      * Generate a new outbound session
      *
