@@ -679,6 +679,12 @@ interface IRoomSummary extends Omit<IPublicRoomsChunkRoom, "canonical_alias" | "
 }
 /* eslint-enable camelcase */
 
+// We're using this constant for methods overloading and inspect whether a variable
+// contains an eventId or not. This was required to ensure backwards compatibility
+// of methods for threads
+// Probably not the most graceful solution but does a good enough job for now
+const EVENT_ID_PREFIX = "$";
+
 /**
  * Represents a Matrix Client. Only directly construct this if you want to use
  * custom modules. Normally, {@link createClient} should be used
@@ -3416,7 +3422,7 @@ export class MatrixClient extends EventEmitter {
         txnId?: string | Callback,
         callback?: Callback,
     ): Promise<ISendEventResponse> {
-        if (!threadId?.startsWith("$") && threadId !== null) {
+        if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
             callback = txnId as Callback;
             txnId = content as string;
             content = eventType as IContent;
@@ -3702,7 +3708,7 @@ export class MatrixClient extends EventEmitter {
         txnId?: string | Callback | IRedactOpts,
         cbOrOpts?: Callback | IRedactOpts,
     ): Promise<ISendEventResponse> {
-        if (!threadId?.startsWith("$") && threadId !== null) {
+        if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
             cbOrOpts = txnId as (Callback | IRedactOpts);
             txnId = eventId;
             eventId = threadId;
@@ -3796,7 +3802,7 @@ export class MatrixClient extends EventEmitter {
         txnId?: string | Callback,
         callback?: Callback,
     ): Promise<ISendEventResponse> {
-        if (!threadId?.startsWith("$") && threadId !== null) {
+        if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
             callback = txnId as Callback;
             txnId = body;
             body = threadId;
@@ -3835,7 +3841,7 @@ export class MatrixClient extends EventEmitter {
         txnId?: string | Callback,
         callback?: Callback,
     ): Promise<ISendEventResponse> {
-        if (!threadId?.startsWith("$") && threadId !== null) {
+        if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
             callback = txnId as Callback;
             txnId = body;
             body = threadId;
@@ -3874,7 +3880,7 @@ export class MatrixClient extends EventEmitter {
         txnId?: string | Callback,
         callback?: Callback,
     ): Promise<ISendEventResponse> {
-        if (!threadId?.startsWith("$") && threadId !== null) {
+        if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
             callback = txnId as Callback;
             txnId = body;
             body = threadId;
@@ -3917,7 +3923,7 @@ export class MatrixClient extends EventEmitter {
         text: Callback | string = "Image",
         callback?: Callback,
     ): Promise<ISendEventResponse> {
-        if (!threadId?.startsWith("$") && threadId !== null) {
+        if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
             callback = text as Callback;
             text = info as string || "Image";
             info = url as IImageInfo;
@@ -3970,7 +3976,7 @@ export class MatrixClient extends EventEmitter {
         text: Callback | string = "Sticker",
         callback?: Callback,
     ): Promise<ISendEventResponse> {
-        if (!threadId?.startsWith("$") && threadId !== null) {
+        if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
             callback = text as Callback;
             text = info as string || "Sticker";
             info = url as IImageInfo;
@@ -4018,7 +4024,7 @@ export class MatrixClient extends EventEmitter {
         htmlBody: string | Callback,
         callback?: Callback,
     ): Promise<ISendEventResponse> {
-        if (!threadId?.startsWith("$") && threadId !== null) {
+        if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
             callback = htmlBody as Callback;
             htmlBody = body as string;
             body = threadId;
@@ -4056,7 +4062,7 @@ export class MatrixClient extends EventEmitter {
         htmlBody: string | Callback,
         callback?: Callback,
     ): Promise<ISendEventResponse> {
-        if (!threadId?.startsWith("$") && threadId !== null) {
+        if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
             callback = htmlBody as Callback;
             htmlBody = body as string;
             body = threadId;
@@ -4095,7 +4101,7 @@ export class MatrixClient extends EventEmitter {
         htmlBody: string | Callback,
         callback?: Callback,
     ): Promise<ISendEventResponse> {
-        if (!threadId?.startsWith("$") && threadId !== null) {
+        if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
             callback = htmlBody as Callback;
             htmlBody = body as string;
             body = threadId;
