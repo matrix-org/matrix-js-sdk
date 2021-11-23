@@ -107,6 +107,10 @@ export class Thread extends BaseModel<ThreadEvent> {
             this._currentUserParticipated = true;
         }
 
+        if (this.ready) {
+            this.client.decryptEventIfNeeded(event, {});
+        }
+
         await this.client.decryptEventIfNeeded(event, {});
         this.emit(ThreadEvent.Update, this);
     }
@@ -186,5 +190,9 @@ export class Thread extends BaseModel<ThreadEvent> {
 
     public has(eventId: string): boolean {
         return this.timelineSet.findEventById(eventId) instanceof MatrixEvent;
+    }
+
+    public get hasCurrentUserParticipated(): boolean {
+        return this._currentUserParticipated;
     }
 }
