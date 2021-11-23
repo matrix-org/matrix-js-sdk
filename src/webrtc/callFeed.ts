@@ -29,7 +29,13 @@ export interface ICallFeedOpts {
     userId: string;
     stream: MediaStream;
     purpose: SDPStreamMetadataPurpose;
+    /**
+     * Whether or not the remote SDPStreamMetadata says audio is muted
+     */
     audioMuted: boolean;
+    /**
+     * Whether or not the remote SDPStreamMetadata says video is muted
+     */
     videoMuted: boolean;
 }
 

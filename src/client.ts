@@ -75,11 +75,13 @@ import {
     IKeyBackupPrepareOpts,
     IKeyBackupRestoreOpts,
     IKeyBackupRestoreResult,
+    IKeyBackupRoomSessions,
+    IKeyBackupSession,
 } from "./crypto/keybackup";
 import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
 import type Request from "request";
 import { MatrixScheduler } from "./scheduler";
-import { ICryptoCallbacks, IMinimalEvent, IRoomEvent, IStateEvent } from "./matrix";
+import { IAuthData, ICryptoCallbacks, IMinimalEvent, IRoomEvent, IStateEvent, NotificationCountType } from "./matrix";
 import {
     CrossSigningKey,
     IAddSecretStorageKeyOpts,
@@ -677,6 +679,14 @@ interface IRoomSummary extends Omit<IPublicRoomsChunkRoom, "canonical_alias" | "
     membership?: string;
     is_encrypted: boolean;
 }
+
+interface IRoomKeysResponse {
+    sessions: IKeyBackupRoomSessions;
+}
+
+interface IRoomsKeysResponse {
+    rooms: Record<string, IRoomKeysResponse>;
+}
 /* eslint-enable camelcase */
 
 /**
@@ -724,7 +734,7 @@ export class MatrixClient extends EventEmitter {
     protected fallbackICEServerAllowed = false;
     protected roomList: RoomList;
     protected syncApi: SyncApi;
-    public pushRules: any; // TODO: Types
+    public pushRules: IPushRules;
     protected syncLeftRoomsPromise: Promise<Room[]>;
     protected syncedLeftRooms = false;
     protected clientOpts: IStoredClientOpts;
@@ -2690,7 +2700,6 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise<object>} Status of restoration with `total` and `imported`
      * key counts.
      */
-    // TODO: Types
     public async restoreKeyBackupWithPassword(
         password: string,
         targetRoomId: string,
@@ -2717,7 +2726,6 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise<object>} Status of restoration with `total` and `imported`
      * key counts.
      */
-    // TODO: Types
     public async restoreKeyBackupWithSecretStorage(
         backupInfo: IKeyBackupInfo,
         targetRoomId?: string,
@@ -2754,7 +2762,6 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise<object>} Status of restoration with `total` and `imported`
      * key counts.
      */
-    // TODO: Types
     public restoreKeyBackupWithRecoveryKey(
         recoveryKey: string,
         targetRoomId: string,
@@ -2766,7 +2773,6 @@ export class MatrixClient extends EventEmitter {
         return this.restoreKeyBackup(privKey, targetRoomId, targetSessionId, backupInfo, opts);
     }
 
-    // TODO: Types
     public async restoreKeyBackupWithCache(
         targetRoomId: string,
         targetSessionId: string,
@@ -2827,11 +2833,11 @@ export class MatrixClient extends EventEmitter {
             const res = await this.http.authedRequest(
                 undefined, "GET", path.path, path.queryData, undefined,
                 { prefix: PREFIX_UNSTABLE },
-            );
+            ) as IRoomsKeysResponse | IRoomKeysResponse | IKeyBackupSession;
 
-            if (res.rooms) {
-                // TODO: Types
-                for (const [roomId, roomData] of Object.entries<any>(res.rooms)) {
+            if ((res as IRoomsKeysResponse).rooms) {
+                const rooms = (res as IRoomsKeysResponse).rooms;
+                for (const [roomId, roomData] of Object.entries(rooms)) {
                     if (!roomData.sessions) continue;
 
                     totalKeyCount += Object.keys(roomData.sessions).length;
@@ -2841,9 +2847,10 @@ export class MatrixClient extends EventEmitter {
                         keys.push(k);
                     }
                 }
-            } else if (res.sessions) {
-                totalKeyCount = Object.keys(res.sessions).length;
-                keys = await algorithm.decryptSessions(res.sessions);
+            } else if ((res as IRoomKeysResponse).sessions) {
+                const sessions = (res as IRoomKeysResponse).sessions;
+                totalKeyCount = Object.keys(sessions).length;
+                keys = await algorithm.decryptSessions(sessions);
                 for (const k of keys) {
                     k.room_id = targetRoomId;
                 }
@@ -2851,7 +2858,7 @@ export class MatrixClient extends EventEmitter {
                 totalKeyCount = 1;
                 try {
                     const [key] = await algorithm.decryptSessions({
-                        [targetSessionId]: res,
+                        [targetSessionId]: res as IKeyBackupSession,
                     });
                     key.room_id = targetRoomId;
                     key.session_id = targetSessionId;
@@ -7485,7 +7492,7 @@ export class MatrixClient extends EventEmitter {
         return this.http.authedRequest(undefined, "GET", path, qps, undefined);
     }
 
-    public uploadDeviceSigningKeys(auth: any, keys?: CrossSigningKeys): Promise<{}> { // TODO: types
+    public uploadDeviceSigningKeys(auth?: IAuthData, keys?: CrossSigningKeys): Promise<{}> {
         const data = Object.assign({}, keys);
         if (auth) Object.assign(data, { auth });
         return this.http.authedRequest(
@@ -8550,7 +8557,7 @@ export class MatrixClient extends EventEmitter {
         const ROOM = 0;
         const THREAD = 1;
         const threadRoots = new Set<string>();
-        if (this.supportsExperimentalThreads) {
+        if (this.supportsExperimentalThreads()) {
             return events.reduce((memo, event: MatrixEvent) => {
                 const room = this.getRoom(event.getRoomId());
                 // An event should live in the thread timeline if

@@ -40,6 +40,8 @@ export class Thread extends Receipt {
      */
     public readonly timelineSet;
 
+    private _currentUserParticipated = false;
+
     constructor(
         events: MatrixEvent[] = [],
         public readonly room: Room,
@@ -90,6 +92,10 @@ export class Thread extends Receipt {
             roomState,
         );
 
+        if (!this._currentUserParticipated && event.getSender() === this.client.getUserId()) {
+            this._currentUserParticipated = true;
+        }
+
         if (this.ready) {
             this.client.decryptEventIfNeeded(event, {});
         }
@@ -113,6 +119,15 @@ export class Thread extends Receipt {
      */
     public findEventById(eventId: string) {
         return this.timelineSet.findEventById(eventId);
+    }
+
+    /**
+     * Return last reply to the thread
+     */
+    public get lastReply(): MatrixEvent {
+        const threadReplies = this.events
+            .filter(event => event.isThreadRelation);
+        return threadReplies[threadReplies.length - 1];
     }
 
     /**
@@ -160,17 +175,6 @@ export class Thread extends Receipt {
     }
 
     /**
-     * A set of mxid participating to the thread
-     */
-    public get participants(): Set<string> {
-        const participants = new Set<string>();
-        this.events.forEach(event => {
-            participants.add(event.getSender());
-        });
-        return participants;
-    }
-
-    /**
      * A getter for the last event added to the thread
      */
     public get replyToEvent(): MatrixEvent {
@@ -193,28 +197,7 @@ export class Thread extends Receipt {
         return this.timelineSet.findEventById(eventId) instanceof MatrixEvent;
     }
 
-    public on(event: ThreadEvent, listener: (...args: any[]) => void): this {
-        super.on(event, listener);
-        return this;
-    }
-
-    public once(event: ThreadEvent, listener: (...args: any[]) => void): this {
-        super.once(event, listener);
-        return this;
-    }
-
-    public off(event: ThreadEvent, listener: (...args: any[]) => void): this {
-        super.off(event, listener);
-        return this;
-    }
-
-    public addListener(event: ThreadEvent, listener: (...args: any[]) => void): this {
-        super.addListener(event, listener);
-        return this;
-    }
-
-    public removeListener(event: ThreadEvent, listener: (...args: any[]) => void): this {
-        super.removeListener(event, listener);
-        return this;
+    public get hasCurrentUserParticipated(): boolean {
+        return this._currentUserParticipated;
     }
 }
