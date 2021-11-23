@@ -40,6 +40,8 @@ export class Thread extends BaseModel<ThreadEvent> {
      */
     public readonly timelineSet;
 
+    private _currentUserParticipated = false;
+
     constructor(
         events: MatrixEvent[] = [],
         public readonly room: Room,
@@ -91,6 +93,10 @@ export class Thread extends BaseModel<ThreadEvent> {
             false,
             roomState,
         );
+
+        if (!this._currentUserParticipated && event.getSender() === this.client.getUserId()) {
+            this._currentUserParticipated = true;
+        }
 
         if (this.ready) {
             this.client.decryptEventIfNeeded(event, {});
@@ -151,17 +157,6 @@ export class Thread extends BaseModel<ThreadEvent> {
     }
 
     /**
-     * A set of mxid participating to the thread
-     */
-    public get participants(): Set<string> {
-        const participants = new Set<string>();
-        this.events.forEach(event => {
-            participants.add(event.getSender());
-        });
-        return participants;
-    }
-
-    /**
      * A getter for the last event added to the thread
      */
     public get replyToEvent(): MatrixEvent {
@@ -182,5 +177,9 @@ export class Thread extends BaseModel<ThreadEvent> {
 
     public has(eventId: string): boolean {
         return this.timelineSet.findEventById(eventId) instanceof MatrixEvent;
+    }
+
+    public get hasCurrentUserParticipated(): boolean {
+        return this._currentUserParticipated;
     }
 }
