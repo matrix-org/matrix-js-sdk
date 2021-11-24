@@ -1306,6 +1306,16 @@ export class Room extends EventEmitter {
             this.reEmitter.reEmit(thread, [ThreadEvent.Update, ThreadEvent.Ready]);
             this.emit(ThreadEvent.New, thread);
         }
+
+        if (event.getUnsigned().transaction_id) {
+            const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id];
+            if (existingEvent) {
+                // remote echo of an event we sent earlier
+                this.handleRemoteEcho(event, existingEvent);
+                return;
+            }
+        }
+
         this.emit(ThreadEvent.Update, thread);
     }
 
