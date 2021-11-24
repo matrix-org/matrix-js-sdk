@@ -18,7 +18,7 @@ import { MatrixClient } from "../matrix";
 import { MatrixEvent } from "./event";
 import { EventTimeline } from "./event-timeline";
 import { EventTimelineSet } from './event-timeline-set';
-import { Room } from './room';
+import { Room, RoomEvents } from './room';
 import { Receipt } from './receipt';
 
 export enum ThreadEvent {
@@ -30,7 +30,7 @@ export enum ThreadEvent {
 /**
  * @experimental
  */
-export class Thread extends Receipt {
+export class Thread extends Receipt<ThreadEvent> {
     /**
      * A reference to the event ID at the top of the thread
      */
@@ -60,11 +60,20 @@ export class Thread extends Receipt {
         this.timelineSet = new EventTimelineSet(this.room, {
             unstableClientRelationAggregation: true,
             timelineSupport: true,
-            pendingEvents: false,
+            pendingEvents: true,
             context: this,
         });
         events.forEach(event => this.addEvent(event));
+
+        room.on(RoomEvents.LocalEchoUpdated, this.onEcho);
+        room.on(RoomEvents.Timeline, this.onEcho);
     }
+
+    onEcho = (event: MatrixEvent) => {
+        if (this.timelineSet.eventIdToTimeline(event.getId())) {
+            this.emit(ThreadEvent.Update, this);
+        }
+    };
 
     /**
      * Add an event to the thread and updates

@@ -24,7 +24,7 @@ limitations under the License.
  */
 
 import { User } from "./models/user";
-import { Room } from "./models/room";
+import { Room, RoomEvents } from "./models/room";
 import { NotificationCountType } from "./@types/receipt";
 import { Group } from "./models/group";
 import * as utils from "./utils";
@@ -55,6 +55,7 @@ import { MatrixError } from "./http-api";
 import { ISavedSync } from "./store";
 import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
+import { ReceiptEvents } from "./models/receipt";
 
 const DEBUG = true;
 
@@ -179,15 +180,10 @@ export class SyncApi {
             timelineSupport,
             unstableClientRelationAggregation,
         });
-        client.reEmitter.reEmit(room, ["Room.name", "Room.timeline",
-            "Room.redaction",
-            "Room.redactionCancelled",
-            "Room.receipt", "Room.tags",
+        client.reEmitter.reEmit(room, [
+            ...Object.values(RoomEvents),
+            ...Object.values(ReceiptEvents),
             "Room.timelineReset",
-            "Room.localEchoUpdated",
-            "Room.accountData",
-            "Room.myMembership",
-            "Room.replaceEvent",
         ]);
         this.registerStateListeners(room);
         return room;

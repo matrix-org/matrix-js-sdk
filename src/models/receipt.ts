@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventEmitter } from "events";
 import { EventTimelineSet } from "./event-timeline-set";
 import { MatrixEvent } from "./event";
 import { NotificationCountType } from "../@types/receipt";
+import { TypedEventEmitter } from "./typed-event-emitter";
 
 interface IReceipt {
     ts: number;
@@ -63,7 +63,11 @@ export function synthesizeReceipt(userId: string, event: MatrixEvent, receiptTyp
     return new MatrixEvent(fakeReceipt);
 }
 
-export abstract class Receipt extends EventEmitter {
+export enum ReceiptEvents {
+    Receipt = "Room.Receipt"
+}
+
+export abstract class Receipt<Events extends string = null> extends TypedEventEmitter<Events | ReceiptEvents> {
     // receipts should clobber based on receipt_type and user_id pairs hence
     // the form of this structure. This is sub-optimal for the exposed APIs
     // which pass in an event ID and get back some receipts, so we also store
@@ -105,7 +109,7 @@ export abstract class Receipt extends EventEmitter {
 
         // send events after we've regenerated the cache, otherwise things that
         // listened for the event would read from a stale cache
-        this.emit("Room.receipt", event, this);
+        this.emit(ReceiptEvents.Receipt, event, this);
     }
 
     /**

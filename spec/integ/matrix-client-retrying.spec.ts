@@ -23,7 +23,7 @@ describe("MatrixClient retrying", function() {
         );
         httpBackend = testClient.httpBackend;
         client = testClient.client;
-        room = new Room(roomId);
+        room = new Room(roomId, client, userId);
         client.store.storeRoom(room);
     });
 
@@ -50,7 +50,10 @@ describe("MatrixClient retrying", function() {
 
     it("should mark events as EventStatus.CANCELLED when cancelled", function() {
         // send a couple of events; the second will be queued
-        const p1 = client.sendMessage(roomId, "m1").then(function(ev) {
+        const p1 = client.sendMessage(roomId, {
+            "msgtype": "m.text",
+            "body": "m1",
+        }).then(function(ev) {
             // we expect the first message to fail
             throw new Error('Message 1 unexpectedly sent successfully');
         }, (e) => {
@@ -60,7 +63,10 @@ describe("MatrixClient retrying", function() {
         // XXX: it turns out that the promise returned by this message
         // never gets resolved.
         // https://github.com/matrix-org/matrix-js-sdk/issues/496
-        client.sendMessage(roomId, "m2");
+        client.sendMessage(roomId, {
+            "msgtype": "m.text",
+            "body": "m2",
+        });
 
         // both events should be in the timeline at this point
         const tl = room.getLiveTimeline().getEvents();
@@ -88,7 +94,7 @@ describe("MatrixClient retrying", function() {
         }).respond(400); // fail the first message
 
         // wait for the localecho of ev1 to be updated
-        const p3 = new Promise((resolve, reject) => {
+        const p3 = new Promise<void>((resolve, reject) => {
             room.on("Room.localEchoUpdated", (ev0) => {
                 if (ev0 === ev1) {
                     resolve();

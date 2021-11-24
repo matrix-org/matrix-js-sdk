@@ -60,7 +60,18 @@ export interface IRecommendedVersion {
     urgent: boolean;
 }
 
-export class Room extends Receipt {
+export enum RoomEvents {
+    LocalEchoUpdated = "Room.localEchoUpdated",
+    Timeline = "Room.timeline",
+    MyMembership = "Room.myMembership",
+    Redaction = "Room.redaction",
+    RedactionCancelled = "Room.redactionCancelled",
+    Name = "Room.name",
+    Tags = "Room.tags",
+    AccountData = "Room.accountData"
+}
+
+export class Room extends Receipt<RoomEvents | ThreadEvent> {
     private readonly reEmitter: ReEmitter;
     private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
 
@@ -168,12 +179,6 @@ export class Room extends Receipt {
         this.reEmitter = new ReEmitter(this);
 
         opts.pendingEventOrdering = opts.pendingEventOrdering || PendingEventOrdering.Chronological;
-        if (["chronological", "detached"].indexOf(opts.pendingEventOrdering) === -1) {
-            throw new Error(
-                "opts.pendingEventOrdering MUST be either 'chronological' or " +
-                "'detached'. Got: '" + opts.pendingEventOrdering + "'",
-            );
-        }
 
         this.name = roomId;
 
@@ -184,7 +189,7 @@ export class Room extends Receipt {
 
         this.fixUpLegacyTimelineFields();
 
-        if (this.opts.pendingEventOrdering == "detached") {
+        if (this.opts.pendingEventOrdering === PendingEventOrdering.Detached) {
             this.pendingEventList = [];
             const serializedPendingEventList = client.sessionStore.store.getItem(pendingEventsKey(this.roomId));
             if (serializedPendingEventList) {
@@ -395,14 +400,16 @@ export class Room extends Receipt {
      *
      * @throws If <code>opts.pendingEventOrdering</code> was not 'detached'
      */
-    public getPendingEvents(): MatrixEvent[] {
-        if (this.opts.pendingEventOrdering !== "detached") {
+    public getPendingEvents(thread?: Thread): MatrixEvent[] {
+        if (this.opts.pendingEventOrdering !== PendingEventOrdering.Detached) {
             throw new Error(
                 "Cannot call getPendingEvents with pendingEventOrdering == " +
                 this.opts.pendingEventOrdering);
         }
 
-        return this.pendingEventList;
+        return this.pendingEventList.filter(event => {
+            return !thread || thread.id === event.threadRootId;
+        });
     }
 
     /**
@@ -412,7 +419,7 @@ export class Room extends Receipt {
      * @return {boolean} True if an element was removed.
      */
     public removePendingEvent(eventId: string): boolean {
-        if (this.opts.pendingEventOrdering !== "detached") {
+        if (this.opts.pendingEventOrdering !== PendingEventOrdering.Detached) {
             throw new Error(
                 "Cannot call removePendingEvent with pendingEventOrdering == " +
                 this.opts.pendingEventOrdering);
@@ -438,7 +445,7 @@ export class Room extends Receipt {
      * @return {boolean}
      */
     public hasPendingEvent(eventId: string): boolean {
-        if (this.opts.pendingEventOrdering !== "detached") {
+        if (this.opts.pendingEventOrdering !== PendingEventOrdering.Detached) {
             return false;
         }
 
@@ -452,7 +459,7 @@ export class Room extends Receipt {
      * @return {MatrixEvent}
      */
     public getPendingEvent(eventId: string): MatrixEvent | null {
-        if (this.opts.pendingEventOrdering !== "detached") {
+        if (this.opts.pendingEventOrdering !== PendingEventOrdering.Detached) {
             return null;
         }
 
@@ -594,7 +601,7 @@ export class Room extends Receipt {
             if (membership === "leave") {
                 this.cleanupAfterLeaving();
             }
-            this.emit("Room.myMembership", this, membership, prevMembership);
+            this.emit(RoomEvents.MyMembership, this, membership, prevMembership);
         }
     }
 
@@ -799,7 +806,13 @@ export class Room extends Receipt {
      * the given event, or null if unknown
      */
     public getTimelineForEvent(eventId: string): EventTimeline {
-        return this.getUnfilteredTimelineSet().getTimelineForEvent(eventId);
+        const event = this.findEventById(eventId);
+        const thread = this.findThreadForEvent(event);
+        if (thread) {
+            return thread.timelineSet.getLiveTimeline();
+        } else {
+            return this.getUnfilteredTimelineSet().getTimelineForEvent(eventId);
+        }
     }
 
     /**
@@ -1247,10 +1260,9 @@ export class Room extends Receipt {
             events.unshift(rootEvent);
             thread = new Thread(events, this, this.client);
             this.threads.set(thread.id, thread);
-            this.reEmitter.reEmit(thread, [ThreadEvent.Update, ThreadEvent.Ready]);
+            this.reEmitter.reEmit(thread, Object.values(ThreadEvent));
             this.emit(ThreadEvent.New, thread);
         }
-        this.emit(ThreadEvent.Update, thread);
     }
 
     /**
@@ -1283,7 +1295,7 @@ export class Room extends Receipt {
                     }
                 }
 
-                this.emit("Room.redaction", event, this);
+                this.emit(RoomEvents.Redaction, event, this);
 
                 // TODO: we stash user displaynames (among other things) in
                 // RoomMember objects which are then attached to other events
@@ -1349,13 +1361,6 @@ export class Room extends Receipt {
      * unique transaction id.
      */
     public addPendingEvent(event: MatrixEvent, txnId: string): void {
-        // TODO: Enable "pending events" for threads
-        // There's a fair few things to update to make them work with Threads
-        // Will get back to it when the plan is to build a more polished UI ready for production
-        if (this.client?.supportsExperimentalThreads() && event.threadRootId) {
-            return;
-        }
-
         if (event.status !== EventStatus.SENDING && event.status !== EventStatus.NOT_SENT) {
             throw new Error("addPendingEvent called on an event with status " +
                 event.status);
@@ -1372,8 +1377,8 @@ export class Room extends Receipt {
         EventTimeline.setEventMetadata(event, this.getLiveTimeline().getState(EventTimeline.FORWARDS), false);
 
         this.txnToEvent[txnId] = event;
-
-        if (this.opts.pendingEventOrdering == "detached") {
+        const thread = this.threads.get(event.threadRootId);
+        if (this.opts.pendingEventOrdering === PendingEventOrdering.Detached && !thread) {
             if (this.pendingEventList.some((e) => e.status === EventStatus.NOT_SENT)) {
                 logger.warn("Setting event as NOT_SENT due to messages in the same state");
                 event.setStatus(EventStatus.NOT_SENT);
@@ -1392,29 +1397,34 @@ export class Room extends Receipt {
                 let redactedEvent = this.pendingEventList &&
                     this.pendingEventList.find(e => e.getId() === redactId);
                 if (!redactedEvent) {
-                    redactedEvent = this.getUnfilteredTimelineSet().findEventById(redactId);
+                    redactedEvent = this.findEventById(redactId);
                 }
                 if (redactedEvent) {
                     redactedEvent.markLocallyRedacted(event);
-                    this.emit("Room.redaction", event, this);
+                    this.emit(RoomEvents.Redaction, event, this);
                 }
             }
         } else {
-            for (let i = 0; i < this.timelineSets.length; i++) {
-                const timelineSet = this.timelineSets[i];
-                if (timelineSet.getFilter()) {
-                    if (timelineSet.getFilter().filterRoomTimeline([event]).length) {
+            if (thread) {
+                thread.timelineSet.addEventToTimeline(event,
+                    thread.timelineSet.getLiveTimeline(), false);
+            } else {
+                for (let i = 0; i < this.timelineSets.length; i++) {
+                    const timelineSet = this.timelineSets[i];
+                    if (timelineSet.getFilter()) {
+                        if (timelineSet.getFilter().filterRoomTimeline([event]).length) {
+                            timelineSet.addEventToTimeline(event,
+                                timelineSet.getLiveTimeline(), false);
+                        }
+                    } else {
                         timelineSet.addEventToTimeline(event,
                             timelineSet.getLiveTimeline(), false);
                     }
-                } else {
-                    timelineSet.addEventToTimeline(event,
-                        timelineSet.getLiveTimeline(), false);
                 }
             }
         }
 
-        this.emit("Room.localEchoUpdated", event, this, null, null);
+        this.emit(RoomEvents.LocalEchoUpdated, event, this, null, null);
     }
 
     /**
@@ -1467,16 +1477,21 @@ export class Room extends Receipt {
      * @param {module:models/event.MatrixEvent} event the relation event that needs to be aggregated.
      */
     private aggregateNonLiveRelation(event: MatrixEvent): void {
-        // TODO: We should consider whether this means it would be a better
-        // design to lift the relations handling up to the room instead.
-        for (let i = 0; i < this.timelineSets.length; i++) {
-            const timelineSet = this.timelineSets[i];
-            if (timelineSet.getFilter()) {
-                if (timelineSet.getFilter().filterRoomTimeline([event]).length) {
+        const thread = this.findThreadForEvent(event);
+        if (thread) {
+            thread.timelineSet.aggregateRelations(event);
+        } else {
+            // TODO: We should consider whether this means it would be a better
+            // design to lift the relations handling up to the room instead.
+            for (let i = 0; i < this.timelineSets.length; i++) {
+                const timelineSet = this.timelineSets[i];
+                if (timelineSet.getFilter()) {
+                    if (timelineSet.getFilter().filterRoomTimeline([event]).length) {
+                        timelineSet.aggregateRelations(event);
+                    }
+                } else {
                     timelineSet.aggregateRelations(event);
                 }
-            } else {
-                timelineSet.aggregateRelations(event);
             }
         }
     }
@@ -1517,14 +1532,19 @@ export class Room extends Receipt {
         // any, which is good, because we don't want to try decoding it again).
         localEvent.handleRemoteEcho(remoteEvent.event);
 
-        for (let i = 0; i < this.timelineSets.length; i++) {
-            const timelineSet = this.timelineSets[i];
+        const thread = this.threads.get(remoteEvent.threadRootId);
+        if (thread) {
+            thread.timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
+        } else {
+            for (let i = 0; i < this.timelineSets.length; i++) {
+                const timelineSet = this.timelineSets[i];
 
-            // if it's already in the timeline, update the timeline map. If it's not, add it.
-            timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
+                // if it's already in the timeline, update the timeline map. If it's not, add it.
+                timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
+            }
         }
 
-        this.emit("Room.localEchoUpdated", localEvent, this,
+        this.emit(RoomEvents.LocalEchoUpdated, localEvent, this,
             oldEventId, oldStatus);
     }
 
@@ -1554,7 +1574,7 @@ export class Room extends Receipt {
 
         // SENT races against /sync, so we have to special-case it.
         if (newStatus == EventStatus.SENT) {
-            const timeline = this.getUnfilteredTimelineSet().eventIdToTimeline(newEventId);
+            const timeline = this.getTimelineForEvent(newEventId);
             if (timeline) {
                 // we've already received the event via the event stream.
                 // nothing more to do here.
@@ -1582,11 +1602,16 @@ export class Room extends Receipt {
             // update the event id
             event.replaceLocalEventId(newEventId);
 
-            // if the event was already in the timeline (which will be the case if
-            // opts.pendingEventOrdering==chronological), we need to update the
-            // timeline map.
-            for (let i = 0; i < this.timelineSets.length; i++) {
-                this.timelineSets[i].replaceEventId(oldEventId, newEventId);
+            const thread = this.findThreadForEvent(event);
+            if (thread) {
+                thread.timelineSet.replaceEventId(oldEventId, newEventId);
+            } else {
+                // if the event was already in the timeline (which will be the case if
+                // opts.pendingEventOrdering==chronological), we need to update the
+                // timeline map.
+                for (let i = 0; i < this.timelineSets.length; i++) {
+                    this.timelineSets[i].replaceEventId(oldEventId, newEventId);
+                }
             }
         } else if (newStatus == EventStatus.CANCELLED) {
             // remove it from the pending event list, or the timeline.
@@ -1603,7 +1628,7 @@ export class Room extends Receipt {
         }
         this.savePendingEvents();
 
-        this.emit("Room.localEchoUpdated", event, this, oldEventId, oldStatus);
+        this.emit(RoomEvents.LocalEchoUpdated, event, this, oldEventId, oldStatus);
     }
 
     private revertRedactionLocalEcho(redactionEvent: MatrixEvent): void {
@@ -1616,7 +1641,7 @@ export class Room extends Receipt {
         if (redactedEvent) {
             redactedEvent.unmarkLocallyRedacted();
             // re-render after undoing redaction
-            this.emit("Room.redactionCancelled", redactionEvent, this);
+            this.emit(RoomEvents.RedactionCancelled, redactionEvent, this);
             // reapply relation now redaction failed
             if (redactedEvent.isRelation()) {
                 this.aggregateNonLiveRelation(redactedEvent);
@@ -1756,7 +1781,7 @@ export class Room extends Receipt {
         });
 
         if (oldName !== this.name) {
-            this.emit("Room.name", this);
+            this.emit(RoomEvents.Name, this);
         }
     }
 
@@ -1778,7 +1803,7 @@ export class Room extends Receipt {
 
         // XXX: we could do a deep-comparison to see if the tags have really
         // changed - but do we want to bother?
-        this.emit("Room.tags", event, this);
+        this.emit(RoomEvents.Tags, event, this);
     }
 
     /**
@@ -1793,7 +1818,7 @@ export class Room extends Receipt {
             }
             const lastEvent = this.accountData[event.getType()];
             this.accountData[event.getType()] = event;
-            this.emit("Room.accountData", event, this, lastEvent);
+            this.emit(RoomEvents.AccountData, event, this, lastEvent);
         }
     }
 

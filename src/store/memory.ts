@@ -185,7 +185,7 @@ export class MemoryStore implements IStore {
      */
     public removeRoom(roomId: string): void {
         if (this.rooms[roomId]) {
-            this.rooms[roomId].removeListener("RoomState.members", this.onRoomMember);
+            this.rooms[roomId].currentState.removeListener("RoomState.members", this.onRoomMember);
         }
         delete this.rooms[roomId];
     }

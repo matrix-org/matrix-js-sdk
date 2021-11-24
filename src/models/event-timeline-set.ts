@@ -28,7 +28,9 @@ import { Room } from "./room";
 import { Filter } from "../filter";
 import { EventType, RelationType } from "../@types/event";
 import { RoomState } from "./room-state";
-import { Receipt } from "./receipt";
+import { Receipt, ReceiptEvents } from "./receipt";
+import { Thread, ThreadEvent } from "./thread";
+import { RoomEvents } from "..";
 
 // var DEBUG = false;
 const DEBUG = true;
@@ -46,7 +48,7 @@ interface IOpts {
     filter?: Filter;
     unstableClientRelationAggregation?: boolean;
     pendingEvents?: boolean;
-    context?: Receipt;
+    context?: Receipt<ReceiptEvents | RoomEvents | ThreadEvent>;
 }
 
 export enum DuplicateStrategy {
@@ -63,7 +65,7 @@ export class EventTimelineSet extends EventEmitter {
     private _eventIdToTimeline: Record<string, EventTimeline>;
     private filter?: Filter;
     private relations: Record<string, Record<string, Record<RelationType, Relations>>>;
-    public readonly context: Receipt;
+    public readonly context: Receipt<ReceiptEvents | RoomEvents | ThreadEvent>;
 
     /**
      * Construct a set of EventTimeline objects, typically on behalf of a given
@@ -160,18 +162,18 @@ export class EventTimelineSet extends EventEmitter {
      *
      * @throws If <code>opts.pendingEventOrdering</code> was not 'detached'
      */
-    public getPendingEvents(): MatrixEvent[] {
+    public getPendingEvents(thread?: Thread): MatrixEvent[] {
         if (!this.room || !this.displayPendingEvents) {
             return [];
         }
 
+        const pendingEvents = this.room.getPendingEvents(thread);
         if (this.filter) {
-            return this.filter.filterRoomTimeline(this.room.getPendingEvents());
+            return this.filter.filterRoomTimeline(pendingEvents);
         } else {
-            return this.room.getPendingEvents();
+            return pendingEvents;
         }
     }
-
     /**
      * Get the live timeline for this room.
      *
