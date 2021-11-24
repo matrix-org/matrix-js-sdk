@@ -118,6 +118,17 @@ export class MediaHandler {
             const constraints = this.getUserMediaContraints(shouldRequestAudio, shouldRequestVideo);
             logger.log("Getting user media with constraints", constraints);
             stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+            for (const track of stream.getTracks()) {
+                const settings = track.getSettings();
+
+                if (track.kind === "audio") {
+                    this.audioInput = settings.deviceId;
+                } else if (track.kind === "video") {
+                    this.videoInput = settings.deviceId;
+                }
+            }
+
             this.localUserMediaStream = stream;
         } else {
             stream = this.localUserMediaStream.clone();
