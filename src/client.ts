@@ -3698,24 +3698,24 @@ export class MatrixClient extends EventEmitter {
     public redactEvent(
         roomId: string,
         eventId: string,
-        txnId?: string,
+        txnId?: string | undefined,
         cbOrOpts?: Callback | IRedactOpts,
     );
     public redactEvent(
         roomId: string,
         threadId: string | null,
         eventId: string,
-        txnId?: string,
+        txnId?: string | undefined,
         cbOrOpts?: Callback | IRedactOpts,
     );
     public redactEvent(
         roomId: string,
         threadId: string | null,
-        eventId: string,
+        eventId?: string,
         txnId?: string | Callback | IRedactOpts,
         cbOrOpts?: Callback | IRedactOpts,
     ): Promise<ISendEventResponse> {
-        if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
+        if (!eventId || eventId.startsWith(EVENT_ID_PREFIX)) {
             cbOrOpts = txnId as (Callback | IRedactOpts);
             txnId = eventId;
             eventId = threadId;
