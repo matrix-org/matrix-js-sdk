@@ -56,6 +56,7 @@ import { ISavedSync } from "./store";
 import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
 import { ReceiptEvents } from "./models/receipt";
+import { RoomMemberEvents, RoomStateEvents } from ".";
 
 const DEBUG = true;
 
@@ -210,17 +211,11 @@ export class SyncApi {
         // we need to also re-emit room state and room member events, so hook it up
         // to the client now. We need to add a listener for RoomState.members in
         // order to hook them correctly. (TODO: find a better way?)
-        client.reEmitter.reEmit(room.currentState, [
-            "RoomState.events", "RoomState.members", "RoomState.newMember",
-        ]);
-        room.currentState.on("RoomState.newMember", function(event, state, member) {
+        client.reEmitter.reEmit(room.currentState, Object.values(RoomStateEvents));
+        room.currentState.on(RoomStateEvents.NewMember, function(event, state, member) {
             member.user = client.getUser(member.userId);
             client.reEmitter.reEmit(
-                member,
-                [
-                    "RoomMember.name", "RoomMember.typing", "RoomMember.powerLevel",
-                    "RoomMember.membership",
-                ],
+                member, Object.values(RoomMemberEvents),
             );
         });
     }
@@ -231,9 +226,9 @@ export class SyncApi {
      */
     private deregisterStateListeners(room: Room): void {
         // could do with a better way of achieving this.
-        room.currentState.removeAllListeners("RoomState.events");
-        room.currentState.removeAllListeners("RoomState.members");
-        room.currentState.removeAllListeners("RoomState.newMember");
+        room.currentState.removeAllListeners(RoomStateEvents.Events);
+        room.currentState.removeAllListeners(RoomStateEvents.Members);
+        room.currentState.removeAllListeners(RoomStateEvents.NewMember);
     }
 
     /**

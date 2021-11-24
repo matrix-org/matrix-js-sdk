@@ -30,7 +30,7 @@ import { EventType, RelationType } from "../@types/event";
 import { RoomState } from "./room-state";
 import { Receipt, ReceiptEvents } from "./receipt";
 import { Thread, ThreadEvent } from "./thread";
-import { RoomEvents } from "..";
+import { RoomEvents, RoomMemberEvents, RoomStateEvents } from "..";
 
 // var DEBUG = false;
 const DEBUG = true;
@@ -48,7 +48,7 @@ interface IOpts {
     filter?: Filter;
     unstableClientRelationAggregation?: boolean;
     pendingEvents?: boolean;
-    context?: Receipt<ReceiptEvents | RoomEvents | ThreadEvent>;
+    context?: Receipt<ReceiptEvents | RoomEvents | RoomStateEvents | RoomMemberEvents | ThreadEvent>;
 }
 
 export enum DuplicateStrategy {
@@ -65,7 +65,7 @@ export class EventTimelineSet extends EventEmitter {
     private _eventIdToTimeline: Record<string, EventTimeline>;
     private filter?: Filter;
     private relations: Record<string, Record<string, Record<RelationType, Relations>>>;
-    public readonly context: Receipt<ReceiptEvents | RoomEvents | ThreadEvent>;
+    public readonly context: Receipt<ReceiptEvents | RoomEvents | RoomStateEvents | RoomMemberEvents | ThreadEvent>;
 
     /**
      * Construct a set of EventTimeline objects, typically on behalf of a given

@@ -18,8 +18,6 @@ limitations under the License.
  * @module models/room-state
  */
 
-import { EventEmitter } from "events";
-
 import { RoomMember } from "./room-member";
 import { logger } from '../logger';
 import * as utils from "../utils";
@@ -27,6 +25,7 @@ import { EventType } from "../@types/event";
 import { MatrixEvent } from "./event";
 import { MatrixClient } from "../client";
 import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
+import { TypedEventEmitter } from "./typed-event-emitter";
 
 // possible statuses for out-of-band member loading
 enum OobStatus {
@@ -35,7 +34,13 @@ enum OobStatus {
     Finished,
 }
 
-export class RoomState extends EventEmitter {
+export enum RoomStateEvents {
+    Events = "RoomState.events",
+    Members = "RoomState.members",
+    NewMember = "RoomState.newMember"
+}
+
+export class RoomState extends TypedEventEmitter<RoomStateEvents> {
     private sentinels: Record<string, RoomMember> = {}; // userId: RoomMember
     // stores fuzzy matches to a list of userIDs (applies utils.removeHiddenChars to keys)
     private displayNameToUserIds: Record<string, string[]> = {};
@@ -307,7 +312,7 @@ export class RoomState extends EventEmitter {
                 this.updateDisplayNameCache(event.getStateKey(), event.getContent().displayname);
                 this.updateThirdPartyTokenCache(event);
             }
-            this.emit("RoomState.events", event, this, lastStateEvent);
+            this.emit(RoomStateEvents.Events, event, this, lastStateEvent);
         });
 
         // update higher level data structures. This needs to be done AFTER the
@@ -342,7 +347,7 @@ export class RoomState extends EventEmitter {
                 member.setMembershipEvent(event, this);
 
                 this.updateMember(member);
-                this.emit("RoomState.members", event, this, member);
+                this.emit(RoomStateEvents.Members, event, this, member);
             } else if (event.getType() === EventType.RoomPowerLevels) {
                 // events with unknown state keys should be ignored
                 // and should not aggregate onto members power levels
@@ -357,7 +362,7 @@ export class RoomState extends EventEmitter {
                     const oldLastModified = member.getLastModifiedTime();
                     member.setPowerLevelEvent(event);
                     if (oldLastModified !== member.getLastModifiedTime()) {
-                        this.emit("RoomState.members", event, this, member);
+                        this.emit(RoomStateEvents.Members, event, this, member);
                     }
                 });
 
@@ -384,7 +389,7 @@ export class RoomState extends EventEmitter {
             // add member to members before emitting any events,
             // as event handlers often lookup the member
             this.members[userId] = member;
-            this.emit("RoomState.newMember", event, this, member);
+            this.emit(RoomStateEvents.NewMember, event, this, member);
         }
         return member;
     }
@@ -503,7 +508,7 @@ export class RoomState extends EventEmitter {
 
         this.setStateEvent(stateEvent);
         this.updateMember(member);
-        this.emit("RoomState.members", stateEvent, this, member);
+        this.emit(RoomStateEvents.Members, stateEvent, this, member);
     }
 
     /**

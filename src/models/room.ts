@@ -24,7 +24,7 @@ import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
 import { normalize } from "../utils";
 import { EventStatus, IEvent, MatrixEvent } from "./event";
-import { RoomMember } from "./room-member";
+import { RoomMember, RoomMemberEvents } from "./room-member";
 import { IRoomSummary, RoomSummary } from "./room-summary";
 import { logger } from '../logger';
 import { ReEmitter } from '../ReEmitter';
@@ -36,6 +36,7 @@ import { RoomState } from "./room-state";
 import { Thread, ThreadEvent } from "./thread";
 import { Receipt, synthesizeReceipt } from "./receipt";
 import { NotificationCountType } from "../@types/receipt";
+import { RoomStateEvents } from "..";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -71,7 +72,7 @@ export enum RoomEvents {
     AccountData = "Room.accountData"
 }
 
-export class Room extends Receipt<RoomEvents | ThreadEvent> {
+export class Room extends Receipt<RoomEvents | RoomStateEvents | RoomMemberEvents | ThreadEvent > {
     private readonly reEmitter: ReEmitter;
     private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
 
