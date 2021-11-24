@@ -225,12 +225,6 @@ export class Room extends EventEmitter {
         this.reEmitter = new ReEmitter(this);
 
         opts.pendingEventOrdering = opts.pendingEventOrdering || PendingEventOrdering.Chronological;
-        if (["chronological", "detached"].indexOf(opts.pendingEventOrdering) === -1) {
-            throw new Error(
-                "opts.pendingEventOrdering MUST be either 'chronological' or " +
-                "'detached'. Got: '" + opts.pendingEventOrdering + "'",
-            );
-        }
 
         this.name = roomId;
 
@@ -241,7 +235,7 @@ export class Room extends EventEmitter {
 
         this.fixUpLegacyTimelineFields();
 
-        if (this.opts.pendingEventOrdering == "detached") {
+        if (this.opts.pendingEventOrdering === PendingEventOrdering.Detached) {
             this.pendingEventList = [];
             const serializedPendingEventList = client.sessionStore.store.getItem(pendingEventsKey(this.roomId));
             if (serializedPendingEventList) {
@@ -452,14 +446,16 @@ export class Room extends EventEmitter {
      *
      * @throws If <code>opts.pendingEventOrdering</code> was not 'detached'
      */
-    public getPendingEvents(): MatrixEvent[] {
-        if (this.opts.pendingEventOrdering !== "detached") {
+    public getPendingEvents(thread?: Thread): MatrixEvent[] {
+        if (this.opts.pendingEventOrdering !== PendingEventOrdering.Detached) {
             throw new Error(
                 "Cannot call getPendingEvents with pendingEventOrdering == " +
                 this.opts.pendingEventOrdering);
         }
 
-        return this.pendingEventList;
+        return this.pendingEventList.filter(event => {
+            return !thread || thread.id === event.threadRootId;
+        });
     }
 
     /**
@@ -469,7 +465,7 @@ export class Room extends EventEmitter {
      * @return {boolean} True if an element was removed.
      */
     public removePendingEvent(eventId: string): boolean {
-        if (this.opts.pendingEventOrdering !== "detached") {
+        if (this.opts.pendingEventOrdering !== PendingEventOrdering.Detached) {
             throw new Error(
                 "Cannot call removePendingEvent with pendingEventOrdering == " +
                 this.opts.pendingEventOrdering);
@@ -495,7 +491,7 @@ export class Room extends EventEmitter {
      * @return {boolean}
      */
     public hasPendingEvent(eventId: string): boolean {
-        if (this.opts.pendingEventOrdering !== "detached") {
+        if (this.opts.pendingEventOrdering !== PendingEventOrdering.Detached) {
             return false;
         }
 
@@ -509,7 +505,7 @@ export class Room extends EventEmitter {
      * @return {MatrixEvent}
      */
     public getPendingEvent(eventId: string): MatrixEvent | null {
-        if (this.opts.pendingEventOrdering !== "detached") {
+        if (this.opts.pendingEventOrdering !== PendingEventOrdering.Detached) {
             return null;
         }
 
@@ -856,7 +852,13 @@ export class Room extends EventEmitter {
      * the given event, or null if unknown
      */
     public getTimelineForEvent(eventId: string): EventTimeline {
-        return this.getUnfilteredTimelineSet().getTimelineForEvent(eventId);
+        const event = this.findEventById(eventId);
+        const thread = this.findThreadForEvent(event);
+        if (thread) {
+            return thread.timelineSet.getLiveTimeline();
+        } else {
+            return this.getUnfilteredTimelineSet().getTimelineForEvent(eventId);
+        }
     }
 
     /**
@@ -1403,13 +1405,6 @@ export class Room extends EventEmitter {
      * unique transaction id.
      */
     public addPendingEvent(event: MatrixEvent, txnId: string): void {
-        // TODO: Enable "pending events" for threads
-        // There's a fair few things to update to make them work with Threads
-        // Will get back to it when the plan is to build a more polished UI ready for production
-        if (this.client?.supportsExperimentalThreads() && event.threadRootId) {
-            return;
-        }
-
         if (event.status !== EventStatus.SENDING && event.status !== EventStatus.NOT_SENT) {
             throw new Error("addPendingEvent called on an event with status " +
                 event.status);
@@ -1426,8 +1421,8 @@ export class Room extends EventEmitter {
         EventTimeline.setEventMetadata(event, this.getLiveTimeline().getState(EventTimeline.FORWARDS), false);
 
         this.txnToEvent[txnId] = event;
-
-        if (this.opts.pendingEventOrdering == "detached") {
+        const thread = this.threads.get(event.threadRootId);
+        if (this.opts.pendingEventOrdering === PendingEventOrdering.Detached && !thread) {
             if (this.pendingEventList.some((e) => e.status === EventStatus.NOT_SENT)) {
                 logger.warn("Setting event as NOT_SENT due to messages in the same state");
                 event.setStatus(EventStatus.NOT_SENT);
@@ -1446,7 +1441,7 @@ export class Room extends EventEmitter {
                 let redactedEvent = this.pendingEventList &&
                     this.pendingEventList.find(e => e.getId() === redactId);
                 if (!redactedEvent) {
-                    redactedEvent = this.getUnfilteredTimelineSet().findEventById(redactId);
+                    redactedEvent = this.findEventById(redactId);
                 }
                 if (redactedEvent) {
                     redactedEvent.markLocallyRedacted(event);
@@ -1454,16 +1449,21 @@ export class Room extends EventEmitter {
                 }
             }
         } else {
-            for (let i = 0; i < this.timelineSets.length; i++) {
-                const timelineSet = this.timelineSets[i];
-                if (timelineSet.getFilter()) {
-                    if (timelineSet.getFilter().filterRoomTimeline([event]).length) {
+            if (thread) {
+                thread.timelineSet.addEventToTimeline(event,
+                    thread.timelineSet.getLiveTimeline(), false);
+            } else {
+                for (let i = 0; i < this.timelineSets.length; i++) {
+                    const timelineSet = this.timelineSets[i];
+                    if (timelineSet.getFilter()) {
+                        if (timelineSet.getFilter().filterRoomTimeline([event]).length) {
+                            timelineSet.addEventToTimeline(event,
+                                timelineSet.getLiveTimeline(), false);
+                        }
+                    } else {
                         timelineSet.addEventToTimeline(event,
                             timelineSet.getLiveTimeline(), false);
                     }
-                } else {
-                    timelineSet.addEventToTimeline(event,
-                        timelineSet.getLiveTimeline(), false);
                 }
             }
         }
@@ -1521,16 +1521,21 @@ export class Room extends EventEmitter {
      * @param {module:models/event.MatrixEvent} event the relation event that needs to be aggregated.
      */
     private aggregateNonLiveRelation(event: MatrixEvent): void {
-        // TODO: We should consider whether this means it would be a better
-        // design to lift the relations handling up to the room instead.
-        for (let i = 0; i < this.timelineSets.length; i++) {
-            const timelineSet = this.timelineSets[i];
-            if (timelineSet.getFilter()) {
-                if (timelineSet.getFilter().filterRoomTimeline([event]).length) {
+        const thread = this.findThreadForEvent(event);
+        if (thread) {
+            thread.timelineSet.aggregateRelations(event);
+        } else {
+            // TODO: We should consider whether this means it would be a better
+            // design to lift the relations handling up to the room instead.
+            for (let i = 0; i < this.timelineSets.length; i++) {
+                const timelineSet = this.timelineSets[i];
+                if (timelineSet.getFilter()) {
+                    if (timelineSet.getFilter().filterRoomTimeline([event]).length) {
+                        timelineSet.aggregateRelations(event);
+                    }
+                } else {
                     timelineSet.aggregateRelations(event);
                 }
-            } else {
-                timelineSet.aggregateRelations(event);
             }
         }
     }
@@ -1571,11 +1576,16 @@ export class Room extends EventEmitter {
         // any, which is good, because we don't want to try decoding it again).
         localEvent.handleRemoteEcho(remoteEvent.event);
 
-        for (let i = 0; i < this.timelineSets.length; i++) {
-            const timelineSet = this.timelineSets[i];
+        const thread = this.threads.get(remoteEvent.threadRootId);
+        if (thread) {
+            thread.timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
+        } else {
+            for (let i = 0; i < this.timelineSets.length; i++) {
+                const timelineSet = this.timelineSets[i];
 
-            // if it's already in the timeline, update the timeline map. If it's not, add it.
-            timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
+                // if it's already in the timeline, update the timeline map. If it's not, add it.
+                timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
+            }
         }
 
         this.emit("Room.localEchoUpdated", localEvent, this,
@@ -1608,7 +1618,7 @@ export class Room extends EventEmitter {
 
         // SENT races against /sync, so we have to special-case it.
         if (newStatus == EventStatus.SENT) {
-            const timeline = this.getUnfilteredTimelineSet().eventIdToTimeline(newEventId);
+            const timeline = this.getTimelineForEvent(newEventId);
             if (timeline) {
                 // we've already received the event via the event stream.
                 // nothing more to do here.
@@ -1636,11 +1646,16 @@ export class Room extends EventEmitter {
             // update the event id
             event.replaceLocalEventId(newEventId);
 
-            // if the event was already in the timeline (which will be the case if
-            // opts.pendingEventOrdering==chronological), we need to update the
-            // timeline map.
-            for (let i = 0; i < this.timelineSets.length; i++) {
-                this.timelineSets[i].replaceEventId(oldEventId, newEventId);
+            const thread = this.findThreadForEvent(event);
+            if (thread) {
+                thread.timelineSet.replaceEventId(oldEventId, newEventId);
+            } else {
+                // if the event was already in the timeline (which will be the case if
+                // opts.pendingEventOrdering==chronological), we need to update the
+                // timeline map.
+                for (let i = 0; i < this.timelineSets.length; i++) {
+                    this.timelineSets[i].replaceEventId(oldEventId, newEventId);
+                }
             }
         } else if (newStatus == EventStatus.CANCELLED) {
             // remove it from the pending event list, or the timeline.

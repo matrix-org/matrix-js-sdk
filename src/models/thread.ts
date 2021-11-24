@@ -55,10 +55,19 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         this.timelineSet = new EventTimelineSet(this.room, {
             unstableClientRelationAggregation: true,
             timelineSupport: true,
-            pendingEvents: false,
+            pendingEvents: true,
         });
         events.forEach(event => this.addEvent(event));
+
+        room.on("Room.localEchoUpdated", this.onEcho);
+        room.on("Room.timeline", this.onEcho);
     }
+
+    onEcho = (event: MatrixEvent) => {
+        if (this.timelineSet.eventIdToTimeline(event.getId())) {
+            this.emit(ThreadEvent.Update, this);
+        }
+    };
 
     /**
      * Add an event to the thread and updates
