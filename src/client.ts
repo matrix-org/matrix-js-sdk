@@ -4176,8 +4176,10 @@ export class MatrixClient extends EventEmitter {
     ): Promise<{}> {
         const room = this.getRoom(roomId);
 
-        const rmEvent = room.findEventById(rmEventId);
-        const context = rmEvent.getThread() ?? room;
+        let context;
+        if (rrEvent) {
+            context = rrEvent.getThread() ?? room;
+        }
 
         if (context && context.hasPendingEvent(rmEventId)) {
             throw new Error(`Cannot set read marker to a pending event (${rmEventId})`);
