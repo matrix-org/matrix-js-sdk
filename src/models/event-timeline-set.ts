@@ -24,13 +24,13 @@ import { EventTimeline } from "./event-timeline";
 import { EventStatus, MatrixEvent } from "./event";
 import { logger } from '../logger';
 import { Relations } from './relations';
-import { Room } from "./room";
+import { Room, RoomEvents } from "./room";
 import { Filter } from "../filter";
 import { EventType, RelationType } from "../@types/event";
-import { RoomState } from "./room-state";
+import { RoomState, RoomStateEvents } from "./room-state";
 import { Receipt, ReceiptEvents } from "./receipt";
 import { Thread, ThreadEvent } from "./thread";
-import { RoomEvents, RoomMemberEvents, RoomStateEvents } from "..";
+import { RoomMemberEvents } from "./room-member";
 
 // var DEBUG = false;
 const DEBUG = true;

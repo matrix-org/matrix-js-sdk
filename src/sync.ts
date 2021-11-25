@@ -56,7 +56,8 @@ import { ISavedSync } from "./store";
 import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
 import { ReceiptEvents } from "./models/receipt";
-import { RoomMemberEvents, RoomStateEvents } from ".";
+import { RoomStateEvents } from "./models/room-state";
+import { RoomMemberEvents } from "./models/room-member";
 
 const DEBUG = true;
 

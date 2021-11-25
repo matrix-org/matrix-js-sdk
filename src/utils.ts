@@ -23,7 +23,6 @@ limitations under the License.
 import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
 import type NodeCrypto from "crypto";
-import { MatrixClient } from "./client";
 import { MatrixEvent } from "./models/event";
 import { NotificationCountType } from "./@types/receipt";
 
@@ -732,7 +731,7 @@ export function recursivelyAssign(target: Object, source: Object, ignoreNullish 
     return target;
 }
 
-export function setTotalCount(client: MatrixClient, event: MatrixEvent): void {
+export function setTotalCount(client, event: MatrixEvent): void {
     const room = client.getRoom(event.getRoomId());
     if (!room) return;
 
@@ -754,7 +753,7 @@ export function setTotalCount(client: MatrixClient, event: MatrixEvent): void {
     }
 }
 
-export function setHighlightBadgeForEncryptedRooms(client: MatrixClient, event: MatrixEvent): void {
+export function setHighlightBadgeForEncryptedRooms(client: any, event: MatrixEvent): void {
     const oldActions = event.getPushActions();
     const actions = client.pushProcessor.actionsForEvent(event);
     event.setPushActions(actions); // Might as well while we're here

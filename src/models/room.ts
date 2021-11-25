@@ -32,11 +32,10 @@ import { EventType, RoomCreateTypeField, RoomType, UNSTABLE_ELEMENT_FUNCTIONAL_U
 import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
 import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
 import { Filter } from "../filter";
-import { RoomState } from "./room-state";
+import { RoomState, RoomStateEvents } from "./room-state";
 import { Thread, ThreadEvent } from "./thread";
 import { Receipt, synthesizeReceipt } from "./receipt";
 import { NotificationCountType } from "../@types/receipt";
-import { RoomStateEvents } from "..";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
