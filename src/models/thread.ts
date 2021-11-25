@@ -39,6 +39,7 @@ export class Thread extends Receipt<ThreadEvent> {
      * A reference to all the events ID at the bottom of the threads
      */
     public readonly timelineSet;
+    public timeline: MatrixEvent[];
 
     private _currentUserParticipated = false;
 
@@ -64,6 +65,8 @@ export class Thread extends Receipt<ThreadEvent> {
             context: this,
         });
         events.forEach(event => this.addEvent(event));
+
+        this.timeline = this.timelineSet.getLiveTimeline().getEvents();
 
         room.on(RoomEvents.LocalEchoUpdated, this.onEcho);
         room.on(RoomEvents.Timeline, this.onEcho);
@@ -119,10 +122,6 @@ export class Thread extends Receipt<ThreadEvent> {
         return false;
     }
 
-    public get timeline(): MatrixEvent[] {
-        return this.timelineSet.getLiveTimeline().getEvents();
-    }
-
     /**
      * Finds an event by ID in the current thread
      */
@@ -134,7 +133,7 @@ export class Thread extends Receipt<ThreadEvent> {
      * Return last reply to the thread
      */
     public get lastReply(): MatrixEvent {
-        const threadReplies = this.events
+        const threadReplies = this.timeline
             .filter(event => event.isThreadRelation);
         return threadReplies[threadReplies.length - 1];
     }
@@ -169,7 +168,7 @@ export class Thread extends Receipt<ThreadEvent> {
     }
 
     public get roomId(): string {
-        return this.events[0].getRoomId();
+        return this.timeline[0].getRoomId();
     }
 
     /**
@@ -178,7 +177,7 @@ export class Thread extends Receipt<ThreadEvent> {
      * exclude annotations from that number
      */
     public get length(): number {
-        return this.events
+        return this.timeline
             .filter(event => event.isThreadRelation)
             .length;
     }
@@ -187,19 +186,8 @@ export class Thread extends Receipt<ThreadEvent> {
      * A getter for the last event added to the thread
      */
     public get replyToEvent(): MatrixEvent {
-        const events = this.events;
+        const events = this.timeline;
         return events[events.length -1];
-    }
-
-    public get events(): MatrixEvent[] {
-        return this.timelineSet.getLiveTimeline().getEvents();
-    }
-
-    public merge(thread: Thread): void {
-        thread.events.forEach(event => {
-            this.addEvent(event);
-        });
-        this.events.forEach(event => event.setThread(this));
     }
 
     public has(eventId: string): boolean {
