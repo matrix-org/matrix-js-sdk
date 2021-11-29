@@ -618,14 +618,14 @@ export class RoomState extends EventEmitter {
     }
 
     /**
-     * Returns true if the given MatrixClient has permission to send a state
-     * event of type `stateEventType` into this room.
-     * @param {string} stateEventType The type of state events to test
-     * @param {MatrixClient} cli The client to test permission for
-     * @return {boolean} true if the given client should be permitted to send
-     *                        the given type of state event into this room,
-     *                        according to the room's state.
-     */
+      * Returns true if the given MatrixClient has permission to send a state
+      * event of type `stateEventType` into this room.
+      * @param {string} stateEventType The type of state events to test
+      * @param {MatrixClient} cli The client to test permission for
+      * @return {boolean} true if the given client should be permitted to send
+      *                        the given type of state event into this room,
+      *                        according to the room's state.
+      */
     public mayClientSendStateEvent(stateEventType: EventType | string, cli: MatrixClient): boolean {
         if (cli.isGuest()) {
             return false;
