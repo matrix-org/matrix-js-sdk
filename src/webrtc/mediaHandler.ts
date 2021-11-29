@@ -17,19 +17,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import EventEmitter from "events";
 import { GroupCallType } from "../webrtc/groupCall";
 import { MatrixClient } from "../client";
 import { logger } from "../logger";
 import { CallState } from "./call";
 
-export class MediaHandler {
+export enum MediaHandlerEvent {
+    LocalStreamsChanged = "local_streams_changed"
+}
+
+export class MediaHandler extends EventEmitter {
     private audioInput: string;
     private videoInput: string;
     private localUserMediaStream?: MediaStream;
     public userMediaStreams: MediaStream[] = [];
     public screensharingStreams: MediaStream[] = [];
 
-    constructor(private client: MatrixClient) {}
+    constructor(private client: MatrixClient) {
+        super();
+    }
 
     /**
      * Set an audio input device to use for MatrixCalls
@@ -89,6 +96,8 @@ export class MediaHandler {
 
             await groupCall.updateLocalUsermediaStream(stream);
         }
+
+        this.emit(MediaHandlerEvent.LocalStreamsChanged);
     }
 
     public async hasAudioDevice(): Promise<boolean> {
@@ -148,6 +157,8 @@ export class MediaHandler {
 
         this.userMediaStreams.push(stream);
 
+        this.emit(MediaHandlerEvent.LocalStreamsChanged);
+
         return stream;
     }
 
@@ -166,6 +177,8 @@ export class MediaHandler {
             logger.debug("Splicing usermedia stream out stream array", mediaStream.id);
             this.userMediaStreams.splice(index, 1);
         }
+
+        this.emit(MediaHandlerEvent.LocalStreamsChanged);
     }
 
     /**
@@ -195,6 +208,8 @@ export class MediaHandler {
 
         this.screensharingStreams.push(stream);
 
+        this.emit(MediaHandlerEvent.LocalStreamsChanged);
+
         return stream;
     }
 
@@ -213,6 +228,8 @@ export class MediaHandler {
             logger.debug("Splicing screensharing stream out stream array", mediaStream.id);
             this.screensharingStreams.splice(index, 1);
         }
+
+        this.emit(MediaHandlerEvent.LocalStreamsChanged);
     }
 
     /**
@@ -234,6 +251,8 @@ export class MediaHandler {
         this.userMediaStreams = [];
         this.screensharingStreams = [];
         this.localUserMediaStream = undefined;
+
+        this.emit(MediaHandlerEvent.LocalStreamsChanged);
     }
 
     private getUserMediaContraints(audio: boolean, video: boolean): MediaStreamConstraints {
