@@ -265,6 +265,7 @@ export class MatrixCall extends EventEmitter {
     public hangupReason: string;
     public direction: CallDirection;
     public ourPartyId: string;
+    public peerConn?: RTCPeerConnection;
 
     private client: MatrixClient;
     private forceTURN: boolean;
@@ -275,7 +276,6 @@ export class MatrixCall extends EventEmitter {
     private candidateSendQueue: Array<RTCIceCandidate> = [];
     private candidateSendTries = 0;
     private sentEndOfCandidates = false;
-    private peerConn: RTCPeerConnection;
     private feeds: Array<CallFeed> = [];
     private usermediaSenders: Array<RTCRtpSender> = [];
     private screensharingSenders: Array<RTCRtpSender> = [];
