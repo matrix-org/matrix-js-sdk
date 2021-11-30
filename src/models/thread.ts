@@ -107,10 +107,6 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
             this._currentUserParticipated = true;
         }
 
-        if (this.ready) {
-            this.client.decryptEventIfNeeded(event, {});
-        }
-
         await this.client.decryptEventIfNeeded(event, {});
         this.emit(ThreadEvent.Update, this);
     }
@@ -124,15 +120,6 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
 
     /**
      * Return last reply to the thread
-     */
-    public get lastReply(): MatrixEvent {
-        const threadReplies = this.events
-            .filter(event => event.isThreadRelation);
-        return threadReplies[threadReplies.length - 1];
-    }
-
-    /**
-     * Determines thread's ready status
      */
     public get lastReply(): MatrixEvent {
         const threadReplies = this.events
