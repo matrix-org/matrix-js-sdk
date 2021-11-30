@@ -183,7 +183,7 @@ export class CallEventHandler {
                 return;
             }
 
-            opponentDeviceId = groupCall.getDeviceForMember(senderId)?.device_id;
+            opponentDeviceId = content.device_id;
 
             if (!opponentDeviceId) {
                 logger.warn(`Cannot find a device id for ${senderId}. Ignoring event.`);

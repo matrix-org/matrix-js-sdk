@@ -1997,7 +1997,10 @@ export class MatrixCall extends EventEmitter {
         if (this.opponentDeviceId) {
             return this.client.sendToDevice(eventType, {
                 [this.invitee || this.getOpponentMember().userId]: {
-                    [this.opponentDeviceId]: realContent,
+                    [this.opponentDeviceId]: {
+                        ...realContent,
+                        device_id: this.client.deviceId,
+                    },
                 },
             });
         } else {
