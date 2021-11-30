@@ -31,3 +31,9 @@ try {
 
 export * from "./matrix";
 export default matrixcs;
+
+export * from './@types/event';
+export * from './@types/PushRules';
+export * from './@types/requests';
+export * from './@types/search';
+export * from './models/room-summary';
