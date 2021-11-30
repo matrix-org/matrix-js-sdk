@@ -1748,7 +1748,7 @@ export class Room extends EventEmitter {
             // types X Y Z to the timeline".
             this.addLiveEvent(events[i], duplicateStrategy, fromCache);
             const thread = this.threads.get(events[i].getId());
-            if (thread && !thread.ready) {
+            if (thread) {
                 thread.addEvent(events[i], true);
             }
         }
