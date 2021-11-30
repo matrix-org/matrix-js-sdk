@@ -24,7 +24,6 @@ import {
     TreePermissions,
 } from "../../../src/models/MSC3089TreeSpace";
 import { DEFAULT_ALPHABET } from "../../../src/utils";
-import { MockBlob } from "../../MockBlob";
 import { MatrixError } from "../../../src/http-api";
 
 describe("MSC3089TreeSpace", () => {
@@ -887,12 +886,8 @@ describe("MSC3089TreeSpace", () => {
         const fileName = "My File.txt";
         const fileContents = "This is a test file";
 
-        // Mock out Blob for the test environment
-        (<any>global).Blob = MockBlob;
-
-        const uploadFn = jest.fn().mockImplementation((contents: Blob, opts: any) => {
-            expect(contents).toBeInstanceOf(Blob);
-            expect(contents.size).toEqual(fileContents.length);
+        const uploadFn = jest.fn().mockImplementation((contents: Buffer, opts: any) => {
+            expect(contents.length).toEqual(fileContents.length);
             expect(opts).toMatchObject({
                 includeFilename: false,
                 onlyContentUri: true, // because the tests rely on this - we shouldn't really be testing  for this.
@@ -930,7 +925,7 @@ describe("MSC3089TreeSpace", () => {
             });
         client.sendStateEvent = sendStateFn;
 
-        const buf = Uint8Array.from(Array.from(fileContents).map((_, i) => fileContents.charCodeAt(i)));
+        const buf = Buffer.from(fileContents);
 
         // We clone the file info just to make sure it doesn't get mutated for the test.
         const result = await tree.createFile(fileName, buf, Object.assign({}, fileInfo), { metadata: true });
@@ -951,12 +946,8 @@ describe("MSC3089TreeSpace", () => {
         const fileName = "My File.txt";
         const fileContents = "This is a test file";
 
-        // Mock out Blob for the test environment
-        (<any>global).Blob = MockBlob;
-
-        const uploadFn = jest.fn().mockImplementation((contents: Blob, opts: any) => {
-            expect(contents).toBeInstanceOf(Blob);
-            expect(contents.size).toEqual(fileContents.length);
+        const uploadFn = jest.fn().mockImplementation((contents: Buffer, opts: any) => {
+            expect(contents.length).toEqual(fileContents.length);
             expect(opts).toMatchObject({
                 includeFilename: false,
                 onlyContentUri: true, // because the tests rely on this - we shouldn't really be testing  for this.
@@ -997,7 +988,7 @@ describe("MSC3089TreeSpace", () => {
             });
         client.sendStateEvent = sendStateFn;
 
-        const buf = Uint8Array.from(Array.from(fileContents).map((_, i) => fileContents.charCodeAt(i)));
+        const buf = Buffer.from(fileContents);
 
         // We clone the file info just to make sure it doesn't get mutated for the test.
         const result = await tree.createFile(fileName, buf, Object.assign({}, fileInfo), { "m.new_content": true });
