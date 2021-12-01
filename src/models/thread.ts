@@ -25,6 +25,8 @@ export enum ThreadEvent {
     New = "Thread.new",
     Ready = "Thread.ready",
     Update = "Thread.update",
+    NewReply = "Thread.newReply",
+    ViewThread = "Thred.viewThread",
 }
 
 /**
@@ -109,6 +111,10 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
 
         await this.client.decryptEventIfNeeded(event, {});
         this.emit(ThreadEvent.Update, this);
+
+        if (event.isThreadRelation) {
+            this.emit(ThreadEvent.NewReply, this, event);
+        }
     }
 
     /**
