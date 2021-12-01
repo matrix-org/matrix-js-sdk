@@ -871,8 +871,7 @@ export class MatrixClient extends EventEmitter {
         // state, such as highlights when the user's name is mentioned.
         this.on("Event.decrypted", (event) => {
             const oldActions = event.getPushActions();
-            const actions = this.pushProcessor.actionsForEvent(event);
-            event.setPushActions(actions); // Might as well while we're here
+            const actions = this.getPushActionsForEvent(event, true);
 
             const room = this.getRoom(event.getRoomId());
             if (!room) return;
@@ -882,10 +881,8 @@ export class MatrixClient extends EventEmitter {
             // Ensure the unread counts are kept up to date if the event is encrypted
             // We also want to make sure that the notification count goes up if we already
             // have encrypted events to avoid other code from resetting 'highlight' to zero.
-            const oldHighlight = oldActions && oldActions.tweaks
-                ? !!oldActions.tweaks.highlight : false;
-            const newHighlight = actions && actions.tweaks
-                ? !!actions.tweaks.highlight : false;
+            const oldHighlight = !!oldActions?.tweaks?.highlight ?? false;
+            const newHighlight = !!actions?.tweaks?.highlight ?? false;
             if (oldHighlight !== newHighlight || currentCount > 0) {
                 // TODO: Handle mentions received while the client is offline
                 // See also https://github.com/vector-im/element-web/issues/9069
@@ -4641,10 +4638,12 @@ export class MatrixClient extends EventEmitter {
      * Obtain a dict of actions which should be performed for this event according
      * to the push rules for this user.  Caches the dict on the event.
      * @param {MatrixEvent} event The event to get push actions for.
+     * @param {boolean} forceRecalculate forces to recalculate actions for an event
+     * Useful when an event just got decrypted
      * @return {module:pushprocessor~PushAction} A dict of actions to perform.
      */
-    public getPushActionsForEvent(event: MatrixEvent): IActionsObject {
-        if (!event.getPushActions()) {
+    public getPushActionsForEvent(event: MatrixEvent, forceRecalculate = false): IActionsObject {
+        if (!event.getPushActions() || forceRecalculate) {
             event.setPushActions(this.pushProcessor.actionsForEvent(event));
         }
         return event.getPushActions();
