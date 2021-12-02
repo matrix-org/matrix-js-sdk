@@ -31,6 +31,7 @@ import { MSC3089Branch } from "./MSC3089Branch";
 import promiseRetry from "p-retry";
 import { isRoomSharedHistory } from "../crypto/algorithms/megolm";
 import { ISendEventResponse } from "../@types/requests";
+import type { ReadStream } from "fs";
 
 /**
  * The recommended defaults for a tree space's power levels. Note that this
@@ -449,21 +450,23 @@ export class MSC3089TreeSpace {
 
     /**
      * Creates (uploads) a new file to this tree. The file must have already been encrypted for the room.
+     * The file contents are in a type that is compatible with MatrixClient.uploadContent().
      * @param {string} name The name of the file.
-     * @param {ArrayBuffer} encryptedContents The encrypted contents.
+     * @param {File | String | Buffer | ReadStream | Blob} encryptedContents The encrypted contents.
      * @param {Partial<IEncryptedFile>} info The encrypted file information.
      * @param {IContent} additionalContent Optional event content fields to include in the message.
      * @returns {Promise<ISendEventResponse>} Resolves to the file event's sent response.
      */
     public async createFile(
         name: string,
-        encryptedContents: ArrayBuffer,
+        encryptedContents: File | String | Buffer | ReadStream | Blob,
         info: Partial<IEncryptedFile>,
         additionalContent?: IContent,
     ): Promise<ISendEventResponse> {
-        const mxc = await this.client.uploadContent(new Blob([encryptedContents]), {
+        const mxc = await this.client.uploadContent(encryptedContents, {
             includeFilename: false,
             onlyContentUri: true,
+            rawResponse: false, // make this explicit otherwise behaviour is different on browser vs NodeJS
         });
         info.url = mxc;
 

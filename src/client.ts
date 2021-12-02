@@ -75,11 +75,13 @@ import {
     IKeyBackupPrepareOpts,
     IKeyBackupRestoreOpts,
     IKeyBackupRestoreResult,
+    IKeyBackupRoomSessions,
+    IKeyBackupSession,
 } from "./crypto/keybackup";
 import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
 import type Request from "request";
 import { MatrixScheduler } from "./scheduler";
-import { ICryptoCallbacks, IMinimalEvent, IRoomEvent, IStateEvent, NotificationCountType } from "./matrix";
+import { IAuthData, ICryptoCallbacks, IMinimalEvent, IRoomEvent, IStateEvent, NotificationCountType } from "./matrix";
 import {
     CrossSigningKey,
     IAddSecretStorageKeyOpts,
@@ -677,7 +679,21 @@ interface IRoomSummary extends Omit<IPublicRoomsChunkRoom, "canonical_alias" | "
     membership?: string;
     is_encrypted: boolean;
 }
+
+interface IRoomKeysResponse {
+    sessions: IKeyBackupRoomSessions;
+}
+
+interface IRoomsKeysResponse {
+    rooms: Record<string, IRoomKeysResponse>;
+}
 /* eslint-enable camelcase */
+
+// We're using this constant for methods overloading and inspect whether a variable
+// contains an eventId or not. This was required to ensure backwards compatibility
+// of methods for threads
+// Probably not the most graceful solution but does a good enough job for now
+const EVENT_ID_PREFIX = "$";
 
 /**
  * Represents a Matrix Client. Only directly construct this if you want to use
@@ -724,7 +740,7 @@ export class MatrixClient extends EventEmitter {
     protected fallbackICEServerAllowed = false;
     protected roomList: RoomList;
     protected syncApi: SyncApi;
-    public pushRules: any; // TODO: Types
+    public pushRules: IPushRules;
     protected syncLeftRoomsPromise: Promise<Room[]>;
     protected syncedLeftRooms = false;
     protected clientOpts: IStoredClientOpts;
@@ -2719,7 +2735,6 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise<object>} Status of restoration with `total` and `imported`
      * key counts.
      */
-    // TODO: Types
     public async restoreKeyBackupWithPassword(
         password: string,
         targetRoomId: string,
@@ -2746,7 +2761,6 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise<object>} Status of restoration with `total` and `imported`
      * key counts.
      */
-    // TODO: Types
     public async restoreKeyBackupWithSecretStorage(
         backupInfo: IKeyBackupInfo,
         targetRoomId?: string,
@@ -2783,7 +2797,6 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise<object>} Status of restoration with `total` and `imported`
      * key counts.
      */
-    // TODO: Types
     public restoreKeyBackupWithRecoveryKey(
         recoveryKey: string,
         targetRoomId: string,
@@ -2795,7 +2808,6 @@ export class MatrixClient extends EventEmitter {
         return this.restoreKeyBackup(privKey, targetRoomId, targetSessionId, backupInfo, opts);
     }
 
-    // TODO: Types
     public async restoreKeyBackupWithCache(
         targetRoomId: string,
         targetSessionId: string,
@@ -2856,11 +2868,11 @@ export class MatrixClient extends EventEmitter {
             const res = await this.http.authedRequest(
                 undefined, "GET", path.path, path.queryData, undefined,
                 { prefix: PREFIX_UNSTABLE },
-            );
+            ) as IRoomsKeysResponse | IRoomKeysResponse | IKeyBackupSession;
 
-            if (res.rooms) {
-                // TODO: Types
-                for (const [roomId, roomData] of Object.entries<any>(res.rooms)) {
+            if ((res as IRoomsKeysResponse).rooms) {
+                const rooms = (res as IRoomsKeysResponse).rooms;
+                for (const [roomId, roomData] of Object.entries(rooms)) {
                     if (!roomData.sessions) continue;
 
                     totalKeyCount += Object.keys(roomData.sessions).length;
@@ -2870,9 +2882,10 @@ export class MatrixClient extends EventEmitter {
                         keys.push(k);
                     }
                 }
-            } else if (res.sessions) {
-                totalKeyCount = Object.keys(res.sessions).length;
-                keys = await algorithm.decryptSessions(res.sessions);
+            } else if ((res as IRoomKeysResponse).sessions) {
+                const sessions = (res as IRoomKeysResponse).sessions;
+                totalKeyCount = Object.keys(sessions).length;
+                keys = await algorithm.decryptSessions(sessions);
                 for (const k of keys) {
                     k.room_id = targetRoomId;
                 }
@@ -2880,7 +2893,7 @@ export class MatrixClient extends EventEmitter {
                 totalKeyCount = 1;
                 try {
                     const [key] = await algorithm.decryptSessions({
-                        [targetSessionId]: res,
+                        [targetSessionId]: res as IKeyBackupSession,
                     });
                     key.room_id = targetRoomId;
                     key.session_id = targetSessionId;
@@ -3385,10 +3398,11 @@ export class MatrixClient extends EventEmitter {
 
     /**
      * @param {string} roomId
+     * @param {string} threadId
      * @param {string} eventType
      * @param {Object} content
      * @param {string} txnId Optional.
-     * @param {module:client.callback} callback Optional.
+     * @param {module:client.callback} callback Optional. Deprecated
      * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
@@ -3398,20 +3412,45 @@ export class MatrixClient extends EventEmitter {
         content: IContent,
         txnId?: string,
         callback?: Callback,
+    );
+    public sendEvent(
+        roomId: string,
+        threadId: string | null,
+        eventType: string,
+        content: IContent,
+        txnId?: string,
+        callback?: Callback,
+    )
+    public sendEvent(
+        roomId: string,
+        threadId: string | null,
+        eventType: string | IContent,
+        content: IContent | string,
+        txnId?: string | Callback,
+        callback?: Callback,
     ): Promise<ISendEventResponse> {
-        return this.sendCompleteEvent(roomId, { type: eventType, content }, txnId, callback);
+        if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
+            callback = txnId as Callback;
+            txnId = content as string;
+            content = eventType as IContent;
+            eventType = threadId;
+            threadId = null;
+        }
+        return this.sendCompleteEvent(roomId, threadId, { type: eventType, content }, txnId as string, callback);
     }
 
     /**
      * @param {string} roomId
+     * @param {string} threadId
      * @param {object} eventObject An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
      * @param {string} txnId Optional.
-     * @param {module:client.callback} callback Optional.
+     * @param {module:client.callback} callback Optional. Deprecated
      * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     private sendCompleteEvent(
         roomId: string,
+        threadId: string | null,
         eventObject: any,
         txnId?: string,
         callback?: Callback,
@@ -3437,6 +3476,10 @@ export class MatrixClient extends EventEmitter {
         }));
 
         const room = this.getRoom(roomId);
+        const thread = room?.threads.get(threadId);
+        if (thread) {
+            localEvent.setThread(thread);
+        }
 
         // if this is a relation or redaction of an event
         // that hasn't been sent yet (e.g. with a local id starting with a ~)
@@ -3453,12 +3496,12 @@ export class MatrixClient extends EventEmitter {
         const type = localEvent.getType();
         logger.log(`sendEvent of type ${type} in ${roomId} with txnId ${txnId}`);
 
-        localEvent.setTxnId(txnId);
+        localEvent.setTxnId(txnId as string);
         localEvent.setStatus(EventStatus.SENDING);
 
         // add this event immediately to the local store as 'sending'.
         if (room) {
-            room.addPendingEvent(localEvent, txnId);
+            room.addPendingEvent(localEvent, txnId as string);
         }
 
         // addPendingEvent can change the state to NOT_SENT if it believes
@@ -3648,31 +3691,52 @@ export class MatrixClient extends EventEmitter {
      *    supplied.
      * @param {object|module:client.callback} cbOrOpts
      *    Options to pass on, may contain `reason`.
-     *    Can be callback for backwards compatibility.
+     *    Can be callback for backwards compatibility. Deprecated
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public redactEvent(
         roomId: string,
         eventId: string,
-        txnId?: string,
+        txnId?: string | undefined,
+        cbOrOpts?: Callback | IRedactOpts,
+    );
+    public redactEvent(
+        roomId: string,
+        threadId: string | null,
+        eventId: string,
+        txnId?: string | undefined,
+        cbOrOpts?: Callback | IRedactOpts,
+    );
+    public redactEvent(
+        roomId: string,
+        threadId: string | null,
+        eventId?: string,
+        txnId?: string | Callback | IRedactOpts,
         cbOrOpts?: Callback | IRedactOpts,
     ): Promise<ISendEventResponse> {
+        if (!eventId || eventId.startsWith(EVENT_ID_PREFIX)) {
+            cbOrOpts = txnId as (Callback | IRedactOpts);
+            txnId = eventId;
+            eventId = threadId;
+            threadId = null;
+        }
         const opts = typeof (cbOrOpts) === 'object' ? cbOrOpts : {};
         const reason = opts.reason;
         const callback = typeof (cbOrOpts) === 'function' ? cbOrOpts : undefined;
-        return this.sendCompleteEvent(roomId, {
+        return this.sendCompleteEvent(roomId, threadId, {
             type: EventType.RoomRedaction,
             content: { reason: reason },
             redacts: eventId,
-        }, txnId, callback);
+        }, txnId as string, callback);
     }
 
     /**
      * @param {string} roomId
+     * @param {string} threadId
      * @param {Object} content
      * @param {string} txnId Optional.
-     * @param {module:client.callback} callback Optional.
+     * @param {module:client.callback} callback Optional. Deprecated
      * @return {Promise} Resolves: to an ISendEventResponse object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
@@ -3681,19 +3745,47 @@ export class MatrixClient extends EventEmitter {
         content: IContent,
         txnId?: string,
         callback?: Callback,
+    )
+    public sendMessage(
+        roomId: string,
+        threadId: string | null,
+        content: IContent,
+        txnId?: string,
+        callback?: Callback,
+    )
+    public sendMessage(
+        roomId: string,
+        threadId: string | null | IContent,
+        content: IContent | string,
+        txnId?: string | Callback,
+        callback?: Callback,
     ): Promise<ISendEventResponse> {
+        if (typeof threadId !== "string" && threadId !== null) {
+            callback = txnId as Callback;
+            txnId = content as string;
+            content = threadId as IContent;
+            threadId = null;
+        }
         if (utils.isFunction(txnId)) {
             callback = txnId as any as Callback; // for legacy
             txnId = undefined;
         }
-        return this.sendEvent(roomId, EventType.RoomMessage, content, txnId, callback);
+        return this.sendEvent(
+            roomId,
+            threadId as (string | null),
+            EventType.RoomMessage,
+            content as IContent,
+            txnId as string,
+            callback,
+        );
     }
 
     /**
      * @param {string} roomId
+     * @param {string} threadId
      * @param {string} body
      * @param {string} txnId Optional.
-     * @param {module:client.callback} callback Optional.
+     * @param {module:client.callback} callback Optional. Deprecated
      * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
@@ -3702,29 +3794,76 @@ export class MatrixClient extends EventEmitter {
         body: string,
         txnId?: string,
         callback?: Callback,
+    )
+    public sendTextMessage(
+        roomId: string,
+        threadId: string | null,
+        body: string,
+        txnId?: string,
+        callback?: Callback,
+    )
+    public sendTextMessage(
+        roomId: string,
+        threadId: string | null,
+        body: string,
+        txnId?: string | Callback,
+        callback?: Callback,
     ): Promise<ISendEventResponse> {
+        if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
+            callback = txnId as Callback;
+            txnId = body;
+            body = threadId;
+            threadId = null;
+        }
         const content = ContentHelpers.makeTextMessage(body);
-        return this.sendMessage(roomId, content, txnId, callback);
+        return this.sendMessage(roomId, threadId, content, txnId as string, callback);
     }
 
     /**
      * @param {string} roomId
+     * @param {string} threadId
      * @param {string} body
      * @param {string} txnId Optional.
-     * @param {module:client.callback} callback Optional.
+     * @param {module:client.callback} callback Optional. Deprecated
      * @return {Promise} Resolves: to a ISendEventResponse object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public sendNotice(roomId: string, body: string, txnId?: string, callback?: Callback): Promise<ISendEventResponse> {
+    public sendNotice(
+        roomId: string,
+        body: string,
+        txnId?: string,
+        callback?: Callback,
+    )
+    public sendNotice(
+        roomId: string,
+        threadId: string | null,
+        body: string,
+        txnId?: string,
+        callback?: Callback,
+    );
+    public sendNotice(
+        roomId: string,
+        threadId: string | null,
+        body: string,
+        txnId?: string | Callback,
+        callback?: Callback,
+    ): Promise<ISendEventResponse> {
+        if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
+            callback = txnId as Callback;
+            txnId = body;
+            body = threadId;
+            threadId = null;
+        }
         const content = ContentHelpers.makeNotice(body);
-        return this.sendMessage(roomId, content, txnId, callback);
+        return this.sendMessage(roomId, threadId, content, txnId as string, callback);
     }
 
     /**
      * @param {string} roomId
+     * @param {string} threadId
      * @param {string} body
      * @param {string} txnId Optional.
-     * @param {module:client.callback} callback Optional.
+     * @param {module:client.callback} callback Optional. Deprecated
      * @return {Promise} Resolves: to a ISendEventResponse object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
@@ -3733,17 +3872,38 @@ export class MatrixClient extends EventEmitter {
         body: string,
         txnId?: string,
         callback?: Callback,
+    )
+    public sendEmoteMessage(
+        roomId: string,
+        threadId: string | null,
+        body: string,
+        txnId?: string,
+        callback?: Callback,
+    );
+    public sendEmoteMessage(
+        roomId: string,
+        threadId: string | null,
+        body: string,
+        txnId?: string | Callback,
+        callback?: Callback,
     ): Promise<ISendEventResponse> {
+        if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
+            callback = txnId as Callback;
+            txnId = body;
+            body = threadId;
+            threadId = null;
+        }
         const content = ContentHelpers.makeEmoteMessage(body);
-        return this.sendMessage(roomId, content, txnId, callback);
+        return this.sendMessage(roomId, threadId, content, txnId as string, callback);
     }
 
     /**
      * @param {string} roomId
+     * @param {string} threadId
      * @param {string} url
      * @param {Object} info
      * @param {string} text
-     * @param {module:client.callback} callback Optional.
+     * @param {module:client.callback} callback Optional. Deprecated
      * @return {Promise} Resolves: to a ISendEventResponse object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
@@ -3751,9 +3911,32 @@ export class MatrixClient extends EventEmitter {
         roomId: string,
         url: string,
         info?: IImageInfo,
-        text = "Image",
+        text?: string,
+        callback?: Callback,
+    );
+    public sendImageMessage(
+        roomId: string,
+        threadId: string | null,
+        url: string,
+        info?: IImageInfo,
+        text?: string,
+        callback?: Callback,
+    );
+    public sendImageMessage(
+        roomId: string,
+        threadId: string | null,
+        url: string | IImageInfo,
+        info?: IImageInfo | string,
+        text: Callback | string = "Image",
         callback?: Callback,
     ): Promise<ISendEventResponse> {
+        if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
+            callback = text as Callback;
+            text = info as string || "Image";
+            info = url as IImageInfo;
+            url = threadId as string;
+            threadId = null;
+        }
         if (utils.isFunction(text)) {
             callback = text as any as Callback; // legacy
             text = undefined;
@@ -3764,15 +3947,16 @@ export class MatrixClient extends EventEmitter {
             info: info,
             body: text,
         };
-        return this.sendMessage(roomId, content, undefined, callback);
+        return this.sendMessage(roomId, threadId, content, undefined, callback);
     }
 
     /**
      * @param {string} roomId
+     * @param {string} threadId
      * @param {string} url
      * @param {Object} info
      * @param {string} text
-     * @param {module:client.callback} callback Optional.
+     * @param {module:client.callback} callback Optional. Deprecated
      * @return {Promise} Resolves: to a ISendEventResponse object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
@@ -3780,9 +3964,32 @@ export class MatrixClient extends EventEmitter {
         roomId: string,
         url: string,
         info?: IImageInfo,
-        text = "Sticker",
+        text?: string,
+        callback?: Callback,
+    );
+    public sendStickerMessage(
+        roomId: string,
+        threadId: string | null,
+        url: string,
+        info?: IImageInfo,
+        text?: string,
+        callback?: Callback,
+    );
+    public sendStickerMessage(
+        roomId: string,
+        threadId: string | null,
+        url: string | IImageInfo,
+        info?: IImageInfo | string,
+        text: Callback | string = "Sticker",
         callback?: Callback,
     ): Promise<ISendEventResponse> {
+        if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
+            callback = text as Callback;
+            text = info as string || "Sticker";
+            info = url as IImageInfo;
+            url = threadId as string;
+            threadId = null;
+        }
         if (utils.isFunction(text)) {
             callback = text as any as Callback; // legacy
             text = undefined;
@@ -3792,14 +3999,15 @@ export class MatrixClient extends EventEmitter {
             info: info,
             body: text,
         };
-        return this.sendEvent(roomId, EventType.Sticker, content, undefined, callback);
+        return this.sendEvent(roomId, threadId, EventType.Sticker, content, undefined, callback);
     }
 
     /**
      * @param {string} roomId
+     * @param {string} threadId
      * @param {string} body
      * @param {string} htmlBody
-     * @param {module:client.callback} callback Optional.
+     * @param {module:client.callback} callback Optional. Deprecated
      * @return {Promise} Resolves: to a ISendEventResponse object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
@@ -3808,16 +4016,36 @@ export class MatrixClient extends EventEmitter {
         body: string,
         htmlBody: string,
         callback?: Callback,
+    );
+    public sendHtmlMessage(
+        roomId: string,
+        threadId: string | null,
+        body: string,
+        htmlBody: string,
+        callback?: Callback,
+    )
+    public sendHtmlMessage(
+        roomId: string,
+        threadId: string | null,
+        body: string,
+        htmlBody: string | Callback,
+        callback?: Callback,
     ): Promise<ISendEventResponse> {
-        const content = ContentHelpers.makeHtmlMessage(body, htmlBody);
-        return this.sendMessage(roomId, content, undefined, callback);
+        if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
+            callback = htmlBody as Callback;
+            htmlBody = body as string;
+            body = threadId;
+            threadId = null;
+        }
+        const content = ContentHelpers.makeHtmlMessage(body, htmlBody as string);
+        return this.sendMessage(roomId, threadId, content, undefined, callback);
     }
 
     /**
      * @param {string} roomId
      * @param {string} body
      * @param {string} htmlBody
-     * @param {module:client.callback} callback Optional.
+     * @param {module:client.callback} callback Optional. Deprecated
      * @return {Promise} Resolves: to a ISendEventResponse object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
@@ -3826,16 +4054,37 @@ export class MatrixClient extends EventEmitter {
         body: string,
         htmlBody: string,
         callback?: Callback,
+    );
+    public sendHtmlNotice(
+        roomId: string,
+        threadId: string | null,
+        body: string,
+        htmlBody: string,
+        callback?: Callback,
+    )
+    public sendHtmlNotice(
+        roomId: string,
+        threadId: string | null,
+        body: string,
+        htmlBody: string | Callback,
+        callback?: Callback,
     ): Promise<ISendEventResponse> {
-        const content = ContentHelpers.makeHtmlNotice(body, htmlBody);
-        return this.sendMessage(roomId, content, undefined, callback);
+        if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
+            callback = htmlBody as Callback;
+            htmlBody = body as string;
+            body = threadId;
+            threadId = null;
+        }
+        const content = ContentHelpers.makeHtmlNotice(body, htmlBody as string);
+        return this.sendMessage(roomId, threadId, content, undefined, callback);
     }
 
     /**
      * @param {string} roomId
+     * @param {string} threadId
      * @param {string} body
      * @param {string} htmlBody
-     * @param {module:client.callback} callback Optional.
+     * @param {module:client.callback} callback Optional. Deprecated
      * @return {Promise} Resolves: to a ISendEventResponse object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
@@ -3844,9 +4093,29 @@ export class MatrixClient extends EventEmitter {
         body: string,
         htmlBody: string,
         callback?: Callback,
+    );
+    public sendHtmlEmote(
+        roomId: string,
+        threadId: string | null,
+        body: string,
+        htmlBody: string,
+        callback?: Callback,
+    )
+    public sendHtmlEmote(
+        roomId: string,
+        threadId: string | null,
+        body: string,
+        htmlBody: string | Callback,
+        callback?: Callback,
     ): Promise<ISendEventResponse> {
-        const content = ContentHelpers.makeHtmlEmote(body, htmlBody);
-        return this.sendMessage(roomId, content, undefined, callback);
+        if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
+            callback = htmlBody as Callback;
+            htmlBody = body as string;
+            body = threadId;
+            threadId = null;
+        }
+        const content = ContentHelpers.makeHtmlEmote(body, htmlBody as string);
+        return this.sendMessage(roomId, threadId, content, undefined, callback);
     }
 
     /**
@@ -4578,7 +4847,12 @@ export class MatrixClient extends EventEmitter {
                     const stateEvents = res.state.map(this.getEventMapper());
                     room.currentState.setUnknownStateEvents(stateEvents);
                 }
-                room.addEventsToTimeline(matrixEvents, true, room.getLiveTimeline());
+
+                const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(matrixEvents);
+
+                room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
+                this.processThreadEvents(room, threadedEvents);
+
                 room.oldState.paginationToken = res.end;
                 if (res.chunk.length === 0) {
                     room.oldState.paginationToken = null;
@@ -4684,7 +4958,11 @@ export class MatrixClient extends EventEmitter {
                 const stateEvents = res.state.map(this.getEventMapper());
                 timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(stateEvents);
             }
-            timelineSet.addEventsToTimeline(matrixEvents, true, timeline, res.start);
+
+            const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(matrixEvents);
+
+            timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
+            this.processThreadEvents(timelineSet.room, threadedEvents);
 
             // there is no guarantee that the event ended up in "timeline" (we
             // might have switched to a neighbouring timeline) - so check the
@@ -4817,8 +5095,11 @@ export class MatrixClient extends EventEmitter {
                     matrixEvents[i] = event;
                 }
 
-                eventTimeline.getTimelineSet()
-                    .addEventsToTimeline(matrixEvents, backwards, eventTimeline, token);
+                const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(matrixEvents);
+
+                const timelineSet = eventTimeline.getTimelineSet();
+                timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
+                this.processThreadEvents(timelineSet.room, threadedEvents);
 
                 // if we've hit the end of the timeline, we need to stop trying to
                 // paginate. We need to keep the 'forwards' token though, to make sure
@@ -4851,8 +5132,12 @@ export class MatrixClient extends EventEmitter {
                 }
                 const token = res.end;
                 const matrixEvents = res.chunk.map(this.getEventMapper());
+
+                const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(matrixEvents);
+
                 eventTimeline.getTimelineSet()
-                    .addEventsToTimeline(matrixEvents, backwards, eventTimeline, token);
+                    .addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
+                this.processThreadEvents(room, threadedEvents);
 
                 // if we've hit the end of the timeline, we need to stop trying to
                 // paginate. We need to keep the 'forwards' token though, to make sure
@@ -5999,7 +6284,9 @@ export class MatrixClient extends EventEmitter {
         if (fetchedEventType === EventType.RoomMessageEncrypted) {
             const allEvents = originalEvent ? events.concat(originalEvent) : events;
             await Promise.all(allEvents.map(e => {
-                return new Promise(resolve => e.once("Event.decrypted", resolve));
+                if (e.isEncrypted()) {
+                    return new Promise(resolve => e.once("Event.decrypted", resolve));
+                }
             }));
             events = events.filter(e => e.getType() === eventType);
         }
@@ -6588,7 +6875,7 @@ export class MatrixClient extends EventEmitter {
         eventType: string,
         stateKey: string,
         callback?: Callback,
-    ): Promise<IStateEventWithRoomId> {
+    ): Promise<Record<string, any>> {
         const pathParams = {
             $roomId: roomId,
             $eventType: eventType,
@@ -7492,7 +7779,7 @@ export class MatrixClient extends EventEmitter {
         return this.http.authedRequest(undefined, "GET", path, qps, undefined);
     }
 
-    public uploadDeviceSigningKeys(auth: any, keys?: CrossSigningKeys): Promise<{}> { // TODO: types
+    public uploadDeviceSigningKeys(auth?: IAuthData, keys?: CrossSigningKeys): Promise<{}> {
         const data = Object.assign({}, keys);
         if (auth) Object.assign(data, { auth });
         return this.http.authedRequest(
@@ -8550,6 +8837,60 @@ export class MatrixClient extends EventEmitter {
             qsStringifyOptions: { arrayFormat: 'repeat' },
             prefix: "/_matrix/client/unstable/im.nheko.summary",
         });
+    }
+
+    public partitionThreadedEvents(events: MatrixEvent[]): [MatrixEvent[], MatrixEvent[]] {
+        // Indices to the events array, for readibility
+        const ROOM = 0;
+        const THREAD = 1;
+        const threadRoots = new Set<string>();
+        if (this.supportsExperimentalThreads()) {
+            return events.reduce((memo, event: MatrixEvent) => {
+                const room = this.getRoom(event.getRoomId());
+                // An event should live in the thread timeline if
+                // - It's a reply in thread event
+                // - It's related to a reply in thread event
+                let shouldLiveInThreadTimeline = event.isThreadRelation;
+                if (shouldLiveInThreadTimeline) {
+                    threadRoots.add(event.relationEventId);
+                } else {
+                    const parentEventId = event.parentEventId;
+                    const parentEvent = room?.findEventById(parentEventId) || events.find((mxEv: MatrixEvent) => {
+                        return mxEv.getId() === parentEventId;
+                    });
+                    shouldLiveInThreadTimeline = parentEvent?.isThreadRelation;
+
+                    // Copy all the reactions and annotations to the root event
+                    // to the thread timeline. They will end up living in both
+                    // timelines at the same time
+                    const targetingThreadRoot = parentEvent?.isThreadRoot || threadRoots.has(event.relationEventId);
+                    if (targetingThreadRoot && !event.isThreadRelation && event.relationEventId) {
+                        memo[THREAD].push(event);
+                    }
+                }
+                const targetTimeline = shouldLiveInThreadTimeline ? THREAD : ROOM;
+                memo[targetTimeline].push(event);
+                return memo;
+            }, [[], []]);
+        } else {
+            // When `experimentalThreadSupport` is disabled
+            // treat all events as timelineEvents
+            return [
+                events,
+                [],
+            ];
+        }
+    }
+
+    /**
+     * @experimental
+     */
+    public processThreadEvents(room: Room, threadedEvents: MatrixEvent[]): void {
+        threadedEvents
+            .sort((a, b) => a.getTs() - b.getTs())
+            .forEach(event => {
+                room.addThreadedEvent(event);
+            });
     }
 }
 

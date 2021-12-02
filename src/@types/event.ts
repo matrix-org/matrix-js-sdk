@@ -111,6 +111,7 @@ export enum MsgType {
     Audio = "m.audio",
     Location = "m.location",
     Video = "m.video",
+    KeyVerificationRequest = "m.key.verification.request",
 }
 
 export const RoomCreateTypeField = "type";
