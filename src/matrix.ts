@@ -45,6 +45,11 @@ export * from "./store/indexeddb";
 export * from "./store/session/webstorage";
 export * from "./crypto/store/memory-crypto-store";
 export * from "./crypto/store/indexeddb-crypto-store";
+export * from './@types/event';
+export * from './@types/PushRules';
+export * from './@types/requests';
+export * from './@types/search';
+export * from './models/room-summary';
 export * from "./content-repo";
 export * as ContentHelpers from "./content-helpers";
 export {
