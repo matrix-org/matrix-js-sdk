@@ -245,8 +245,11 @@ export class MSC3089TreeSpace {
         const children = this.room.currentState.getStateEvents(EventType.SpaceChild);
         for (const child of children) {
             try {
-                const tree = this.client.unstableGetFileTreeSpace(child.getStateKey());
-                if (tree) trees.push(tree);
+                const stateKey = child.getStateKey();
+                if (stateKey) {
+                    const tree = this.client.unstableGetFileTreeSpace(stateKey);
+                    if (tree) trees.push(tree);
+                }
             } catch (e) {
                 logger.warn("Unable to create tree space instance for listing. Are we joined?", e);
             }
@@ -278,8 +281,12 @@ export class MSC3089TreeSpace {
         const members = this.room.currentState.getStateEvents(EventType.RoomMember);
         for (const member of members) {
             const isNotUs = member.getStateKey() !== this.client.getUserId();
-            if (isNotUs && kickMemberships.includes(member.getContent()['membership'])) {
-                await this.client.kick(this.roomId, member.getStateKey(), "Room deleted");
+            if (isNotUs && kickMemberships.includes(member.getContent<string>()['membership'])) {
+                const stateKey = member.getStateKey();
+                if (!stateKey) {
+                    throw new Error("State key not found for branch");
+                }
+                await this.client.kick(this.roomId, stateKey, "Room deleted");
             }
         }
 
@@ -288,7 +295,8 @@ export class MSC3089TreeSpace {
 
     private getOrderedChildren(children: MatrixEvent[]): { roomId: string, order: string }[] {
         const ordered: { roomId: string, order: string }[] = children
-            .map(c => ({ roomId: c.getStateKey(), order: c.getContent()['order'] }));
+            .map(c => ({ roomId: c.getStateKey(), order: c.getContent()['order'] }))
+            .filter(c => c.roomId) as { roomId: string, order: string }[];
         ordered.sort((a, b) => {
             if (a.order && !b.order) {
                 return -1;
@@ -321,7 +329,9 @@ export class MSC3089TreeSpace {
 
         // XXX: We are assuming the parent is a valid tree space.
         // We probably don't need to validate the parent room state for this usecase though.
-        const parentRoom = this.client.getRoom(parent.getStateKey());
+        const stateKey = parent.getStateKey();
+        if (!stateKey) throw new Error("No state key found for parent");
+        const parentRoom = this.client.getRoom(stateKey);
         if (!parentRoom) throw new Error("Unable to locate room for parent");
 
         return parentRoom;
@@ -413,7 +423,7 @@ export class MSC3089TreeSpace {
             // We were asked by the order algorithm to prepare the moving space for a landing
             // in the undefined order part of the order array, which means we need to update the
             // spaces that come before it with a stable order value.
-            let lastOrder: string;
+            let lastOrder: string | undefined;
             for (let i = 0; i <= index; i++) {
                 const target = ordered[i];
                 if (i === 0) {
@@ -432,7 +442,9 @@ export class MSC3089TreeSpace {
                     lastOrder = target.order;
                 }
             }
-            newOrder = nextString(lastOrder);
+            if (lastOrder) {
+                newOrder = nextString(lastOrder);
+            }
         }
 
         // TODO: Deal with order conflicts by reordering
