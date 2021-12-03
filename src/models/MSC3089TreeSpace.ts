@@ -258,9 +258,9 @@ export class MSC3089TreeSpace {
      * Gets a subdirectory of a given ID under this tree space. Note that this will not recurse
      * into children and instead only look one level deep.
      * @param {string} roomId The room ID (directory ID) to find.
-     * @returns {MSC3089TreeSpace} The directory, or falsy if not found.
+     * @returns {MSC3089TreeSpace | undefined} The directory, or undefined if not found.
      */
-    public getDirectory(roomId: string): MSC3089TreeSpace {
+    public getDirectory(roomId: string): MSC3089TreeSpace | undefined {
         return this.getDirectories().find(r => r.roomId === roomId);
     }
 
@@ -502,9 +502,9 @@ export class MSC3089TreeSpace {
     /**
      * Retrieves a file from the tree.
      * @param {string} fileEventId The event ID of the file.
-     * @returns {MSC3089Branch} The file, or falsy if not found.
+     * @returns {MSC3089Branch | null} The file, or null if not found.
      */
-    public getFile(fileEventId: string): MSC3089Branch {
+    public getFile(fileEventId: string): MSC3089Branch | null {
         const branch = this.room.currentState.getStateEvents(UNSTABLE_MSC3089_BRANCH.name, fileEventId);
         return branch ? new MSC3089Branch(this.client, branch, this) : null;
     }
