@@ -38,7 +38,11 @@ export class MSC3089Branch {
      * The file ID.
      */
     public get id(): string {
-        return this.indexEvent.getStateKey();
+        const stateKey = this.indexEvent.getStateKey();
+        if (!stateKey) {
+            throw new Error("State key not found for branch");
+        }
+        return stateKey;
     }
 
     /**
@@ -121,6 +125,10 @@ export class MSC3089Branch {
         const file = event.getOriginalContent()['file'];
         const httpUrl = this.client.mxcUrlToHttp(file['url']);
 
+        if (!httpUrl) {
+            throw new Error(`No HTTP URL available for ${file['url']}`);
+        }
+
         return { info: file, httpUrl: httpUrl };
     }
 
@@ -199,7 +207,7 @@ export class MSC3089Branch {
         // XXX: This is a very inefficient search, but it's the best we can do with the
         // relations structure we have in the SDK. As of writing, it is not worth the
         // investment in improving the structure.
-        let childEvent: MatrixEvent;
+        let childEvent: MatrixEvent | undefined;
         let parentEvent = await this.getFileEvent();
         do {
             childEvent = timelineEvents.find(e => e.replacingEventId() === parentEvent.getId());
