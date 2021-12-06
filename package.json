@@ -35,6 +35,7 @@
   "matrix_src_browser": "./src/browser-index.js",
   "matrix_lib_main": "./lib/index.js",
   "matrix_lib_typings": "./lib/index.d.ts",
+  "types": "./lib",
   "author": "matrix.org",
   "license": "Apache-2.0",
   "files": [
