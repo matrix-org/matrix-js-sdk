@@ -1852,16 +1852,7 @@ export class Room extends EventEmitter {
         });
     }
 
-    /**
-     * Get the ID of the event that a given user has read up to, or null if we
-     * have received no read receipts from them.
-     * @param {String} userId The user ID to get read receipt event ID for
-     * @param {Boolean} ignoreSynthesized If true, return only receipts that have been
-     *                                    sent by the server, not implicit ones generated
-     *                                    by the JS SDK.
-     * @return {String} ID of the latest event that the given user has read, or null.
-     */
-    public getEventReadUpTo(userId: string, ignoreSynthesized = false): string | null {
+    public getReadReceiptForUserId(userId: string, ignoreSynthesized = false): IWrappedReceipt | null {
         let receipts = this.receipts;
         if (ignoreSynthesized) {
             receipts = this.realReceipts;
@@ -1874,7 +1865,21 @@ export class Room extends EventEmitter {
             return null;
         }
 
-        return receipts["m.read"][userId].eventId;
+        return receipts["m.read"][userId];
+    }
+
+    /**
+     * Get the ID of the event that a given user has read up to, or null if we
+     * have received no read receipts from them.
+     * @param {String} userId The user ID to get read receipt event ID for
+     * @param {Boolean} ignoreSynthesized If true, return only receipts that have been
+     *                                    sent by the server, not implicit ones generated
+     *                                    by the JS SDK.
+     * @return {String} ID of the latest event that the given user has read, or null.
+     */
+    public getEventReadUpTo(userId: string, ignoreSynthesized = false): string | null {
+        const readReceipt = this.getReadReceiptForUserId(userId, ignoreSynthesized);
+        return readReceipt?.eventId ?? null;
     }
 
     /**
