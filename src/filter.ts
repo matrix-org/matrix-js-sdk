@@ -66,7 +66,7 @@ export interface IRoomEventFilter extends IFilterComponent {
     lazy_load_members?: boolean;
     include_redundant_members?: boolean;
     types?: EventType[] | string[];
-    [UNSTABLE_FILTER_RELATION_TYPES.name]?: RelationType[] | string[];
+    [UNSTABLE_FILTER_RELATION_TYPES.name]?: Array<RelationType | string>;
     [UNSTABLE_FILTER_RELATION_SENDERS.name]?: string[];
 }
 
