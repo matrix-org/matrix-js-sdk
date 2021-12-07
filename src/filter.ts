@@ -18,6 +18,7 @@ limitations under the License.
  * @module filter
  */
 
+import { EventType, RelationType } from "./@types/event";
 import { FilterComponent, IFilterComponent } from "./filter-component";
 import { MatrixEvent } from "./models/event";
 
@@ -50,6 +51,9 @@ export interface IFilterDefinition {
 export interface IRoomEventFilter extends IFilterComponent {
     lazy_load_members?: boolean;
     include_redundant_members?: boolean;
+    types?: EventType[] | string[];
+    relation_types?: RelationType[] | string[];
+    relation_senders?: string[];
 }
 
 interface IStateFilter extends IRoomEventFilter {}
