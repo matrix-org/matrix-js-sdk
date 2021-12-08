@@ -1288,34 +1288,8 @@ export class Room extends EventEmitter {
      * @experimental
      */
     public async addThreadedEvent(event: MatrixEvent): Promise<void> {
-        let thread = this.findThreadForEvent(event);
-        if (thread) {
-            thread.addEvent(event);
-        } else {
-            const events = [event];
-            let rootEvent = this.findEventById(event.threadRootId);
-            // If the rootEvent does not exist in the current sync, then look for
-            // it over the network
-            if (!rootEvent) {
-                const eventData = await this.client.fetchRoomEvent(this.roomId, event.threadRootId);
-                rootEvent = new MatrixEvent(eventData);
-            }
-            events.unshift(rootEvent);
-            thread = new Thread(events, this, this.client);
-            this.threads.set(thread.id, thread);
-            this.reEmitter.reEmit(thread, [ThreadEvent.Update, ThreadEvent.Ready]);
-            this.emit(ThreadEvent.New, thread);
-        }
-
-        if (event.getUnsigned().transaction_id) {
-            const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id];
-            if (existingEvent) {
-                // remote echo of an event we sent earlier
-                this.handleRemoteEcho(event, existingEvent);
-                return;
-            }
-        }
-
+        const thread = this.findThreadForEvent(event);
+        thread.addEvent(event);
         this.emit(ThreadEvent.Update, thread);
     }
 
@@ -1749,7 +1723,7 @@ export class Room extends EventEmitter {
             this.addLiveEvent(events[i], duplicateStrategy, fromCache);
             const thread = this.threads.get(events[i].getId());
             if (thread) {
-                thread.addEvent(events[i], true);
+                thread.addEvent(events[i]);
             }
         }
     }

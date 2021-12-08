@@ -28,6 +28,7 @@ import {
     EventType,
     MsgType,
     RelationType,
+    ThreadBundledRelation,
 } from "../@types/event";
 import { Crypto } from "../crypto";
 import { deepSortedObjectEntries } from "../utils";
@@ -88,6 +89,7 @@ export interface IUnsigned {
     redacted_because?: IEvent;
     transaction_id?: string;
     invite_room_state?: StrippedState[];
+    "m.relations"?: Record<RelationType | string, any>; // TODO Types
 }
 
 export interface IEvent {
@@ -424,6 +426,8 @@ export class MatrixEvent extends EventEmitter {
         const relatesTo = this.getWireContent()?.["m.relates_to"];
         if (relatesTo?.rel_type === RelationType.Thread) {
             return relatesTo.event_id;
+        } else if (this.isThreadRoot) {
+            return this.getId();
         }
     }
 
@@ -431,17 +435,22 @@ export class MatrixEvent extends EventEmitter {
      * @experimental
      */
     public get isThreadRelation(): boolean {
-        return !!this.threadRootId;
+        const relatesTo = this.getWireContent()?.["m.relates_to"];
+        const hasThreadRelType = relatesTo?.rel_type === RelationType.Thread;
+        return (this.getThread() || hasThreadRelType) && !this.isThreadRoot;
+    }
+
+    public getAggregatedRelationship<T>(type: RelationType | string): T {
+        return this.getUnsigned()?.["m.relations"]?.[type] as T;
     }
 
     /**
      * @experimental
      */
     public get isThreadRoot(): boolean {
-        // TODO, change the inner working of this getter for it to use the
-        // bundled relationship return on the event, view MSC3440
-        const thread = this.getThread();
-        return thread?.id === this.getId();
+        const isThreadRootWithoutServerSupport = this.getThread() && this.getThread().id === this.getId();
+        const threadBundle = this.getAggregatedRelationship<ThreadBundledRelation>(RelationType.Thread);
+        return !!threadBundle || isThreadRootWithoutServerSupport;
     }
 
     public get parentEventId(): string {

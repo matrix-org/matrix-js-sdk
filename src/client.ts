@@ -149,6 +149,7 @@ import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, Rule
 import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
 import { MediaHandler } from "./webrtc/mediaHandler";
+import { Thread } from "./models/thread";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -4849,10 +4850,10 @@ export class MatrixClient extends EventEmitter {
                     room.currentState.setUnknownStateEvents(stateEvents);
                 }
 
-                const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(matrixEvents);
-
+                // Discarding threaded events from scrollback until there's a way
+                // to exclude a relation type from the /messages endpoint
+                const [timelineEvents] = this.partitionThreadedEvents(matrixEvents);
                 room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
-                this.processThreadEvents(room, threadedEvents);
 
                 room.oldState.paginationToken = res.end;
                 if (res.chunk.length === 0) {
@@ -6287,13 +6288,11 @@ export class MatrixClient extends EventEmitter {
         }
         let events = result.chunk.map(mapper);
         if (fetchedEventType === EventType.RoomMessageEncrypted) {
-            const allEvents = originalEvent ? events.concat(originalEvent) : events;
-            await Promise.all(allEvents.map(e => {
-                if (e.isEncrypted()) {
-                    return new Promise(resolve => e.once("Event.decrypted", resolve));
-                }
-            }));
-            events = events.filter(e => e.getType() === eventType);
+            await this.decryptEventIfNeeded(originalEvent);
+            await Promise.all(events.map(e => this.decryptEventIfNeeded(e)));
+            if (eventType) {
+                events = events.filter(e => e.getType() === eventType);
+            }
         }
         if (originalEvent && relationType === RelationType.Replace) {
             events = events.filter(e => e.getSender() === originalEvent.getSender());
@@ -8895,12 +8894,20 @@ export class MatrixClient extends EventEmitter {
     /**
      * @experimental
      */
-    public processThreadEvents(room: Room, threadedEvents: MatrixEvent[]): void {
-        threadedEvents
-            .sort((a, b) => a.getTs() - b.getTs())
-            .forEach(event => {
+    public processThreadEvents(room: Room, threadedEvents: MatrixEvent[], add = false): void {
+        for (const event of threadedEvents) {
+            if ((event.isThreadRelation || event.isThreadRoot) && !room.threads.has(event.threadRootId)) {
+                const thread = new Thread(event.threadRootId, room, this);
+                event.setThread(thread);
+                room.threads.set(
+                    event.threadRootId,
+                    thread,
+                );
+            }
+            if (add) {
                 room.addThreadedEvent(event);
-            });
+            }
+        }
     }
 
     /**

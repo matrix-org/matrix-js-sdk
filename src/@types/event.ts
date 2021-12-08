@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { IEvent } from "../models/event";
 import { UnstableValue } from "../NamespacedValue";
 
 export enum EventType {
@@ -112,6 +113,12 @@ export enum MsgType {
     Location = "m.location",
     Video = "m.video",
     KeyVerificationRequest = "m.key.verification.request",
+}
+
+export interface ThreadBundledRelation {
+    // eslint-disable-next-line camelcase
+    latest_event: IEvent;
+    count: number;
 }
 
 export const RoomCreateTypeField = "type";

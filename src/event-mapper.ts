@@ -16,6 +16,7 @@ limitations under the License.
 
 import { MatrixClient } from "./client";
 import { IEvent, MatrixEvent } from "./models/event";
+import { Thread } from "./models/thread";
 
 export type EventMapper = (obj: Partial<IEvent>) => MatrixEvent;
 
@@ -30,6 +31,20 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
 
     function mapper(plainOldJsObject: Partial<IEvent>) {
         const event = new MatrixEvent(plainOldJsObject);
+
+        const room = client.getRoom(event.getRoomId());
+        if (event.isThreadRoot) {
+            let thread = room.threads.get(event.getId());
+            if (!thread) {
+                thread = new Thread(event.getId(), room, client);
+                room.threads.set(
+                    event.getId(),
+                    thread,
+                );
+            }
+            event.setThread(thread);
+        }
+
         if (event.isEncrypted()) {
             if (!preventReEmit) {
                 client.reEmitter.reEmit(event, [
