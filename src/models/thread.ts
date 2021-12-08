@@ -41,8 +41,6 @@ export enum ThreadEvent {
  */
 export class Thread extends TypedEventEmitter<ThreadEvent> {
     private _ready = false;
-    private prevBatch: string;
-    private nextBatch: string;
 
     private _head: MatrixEvent;
     private eventToPreview: MatrixEvent = null;
@@ -121,8 +119,18 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
             events = [originalEvent, ...events];
         }
 
-        if (prevBatch) this.prevBatch = prevBatch;
-        if (nextBatch) this.nextBatch = nextBatch;
+        if (prevBatch) {
+            this.liveTimeline.setPaginationToken(
+                prevBatch,
+                EventTimeline.FORWARDS,
+            );
+        }
+        if (nextBatch) {
+            this.liveTimeline.setPaginationToken(
+                nextBatch,
+                EventTimeline.BACKWARDS,
+            );
+        }
 
         for (const event of events) {
             event.setThread(this);
@@ -131,7 +139,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         this.timelineSet.addEventsToTimeline(
             events,
             true,
-            this.timelineSet.getLiveTimeline(),
+            this.liveTimeline,
             null,
         );
 
@@ -143,6 +151,10 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         };
     }
 
+    public get liveTimeline(): EventTimeline {
+        return this.timelineSet.getLiveTimeline();
+    }
+
     public onPaginationRequest = async (
         timelineWindow: TimelineWindow | null,
         direction = Direction.Backward,
@@ -152,10 +164,13 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
             limit,
         };
 
-        if (direction === Direction.Backward && this.prevBatch) {
-            opts.from = this.prevBatch;
-        } else if (direction === Direction.Forward && this.nextBatch) {
-            opts.to = this.nextBatch;
+        const backwardToken = this.liveTimeline.getPaginationToken(Direction.Backward);
+        const forwardToken = this.liveTimeline.getPaginationToken(Direction.Forward);
+
+        if (direction === Direction.Backward && backwardToken) {
+            opts.from = backwardToken;
+        } else if (direction === Direction.Forward && forwardToken) {
+            opts.to = forwardToken;
         }
 
         const { nextBatch, prevBatch } = await this.fetchEvents(opts);
@@ -223,7 +238,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         event.setThread(this);
         this.timelineSet.addEventToTimeline(
             event,
-            this.timelineSet.getLiveTimeline(),
+            this.liveTimeline,
             false,
             false,
             this.roomState,
