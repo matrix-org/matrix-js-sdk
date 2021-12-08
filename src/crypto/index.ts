@@ -1962,7 +1962,7 @@ export class Crypto extends EventEmitter {
         this.fallbackCleanup = setTimeout(() => {
             delete this.fallbackCleanup;
             this.olmDevice.forgetOldFallbackKey();
-        }, 5*60*1000);
+        }, 60*60*1000);
 
         await this.olmDevice.markKeysAsPublished();
         return res;
