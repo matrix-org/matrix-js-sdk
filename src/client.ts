@@ -108,6 +108,8 @@ import {
     IPaginateOpts,
     IPresenceOpts,
     IRedactOpts,
+    IRelationsRequestOpts,
+    IRelationsResponse,
     IRoomDirectoryOptions,
     ISearchOpts,
     ISendEventResponse,
@@ -6257,16 +6259,20 @@ export class MatrixClient extends EventEmitter {
      * @param {string} relationType the rel_type of the relations requested
      * @param {string} eventType the event type of the relations requested
      * @param {Object} opts options with optional values for the request.
-     * @param {Object} opts.from the pagination token returned from a previous request as `nextBatch` to return following relations.
      * @return {Object} an object with `events` as `MatrixEvent[]` and optionally `nextBatch` if more relations are available.
      */
     public async relations(
         roomId: string,
         eventId: string,
-        relationType: string,
-        eventType: string,
-        opts: { from: string },
-    ): Promise<{ originalEvent: MatrixEvent, events: MatrixEvent[], nextBatch?: string }> {
+        relationType: RelationType | string | null,
+        eventType: EventType | string | null,
+        opts: IRelationsRequestOpts = {},
+    ): Promise<{
+        originalEvent: MatrixEvent;
+        events: MatrixEvent[];
+        nextBatch?: string;
+        prevBatch?: string;
+    }> {
         const fetchedEventType = this.getEncryptedIfNeededEventType(roomId, eventType);
         const result = await this.fetchRelations(
             roomId,
@@ -6296,6 +6302,7 @@ export class MatrixClient extends EventEmitter {
             originalEvent,
             events,
             nextBatch: result.next_batch,
+            prevBatch: result.prev_batch,
         };
     }
 
@@ -6743,26 +6750,30 @@ export class MatrixClient extends EventEmitter {
      * Fetches relations for a given event
      * @param {string} roomId the room of the event
      * @param {string} eventId the id of the event
-     * @param {string} relationType the rel_type of the relations requested
-     * @param {string} eventType the event type of the relations requested
-     * @param {Object} opts options with optional values for the request.
-     * @param {Object} opts.from the pagination token returned from a previous request as `next_batch` to return following relations.
-     * @return {Object} the response, with chunk and next_batch.
+     * @param {string} [relationType] the rel_type of the relations requested
+     * @param {string} [eventType] the event type of the relations requested
+     * @param {Object} [opts] options with optional values for the request.
+    * @return {Object} the response, with chunk, prev_batch and, next_batch.
      */
     public async fetchRelations(
         roomId: string,
         eventId: string,
-        relationType: string,
-        eventType: string,
-        opts: { from: string },
-    ): Promise<any> { // TODO: Types
-        const queryParams: any = {};
-        if (opts.from) {
-            queryParams.from = opts.from;
+        relationType?: RelationType | string | null,
+        eventType?: EventType | string | null,
+        opts: IRelationsRequestOpts = {},
+    ): Promise<IRelationsResponse> {
+        const params = new URLSearchParams();
+        for (const [key, val] of Object.entries(opts)) {
+            params.set(key, val);
         }
-        const queryString = utils.encodeParams(queryParams);
+        const queryString = params.toString();
+
+        let templatedUrl = "/rooms/$roomId/relations/$eventId";
+        if (relationType !== null) templatedUrl += "/$relationType";
+        if (eventType !== null) templatedUrl += "/$eventType";
+
         const path = utils.encodeUri(
-            "/rooms/$roomId/relations/$eventId/$relationType/$eventType?" + queryString, {
+            templatedUrl + "?" + queryString, {
                 $roomId: roomId,
                 $eventId: eventId,
                 $relationType: relationType,
