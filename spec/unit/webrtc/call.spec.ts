@@ -107,11 +107,11 @@ class MockMediaHandler {
 }
 
 describe('Call', function() {
-    let client: TestClient;
-    let call: MatrixCall;
-    let prevNavigator: Navigator;
-    let prevDocument: Document;
-    let prevWindow: Window;
+    let client;
+    let call;
+    let prevNavigator;
+    let prevDocument;
+    let prevWindow;
 
     beforeEach(function() {
         prevNavigator = global.navigator;
