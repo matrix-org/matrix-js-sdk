@@ -5065,14 +5065,14 @@ export class MatrixClient extends EventEmitter {
             return pendingRequest;
         }
 
-        let path;
-        let params;
-        let promise;
+        let path: string;
+        let params: Record<string, string>;
+        let promise: Promise<boolean>;
 
         if (isNotifTimeline) {
             path = "/notifications";
             params = {
-                limit: ('limit' in opts) ? opts.limit : 30,
+                limit: (opts.limit ?? 30).toString(),
                 only: 'highlight',
             };
 
@@ -7544,7 +7544,7 @@ export class MatrixClient extends EventEmitter {
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public getPushRules(callback?: Callback): Promise<IPushRules> {
-        return this.http.authedRequest(callback, "GET", "/pushrules/").then(rules => {
+        return this.http.authedRequest(callback, "GET", "/pushrules/").then((rules: IPushRules) => {
             return PushProcessor.rewriteDefaultRules(rules);
         });
     }
@@ -8018,7 +8018,7 @@ export class MatrixClient extends EventEmitter {
         addressPairs: [string, string][],
         identityAccessToken: string,
     ): Promise<{ address: string, mxid: string }[]> {
-        const params = {
+        const params: Record<string, string | string[]> = {
             // addresses: ["email@example.org", "10005550000"],
             // algorithm: "sha256",
             // pepper: "abc123"
@@ -8032,7 +8032,7 @@ export class MatrixClient extends EventEmitter {
 
         params['pepper'] = hashes['lookup_pepper'];
 
-        const localMapping = {
+        const localMapping: Record<string, string> = {
             // hashed identifier => plain text address
             // For use in this function's return format
         };

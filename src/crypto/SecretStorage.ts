@@ -37,7 +37,7 @@ export interface ISecretRequest {
 
 export interface IAccountDataClient extends EventEmitter {
     // Subset of MatrixClient (which also uses any for the event content)
-    getAccountDataFromServer: (eventType: string) => Promise<Record<string, any>>;
+    getAccountDataFromServer: <T>(eventType: string) => Promise<T>;
     getAccountData: (eventType: string) => MatrixEvent;
     setAccountData: (eventType: string, content: any) => Promise<{}>;
 }
@@ -76,7 +76,7 @@ export class SecretStorage {
     ) {}
 
     public async getDefaultKeyId(): Promise<string> {
-        const defaultKey = await this.accountDataAdapter.getAccountDataFromServer(
+        const defaultKey = await this.accountDataAdapter.getAccountDataFromServer<{ key: string }>(
             'm.secret_storage.default_key',
         );
         if (!defaultKey) return null;
@@ -230,7 +230,7 @@ export class SecretStorage {
      *     or null/undefined to use the default key.
      */
     public async store(name: string, secret: string, keys?: string[]): Promise<void> {
-        const encrypted = {};
+        const encrypted: Record<string, IEncryptedPayload> = {};
 
         if (!keys) {
             const defaultKeyId = await this.getDefaultKeyId();
@@ -246,9 +246,9 @@ export class SecretStorage {
 
         for (const keyId of keys) {
             // get key information from key storage
-            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer(
+            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretStorageKeyInfo>(
                 "m.secret_storage.key." + keyId,
-            ) as ISecretStorageKeyInfo;
+            );
             if (!keyInfo) {
                 throw new Error("Unknown key: " + keyId);
             }
@@ -277,7 +277,7 @@ export class SecretStorage {
      * @return {string} the contents of the secret
      */
     public async get(name: string): Promise<string> {
-        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer(name);
+        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<any>(name); // TODO types
         if (!secretInfo) {
             return;
         }
@@ -286,11 +286,13 @@ export class SecretStorage {
         }
 
         // get possible keys to decrypt
-        const keys = {};
+        const keys: Record<string, ISecretStorageKeyInfo> = {};
         for (const keyId of Object.keys(secretInfo.encrypted)) {
             // get key information from key storage
-            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer(
-                "m.secret_storage.key." + keyId,
+            const keyInfo = (
+                await this.accountDataAdapter.getAccountDataFromServer<ISecretStorageKeyInfo>(
+                    "m.secret_storage.key." + keyId,
+                )
             );
             const encInfo = secretInfo.encrypted[keyId];
             // only use keys we understand the encryption algorithm of
@@ -306,7 +308,7 @@ export class SecretStorage {
                 `the keys it is encrypted with are for a supported algorithm`);
         }
 
-        let keyId;
+        let keyId: string;
         let decryption;
         try {
             // fetch private key from app
@@ -375,8 +377,8 @@ export class SecretStorage {
     public request(name: string, devices: string[]): ISecretRequest {
         const requestId = this.baseApis.makeTxnId();
 
-        let resolve: (string) => void;
-        let reject: (Error) => void;
+        let resolve: (s: string) => void;
+        let reject: (e: Error) => void;
         const promise = new Promise<string>((res, rej) => {
             resolve = res;
             reject = rej;

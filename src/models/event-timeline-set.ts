@@ -33,7 +33,7 @@ import { Thread } from "./thread";
 // var DEBUG = false;
 const DEBUG = true;
 
-let debuglog;
+let debuglog: (...args: any[]) => void;
 if (DEBUG) {
     // using bind means that we get to keep useful line numbers in the console
     debuglog = logger.log.bind(logger);
