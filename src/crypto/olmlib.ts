@@ -21,9 +21,9 @@ limitations under the License.
  */
 
 import anotherjson from "another-json";
-import type { PkSigning } from "@matrix-org/olm";
 import { Logger } from "loglevel";
 
+import type { PkSigning } from "@matrix-org/olm";
 import { OlmDevice } from "./OlmDevice";
 import { DeviceInfo } from "./deviceinfo";
 import { logger } from '../logger';

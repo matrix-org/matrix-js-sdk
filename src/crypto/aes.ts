@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import type { BinaryLike } from "crypto";
-
 import { getCrypto } from '../utils';
 import { decodeBase64, encodeBase64 } from './olmlib';
 

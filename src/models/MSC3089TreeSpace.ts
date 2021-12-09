@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import promiseRetry from "p-retry";
+
 import { MatrixClient } from "../client";
 import { EventType, IEncryptedFile, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_MSC3089_LEAF } from "../@types/event";
 import { Room } from "./room";
@@ -28,7 +30,6 @@ import {
     simpleRetryOperation,
 } from "../utils";
 import { MSC3089Branch } from "./MSC3089Branch";
-import promiseRetry from "p-retry";
 import { isRoomSharedHistory } from "../crypto/algorithms/megolm";
 import { ISendEventResponse } from "../@types/requests";
 import type { ReadStream } from "fs";

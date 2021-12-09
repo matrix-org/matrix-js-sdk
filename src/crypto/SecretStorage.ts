@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { EventEmitter } from 'stream';
+
 import { logger } from '../logger';
 import * as olmlib from './olmlib';
 import { randomString } from '../randomstring';
@@ -21,7 +23,6 @@ import { encryptAES, decryptAES, IEncryptedPayload, calculateKeyCheck } from './
 import { encodeBase64 } from "./olmlib";
 import { ICryptoCallbacks, MatrixClient, MatrixEvent } from '../matrix';
 import { IAddSecretStorageKeyOpts, ISecretStorageKeyInfo } from './api';
-import { EventEmitter } from 'stream';
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
 

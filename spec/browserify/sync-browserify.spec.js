@@ -17,9 +17,10 @@ limitations under the License.
 // load XmlHttpRequest mock
 import "./setupTests";
 import "../../dist/browser-matrix"; // uses browser-matrix instead of the src
+import MockHttpBackend from "matrix-mock-request";
+
 import { MockStorageApi } from "../MockStorageApi";
 import { WebStorageSessionStore } from "../../src/store/session/webstorage";
-import MockHttpBackend from "matrix-mock-request";
 import { LocalStorageCryptoStore } from "../../src/crypto/store/localStorage-crypto-store";
 import * as utils from "../test-utils";
 
