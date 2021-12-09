@@ -85,7 +85,7 @@ class MockRTCPeerConnection {
 
 class MockMediaStream {
     constructor(
-        public id,
+        public id: string,
     ) {}
 
     getTracks() { return []; }
@@ -106,11 +106,11 @@ class MockMediaHandler {
 }
 
 describe('Call', function() {
-    let client;
-    let call;
-    let prevNavigator;
-    let prevDocument;
-    let prevWindow;
+    let client: TestClient;
+    let call: MatrixCall;
+    let prevNavigator: Navigator;
+    let prevDocument: Document;
+    let prevWindow: Window;
 
     beforeEach(function() {
         prevNavigator = global.navigator;

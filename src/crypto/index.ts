@@ -58,7 +58,7 @@ import { BackupManager } from "./backup";
 import { IStore } from "../store";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
-import { MatrixEvent, EventStatus } from "../models/event";
+import { MatrixEvent, EventStatus, IContent, IUnsigned } from "../models/event";
 import { MatrixClient, IKeysUploadResponse, SessionStore, ISignedKey, ICrossSigningKey } from "../client";
 import type { EncryptionAlgorithm, DecryptionAlgorithm } from "./algorithms/base";
 import type { IRoomEncryption, RoomList } from "./RoomList";
@@ -172,10 +172,15 @@ interface ISignableObject {
 }
 
 export interface IEventDecryptionResult {
-    clearEvent: object;
+    clearEvent: {
+        room_id?: string;
+        type: string;
+        content: IContent;
+        unsigned?: IUnsigned;
+    };
+    forwardingCurve25519KeyChain?: string[];
     senderCurve25519Key?: string;
     claimedEd25519Key?: string;
-    forwardingCurve25519KeyChain?: string[];
     untrusted?: boolean;
 }
 

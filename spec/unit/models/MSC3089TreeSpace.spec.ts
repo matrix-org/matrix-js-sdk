@@ -1018,7 +1018,7 @@ describe("MSC3089TreeSpace", () => {
     it('should return falsy for unknown files', () => {
         const fileEventId = "$file";
         room.currentState = {
-            getStateEvents: (eventType: string, stateKey?: string) => {
+            getStateEvents: (eventType: string, stateKey?: string): MatrixEvent[] | MatrixEvent | null => {
                 expect(eventType).toEqual(UNSTABLE_MSC3089_BRANCH.unstable); // test to ensure we're definitely using unstable
                 expect(stateKey).toEqual(fileEventId);
                 return null;

@@ -67,7 +67,7 @@ export enum AuthType {
 export interface IAuthDict {
     // [key: string]: any;
     type?: string;
-    // session?: string; // TODO
+    session?: string;
     // TODO: Remove `user` once servers support proper UIA
     // See https://github.com/vector-im/element-web/issues/10312
     user?: string;
@@ -359,7 +359,7 @@ export class InteractiveAuth {
         }
 
         // use the sessionid from the last request, if one is present.
-        let auth;
+        let auth: IAuthDict;
         if (this.data.session) {
             auth = {
                 session: this.data.session,

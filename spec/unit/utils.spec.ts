@@ -111,10 +111,10 @@ describe("utils", function() {
 
     describe("deepCompare", function() {
         const assert = {
-            isTrue: function(x) {
+            isTrue: function(x: any) {
                 expect(x).toBe(true);
             },
-            isFalse: function(x) {
+            isFalse: function(x: any) {
                 expect(x).toBe(false);
             },
         };
@@ -176,10 +176,10 @@ describe("utils", function() {
             // no two different function is equal really, they capture their
             // context variables so even if they have same toString(), they
             // won't have same functionality
-            const func = function(x) {
+            const func = function() {
                 return true;
             };
-            const func2 = function(x) {
+            const func2 = function() {
                 return true;
             };
             assert.isTrue(utils.deepCompare(func, func));
@@ -213,7 +213,7 @@ describe("utils", function() {
         it('should retry', async () => {
             let count = 0;
             const val = {};
-            const fn = (attempt) => {
+            const fn = (attempt: any) => {
                 count++;
 
                 // If this expectation fails then it can appear as a Jest Timeout due to
@@ -420,7 +420,7 @@ describe("utils", function() {
                 },
                 [72]: "test",
             };
-            const output = [
+            const output: any = [
                 ["72", "test"],
                 ["a", 42],
                 ["b", [

@@ -3699,14 +3699,14 @@ export class MatrixClient extends EventEmitter {
         eventId: string,
         txnId?: string | undefined,
         cbOrOpts?: Callback | IRedactOpts,
-    );
+    ): Promise<ISendEventResponse>;
     public redactEvent(
         roomId: string,
         threadId: string | null,
         eventId: string,
         txnId?: string | undefined,
         cbOrOpts?: Callback | IRedactOpts,
-    );
+    ): Promise<ISendEventResponse>;
     public redactEvent(
         roomId: string,
         threadId: string | null,
@@ -3744,14 +3744,14 @@ export class MatrixClient extends EventEmitter {
         content: IContent,
         txnId?: string,
         callback?: Callback,
-    )
+    ): Promise<ISendEventResponse>;
     public sendMessage(
         roomId: string,
         threadId: string | null,
         content: IContent,
         txnId?: string,
         callback?: Callback,
-    )
+    ): Promise<ISendEventResponse>;
     public sendMessage(
         roomId: string,
         threadId: string | null | IContent,
@@ -6281,7 +6281,7 @@ export class MatrixClient extends EventEmitter {
             fetchedEventType,
             opts);
         const mapper = this.getEventMapper();
-        let originalEvent;
+        let originalEvent: MatrixEvent;
         if (result.original_event) {
             originalEvent = mapper(result.original_event);
         }

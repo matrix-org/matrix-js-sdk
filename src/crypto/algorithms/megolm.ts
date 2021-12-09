@@ -25,7 +25,7 @@ import * as olmlib from "../olmlib";
 import {
     DecryptionAlgorithm,
     DecryptionError,
-    EncryptionAlgorithm,
+    EncryptionAlgorithm, IParams,
     registerAlgorithm,
     UnknownDeviceError,
 } from "./base";
@@ -98,6 +98,12 @@ interface IPayload extends Partial<IMessage> {
     session_id?: string;
     algorithm?: string;
     sender_key?: string;
+}
+
+interface IEncryptedContent {
+    algorithm: string;
+    sender_key: string;
+    ciphertext: Record<string, string>;
 }
 /* eslint-enable camelcase */
 
@@ -238,7 +244,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
         startTime: number;
     };
 
-    constructor(params) {
+    constructor(params: IParams) {
         super(params);
 
         this.sessionRotationPeriodMsgs = params.config?.rotation_period_msgs ?? 100;
@@ -263,7 +269,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
         blocked: IBlockedMap,
         singleOlmCreationPhase = false,
     ): Promise<OutboundSessionInfo> {
-        let session;
+        let session: OutboundSessionInfo;
 
         // takes the previous OutboundSessionInfo, and considers whether to create
         // a new one. Also shares the key with any (new) devices in the room.
@@ -302,7 +308,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
             }
 
             // now check if we need to share with any devices
-            const shareMap = {};
+            const shareMap: Record<string, DeviceInfo[]> = {};
 
             for (const [userId, userDevices] of Object.entries(devicesInRoom)) {
                 for (const [deviceId, deviceInfo] of Object.entries(userDevices)) {
@@ -350,7 +356,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
                         `Sharing keys (start phase 1) with new Olm sessions in ${this.roomId}`,
                         devicesWithoutSession,
                     );
-                    const errorDevices = [];
+                    const errorDevices: IOlmDevice[] = [];
 
                     // meanwhile, establish olm sessions for devices that we don't
                     // already have a session for, and share keys with them.  If
@@ -358,7 +364,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
                     // shorter timeout when fetching one-time keys for the first
                     // phase.
                     const start = Date.now();
-                    const failedServers = [];
+                    const failedServers: string[] = [];
                     await this.shareKeyWithDevices(
                         session, key, payload, devicesWithoutSession, errorDevices,
                         singleOlmCreationPhase ? 10000 : 2000, failedServers,
@@ -374,7 +380,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
                             // do this in the background and don't block anything else while we
                             // do this.  We only need to retry users from servers that didn't
                             // respond the first time.
-                            const retryDevices = {};
+                            const retryDevices: Record<string, DeviceInfo[]> = {};
                             const failedServerMap = new Set;
                             for (const server of failedServers) {
                                 failedServerMap.add(server);
@@ -584,12 +590,12 @@ class MegolmEncryption extends EncryptionAlgorithm {
         userDeviceMap: IOlmDevice[],
         payload: IPayload,
     ): Promise<void> {
-        const contentMap = {};
+        const contentMap: Record<string, Record<string, IEncryptedContent>> = {};
         const deviceInfoByDeviceId = new Map<string, DeviceInfo>();
 
-        const promises = [];
+        const promises: Promise<unknown>[] = [];
         for (let i = 0; i < userDeviceMap.length; i++) {
-            const encryptedContent = {
+            const encryptedContent: IEncryptedContent = {
                 algorithm: olmlib.OLM_ALGORITHM,
                 sender_key: this.olmDevice.deviceCurve25519Key,
                 ciphertext: {},
@@ -679,7 +685,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
         userDeviceMap: IOlmDevice<IBlockedDevice>[],
         payload: IPayload,
     ): Promise<void> {
-        const contentMap = {};
+        const contentMap: Record<string, Record<string, IPayload>> = {};
 
         for (const val of userDeviceMap) {
             const userId = val.userId;
@@ -1105,7 +1111,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
      *   devices we should shared the session with.
      */
     private checkForUnknownDevices(devicesInRoom: DeviceInfoMap): void {
-        const unknownDevices = {};
+        const unknownDevices: Record<string, Record<string, DeviceInfo>> = {};
 
         Object.keys(devicesInRoom).forEach((userId)=>{
             Object.keys(devicesInRoom[userId]).forEach((deviceId)=>{
@@ -1304,8 +1310,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 content.sender_key, event.getTs() - 120000,
             );
             if (problem) {
-                let problemDescription = PROBLEM_DESCRIPTIONS[problem.type]
-                    || PROBLEM_DESCRIPTIONS.unknown;
+                let problemDescription = PROBLEM_DESCRIPTIONS[problem.type as "no_olm"] || PROBLEM_DESCRIPTIONS.unknown;
                 if (problem.fixed) {
                     problemDescription +=
                         " Trying to create a new secure channel and re-requesting the keys.";
@@ -1794,12 +1799,12 @@ class MegolmDecryption extends DecryptionAlgorithm {
         for (const [senderKey, sessionId] of sharedHistorySessions) {
             const payload = await this.buildKeyForwardingMessage(this.roomId, senderKey, sessionId);
 
-            const promises = [];
-            const contentMap = {};
+            const promises: Promise<unknown>[] = [];
+            const contentMap: Record<string, Record<string, IEncryptedContent>> = {};
             for (const [userId, devices] of Object.entries(devicesByUser)) {
                 contentMap[userId] = {};
                 for (const deviceInfo of devices) {
-                    const encryptedContent = {
+                    const encryptedContent: IEncryptedContent = {
                         algorithm: olmlib.OLM_ALGORITHM,
                         sender_key: this.olmDevice.deviceCurve25519Key,
                         ciphertext: {},

@@ -265,8 +265,8 @@ export class DeviceList extends EventEmitter {
      * module:crypto/deviceinfo|DeviceInfo}.
      */
     public downloadKeys(userIds: string[], forceDownload: boolean): Promise<DeviceInfoMap> {
-        const usersToDownload = [];
-        const promises = [];
+        const usersToDownload: string[] = [];
+        const promises: Promise<unknown>[] = [];
 
         userIds.forEach((u) => {
             const trackingStatus = this.deviceTrackingStatus[u];
@@ -633,7 +633,7 @@ export class DeviceList extends EventEmitter {
             }
         });
 
-        const finished = (success) => {
+        const finished = (success: boolean): void => {
             this.emit("crypto.willUpdateDevices", users, !this.hasFetched);
             users.forEach((u) => {
                 this.dirty = true;
