@@ -32,6 +32,7 @@ import {
 import { MSC3089Branch } from "./MSC3089Branch";
 import { isRoomSharedHistory } from "../crypto/algorithms/megolm";
 import { ISendEventResponse } from "../@types/requests";
+import type { ReadStream } from "fs";
 
 /**
  * The recommended defaults for a tree space's power levels. Note that this
@@ -245,8 +246,11 @@ export class MSC3089TreeSpace {
         const children = this.room.currentState.getStateEvents(EventType.SpaceChild);
         for (const child of children) {
             try {
-                const tree = this.client.unstableGetFileTreeSpace(child.getStateKey());
-                if (tree) trees.push(tree);
+                const stateKey = child.getStateKey();
+                if (stateKey) {
+                    const tree = this.client.unstableGetFileTreeSpace(stateKey);
+                    if (tree) trees.push(tree);
+                }
             } catch (e) {
                 logger.warn("Unable to create tree space instance for listing. Are we joined?", e);
             }
@@ -258,9 +262,9 @@ export class MSC3089TreeSpace {
      * Gets a subdirectory of a given ID under this tree space. Note that this will not recurse
      * into children and instead only look one level deep.
      * @param {string} roomId The room ID (directory ID) to find.
-     * @returns {MSC3089TreeSpace} The directory, or falsy if not found.
+     * @returns {MSC3089TreeSpace | undefined} The directory, or undefined if not found.
      */
-    public getDirectory(roomId: string): MSC3089TreeSpace {
+    public getDirectory(roomId: string): MSC3089TreeSpace | undefined {
         return this.getDirectories().find(r => r.roomId === roomId);
     }
 
@@ -278,8 +282,12 @@ export class MSC3089TreeSpace {
         const members = this.room.currentState.getStateEvents(EventType.RoomMember);
         for (const member of members) {
             const isNotUs = member.getStateKey() !== this.client.getUserId();
-            if (isNotUs && kickMemberships.includes(member.getContent()['membership'])) {
-                await this.client.kick(this.roomId, member.getStateKey(), "Room deleted");
+            if (isNotUs && kickMemberships.includes(member.getContent<string>()['membership'])) {
+                const stateKey = member.getStateKey();
+                if (!stateKey) {
+                    throw new Error("State key not found for branch");
+                }
+                await this.client.kick(this.roomId, stateKey, "Room deleted");
             }
         }
 
@@ -288,7 +296,8 @@ export class MSC3089TreeSpace {
 
     private getOrderedChildren(children: MatrixEvent[]): { roomId: string, order: string }[] {
         const ordered: { roomId: string, order: string }[] = children
-            .map(c => ({ roomId: c.getStateKey(), order: c.getContent()['order'] }));
+            .map(c => ({ roomId: c.getStateKey(), order: c.getContent()['order'] }))
+            .filter(c => c.roomId) as { roomId: string, order: string }[];
         ordered.sort((a, b) => {
             if (a.order && !b.order) {
                 return -1;
@@ -321,7 +330,9 @@ export class MSC3089TreeSpace {
 
         // XXX: We are assuming the parent is a valid tree space.
         // We probably don't need to validate the parent room state for this usecase though.
-        const parentRoom = this.client.getRoom(parent.getStateKey());
+        const stateKey = parent.getStateKey();
+        if (!stateKey) throw new Error("No state key found for parent");
+        const parentRoom = this.client.getRoom(stateKey);
         if (!parentRoom) throw new Error("Unable to locate room for parent");
 
         return parentRoom;
@@ -413,7 +424,7 @@ export class MSC3089TreeSpace {
             // We were asked by the order algorithm to prepare the moving space for a landing
             // in the undefined order part of the order array, which means we need to update the
             // spaces that come before it with a stable order value.
-            let lastOrder: string;
+            let lastOrder: string | undefined;
             for (let i = 0; i <= index; i++) {
                 const target = ordered[i];
                 if (i === 0) {
@@ -432,7 +443,9 @@ export class MSC3089TreeSpace {
                     lastOrder = target.order;
                 }
             }
-            newOrder = nextString(lastOrder);
+            if (lastOrder) {
+                newOrder = nextString(lastOrder);
+            }
         }
 
         // TODO: Deal with order conflicts by reordering
@@ -450,21 +463,23 @@ export class MSC3089TreeSpace {
 
     /**
      * Creates (uploads) a new file to this tree. The file must have already been encrypted for the room.
+     * The file contents are in a type that is compatible with MatrixClient.uploadContent().
      * @param {string} name The name of the file.
-     * @param {ArrayBuffer} encryptedContents The encrypted contents.
+     * @param {File | String | Buffer | ReadStream | Blob} encryptedContents The encrypted contents.
      * @param {Partial<IEncryptedFile>} info The encrypted file information.
      * @param {IContent} additionalContent Optional event content fields to include in the message.
      * @returns {Promise<ISendEventResponse>} Resolves to the file event's sent response.
      */
     public async createFile(
         name: string,
-        encryptedContents: ArrayBuffer,
+        encryptedContents: File | String | Buffer | ReadStream | Blob,
         info: Partial<IEncryptedFile>,
         additionalContent?: IContent,
     ): Promise<ISendEventResponse> {
-        const mxc = await this.client.uploadContent(new Blob([encryptedContents]), {
+        const mxc = await this.client.uploadContent(encryptedContents, {
             includeFilename: false,
             onlyContentUri: true,
+            rawResponse: false, // make this explicit otherwise behaviour is different on browser vs NodeJS
         });
         info.url = mxc;
 
@@ -500,9 +515,9 @@ export class MSC3089TreeSpace {
     /**
      * Retrieves a file from the tree.
      * @param {string} fileEventId The event ID of the file.
-     * @returns {MSC3089Branch} The file, or falsy if not found.
+     * @returns {MSC3089Branch | null} The file, or null if not found.
      */
-    public getFile(fileEventId: string): MSC3089Branch {
+    public getFile(fileEventId: string): MSC3089Branch | null {
         const branch = this.room.currentState.getStateEvents(UNSTABLE_MSC3089_BRANCH.name, fileEventId);
         return branch ? new MSC3089Branch(this.client, branch, this) : null;
     }

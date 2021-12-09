@@ -584,8 +584,8 @@ export class MatrixCall extends EventEmitter {
                 new CallFeed({
                     client: this.client,
                     roomId: this.roomId,
-                    audioMuted: stream.getAudioTracks().length === 0,
-                    videoMuted: stream.getVideoTracks().length === 0,
+                    audioMuted: false,
+                    videoMuted: false,
                     userId,
                     stream,
                     purpose,
@@ -823,8 +823,8 @@ export class MatrixCall extends EventEmitter {
                     userId: this.client.getUserId(),
                     stream,
                     purpose: SDPStreamMetadataPurpose.Usermedia,
-                    audioMuted: stream.getAudioTracks().length === 0,
-                    videoMuted: stream.getVideoTracks().length === 0,
+                    audioMuted: false,
+                    videoMuted: false,
                 });
 
                 const feeds = [usermediaFeed];
@@ -1011,9 +1011,7 @@ export class MatrixCall extends EventEmitter {
                 this.pushNewLocalFeed(stream, SDPStreamMetadataPurpose.Screenshare);
                 return true;
             } catch (err) {
-                this.emit(CallEvent.Error,
-                    new CallError(CallErrorCode.NoUserMedia, "Failed to get screen-sharing stream: ", err),
-                );
+                logger.error("Failed to get screen-sharing stream:", err);
                 return false;
             }
         } else {
@@ -1054,9 +1052,7 @@ export class MatrixCall extends EventEmitter {
 
                 return true;
             } catch (err) {
-                this.emit(CallEvent.Error,
-                    new CallError(CallErrorCode.NoUserMedia, "Failed to get screen-sharing stream: ", err),
-                );
+                logger.error("Failed to get screen-sharing stream:", err);
                 return false;
             }
         } else {
@@ -2068,8 +2064,8 @@ export class MatrixCall extends EventEmitter {
                 userId: this.client.getUserId(),
                 stream,
                 purpose: SDPStreamMetadataPurpose.Usermedia,
-                audioMuted: stream.getAudioTracks().length === 0,
-                videoMuted: stream.getVideoTracks().length === 0,
+                audioMuted: false,
+                videoMuted: false,
             });
             await this.placeCallWithCallFeeds([callFeed]);
         } catch (e) {

@@ -15,6 +15,10 @@ limitations under the License.
 */
 
 import { randomString } from '../randomstring';
+import { getCrypto } from '../utils';
+
+const subtleCrypto = (typeof window !== "undefined" && window.crypto) ?
+    (window.crypto.subtle || window.crypto.webkitSubtle) : null;
 
 const DEFAULT_ITERATIONS = 500000;
 
@@ -71,10 +75,20 @@ export async function deriveKey(
     iterations: number,
     numBits = DEFAULT_BITSIZE,
 ): Promise<Uint8Array> {
+    return subtleCrypto
+        ? deriveKeyBrowser(password, salt, iterations, numBits)
+        : deriveKeyNode(password, salt, iterations, numBits);
+}
+
+async function deriveKeyBrowser(
+    password: string,
+    salt: string,
+    iterations: number,
+    numBits: number,
+): Promise<Uint8Array> {
     const subtleCrypto = global.crypto.subtle;
     const TextEncoder = global.TextEncoder;
     if (!subtleCrypto || !TextEncoder) {
-        // TODO: Implement this for node
         throw new Error("Password-based backup is not avaiable on this platform");
     }
 
@@ -98,4 +112,18 @@ export async function deriveKey(
     );
 
     return new Uint8Array(keybits);
+}
+
+async function deriveKeyNode(
+    password: string,
+    salt: string,
+    iterations: number,
+    numBits: number,
+): Promise<Uint8Array> {
+    const crypto = getCrypto();
+    if (!crypto) {
+        throw new Error("No usable crypto implementation");
+    }
+
+    return crypto.pbkdf2Sync(password, Buffer.from(salt, 'binary'), iterations, numBits, 'sha512');
 }

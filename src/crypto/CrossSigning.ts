@@ -304,7 +304,7 @@ export class CrossSigningInfo extends EventEmitter {
         }
 
         const privateKeys: Record<string, Uint8Array> = {};
-        const keys: Record<string, any> = {}; // TODO types
+        const keys: Record<string, ICrossSigningKey> = {};
         let masterSigning;
         let masterPub;
 

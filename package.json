@@ -1,6 +1,6 @@
 {
   "name": "matrix-js-sdk",
-  "version": "15.0.0",
+  "version": "15.2.0",
   "description": "Matrix Client-Server SDK for Javascript",
   "scripts": {
     "prepublishOnly": "yarn build",
@@ -82,7 +82,7 @@
     "@types/request": "^2.48.5",
     "@typescript-eslint/eslint-plugin": "^4.17.0",
     "@typescript-eslint/parser": "^4.17.0",
-    "allchange": "^1.0.4",
+    "allchange": "^1.0.6",
     "babel-jest": "^26.6.3",
     "babelify": "^10.0.0",
     "better-docs": "^2.4.0-beta.9",

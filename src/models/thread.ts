@@ -14,24 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventEmitter } from "events";
-
 import { MatrixClient } from "../matrix";
 import { MatrixEvent } from "./event";
 import { EventTimeline } from "./event-timeline";
 import { EventTimelineSet } from './event-timeline-set';
 import { Room } from './room';
+import { TypedEventEmitter } from "./typed-event-emitter";
 
 export enum ThreadEvent {
     New = "Thread.new",
     Ready = "Thread.ready",
     Update = "Thread.update",
+    NewReply = "Thread.newReply",
+    ViewThread = "Thred.viewThread",
 }
 
 /**
  * @experimental
  */
-export class Thread extends EventEmitter {
+export class Thread extends TypedEventEmitter<ThreadEvent> {
     /**
      * A reference to the event ID at the top of the thread
      */
@@ -40,6 +41,8 @@ export class Thread extends EventEmitter {
      * A reference to all the events ID at the bottom of the threads
      */
     public readonly timelineSet;
+
+    private _currentUserParticipated = false;
 
     constructor(
         events: MatrixEvent[] = [],
@@ -54,10 +57,19 @@ export class Thread extends EventEmitter {
         this.timelineSet = new EventTimelineSet(this.room, {
             unstableClientRelationAggregation: true,
             timelineSupport: true,
-            pendingEvents: false,
+            pendingEvents: true,
         });
         events.forEach(event => this.addEvent(event));
+
+        room.on("Room.localEchoUpdated", this.onEcho);
+        room.on("Room.timeline", this.onEcho);
     }
+
+    onEcho = (event: MatrixEvent) => {
+        if (this.timelineSet.eventIdToTimeline(event.getId())) {
+            this.emit(ThreadEvent.Update, this);
+        }
+    };
 
     /**
      * Add an event to the thread and updates
@@ -93,10 +105,16 @@ export class Thread extends EventEmitter {
             roomState,
         );
 
-        if (this.ready) {
-            this.client.decryptEventIfNeeded(event, {});
+        if (!this._currentUserParticipated && event.getSender() === this.client.getUserId()) {
+            this._currentUserParticipated = true;
         }
+
+        await this.client.decryptEventIfNeeded(event, {});
         this.emit(ThreadEvent.Update, this);
+
+        if (event.isThreadRelation) {
+            this.emit(ThreadEvent.NewReply, this, event);
+        }
     }
 
     /**
@@ -107,10 +125,12 @@ export class Thread extends EventEmitter {
     }
 
     /**
-     * Determines thread's ready status
+     * Return last reply to the thread
      */
-    public get ready(): boolean {
-        return this.rootEvent !== undefined;
+    public get lastReply(): MatrixEvent {
+        const threadReplies = this.events
+            .filter(event => event.isThreadRelation);
+        return threadReplies[threadReplies.length - 1];
     }
 
     /**
@@ -143,17 +163,6 @@ export class Thread extends EventEmitter {
     }
 
     /**
-     * A set of mxid participating to the thread
-     */
-    public get participants(): Set<string> {
-        const participants = new Set<string>();
-        this.events.forEach(event => {
-            participants.add(event.getSender());
-        });
-        return participants;
-    }
-
-    /**
      * A getter for the last event added to the thread
      */
     public get replyToEvent(): MatrixEvent {
@@ -176,28 +185,7 @@ export class Thread extends EventEmitter {
         return this.timelineSet.findEventById(eventId) instanceof MatrixEvent;
     }
 
-    public on(event: ThreadEvent, listener: (...args: any[]) => void): this {
-        super.on(event, listener);
-        return this;
-    }
-
-    public once(event: ThreadEvent, listener: (...args: any[]) => void): this {
-        super.once(event, listener);
-        return this;
-    }
-
-    public off(event: ThreadEvent, listener: (...args: any[]) => void): this {
-        super.off(event, listener);
-        return this;
-    }
-
-    public addListener(event: ThreadEvent, listener: (...args: any[]) => void): this {
-        super.addListener(event, listener);
-        return this;
-    }
-
-    public removeListener(event: ThreadEvent, listener: (...args: any[]) => void): this {
-        super.removeListener(event, listener);
-        return this;
+    public get hasCurrentUserParticipated(): boolean {
+        return this._currentUserParticipated;
     }
 }

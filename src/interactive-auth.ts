@@ -35,6 +35,7 @@ export interface IInputs {
     emailAddress?: string;
     phoneCountry?: string;
     phoneNumber?: string;
+    registrationToken?: string;
 }
 
 export interface IStageStatus {
@@ -61,6 +62,7 @@ export enum AuthType {
     Sso = "m.login.sso",
     SsoUnstable = "org.matrix.login.sso",
     Dummy = "m.login.dummy",
+    RegistrationToken = "org.matrix.msc3231.login.registration_token",
 }
 
 export interface IAuthDict {
@@ -79,6 +81,7 @@ export interface IAuthDict {
     // eslint-disable-next-line camelcase
     threepid_creds?: any;
     threepidCreds?: any;
+    registrationToken?: string;
 }
 
 class NoAuthFlowFoundError extends Error {
@@ -449,6 +452,7 @@ export class InteractiveAuth {
             } catch (e) {
                 this.attemptAuthDeferred.reject(e);
                 this.attemptAuthDeferred = null;
+                return;
             }
 
             if (
