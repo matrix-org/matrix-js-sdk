@@ -5067,7 +5067,7 @@ export class MatrixClient extends EventEmitter {
 
         let path;
         let params;
-        let promise;
+        let promise: Promise<boolean>;
 
         if (isNotifTimeline) {
             path = "/notifications";
