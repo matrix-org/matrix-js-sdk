@@ -1957,12 +1957,11 @@ export class Crypto extends EventEmitter {
 
         const requestBody: Record<string, any> = {
             "one_time_keys": oneTimeJson,
-            "org.matrix.msc2732.fallback_keys": fallbackJson,
-            "fallback_keys": fallbackJson,
         };
 
         if (fallbackJson) {
             requestBody["org.matrix.msc2732.fallback_keys"] = fallbackJson;
+            requestBody["fallback_keys"] = fallbackJson;
         }
 
         const res = await this.baseApis.uploadKeysRequest(requestBody);
