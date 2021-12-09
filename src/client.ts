@@ -3106,7 +3106,7 @@ export class MatrixClient extends EventEmitter {
      * data event.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async getAccountDataFromServer(eventType: string): Promise<Record<string, any>> {
+    public async getAccountDataFromServer<T>(eventType: string): Promise<T> {
         if (this.isInitialSyncComplete()) {
             const event = this.store.getAccountData(eventType);
             if (!event) {
@@ -5067,7 +5067,7 @@ export class MatrixClient extends EventEmitter {
 
         let path: string;
         let params: Record<string, string>;
-        let promise: Promise<boolean>;
+        let promise;
 
         if (isNotifTimeline) {
             path = "/notifications";

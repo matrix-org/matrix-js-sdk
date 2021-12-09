@@ -85,7 +85,7 @@ export interface IUnsigned {
     age?: number;
     prev_sender?: string;
     prev_content?: IContent;
-    redacted_because?: IEvent;
+    redacted_because?: IClearEvent;
     transaction_id?: string;
     invite_room_state?: StrippedState[];
 }
@@ -123,13 +123,14 @@ export interface IEventRelation {
     event_id: string;
     key?: string;
 }
-/* eslint-enable camelcase */
 
 export interface IClearEvent {
+    room_id?: string;
     type: string;
     content: Omit<IContent, "membership" | "avatar_url" | "displayname" | "m.relates_to">;
     unsigned?: IUnsigned;
 }
+/* eslint-enable camelcase */
 
 interface IKeyRequestRecipient {
     userId: string;

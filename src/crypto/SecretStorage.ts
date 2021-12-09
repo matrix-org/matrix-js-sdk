@@ -339,7 +339,7 @@ export class SecretStorage {
      */
     public async isStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo>> {
         // check if secret exists
-        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer(name);
+        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<any>(name); // TODO types
         if (!secretInfo) return null;
         if (!secretInfo.encrypted) {
             return null;
@@ -352,7 +352,7 @@ export class SecretStorage {
         // filter secret encryption keys with supported algorithm
         for (const keyId of Object.keys(secretInfo.encrypted)) {
             // get key information from key storage
-            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer(
+            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<any>( // TODO types
                 "m.secret_storage.key." + keyId,
             );
             if (!keyInfo) continue;
