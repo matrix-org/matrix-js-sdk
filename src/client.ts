@@ -6564,7 +6564,7 @@ export class MatrixClient extends EventEmitter {
         };
 
         // merge data into loginData
-        utils.extend(loginData, data);
+        Object.assign(loginData, data);
 
         return this.http.authedRequest(
             (error, response) => {

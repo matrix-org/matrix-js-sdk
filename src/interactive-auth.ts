@@ -18,7 +18,6 @@ limitations under the License.
 
 /** @module interactive-auth */
 
-import * as utils from "./utils";
 import { logger } from './logger';
 import { MatrixClient } from "./client";
 import { defer, IDeferred } from "./utils";
@@ -365,7 +364,7 @@ export class InteractiveAuth {
             auth = {
                 session: this.data.session,
             };
-            utils.extend(auth, authData);
+            Object.assign(auth, authData);
         } else {
             auth = authData;
         }

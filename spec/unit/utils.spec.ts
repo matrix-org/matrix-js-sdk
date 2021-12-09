@@ -189,66 +189,6 @@ describe("utils", function() {
         });
     });
 
-    describe("extend", function() {
-        const SOURCE = { "prop2": 1, "string2": "x", "newprop": "new" };
-
-        it("should extend", function() {
-            const target = {
-                "prop1": 5, "prop2": 7, "string1": "baz", "string2": "foo",
-            };
-            const merged = {
-                "prop1": 5, "prop2": 1, "string1": "baz", "string2": "x",
-                "newprop": "new",
-            };
-            const sourceOrig = JSON.stringify(SOURCE);
-
-            utils.extend(target, SOURCE);
-            expect(JSON.stringify(target)).toEqual(JSON.stringify(merged));
-
-            // check the originial wasn't modified
-            expect(JSON.stringify(SOURCE)).toEqual(sourceOrig);
-        });
-
-        it("should ignore null", function() {
-            const target = {
-                "prop1": 5, "prop2": 7, "string1": "baz", "string2": "foo",
-            };
-            const merged = {
-                "prop1": 5, "prop2": 1, "string1": "baz", "string2": "x",
-                "newprop": "new",
-            };
-            const sourceOrig = JSON.stringify(SOURCE);
-
-            utils.extend(target, null, SOURCE);
-            expect(JSON.stringify(target)).toEqual(JSON.stringify(merged));
-
-            // check the originial wasn't modified
-            expect(JSON.stringify(SOURCE)).toEqual(sourceOrig);
-        });
-
-        it("should handle properties created with defineProperties", function() {
-            const source = Object.defineProperties({}, {
-                "enumerableProp": {
-                    get: function() {
-                        return true;
-                    },
-                    enumerable: true,
-                },
-                "nonenumerableProp": {
-                    get: function() {
-                        return true;
-                    },
-                },
-            });
-
-            // TODO: Fix type
-            const target: any = {};
-            utils.extend(target, source);
-            expect(target.enumerableProp).toBe(true);
-            expect(target.nonenumerableProp).toBe(undefined);
-        });
-    });
-
     describe("chunkPromises", function() {
         it("should execute promises in chunks", async function() {
             let promiseCount = 0;

@@ -657,7 +657,7 @@ MatrixHttpApi.prototype = {
             };
         }
 
-        const headers = utils.extend({}, opts.headers || {});
+        const headers = Object.assign({}, opts.headers || {});
         const json = opts.json === undefined ? true : opts.json;
         let bodyParser = opts.bodyParser;
 
