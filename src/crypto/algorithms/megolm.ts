@@ -25,7 +25,8 @@ import * as olmlib from "../olmlib";
 import {
     DecryptionAlgorithm,
     DecryptionError,
-    EncryptionAlgorithm, IParams,
+    EncryptionAlgorithm,
+    IParams,
     registerAlgorithm,
     UnknownDeviceError,
 } from "./base";
@@ -1404,14 +1405,14 @@ class MegolmDecryption extends DecryptionAlgorithm {
         const senderKey = content.sender_key;
         const sessionId = content.session_id;
         const senderPendingEvents = this.pendingEvents[senderKey];
-        const pendingEvents = senderPendingEvents && senderPendingEvents.get(sessionId);
+        const pendingEvents = senderPendingEvents?.get(sessionId);
         if (!pendingEvents) {
             return;
         }
 
         pendingEvents.delete(event);
         if (pendingEvents.size === 0) {
-            senderPendingEvents.delete(senderKey);
+            senderPendingEvents.delete(sessionId);
         }
         if (senderPendingEvents.size === 0) {
             delete this.pendingEvents[senderKey];
