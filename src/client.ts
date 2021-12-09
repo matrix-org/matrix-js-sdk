@@ -27,7 +27,7 @@ import { createNewMatrixCall, MatrixCall } from "./webrtc/call";
 import { Filter, IFilterDefinition } from "./filter";
 import { CallEventHandler } from './webrtc/callEventHandler';
 import * as utils from './utils';
-import { sleep } from './utils';
+import { IDeferred, sleep } from './utils';
 import { Group } from "./models/group";
 import { Direction, EventTimeline } from "./models/event-timeline";
 import { IActionsObject, PushProcessor } from "./pushprocessor";
@@ -1423,7 +1423,7 @@ export class MatrixClient extends EventEmitter {
         // We swallow errors because we need a default object anyhow
         return this.http.authedRequest(
             undefined, "GET", "/capabilities",
-        ).catch((e) => {
+        ).catch((e: Error) => {
             logger.error(e);
             return null; // otherwise consume the error
         }).then((r) => {
@@ -3201,7 +3201,7 @@ export class MatrixClient extends EventEmitter {
             );
         }
 
-        const queryString = {};
+        const queryString: Record<string, string | string[]> = {};
         if (opts.viaServers) {
             queryString["server_name"] = opts.viaServers;
         }
@@ -3411,7 +3411,7 @@ export class MatrixClient extends EventEmitter {
         content: IContent,
         txnId?: string,
         callback?: Callback,
-    );
+    ): Promise<ISendEventResponse>;
     public sendEvent(
         roomId: string,
         threadId: string | null,
@@ -3419,7 +3419,7 @@ export class MatrixClient extends EventEmitter {
         content: IContent,
         txnId?: string,
         callback?: Callback,
-    )
+    ): Promise<ISendEventResponse>;
     public sendEvent(
         roomId: string,
         threadId: string | null,
@@ -3793,14 +3793,14 @@ export class MatrixClient extends EventEmitter {
         body: string,
         txnId?: string,
         callback?: Callback,
-    )
+    ): Promise<ISendEventResponse>;
     public sendTextMessage(
         roomId: string,
         threadId: string | null,
         body: string,
         txnId?: string,
         callback?: Callback,
-    )
+    ): Promise<ISendEventResponse>;
     public sendTextMessage(
         roomId: string,
         threadId: string | null,
@@ -3832,14 +3832,14 @@ export class MatrixClient extends EventEmitter {
         body: string,
         txnId?: string,
         callback?: Callback,
-    )
+    ): Promise<ISendEventResponse>;
     public sendNotice(
         roomId: string,
         threadId: string | null,
         body: string,
         txnId?: string,
         callback?: Callback,
-    );
+    ): Promise<ISendEventResponse>;
     public sendNotice(
         roomId: string,
         threadId: string | null,
@@ -3871,14 +3871,14 @@ export class MatrixClient extends EventEmitter {
         body: string,
         txnId?: string,
         callback?: Callback,
-    )
+    ): Promise<ISendEventResponse>;
     public sendEmoteMessage(
         roomId: string,
         threadId: string | null,
         body: string,
         txnId?: string,
         callback?: Callback,
-    );
+    ): Promise<ISendEventResponse>;
     public sendEmoteMessage(
         roomId: string,
         threadId: string | null,
@@ -3912,7 +3912,7 @@ export class MatrixClient extends EventEmitter {
         info?: IImageInfo,
         text?: string,
         callback?: Callback,
-    );
+    ): Promise<ISendEventResponse>;
     public sendImageMessage(
         roomId: string,
         threadId: string | null,
@@ -3920,7 +3920,7 @@ export class MatrixClient extends EventEmitter {
         info?: IImageInfo,
         text?: string,
         callback?: Callback,
-    );
+    ): Promise<ISendEventResponse>;
     public sendImageMessage(
         roomId: string,
         threadId: string | null,
@@ -3965,7 +3965,7 @@ export class MatrixClient extends EventEmitter {
         info?: IImageInfo,
         text?: string,
         callback?: Callback,
-    );
+    ): Promise<ISendEventResponse>;
     public sendStickerMessage(
         roomId: string,
         threadId: string | null,
@@ -3973,7 +3973,7 @@ export class MatrixClient extends EventEmitter {
         info?: IImageInfo,
         text?: string,
         callback?: Callback,
-    );
+    ): Promise<ISendEventResponse>;
     public sendStickerMessage(
         roomId: string,
         threadId: string | null,
@@ -4015,14 +4015,14 @@ export class MatrixClient extends EventEmitter {
         body: string,
         htmlBody: string,
         callback?: Callback,
-    );
+    ): Promise<ISendEventResponse>;
     public sendHtmlMessage(
         roomId: string,
         threadId: string | null,
         body: string,
         htmlBody: string,
         callback?: Callback,
-    )
+    ): Promise<ISendEventResponse>;
     public sendHtmlMessage(
         roomId: string,
         threadId: string | null,
@@ -4053,14 +4053,14 @@ export class MatrixClient extends EventEmitter {
         body: string,
         htmlBody: string,
         callback?: Callback,
-    );
+    ): Promise<ISendEventResponse>;
     public sendHtmlNotice(
         roomId: string,
         threadId: string | null,
         body: string,
         htmlBody: string,
         callback?: Callback,
-    )
+    ): Promise<ISendEventResponse>;
     public sendHtmlNotice(
         roomId: string,
         threadId: string | null,
@@ -4092,14 +4092,14 @@ export class MatrixClient extends EventEmitter {
         body: string,
         htmlBody: string,
         callback?: Callback,
-    );
+    ): Promise<ISendEventResponse>;
     public sendHtmlEmote(
         roomId: string,
         threadId: string | null,
         body: string,
         htmlBody: string,
         callback?: Callback,
-    )
+    ): Promise<ISendEventResponse>;
     public sendHtmlEmote(
         roomId: string,
         threadId: string | null,
@@ -4420,7 +4420,7 @@ export class MatrixClient extends EventEmitter {
                 errcode: "ORG.MATRIX.JSSDK_MISSING_PARAM",
             }));
         }
-        const params = {
+        const params: Record<string, string> = {
             id_server: identityServerUrl,
             medium: medium,
             address: address,
@@ -4478,10 +4478,10 @@ export class MatrixClient extends EventEmitter {
             }
         }
 
-        const populationResults = {}; // {roomId: Error}
+        const populationResults: Record<string, Error> = {}; // {roomId: Error}
         const promises = [];
 
-        const doLeave = (roomId) => {
+        const doLeave = (roomId: string) => {
             return this.leave(roomId).then(() => {
                 populationResults[roomId] = null;
             }).catch((err) => {
@@ -5509,7 +5509,7 @@ export class MatrixClient extends EventEmitter {
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public setRoomMutePushRule(scope: string, roomId: string, mute: boolean): Promise<void> | void {
-        let deferred;
+        let promise: Promise<void>;
         let hasDontNotifyRule;
 
         // Get the existing room-kind push rule if any
@@ -5523,17 +5523,17 @@ export class MatrixClient extends EventEmitter {
         if (!mute) {
             // Remove the rule only if it is a muting rule
             if (hasDontNotifyRule) {
-                deferred = this.deletePushRule(scope, PushRuleKind.RoomSpecific, roomPushRule.rule_id);
+                promise = this.deletePushRule(scope, PushRuleKind.RoomSpecific, roomPushRule.rule_id);
             }
         } else {
             if (!roomPushRule) {
-                deferred = this.addPushRule(scope, PushRuleKind.RoomSpecific, roomId, {
+                promise = this.addPushRule(scope, PushRuleKind.RoomSpecific, roomId, {
                     actions: ["dont_notify"],
                 });
             } else if (!hasDontNotifyRule) {
                 // Remove the existing one before setting the mute push rule
                 // This is a workaround to SYN-590 (Push rule update fails)
-                deferred = utils.defer();
+                const deferred = utils.defer();
                 this.deletePushRule(scope, PushRuleKind.RoomSpecific, roomPushRule.rule_id)
                     .then(() => {
                         this.addPushRule(scope, PushRuleKind.RoomSpecific, roomId, {
@@ -5547,21 +5547,21 @@ export class MatrixClient extends EventEmitter {
                         deferred.reject(err);
                     });
 
-                deferred = deferred.promise;
+                promise = deferred.promise;
             }
         }
 
-        if (deferred) {
+        if (promise) {
             return new Promise<void>((resolve, reject) => {
                 // Update this.pushRules when the operation completes
-                deferred.then(() => {
+                promise.then(() => {
                     this.getPushRules().then((result) => {
                         this.pushRules = result;
                         resolve();
                     }).catch((err) => {
                         reject(err);
                     });
-                }).catch((err) => {
+                }).catch((err: Error) => {
                     // Update it even if the previous operation fails. This can help the
                     // app to recover when push settings has been modifed from another client
                     this.getPushRules().then((result) => {

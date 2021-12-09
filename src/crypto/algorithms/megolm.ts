@@ -1765,7 +1765,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
         }));
 
         // If decrypted successfully, they'll have been removed from pendingEvents
-        return !((this.pendingEvents[senderKey] || {})[sessionId]);
+        return !this.pendingEvents[senderKey]?.has(sessionId);
     }
 
     public async retryDecryptionFromSender(senderKey: string): Promise<boolean> {
