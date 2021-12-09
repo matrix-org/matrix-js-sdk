@@ -3106,7 +3106,7 @@ export class MatrixClient extends EventEmitter {
      * data event.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async getAccountDataFromServer<T>(eventType: string): Promise<T> {
+    public async getAccountDataFromServer<T extends {[k: string]: any}>(eventType: string): Promise<T> {
         if (this.isInitialSyncComplete()) {
             const event = this.store.getAccountData(eventType);
             if (!event) {

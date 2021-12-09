@@ -35,6 +35,7 @@ import { RoomMember } from "./room-member";
 import { Thread, ThreadEvent } from "./thread";
 import { IActionsObject } from '../pushprocessor';
 import { ReEmitter } from '../ReEmitter';
+import { MatrixError } from "../http-api";
 
 /**
  * Enum for event statuses.
@@ -85,7 +86,7 @@ export interface IUnsigned {
     age?: number;
     prev_sender?: string;
     prev_content?: IContent;
-    redacted_because?: IClearEvent;
+    redacted_because?: IEvent;
     transaction_id?: string;
     invite_room_state?: StrippedState[];
 }
@@ -203,7 +204,7 @@ export class MatrixEvent extends EventEmitter {
     public sender: RoomMember = null;
     public target: RoomMember = null;
     public status: EventStatus = null;
-    public error: Error = null;
+    public error: MatrixError = null;
     public forwardLooking = true;
 
     /* If the event is a `m.key.verification.request` (or to_device `m.key.verification.start`) event,

@@ -37,7 +37,7 @@ export interface ISecretRequest {
 
 export interface IAccountDataClient extends EventEmitter {
     // Subset of MatrixClient (which also uses any for the event content)
-    getAccountDataFromServer: <T>(eventType: string) => Promise<T>;
+    getAccountDataFromServer: <T extends {[k: string]: any}>(eventType: string) => Promise<T>;
     getAccountData: (eventType: string) => MatrixEvent;
     setAccountData: (eventType: string, content: any) => Promise<{}>;
 }
@@ -52,6 +52,13 @@ interface ISecretRequestInternal {
 interface IDecryptors {
     encrypt: (plaintext: string) => Promise<IEncryptedPayload>;
     decrypt: (ciphertext: IEncryptedPayload) => Promise<string>;
+}
+
+interface ISecretInfo {
+    encrypted: {
+        // eslint-disable-next-line camelcase
+        key_id: IEncryptedPayload;
+    };
 }
 
 /**
@@ -149,7 +156,7 @@ export class SecretStorage {
             do {
                 keyId = randomString(32);
             } while (
-                await this.accountDataAdapter.getAccountDataFromServer(
+                await this.accountDataAdapter.getAccountDataFromServer<ISecretStorageKeyInfo>(
                     `m.secret_storage.key.${keyId}`,
                 )
             );
@@ -182,9 +189,9 @@ export class SecretStorage {
             return null;
         }
 
-        const keyInfo = await this.accountDataAdapter.getAccountDataFromServer(
+        const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretStorageKeyInfo>(
             "m.secret_storage.key." + keyId,
-        ) as ISecretStorageKeyInfo;
+        );
         return keyInfo ? [keyId, keyInfo] : null;
     }
 
@@ -277,7 +284,7 @@ export class SecretStorage {
      * @return {string} the contents of the secret
      */
     public async get(name: string): Promise<string> {
-        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<any>(name); // TODO types
+        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretInfo>(name);
         if (!secretInfo) {
             return;
         }
@@ -339,7 +346,7 @@ export class SecretStorage {
      */
     public async isStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo>> {
         // check if secret exists
-        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<any>(name); // TODO types
+        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretInfo>(name);
         if (!secretInfo) return null;
         if (!secretInfo.encrypted) {
             return null;
@@ -352,7 +359,7 @@ export class SecretStorage {
         // filter secret encryption keys with supported algorithm
         for (const keyId of Object.keys(secretInfo.encrypted)) {
             // get key information from key storage
-            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<any>( // TODO types
+            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretStorageKeyInfo>(
                 "m.secret_storage.key." + keyId,
             );
             if (!keyInfo) continue;
