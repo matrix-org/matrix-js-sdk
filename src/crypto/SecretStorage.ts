@@ -54,6 +54,13 @@ interface IDecryptors {
     decrypt: (ciphertext: IEncryptedPayload) => Promise<string>;
 }
 
+interface ISecretInfo {
+    encrypted: {
+        // eslint-disable-next-line camelcase
+        key_id: IEncryptedPayload;
+    };
+}
+
 /**
  * Implements Secure Secret Storage and Sharing (MSC1946)
  * @module crypto/SecretStorage
@@ -149,7 +156,7 @@ export class SecretStorage {
             do {
                 keyId = randomString(32);
             } while (
-                await this.accountDataAdapter.getAccountDataFromServer(
+                await this.accountDataAdapter.getAccountDataFromServer<ISecretStorageKeyInfo>(
                     `m.secret_storage.key.${keyId}`,
                 )
             );
@@ -277,7 +284,7 @@ export class SecretStorage {
      * @return {string} the contents of the secret
      */
     public async get(name: string): Promise<string> {
-        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer(name);
+        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretInfo>(name);
         if (!secretInfo) {
             return;
         }
@@ -339,7 +346,7 @@ export class SecretStorage {
      */
     public async isStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo>> {
         // check if secret exists
-        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer(name);
+        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretInfo>(name);
         if (!secretInfo) return null;
         if (!secretInfo.encrypted) {
             return null;
@@ -352,7 +359,7 @@ export class SecretStorage {
         // filter secret encryption keys with supported algorithm
         for (const keyId of Object.keys(secretInfo.encrypted)) {
             // get key information from key storage
-            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer(
+            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretStorageKeyInfo>(
                 "m.secret_storage.key." + keyId,
             );
             if (!keyInfo) continue;
