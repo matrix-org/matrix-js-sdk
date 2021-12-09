@@ -1870,7 +1870,7 @@ export class Crypto extends EventEmitter {
                     // fallback key, but it hasn't been published yet, so we
                     // can use that instead of generating a new one
                     if (!fallbackKeys.curve25519 ||
-                        [...Object.keys(fallbackKeys.curve25519)].length == 0) {
+                        Object.keys(fallbackKeys.curve25519).length == 0) {
                         logger.info("generating fallback key");
                         if (this.fallbackCleanup) {
                             // cancel any pending fallback cleanup because generating
