@@ -2199,18 +2199,15 @@ export class MatrixClient extends EventEmitter {
      * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
      *
      * @param {string} name the name of the secret
-     * @param {boolean} checkKey check if the secret is encrypted by a trusted
-     *     key
-     *
      * @return {object?} map of key name to key info the secret is encrypted
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    public isSecretStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo>> {
+    public isSecretStored(name: string): Promise<Record<string, ISecretStorageKeyInfo>> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.isSecretStored(name, checkKey);
+        return this.crypto.isSecretStored(name);
     }
 
     /**
@@ -2541,7 +2538,7 @@ export class MatrixClient extends EventEmitter {
      *     trusted key
      */
     public isKeyBackupKeyStored(): Promise<Record<string, ISecretStorageKeyInfo>> {
-        return Promise.resolve(this.isSecretStored("m.megolm_backup.v1", false /* checkKey */));
+        return Promise.resolve(this.isSecretStored("m.megolm_backup.v1"));
     }
 
     /**
@@ -2551,7 +2548,6 @@ export class MatrixClient extends EventEmitter {
      * @param {object} info Info object from prepareKeyBackupVersion
      * @returns {Promise<object>} Object with 'version' param indicating the version created
      */
-    // TODO: Fix types
     public async createKeyBackupVersion(info: IKeyBackupInfo): Promise<IKeyBackupInfo> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");

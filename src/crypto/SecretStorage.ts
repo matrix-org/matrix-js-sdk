@@ -331,21 +331,18 @@ export class SecretStorage {
      * Check if a secret is stored on the server.
      *
      * @param {string} name the name of the secret
-     * @param {boolean} checkKey check if the secret is encrypted by a trusted key
      *
      * @return {object?} map of key name to key info the secret is encrypted
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    public async isStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo>> {
+    public async isStored(name: string): Promise<Record<string, ISecretStorageKeyInfo>> {
         // check if secret exists
         const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<any>(name); // TODO types
         if (!secretInfo) return null;
         if (!secretInfo.encrypted) {
             return null;
         }
-
-        if (checkKey === undefined) checkKey = true;
 
         const ret = {};
 

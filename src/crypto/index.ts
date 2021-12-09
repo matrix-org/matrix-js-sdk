@@ -1013,11 +1013,8 @@ export class Crypto extends EventEmitter {
         return this.secretStorage.get(name);
     }
 
-    public isSecretStored(
-        name: string,
-        checkKey?: boolean,
-    ): Promise<Record<string, ISecretStorageKeyInfo>> {
-        return this.secretStorage.isStored(name, checkKey);
+    public isSecretStored(name: string): Promise<Record<string, ISecretStorageKeyInfo>> {
+        return this.secretStorage.isStored(name);
     }
 
     public requestSecret(name: string, devices: string[]): ISecretRequest {
