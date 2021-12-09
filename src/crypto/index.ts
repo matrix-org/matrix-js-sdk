@@ -1928,8 +1928,9 @@ export class Crypto extends EventEmitter {
     private async uploadOneTimeKeys() {
         const promises = [];
 
-        const fallbackJson: Record<string, IOneTimeKey> = {};
+        let fallbackJson: Record<string, IOneTimeKey>;
         if (this.getNeedsNewFallback()) {
+            fallbackJson = {};
             const fallbackKeys = await this.olmDevice.getFallbackKey();
             for (const [keyId, key] of Object.entries(fallbackKeys.curve25519)) {
                 const k = { key, fallback: true };
@@ -1954,15 +1955,24 @@ export class Crypto extends EventEmitter {
 
         await Promise.all(promises);
 
-        const res = await this.baseApis.uploadKeysRequest({
+        const requestBody: Record<string, any> = {
             "one_time_keys": oneTimeJson,
             "org.matrix.msc2732.fallback_keys": fallbackJson,
-        });
+            "fallback_keys": fallbackJson,
+        };
 
-        this.fallbackCleanup = setTimeout(() => {
-            delete this.fallbackCleanup;
-            this.olmDevice.forgetOldFallbackKey();
-        }, 60*60*1000);
+        if (fallbackJson) {
+            requestBody["org.matrix.msc2732.fallback_keys"] = fallbackJson;
+        }
+
+        const res = await this.baseApis.uploadKeysRequest(requestBody);
+
+        if (fallbackJson) {
+            this.fallbackCleanup = setTimeout(() => {
+                delete this.fallbackCleanup;
+                this.olmDevice.forgetOldFallbackKey();
+            }, 60*60*1000);
+        }
 
         await this.olmDevice.markKeysAsPublished();
         return res;
