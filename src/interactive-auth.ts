@@ -35,6 +35,7 @@ export interface IInputs {
     emailAddress?: string;
     phoneCountry?: string;
     phoneNumber?: string;
+    registrationToken?: string;
 }
 
 export interface IStageStatus {
@@ -80,6 +81,7 @@ export interface IAuthDict {
     // eslint-disable-next-line camelcase
     threepid_creds?: any;
     threepidCreds?: any;
+    registrationToken?: string;
 }
 
 class NoAuthFlowFoundError extends Error {
