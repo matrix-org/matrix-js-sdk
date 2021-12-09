@@ -51,14 +51,14 @@ export interface IStore {
      * Set the sync token.
      * @param {string} token
      */
-    setSyncToken(token: string);
+    setSyncToken(token: string): void;
 
     /**
      * No-op.
      * @param {Group} group
      * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
      */
-    storeGroup(group: Group);
+    storeGroup(group: Group): void;
 
     /**
      * No-op.
@@ -79,7 +79,7 @@ export interface IStore {
      * No-op.
      * @param {Room} room
      */
-    storeRoom(room: Room);
+    storeRoom(room: Room): void;
 
     /**
      * No-op.
@@ -98,7 +98,7 @@ export interface IStore {
      * Permanently delete a room.
      * @param {string} roomId
      */
-    removeRoom(roomId: string);
+    removeRoom(roomId: string): void;
 
     /**
      * No-op.
@@ -110,7 +110,7 @@ export interface IStore {
      * No-op.
      * @param {User} user
      */
-    storeUser(user: User);
+    storeUser(user: User): void;
 
     /**
      * No-op.
@@ -140,13 +140,13 @@ export interface IStore {
      * @param {string} token The token associated with these events.
      * @param {boolean} toStart True if these are paginated results.
      */
-    storeEvents(room: Room, events: MatrixEvent[], token: string, toStart: boolean);
+    storeEvents(room: Room, events: MatrixEvent[], token: string, toStart: boolean): void;
 
     /**
      * Store a filter.
      * @param {Filter} filter
      */
-    storeFilter(filter: Filter);
+    storeFilter(filter: Filter): void;
 
     /**
      * Retrieve a filter.
@@ -168,13 +168,13 @@ export interface IStore {
      * @param {string} filterName
      * @param {string} filterId
      */
-    setFilterIdByName(filterName: string, filterId: string);
+    setFilterIdByName(filterName: string, filterId: string): void;
 
     /**
      * Store user-scoped account data events
      * @param {Array<MatrixEvent>} events The events to store.
      */
-    storeAccountDataEvents(events: MatrixEvent[]);
+    storeAccountDataEvents(events: MatrixEvent[]): void;
 
     /**
      * Get account data event by event type

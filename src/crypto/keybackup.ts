@@ -67,5 +67,5 @@ export interface IKeyBackupRestoreResult {
 
 export interface IKeyBackupRestoreOpts {
     cacheCompleteCallback?: () => void;
-    progressCallback?: ({ stage: string }) => void;
+    progressCallback?: (progress: { stage: string }) => void;
 }

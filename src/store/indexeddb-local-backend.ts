@@ -66,7 +66,7 @@ function selectQuery<T>(
 ): Promise<T[]> {
     const query = store.openCursor(keyRange);
     return new Promise((resolve, reject) => {
-        const results = [];
+        const results: T[] = [];
         query.onerror = () => {
             reject(new Error("Query failed: " + query.error));
         };
@@ -238,7 +238,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             const range = IDBKeyRange.only(roomId);
             const request = roomIndex.openCursor(range);
 
-            const membershipEvents = [];
+            const membershipEvents: IEvent[] = [];
             // did we encounter the oob_written marker object
             // amongst the results? That means OOB member
             // loading already happened for this room

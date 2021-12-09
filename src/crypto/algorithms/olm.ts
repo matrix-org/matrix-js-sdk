@@ -282,7 +282,7 @@ class OlmDecryption extends DecryptionAlgorithm {
         const sessionIds = await this.olmDevice.getSessionIdsForDevice(theirDeviceIdentityKey);
 
         // try each session in turn.
-        const decryptionErrors = {};
+        const decryptionErrors: Record<string, string> = {};
         for (let i = 0; i < sessionIds.length; i++) {
             const sessionId = sessionIds[i];
             try {
