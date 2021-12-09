@@ -121,7 +121,7 @@ export interface ICryptoCallbacks {
     ) => Promise<string>;
     getDehydrationKey?: (
         keyInfo: ISecretStorageKeyInfo,
-        checkFunc: (Uint8Array) => void,
+        checkFunc: (key: Uint8Array) => void,
     ) => Promise<Uint8Array>;
     getBackupKey?: () => Promise<Uint8Array>;
 }
