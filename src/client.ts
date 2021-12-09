@@ -5124,8 +5124,8 @@ export class MatrixClient extends EventEmitter {
                 token,
                 opts.limit,
                 dir,
-                eventTimeline.getFilter());
-            promise.then((res) => {
+                eventTimeline.getFilter(),
+            ).then((res) => {
                 if (res.state) {
                     const roomState = eventTimeline.getState(dir);
                     const stateEvents = res.state.map(this.getEventMapper());
