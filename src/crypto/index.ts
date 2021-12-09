@@ -58,7 +58,7 @@ import { BackupManager } from "./backup";
 import { IStore } from "../store";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
-import { MatrixEvent, EventStatus, IClearEvent } from "../models/event";
+import { MatrixEvent, EventStatus, IClearEvent, IEvent } from "../models/event";
 import { MatrixClient, IKeysUploadResponse, SessionStore, ISignedKey, ICrossSigningKey } from "../client";
 import type { EncryptionAlgorithm, DecryptionAlgorithm } from "./algorithms/base";
 import type { IRoomEncryption, RoomList } from "./RoomList";
@@ -2791,7 +2791,7 @@ export class Crypto extends EventEmitter {
                     type: "m.room.message",
                     content: {},
                     unsigned: {
-                        redacted_because: decryptedEvent.clearEvent,
+                        redacted_because: decryptedEvent.clearEvent as IEvent,
                     },
                 },
             };
