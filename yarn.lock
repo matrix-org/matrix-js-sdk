@@ -1210,9 +1210,9 @@
     "@types/yargs" "^15.0.0"
     chalk "^4.0.0"
 
-"@matrix-org/olm@https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.3.tgz":
-  version "3.2.3"
-  resolved "https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.3.tgz#cc332fdd25c08ef0e40f4d33fc3f822a0f98b6f4"
+"@matrix-org/olm@https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.7.tgz":
+  version "3.2.7"
+  resolved "https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.7.tgz#d54279ec26cd46518ea06af306bd450aeab207bf"
 
 "@nicolo-ribaudo/chokidar-2@2.1.8-no-fsevents.3":
   version "2.1.8-no-fsevents.3"
