@@ -150,7 +150,7 @@ import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, Rule
 import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
 import { MediaHandler } from "./webrtc/mediaHandler";
-import { Thread } from "./models/thread";
+import { Thread, ThreadEvent } from "./models/thread";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -4965,7 +4965,7 @@ export class MatrixClient extends EventEmitter {
             const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(matrixEvents);
 
             timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
-            this.processThreadEvents(timelineSet.room, threadedEvents);
+            this.processThreadEvents(timelineSet.room, threadedEvents, { scrollback: true });
 
             // there is no guarantee that the event ended up in "timeline" (we
             // might have switched to a neighbouring timeline) - so check the
@@ -5102,7 +5102,7 @@ export class MatrixClient extends EventEmitter {
 
                 const timelineSet = eventTimeline.getTimelineSet();
                 timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
-                this.processThreadEvents(timelineSet.room, threadedEvents);
+                this.processThreadEvents(timelineSet.room, threadedEvents, { scrollback: true });
 
                 // if we've hit the end of the timeline, we need to stop trying to
                 // paginate. We need to keep the 'forwards' token though, to make sure
@@ -5140,7 +5140,7 @@ export class MatrixClient extends EventEmitter {
 
                 eventTimeline.getTimelineSet()
                     .addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
-                this.processThreadEvents(room, threadedEvents);
+                this.processThreadEvents(room, threadedEvents, { scrollback: true });
 
                 // if we've hit the end of the timeline, we need to stop trying to
                 // paginate. We need to keep the 'forwards' token though, to make sure
@@ -6810,7 +6810,7 @@ export class MatrixClient extends EventEmitter {
         roomId: string,
         eventId: string,
         callback?: Callback,
-    ): Promise<IMinimalEvent> {
+    ): Promise<IEvent> {
         const path = utils.encodeUri(
             "/rooms/$roomId/event/$eventId", {
                 $roomId: roomId,
@@ -8895,7 +8895,11 @@ export class MatrixClient extends EventEmitter {
     /**
      * @experimental
      */
-    public processThreadEvents(room: Room, threadedEvents: MatrixEvent[], add = false): void {
+    public processThreadEvents(
+        room: Room,
+        threadedEvents: MatrixEvent[],
+        { initialSync = false, scrollback = false },
+    ): void {
         for (const event of threadedEvents) {
             if ((event.isThreadRelation || event.isThreadRoot) && !room.threads.has(event.threadRootId)) {
                 const thread = new Thread(event.threadRootId, room, this);
@@ -8905,8 +8909,19 @@ export class MatrixClient extends EventEmitter {
                     thread,
                 );
             }
-            if (add) {
-                room.addThreadedEvent(event);
+
+            const thread = room.findThreadForEvent(event);
+            if (
+                // when there's no server side support messages are discovered
+                // from the sync response. Whenever we stumble upon a thread relation
+                // we want to add it to the thread
+                (initialSync || scrollback) && !thread.hasServerSideSupport ||
+                // whenever a new message comes in via sync, add it to the thread
+                // regardless of server side support or not
+                (!initialSync && !scrollback)
+            ) {
+                thread.addEvent(event);
+                this.emit(ThreadEvent.Update, thread);
             }
         }
     }

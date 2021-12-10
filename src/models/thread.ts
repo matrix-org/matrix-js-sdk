@@ -46,6 +46,8 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
     private eventToPreview: MatrixEvent = null;
     private replyCount = 0;
 
+    public _hasServerSideSupport = false;
+
     /**
      * A reference to all the events ID at the bottom of the threads
      */
@@ -63,30 +65,41 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
             pendingEvents: true,
         });
 
-        const head = this.room.findEventById(threadHeadId);
-        if (head) {
-            this.setThreadHead(head);
-        } else {
-            this.client.fetchRoomEvent(this.roomId, threadHeadId)
-                .then(eventData => {
-                    const head = new MatrixEvent(eventData);
-                    this.setThreadHead(head);
-                });
-        }
+        let head = this.room.findEventById(threadHeadId);
+        this.client.fetchRoomEvent(this.roomId, threadHeadId)
+            .then(eventData => {
+                if (head) {
+                    // We have to refresh the stale unsigned data as the one
+                    // stored in indexeddb is probably out of date
+                    head.setUnsigned(eventData.unsigned);
+                } else {
+                    head = new MatrixEvent(eventData);
+                }
 
+                // If our event has aggregated relationship we know that we have
+                // server side support for threads, and we can be smarter about
+                // how it works
+                if (head.getAggregatedRelationship(RelationType.Thread)) {
+                    this._hasServerSideSupport = true;
+                }
+
+                this.setThreadHead(head);
+
+                this._hasServerSideSupport
+                    ? this.on(ThreadEvent.ViewThread, this.init)
+                    : this.init();
+            });
         room.on("Room.localEchoUpdated", this.onEcho);
         room.on("Room.timeline", this.onEcho);
-
-        this.on(ThreadEvent.ViewThread, this.init);
     }
 
     public init = async (): Promise<void> => {
-        const { originalEvent } = await this.fetchEvents();
-        if (!this._head) {
-            this._head = originalEvent;
+        if (this._hasServerSideSupport) {
+            const { originalEvent } = await this.fetchEvents();
+            if (!this._head) {
+                this._head = originalEvent;
+            }
         }
-
-        // Get unsigned field and set
 
         this._ready = true;
         this.off(ThreadEvent.ViewThread, this.init);
@@ -187,6 +200,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         this.eventToPreview = event;
 
         event.setThread(this);
+
         const threadBundle = this._head
             .getAggregatedRelationship<ThreadBundledRelation>(RelationType.Thread);
 
@@ -197,6 +211,9 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
             });
             EventTimeline.setEventMetadata(this.eventToPreview, this.roomState, false);
             this.replyCount = threadBundle.count;
+        } else {
+            this.addEvent(this._head);
+            this.replyCount = 0;
         }
 
         this.emit(ThreadEvent.Update);
@@ -231,8 +248,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         // event from the sync we need to make that happen before doing anything
         // else, otherwise the final event ordering will be incorrect
         if (!this._ready) {
-            this.init();
-            this.once(ThreadEvent.ViewThread, this.init);
+            await this.init();
         }
 
         event.setThread(this);
@@ -306,5 +322,9 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
 
     public has(eventId: string): boolean {
         return this.findEventById(eventId) instanceof MatrixEvent;
+    }
+
+    public get hasServerSideSupport(): boolean {
+        return this._hasServerSideSupport;
     }
 }

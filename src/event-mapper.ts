@@ -33,7 +33,7 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
         const event = new MatrixEvent(plainOldJsObject);
 
         const room = client.getRoom(event.getRoomId());
-        if (event.isThreadRoot) {
+        if (event.isThreadRoot && room) {
             let thread = room.threads.get(event.getId());
             if (!thread) {
                 thread = new Thread(event.getId(), room, client);

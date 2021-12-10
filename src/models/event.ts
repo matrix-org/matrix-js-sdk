@@ -913,6 +913,10 @@ export class MatrixEvent extends EventEmitter {
         return this.event.unsigned || {};
     }
 
+    public setUnsigned(unsigned: IUnsigned): void {
+        this.event.unsigned = unsigned;
+    }
+
     public unmarkLocallyRedacted(): boolean {
         const value = this._localRedactionEvent;
         this._localRedactionEvent = null;
@@ -1039,9 +1043,9 @@ export class MatrixEvent extends EventEmitter {
 
     /**
      * Replace the `event` property and recalculate any properties based on it.
-     * @param {Object} event the object to assign to the `event` property
+     * @param {IEvent} event the object to assign to the `event` property
      */
-    public handleRemoteEcho(event: object): void {
+    public handleRemoteEcho(event: Partial<IEvent>): void {
         const oldUnsigned = this.getUnsigned();
         const oldId = this.getId();
         this.event = event;

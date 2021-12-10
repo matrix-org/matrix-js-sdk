@@ -35,7 +35,7 @@ import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersio
 import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
 import { Filter } from "../filter";
 import { RoomState } from "./room-state";
-import { Thread, ThreadEvent } from "./thread";
+import { Thread } from "./thread";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -1284,16 +1284,6 @@ export class Room extends EventEmitter {
     }
 
     /**
-     * Add an event to a thread's timeline. Will fire "Thread.update"
-     * @experimental
-     */
-    public async addThreadedEvent(event: MatrixEvent): Promise<void> {
-        const thread = this.findThreadForEvent(event);
-        thread.addEvent(event);
-        this.emit(ThreadEvent.Update, thread);
-    }
-
-    /**
      * Add an event to the end of this room's live timelines. Will fire
      * "Room.timeline".
      *
@@ -1434,8 +1424,7 @@ export class Room extends EventEmitter {
             }
         } else {
             if (thread) {
-                thread.timelineSet.addEventToTimeline(event,
-                    thread.timelineSet.getLiveTimeline(), false);
+                thread.addEvent(event);
             } else {
                 for (let i = 0; i < this.timelineSets.length; i++) {
                     const timelineSet = this.timelineSets[i];
