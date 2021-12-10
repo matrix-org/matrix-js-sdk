@@ -33,7 +33,7 @@ import { EventTimeline } from "./models/event-timeline";
 import { PushProcessor } from "./pushprocessor";
 import { logger } from './logger';
 import { InvalidStoreError } from './errors';
-import { IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
+import { IProcessEventsOpts, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
 import { SyncState } from "./sync.api";
 import {
     Category,
@@ -1710,7 +1710,7 @@ export class SyncApi {
     /**
      * @experimental
      */
-    private processThreadEvents(room: Room, threadedEvents: MatrixEvent[], opts): void {
+    private processThreadEvents(room: Room, threadedEvents: MatrixEvent[], opts: IProcessEventsOpts): void {
         return this.client.processThreadEvents(room, threadedEvents, opts);
     }
 

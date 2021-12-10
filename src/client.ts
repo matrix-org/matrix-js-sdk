@@ -691,6 +691,12 @@ interface IRoomKeysResponse {
 interface IRoomsKeysResponse {
     rooms: Record<string, IRoomKeysResponse>;
 }
+
+export interface IProcessEventsOpts {
+    scrollback?: boolean;
+    initialSync?: boolean;
+}
+
 /* eslint-enable camelcase */
 
 // We're using this constant for methods overloading and inspect whether a variable
@@ -8898,7 +8904,7 @@ export class MatrixClient extends EventEmitter {
     public processThreadEvents(
         room: Room,
         threadedEvents: MatrixEvent[],
-        { initialSync = false, scrollback = false },
+        { initialSync = false, scrollback = false }: IProcessEventsOpts,
     ): void {
         for (const event of threadedEvents) {
             if ((event.isThreadRelation || event.isThreadRoot) && !room.threads.has(event.threadRootId)) {
