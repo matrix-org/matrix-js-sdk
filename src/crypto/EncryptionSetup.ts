@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { EventEmitter } from "events";
+
 import { logger } from "../logger";
 import { MatrixEvent } from "../models/event";
-import { EventEmitter } from "events";
 import { createCryptoStoreCacheCallbacks, ICacheCallbacks } from "./CrossSigning";
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { PREFIX_UNSTABLE } from "../http-api";

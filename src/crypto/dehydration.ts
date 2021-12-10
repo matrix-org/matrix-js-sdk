@@ -14,10 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import anotherjson from "another-json";
+
 import { decodeBase64, encodeBase64 } from './olmlib';
 import { IndexedDBCryptoStore } from '../crypto/store/indexeddb-crypto-store';
 import { decryptAES, encryptAES } from './aes';
-import anotherjson from "another-json";
 import { logger } from '../logger';
 import { ISecretStorageKeyInfo } from "./api";
 import { Crypto } from "./index";

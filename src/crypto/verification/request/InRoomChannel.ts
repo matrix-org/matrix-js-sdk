@@ -36,7 +36,7 @@ const M_RELATES_TO = "m.relates_to";
  * Uses the event id of the initial m.key.verification.request event as a transaction id.
  */
 export class InRoomChannel implements IVerificationChannel {
-    private requestEventId = null;
+    private requestEventId: string = null;
 
     /**
      * @param {MatrixClient} client the matrix client, to send messages with and get current user & device from.

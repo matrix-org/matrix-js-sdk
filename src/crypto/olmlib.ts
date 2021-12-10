@@ -21,13 +21,12 @@ limitations under the License.
  */
 
 import anotherjson from "another-json";
-import type { PkSigning } from "@matrix-org/olm";
 import { Logger } from "loglevel";
 
+import type { PkSigning } from "@matrix-org/olm";
 import { OlmDevice } from "./OlmDevice";
 import { DeviceInfo } from "./deviceinfo";
 import { logger } from '../logger';
-import * as utils from "../utils";
 import { IOneTimeKey } from "./dehydration";
 import { MatrixClient } from "../client";
 
@@ -126,7 +125,7 @@ export async function encryptMessageForDevice(
     // involved in the session. If we're looking to reduce data transfer in the
     // future, we could elide them for subsequent messages.
 
-    utils.extend(payload, payloadFields);
+    Object.assign(payload, payloadFields);
 
     resultsObject[deviceKey] = await olmDevice.encryptMessage(
         deviceKey, sessionId, JSON.stringify(payload),

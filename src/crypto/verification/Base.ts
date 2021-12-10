@@ -20,8 +20,9 @@ limitations under the License.
  * @module crypto/verification/Base
  */
 
-import { MatrixEvent } from '../../models/event';
 import { EventEmitter } from 'events';
+
+import { MatrixEvent } from '../../models/event';
 import { logger } from '../../logger';
 import { DeviceInfo } from '../deviceinfo';
 import { newTimeoutError } from "./Error";

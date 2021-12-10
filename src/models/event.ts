@@ -30,12 +30,13 @@ import {
     RelationType,
     ThreadBundledRelation,
 } from "../@types/event";
-import { Crypto } from "../crypto";
+import { Crypto, IEventDecryptionResult } from "../crypto";
 import { deepSortedObjectEntries } from "../utils";
 import { RoomMember } from "./room-member";
 import { Thread, ThreadEvent } from "./thread";
 import { IActionsObject } from '../pushprocessor';
 import { ReEmitter } from '../ReEmitter';
+import { MatrixError } from "../http-api";
 
 /**
  * Enum for event statuses.
@@ -126,25 +127,13 @@ export interface IEventRelation {
     key?: string;
 }
 
-interface IDecryptionResult {
-    clearEvent: {
-        room_id?: string;
-        type: string;
-        content: IContent;
-        unsigned?: IUnsigned;
-    };
-    forwardingCurve25519KeyChain?: string[];
-    senderCurve25519Key?: string;
-    claimedEd25519Key?: string;
-    untrusted?: boolean;
-}
-/* eslint-enable camelcase */
-
 export interface IClearEvent {
+    room_id?: string;
     type: string;
     content: Omit<IContent, "membership" | "avatar_url" | "displayname" | "m.relates_to">;
     unsigned?: IUnsigned;
 }
+/* eslint-enable camelcase */
 
 interface IKeyRequestRecipient {
     userId: string;
@@ -217,14 +206,14 @@ export class MatrixEvent extends EventEmitter {
     public sender: RoomMember = null;
     public target: RoomMember = null;
     public status: EventStatus = null;
-    public error = null;
+    public error: MatrixError = null;
     public forwardLooking = true;
 
     /* If the event is a `m.key.verification.request` (or to_device `m.key.verification.start`) event,
      * `Crypto` will set this the `VerificationRequest` for the event
      * so it can be easily accessed from the timeline.
      */
-    public verificationRequest = null;
+    public verificationRequest: VerificationRequest = null;
 
     private readonly reEmitter: ReEmitter;
 
@@ -699,8 +688,8 @@ export class MatrixEvent extends EventEmitter {
         while (true) {
             this.retryDecryption = false;
 
-            let res;
-            let err;
+            let res: IEventDecryptionResult;
+            let err: Error;
             try {
                 if (!crypto) {
                     res = this.badEncryptedMessage("Encryption not enabled");
@@ -788,7 +777,7 @@ export class MatrixEvent extends EventEmitter {
         }
     }
 
-    private badEncryptedMessage(reason: string): IDecryptionResult {
+    private badEncryptedMessage(reason: string): IEventDecryptionResult {
         return {
             clearEvent: {
                 type: "m.room.message",
@@ -812,7 +801,7 @@ export class MatrixEvent extends EventEmitter {
      * @param {module:crypto~EventDecryptionResult} decryptionResult
      *     the decryption result, including the plaintext and some key info
      */
-    private setClearData(decryptionResult: IDecryptionResult): void {
+    private setClearData(decryptionResult: IEventDecryptionResult): void {
         this.clearEvent = decryptionResult.clearEvent;
         this.senderCurve25519Key =
             decryptionResult.senderCurve25519Key || null;

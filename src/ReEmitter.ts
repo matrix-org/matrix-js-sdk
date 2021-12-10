@@ -30,7 +30,7 @@ export class ReEmitter {
             // We include the source as the last argument for event handlers which may need it,
             // such as read receipt listeners on the client class which won't have the context
             // of the room.
-            const forSource = (...args) => {
+            const forSource = (...args: any[]) => {
                 // EventEmitter special cases 'error' to make the emit function throw if no
                 // handler is attached, which sort of makes sense for making sure that something
                 // handles an error, but for re-emitting, there could be a listener on the original

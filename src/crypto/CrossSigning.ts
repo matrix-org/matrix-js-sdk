@@ -20,12 +20,12 @@ limitations under the License.
  */
 
 import { EventEmitter } from 'events';
+import { PkSigning } from "@matrix-org/olm";
 
 import { decodeBase64, encodeBase64, pkSign, pkVerify } from './olmlib';
 import { logger } from '../logger';
 import { IndexedDBCryptoStore } from '../crypto/store/indexeddb-crypto-store';
 import { decryptAES, encryptAES } from './aes';
-import { PkSigning } from "@matrix-org/olm";
 import { DeviceInfo } from "./deviceinfo";
 import { SecretStorage } from "./SecretStorage";
 import { ICrossSigningKey, ISignedKey, MatrixClient } from "../client";

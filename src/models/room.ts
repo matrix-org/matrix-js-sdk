@@ -48,19 +48,19 @@ const SAFE_ROOM_VERSIONS = ['1', '2', '3', '4', '5', '6'];
 
 function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: string): MatrixEvent {
     // console.log("synthesizing receipt for "+event.getId());
-    // This is really ugly because JS has no way to express an object literal
-    // where the name of a key comes from an expression
-    const fakeReceipt = {
-        content: {},
+    return new MatrixEvent({
+        content: {
+            [event.getId()]: {
+                [receiptType]: {
+                    [userId]: {
+                        ts: event.getTs(),
+                    },
+                },
+            },
+        },
         type: "m.receipt",
         room_id: event.getRoomId(),
-    };
-    fakeReceipt.content[event.getId()] = {};
-    fakeReceipt.content[event.getId()][receiptType] = {};
-    fakeReceipt.content[event.getId()][receiptType][userId] = {
-        ts: event.getTs(),
-    };
-    return new MatrixEvent(fakeReceipt);
+    });
 }
 
 interface IOpts {
@@ -240,7 +240,7 @@ export class Room extends EventEmitter {
             const serializedPendingEventList = client.sessionStore.store.getItem(pendingEventsKey(this.roomId));
             if (serializedPendingEventList) {
                 JSON.parse(serializedPendingEventList)
-                    .forEach(async serializedEvent => {
+                    .forEach(async (serializedEvent: Partial<IEvent>) => {
                         const event = new MatrixEvent(serializedEvent);
                         if (event.getType() === EventType.RoomMessageEncrypted) {
                             await event.attemptDecryption(this.client.crypto);
@@ -997,14 +997,14 @@ export class Room extends EventEmitter {
      * @return {array} The room's alias as an array of strings
      */
     public getAliases(): string[] {
-        const aliasStrings = [];
+        const aliasStrings: string[] = [];
 
         const aliasEvents = this.currentState.getStateEvents(EventType.RoomAliases);
         if (aliasEvents) {
             for (let i = 0; i < aliasEvents.length; ++i) {
                 const aliasEvent = aliasEvents[i];
                 if (Array.isArray(aliasEvent.getContent().aliases)) {
-                    const filteredAliases = aliasEvent.getContent().aliases.filter(a => {
+                    const filteredAliases = aliasEvent.getContent<{ aliases: string[] }>().aliases.filter(a => {
                         if (typeof(a) !== "string") return false;
                         if (a[0] !== '#') return false;
                         if (!a.endsWith(`:${aliasEvent.getStateKey()}`)) return false;
@@ -1966,7 +1966,7 @@ export class Room extends EventEmitter {
      * @return {Object} Map of receipts by event ID
      */
     private buildReceiptCache(receipts: Receipts): ReceiptCache {
-        const receiptCacheByEventId = {};
+        const receiptCacheByEventId: ReceiptCache = {};
         Object.keys(receipts).forEach(function(receiptType) {
             Object.keys(receipts[receiptType]).forEach(function(userId) {
                 const receipt = receipts[receiptType][userId];
@@ -2159,7 +2159,7 @@ export class Room extends EventEmitter {
         }
 
         // get members that are NOT ourselves and are actually in the room.
-        let otherNames = null;
+        let otherNames: string[] = null;
         if (this.summaryHeroes) {
             // if we have a summary, the member state events
             // should be in the room state
@@ -2240,31 +2240,29 @@ function pendingEventsKey(roomId: string): string {
 
 /* a map from current event status to a list of allowed next statuses
      */
-const ALLOWED_TRANSITIONS = {};
-
-ALLOWED_TRANSITIONS[EventStatus.ENCRYPTING] = [
-    EventStatus.SENDING,
-    EventStatus.NOT_SENT,
-];
-
-ALLOWED_TRANSITIONS[EventStatus.SENDING] = [
-    EventStatus.ENCRYPTING,
-    EventStatus.QUEUED,
-    EventStatus.NOT_SENT,
-    EventStatus.SENT,
-];
-
-ALLOWED_TRANSITIONS[EventStatus.QUEUED] =
-    [EventStatus.SENDING, EventStatus.CANCELLED];
-
-ALLOWED_TRANSITIONS[EventStatus.SENT] =
-    [];
-
-ALLOWED_TRANSITIONS[EventStatus.NOT_SENT] =
-    [EventStatus.SENDING, EventStatus.QUEUED, EventStatus.CANCELLED];
-
-ALLOWED_TRANSITIONS[EventStatus.CANCELLED] =
-    [];
+const ALLOWED_TRANSITIONS: Record<EventStatus, EventStatus[]> = {
+    [EventStatus.ENCRYPTING]: [
+        EventStatus.SENDING,
+        EventStatus.NOT_SENT,
+    ],
+    [EventStatus.SENDING]: [
+        EventStatus.ENCRYPTING,
+        EventStatus.QUEUED,
+        EventStatus.NOT_SENT,
+        EventStatus.SENT,
+    ],
+    [EventStatus.QUEUED]: [
+        EventStatus.SENDING,
+        EventStatus.CANCELLED,
+    ],
+    [EventStatus.SENT]: [],
+    [EventStatus.NOT_SENT]: [
+        EventStatus.SENDING,
+        EventStatus.QUEUED,
+        EventStatus.CANCELLED,
+    ],
+    [EventStatus.CANCELLED]: [],
+};
 
 // TODO i18n
 function memberNamesToRoomName(names: string[], count = (names.length + 1)) {

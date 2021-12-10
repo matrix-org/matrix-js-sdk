@@ -18,7 +18,6 @@ limitations under the License.
 
 /** @module interactive-auth */
 
-import * as utils from "./utils";
 import { logger } from './logger';
 import { MatrixClient } from "./client";
 import { defer, IDeferred } from "./utils";
@@ -35,6 +34,7 @@ export interface IInputs {
     emailAddress?: string;
     phoneCountry?: string;
     phoneNumber?: string;
+    registrationToken?: string;
 }
 
 export interface IStageStatus {
@@ -67,7 +67,7 @@ export enum AuthType {
 export interface IAuthDict {
     // [key: string]: any;
     type?: string;
-    // session?: string; // TODO
+    session?: string;
     // TODO: Remove `user` once servers support proper UIA
     // See https://github.com/vector-im/element-web/issues/10312
     user?: string;
@@ -80,6 +80,7 @@ export interface IAuthDict {
     // eslint-disable-next-line camelcase
     threepid_creds?: any;
     threepidCreds?: any;
+    registrationToken?: string;
 }
 
 class NoAuthFlowFoundError extends Error {
@@ -358,12 +359,12 @@ export class InteractiveAuth {
         }
 
         // use the sessionid from the last request, if one is present.
-        let auth;
+        let auth: IAuthDict;
         if (this.data.session) {
             auth = {
                 session: this.data.session,
             };
-            utils.extend(auth, authData);
+            Object.assign(auth, authData);
         } else {
             auth = authData;
         }

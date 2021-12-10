@@ -284,7 +284,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
     }
 }
 
-function debuglog(...args) {
+function debuglog(...args: any[]) {
     if (DEBUG) {
         logger.log(...args);
     }

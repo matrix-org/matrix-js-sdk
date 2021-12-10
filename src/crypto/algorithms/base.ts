@@ -46,7 +46,7 @@ type DecryptionClassParams = Omit<IParams, "deviceId" | "config">;
  */
 export const DECRYPTION_CLASSES: Record<string, new (params: DecryptionClassParams) => DecryptionAlgorithm> = {};
 
-interface IParams {
+export interface IParams {
     userId: string;
     deviceId: string;
     crypto: Crypto;
