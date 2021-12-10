@@ -1416,11 +1416,14 @@ export class SyncApi {
             const currentCount = data.device_one_time_keys_count.signed_curve25519 || 0;
             this.opts.crypto.updateOneTimeKeyCount(currentCount);
         }
-        if (this.opts.crypto && data["org.matrix.msc2732.device_unused_fallback_key_types"]) {
+        if (this.opts.crypto &&
+            (data["device_unused_fallback_key_types"] ||
+                data["org.matrix.msc2732.device_unused_fallback_key_types"])) {
             // The presence of device_unused_fallback_key_types indicates that the
             // server supports fallback keys. If there's no unused
             // signed_curve25519 fallback key we need a new one.
-            const unusedFallbackKeys = data["org.matrix.msc2732.device_unused_fallback_key_types"];
+            const unusedFallbackKeys = data["device_unused_fallback_key_types"] ||
+                data["org.matrix.msc2732.device_unused_fallback_key_types"];
             this.opts.crypto.setNeedsNewFallback(
                 unusedFallbackKeys instanceof Array &&
                 !unusedFallbackKeys.includes("signed_curve25519"),

@@ -543,11 +543,23 @@ export class OlmDevice {
             'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
                 this.getAccount(txn, (account: Account) => {
-                    result = JSON.parse(account.fallback_key());
+                    result = JSON.parse(account.unpublished_fallback_key());
                 });
             },
         );
         return result;
+    }
+
+    public async forgetOldFallbackKey(): Promise<void> {
+        await this.cryptoStore.doTxn(
+            'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+            (txn) => {
+                this.getAccount(txn, (account: Account) => {
+                    account.forget_old_fallback_key();
+                    this.storeAccount(txn, account);
+                });
+            },
+        );
     }
 
     /**

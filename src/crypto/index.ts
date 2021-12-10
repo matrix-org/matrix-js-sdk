@@ -248,6 +248,7 @@ export class Crypto extends EventEmitter {
 
     private oneTimeKeyCount: number;
     private needsNewFallback: boolean;
+    private fallbackCleanup?: number; // setTimeout ID
 
     /**
      * Cryptography bits
@@ -1850,8 +1851,23 @@ export class Crypto extends EventEmitter {
                 }
 
                 if (this.getNeedsNewFallback()) {
-                    logger.info("generating fallback key");
-                    await this.olmDevice.generateFallbackKey();
+                    const fallbackKeys = await this.olmDevice.getFallbackKey();
+                    // if fallbackKeys is non-empty, we've already generated a
+                    // fallback key, but it hasn't been published yet, so we
+                    // can use that instead of generating a new one
+                    if (!fallbackKeys.curve25519 ||
+                        Object.keys(fallbackKeys.curve25519).length == 0) {
+                        logger.info("generating fallback key");
+                        if (this.fallbackCleanup) {
+                            // cancel any pending fallback cleanup because generating
+                            // a new fallback key will already drop the old fallback
+                            // that would have been dropped, and we don't want to kill
+                            // the current key
+                            clearTimeout(this.fallbackCleanup);
+                            delete this.fallbackCleanup;
+                        }
+                        await this.olmDevice.generateFallbackKey();
+                    }
                 }
 
                 logger.info("calling uploadOneTimeKeys");
@@ -1898,8 +1914,9 @@ export class Crypto extends EventEmitter {
     private async uploadOneTimeKeys() {
         const promises = [];
 
-        const fallbackJson: Record<string, IOneTimeKey> = {};
+        let fallbackJson: Record<string, IOneTimeKey>;
         if (this.getNeedsNewFallback()) {
+            fallbackJson = {};
             const fallbackKeys = await this.olmDevice.getFallbackKey();
             for (const [keyId, key] of Object.entries(fallbackKeys.curve25519)) {
                 const k = { key, fallback: true };
@@ -1924,10 +1941,23 @@ export class Crypto extends EventEmitter {
 
         await Promise.all(promises);
 
-        const res = await this.baseApis.uploadKeysRequest({
+        const requestBody: Record<string, any> = {
             "one_time_keys": oneTimeJson,
-            "org.matrix.msc2732.fallback_keys": fallbackJson,
-        });
+        };
+
+        if (fallbackJson) {
+            requestBody["org.matrix.msc2732.fallback_keys"] = fallbackJson;
+            requestBody["fallback_keys"] = fallbackJson;
+        }
+
+        const res = await this.baseApis.uploadKeysRequest(requestBody);
+
+        if (fallbackJson) {
+            this.fallbackCleanup = setTimeout(() => {
+                delete this.fallbackCleanup;
+                this.olmDevice.forgetOldFallbackKey();
+            }, 60*60*1000);
+        }
 
         await this.olmDevice.markKeysAsPublished();
         return res;
