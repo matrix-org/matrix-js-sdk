@@ -115,7 +115,7 @@ export enum MsgType {
     KeyVerificationRequest = "m.key.verification.request",
 }
 
-export interface ThreadBundledRelation {
+export interface IThreadBundledRelation {
     // eslint-disable-next-line camelcase
     latest_event: IEvent;
     count: number;

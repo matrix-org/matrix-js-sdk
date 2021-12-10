@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { RelationType, ThreadBundledRelation } from "../@types/event";
+import { RelationType, IThreadBundledRelation } from "../@types/event";
 import { IRelationsRequestOpts } from "../@types/requests";
 import { MatrixClient } from "../client";
 import { TimelineWindow } from "../timeline-window";
@@ -199,7 +199,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         event.setThread(this);
 
         const threadBundle = this._head
-            .getAggregatedRelationship<ThreadBundledRelation>(RelationType.Thread);
+            .getAggregatedRelationship<IThreadBundledRelation>(RelationType.Thread);
 
         if (threadBundle) {
             this.eventToPreview = new MatrixEvent(threadBundle.latest_event);

@@ -28,7 +28,7 @@ import {
     EventType,
     MsgType,
     RelationType,
-    ThreadBundledRelation,
+    IThreadBundledRelation,
 } from "../@types/event";
 import { Crypto, IEventDecryptionResult } from "../crypto";
 import { deepSortedObjectEntries } from "../utils";
@@ -438,7 +438,7 @@ export class MatrixEvent extends EventEmitter {
      */
     public get isThreadRoot(): boolean {
         const isThreadRootWithoutServerSupport = this.getThread() && this.getThread().id === this.getId();
-        const threadBundle = this.getAggregatedRelationship<ThreadBundledRelation>(RelationType.Thread);
+        const threadBundle = this.getAggregatedRelationship<IThreadBundledRelation>(RelationType.Thread);
         return !!threadBundle || isThreadRootWithoutServerSupport;
     }
 
