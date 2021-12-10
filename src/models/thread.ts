@@ -14,18 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {
-    IRelationsRequestOpts,
-    MatrixClient,
-    RelationType,
-    RoomState,
-    ThreadBundledRelation,
-    TimelineWindow,
-} from "../matrix";
+import { RelationType, ThreadBundledRelation } from "../@types/event";
+import { IRelationsRequestOpts } from "../@types/requests";
+import { MatrixClient } from "../client";
+import { TimelineWindow } from "../timeline-window";
 import { MatrixEvent } from "./event";
 import { Direction, EventTimeline } from "./event-timeline";
 import { EventTimelineSet } from './event-timeline-set';
 import { Room } from './room';
+import { RoomState } from "./room-state";
 import { TypedEventEmitter } from "./typed-event-emitter";
 
 export enum ThreadEvent {
