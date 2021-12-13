@@ -21,7 +21,7 @@ limitations under the License.
 import { EventEmitter } from "events";
 
 import { EventTimelineSet, DuplicateStrategy } from "./event-timeline-set";
-import { EventTimeline } from "./event-timeline";
+import { Direction, EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
 import { normalize } from "../utils";
@@ -107,6 +107,10 @@ type Receipts = Record<string, Record<string, IWrappedReceipt>>;
 export enum NotificationCountType {
     Highlight = "highlight",
     Total = "total",
+}
+
+export interface ICreateFilterOpts {
+    prepopulateTimeline?: boolean;
 }
 
 export class Room extends EventEmitter {
@@ -778,7 +782,7 @@ export class Room extends EventEmitter {
      * timeline which would otherwise be unable to paginate forwards without this token).
      * Removing just the old live timeline whilst preserving previous ones is not supported.
      */
-    public resetLiveTimeline(backPaginationToken: string, forwardPaginationToken: string): void {
+    public resetLiveTimeline(backPaginationToken: string | null, forwardPaginationToken: string | null): void {
         for (let i = 0; i < this.timelineSets.length; i++) {
             this.timelineSets[i].resetLiveTimeline(
                 backPaginationToken, forwardPaginationToken,
@@ -1209,7 +1213,10 @@ export class Room extends EventEmitter {
      * @param {Filter} filter The filter to be applied to this timelineSet
      * @return {EventTimelineSet} The timelineSet
      */
-    public getOrCreateFilteredTimelineSet(filter: Filter): EventTimelineSet {
+    public getOrCreateFilteredTimelineSet(
+        filter: Filter,
+        { prepopulateTimeline = true }: ICreateFilterOpts = {},
+    ): EventTimelineSet {
         if (this.filteredTimelineSets[filter.filterId]) {
             return this.filteredTimelineSets[filter.filterId];
         }
@@ -1219,29 +1226,38 @@ export class Room extends EventEmitter {
         this.filteredTimelineSets[filter.filterId] = timelineSet;
         this.timelineSets.push(timelineSet);
 
-        // populate up the new timelineSet with filtered events from our live
-        // unfiltered timeline.
-        //
-        // XXX: This is risky as our timeline
-        // may have grown huge and so take a long time to filter.
-        // see https://github.com/vector-im/vector-web/issues/2109
-
         const unfilteredLiveTimeline = this.getLiveTimeline();
+        // Not all filter are possible to replicate client-side only
+        // When that's the case we do not want to prepopulate from the live timeline
+        // as we would get incorrect results compared to what the server would send back
+        if (prepopulateTimeline) {
+            // populate up the new timelineSet with filtered events from our live
+            // unfiltered timeline.
+            //
+            // XXX: This is risky as our timeline
+            // may have grown huge and so take a long time to filter.
+            // see https://github.com/vector-im/vector-web/issues/2109
 
-        unfilteredLiveTimeline.getEvents().forEach(function(event) {
-            timelineSet.addLiveEvent(event);
-        });
+            unfilteredLiveTimeline.getEvents().forEach(function(event) {
+                timelineSet.addLiveEvent(event);
+            });
 
-        // find the earliest unfiltered timeline
-        let timeline = unfilteredLiveTimeline;
-        while (timeline.getNeighbouringTimeline(EventTimeline.BACKWARDS)) {
-            timeline = timeline.getNeighbouringTimeline(EventTimeline.BACKWARDS);
+            // find the earliest unfiltered timeline
+            let timeline = unfilteredLiveTimeline;
+            while (timeline.getNeighbouringTimeline(EventTimeline.BACKWARDS)) {
+                timeline = timeline.getNeighbouringTimeline(EventTimeline.BACKWARDS);
+            }
+
+            timelineSet.getLiveTimeline().setPaginationToken(
+                timeline.getPaginationToken(EventTimeline.BACKWARDS),
+                EventTimeline.BACKWARDS,
+            );
+        } else {
+            const livePaginationToken = unfilteredLiveTimeline.getPaginationToken(Direction.Forward);
+            timelineSet
+                .getLiveTimeline()
+                .setPaginationToken(livePaginationToken, Direction.Backward);
         }
-
-        timelineSet.getLiveTimeline().setPaginationToken(
-            timeline.getPaginationToken(EventTimeline.BACKWARDS),
-            EventTimeline.BACKWARDS,
-        );
 
         // alternatively, we could try to do something like this to try and re-paginate
         // in the filtered events from nothing, but Mark says it's an abuse of the API
