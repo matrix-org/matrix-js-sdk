@@ -6765,7 +6765,9 @@ export class MatrixClient extends EventEmitter {
     ): Promise<IRelationsResponse> {
         const params = new URLSearchParams();
         for (const [key, val] of Object.entries(opts)) {
-            params.set(key, val);
+            if (val) { // filter out falsey values
+                params.set(key, val);
+            }
         }
         const queryString = params.toString();
 
