@@ -22,7 +22,6 @@ limitations under the License.
 
 import { parse as parseContentType, ParsedMediaType } from "content-type";
 import EventEmitter from "events";
-
 import type { IncomingHttpHeaders, IncomingMessage } from "http";
 import type { Request as _Request, CoreOptions } from "request";
 
