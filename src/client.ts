@@ -621,7 +621,7 @@ export interface IMyDevice {
     last_seen_ts?: number;
 }
 
-interface IDownloadKeyResult {
+export interface IDownloadKeyResult {
     failures: { [serverName: string]: object };
     device_keys: {
         [userId: string]: {
@@ -630,6 +630,30 @@ interface IDownloadKeyResult {
                     device_display_name: string;
                 };
             };
+        };
+    };
+    // the following three fields were added in 1.1
+    master_keys?: {
+        [userId: string]: {
+            keys: { [keyId: string]: string };
+            usage: string[];
+            user_id: string;
+        };
+    };
+    self_signing_keys?: {
+        [userId: string]: {
+            keys: { [keyId: string]: string };
+            signatures: ISignatures;
+            usage: string[];
+            user_id: string;
+        };
+    };
+    user_signing_keys?: {
+        [userId: string]: {
+            keys: { [keyId: string]: string };
+            signatures: ISignatures;
+            usage: string[];
+            user_id: string;
         };
     };
 }
