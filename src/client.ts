@@ -634,11 +634,16 @@ interface IDownloadKeyResult {
     };
 }
 
-interface IClaimOTKsResult {
+export interface IClaimOTKsResult {
     failures: { [serverName: string]: object };
     one_time_keys: {
         [userId: string]: {
-            [deviceId: string]: string;
+            [deviceId: string]: {
+                [keyId: string]: {
+                    key: string;
+                    signatures: ISignatures;
+                };
+            };
         };
     };
 }
@@ -5691,18 +5696,14 @@ export class MatrixClient extends EventEmitter {
         searchResults.count = roomEvents.count;
         searchResults.next_batch = roomEvents.next_batch;
 
-        // combine the highlight list with our existing list; build an object
-        // to avoid O(N^2) fail
-        const highlights = {};
-        roomEvents.highlights.forEach((hl) => {
-            highlights[hl] = 1;
-        });
+        // combine the highlight list with our existing list;
+        const highlights = new Set<string>(roomEvents.highlights);
         searchResults.highlights.forEach((hl) => {
-            highlights[hl] = 1;
+            highlights.add(hl);
         });
 
         // turn it back into a list.
-        searchResults.highlights = Object.keys(highlights);
+        searchResults.highlights = Array.from(highlights);
 
         // append the new results to our existing results
         const resultsLength = roomEvents.results ? roomEvents.results.length : 0;
@@ -5793,11 +5794,9 @@ export class MatrixClient extends EventEmitter {
 
         return this.http.authedRequest(
             undefined, "GET", path, undefined, undefined,
-        ).then((response) => {
+        ).then((response: IFilterDefinition) => {
             // persist the filter
-            const filter = Filter.fromJson(
-                userId, filterId, response,
-            );
+            const filter = Filter.fromJson(userId, filterId, response);
             this.store.storeFilter(filter);
             return filter;
         });
@@ -6095,7 +6094,7 @@ export class MatrixClient extends EventEmitter {
             {
                 prefix: '',
             },
-        ).catch((e) => {
+        ).catch((e: Error) => {
             // Need to unset this if it fails, otherwise we'll never retry
             this.serverVersionsPromise = null;
             // but rethrow the exception to anything that was waiting
@@ -6419,7 +6418,7 @@ export class MatrixClient extends EventEmitter {
     public isUsernameAvailable(username: string): Promise<true> {
         return this.http.authedRequest(
             undefined, "GET", '/register/available', { username: username },
-        ).then((response) => {
+        ).then((response: { available: boolean }) => {
             return response.available;
         });
     }
@@ -7744,11 +7743,11 @@ export class MatrixClient extends EventEmitter {
      *     an error response ({@link module:http-api.MatrixError}).
      */
     public claimOneTimeKeys(
-        devices: string[],
+        devices: [string, string][],
         keyAlgorithm = "signed_curve25519",
         timeout?: number,
     ): Promise<IClaimOTKsResult> {
-        const queries = {};
+        const queries: Record<string, Record<string, string>> = {};
 
         if (keyAlgorithm === undefined) {
             keyAlgorithm = "signed_curve25519";
