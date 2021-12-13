@@ -25,8 +25,6 @@ import EventEmitter from "events";
 import type { IncomingHttpHeaders, IncomingMessage } from "http";
 import type { Request as _Request, CoreOptions } from "request";
 
-import * as utils from "./utils";
-import { logger } from './logger';
 // we use our own implementation of setTimeout, so that if we get suspended in
 // the middle of a /sync, we cancel the sync as soon as we awake, rather than
 // waiting for the delay to elapse.
@@ -35,6 +33,8 @@ import { IUploadOpts } from "./@types/requests";
 import { IAbortablePromise } from "./@types/partials";
 import { IDeferred } from "./utils";
 import { Callback } from "./client";
+import * as utils from "./utils";
+import { logger } from './logger';
 
 /*
 TODO:

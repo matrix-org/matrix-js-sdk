@@ -22,7 +22,7 @@ import { createCryptoStoreCacheCallbacks, ICacheCallbacks } from "./CrossSigning
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { Method, PREFIX_UNSTABLE } from "../http-api";
 import { Crypto, IBootstrapCrossSigningOpts } from "./index";
-import { CrossSigningKeys, ICrossSigningKey, ICryptoCallbacks, ISignedKey, KeySignatures, } from "../matrix";
+import { CrossSigningKeys, ICrossSigningKey, ICryptoCallbacks, ISignedKey, KeySignatures } from "../matrix";
 import { ISecretStorageKeyInfo } from "./api";
 import { IKeyBackupInfo } from "./keybackup";
 
