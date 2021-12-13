@@ -27,12 +27,19 @@ import type NodeCrypto from "crypto";
 
 /**
  * Encode a dictionary of query parameters.
+ * Omits any undefined/null values.
  * @param {Object} params A dict of key/values to encode e.g.
  * {"foo": "bar", "baz": "taz"}
  * @return {string} The encoded string e.g. foo=bar&baz=taz
  */
-export function encodeParams(params: Record<string, string>): string {
-    return new URLSearchParams(params).toString();
+export function encodeParams(params: Record<string, string | number>): string {
+    const searchParams = new URLSearchParams();
+    for (const [key, val] of Object.entries(params)) {
+        if (val !== undefined && val !== null) {
+            searchParams.set(key, String(val));
+        }
+    }
+    return searchParams.toString();
 }
 
 export type QueryDict = Record<string, string | string[]>;
