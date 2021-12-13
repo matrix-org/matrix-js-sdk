@@ -21,7 +21,7 @@ limitations under the License.
 import { EventEmitter } from "events";
 
 import { EventTimelineSet, DuplicateStrategy } from "./event-timeline-set";
-import { EventTimeline } from "./event-timeline";
+import { Direction, EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
 import { normalize } from "../utils";
@@ -1424,7 +1424,7 @@ export class Room extends EventEmitter {
             }
         } else {
             if (thread) {
-                thread.addEvent(event);
+                thread.addEvent(event, Direction.Forward);
             } else {
                 for (let i = 0; i < this.timelineSets.length; i++) {
                     const timelineSet = this.timelineSets[i];
@@ -1712,7 +1712,7 @@ export class Room extends EventEmitter {
             this.addLiveEvent(events[i], duplicateStrategy, fromCache);
             const thread = this.threads.get(events[i].getId());
             if (thread) {
-                thread.addEvent(events[i]);
+                thread.addEvent(events[i], Direction.Forward);
             }
         }
     }

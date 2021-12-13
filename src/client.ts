@@ -8924,9 +8924,12 @@ export class MatrixClient extends EventEmitter {
                 (initialSync || scrollback) && !thread.hasServerSideSupport ||
                 // whenever a new message comes in via sync, add it to the thread
                 // regardless of server side support or not
-                (!initialSync && !scrollback)
+                (!initialSync && !scrollback) ||
+
+                !thread.ready
             ) {
-                thread.addEvent(event);
+                const direction = scrollback ? Direction.Backward : Direction.Forward;
+                thread.addEvent(event, direction);
                 this.emit(ThreadEvent.Update, thread);
             }
         }

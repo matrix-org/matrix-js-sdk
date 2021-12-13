@@ -171,6 +171,10 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         direction = Direction.Backward,
         limit = 20,
     ): Promise<boolean> => {
+        if (!this._hasServerSideSupport) {
+            return false;
+        }
+
         const timelineIndex = timelineWindow.getTimelineIndex(direction);
 
         const paginationKey = direction === Direction.Backward ? "from" : "to";
@@ -231,7 +235,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
      * Will fire "Thread.update"
      * @param event The event to add
      */
-    public async addEvent(event: MatrixEvent): Promise<void> {
+    public async addEvent(event: MatrixEvent, direction = Direction.Forward): Promise<void> {
         if (this.has(event.getId())) {
             return;
         }
@@ -252,7 +256,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         this.timelineSet.addEventToTimeline(
             event,
             this.liveTimeline,
-            false,
+            direction === Direction.Backward,
             false,
             this.roomState,
         );
