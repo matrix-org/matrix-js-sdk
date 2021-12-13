@@ -26,6 +26,7 @@ import { IVerificationChannel } from "./Channel";
 import { EventType } from "../../../@types/event";
 import { MatrixClient } from "../../../client";
 import { MatrixEvent } from "../../../models/event";
+import { IRequestsMap } from "../..";
 
 const MESSAGE_TYPE = EventType.RoomMessage;
 const M_REFERENCE = "m.reference";
@@ -304,7 +305,7 @@ export class InRoomChannel implements IVerificationChannel {
     }
 }
 
-export class InRoomRequests {
+export class InRoomRequests implements IRequestsMap {
     private requestsByRoomId = new Map<string, Map<string, VerificationRequest>>();
 
     public getRequest(event: MatrixEvent): VerificationRequest {
@@ -328,7 +329,7 @@ export class InRoomRequests {
         this.doSetRequest(event.getRoomId(), InRoomChannel.getTransactionId(event), request);
     }
 
-    public setRequestByChannel(channel: InRoomChannel, request: VerificationRequest): void {
+    public setRequestByChannel(channel: IVerificationChannel, request: VerificationRequest): void {
         this.doSetRequest(channel.roomId, channel.transactionId, request);
     }
 

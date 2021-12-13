@@ -1424,11 +1424,10 @@ export class MatrixClient extends EventEmitter {
         // We swallow errors because we need a default object anyhow
         return this.http.authedRequest(
             undefined, "GET", "/capabilities",
-        ).catch((e: Error) => {
+        ).catch((e: Error): {} => {
             logger.error(e);
             return null; // otherwise consume the error
-        }).then((r) => {
-            if (!r) r = {};
+        }).then((r: { capabilities?: ICapabilities } = {}) => {
             const capabilities: ICapabilities = r["capabilities"] || {};
 
             // If the capabilities missed the cache, cache it for a shorter amount
@@ -2836,7 +2835,7 @@ export class MatrixClient extends EventEmitter {
         }
 
         let totalKeyCount = 0;
-        let keys = [];
+        let keys: IMegolmSessionData[] = [];
 
         const path = this.makeKeyBackupPath(targetRoomId, targetSessionId, backupInfo.version);
 
