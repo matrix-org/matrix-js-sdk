@@ -848,6 +848,10 @@ export interface IResponse<T> {
     headers?: IncomingHttpHeaders;
 }
 
+function getStatusCode(response: XMLHttpRequest | IncomingMessage): number {
+    return (response as XMLHttpRequest).status || (response as IncomingMessage).statusCode;
+}
+
 /*
  * Returns a callback that can be invoked by an HTTP request on completion,
  * that will either resolve or reject the given defer as well as invoke the
@@ -881,14 +885,12 @@ function requestCallback<T>(
             }
         }
 
-        const httpStatus = (response as XMLHttpRequest).status || (response as IncomingMessage).statusCode;
-
         let data: T | string = body;
 
         if (!err) {
             try {
-                if (httpStatus >= 400) {
-                    err = parseErrorResponse(response, httpStatus, body);
+                if (getStatusCode(response) >= 400) {
+                    err = parseErrorResponse(response, body);
                 } else if (bodyParser) {
                     data = bodyParser(body);
                 }
@@ -905,7 +907,7 @@ function requestCallback<T>(
             userDefinedCallback?.(null, data as T);
         } else {
             const res: IResponse<T> = {
-                code: httpStatus,
+                code: getStatusCode(response),
 
                 // XXX: why do we bother with this? it doesn't work for
                 // XMLHttpRequest, so clearly we don't use it.
@@ -927,11 +929,11 @@ function requestCallback<T>(
  * we return a generic Error.
  *
  * @param {XMLHttpRequest|http.IncomingMessage} response response object
- * @param {number} httpStatus http status code of the response
  * @param {String} body raw body of the response
  * @returns {Error}
  */
-function parseErrorResponse(response: XMLHttpRequest | IncomingMessage, httpStatus: number, body?: string) {
+function parseErrorResponse(response: XMLHttpRequest | IncomingMessage, body?: string) {
+    const httpStatus = getStatusCode(response);
     const contentType = getResponseContentType(response);
 
     let err;
