@@ -4805,12 +4805,11 @@ export class MatrixClient extends EventEmitter {
      * <code>null</code>.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public scrollback(room: Room, limit: number, callback?: Callback): Promise<Room> {
+    public scrollback(room: Room, limit = 30, callback?: Callback): Promise<Room> {
         if (utils.isFunction(limit)) {
             callback = limit as any as Callback; // legacy
             limit = undefined;
         }
-        limit = limit || 30;
         let timeToWaitMs = 0;
 
         let info = this.ongoingScrollbacks[room.roomId] || {};
@@ -4991,20 +4990,21 @@ export class MatrixClient extends EventEmitter {
     // XXX: Intended private, used in code.
     public createMessagesRequest(
         roomId: string,
-        fromToken: string,
-        limit: number,
+        fromToken: string | null,
+        limit = 30,
         dir: Direction,
         timelineFilter?: Filter,
     ): Promise<IMessagesResponse> {
         const path = utils.encodeUri("/rooms/$roomId/messages", { $roomId: roomId });
-        if (limit === undefined) {
-            limit = 30;
-        }
+
         const params: Record<string, string | number> = {
-            from: fromToken,
             limit: limit,
             dir: dir,
         };
+
+        if (fromToken) {
+            params.from = fromToken;
+        }
 
         let filter = null;
         if (this.clientOpts.lazyLoadMembers) {
@@ -5054,11 +5054,6 @@ export class MatrixClient extends EventEmitter {
         const dir = backwards ? EventTimeline.BACKWARDS : EventTimeline.FORWARDS;
 
         const token = eventTimeline.getPaginationToken(dir);
-        if (!token) {
-            // no token - no results.
-            return Promise.resolve(false);
-        }
-
         const pendingRequest = eventTimeline.paginationRequests[dir];
 
         if (pendingRequest) {
