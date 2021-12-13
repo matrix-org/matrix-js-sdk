@@ -6763,11 +6763,7 @@ export class MatrixClient extends EventEmitter {
         eventType?: EventType | string | null,
         opts: IRelationsRequestOpts = {},
     ): Promise<IRelationsResponse> {
-        const params = new URLSearchParams();
-        for (const [key, val] of Object.entries(opts)) {
-            params.set(key, val);
-        }
-        const queryString = params.toString();
+        const queryString = utils.encodeParams(opts as Record<string, string | number>);
 
         let templatedUrl = "/rooms/$roomId/relations/$eventId";
         if (relationType !== null) templatedUrl += "/$relationType";
