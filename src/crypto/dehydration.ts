@@ -22,6 +22,7 @@ import { decryptAES, encryptAES } from './aes';
 import { logger } from '../logger';
 import { ISecretStorageKeyInfo } from "./api";
 import { Crypto } from "./index";
+import { Method } from "../http-api";
 
 // FIXME: these types should eventually go in a different file
 type Signatures = Record<string, Record<string, string>>;
@@ -207,9 +208,10 @@ export class DehydrationManager {
             }
 
             logger.log("Uploading account to server");
-            const dehydrateResult = await this.crypto.baseApis.http.authedRequest(
+            // eslint-disable-next-line camelcase
+            const dehydrateResult = await this.crypto.baseApis.http.authedRequest<{ device_id: string }>(
                 undefined,
-                "PUT",
+                Method.Put,
                 "/dehydrated_device",
                 undefined,
                 {
@@ -272,7 +274,7 @@ export class DehydrationManager {
             logger.log("Uploading keys to server");
             await this.crypto.baseApis.http.authedRequest(
                 undefined,
-                "POST",
+                Method.Post,
                 "/keys/upload/" + encodeURI(deviceId),
                 undefined,
                 {

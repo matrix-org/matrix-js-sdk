@@ -160,7 +160,7 @@ export class MSC3089Branch {
      */
     public async createNewVersion(
         name: string,
-        encryptedContents: File | String | Buffer | ReadStream | Blob,
+        encryptedContents: Document | XMLHttpRequestBodyInit,
         info: Partial<IEncryptedFile>,
         additionalContent?: IContent,
     ): Promise<void> {

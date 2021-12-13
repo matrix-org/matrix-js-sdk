@@ -49,7 +49,7 @@ export interface IAuthData {
     flows?: IFlow[];
     params?: Record<string, Record<string, any>>;
     errcode?: string;
-    error?: MatrixError;
+    error?: string;
 }
 
 export enum AuthType {

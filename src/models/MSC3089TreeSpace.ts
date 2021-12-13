@@ -472,7 +472,7 @@ export class MSC3089TreeSpace {
      */
     public async createFile(
         name: string,
-        encryptedContents: File | String | Buffer | ReadStream | Blob,
+        encryptedContents: Document | XMLHttpRequestBodyInit,
         info: Partial<IEncryptedFile>,
         additionalContent?: IContent,
     ): Promise<ISendEventResponse> {
