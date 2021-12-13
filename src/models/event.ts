@@ -1358,6 +1358,9 @@ export class MatrixEvent extends EventEmitter {
     public setThread(thread: Thread): void {
         this.thread = thread;
         this.reEmitter.reEmit(thread, [ThreadEvent.Ready, ThreadEvent.Update]);
+        if (thread && thread !== this.thread) {
+            this.emit(ThreadEvent.New, thread);
+        }
     }
 
     /**

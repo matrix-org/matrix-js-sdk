@@ -45,6 +45,9 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
 
     public _hasServerSideSupport = false;
 
+    private _rootRefreshed = false;
+    private _eventsQueue: MatrixEvent[] = [];
+
     /**
      * A reference to all the events ID at the bottom of the threads
      */
@@ -63,8 +66,11 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         });
 
         let head = this.room.findEventById(threadHeadId);
+
         this.client.fetchRoomEvent(this.roomId, threadHeadId)
-            .then(eventData => {
+            .then(async eventData => {
+                this._rootRefreshed = true;
+
                 if (head) {
                     // We have to refresh the stale unsigned data as the one
                     // stored in indexeddb is probably out of date
@@ -82,9 +88,15 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
 
                 this.setThreadHead(head);
 
-                this._hasServerSideSupport
-                    ? this.on(ThreadEvent.ViewThread, this.init)
-                    : this.init();
+                if (this._hasServerSideSupport) {
+                    this.on(ThreadEvent.ViewThread, this.init);
+                } else {
+                    await this.init();
+                    this._eventsQueue.forEach(event => {
+                        this.addEvent(event);
+                    });
+                }
+                delete this._eventsQueue;
             });
         room.on("Room.localEchoUpdated", this.onEcho);
         room.on("Room.timeline", this.onEcho);
@@ -129,28 +141,17 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
             events = [originalEvent, ...events];
         }
 
-        if (prevBatch) {
-            this.liveTimeline.setPaginationToken(
-                prevBatch,
-                EventTimeline.FORWARDS,
-            );
-        }
-        if (nextBatch) {
-            this.liveTimeline.setPaginationToken(
-                nextBatch,
-                EventTimeline.BACKWARDS,
-            );
-        }
-
         for (const event of events) {
             event.setThread(this);
         }
 
+        const prependEvents = !opts.direction || opts.direction === Direction.Backward;
+
         this.timelineSet.addEventsToTimeline(
             events,
-            true,
+            prependEvents,
             this.liveTimeline,
-            null,
+            prependEvents ? nextBatch : prevBatch,
         );
 
         return {
@@ -170,26 +171,20 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         direction = Direction.Backward,
         limit = 20,
     ): Promise<boolean> => {
+        const timelineIndex = timelineWindow.getTimelineIndex(direction);
+
+        const paginationKey = direction === Direction.Backward ? "from" : "to";
+        const paginationToken = timelineIndex.timeline.getPaginationToken(direction);
+
         const opts: IRelationsRequestOpts = {
             limit,
+            [paginationKey]: paginationToken,
+            direction,
         };
 
-        const backwardToken = this.liveTimeline.getPaginationToken(Direction.Backward);
-        const forwardToken = this.liveTimeline.getPaginationToken(Direction.Forward);
+        await this.fetchEvents(opts);
 
-        if (direction === Direction.Backward && backwardToken) {
-            opts.from = backwardToken;
-        } else if (direction === Direction.Forward && forwardToken) {
-            opts.to = forwardToken;
-        }
-
-        const { nextBatch, prevBatch } = await this.fetchEvents(opts);
-
-        const isEndOfTimeline = false
-            || opts.from && !nextBatch
-            || opts.to && !prevBatch;
-
-        return isEndOfTimeline;
+        return timelineWindow.paginate(direction, limit);
     };
 
     private setThreadHead(event: MatrixEvent) {
@@ -238,6 +233,11 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
      */
     public async addEvent(event: MatrixEvent): Promise<void> {
         if (this.has(event.getId())) {
+            return;
+        }
+
+        if (!this._rootRefreshed) {
+            this._eventsQueue.push(event);
             return;
         }
 
@@ -323,5 +323,9 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
 
     public get hasServerSideSupport(): boolean {
         return this._hasServerSideSupport;
+    }
+
+    public get ready(): boolean {
+        return this._ready;
     }
 }
