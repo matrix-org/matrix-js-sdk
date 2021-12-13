@@ -32,7 +32,7 @@ import type NodeCrypto from "crypto";
  * {"foo": "bar", "baz": "taz"}
  * @return {string} The encoded string e.g. foo=bar&baz=taz
  */
-export function encodeParams(params: Record<string, string | number>): string {
+export function encodeParams(params: Record<string, string | number | boolean>): string {
     const searchParams = new URLSearchParams();
     for (const [key, val] of Object.entries(params)) {
         if (val !== undefined && val !== null) {

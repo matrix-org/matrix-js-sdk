@@ -26,6 +26,15 @@ describe("utils", function() {
                 "foo=bar&baz=beer%40",
             );
         });
+
+        it("should handle boolean and numeric values", function() {
+            const params = {
+                string: "foobar",
+                number: 12345,
+                boolean: false,
+            };
+            expect(utils.encodeParams(params)).toEqual("string=foobar&number=12345&boolean=false");
+        });
     });
 
     describe("encodeUri", function() {
