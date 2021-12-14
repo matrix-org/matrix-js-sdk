@@ -4285,7 +4285,7 @@ export class MatrixClient extends EventEmitter {
         const resp = this.http.authedRequest(
             callback, Method.Get, "/preview_url", {
                 url,
-                ts: String(ts),
+                ts: ts.toString(),
             }, undefined, {
                 prefix: PREFIX_MEDIA_R0,
             },
@@ -5016,18 +5016,16 @@ export class MatrixClient extends EventEmitter {
     public createMessagesRequest(
         roomId: string,
         fromToken: string,
-        limit: number,
+        limit = 30,
         dir: Direction,
         timelineFilter?: Filter,
     ): Promise<IMessagesResponse> {
         const path = utils.encodeUri("/rooms/$roomId/messages", { $roomId: roomId });
-        if (limit === undefined) {
-            limit = 30;
-        }
+
         const params: Record<string, string> = {
             from: fromToken,
-            limit: String(limit),
-            dir: dir,
+            limit: limit.toString(),
+            dir,
         };
 
         let filter = null;
@@ -6956,13 +6954,12 @@ export class MatrixClient extends EventEmitter {
             callback = limit as any as Callback; // legacy
             limit = undefined;
         }
+
         const path = utils.encodeUri("/rooms/$roomId/initialSync",
             { $roomId: roomId },
         );
-        if (!limit) {
-            limit = 30;
-        }
-        return this.http.authedRequest(callback, Method.Get, path, { limit: String(limit) });
+
+        return this.http.authedRequest(callback, Method.Get, path, { limit: limit?.toString() ?? "30" });
     }
 
     /**
@@ -7873,7 +7870,7 @@ export class MatrixClient extends EventEmitter {
         const params = {
             client_secret: clientSecret,
             email: email,
-            send_attempt: String(sendAttempt),
+            send_attempt: sendAttempt?.toString(),
             next_link: nextLink,
         };
 
@@ -7923,7 +7920,7 @@ export class MatrixClient extends EventEmitter {
             client_secret: clientSecret,
             country: phoneCountry,
             phone_number: phoneNumber,
-            send_attempt: String(sendAttempt),
+            send_attempt: sendAttempt?.toString(),
             next_link: nextLink,
         };
 
@@ -8388,9 +8385,9 @@ export class MatrixClient extends EventEmitter {
             next_batch?: string; // eslint-disable-line camelcase
         }>(undefined, Method.Get, path, {
             suggested_only: String(suggestedOnly),
-            max_depth: String(maxDepth),
+            max_depth: maxDepth?.toString(),
             from: fromToken,
-            limit: String(limit),
+            limit: limit?.toString(),
         }, undefined, {
             prefix: "/_matrix/client/unstable/org.matrix.msc2946",
         }).catch(e => {
