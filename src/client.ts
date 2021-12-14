@@ -1450,12 +1450,11 @@ export class MatrixClient extends EventEmitter {
             }
         }
 
-        // We swallow errors because we need a default object anyhow
         return this.http.authedRequest(
             undefined, "GET", "/capabilities",
-        ).catch((e: Error): {} => {
+        ).catch((e: Error): void => {
+            // We swallow errors because we need a default object anyhow
             logger.error(e);
-            return null; // otherwise consume the error
         }).then((r: { capabilities?: ICapabilities } = {}) => {
             const capabilities: ICapabilities = r["capabilities"] || {};
 
