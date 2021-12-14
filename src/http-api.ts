@@ -252,13 +252,15 @@ export class MatrixHttpApi {
      */
     public uploadContent<O extends IUploadOpts>(
         file: FileType,
-        opts: O = {} as O,
+        opts?: O,
     ): IAbortablePromise<UploadContentResponseType<O>> {
         if (utils.isFunction(opts)) {
             // opts used to be callback, backwards compatibility
             opts = {
                 callback: opts as unknown as IUploadOpts["callback"],
             } as O;
+        } else if (!opts) {
+            opts = {} as O;
         }
 
         // default opts.includeFilename to true (ignoring falsey values)
@@ -548,11 +550,13 @@ export class MatrixHttpApi {
         callback: Callback<T>,
         method: Method,
         path: string,
-        queryParams: Record<string, string | string[]> = {},
+        queryParams?: Record<string, string | string[]>,
         data?: CoreOptions["body"],
-        opts: O | number = {} as O, // number is legacy
+        opts?: O | number, // number is legacy
     ): IAbortablePromise<ResponseType<T, O>> {
-        let requestOpts = opts as O;
+        if (!queryParams) queryParams = {};
+        let requestOpts = (opts || {}) as O;
+
         if (this.opts.useAuthorizationHeader) {
             if (isFinite(opts as number)) {
                 // opts used to be localTimeoutMs
@@ -570,10 +574,8 @@ export class MatrixHttpApi {
             if (queryParams.access_token) {
                 delete queryParams.access_token;
             }
-        } else {
-            if (!queryParams.access_token) {
-                queryParams.access_token = this.opts.accessToken;
-            }
+        } else if (!queryParams.access_token) {
+            queryParams.access_token = this.opts.accessToken;
         }
 
         const requestPromise = this.request<T, O>(callback, method, path, queryParams, data, requestOpts);
@@ -629,9 +631,9 @@ export class MatrixHttpApi {
         callback: Callback<T>,
         method: Method,
         path: string,
-        queryParams: CoreOptions["qs"] = {},
+        queryParams?: CoreOptions["qs"],
         data?: CoreOptions["body"],
-        opts: O = {} as O,
+        opts?: O,
     ): IAbortablePromise<ResponseType<T, O>> {
         const prefix = opts.prefix ?? this.opts.prefix;
         const fullUri = this.opts.baseUrl + prefix + path;
@@ -672,11 +674,11 @@ export class MatrixHttpApi {
         callback: Callback<T>,
         method: Method,
         uri: string,
-        queryParams: CoreOptions["qs"] = {},
+        queryParams?: CoreOptions["qs"],
         data?: CoreOptions["body"],
-        opts: O | number = {} as O, // number is legacy
+        opts?: O | number, // number is legacy
     ): IAbortablePromise<ResponseType<T, O>> {
-        let requestOpts = opts as O;
+        let requestOpts = (opts || {}) as O;
         if (isFinite(opts as number)) {
             // opts used to be localTimeoutMs
             requestOpts = {
@@ -739,9 +741,9 @@ export class MatrixHttpApi {
         callback: Callback<T>,
         method: Method,
         uri: string,
-        queryParams: Record<string, string>,
-        data: CoreOptions["body"],
-        opts: O = {} as O,
+        queryParams?: Record<string, string>,
+        data?: CoreOptions["body"],
+        opts?: O,
     ): IAbortablePromise<ResponseType<T, O>> {
         if (callback !== undefined && !utils.isFunction(callback)) {
             throw Error("Expected callback to be a function but got " + typeof callback);
@@ -749,12 +751,13 @@ export class MatrixHttpApi {
 
         if (this.opts.extraParams) {
             queryParams = {
-                ...queryParams,
+                ...(queryParams || {}),
                 ...this.opts.extraParams,
             };
         }
 
         const headers = Object.assign({}, opts.headers || {});
+        if (!opts) opts = {} as O;
         const json = opts.json ?? true;
         let bodyParser = opts.bodyParser;
 
