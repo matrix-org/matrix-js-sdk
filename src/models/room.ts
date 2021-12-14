@@ -20,7 +20,7 @@ limitations under the License.
 
 import { EventEmitter } from "events";
 
-import { EventTimelineSet, DuplicateStrategy } from "./event-timeline-set";
+import { DuplicateStrategy, EventTimelineSet } from "./event-timeline-set";
 import { EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
@@ -36,6 +36,7 @@ import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@type
 import { Filter } from "../filter";
 import { RoomState } from "./room-state";
 import { Thread, ThreadEvent } from "./thread";
+import { Method } from "../http-api";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -660,7 +661,7 @@ export class Room extends EventEmitter {
         const path = utils.encodeUri("/rooms/$roomId/members?" + queryString,
             { $roomId: this.roomId });
         const http = this.client.http;
-        const response = await http.authedRequest(undefined, "GET", path);
+        const response = await http.authedRequest<{ chunk: IEvent[] }>(undefined, Method.Get, path);
         return response.chunk;
     }
 
