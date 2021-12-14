@@ -635,7 +635,7 @@ export class MatrixHttpApi {
         data?: CoreOptions["body"],
         opts?: O,
     ): IAbortablePromise<ResponseType<T, O>> {
-        const prefix = opts.prefix ?? this.opts.prefix;
+        const prefix = opts?.prefix ?? this.opts.prefix;
         const fullUri = this.opts.baseUrl + prefix + path;
 
         return this.requestOtherUrl<T, O>(callback, method, fullUri, queryParams, data, opts);
