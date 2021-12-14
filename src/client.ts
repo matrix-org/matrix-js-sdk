@@ -624,7 +624,7 @@ export interface IMyDevice {
     last_seen_ts?: number;
 }
 
-interface IDownloadKeyResult {
+export interface IDownloadKeyResult {
     failures: { [serverName: string]: object };
     device_keys: {
         [userId: string]: {
@@ -635,13 +635,42 @@ interface IDownloadKeyResult {
             };
         };
     };
+    // the following three fields were added in 1.1
+    master_keys?: {
+        [userId: string]: {
+            keys: { [keyId: string]: string };
+            usage: string[];
+            user_id: string;
+        };
+    };
+    self_signing_keys?: {
+        [userId: string]: {
+            keys: { [keyId: string]: string };
+            signatures: ISignatures;
+            usage: string[];
+            user_id: string;
+        };
+    };
+    user_signing_keys?: {
+        [userId: string]: {
+            keys: { [keyId: string]: string };
+            signatures: ISignatures;
+            usage: string[];
+            user_id: string;
+        };
+    };
 }
 
-interface IClaimOTKsResult {
+export interface IClaimOTKsResult {
     failures: { [serverName: string]: object };
     one_time_keys: {
         [userId: string]: {
-            [deviceId: string]: string;
+            [deviceId: string]: {
+                [keyId: string]: {
+                    key: string;
+                    signatures: ISignatures;
+                };
+            };
         };
     };
 }
@@ -1421,14 +1450,12 @@ export class MatrixClient extends EventEmitter {
             }
         }
 
-        // We swallow errors because we need a default object anyhow
         return this.http.authedRequest(
             undefined, Method.Get, "/capabilities",
-        ).catch((e: Error) => {
+        ).catch((e: Error): void => {
+            // We swallow errors because we need a default object anyhow
             logger.error(e);
-            return null; // otherwise consume the error
-        }).then((r) => {
-            if (!r) r = {};
+        }).then((r: { capabilities?: ICapabilities } = {}) => {
             const capabilities: ICapabilities = r["capabilities"] || {};
 
             // If the capabilities missed the cache, cache it for a shorter amount
@@ -2835,7 +2862,7 @@ export class MatrixClient extends EventEmitter {
         }
 
         let totalKeyCount = 0;
-        let keys = [];
+        let keys: IMegolmSessionData[] = [];
 
         const path = this.makeKeyBackupPath(targetRoomId, targetSessionId, backupInfo.version);
 
@@ -5689,18 +5716,14 @@ export class MatrixClient extends EventEmitter {
         searchResults.count = roomEvents.count;
         searchResults.next_batch = roomEvents.next_batch;
 
-        // combine the highlight list with our existing list; build an object
-        // to avoid O(N^2) fail
-        const highlights = {};
-        roomEvents.highlights.forEach((hl) => {
-            highlights[hl] = 1;
-        });
+        // combine the highlight list with our existing list;
+        const highlights = new Set<string>(roomEvents.highlights);
         searchResults.highlights.forEach((hl) => {
-            highlights[hl] = 1;
+            highlights.add(hl);
         });
 
         // turn it back into a list.
-        searchResults.highlights = Object.keys(highlights);
+        searchResults.highlights = Array.from(highlights);
 
         // append the new results to our existing results
         const resultsLength = roomEvents.results ? roomEvents.results.length : 0;
@@ -5790,13 +5813,11 @@ export class MatrixClient extends EventEmitter {
             $filterId: filterId,
         });
 
-        return this.http.authedRequest(
+        return this.http.authedRequest<IFilterDefinition>(
             undefined, Method.Get, path, undefined, undefined,
         ).then((response) => {
             // persist the filter
-            const filter = Filter.fromJson(
-                userId, filterId, response,
-            );
+            const filter = Filter.fromJson(userId, filterId, response);
             this.store.storeFilter(filter);
             return filter;
         });
@@ -6094,7 +6115,7 @@ export class MatrixClient extends EventEmitter {
             {
                 prefix: '',
             },
-        ).catch((e) => {
+        ).catch((e: Error) => {
             // Need to unset this if it fails, otherwise we'll never retry
             this.serverVersionsPromise = null;
             // but rethrow the exception to anything that was waiting
@@ -6761,11 +6782,7 @@ export class MatrixClient extends EventEmitter {
         eventType?: EventType | string | null,
         opts: IRelationsRequestOpts = {},
     ): Promise<IRelationsResponse> {
-        const params = new URLSearchParams();
-        for (const [key, val] of Object.entries(opts)) {
-            params.set(key, val);
-        }
-        const queryString = params.toString();
+        const queryString = utils.encodeParams(opts as Record<string, string | number>);
 
         let templatedUrl = "/rooms/$roomId/relations/$eventId";
         if (relationType !== null) templatedUrl += "/$relationType";
@@ -7741,11 +7758,11 @@ export class MatrixClient extends EventEmitter {
      *     an error response ({@link module:http-api.MatrixError}).
      */
     public claimOneTimeKeys(
-        devices: string[],
+        devices: [string, string][],
         keyAlgorithm = "signed_curve25519",
         timeout?: number,
     ): Promise<IClaimOTKsResult> {
-        const queries = {};
+        const queries: Record<string, Record<string, string>> = {};
 
         if (keyAlgorithm === undefined) {
             keyAlgorithm = "signed_curve25519";
