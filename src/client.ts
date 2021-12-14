@@ -723,6 +723,11 @@ interface IRoomKeysResponse {
 interface IRoomsKeysResponse {
     rooms: Record<string, IRoomKeysResponse>;
 }
+
+interface IRoomHierarchy {
+    rooms: IHierarchyRoom[];
+    next_batch?: string;
+}
 /* eslint-enable camelcase */
 
 // We're using this constant for methods overloading and inspect whether a variable
@@ -8376,18 +8381,12 @@ export class MatrixClient extends EventEmitter {
         maxDepth?: number,
         suggestedOnly = false,
         fromToken?: string,
-    ): Promise<{
-        rooms: IHierarchyRoom[];
-        next_batch?: string; // eslint-disable-line camelcase
-    }> {
+    ): Promise<IRoomHierarchy> {
         const path = utils.encodeUri("/rooms/$roomId/hierarchy", {
             $roomId: roomId,
         });
 
-        return this.http.authedRequest<{
-            rooms: IHierarchyRoom[];
-            next_batch?: string; // eslint-disable-line camelcase
-        }>(undefined, Method.Get, path, {
+        return this.http.authedRequest<IRoomHierarchy>(undefined, Method.Get, path, {
             suggested_only: String(suggestedOnly),
             max_depth: String(maxDepth),
             from: fromToken,
@@ -8397,11 +8396,11 @@ export class MatrixClient extends EventEmitter {
         }).catch(e => {
             if (e.errcode === "M_UNRECOGNIZED") {
                 // fall back to the development prefix
-                return this.http.authedRequest(undefined, "GET", path, {
-                    suggested_only: suggestedOnly,
-                    max_depth: maxDepth,
+                return this.http.authedRequest<IRoomHierarchy>(undefined, Method.Get, path, {
+                    suggested_only: String(suggestedOnly),
+                    max_depth: String(maxDepth),
                     from: fromToken,
-                    limit,
+                    limit: String(limit),
                 }, undefined, {
                     prefix: "/_matrix/client/unstable/org.matrix.msc2946",
                 });
