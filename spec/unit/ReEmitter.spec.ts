@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { EventEmitter } from "events";
+
 import { ReEmitter } from "../../src/ReEmitter";
 
 const EVENTNAME = "UnknownEntry";

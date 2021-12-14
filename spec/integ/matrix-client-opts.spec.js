@@ -1,5 +1,6 @@
-import * as utils from "../test-utils";
 import HttpBackend from "matrix-mock-request";
+
+import * as utils from "../test-utils";
 import { MatrixClient } from "../../src/matrix";
 import { MatrixScheduler } from "../../src/scheduler";
 import { MemoryStore } from "../../src/store/memory";

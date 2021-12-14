@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { Callback } from "../client";
-import { IContent } from "../models/event";
+import { IContent, IEvent } from "../models/event";
 import { Preset, Visibility } from "./partials";
 import { SearchKey } from "./search";
 import { IRoomEventFilter } from "../filter";
@@ -139,4 +139,18 @@ export interface IBindThreePidBody {
     id_access_token: string;
     sid: string;
 }
+
+export interface IRelationsRequestOpts {
+    from?: string;
+    to?: string;
+    limit?: number;
+}
+
+export interface IRelationsResponse {
+    original_event: IEvent;
+    chunk: IEvent[];
+    next_batch?: string;
+    prev_batch?: string;
+}
+
 /* eslint-enable camelcase */

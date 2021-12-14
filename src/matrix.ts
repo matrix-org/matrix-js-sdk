@@ -46,6 +46,11 @@ export * from "./store/session/webstorage";
 export * from "./crypto/store/memory-crypto-store";
 export * from "./crypto/store/indexeddb-crypto-store";
 export * from "./content-repo";
+export * from './@types/event';
+export * from './@types/PushRules';
+export * from './@types/requests';
+export * from './@types/search';
+export * from './models/room-summary';
 export * as ContentHelpers from "./content-helpers";
 export {
     createNewMatrixCall,
@@ -116,7 +121,7 @@ export interface ICryptoCallbacks {
     ) => Promise<string>;
     getDehydrationKey?: (
         keyInfo: ISecretStorageKeyInfo,
-        checkFunc: (Uint8Array) => void,
+        checkFunc: (key: Uint8Array) => void,
     ) => Promise<Uint8Array>;
     getBackupKey?: () => Promise<Uint8Array>;
 }

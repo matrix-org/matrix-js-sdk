@@ -37,20 +37,20 @@ import { IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client"
 import { SyncState } from "./sync.api";
 import {
     Category,
+    IEphemeral,
     IInvitedRoom,
     IInviteState,
     IJoinedRoom,
     ILeftRoom,
-    IStateEvent,
+    IMinimalEvent,
     IRoomEvent,
+    IStateEvent,
     IStrippedState,
     ISyncResponse,
     ITimeline,
-    IEphemeral,
-    IMinimalEvent,
 } from "./sync-accumulator";
 import { MatrixEvent } from "./models/event";
-import { MatrixError } from "./http-api";
+import { MatrixError, Method } from "./http-api";
 import { ISavedSync } from "./store";
 import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
@@ -94,6 +94,12 @@ export interface ISyncStateData {
     fromCache?: boolean;
 }
 
+enum SetPresence {
+    Offline = "offline",
+    Online = "online",
+    Unavailable = "unavailable",
+}
+
 interface ISyncParams {
     filter?: string;
     timeout: number;
@@ -101,7 +107,7 @@ interface ISyncParams {
     // eslint-disable-next-line camelcase
     full_state?: boolean;
     // eslint-disable-next-line camelcase
-    set_presence?: "offline" | "online" | "unavailable";
+    set_presence?: SetPresence;
     _cacheBuster?: string | number; // not part of the API itself
 }
 
@@ -260,12 +266,12 @@ export class SyncApi {
             getFilterName(client.credentials.userId, "LEFT_ROOMS"), filter,
         ).then(function(filterId) {
             qps.filter = filterId;
-            return client.http.authedRequest(
-                undefined, "GET", "/sync", qps, undefined, localTimeoutMs,
+            return client.http.authedRequest<any>( // TODO types
+                undefined, Method.Get, "/sync", qps as any, undefined, localTimeoutMs,
             );
         }).then((data) => {
             let leaveRooms = [];
-            if (data.rooms && data.rooms.leave) {
+            if (data.rooms?.leave) {
                 leaveRooms = this.mapSyncResponseToRoomArray(data.rooms.leave);
             }
             const rooms = [];
@@ -400,9 +406,10 @@ export class SyncApi {
         }
 
         // FIXME: gut wrenching; hard-coded timeout values
-        this.client.http.authedRequest(undefined, "GET", "/events", {
+        // TODO types
+        this.client.http.authedRequest<any>(undefined, Method.Get, "/events", {
             room_id: peekRoom.roomId,
-            timeout: 30 * 1000,
+            timeout: String(30 * 1000),
             from: token,
         }, undefined, 50 * 1000).then((res) => {
             if (this._peekRoom !== peekRoom) {
@@ -505,6 +512,7 @@ export class SyncApi {
             // The logout already happened, we just need to stop.
             logger.warn("Token no longer valid - assuming logout");
             this.stop();
+            this.updateSyncState(SyncState.Error, { error });
             return true;
         }
         return false;
@@ -864,8 +872,8 @@ export class SyncApi {
 
     private doSyncRequest(syncOptions: ISyncOptions, syncToken: string): IRequestPromise<ISyncResponse> {
         const qps = this.getSyncParams(syncOptions, syncToken);
-        return this.client.http.authedRequest(
-            undefined, "GET", "/sync", qps, undefined,
+        return this.client.http.authedRequest( // TODO types
+            undefined, Method.Get, "/sync", qps as any, undefined,
             qps.timeout + BUFFER_PERIOD_MS,
         );
     }
@@ -900,7 +908,7 @@ export class SyncApi {
         };
 
         if (this.opts.disablePresence) {
-            qps.set_presence = "offline";
+            qps.set_presence = SetPresence.Offline;
         }
 
         if (syncToken) {
@@ -923,7 +931,7 @@ export class SyncApi {
         return qps;
     }
 
-    private onSyncError(err: Error, syncOptions: ISyncOptions): void {
+    private onSyncError(err: MatrixError, syncOptions: ISyncOptions): void {
         if (!this.running) {
             debuglog("Sync no longer running: exiting");
             if (this.connectionReturnedDefer) {
@@ -1415,11 +1423,14 @@ export class SyncApi {
             const currentCount = data.device_one_time_keys_count.signed_curve25519 || 0;
             this.opts.crypto.updateOneTimeKeyCount(currentCount);
         }
-        if (this.opts.crypto && data["org.matrix.msc2732.device_unused_fallback_key_types"]) {
+        if (this.opts.crypto &&
+            (data["device_unused_fallback_key_types"] ||
+                data["org.matrix.msc2732.device_unused_fallback_key_types"])) {
             // The presence of device_unused_fallback_key_types indicates that the
             // server supports fallback keys. If there's no unused
             // signed_curve25519 fallback key we need a new one.
-            const unusedFallbackKeys = data["org.matrix.msc2732.device_unused_fallback_key_types"];
+            const unusedFallbackKeys = data["device_unused_fallback_key_types"] ||
+                data["org.matrix.msc2732.device_unused_fallback_key_types"];
             this.opts.crypto.setNeedsNewFallback(
                 unusedFallbackKeys instanceof Array &&
                 !unusedFallbackKeys.includes("signed_curve25519"),
@@ -1473,7 +1484,7 @@ export class SyncApi {
 
         this.client.http.request(
             undefined, // callback
-            "GET", "/_matrix/client/versions",
+            Method.Get, "/_matrix/client/versions",
             undefined, // queryParams
             undefined, // data
             {

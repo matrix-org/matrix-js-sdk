@@ -20,6 +20,7 @@ limitations under the License.
 import './olm-loader';
 
 import MockHttpBackend from 'matrix-mock-request';
+
 import { LocalStorageCryptoStore } from '../src/crypto/store/localStorage-crypto-store';
 import { logger } from '../src/logger';
 import { WebStorageSessionStore } from "../src/store/session/webstorage";

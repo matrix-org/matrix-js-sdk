@@ -18,6 +18,7 @@ import { MatrixClient } from "../client";
 import { IEncryptedFile, RelationType, UNSTABLE_MSC3089_BRANCH } from "../@types/event";
 import { IContent, MatrixEvent } from "./event";
 import { MSC3089TreeSpace } from "./MSC3089TreeSpace";
+import { FileType } from "../http-api";
 
 /**
  * Represents a [MSC3089](https://github.com/matrix-org/matrix-doc/pull/3089) branch - a reference
@@ -37,7 +38,11 @@ export class MSC3089Branch {
      * The file ID.
      */
     public get id(): string {
-        return this.indexEvent.getStateKey();
+        const stateKey = this.indexEvent.getStateKey();
+        if (!stateKey) {
+            throw new Error("State key not found for branch");
+        }
+        return stateKey;
     }
 
     /**
@@ -120,6 +125,10 @@ export class MSC3089Branch {
         const file = event.getOriginalContent()['file'];
         const httpUrl = this.client.mxcUrlToHttp(file['url']);
 
+        if (!httpUrl) {
+            throw new Error(`No HTTP URL available for ${file['url']}`);
+        }
+
         return { info: file, httpUrl: httpUrl };
     }
 
@@ -142,16 +151,16 @@ export class MSC3089Branch {
     }
 
     /**
-     * Creates a new version of this file.
+     * Creates a new version of this file with contents in a type that is compatible with MatrixClient.uploadContent().
      * @param {string} name The name of the file.
-     * @param {ArrayBuffer} encryptedContents The encrypted contents.
+     * @param {File | String | Buffer | ReadStream | Blob} encryptedContents The encrypted contents.
      * @param {Partial<IEncryptedFile>} info The encrypted file information.
      * @param {IContent} additionalContent Optional event content fields to include in the message.
      * @returns {Promise<void>} Resolves when uploaded.
      */
     public async createNewVersion(
         name: string,
-        encryptedContents: ArrayBuffer,
+        encryptedContents: FileType,
         info: Partial<IEncryptedFile>,
         additionalContent?: IContent,
     ): Promise<void> {
@@ -198,7 +207,7 @@ export class MSC3089Branch {
         // XXX: This is a very inefficient search, but it's the best we can do with the
         // relations structure we have in the SDK. As of writing, it is not worth the
         // investment in improving the structure.
-        let childEvent: MatrixEvent;
+        let childEvent: MatrixEvent | undefined;
         let parentEvent = await this.getFileEvent();
         do {
             childEvent = timelineEvents.find(e => e.replacingEventId() === parentEvent.getId());

@@ -18,8 +18,23 @@ limitations under the License.
  * @module filter
  */
 
+import {
+    EventType,
+    RelationType,
+} from "./@types/event";
 import { FilterComponent, IFilterComponent } from "./filter-component";
 import { MatrixEvent } from "./models/event";
+import { UnstableValue } from "./NamespacedValue";
+
+export const UNSTABLE_FILTER_RELATION_SENDERS = new UnstableValue(
+    "relation_senders",
+    "io.element.relation_senders",
+);
+
+export const UNSTABLE_FILTER_RELATION_TYPES = new UnstableValue(
+    "relation_types",
+    "io.element.relation_types",
+);
 
 /**
  * @param {Object} obj
@@ -50,6 +65,9 @@ export interface IFilterDefinition {
 export interface IRoomEventFilter extends IFilterComponent {
     lazy_load_members?: boolean;
     include_redundant_members?: boolean;
+    types?: EventType[] | string[];
+    [UNSTABLE_FILTER_RELATION_TYPES.name]?: Array<RelationType | string>;
+    [UNSTABLE_FILTER_RELATION_SENDERS.name]?: string[];
 }
 
 interface IStateFilter extends IRoomEventFilter {}

@@ -175,8 +175,10 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
     }
 
     public async filterOutNotifiedErrorDevices(devices: IOlmDevice[]): Promise<IOlmDevice[]> {
-        const notifiedErrorDevices = getJsonItem<string[]>(this.store, KEY_NOTIFIED_ERROR_DEVICES) || {};
-        const ret = [];
+        const notifiedErrorDevices = getJsonItem<MemoryCryptoStore["notifiedErrorDevices"]>(
+            this.store, KEY_NOTIFIED_ERROR_DEVICES,
+        ) || {};
+        const ret: IOlmDevice[] = [];
 
         for (const device of devices) {
             const { userId, deviceInfo } = device;
@@ -291,7 +293,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
     }
 
     public getEndToEndRooms(txn: unknown, func: (rooms: Record<string, IRoomEncryption>) => void): void {
-        const result = {};
+        const result: Record<string, IRoomEncryption> = {};
         const prefix = keyEndToEndRoomsPrefix('');
 
         for (let i = 0; i < this.store.length; ++i) {
@@ -306,7 +308,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
 
     public getSessionsNeedingBackup(limit: number): Promise<ISession[]> {
         const sessionsNeedingBackup = getJsonItem<string[]>(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};
-        const sessions = [];
+        const sessions: ISession[] = [];
 
         for (const session in sessionsNeedingBackup) {
             if (Object.prototype.hasOwnProperty.call(sessionsNeedingBackup, session)) {

@@ -58,14 +58,7 @@ export interface IEncryptedEventInfo {
 }
 
 export interface IRecoveryKey {
-    keyInfo?: {
-        pubkey: string;
-        passphrase?: {
-            algorithm: string;
-            iterations: number;
-            salt: string;
-        };
-    };
+    keyInfo?: IAddSecretStorageKeyOpts;
     privateKey: Uint8Array;
     encodedPrivateKey?: string;
 }
@@ -125,12 +118,13 @@ export interface IPassphraseInfo {
     algorithm: "m.pbkdf2";
     iterations: number;
     salt: string;
-    bits: number;
+    bits?: number;
 }
 
 export interface IAddSecretStorageKeyOpts {
-    name: string;
-    passphrase: IPassphraseInfo;
+    pubkey: string;
+    passphrase?: IPassphraseInfo;
+    name?: string;
     key: Uint8Array;
 }
 

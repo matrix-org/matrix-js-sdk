@@ -21,8 +21,9 @@ limitations under the License.
  * @module webrtc/call
  */
 
-import { logger } from '../logger';
 import { EventEmitter } from 'events';
+
+import { logger } from '../logger';
 import * as utils from '../utils';
 import { MatrixEvent } from '../models/event';
 import { EventType } from '../@types/event';
@@ -583,8 +584,8 @@ export class MatrixCall extends EventEmitter {
                 new CallFeed({
                     client: this.client,
                     roomId: this.roomId,
-                    audioMuted: stream.getAudioTracks().length === 0,
-                    videoMuted: stream.getVideoTracks().length === 0,
+                    audioMuted: false,
+                    videoMuted: false,
                     userId,
                     stream,
                     purpose,
@@ -822,8 +823,8 @@ export class MatrixCall extends EventEmitter {
                     userId: this.client.getUserId(),
                     stream,
                     purpose: SDPStreamMetadataPurpose.Usermedia,
-                    audioMuted: stream.getAudioTracks().length === 0,
-                    videoMuted: stream.getVideoTracks().length === 0,
+                    audioMuted: false,
+                    videoMuted: false,
                 });
 
                 const feeds = [usermediaFeed];
@@ -2063,8 +2064,8 @@ export class MatrixCall extends EventEmitter {
                 userId: this.client.getUserId(),
                 stream,
                 purpose: SDPStreamMetadataPurpose.Usermedia,
-                audioMuted: stream.getAudioTracks().length === 0,
-                videoMuted: stream.getVideoTracks().length === 0,
+                audioMuted: false,
+                videoMuted: false,
             });
             await this.placeCallWithCallFeeds([callFeed]);
         } catch (e) {
