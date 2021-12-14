@@ -22,9 +22,7 @@ import { decryptAES, encryptAES } from './aes';
 import { logger } from '../logger';
 import { ISecretStorageKeyInfo } from "./api";
 import { Crypto } from "./index";
-
-// FIXME: these types should eventually go in a different file
-type Signatures = Record<string, Record<string, string>>;
+import { ISignatures } from "../@types/signed";
 
 export interface IDehydratedDevice {
     device_id: string; // eslint-disable-line camelcase
@@ -43,13 +41,13 @@ export interface IDeviceKeys {
     device_id: string; // eslint-disable-line camelcase
     user_id: string; // eslint-disable-line camelcase
     keys: Record<string, string>;
-    signatures?: Signatures;
+    signatures?: ISignatures;
 }
 
 export interface IOneTimeKey {
     key: string;
     fallback?: boolean;
-    signatures?: Signatures;
+    signatures?: ISignatures;
 }
 
 export const DEHYDRATION_ALGORITHM = "org.matrix.msc2697.v1.olm.libolm_pickle";
@@ -244,7 +242,7 @@ export class DehydrationManager {
             }
 
             logger.log("Preparing one-time keys");
-            const oneTimeKeys = {};
+            const oneTimeKeys: Record<string, IOneTimeKey> = {};
             for (const [keyId, key] of Object.entries(otks.curve25519)) {
                 const k: IOneTimeKey = { key };
                 const signature = account.sign(anotherjson.stringify(k));
