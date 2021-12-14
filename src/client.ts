@@ -41,6 +41,7 @@ import { IRoomEncryption, RoomList } from './crypto/RoomList';
 import { logger } from './logger';
 import { SERVICE_TYPES } from './service-types';
 import {
+    FileType,
     IHttpOpts,
     IUpload,
     MatrixError,
@@ -51,6 +52,7 @@ import {
     PREFIX_R0,
     PREFIX_UNSTABLE,
     retryNetworkOperation,
+    UploadContentResponseType,
 } from "./http-api";
 import {
     Crypto,
@@ -7234,11 +7236,11 @@ export class MatrixClient extends EventEmitter {
      *    determined by this.opts.onlyData, opts.rawResponse, and
      *    opts.onlyContentUri.  Rejects with an error (usually a MatrixError).
      */
-    public uploadContent(
-        file: Document | XMLHttpRequestBodyInit,
-        opts?: IUploadOpts,
-    ): IAbortablePromise<any> { // TODO: Advanced types
-        return this.http.uploadContent(file, opts);
+    public uploadContent<O extends IUploadOpts>(
+        file: FileType,
+        opts?: O,
+    ): IAbortablePromise<UploadContentResponseType<O>> {
+        return this.http.uploadContent<O>(file, opts);
     }
 
     /**

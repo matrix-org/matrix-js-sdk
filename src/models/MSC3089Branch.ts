@@ -18,6 +18,7 @@ import { MatrixClient } from "../client";
 import { IEncryptedFile, RelationType, UNSTABLE_MSC3089_BRANCH } from "../@types/event";
 import { IContent, MatrixEvent } from "./event";
 import { MSC3089TreeSpace } from "./MSC3089TreeSpace";
+import { FileType } from "../http-api";
 
 /**
  * Represents a [MSC3089](https://github.com/matrix-org/matrix-doc/pull/3089) branch - a reference
@@ -159,7 +160,7 @@ export class MSC3089Branch {
      */
     public async createNewVersion(
         name: string,
-        encryptedContents: Document | XMLHttpRequestBodyInit,
+        encryptedContents: FileType,
         info: Partial<IEncryptedFile>,
         additionalContent?: IContent,
     ): Promise<void> {

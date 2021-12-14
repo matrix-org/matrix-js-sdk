@@ -32,6 +32,7 @@ import {
 import { MSC3089Branch } from "./MSC3089Branch";
 import { isRoomSharedHistory } from "../crypto/algorithms/megolm";
 import { ISendEventResponse } from "../@types/requests";
+import { FileType } from "../http-api";
 
 /**
  * The recommended defaults for a tree space's power levels. Note that this
@@ -471,7 +472,7 @@ export class MSC3089TreeSpace {
      */
     public async createFile(
         name: string,
-        encryptedContents: Document | XMLHttpRequestBodyInit,
+        encryptedContents: FileType,
         info: Partial<IEncryptedFile>,
         additionalContent?: IContent,
     ): Promise<ISendEventResponse> {

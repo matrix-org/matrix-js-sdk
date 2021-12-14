@@ -123,12 +123,35 @@ interface IContentUri {
     };
 }
 
+type ResponseType<T, O extends IRequestOpts<T> | void = void> =
+    O extends { bodyParser: (body: string) => T } ? T :
+    O extends { json: false } ? string :
+    T;
+
+interface IUploadResponse {
+    // eslint-disable-next-line camelcase
+    content_uri: string;
+}
+
+// This type's defaults only work for the Browser
+// in the Browser we default rawResponse = false & onlyContentUri = true
+// in Node we default rawResponse = true & onlyContentUri = false
+export type UploadContentResponseType<O extends IUploadOpts> =
+    O extends undefined ? string :
+    O extends { rawResponse: true } ? string :
+    O extends { onlyContentUri: true } ? string :
+    O extends { rawResponse: false } ? IUploadResponse :
+    O extends { onlyContentUri: false } ? IUploadResponse :
+    string;
+
 export enum Method {
     Get = "GET",
     Put = "PUT",
     Post = "POST",
     Delete = "DELETE",
 }
+
+export type FileType = Document | XMLHttpRequestBodyInit;
 
 /**
  * Construct a MatrixHttpApi.
@@ -227,14 +250,15 @@ export class MatrixHttpApi {
      *    determined by this.opts.onlyData, opts.rawResponse, and
      *    opts.onlyContentUri.  Rejects with an error (usually a MatrixError).
      */
-    public uploadContent(file: Document | XMLHttpRequestBodyInit, opts: IUploadOpts): IAbortablePromise<any> { // TODO types
+    public uploadContent<O extends IUploadOpts>(
+        file: FileType,
+        opts: O = {} as O,
+    ): IAbortablePromise<UploadContentResponseType<O>> {
         if (utils.isFunction(opts)) {
-            // opts used to be callback
+            // opts used to be callback, backwards compatibility
             opts = {
-                callback: opts as IUploadOpts["callback"],
-            };
-        } else if (opts === undefined) {
-            opts = {};
+                callback: opts as unknown as IUploadOpts["callback"],
+            } as O;
         }
 
         // default opts.includeFilename to true (ignoring falsey values)
@@ -303,7 +327,7 @@ export class MatrixHttpApi {
         // of important here)
 
         const upload = { loaded: 0, total: 0 } as IUpload;
-        let promise: IAbortablePromise<any>; // TODO types
+        let promise: IAbortablePromise<UploadContentResponseType<O>>;
 
         // XMLHttpRequest doesn't parse JSON for us. request normally does, but
         // we're setting opts.json=false so that it doesn't JSON-encode the
@@ -324,7 +348,7 @@ export class MatrixHttpApi {
         }
 
         if (global.XMLHttpRequest) {
-            const defer = utils.defer<Awaited<ReturnType<MatrixHttpApi["uploadContent"]>>>();
+            const defer = utils.defer<UploadContentResponseType<O>>();
             const xhr = new global.XMLHttpRequest();
             const cb = requestCallback(defer, opts.callback, this.opts.onlyData);
 
@@ -395,7 +419,7 @@ export class MatrixHttpApi {
             }
             xhr.setRequestHeader("Content-Type", contentType);
             xhr.send(body);
-            promise = defer.promise as IAbortablePromise<void>;
+            promise = defer.promise as IAbortablePromise<UploadContentResponseType<O>>;
 
             // dirty hack (as per doRequest) to allow the upload to be cancelled.
             promise.abort = xhr.abort.bind(xhr);
@@ -424,13 +448,13 @@ export class MatrixHttpApi {
                     return;
                 }
             }
-        }) as ReturnType<MatrixHttpApi["uploadContent"]>;
+        }) as IAbortablePromise<UploadContentResponseType<O>>;
 
         // copy our dirty abort() method to the new promise
         upload.promise.abort = promise.abort;
         this.uploads.push(upload);
 
-        return upload.promise;
+        return upload.promise as IAbortablePromise<UploadContentResponseType<O>>;
     }
 
     public cancelUpload(promise: IAbortablePromise<unknown>): boolean {
@@ -520,21 +544,21 @@ export class MatrixHttpApi {
      * @return {module:http-api.MatrixError} Rejects with an error if a problem
      * occurred. This includes network problems and Matrix-specific error JSON.
      */
-    public authedRequest<T>(
+    public authedRequest<T, O extends IRequestOpts<T> = IRequestOpts<T>>(
         callback: Callback<T>,
         method: Method,
         path: string,
         queryParams: Record<string, string | string[]> = {},
         data?: CoreOptions["body"],
-        opts: IRequestOpts<T> | number = {}, // number is legacy
-    ): IAbortablePromise<T> {
-        let requestOpts = opts as IRequestOpts<T>;
+        opts: O | number = {} as O, // number is legacy
+    ): IAbortablePromise<ResponseType<T, O>> {
+        let requestOpts = opts as O;
         if (this.opts.useAuthorizationHeader) {
             if (isFinite(opts as number)) {
                 // opts used to be localTimeoutMs
                 requestOpts = {
                     localTimeoutMs: opts as number,
-                } as IRequestOpts<T>;
+                } as O;
             }
 
             if (!requestOpts.headers) {
@@ -552,7 +576,7 @@ export class MatrixHttpApi {
             }
         }
 
-        const requestPromise = this.request(callback, method, path, queryParams, data, requestOpts);
+        const requestPromise = this.request<T, O>(callback, method, path, queryParams, data, requestOpts);
 
         requestPromise.catch((err: MatrixError) => {
             if (err.errcode == 'M_UNKNOWN_TOKEN') {
@@ -601,18 +625,18 @@ export class MatrixHttpApi {
      * @return {module:http-api.MatrixError} Rejects with an error if a problem
      * occurred. This includes network problems and Matrix-specific error JSON.
      */
-    public request<T>(
+    public request<T, O extends IRequestOpts<T> = IRequestOpts<T>>(
         callback: Callback<T>,
         method: Method,
         path: string,
         queryParams: CoreOptions["qs"] = {},
         data?: CoreOptions["body"],
-        opts: IRequestOpts<T> = {},
-    ): IAbortablePromise<T> {
+        opts: O = {} as O,
+    ): IAbortablePromise<ResponseType<T, O>> {
         const prefix = opts.prefix ?? this.opts.prefix;
         const fullUri = this.opts.baseUrl + prefix + path;
 
-        return this.requestOtherUrl(callback, method, fullUri, queryParams, data, opts);
+        return this.requestOtherUrl<T, O>(callback, method, fullUri, queryParams, data, opts);
     }
 
     /**
@@ -632,7 +656,7 @@ export class MatrixHttpApi {
      * @param {Number=} opts.localTimeoutMs The maximum amount of time to wait before
      * timing out the request. If not specified, there is no timeout.
      *
-     * @param {sting=} opts.prefix The full prefix to use e.g.
+     * @param {string=} opts.prefix The full prefix to use e.g.
      * "/_matrix/client/v2_alpha". If not specified, uses this.opts.prefix.
      *
      * @param {Object=} opts.headers map of additional request headers
@@ -644,23 +668,23 @@ export class MatrixHttpApi {
      * @return {module:http-api.MatrixError} Rejects with an error if a problem
      * occurred. This includes network problems and Matrix-specific error JSON.
      */
-    public requestOtherUrl<T>(
+    public requestOtherUrl<T, O extends IRequestOpts<T> = IRequestOpts<T>>(
         callback: Callback<T>,
         method: Method,
         uri: string,
         queryParams: CoreOptions["qs"] = {},
         data?: CoreOptions["body"],
-        opts: IRequestOpts<T> | number = {}, // number is legacy
-    ): IAbortablePromise<T> {
-        let requestOpts = opts as IRequestOpts<T>;
+        opts: O | number = {} as O, // number is legacy
+    ): IAbortablePromise<ResponseType<T, O>> {
+        let requestOpts = opts as O;
         if (isFinite(opts as number)) {
             // opts used to be localTimeoutMs
             requestOpts = {
                 localTimeoutMs: opts as number,
-            };
+            } as O;
         }
 
-        return this.doRequest(callback, method, uri, queryParams, data, requestOpts);
+        return this.doRequest<T, O>(callback, method, uri, queryParams, data, requestOpts);
     }
 
     /**
@@ -707,21 +731,21 @@ export class MatrixHttpApi {
      * @return {Promise} a promise which resolves to either the
      * response object (if this.opts.onlyData is truthy), or the parsed
      * body. Rejects
+     *
+     * Generic T is the callback/promise resolve type
+     * Generic O should be inferred
      */
-    private doRequest<T>(
+    private doRequest<T, O extends IRequestOpts<T> = IRequestOpts<T>>(
         callback: Callback<T>,
         method: Method,
         uri: string,
         queryParams: Record<string, string>,
         data: CoreOptions["body"],
-        opts: IRequestOpts<T>,
-    ): IAbortablePromise<T> {
+        opts: O = {} as O,
+    ): IAbortablePromise<ResponseType<T, O>> {
         if (callback !== undefined && !utils.isFunction(callback)) {
-            throw Error(
-                "Expected callback to be a function but got " + typeof callback,
-            );
+            throw Error("Expected callback to be a function but got " + typeof callback);
         }
-        opts = opts || {};
 
         if (this.opts.extraParams) {
             queryParams = {
@@ -781,7 +805,7 @@ export class MatrixHttpApi {
         };
         resetTimeout();
 
-        const reqPromise = defer.promise as IAbortablePromise<T>;
+        const reqPromise = defer.promise as IAbortablePromise<ResponseType<T, O>>;
 
         try {
             req = this.opts.request(
