@@ -18,6 +18,7 @@ import { MatrixClient } from "../client";
 import { IEncryptedFile, RelationType, UNSTABLE_MSC3089_BRANCH } from "../@types/event";
 import { IContent, MatrixEvent } from "./event";
 import { MSC3089TreeSpace } from "./MSC3089TreeSpace";
+import { EventTimeline } from "./event-timeline";
 import type { ReadStream } from "fs";
 
 /**
@@ -143,7 +144,7 @@ export class MSC3089Branch {
         let event: MatrixEvent | undefined = room.getUnfilteredTimelineSet().findEventById(this.id);
 
         // keep scrolling back if needed until we find the event or reach the start of the room:
-        while (!event && room.oldState.paginationToken) {
+        while (!event && room.getLiveTimeline().getState(EventTimeline.FORWARDS).paginationToken) {
             await this.client.scrollback(room, 100);
             event = room.getUnfilteredTimelineSet().findEventById(this.id);
         }
