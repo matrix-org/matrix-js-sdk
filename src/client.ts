@@ -8958,16 +8958,14 @@ export class MatrixClient extends EventEmitter {
             $roomId: roomId,
         });
 
-        const params: Record<string, string | number> = {
-            ts: timestamp,
-            dir: dir,
-        };
-
         return await this.http.authedRequest(
             undefined,
-            "GET",
+            Method.Get,
             path,
-            params,
+            {
+                ts: timestamp.toString(),
+                dir: dir,
+            },
             undefined,
             {
                 prefix: "/_matrix/client/unstable/org.matrix.msc3030",
