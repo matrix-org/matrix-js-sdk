@@ -97,7 +97,7 @@ import {
     IRecoveryKey,
     ISecretStorageKeyInfo,
 } from "./crypto/api";
-import { SyncState } from "./sync.api";
+import { SyncState } from "./sync";
 import { EventTimelineSet } from "./models/event-timeline-set";
 import { VerificationRequest } from "./crypto/verification/request/VerificationRequest";
 import { VerificationBase as Verification } from "./crypto/verification/Base";

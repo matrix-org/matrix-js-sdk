@@ -34,7 +34,6 @@ import { PushProcessor } from "./pushprocessor";
 import { logger } from './logger';
 import { InvalidStoreError } from './errors';
 import { IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
-import { SyncState } from "./sync.api";
 import {
     Category,
     IEphemeral,
@@ -67,6 +66,15 @@ const BUFFER_PERIOD_MS = 80 * 1000;
 // to RECONNECTING. This is needed to inform the client of server issues when the
 // keepAlive is successful but the server /sync fails.
 const FAILED_SYNC_ERROR_THRESHOLD = 3;
+
+export enum SyncState {
+    Error = "ERROR",
+    Prepared = "PREPARED",
+    Stopped = "STOPPED",
+    Syncing = "SYNCING",
+    Catchup = "CATCHUP",
+    Reconnecting = "RECONNECTING",
+}
 
 function getFilterName(userId: string, suffix?: string): string {
     // scope this on the user ID because people may login on many accounts
