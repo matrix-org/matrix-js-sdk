@@ -50,9 +50,9 @@ export interface ILocationContent extends IContent {
     geo_uri: string;
     [LOCATION_EVENT_TYPE.name]: {
         uri: string;
-        description: string;
+        description?: string;
     };
     [TEXT_NODE_TYPE.name]: string;
-    [TIMESTAMP_NODE_TYPE.name]: string;
+    [TIMESTAMP_NODE_TYPE.name]: number;
 }
 /* eslint-enable camelcase */
