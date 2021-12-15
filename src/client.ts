@@ -8946,8 +8946,8 @@ export class MatrixClient extends EventEmitter {
     /**
      * Find the event_id closest to the given timestamp in the given direction.
      * @return {Promise} A promise of an object containing the event_id and
-        * origin_server_ts of the closest event to the timestamp in the given
-        * direction
+     *    origin_server_ts of the closest event to the timestamp in the given
+     *    direction
      */
     public async timestampToEvent(
         roomId: string,
