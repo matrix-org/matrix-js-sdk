@@ -50,6 +50,7 @@ import {
     PREFIX_IDENTITY_V2,
     PREFIX_MEDIA_R0,
     PREFIX_R0,
+    PREFIX_V1,
     PREFIX_UNSTABLE,
     retryNetworkOperation,
     UploadContentResponseType,
@@ -721,6 +722,11 @@ interface IRoomKeysResponse {
 
 interface IRoomsKeysResponse {
     rooms: Record<string, IRoomKeysResponse>;
+}
+
+interface IRoomHierarchy {
+    rooms: IHierarchyRoom[];
+    next_batch?: string;
 }
 /* eslint-enable camelcase */
 
@@ -8372,24 +8378,32 @@ export class MatrixClient extends EventEmitter {
         maxDepth?: number,
         suggestedOnly = false,
         fromToken?: string,
-    ): Promise<{
-        rooms: IHierarchyRoom[];
-        next_batch?: string; // eslint-disable-line camelcase
-    }> {
+    ): Promise<IRoomHierarchy> {
         const path = utils.encodeUri("/rooms/$roomId/hierarchy", {
             $roomId: roomId,
         });
 
-        return this.http.authedRequest<{
-            rooms: IHierarchyRoom[];
-            next_batch?: string; // eslint-disable-line camelcase
-        }>(undefined, Method.Get, path, {
+        return this.http.authedRequest<IRoomHierarchy>(undefined, Method.Get, path, {
             suggested_only: String(suggestedOnly),
             max_depth: maxDepth?.toString(),
             from: fromToken,
             limit: limit?.toString(),
         }, undefined, {
-            prefix: "/_matrix/client/unstable/org.matrix.msc2946",
+            prefix: PREFIX_V1,
+        }).catch(e => {
+            if (e.errcode === "M_UNRECOGNIZED") {
+                // fall back to the development prefix
+                return this.http.authedRequest<IRoomHierarchy>(undefined, Method.Get, path, {
+                    suggested_only: String(suggestedOnly),
+                    max_depth: String(maxDepth),
+                    from: fromToken,
+                    limit: String(limit),
+                }, undefined, {
+                    prefix: "/_matrix/client/unstable/org.matrix.msc2946",
+                });
+            }
+
+            throw e;
         }).catch(e => {
             if (e.errcode === "M_UNRECOGNIZED") {
                 // fall back to the older space summary API as it exposes the same data just in a different shape.
