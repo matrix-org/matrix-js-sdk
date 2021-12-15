@@ -33,6 +33,7 @@ import { encryptAES, decryptAES, calculateKeyCheck } from './aes';
 import { getCrypto } from '../utils';
 import { ICurve25519AuthData, IAes256AuthData, IKeyBackupInfo, IKeyBackupSession } from "./keybackup";
 import { UnstableValue } from "../NamespacedValue";
+import { IMegolmSessionData } from "./index";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 
@@ -87,7 +88,7 @@ interface BackupAlgorithmClass {
 interface BackupAlgorithm {
     untrusted: boolean;
     encryptSession(data: Record<string, any>): Promise<any>;
-    decryptSessions(ciphertexts: Record<string, IKeyBackupSession>): Promise<Record<string, any>[]>;
+    decryptSessions(ciphertexts: Record<string, IKeyBackupSession>): Promise<IMegolmSessionData[]>;
     authData: AuthData;
     keyMatches(key: ArrayLike<number>): Promise<boolean>;
     free(): void;
@@ -185,7 +186,6 @@ export class BackupManager {
     public async prepareKeyBackupVersion(
         key?: string | Uint8Array | null,
         algorithm?: string | undefined,
-        // eslint-disable-next-line camelcase
     ): Promise<IPreparedKeyBackupVersion> {
         const Algorithm = algorithm ? algorithmsByName[algorithm] : DefaultAlgorithm;
         if (!Algorithm) {
@@ -300,7 +300,7 @@ export class BackupManager {
         const ret = {
             usable: false,
             trusted_locally: false,
-            sigs: [],
+            sigs: [] as SigInfo[],
         };
 
         if (
@@ -320,7 +320,7 @@ export class BackupManager {
             ret.trusted_locally = true;
         }
 
-        const mySigs = backupInfo.auth_data.signatures[this.baseApis.getUserId()] || [];
+        const mySigs = backupInfo.auth_data.signatures[this.baseApis.getUserId()] || {};
 
         for (const keyId of Object.keys(mySigs)) {
             const keyIdParts = keyId.split(':');
@@ -645,9 +645,7 @@ export class Curve25519 implements BackupAlgorithm {
         return this.publicKey.encrypt(JSON.stringify(plainText));
     }
 
-    public async decryptSessions(
-        sessions: Record<string, IKeyBackupSession>,
-    ): Promise<Record<string, any>[]> {
+    public async decryptSessions(sessions: Record<string, IKeyBackupSession>): Promise<IMegolmSessionData[]> {
         const privKey = await this.getKey();
         const decryption = new global.Olm.PkDecryption();
         try {
@@ -658,7 +656,7 @@ export class Curve25519 implements BackupAlgorithm {
                 throw { errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY };
             }
 
-            const keys = [];
+            const keys: IMegolmSessionData[] = [];
 
             for (const [sessionId, sessionData] of Object.entries(sessions)) {
                 try {
@@ -777,8 +775,8 @@ export class Aes256 implements BackupAlgorithm {
         return await encryptAES(JSON.stringify(plainText), this.key, data.session_id);
     }
 
-    async decryptSessions(sessions: Record<string, IKeyBackupSession>): Promise<Record<string, any>[]> {
-        const keys = [];
+    async decryptSessions(sessions: Record<string, IKeyBackupSession>): Promise<IMegolmSessionData[]> {
+        const keys: IMegolmSessionData[] = [];
 
         for (const [sessionId, sessionData] of Object.entries(sessions)) {
             try {

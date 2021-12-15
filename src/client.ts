@@ -20,7 +20,6 @@ limitations under the License.
  */
 
 import { EventEmitter } from "events";
-import { ReadStream } from "fs";
 
 import { ISyncStateData, SyncApi } from "./sync";
 import { EventStatus, IContent, IDecryptOptions, IEvent, MatrixEvent } from "./models/event";
@@ -42,13 +41,19 @@ import { IRoomEncryption, RoomList } from './crypto/RoomList';
 import { logger } from './logger';
 import { SERVICE_TYPES } from './service-types';
 import {
+    FileType,
+    IHttpOpts,
+    IUpload,
     MatrixError,
     MatrixHttpApi,
+    Method,
     PREFIX_IDENTITY_V2,
     PREFIX_MEDIA_R0,
     PREFIX_R0,
+    PREFIX_V1,
     PREFIX_UNSTABLE,
     retryNetworkOperation,
+    UploadContentResponseType,
 } from "./http-api";
 import {
     Crypto,
@@ -81,7 +86,6 @@ import {
     IKeyBackupSession,
 } from "./crypto/keybackup";
 import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
-import type Request from "request";
 import { MatrixScheduler } from "./scheduler";
 import { IAuthData, ICryptoCallbacks, IMinimalEvent, IRoomEvent, IStateEvent, NotificationCountType } from "./matrix";
 import {
@@ -155,7 +159,7 @@ import { Thread, ThreadEvent } from "./models/thread";
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
 
-export type Callback = (err: Error | any | null, data?: any) => void;
+export type Callback<T = any> = (err: Error | any | null, data?: T) => void;
 export type ResetTimelineCallback = (roomId: string) => boolean;
 
 const SCROLLBACK_DELAY_MS = 3000;
@@ -208,7 +212,7 @@ export interface ICreateClientOpts {
      * </code> as it returns a function which meets the required interface. See
      * {@link requestFunction} for more information.
      */
-    request?: Request;
+    request?: IHttpOpts["request"];
 
     userId?: string;
 
@@ -257,7 +261,7 @@ export interface ICreateClientOpts {
      * to all requests with this client. Useful for application services which require
      * <code>?user_id=</code>.
      */
-    queryParams?: Record<string, unknown>;
+    queryParams?: Record<string, string>;
 
     /**
      * Device data exported with
@@ -622,7 +626,7 @@ export interface IMyDevice {
     last_seen_ts?: number;
 }
 
-interface IDownloadKeyResult {
+export interface IDownloadKeyResult {
     failures: { [serverName: string]: object };
     device_keys: {
         [userId: string]: {
@@ -633,13 +637,42 @@ interface IDownloadKeyResult {
             };
         };
     };
+    // the following three fields were added in 1.1
+    master_keys?: {
+        [userId: string]: {
+            keys: { [keyId: string]: string };
+            usage: string[];
+            user_id: string;
+        };
+    };
+    self_signing_keys?: {
+        [userId: string]: {
+            keys: { [keyId: string]: string };
+            signatures: ISignatures;
+            usage: string[];
+            user_id: string;
+        };
+    };
+    user_signing_keys?: {
+        [userId: string]: {
+            keys: { [keyId: string]: string };
+            signatures: ISignatures;
+            usage: string[];
+            user_id: string;
+        };
+    };
 }
 
-interface IClaimOTKsResult {
+export interface IClaimOTKsResult {
     failures: { [serverName: string]: object };
     one_time_keys: {
         [userId: string]: {
-            [deviceId: string]: string;
+            [deviceId: string]: {
+                [keyId: string]: {
+                    key: string;
+                    signatures: ISignatures;
+                };
+            };
         };
     };
 }
@@ -695,6 +728,16 @@ interface IRoomsKeysResponse {
 export interface IProcessEventsOpts {
     scrollback?: boolean;
     initialSync?: boolean;
+}
+
+interface IRoomHierarchy {
+    rooms: IHierarchyRoom[];
+    next_batch?: string;
+}
+
+interface ITimestampToEventResponse {
+    event_id: string;
+    origin_server_ts: string;
 }
 
 /* eslint-enable camelcase */
@@ -1091,9 +1134,9 @@ export class MatrixClient extends EventEmitter {
             account.unpickle(key, deviceData.account);
             logger.log("unpickled device");
 
-            const rehydrateResult = await this.http.authedRequest(
+            const rehydrateResult = await this.http.authedRequest<{ success: boolean }>(
                 undefined,
-                "POST",
+                Method.Post,
                 "/dehydrated_device/claim",
                 undefined,
                 {
@@ -1132,9 +1175,9 @@ export class MatrixClient extends EventEmitter {
      */
     public async getDehydratedDevice(): Promise<IDehydratedDevice> {
         try {
-            return await this.http.authedRequest(
+            return await this.http.authedRequest<IDehydratedDevice>(
                 undefined,
-                "GET",
+                Method.Get,
                 "/dehydrated_device",
                 undefined, undefined,
                 {
@@ -1167,10 +1210,7 @@ export class MatrixClient extends EventEmitter {
             logger.warn('not dehydrating device if crypto is not enabled');
             return;
         }
-        // XXX: Private member access.
-        return await this.crypto.dehydrationManager.setKeyAndQueueDehydration(
-            key, keyInfo, deviceDisplayName,
-        );
+        return await this.crypto.dehydrationManager.setKeyAndQueueDehydration(key, keyInfo, deviceDisplayName);
     }
 
     /**
@@ -1428,14 +1468,12 @@ export class MatrixClient extends EventEmitter {
             }
         }
 
-        // We swallow errors because we need a default object anyhow
         return this.http.authedRequest(
-            undefined, "GET", "/capabilities",
-        ).catch((e: Error) => {
+            undefined, Method.Get, "/capabilities",
+        ).catch((e: Error): void => {
+            // We swallow errors because we need a default object anyhow
             logger.error(e);
-            return null; // otherwise consume the error
-        }).then((r) => {
-            if (!r) r = {};
+        }).then((r: { capabilities?: ICapabilities } = {}) => {
             const capabilities: ICapabilities = r["capabilities"] || {};
 
             // If the capabilities missed the cache, cache it for a shorter amount
@@ -2433,7 +2471,7 @@ export class MatrixClient extends EventEmitter {
         let res;
         try {
             res = await this.http.authedRequest(
-                undefined, "GET", "/room_keys/version", undefined, undefined,
+                undefined, Method.Get, "/room_keys/version", undefined, undefined,
                 { prefix: PREFIX_UNSTABLE },
             );
         } catch (e) {
@@ -2559,7 +2597,6 @@ export class MatrixClient extends EventEmitter {
      * @param {object} info Info object from prepareKeyBackupVersion
      * @returns {Promise<object>} Object with 'version' param indicating the version created
      */
-    // TODO: Fix types
     public async createKeyBackupVersion(info: IKeyBackupInfo): Promise<IKeyBackupInfo> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
@@ -2591,8 +2628,8 @@ export class MatrixClient extends EventEmitter {
             await this.crypto.crossSigningInfo.signObject(data.auth_data, "master");
         }
 
-        const res = await this.http.authedRequest(
-            undefined, "POST", "/room_keys/version", undefined, data,
+        const res = await this.http.authedRequest<IKeyBackupInfo>(
+            undefined, Method.Post, "/room_keys/version", undefined, data,
             { prefix: PREFIX_UNSTABLE },
         );
 
@@ -2624,7 +2661,7 @@ export class MatrixClient extends EventEmitter {
         });
 
         return this.http.authedRequest(
-            undefined, "DELETE", path, undefined, undefined,
+            undefined, Method.Delete, path, undefined, undefined,
             { prefix: PREFIX_UNSTABLE },
         );
     }
@@ -2663,7 +2700,7 @@ export class MatrixClient extends EventEmitter {
 
         const path = this.makeKeyBackupPath(roomId, sessionId, version);
         return this.http.authedRequest(
-            undefined, "PUT", path.path, path.queryData, data,
+            undefined, Method.Put, path.path, path.queryData, data,
             { prefix: PREFIX_UNSTABLE },
         );
     }
@@ -2843,7 +2880,7 @@ export class MatrixClient extends EventEmitter {
         }
 
         let totalKeyCount = 0;
-        let keys = [];
+        let keys: IMegolmSessionData[] = [];
 
         const path = this.makeKeyBackupPath(targetRoomId, targetSessionId, backupInfo.version);
 
@@ -2873,7 +2910,7 @@ export class MatrixClient extends EventEmitter {
             }
 
             const res = await this.http.authedRequest(
-                undefined, "GET", path.path, path.queryData, undefined,
+                undefined, Method.Get, path.path, path.queryData, undefined,
                 { prefix: PREFIX_UNSTABLE },
             ) as IRoomsKeysResponse | IRoomKeysResponse | IKeyBackupSession;
 
@@ -2931,7 +2968,7 @@ export class MatrixClient extends EventEmitter {
 
         const path = this.makeKeyBackupPath(roomId, sessionId, version);
         return this.http.authedRequest(
-            undefined, "DELETE", path.path, path.queryData, undefined,
+            undefined, Method.Delete, path.path, path.queryData, undefined,
             { prefix: PREFIX_UNSTABLE },
         );
     }
@@ -2998,7 +3035,7 @@ export class MatrixClient extends EventEmitter {
      */
     public getMediaConfig(callback?: Callback): Promise<IMediaConfig> {
         return this.http.authedRequest(
-            callback, "GET", "/config", undefined, undefined, {
+            callback, Method.Get, "/config", undefined, undefined, {
                 prefix: PREFIX_MEDIA_R0,
             },
         );
@@ -3088,7 +3125,7 @@ export class MatrixClient extends EventEmitter {
             $type: eventType,
         });
         const promise = retryNetworkOperation(5, () => {
-            return this.http.authedRequest(undefined, "PUT", path, undefined, content);
+            return this.http.authedRequest(undefined, Method.Put, path, undefined, content);
         });
         if (callback) {
             promise.then(result => callback(null, result), callback);
@@ -3130,7 +3167,7 @@ export class MatrixClient extends EventEmitter {
         });
         try {
             return await this.http.authedRequest(
-                undefined, "GET", path, undefined,
+                undefined, Method.Get, path, undefined,
             );
         } catch (e) {
             if (e.data && e.data.errcode === 'M_NOT_FOUND') {
@@ -3204,7 +3241,7 @@ export class MatrixClient extends EventEmitter {
 
         if (opts.inviteSignUrl) {
             signPromise = this.http.requestOtherUrl(
-                undefined, 'POST',
+                undefined, Method.Post,
                 opts.inviteSignUrl, { mxid: this.credentials.userId },
             );
         }
@@ -3224,7 +3261,7 @@ export class MatrixClient extends EventEmitter {
             }
 
             const path = utils.encodeUri("/join/$roomid", { $roomid: roomIdOrAlias });
-            const res = await this.http.authedRequest(undefined, "POST", path, queryString, data, reqOpts);
+            const res = await this.http.authedRequest(undefined, Method.Post, path, queryString, data, reqOpts);
 
             const roomId = res['room_id'];
             const syncApi = new SyncApi(this, this.clientOpts);
@@ -3310,7 +3347,7 @@ export class MatrixClient extends EventEmitter {
             $roomId: roomId,
         });
         return this.http.authedRequest(
-            callback, "GET", path, undefined,
+            callback, Method.Get, path, undefined,
         );
     }
 
@@ -3328,7 +3365,7 @@ export class MatrixClient extends EventEmitter {
             $roomId: roomId,
             $tag: tagName,
         });
-        return this.http.authedRequest(callback, "PUT", path, undefined, metadata);
+        return this.http.authedRequest(callback, Method.Put, path, undefined, metadata);
     }
 
     /**
@@ -3344,9 +3381,7 @@ export class MatrixClient extends EventEmitter {
             $roomId: roomId,
             $tag: tagName,
         });
-        return this.http.authedRequest(
-            callback, "DELETE", path, undefined, undefined,
-        );
+        return this.http.authedRequest(callback, Method.Delete, path, undefined, undefined);
     }
 
     /**
@@ -3368,7 +3403,7 @@ export class MatrixClient extends EventEmitter {
             $roomId: roomId,
             $type: eventType,
         });
-        return this.http.authedRequest(callback, "PUT", path, undefined, content);
+        return this.http.authedRequest(callback, Method.Put, path, undefined, content);
     }
 
     /**
@@ -3400,7 +3435,7 @@ export class MatrixClient extends EventEmitter {
         const path = utils.encodeUri("/rooms/$roomId/state/m.room.power_levels", {
             $roomId: roomId,
         });
-        return this.http.authedRequest(callback, "PUT", path, undefined, content);
+        return this.http.authedRequest(callback, Method.Put, path, undefined, content);
     }
 
     /**
@@ -3683,8 +3718,8 @@ export class MatrixClient extends EventEmitter {
             path = utils.encodeUri("/rooms/$roomId/send/$eventType/$txnId", pathParams);
         }
 
-        return this.http.authedRequest(
-            undefined, "PUT", path, undefined, event.getWireContent(),
+        return this.http.authedRequest<ISendEventResponse>(
+            undefined, Method.Put, path, undefined, event.getWireContent(),
         ).then((res) => {
             logger.log(`Event sent to ${event.getRoomId()} with event id ${res.event_id}`);
             return res;
@@ -4149,7 +4184,7 @@ export class MatrixClient extends EventEmitter {
             $receiptType: receiptType,
             $eventId: event.getId(),
         });
-        const promise = this.http.authedRequest(callback, "POST", path, undefined, body || {});
+        const promise = this.http.authedRequest(callback, Method.Post, path, undefined, body || {});
 
         const room = this.getRoom(event.getRoomId());
         if (room) {
@@ -4266,9 +4301,9 @@ export class MatrixClient extends EventEmitter {
         }
 
         const resp = this.http.authedRequest(
-            callback, "GET", "/preview_url", {
-                url: url,
-                ts: ts,
+            callback, Method.Get, "/preview_url", {
+                url,
+                ts: ts.toString(),
             }, undefined, {
                 prefix: PREFIX_MEDIA_R0,
             },
@@ -4301,7 +4336,7 @@ export class MatrixClient extends EventEmitter {
         if (isTyping) {
             data.timeout = timeoutMs ? timeoutMs : 20000;
         }
-        return this.http.authedRequest(callback, "PUT", path, undefined, data);
+        return this.http.authedRequest(callback, Method.Put, path, undefined, data);
     }
 
     /**
@@ -4445,7 +4480,7 @@ export class MatrixClient extends EventEmitter {
             }
         }
 
-        return this.http.authedRequest(callback, "POST", path, undefined, params);
+        return this.http.authedRequest(callback, Method.Post, path, undefined, params);
     }
 
     /**
@@ -4561,7 +4596,7 @@ export class MatrixClient extends EventEmitter {
             user_id: userId,
         };
         return this.http.authedRequest(
-            callback, "POST", path, undefined, data,
+            callback, Method.Post, path, undefined, data,
         );
     }
 
@@ -4582,7 +4617,7 @@ export class MatrixClient extends EventEmitter {
             reason: reason,
         };
         return this.http.authedRequest(
-            callback, "POST", path, undefined, data,
+            callback, Method.Post, path, undefined, data,
         );
     }
 
@@ -4614,7 +4649,7 @@ export class MatrixClient extends EventEmitter {
             { $roomId: roomId, $userId: userId },
         );
 
-        return this.http.authedRequest(callback, "PUT", path, undefined, {
+        return this.http.authedRequest(callback, Method.Put, path, undefined, {
             membership: membershipValue,
             reason: reason,
         });
@@ -4637,7 +4672,7 @@ export class MatrixClient extends EventEmitter {
             $membership: membership,
         });
         return this.http.authedRequest(
-            callback, "POST", path, undefined, {
+            callback, Method.Post, path, undefined, {
                 user_id: userId,  // may be undefined e.g. on leave
                 reason: reason,
             },
@@ -4674,7 +4709,7 @@ export class MatrixClient extends EventEmitter {
             $userId: this.credentials.userId,
             $info: info,
         });
-        return this.http.authedRequest(callback, "PUT", path, undefined, data);
+        return this.http.authedRequest(callback, Method.Put, path, undefined, data);
     }
 
     /**
@@ -4777,7 +4812,7 @@ export class MatrixClient extends EventEmitter {
             throw new Error("Bad presence value: " + opts.presence);
         }
         return this.http.authedRequest(
-            callback, "PUT", path, undefined, opts,
+            callback, Method.Put, path, undefined, opts,
         );
     }
 
@@ -4792,7 +4827,7 @@ export class MatrixClient extends EventEmitter {
             $userId: userId,
         });
 
-        return this.http.authedRequest(callback, "GET", path, undefined, undefined);
+        return this.http.authedRequest(callback, Method.Get, path, undefined, undefined);
     }
 
     /**
@@ -4938,7 +4973,7 @@ export class MatrixClient extends EventEmitter {
 
         // TODO: we should implement a backoff (as per scrollback()) to deal more
         // nicely with HTTP errors.
-        const promise = this.http.authedRequest(undefined, "GET", path, params).then((res) => {
+        const promise = this.http.authedRequest<any>(undefined, Method.Get, path, params).then((res) => { // TODO types
             if (!res.event) {
                 throw new Error("'event' not in '/context' result - homeserver too old?");
             }
@@ -4999,18 +5034,16 @@ export class MatrixClient extends EventEmitter {
     public createMessagesRequest(
         roomId: string,
         fromToken: string,
-        limit: number,
+        limit = 30,
         dir: Direction,
         timelineFilter?: Filter,
     ): Promise<IMessagesResponse> {
         const path = utils.encodeUri("/rooms/$roomId/messages", { $roomId: roomId });
-        if (limit === undefined) {
-            limit = 30;
-        }
-        const params: Record<string, string | number> = {
+
+        const params: Record<string, string> = {
             from: fromToken,
-            limit: limit,
-            dir: dir,
+            limit: limit.toString(),
+            dir,
         };
 
         let filter = null;
@@ -5028,7 +5061,7 @@ export class MatrixClient extends EventEmitter {
         if (filter) {
             params.filter = JSON.stringify(filter);
         }
-        return this.http.authedRequest(undefined, "GET", path, params);
+        return this.http.authedRequest(undefined, Method.Get, path, params);
     }
 
     /**
@@ -5088,8 +5121,8 @@ export class MatrixClient extends EventEmitter {
                 params.from = token;
             }
 
-            promise = this.http.authedRequest(
-                undefined, "GET", path, params, undefined,
+            promise = this.http.authedRequest<any>( // TODO types
+                undefined, Method.Get, path, params, undefined,
             ).then((res) => {
                 const token = res.next_token;
                 const matrixEvents = [];
@@ -5481,7 +5514,7 @@ export class MatrixClient extends EventEmitter {
             }
         }
 
-        return this.http.request(undefined, "POST", endpoint, undefined, postParams);
+        return this.http.request(undefined, Method.Post, endpoint, undefined, postParams);
     }
 
     /**
@@ -5699,18 +5732,14 @@ export class MatrixClient extends EventEmitter {
         searchResults.count = roomEvents.count;
         searchResults.next_batch = roomEvents.next_batch;
 
-        // combine the highlight list with our existing list; build an object
-        // to avoid O(N^2) fail
-        const highlights = {};
-        roomEvents.highlights.forEach((hl) => {
-            highlights[hl] = 1;
-        });
+        // combine the highlight list with our existing list;
+        const highlights = new Set<string>(roomEvents.highlights);
         searchResults.highlights.forEach((hl) => {
-            highlights[hl] = 1;
+            highlights.add(hl);
         });
 
         // turn it back into a list.
-        searchResults.highlights = Object.keys(highlights);
+        searchResults.highlights = Array.from(highlights);
 
         // append the new results to our existing results
         const resultsLength = roomEvents.results ? roomEvents.results.length : 0;
@@ -5767,7 +5796,8 @@ export class MatrixClient extends EventEmitter {
         const path = utils.encodeUri("/user/$userId/filter", {
             $userId: this.credentials.userId,
         });
-        return this.http.authedRequest(undefined, "POST", path, undefined, content).then((response) => {
+        // TODO types
+        return this.http.authedRequest<any>(undefined, Method.Post, path, undefined, content).then((response) => {
             // persist the filter
             const filter = Filter.fromJson(
                 this.credentials.userId, response.filter_id, content,
@@ -5799,13 +5829,11 @@ export class MatrixClient extends EventEmitter {
             $filterId: filterId,
         });
 
-        return this.http.authedRequest(
-            undefined, "GET", path, undefined, undefined,
+        return this.http.authedRequest<IFilterDefinition>(
+            undefined, Method.Get, path, undefined, undefined,
         ).then((response) => {
             // persist the filter
-            const filter = Filter.fromJson(
-                userId, filterId, response,
-            );
+            const filter = Filter.fromJson(userId, filterId, response);
             this.store.storeFilter(filter);
             return filter;
         });
@@ -5879,7 +5907,7 @@ export class MatrixClient extends EventEmitter {
         });
 
         return this.http.authedRequest(
-            undefined, "POST", path, undefined, {},
+            undefined, Method.Post, path, undefined, {},
         );
     }
 
@@ -5896,7 +5924,7 @@ export class MatrixClient extends EventEmitter {
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public turnServer(callback?: Callback): Promise<ITurnServerResponse> {
-        return this.http.authedRequest(callback, "GET", "/voip/turnServer");
+        return this.http.authedRequest(callback, Method.Get, "/voip/turnServer");
     }
 
     /**
@@ -5994,7 +6022,7 @@ export class MatrixClient extends EventEmitter {
             { $userId: this.getUserId() },
         );
         return this.http.authedRequest(
-            undefined, 'GET', path, undefined, undefined, { prefix: '' },
+            undefined, Method.Get, path, undefined, undefined, { prefix: '' },
         ).then(r => r['admin']); // pull out the specific boolean we want
     }
 
@@ -6010,7 +6038,7 @@ export class MatrixClient extends EventEmitter {
             "/_synapse/admin/v1/whois/$userId",
             { $userId: userId },
         );
-        return this.http.authedRequest(undefined, 'GET', path, undefined, undefined, { prefix: '' });
+        return this.http.authedRequest(undefined, Method.Get, path, undefined, undefined, { prefix: '' });
     }
 
     /**
@@ -6025,7 +6053,7 @@ export class MatrixClient extends EventEmitter {
             { $userId: userId },
         );
         return this.http.authedRequest(
-            undefined, 'POST', path, undefined, undefined, { prefix: '' },
+            undefined, Method.Post, path, undefined, undefined, { prefix: '' },
         );
     }
 
@@ -6078,8 +6106,8 @@ export class MatrixClient extends EventEmitter {
         const path = utils.encodeUri("/uk.half-shot.msc2666/user/shared_rooms/$userId", {
             $userId: userId,
         });
-        const res = await this.http.authedRequest(
-            undefined, "GET", path, undefined, undefined,
+        const res = await this.http.authedRequest<{ joined: string[] }>(
+            undefined, Method.Get, path, undefined, undefined,
             { prefix: PREFIX_UNSTABLE },
         );
         return res.joined;
@@ -6095,15 +6123,15 @@ export class MatrixClient extends EventEmitter {
             return this.serverVersionsPromise;
         }
 
-        this.serverVersionsPromise = this.http.request(
+        this.serverVersionsPromise = this.http.request<IServerVersions>(
             undefined, // callback
-            "GET", "/_matrix/client/versions",
+            Method.Get, "/_matrix/client/versions",
             undefined, // queryParams
             undefined, // data
             {
                 prefix: '',
             },
-        ).catch((e) => {
+        ).catch((e: Error) => {
             // Need to unset this if it fails, otherwise we'll never retry
             this.serverVersionsPromise = null;
             // but rethrow the exception to anything that was waiting
@@ -6116,7 +6144,7 @@ export class MatrixClient extends EventEmitter {
     /**
      * Check if a particular spec version is supported by the server.
      * @param {string} version The spec version (such as "r0.5.0") to check for.
-     * @return {Promise<bool>} Whether it is supported
+     * @return {Promise<boolean>} Whether it is supported
      */
     public async isVersionSupported(version: string): Promise<boolean> {
         const { versions } = await this.getVersions();
@@ -6124,7 +6152,7 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
-     * Query the server to see if it support members lazy loading
+     * Query the server to see if it supports members lazy loading
      * @return {Promise<boolean>} true if server supports lazy loading
      */
     public async doesServerSupportLazyLoading(): Promise<boolean> {
@@ -6423,8 +6451,8 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: to `true`.
      */
     public isUsernameAvailable(username: string): Promise<true> {
-        return this.http.authedRequest(
-            undefined, "GET", '/register/available', { username: username },
+        return this.http.authedRequest<{ available: true }>(
+            undefined, Method.Get, '/register/available', { username: username },
         ).then((response) => {
             return response.available;
         });
@@ -6545,7 +6573,7 @@ export class MatrixClient extends EventEmitter {
             params.kind = kind;
         }
 
-        return this.http.request(callback, "POST", "/register", params, data);
+        return this.http.request(callback, Method.Post, "/register", params, data);
     }
 
     /**
@@ -6554,7 +6582,7 @@ export class MatrixClient extends EventEmitter {
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public loginFlows(callback?: Callback): Promise<any> { // TODO: Types
-        return this.http.request(callback, "GET", "/login");
+        return this.http.request(callback, Method.Get, "/login");
     }
 
     /**
@@ -6584,7 +6612,7 @@ export class MatrixClient extends EventEmitter {
                 if (callback) {
                     callback(error, response);
                 }
-            }, "POST", "/login", undefined, loginData,
+            }, Method.Post, "/login", undefined, loginData,
         );
     }
 
@@ -6663,7 +6691,7 @@ export class MatrixClient extends EventEmitter {
      */
     public logout(callback?: Callback): Promise<{}> {
         return this.http.authedRequest(
-            callback, "POST", '/logout',
+            callback, Method.Post, '/logout',
         );
     }
 
@@ -6692,7 +6720,7 @@ export class MatrixClient extends EventEmitter {
             body.erase = erase;
         }
 
-        return this.http.authedRequest(undefined, "POST", '/account/deactivate', undefined, body);
+        return this.http.authedRequest(undefined, Method.Post, '/account/deactivate', undefined, body);
     }
 
     /**
@@ -6749,7 +6777,7 @@ export class MatrixClient extends EventEmitter {
             }
         }
 
-        return this.http.authedRequest(callback, "POST", "/createRoom", undefined, options);
+        return this.http.authedRequest(callback, Method.Post, "/createRoom", undefined, options);
     }
 
     /**
@@ -6768,11 +6796,7 @@ export class MatrixClient extends EventEmitter {
         eventType?: EventType | string | null,
         opts: IRelationsRequestOpts = {},
     ): Promise<IRelationsResponse> {
-        const params = new URLSearchParams();
-        for (const [key, val] of Object.entries(opts)) {
-            params.set(key, val);
-        }
-        const queryString = params.toString();
+        const queryString = utils.encodeParams(opts as Record<string, string | number>);
 
         let templatedUrl = "/rooms/$roomId/relations/$eventId";
         if (relationType !== null) templatedUrl += "/$relationType";
@@ -6786,7 +6810,7 @@ export class MatrixClient extends EventEmitter {
                 $eventType: eventType,
             });
         return await this.http.authedRequest(
-            undefined, "GET", path, null, null, {
+            undefined, Method.Get, path, null, null, {
                 prefix: PREFIX_UNSTABLE,
             },
         );
@@ -6800,7 +6824,7 @@ export class MatrixClient extends EventEmitter {
      */
     public roomState(roomId: string, callback?: Callback): Promise<IStateEventWithRoomId[]> {
         const path = utils.encodeUri("/rooms/$roomId/state", { $roomId: roomId });
-        return this.http.authedRequest(callback, "GET", path);
+        return this.http.authedRequest(callback, Method.Get, path);
     }
 
     /**
@@ -6823,7 +6847,7 @@ export class MatrixClient extends EventEmitter {
                 $eventId: eventId,
             },
         );
-        return this.http.authedRequest(callback, "GET", path);
+        return this.http.authedRequest(callback, Method.Get, path);
     }
 
     /**
@@ -6857,7 +6881,7 @@ export class MatrixClient extends EventEmitter {
 
         const path = utils.encodeUri("/rooms/$roomId/members?" + queryString,
             { $roomId: roomId });
-        return this.http.authedRequest(callback, "GET", path);
+        return this.http.authedRequest(callback, Method.Get, path);
     }
 
     /**
@@ -6873,7 +6897,7 @@ export class MatrixClient extends EventEmitter {
     ): Promise<{ replacement_room: string }> { // eslint-disable-line camelcase
         const path = utils.encodeUri("/rooms/$roomId/upgrade", { $roomId: roomId });
         return this.http.authedRequest(
-            undefined, "POST", path, undefined, { new_version: newVersion },
+            undefined, Method.Post, path, undefined, { new_version: newVersion },
         );
     }
 
@@ -6902,7 +6926,7 @@ export class MatrixClient extends EventEmitter {
             path = utils.encodeUri(path + "/$stateKey", pathParams);
         }
         return this.http.authedRequest(
-            callback, "GET", path,
+            callback, Method.Get, path,
         );
     }
 
@@ -6931,7 +6955,7 @@ export class MatrixClient extends EventEmitter {
         if (stateKey !== undefined) {
             path = utils.encodeUri(path + "/$stateKey", pathParams);
         }
-        return this.http.authedRequest(callback, "PUT", path, undefined, content);
+        return this.http.authedRequest(callback, Method.Put, path, undefined, content);
     }
 
     /**
@@ -6946,15 +6970,12 @@ export class MatrixClient extends EventEmitter {
             callback = limit as any as Callback; // legacy
             limit = undefined;
         }
+
         const path = utils.encodeUri("/rooms/$roomId/initialSync",
             { $roomId: roomId },
         );
-        if (!limit) {
-            limit = 30;
-        }
-        return this.http.authedRequest(
-            callback, "GET", path, { limit: limit },
-        );
+
+        return this.http.authedRequest(callback, Method.Get, path, { limit: limit?.toString() ?? "30" });
     }
 
     /**
@@ -6988,7 +7009,7 @@ export class MatrixClient extends EventEmitter {
             "org.matrix.msc2285.hidden": Boolean(opts ? opts.hidden : false),
         };
 
-        return this.http.authedRequest(undefined, "POST", path, undefined, content);
+        return this.http.authedRequest(undefined, Method.Post, path, undefined, content);
     }
 
     /**
@@ -6997,7 +7018,7 @@ export class MatrixClient extends EventEmitter {
      */
     public getJoinedRooms(): Promise<IJoinedRoomsResponse> {
         const path = utils.encodeUri("/joined_rooms", {});
-        return this.http.authedRequest(undefined, "GET", path);
+        return this.http.authedRequest(undefined, Method.Get, path);
     }
 
     /**
@@ -7011,7 +7032,7 @@ export class MatrixClient extends EventEmitter {
         const path = utils.encodeUri("/rooms/$roomId/joined_members", {
             $roomId: roomId,
         });
-        return this.http.authedRequest(undefined, "GET", path);
+        return this.http.authedRequest(undefined, Method.Get, path);
     }
 
     /**
@@ -7043,9 +7064,9 @@ export class MatrixClient extends EventEmitter {
         }
 
         if (Object.keys(options).length === 0 && Object.keys(queryParams).length === 0) {
-            return this.http.authedRequest(callback, "GET", "/publicRooms");
+            return this.http.authedRequest(callback, Method.Get, "/publicRooms");
         } else {
-            return this.http.authedRequest(callback, "POST", "/publicRooms", queryParams, options);
+            return this.http.authedRequest(callback, Method.Post, "/publicRooms", queryParams, options);
         }
     }
 
@@ -7064,7 +7085,7 @@ export class MatrixClient extends EventEmitter {
         const data = {
             room_id: roomId,
         };
-        return this.http.authedRequest(callback, "PUT", path, undefined, data);
+        return this.http.authedRequest(callback, Method.Put, path, undefined, data);
     }
 
     /**
@@ -7079,7 +7100,7 @@ export class MatrixClient extends EventEmitter {
         const path = utils.encodeUri("/directory/room/$alias", {
             $alias: alias,
         });
-        return this.http.authedRequest(callback, "DELETE", path, undefined, undefined);
+        return this.http.authedRequest(callback, Method.Delete, path, undefined, undefined);
     }
 
     /**
@@ -7092,7 +7113,7 @@ export class MatrixClient extends EventEmitter {
         const path = utils.encodeUri("/rooms/$roomId/aliases",
             { $roomId: roomId });
         const prefix = PREFIX_UNSTABLE + "/org.matrix.msc2432";
-        return this.http.authedRequest(callback, "GET", path, null, null, { prefix });
+        return this.http.authedRequest(callback, Method.Get, path, null, null, { prefix });
     }
 
     /**
@@ -7110,7 +7131,7 @@ export class MatrixClient extends EventEmitter {
         const path = utils.encodeUri("/directory/room/$alias", {
             $alias: alias,
         });
-        return this.http.authedRequest(callback, "GET", path);
+        return this.http.authedRequest(callback, Method.Get, path);
     }
 
     /**
@@ -7123,7 +7144,7 @@ export class MatrixClient extends EventEmitter {
     public resolveRoomAlias(roomAlias: string, callback?: Callback): Promise<{ room_id: string, servers: string[] }> {
         // TODO: deprecate this or getRoomIdForAlias
         const path = utils.encodeUri("/directory/room/$alias", { $alias: roomAlias });
-        return this.http.request(callback, "GET", path);
+        return this.http.request(callback, Method.Get, path);
     }
 
     /**
@@ -7137,7 +7158,7 @@ export class MatrixClient extends EventEmitter {
         const path = utils.encodeUri("/directory/list/room/$roomId", {
             $roomId: roomId,
         });
-        return this.http.authedRequest(callback, "GET", path);
+        return this.http.authedRequest(callback, Method.Get, path);
     }
 
     /**
@@ -7154,7 +7175,7 @@ export class MatrixClient extends EventEmitter {
         const path = utils.encodeUri("/directory/list/room/$roomId", {
             $roomId: roomId,
         });
-        return this.http.authedRequest(callback, "PUT", path, undefined, { visibility });
+        return this.http.authedRequest(callback, Method.Put, path, undefined, { visibility });
     }
 
     /**
@@ -7181,7 +7202,7 @@ export class MatrixClient extends EventEmitter {
             $roomId: roomId,
         });
         return this.http.authedRequest(
-            callback, "PUT", path, undefined, { "visibility": visibility },
+            callback, Method.Put, path, undefined, { "visibility": visibility },
         );
     }
 
@@ -7202,7 +7223,7 @@ export class MatrixClient extends EventEmitter {
             body.limit = opts.limit;
         }
 
-        return this.http.authedRequest(undefined, "POST", "/user_directory/search", undefined, body);
+        return this.http.authedRequest(undefined, Method.Post, "/user_directory/search", undefined, body);
     }
 
     /**
@@ -7245,11 +7266,11 @@ export class MatrixClient extends EventEmitter {
      *    determined by this.opts.onlyData, opts.rawResponse, and
      *    opts.onlyContentUri.  Rejects with an error (usually a MatrixError).
      */
-    public uploadContent(
-        file: File | String | Buffer | ReadStream | Blob,
-        opts?: IUploadOpts,
-    ): IAbortablePromise<any> { // TODO: Advanced types
-        return this.http.uploadContent(file, opts);
+    public uploadContent<O extends IUploadOpts>(
+        file: FileType,
+        opts?: O,
+    ): IAbortablePromise<UploadContentResponseType<O>> {
+        return this.http.uploadContent<O>(file, opts);
     }
 
     /**
@@ -7269,7 +7290,7 @@ export class MatrixClient extends EventEmitter {
      *  - loaded: Number of bytes uploaded
      *  - total: Total number of bytes to upload
      */
-    public getCurrentUploads(): { promise: Promise<any>, loaded: number, total: number }[] { // TODO: Advanced types (promise)
+    public getCurrentUploads(): IUpload[] {
         return this.http.getCurrentUploads();
     }
 
@@ -7297,7 +7318,7 @@ export class MatrixClient extends EventEmitter {
                 { $userId: userId, $info: info }) :
             utils.encodeUri("/profile/$userId",
                 { $userId: userId });
-        return this.http.authedRequest(callback, "GET", path);
+        return this.http.authedRequest(callback, Method.Get, path);
     }
 
     /**
@@ -7307,7 +7328,7 @@ export class MatrixClient extends EventEmitter {
      */
     public getThreePids(callback?: Callback): Promise<{ threepids: IThreepid[] }> {
         const path = "/account/3pid";
-        return this.http.authedRequest(callback, "GET", path, undefined, undefined);
+        return this.http.authedRequest(callback, Method.Get, path, undefined, undefined);
     }
 
     /**
@@ -7330,7 +7351,7 @@ export class MatrixClient extends EventEmitter {
             'bind': bind,
         };
         return this.http.authedRequest(
-            callback, "POST", path, null, data,
+            callback, Method.Post, path, null, data,
         );
     }
 
@@ -7349,7 +7370,7 @@ export class MatrixClient extends EventEmitter {
     public async addThreePidOnly(data: IAddThreePidOnlyBody): Promise<{}> {
         const path = "/account/3pid/add";
         const prefix = await this.isVersionSupported("r0.6.0") ? PREFIX_R0 : PREFIX_UNSTABLE;
-        return this.http.authedRequest(undefined, "POST", path, null, data, { prefix });
+        return this.http.authedRequest(undefined, Method.Post, path, null, data, { prefix });
     }
 
     /**
@@ -7371,7 +7392,7 @@ export class MatrixClient extends EventEmitter {
         const prefix = await this.isVersionSupported("r0.6.0") ?
             PREFIX_R0 : PREFIX_UNSTABLE;
         return this.http.authedRequest(
-            undefined, "POST", path, null, data, { prefix },
+            undefined, Method.Post, path, null, data, { prefix },
         );
     }
 
@@ -7398,7 +7419,7 @@ export class MatrixClient extends EventEmitter {
             id_server: this.getIdentityServerUrl(true),
         };
         const prefix = await this.isVersionSupported("r0.6.0") ? PREFIX_R0 : PREFIX_UNSTABLE;
-        return this.http.authedRequest(undefined, "POST", path, null, data, { prefix });
+        return this.http.authedRequest(undefined, Method.Post, path, null, data, { prefix });
     }
 
     /**
@@ -7415,7 +7436,7 @@ export class MatrixClient extends EventEmitter {
         // eslint-disable-next-line camelcase
     ): Promise<{ id_server_unbind_result: IdServerUnbindResult }> {
         const path = "/account/3pid/delete";
-        return this.http.authedRequest(undefined, "POST", path, null, { medium, address });
+        return this.http.authedRequest(undefined, Method.Post, path, null, { medium, address });
     }
 
     /**
@@ -7434,7 +7455,7 @@ export class MatrixClient extends EventEmitter {
         };
 
         return this.http.authedRequest(
-            callback, "POST", path, null, data,
+            callback, Method.Post, path, null, data,
         );
     }
 
@@ -7444,7 +7465,7 @@ export class MatrixClient extends EventEmitter {
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public getDevices(): Promise<{ devices: IMyDevice[] }> {
-        return this.http.authedRequest(undefined, 'GET', "/devices", undefined, undefined);
+        return this.http.authedRequest(undefined, Method.Get, "/devices", undefined, undefined);
     }
 
     /**
@@ -7457,7 +7478,7 @@ export class MatrixClient extends EventEmitter {
         const path = utils.encodeUri("/devices/$device_id", {
             $device_id: deviceId,
         });
-        return this.http.authedRequest(undefined, 'GET', path, undefined, undefined);
+        return this.http.authedRequest(undefined, Method.Get, path, undefined, undefined);
     }
 
     /**
@@ -7474,7 +7495,7 @@ export class MatrixClient extends EventEmitter {
             $device_id: deviceId,
         });
 
-        return this.http.authedRequest(undefined, "PUT", path, undefined, body);
+        return this.http.authedRequest(undefined, Method.Put, path, undefined, body);
     }
 
     /**
@@ -7496,7 +7517,7 @@ export class MatrixClient extends EventEmitter {
             body.auth = auth;
         }
 
-        return this.http.authedRequest(undefined, "DELETE", path, undefined, body);
+        return this.http.authedRequest(undefined, Method.Delete, path, undefined, body);
     }
 
     /**
@@ -7515,7 +7536,7 @@ export class MatrixClient extends EventEmitter {
         }
 
         const path = "/delete_devices";
-        return this.http.authedRequest(undefined, "POST", path, undefined, body);
+        return this.http.authedRequest(undefined, Method.Post, path, undefined, body);
     }
 
     /**
@@ -7527,7 +7548,7 @@ export class MatrixClient extends EventEmitter {
      */
     public getPushers(callback?: Callback): Promise<{ pushers: IPusher[] }> {
         const path = "/pushers";
-        return this.http.authedRequest(callback, "GET", path, undefined, undefined);
+        return this.http.authedRequest(callback, Method.Get, path, undefined, undefined);
     }
 
     /**
@@ -7540,7 +7561,7 @@ export class MatrixClient extends EventEmitter {
      */
     public setPusher(pusher: IPusherRequest, callback?: Callback): Promise<{}> {
         const path = "/pushers/set";
-        return this.http.authedRequest(callback, "POST", path, null, pusher);
+        return this.http.authedRequest(callback, Method.Post, path, null, pusher);
     }
 
     /**
@@ -7550,7 +7571,7 @@ export class MatrixClient extends EventEmitter {
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public getPushRules(callback?: Callback): Promise<IPushRules> {
-        return this.http.authedRequest(callback, "GET", "/pushrules/").then((rules: IPushRules) => {
+        return this.http.authedRequest(callback, Method.Get, "/pushrules/").then((rules: IPushRules) => {
             return PushProcessor.rewriteDefaultRules(rules);
         });
     }
@@ -7576,7 +7597,7 @@ export class MatrixClient extends EventEmitter {
             $kind: kind,
             $ruleId: ruleId,
         });
-        return this.http.authedRequest(callback, "PUT", path, undefined, body);
+        return this.http.authedRequest(callback, Method.Put, path, undefined, body);
     }
 
     /**
@@ -7598,7 +7619,7 @@ export class MatrixClient extends EventEmitter {
             $kind: kind,
             $ruleId: ruleId,
         });
-        return this.http.authedRequest(callback, "DELETE", path);
+        return this.http.authedRequest(callback, Method.Delete, path);
     }
 
     /**
@@ -7623,7 +7644,7 @@ export class MatrixClient extends EventEmitter {
             $ruleId: ruleId,
         });
         return this.http.authedRequest(
-            callback, "PUT", path, undefined, { "enabled": enabled },
+            callback, Method.Put, path, undefined, { "enabled": enabled },
         );
     }
 
@@ -7649,7 +7670,7 @@ export class MatrixClient extends EventEmitter {
             $ruleId: ruleId,
         });
         return this.http.authedRequest(
-            callback, "PUT", path, undefined, { "actions": actions },
+            callback, Method.Put, path, undefined, { "actions": actions },
         );
     }
 
@@ -7670,7 +7691,7 @@ export class MatrixClient extends EventEmitter {
         if (opts.next_batch) {
             queryParams.next_batch = opts.next_batch;
         }
-        return this.http.authedRequest(callback, "POST", "/search", queryParams, opts.body);
+        return this.http.authedRequest(callback, Method.Post, "/search", queryParams, opts.body);
     }
 
     /**
@@ -7691,12 +7712,12 @@ export class MatrixClient extends EventEmitter {
         opts?: void,
         callback?: Callback,
     ): Promise<IKeysUploadResponse> {
-        return this.http.authedRequest(callback, "POST", "/keys/upload", undefined, content);
+        return this.http.authedRequest(callback, Method.Post, "/keys/upload", undefined, content);
     }
 
     public uploadKeySignatures(content: KeySignatures): Promise<IUploadKeySignaturesResponse> {
         return this.http.authedRequest(
-            undefined, "POST", '/keys/signatures/upload', undefined,
+            undefined, Method.Post, '/keys/signatures/upload', undefined,
             content, {
                 prefix: PREFIX_UNSTABLE,
             },
@@ -7733,7 +7754,7 @@ export class MatrixClient extends EventEmitter {
             content.device_keys[u] = [];
         });
 
-        return this.http.authedRequest(undefined, "POST", "/keys/query", undefined, content);
+        return this.http.authedRequest(undefined, Method.Post, "/keys/query", undefined, content);
     }
 
     /**
@@ -7750,11 +7771,11 @@ export class MatrixClient extends EventEmitter {
      *     an error response ({@link module:http-api.MatrixError}).
      */
     public claimOneTimeKeys(
-        devices: string[],
+        devices: [string, string][],
         keyAlgorithm = "signed_curve25519",
         timeout?: number,
     ): Promise<IClaimOTKsResult> {
-        const queries = {};
+        const queries: Record<string, Record<string, string>> = {};
 
         if (keyAlgorithm === undefined) {
             keyAlgorithm = "signed_curve25519";
@@ -7772,7 +7793,7 @@ export class MatrixClient extends EventEmitter {
             content.timeout = timeout;
         }
         const path = "/keys/claim";
-        return this.http.authedRequest(undefined, "POST", path, undefined, content);
+        return this.http.authedRequest(undefined, Method.Post, path, undefined, content);
     }
 
     /**
@@ -7792,14 +7813,14 @@ export class MatrixClient extends EventEmitter {
         };
 
         const path = "/keys/changes";
-        return this.http.authedRequest(undefined, "GET", path, qps, undefined);
+        return this.http.authedRequest(undefined, Method.Get, path, qps, undefined);
     }
 
     public uploadDeviceSigningKeys(auth?: IAuthData, keys?: CrossSigningKeys): Promise<{}> {
         const data = Object.assign({}, keys);
         if (auth) Object.assign(data, { auth });
         return this.http.authedRequest(
-            undefined, "POST", "/keys/device_signing/upload", undefined, data, {
+            undefined, Method.Post, "/keys/device_signing/upload", undefined, data, {
                 prefix: PREFIX_UNSTABLE,
             },
         );
@@ -7825,7 +7846,7 @@ export class MatrixClient extends EventEmitter {
 
         const uri = this.idBaseUrl + PREFIX_IDENTITY_V2 + "/account/register";
         return this.http.requestOtherUrl(
-            undefined, "POST", uri,
+            undefined, Method.Post, uri,
             null, hsOpenIdToken,
         );
     }
@@ -7865,12 +7886,12 @@ export class MatrixClient extends EventEmitter {
         const params = {
             client_secret: clientSecret,
             email: email,
-            send_attempt: sendAttempt,
+            send_attempt: sendAttempt?.toString(),
             next_link: nextLink,
         };
 
         return await this.http.idServerRequest(
-            callback, "POST", "/validate/email/requestToken",
+            callback, Method.Post, "/validate/email/requestToken",
             params, PREFIX_IDENTITY_V2, identityAccessToken,
         );
     }
@@ -7915,12 +7936,12 @@ export class MatrixClient extends EventEmitter {
             client_secret: clientSecret,
             country: phoneCountry,
             phone_number: phoneNumber,
-            send_attempt: sendAttempt,
+            send_attempt: sendAttempt?.toString(),
             next_link: nextLink,
         };
 
         return await this.http.idServerRequest(
-            callback, "POST", "/validate/msisdn/requestToken",
+            callback, Method.Post, "/validate/msisdn/requestToken",
             params, PREFIX_IDENTITY_V2, identityAccessToken,
         );
     }
@@ -7957,7 +7978,7 @@ export class MatrixClient extends EventEmitter {
         };
 
         return await this.http.idServerRequest(
-            undefined, "POST", "/validate/msisdn/submitToken",
+            undefined, Method.Post, "/validate/msisdn/submitToken",
             params, PREFIX_IDENTITY_V2, identityAccessToken,
         );
     }
@@ -7993,7 +8014,7 @@ export class MatrixClient extends EventEmitter {
         };
 
         return this.http.requestOtherUrl(
-            undefined, "POST", url, undefined, params,
+            undefined, Method.Post, url, undefined, params,
         );
     }
 
@@ -8005,7 +8026,7 @@ export class MatrixClient extends EventEmitter {
      */
     public getIdentityHashDetails(identityAccessToken: string): Promise<any> { // TODO: Types
         return this.http.idServerRequest(
-            undefined, "GET", "/hash_details",
+            undefined, Method.Get, "/hash_details",
             null, PREFIX_IDENTITY_V2, identityAccessToken,
         );
     }
@@ -8074,7 +8095,7 @@ export class MatrixClient extends EventEmitter {
         }
 
         const response = await this.http.idServerRequest(
-            undefined, "POST", "/lookup",
+            undefined, Method.Post, "/lookup",
             params, PREFIX_IDENTITY_V2, identityAccessToken,
         );
 
@@ -8192,7 +8213,7 @@ export class MatrixClient extends EventEmitter {
      */
     public getIdentityAccount(identityAccessToken: string): Promise<any> { // TODO: Types
         return this.http.idServerRequest(
-            undefined, "GET", "/account",
+            undefined, Method.Get, "/account",
             undefined, PREFIX_IDENTITY_V2, identityAccessToken,
         );
     }
@@ -8227,7 +8248,7 @@ export class MatrixClient extends EventEmitter {
         }, {});
         logger.log(`PUT ${path}`, targets);
 
-        return this.http.authedRequest(undefined, "PUT", path, undefined, body);
+        return this.http.authedRequest(undefined, Method.Put, path, undefined, body);
     }
 
     /**
@@ -8236,8 +8257,8 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves to the result object
      */
     public getThirdpartyProtocols(): Promise<{ [protocol: string]: IProtocol }> {
-        return this.http.authedRequest(
-            undefined, "GET", "/thirdparty/protocols", undefined, undefined,
+        return this.http.authedRequest<Record<string, IProtocol>>(
+            undefined, Method.Get, "/thirdparty/protocols", undefined, undefined,
         ).then((response) => {
             // sanity check
             if (!response || typeof (response) !== 'object') {
@@ -8263,7 +8284,7 @@ export class MatrixClient extends EventEmitter {
             $protocol: protocol,
         });
 
-        return this.http.authedRequest(undefined, "GET", path, params, undefined);
+        return this.http.authedRequest(undefined, Method.Get, path, params, undefined);
     }
 
     /**
@@ -8279,12 +8300,12 @@ export class MatrixClient extends EventEmitter {
             $protocol: protocol,
         });
 
-        return this.http.authedRequest(undefined, "GET", path, params, undefined);
+        return this.http.authedRequest(undefined, Method.Get, path, params, undefined);
     }
 
     public getTerms(serviceType: SERVICE_TYPES, baseUrl: string): Promise<any> { // TODO: Types
         const url = this.termsUrlForService(serviceType, baseUrl);
-        return this.http.requestOtherUrl(undefined, 'GET', url);
+        return this.http.requestOtherUrl(undefined, Method.Get, url);
     }
 
     public agreeToTerms(
@@ -8297,7 +8318,7 @@ export class MatrixClient extends EventEmitter {
         const headers = {
             Authorization: "Bearer " + accessToken,
         };
-        return this.http.requestOtherUrl(undefined, 'POST', url, null, { user_accepts: termsUrls }, { headers });
+        return this.http.requestOtherUrl(undefined, Method.Post, url, null, { user_accepts: termsUrls }, { headers });
     }
 
     /**
@@ -8314,7 +8335,7 @@ export class MatrixClient extends EventEmitter {
             $eventId: eventId,
         });
 
-        return this.http.authedRequest(undefined, "POST", path, null, { score, reason });
+        return this.http.authedRequest(undefined, Method.Post, path, null, { score, reason });
     }
 
     /**
@@ -8340,7 +8361,7 @@ export class MatrixClient extends EventEmitter {
             $roomId: roomId,
         });
 
-        return this.http.authedRequest(undefined, "POST", path, null, {
+        return this.http.authedRequest(undefined, Method.Post, path, null, {
             max_rooms_per_space: maxRoomsPerSpace,
             suggested_only: suggestedOnly,
             auto_join_only: autoJoinOnly,
@@ -8367,21 +8388,32 @@ export class MatrixClient extends EventEmitter {
         maxDepth?: number,
         suggestedOnly = false,
         fromToken?: string,
-    ): Promise<{
-        rooms: IHierarchyRoom[];
-        next_batch?: string; // eslint-disable-line camelcase
-    }> {
+    ): Promise<IRoomHierarchy> {
         const path = utils.encodeUri("/rooms/$roomId/hierarchy", {
             $roomId: roomId,
         });
 
-        return this.http.authedRequest(undefined, "GET", path, {
-            suggested_only: suggestedOnly,
-            max_depth: maxDepth,
+        return this.http.authedRequest<IRoomHierarchy>(undefined, Method.Get, path, {
+            suggested_only: String(suggestedOnly),
+            max_depth: maxDepth?.toString(),
             from: fromToken,
-            limit,
+            limit: limit?.toString(),
         }, undefined, {
-            prefix: "/_matrix/client/unstable/org.matrix.msc2946",
+            prefix: PREFIX_V1,
+        }).catch(e => {
+            if (e.errcode === "M_UNRECOGNIZED") {
+                // fall back to the development prefix
+                return this.http.authedRequest<IRoomHierarchy>(undefined, Method.Get, path, {
+                    suggested_only: String(suggestedOnly),
+                    max_depth: String(maxDepth),
+                    from: fromToken,
+                    limit: String(limit),
+                }, undefined, {
+                    prefix: "/_matrix/client/unstable/org.matrix.msc2946",
+                });
+            }
+
+            throw e;
         }).catch(e => {
             if (e.errcode === "M_UNRECOGNIZED") {
                 // fall back to the older space summary API as it exposes the same data just in a different shape.
@@ -8486,7 +8518,7 @@ export class MatrixClient extends EventEmitter {
      */
     public getGroupSummary(groupId: string): Promise<any> {
         const path = utils.encodeUri("/groups/$groupId/summary", { $groupId: groupId });
-        return this.http.authedRequest(undefined, "GET", path);
+        return this.http.authedRequest(undefined, Method.Get, path);
     }
 
     /**
@@ -8497,7 +8529,7 @@ export class MatrixClient extends EventEmitter {
      */
     public getGroupProfile(groupId: string): Promise<any> {
         const path = utils.encodeUri("/groups/$groupId/profile", { $groupId: groupId });
-        return this.http.authedRequest(undefined, "GET", path);
+        return this.http.authedRequest(undefined, Method.Get, path);
     }
 
     /**
@@ -8514,7 +8546,7 @@ export class MatrixClient extends EventEmitter {
     public setGroupProfile(groupId: string, profile: any): Promise<any> {
         const path = utils.encodeUri("/groups/$groupId/profile", { $groupId: groupId });
         return this.http.authedRequest(
-            undefined, "POST", path, undefined, profile,
+            undefined, Method.Post, path, undefined, profile,
         );
     }
 
@@ -8534,7 +8566,7 @@ export class MatrixClient extends EventEmitter {
             { $groupId: groupId },
         );
         return this.http.authedRequest(
-            undefined, "PUT", path, undefined, {
+            undefined, Method.Put, path, undefined, {
                 'm.join_policy': policy,
             },
         );
@@ -8548,7 +8580,7 @@ export class MatrixClient extends EventEmitter {
      */
     public getGroupUsers(groupId: string): Promise<any> {
         const path = utils.encodeUri("/groups/$groupId/users", { $groupId: groupId });
-        return this.http.authedRequest(undefined, "GET", path);
+        return this.http.authedRequest(undefined, Method.Get, path);
     }
 
     /**
@@ -8559,7 +8591,7 @@ export class MatrixClient extends EventEmitter {
      */
     public getGroupInvitedUsers(groupId: string): Promise<any> {
         const path = utils.encodeUri("/groups/$groupId/invited_users", { $groupId: groupId });
-        return this.http.authedRequest(undefined, "GET", path);
+        return this.http.authedRequest(undefined, Method.Get, path);
     }
 
     /**
@@ -8570,7 +8602,7 @@ export class MatrixClient extends EventEmitter {
      */
     public getGroupRooms(groupId: string): Promise<any> {
         const path = utils.encodeUri("/groups/$groupId/rooms", { $groupId: groupId });
-        return this.http.authedRequest(undefined, "GET", path);
+        return this.http.authedRequest(undefined, Method.Get, path);
     }
 
     /**
@@ -8585,7 +8617,7 @@ export class MatrixClient extends EventEmitter {
             "/groups/$groupId/admin/users/invite/$userId",
             { $groupId: groupId, $userId: userId },
         );
-        return this.http.authedRequest(undefined, "PUT", path, undefined, {});
+        return this.http.authedRequest(undefined, Method.Put, path, undefined, {});
     }
 
     /**
@@ -8600,7 +8632,7 @@ export class MatrixClient extends EventEmitter {
             "/groups/$groupId/admin/users/remove/$userId",
             { $groupId: groupId, $userId: userId },
         );
-        return this.http.authedRequest(undefined, "PUT", path, undefined, {});
+        return this.http.authedRequest(undefined, Method.Put, path, undefined, {});
     }
 
     /**
@@ -8618,7 +8650,7 @@ export class MatrixClient extends EventEmitter {
                 "/groups/$groupId/summary/users/$userId",
             { $groupId: groupId, $roleId: roleId, $userId: userId },
         );
-        return this.http.authedRequest(undefined, "PUT", path, undefined, {});
+        return this.http.authedRequest(undefined, Method.Put, path, undefined, {});
     }
 
     /**
@@ -8633,7 +8665,7 @@ export class MatrixClient extends EventEmitter {
             "/groups/$groupId/summary/users/$userId",
             { $groupId: groupId, $userId: userId },
         );
-        return this.http.authedRequest(undefined, "DELETE", path, undefined, {});
+        return this.http.authedRequest(undefined, Method.Delete, path, undefined, {});
     }
 
     /**
@@ -8651,7 +8683,7 @@ export class MatrixClient extends EventEmitter {
                 "/groups/$groupId/summary/rooms/$roomId",
             { $groupId: groupId, $categoryId: categoryId, $roomId: roomId },
         );
-        return this.http.authedRequest(undefined, "PUT", path, undefined, {});
+        return this.http.authedRequest(undefined, Method.Put, path, undefined, {});
     }
 
     /**
@@ -8666,7 +8698,7 @@ export class MatrixClient extends EventEmitter {
             "/groups/$groupId/summary/rooms/$roomId",
             { $groupId: groupId, $roomId: roomId },
         );
-        return this.http.authedRequest(undefined, "DELETE", path, undefined, {});
+        return this.http.authedRequest(undefined, Method.Delete, path, undefined, {});
     }
 
     /**
@@ -8685,7 +8717,7 @@ export class MatrixClient extends EventEmitter {
             "/groups/$groupId/admin/rooms/$roomId",
             { $groupId: groupId, $roomId: roomId },
         );
-        return this.http.authedRequest(undefined, "PUT", path, undefined,
+        return this.http.authedRequest(undefined, Method.Put, path, undefined,
             { "m.visibility": { type: isPublic ? "public" : "private" } },
         );
     }
@@ -8708,7 +8740,7 @@ export class MatrixClient extends EventEmitter {
             "/groups/$groupId/admin/rooms/$roomId/config/m.visibility",
             { $groupId: groupId, $roomId: roomId },
         );
-        return this.http.authedRequest(undefined, "PUT", path, undefined,
+        return this.http.authedRequest(undefined, Method.Put, path, undefined,
             { type: isPublic ? "public" : "private" },
         );
     }
@@ -8725,7 +8757,7 @@ export class MatrixClient extends EventEmitter {
             "/groups/$groupId/admin/rooms/$roomId",
             { $groupId: groupId, $roomId: roomId },
         );
-        return this.http.authedRequest(undefined, "DELETE", path, undefined, {});
+        return this.http.authedRequest(undefined, Method.Delete, path, undefined, {});
     }
 
     /**
@@ -8740,7 +8772,7 @@ export class MatrixClient extends EventEmitter {
             "/groups/$groupId/self/accept_invite",
             { $groupId: groupId },
         );
-        return this.http.authedRequest(undefined, "PUT", path, undefined, opts || {});
+        return this.http.authedRequest(undefined, Method.Put, path, undefined, opts || {});
     }
 
     /**
@@ -8754,7 +8786,7 @@ export class MatrixClient extends EventEmitter {
             "/groups/$groupId/self/join",
             { $groupId: groupId },
         );
-        return this.http.authedRequest(undefined, "PUT", path, undefined, {});
+        return this.http.authedRequest(undefined, Method.Put, path, undefined, {});
     }
 
     /**
@@ -8768,7 +8800,7 @@ export class MatrixClient extends EventEmitter {
             "/groups/$groupId/self/leave",
             { $groupId: groupId },
         );
-        return this.http.authedRequest(undefined, "PUT", path, undefined, {});
+        return this.http.authedRequest(undefined, Method.Put, path, undefined, {});
     }
 
     /**
@@ -8778,7 +8810,7 @@ export class MatrixClient extends EventEmitter {
      */
     public getJoinedGroups(): Promise<any> {
         const path = utils.encodeUri("/joined_groups", {});
-        return this.http.authedRequest(undefined, "GET", path);
+        return this.http.authedRequest(undefined, Method.Get, path);
     }
 
     /**
@@ -8792,7 +8824,7 @@ export class MatrixClient extends EventEmitter {
     public createGroup(content: any): Promise<any> {
         const path = utils.encodeUri("/create_group", {});
         return this.http.authedRequest(
-            undefined, "POST", path, undefined, content,
+            undefined, Method.Post, path, undefined, content,
         );
     }
 
@@ -8813,7 +8845,7 @@ export class MatrixClient extends EventEmitter {
     public getPublicisedGroups(userIds: string[]): Promise<any> {
         const path = utils.encodeUri("/publicised_groups", {});
         return this.http.authedRequest(
-            undefined, "POST", path, undefined, { user_ids: userIds },
+            undefined, Method.Post, path, undefined, { user_ids: userIds },
         );
     }
 
@@ -8829,7 +8861,7 @@ export class MatrixClient extends EventEmitter {
             "/groups/$groupId/self/update_publicity",
             { $groupId: groupId },
         );
-        return this.http.authedRequest(undefined, "PUT", path, undefined, {
+        return this.http.authedRequest(undefined, Method.Put, path, undefined, {
             publicise: isPublic,
         });
     }
@@ -8849,7 +8881,7 @@ export class MatrixClient extends EventEmitter {
      */
     public async getRoomSummary(roomIdOrAlias: string, via?: string[]): Promise<IRoomSummary> {
         const path = utils.encodeUri("/rooms/$roomid/summary", { $roomid: roomIdOrAlias });
-        return this.http.authedRequest(undefined, "GET", path, { via }, null, {
+        return this.http.authedRequest(undefined, Method.Get, path, { via }, null, {
             qsStringifyOptions: { arrayFormat: 'repeat' },
             prefix: "/_matrix/client/unstable/im.nheko.summary",
         });
@@ -8939,7 +8971,37 @@ export class MatrixClient extends EventEmitter {
      * Fetches the user_id of the configured access token.
      */
     public async whoami(): Promise<{ user_id: string }> { // eslint-disable-line camelcase
-        return this.http.authedRequest(undefined, "GET", "/account/whoami");
+        return this.http.authedRequest(undefined, Method.Get, "/account/whoami");
+    }
+
+    /**
+     * Find the event_id closest to the given timestamp in the given direction.
+     * @return {Promise} A promise of an object containing the event_id and
+     *    origin_server_ts of the closest event to the timestamp in the given
+     *    direction
+     */
+    public async timestampToEvent(
+        roomId: string,
+        timestamp: number,
+        dir: Direction,
+    ): Promise<ITimestampToEventResponse> {
+        const path = utils.encodeUri("/rooms/$roomId/timestamp_to_event", {
+            $roomId: roomId,
+        });
+
+        return await this.http.authedRequest(
+            undefined,
+            Method.Get,
+            path,
+            {
+                ts: timestamp.toString(),
+                dir: dir,
+            },
+            undefined,
+            {
+                prefix: "/_matrix/client/unstable/org.matrix.msc3030",
+            },
+        );
     }
 }
 

@@ -21,7 +21,6 @@ limitations under the License.
 import { logger } from './logger';
 import { MatrixClient } from "./client";
 import { defer, IDeferred } from "./utils";
-import { MatrixError } from "./http-api";
 
 const EMAIL_STAGE_TYPE = "m.login.email.identity";
 const MSISDN_STAGE_TYPE = "m.login.msisdn";
@@ -49,7 +48,7 @@ export interface IAuthData {
     flows?: IFlow[];
     params?: Record<string, Record<string, any>>;
     errcode?: string;
-    error?: MatrixError;
+    error?: string;
 }
 
 export enum AuthType {

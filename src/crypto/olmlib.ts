@@ -28,7 +28,8 @@ import { OlmDevice } from "./OlmDevice";
 import { DeviceInfo } from "./deviceinfo";
 import { logger } from '../logger';
 import { IOneTimeKey } from "./dehydration";
-import { MatrixClient } from "../client";
+import { IClaimOTKsResult, MatrixClient } from "../client";
+import { ISignatures } from "../@types/signed";
 
 enum Algorithm {
     Olm = "m.olm.v1.curve25519-aes-sha2",
@@ -132,6 +133,11 @@ export async function encryptMessageForDevice(
     );
 }
 
+interface IExistingOlmSession {
+    device: DeviceInfo;
+    sessionId?: string;
+}
+
 /**
  * Get the existing olm sessions for the given devices, and the devices that
  * don't have olm sessions.
@@ -152,11 +158,11 @@ export async function getExistingOlmSessions(
     olmDevice: OlmDevice,
     baseApis: MatrixClient,
     devicesByUser: Record<string, DeviceInfo[]>,
-) {
-    const devicesWithoutSession = {};
-    const sessions = {};
+): Promise<[Record<string, DeviceInfo[]>, Record<string, Record<string, IExistingOlmSession>>]> {
+    const devicesWithoutSession: {[userId: string]: DeviceInfo[]} = {};
+    const sessions: {[userId: string]: {[deviceId: string]: IExistingOlmSession}} = {};
 
-    const promises = [];
+    const promises: Promise<void>[] = [];
 
     for (const [userId, devices] of Object.entries(devicesByUser)) {
         for (const deviceInfo of devices) {
@@ -230,10 +236,10 @@ export async function ensureOlmSessionsForDevices(
         force = false;
     }
 
-    const devicesWithoutSession = [
+    const devicesWithoutSession: [string, string][] = [
         // [userId, deviceId], ...
     ];
-    const result = {};
+    const result: {[userId: string]: {[deviceId: string]: IExistingOlmSession}} = {};
     const resolveSession: Record<string, (sessionId?: string) => void> = {};
 
     // Mark all sessions this task intends to update as in progress. It is
@@ -321,9 +327,7 @@ export async function ensureOlmSessionsForDevices(
     let taskDetail = `one-time keys for ${devicesWithoutSession.length} devices`;
     try {
         log.debug(`Claiming ${taskDetail}`);
-        res = await baseApis.claimOneTimeKeys(
-            devicesWithoutSession, oneTimeKeyAlgorithm, otkTimeout,
-        );
+        res = await baseApis.claimOneTimeKeys(devicesWithoutSession, oneTimeKeyAlgorithm, otkTimeout);
         log.debug(`Claimed ${taskDetail}`);
     } catch (e) {
         for (const resolver of Object.values(resolveSession)) {
@@ -337,8 +341,8 @@ export async function ensureOlmSessionsForDevices(
         failedServers.push(...Object.keys(res.failures));
     }
 
-    const otkResult = res.one_time_keys || {};
-    const promises = [];
+    const otkResult = res.one_time_keys || {} as IClaimOTKsResult["one_time_keys"];
+    const promises: Promise<void>[] = [];
     for (const [userId, devices] of Object.entries(devicesByUser)) {
         const userRes = otkResult[userId] || {};
         for (let j = 0; j < devices.length; j++) {
@@ -359,7 +363,7 @@ export async function ensureOlmSessionsForDevices(
             }
 
             const deviceRes = userRes[deviceId] || {};
-            let oneTimeKey = null;
+            let oneTimeKey: IOneTimeKey = null;
             for (const keyId in deviceRes) {
                 if (keyId.indexOf(oneTimeKeyAlgorithm + ":") === 0) {
                     oneTimeKey = deviceRes[keyId];
@@ -441,7 +445,7 @@ async function _verifyKeyAndStartSession(
 
 export interface IObject {
     unsigned?: object;
-    signatures?: object;
+    signatures?: ISignatures;
 }
 
 /**

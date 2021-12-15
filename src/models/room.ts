@@ -36,6 +36,7 @@ import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@type
 import { Filter } from "../filter";
 import { RoomState } from "./room-state";
 import { Thread } from "./thread";
+import { Method } from "../http-api";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -135,15 +136,49 @@ export class Room extends EventEmitter {
     private membersPromise?: Promise<boolean>;
 
     // XXX: These should be read-only
+    /**
+     * The human-readable display name for this room.
+     */
     public name: string;
+    /**
+     * The un-homoglyphed name for this room.
+     */
     public normalizedName: string;
+    /**
+     * Dict of room tags; the keys are the tag name and the values
+     * are any metadata associated with the tag - e.g. { "fav" : { order: 1 } }
+     */
     public tags: Record<string, Record<string, any>> = {}; // $tagName: { $metadata: $value }
+    /**
+     * accountData Dict of per-room account_data events; the keys are the
+     * event type and the values are the events.
+     */
     public accountData: Record<string, MatrixEvent> = {}; // $eventType: $event
+    /**
+     * The room summary.
+     */
     public summary: RoomSummary = null;
+    /**
+     * A token which a data store can use to remember the state of the room.
+     */
     public readonly storageToken?: string;
     // legacy fields
+    /**
+     * The live event timeline for this room, with the oldest event at index 0.
+     * Present for backwards compatibility - prefer getLiveTimeline().getEvents()
+     */
     public timeline: MatrixEvent[];
+    /**
+     * oldState The state of the room at the time of the oldest
+     * event in the live timeline. Present for backwards compatibility -
+     * prefer getLiveTimeline().getState(EventTimeline.BACKWARDS).
+     */
     public oldState: RoomState;
+    /**
+     * currentState The state of the room at the time of the
+     * newest event in the timeline. Present for backwards compatibility -
+     * prefer getLiveTimeline().getState(EventTimeline.FORWARDS).
+     */
     public currentState: RoomState;
 
     /**
@@ -191,26 +226,6 @@ export class Room extends EventEmitter {
      * Optional. Set to true to enable client-side aggregation of event relations
      * via `EventTimelineSet#getRelationsForEvent`.
      * This feature is currently unstable and the API may change without notice.
-     *
-     * @prop {string} roomId The ID of this room.
-     * @prop {string} name The human-readable display name for this room.
-     * @prop {string} normalizedName The un-homoglyphed name for this room.
-     * @prop {Array<MatrixEvent>} timeline The live event timeline for this room,
-     * with the oldest event at index 0. Present for backwards compatibility -
-     * prefer getLiveTimeline().getEvents().
-     * @prop {object} tags Dict of room tags; the keys are the tag name and the values
-     * are any metadata associated with the tag - e.g. { "fav" : { order: 1 } }
-     * @prop {object} accountData Dict of per-room account_data events; the keys are the
-     * event type and the values are the events.
-     * @prop {RoomState} oldState The state of the room at the time of the oldest
-     * event in the live timeline. Present for backwards compatibility -
-     * prefer getLiveTimeline().getState(EventTimeline.BACKWARDS).
-     * @prop {RoomState} currentState The state of the room at the time of the
-     * newest event in the timeline. Present for backwards compatibility -
-     * prefer getLiveTimeline().getState(EventTimeline.FORWARDS).
-     * @prop {RoomSummary} summary The room summary.
-     * @prop {*} storageToken A token which a data store can use to remember
-     * the state of the room.
      */
     constructor(
         public readonly roomId: string,
@@ -660,7 +675,7 @@ export class Room extends EventEmitter {
         const path = utils.encodeUri("/rooms/$roomId/members?" + queryString,
             { $roomId: this.roomId });
         const http = this.client.http;
-        const response = await http.authedRequest(undefined, "GET", path);
+        const response = await http.authedRequest<{ chunk: IEvent[] }>(undefined, Method.Get, path);
         return response.chunk;
     }
 
