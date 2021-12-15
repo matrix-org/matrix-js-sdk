@@ -19,7 +19,6 @@ limitations under the License.
 import { UnstableValue } from "../NamespacedValue";
 import { IContent } from "../models/event";
 import { TEXT_NODE_TYPE } from "./extensible_events";
-import { MsgType } from "./event";
 
 export const LOCATION_EVENT_TYPE = new UnstableValue(
     "m.location", "org.matrix.msc3488.location");
@@ -57,23 +56,3 @@ export interface ILocationContent extends IContent {
     [TIMESTAMP_NODE_TYPE.name]: number;
 }
 /* eslint-enable camelcase */
-
-export function makeLocationContent(
-    text: string,
-    uri: string,
-    ts: number,
-    description?: string,
-): ILocationContent {
-    return {
-        "body": text,
-        "msgtype": MsgType.Location,
-        "geo_uri": uri,
-        [LOCATION_EVENT_TYPE.name]: {
-            uri,
-            description,
-        },
-        [TIMESTAMP_NODE_TYPE.name]: ts,
-        [TEXT_NODE_TYPE.name]: text,
-        // TODO: MSC1767 fallbacks m.image thumbnail
-    };
-}
