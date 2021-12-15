@@ -66,3 +66,25 @@ export interface IPollEndContent extends IContent {
         "rel_type": string;
     };
 }
+
+export function makePollContent(
+    question: string,
+    answers: string[],
+    kind: string,
+): IPollContent {
+    question = question.trim();
+    answers = answers.map(a => a.trim()).filter(a => !!a);
+    return {
+        [TEXT_NODE_TYPE.name]:
+            `${question}\n${answers.map((a, i) => `${i + 1}. ${a}`).join('\n')}`,
+        [POLL_START_EVENT_TYPE.name]: {
+            kind: kind,
+            question: {
+                [TEXT_NODE_TYPE.name]: question,
+            },
+            answers: answers.map(
+                (a, i) => ({ id: `${i}-${a}`, [TEXT_NODE_TYPE.name]: a }),
+            ),
+        },
+    };
+}
