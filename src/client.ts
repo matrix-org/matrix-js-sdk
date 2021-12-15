@@ -689,6 +689,11 @@ interface IRoomKeysResponse {
 interface IRoomsKeysResponse {
     rooms: Record<string, IRoomKeysResponse>;
 }
+
+interface ITimestampToEventResponse {
+    event_id: string;
+    origin_server_ts: string;
+}
 /* eslint-enable camelcase */
 
 // We're using this constant for methods overloading and inspect whether a variable
@@ -8908,6 +8913,38 @@ export class MatrixClient extends EventEmitter {
      */
     public async whoami(): Promise<{ user_id: string }> { // eslint-disable-line camelcase
         return this.http.authedRequest(undefined, "GET", "/account/whoami");
+    }
+
+    /**
+     * Find the event_id closest to the given timestamp in the given direction.
+     * @return {Promise} A promise of an object containing the event_id and
+        * origin_server_ts of the closest event to the timestamp in the given
+        * direction
+     */
+     public async timestampToEvent(
+        roomId: string,
+        timestamp: number,
+        dir: Direction,
+     ): Promise<ITimestampToEventResponse> {
+        const path = utils.encodeUri("/rooms/$roomId/timestamp_to_event", {
+            $roomId: roomId,
+        });
+
+        const params: Record<string, string | number> = {
+            ts: timestamp,
+            dir: dir,
+        };
+        
+        return await this.http.authedRequest(
+            undefined,
+            "GET",
+            path,
+            params,
+            undefined,
+            {
+                prefix: "/_matrix/client/unstable/org.matrix.msc3030",
+            },
+        );
     }
 }
 
