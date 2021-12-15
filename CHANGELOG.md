@@ -1,3 +1,8 @@
+Changes in [15.2.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.2.1) (2021-12-13)
+==================================================================================================
+
+ * Security release with updated version of Olm to fix https://matrix.org/blog/2021/12/03/pre-disclosure-upcoming-security-release-of-libolm-and-matrix-js-sdk
+
 Changes in [15.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.2.0) (2021-12-06)
 ==================================================================================================
 

@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import EventEmitter from "events";
+
 import { SDPStreamMetadataPurpose } from "./callEventTypes";
 import { MatrixClient } from "../client";
 import { RoomMember } from "../models/room-member";

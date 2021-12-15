@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import promiseRetry from "p-retry";
+
 import { MatrixClient } from "../client";
 import { EventType, IEncryptedFile, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_MSC3089_LEAF } from "../@types/event";
 import { Room } from "./room";
@@ -28,10 +30,9 @@ import {
     simpleRetryOperation,
 } from "../utils";
 import { MSC3089Branch } from "./MSC3089Branch";
-import promiseRetry from "p-retry";
 import { isRoomSharedHistory } from "../crypto/algorithms/megolm";
 import { ISendEventResponse } from "../@types/requests";
-import type { ReadStream } from "fs";
+import { FileType } from "../http-api";
 
 /**
  * The recommended defaults for a tree space's power levels. Note that this
@@ -281,7 +282,7 @@ export class MSC3089TreeSpace {
         const members = this.room.currentState.getStateEvents(EventType.RoomMember);
         for (const member of members) {
             const isNotUs = member.getStateKey() !== this.client.getUserId();
-            if (isNotUs && kickMemberships.includes(member.getContent<string>()['membership'])) {
+            if (isNotUs && kickMemberships.includes(member.getContent().membership)) {
                 const stateKey = member.getStateKey();
                 if (!stateKey) {
                     throw new Error("State key not found for branch");
@@ -471,7 +472,7 @@ export class MSC3089TreeSpace {
      */
     public async createFile(
         name: string,
-        encryptedContents: File | String | Buffer | ReadStream | Blob,
+        encryptedContents: FileType,
         info: Partial<IEncryptedFile>,
         additionalContent?: IContent,
     ): Promise<ISendEventResponse> {

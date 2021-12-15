@@ -20,7 +20,7 @@ limitations under the License.
 
 import { EventEmitter } from "events";
 
-import { EventTimelineSet, DuplicateStrategy } from "./event-timeline-set";
+import { DuplicateStrategy, EventTimelineSet } from "./event-timeline-set";
 import { EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
@@ -36,6 +36,7 @@ import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@type
 import { Filter } from "../filter";
 import { RoomState } from "./room-state";
 import { Thread, ThreadEvent } from "./thread";
+import { Method } from "../http-api";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -48,19 +49,19 @@ const SAFE_ROOM_VERSIONS = ['1', '2', '3', '4', '5', '6'];
 
 function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: string): MatrixEvent {
     // console.log("synthesizing receipt for "+event.getId());
-    // This is really ugly because JS has no way to express an object literal
-    // where the name of a key comes from an expression
-    const fakeReceipt = {
-        content: {},
+    return new MatrixEvent({
+        content: {
+            [event.getId()]: {
+                [receiptType]: {
+                    [userId]: {
+                        ts: event.getTs(),
+                    },
+                },
+            },
+        },
         type: "m.receipt",
         room_id: event.getRoomId(),
-    };
-    fakeReceipt.content[event.getId()] = {};
-    fakeReceipt.content[event.getId()][receiptType] = {};
-    fakeReceipt.content[event.getId()][receiptType][userId] = {
-        ts: event.getTs(),
-    };
-    return new MatrixEvent(fakeReceipt);
+    });
 }
 
 interface IOpts {
@@ -135,15 +136,49 @@ export class Room extends EventEmitter {
     private membersPromise?: Promise<boolean>;
 
     // XXX: These should be read-only
+    /**
+     * The human-readable display name for this room.
+     */
     public name: string;
+    /**
+     * The un-homoglyphed name for this room.
+     */
     public normalizedName: string;
+    /**
+     * Dict of room tags; the keys are the tag name and the values
+     * are any metadata associated with the tag - e.g. { "fav" : { order: 1 } }
+     */
     public tags: Record<string, Record<string, any>> = {}; // $tagName: { $metadata: $value }
+    /**
+     * accountData Dict of per-room account_data events; the keys are the
+     * event type and the values are the events.
+     */
     public accountData: Record<string, MatrixEvent> = {}; // $eventType: $event
+    /**
+     * The room summary.
+     */
     public summary: RoomSummary = null;
+    /**
+     * A token which a data store can use to remember the state of the room.
+     */
     public readonly storageToken?: string;
     // legacy fields
+    /**
+     * The live event timeline for this room, with the oldest event at index 0.
+     * Present for backwards compatibility - prefer getLiveTimeline().getEvents()
+     */
     public timeline: MatrixEvent[];
+    /**
+     * oldState The state of the room at the time of the oldest
+     * event in the live timeline. Present for backwards compatibility -
+     * prefer getLiveTimeline().getState(EventTimeline.BACKWARDS).
+     */
     public oldState: RoomState;
+    /**
+     * currentState The state of the room at the time of the
+     * newest event in the timeline. Present for backwards compatibility -
+     * prefer getLiveTimeline().getState(EventTimeline.FORWARDS).
+     */
     public currentState: RoomState;
 
     /**
@@ -191,26 +226,6 @@ export class Room extends EventEmitter {
      * Optional. Set to true to enable client-side aggregation of event relations
      * via `EventTimelineSet#getRelationsForEvent`.
      * This feature is currently unstable and the API may change without notice.
-     *
-     * @prop {string} roomId The ID of this room.
-     * @prop {string} name The human-readable display name for this room.
-     * @prop {string} normalizedName The un-homoglyphed name for this room.
-     * @prop {Array<MatrixEvent>} timeline The live event timeline for this room,
-     * with the oldest event at index 0. Present for backwards compatibility -
-     * prefer getLiveTimeline().getEvents().
-     * @prop {object} tags Dict of room tags; the keys are the tag name and the values
-     * are any metadata associated with the tag - e.g. { "fav" : { order: 1 } }
-     * @prop {object} accountData Dict of per-room account_data events; the keys are the
-     * event type and the values are the events.
-     * @prop {RoomState} oldState The state of the room at the time of the oldest
-     * event in the live timeline. Present for backwards compatibility -
-     * prefer getLiveTimeline().getState(EventTimeline.BACKWARDS).
-     * @prop {RoomState} currentState The state of the room at the time of the
-     * newest event in the timeline. Present for backwards compatibility -
-     * prefer getLiveTimeline().getState(EventTimeline.FORWARDS).
-     * @prop {RoomSummary} summary The room summary.
-     * @prop {*} storageToken A token which a data store can use to remember
-     * the state of the room.
      */
     constructor(
         public readonly roomId: string,
@@ -240,7 +255,7 @@ export class Room extends EventEmitter {
             const serializedPendingEventList = client.sessionStore.store.getItem(pendingEventsKey(this.roomId));
             if (serializedPendingEventList) {
                 JSON.parse(serializedPendingEventList)
-                    .forEach(async serializedEvent => {
+                    .forEach(async (serializedEvent: Partial<IEvent>) => {
                         const event = new MatrixEvent(serializedEvent);
                         if (event.getType() === EventType.RoomMessageEncrypted) {
                             await event.attemptDecryption(this.client.crypto);
@@ -660,7 +675,7 @@ export class Room extends EventEmitter {
         const path = utils.encodeUri("/rooms/$roomId/members?" + queryString,
             { $roomId: this.roomId });
         const http = this.client.http;
-        const response = await http.authedRequest(undefined, "GET", path);
+        const response = await http.authedRequest<{ chunk: IEvent[] }>(undefined, Method.Get, path);
         return response.chunk;
     }
 
@@ -997,14 +1012,14 @@ export class Room extends EventEmitter {
      * @return {array} The room's alias as an array of strings
      */
     public getAliases(): string[] {
-        const aliasStrings = [];
+        const aliasStrings: string[] = [];
 
         const aliasEvents = this.currentState.getStateEvents(EventType.RoomAliases);
         if (aliasEvents) {
             for (let i = 0; i < aliasEvents.length; ++i) {
                 const aliasEvent = aliasEvents[i];
                 if (Array.isArray(aliasEvent.getContent().aliases)) {
-                    const filteredAliases = aliasEvent.getContent().aliases.filter(a => {
+                    const filteredAliases = aliasEvent.getContent<{ aliases: string[] }>().aliases.filter(a => {
                         if (typeof(a) !== "string") return false;
                         if (a[0] !== '#') return false;
                         if (!a.endsWith(`:${aliasEvent.getStateKey()}`)) return false;
@@ -1992,7 +2007,7 @@ export class Room extends EventEmitter {
      * @return {Object} Map of receipts by event ID
      */
     private buildReceiptCache(receipts: Receipts): ReceiptCache {
-        const receiptCacheByEventId = {};
+        const receiptCacheByEventId: ReceiptCache = {};
         Object.keys(receipts).forEach(function(receiptType) {
             Object.keys(receipts[receiptType]).forEach(function(userId) {
                 const receipt = receipts[receiptType][userId];
@@ -2185,7 +2200,7 @@ export class Room extends EventEmitter {
         }
 
         // get members that are NOT ourselves and are actually in the room.
-        let otherNames = null;
+        let otherNames: string[] = null;
         if (this.summaryHeroes) {
             // if we have a summary, the member state events
             // should be in the room state
@@ -2266,31 +2281,29 @@ function pendingEventsKey(roomId: string): string {
 
 /* a map from current event status to a list of allowed next statuses
      */
-const ALLOWED_TRANSITIONS = {};
-
-ALLOWED_TRANSITIONS[EventStatus.ENCRYPTING] = [
-    EventStatus.SENDING,
-    EventStatus.NOT_SENT,
-];
-
-ALLOWED_TRANSITIONS[EventStatus.SENDING] = [
-    EventStatus.ENCRYPTING,
-    EventStatus.QUEUED,
-    EventStatus.NOT_SENT,
-    EventStatus.SENT,
-];
-
-ALLOWED_TRANSITIONS[EventStatus.QUEUED] =
-    [EventStatus.SENDING, EventStatus.CANCELLED];
-
-ALLOWED_TRANSITIONS[EventStatus.SENT] =
-    [];
-
-ALLOWED_TRANSITIONS[EventStatus.NOT_SENT] =
-    [EventStatus.SENDING, EventStatus.QUEUED, EventStatus.CANCELLED];
-
-ALLOWED_TRANSITIONS[EventStatus.CANCELLED] =
-    [];
+const ALLOWED_TRANSITIONS: Record<EventStatus, EventStatus[]> = {
+    [EventStatus.ENCRYPTING]: [
+        EventStatus.SENDING,
+        EventStatus.NOT_SENT,
+    ],
+    [EventStatus.SENDING]: [
+        EventStatus.ENCRYPTING,
+        EventStatus.QUEUED,
+        EventStatus.NOT_SENT,
+        EventStatus.SENT,
+    ],
+    [EventStatus.QUEUED]: [
+        EventStatus.SENDING,
+        EventStatus.CANCELLED,
+    ],
+    [EventStatus.SENT]: [],
+    [EventStatus.NOT_SENT]: [
+        EventStatus.SENDING,
+        EventStatus.QUEUED,
+        EventStatus.CANCELLED,
+    ],
+    [EventStatus.CANCELLED]: [],
+};
 
 // TODO i18n
 function memberNamesToRoomName(names: string[], count = (names.length + 1)) {
