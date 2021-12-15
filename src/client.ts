@@ -8921,11 +8921,11 @@ export class MatrixClient extends EventEmitter {
         * origin_server_ts of the closest event to the timestamp in the given
         * direction
      */
-     public async timestampToEvent(
+    public async timestampToEvent(
         roomId: string,
         timestamp: number,
         dir: Direction,
-     ): Promise<ITimestampToEventResponse> {
+    ): Promise<ITimestampToEventResponse> {
         const path = utils.encodeUri("/rooms/$roomId/timestamp_to_event", {
             $roomId: roomId,
         });
@@ -8934,7 +8934,7 @@ export class MatrixClient extends EventEmitter {
             ts: timestamp,
             dir: dir,
         };
-        
+
         return await this.http.authedRequest(
             undefined,
             "GET",
