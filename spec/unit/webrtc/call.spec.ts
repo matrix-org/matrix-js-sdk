@@ -17,6 +17,7 @@ limitations under the License.
 import { TestClient } from '../../TestClient';
 import { MatrixCall, CallErrorCode, CallEvent } from '../../../src/webrtc/call';
 import { SDPStreamMetadataKey, SDPStreamMetadataPurpose } from '../../../src/webrtc/callEventTypes';
+import { RoomMember } from "../../../src";
 
 const DUMMY_SDP = (
     "v=0\r\n" +
@@ -85,7 +86,7 @@ class MockRTCPeerConnection {
 
 class MockMediaStream {
     constructor(
-        public id,
+        public id: string,
     ) {}
 
     getTracks() { return []; }
@@ -362,7 +363,7 @@ describe('Call', function() {
         await callPromise;
 
         call.getOpponentMember = () => {
-            return { userId: "@bob:bar.uk" };
+            return { userId: "@bob:bar.uk" } as RoomMember;
         };
 
         await call.onAnswerReceived({

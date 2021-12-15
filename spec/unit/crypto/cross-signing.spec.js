@@ -17,6 +17,7 @@ limitations under the License.
 
 import '../../olm-loader';
 import anotherjson from 'another-json';
+
 import * as olmlib from "../../../src/crypto/olmlib";
 import { TestClient } from '../../TestClient';
 import { HttpResponse, setHttpResponses } from '../../test-utils';

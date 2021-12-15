@@ -112,7 +112,7 @@ export class RoomHierarchy {
                 if (!this.backRefs.has(childRoomId)) {
                     this.backRefs.set(childRoomId, []);
                 }
-                this.backRefs.get(childRoomId).push(ev.room_id);
+                this.backRefs.get(childRoomId).push(room.room_id);
 
                 // fill viaMap
                 if (Array.isArray(ev.content.via)) {

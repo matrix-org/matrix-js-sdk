@@ -20,8 +20,9 @@ limitations under the License.
  * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
  */
 
-import * as utils from "../utils";
 import { EventEmitter } from "events";
+
+import * as utils from "../utils";
 
 /**
  * Construct a new Group.

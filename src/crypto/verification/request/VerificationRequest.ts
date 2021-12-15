@@ -14,8 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from '../../../logger';
 import { EventEmitter } from 'events';
+
+import { logger } from '../../../logger';
 import {
     errorFactory,
     errorFromEvent,
@@ -581,7 +582,9 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
         // get common methods
         if (phase === PHASE_REQUESTED || phase === PHASE_READY) {
             if (!this.wasSentByOwnDevice(event)) {
-                const content = event.getContent();
+                const content = event.getContent<{
+                    methods: string[];
+                }>();
                 this.commonMethods =
                     content.methods.filter(m => this.verificationMethods.has(m));
             }

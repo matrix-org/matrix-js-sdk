@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,22 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import request from "request";
+// Types for MSC1767: Extensible events in Matrix
 
-import * as matrixcs from "./matrix";
-import * as utils from "./utils";
-import { logger } from './logger';
+import { UnstableValue } from "../NamespacedValue";
 
-matrixcs.request(request);
-
-try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const crypto = require('crypto');
-    utils.setCrypto(crypto);
-} catch (err) {
-    logger.log('nodejs was compiled without crypto support');
-}
-
-export * from "./matrix";
-export default matrixcs;
-
+export const TEXT_NODE_TYPE = new UnstableValue("m.text", "org.matrix.msc1767.text");

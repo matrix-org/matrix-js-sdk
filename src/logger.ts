@@ -76,7 +76,7 @@ function extendLogger(logger: PrefixedLogger) {
 
 extendLogger(logger);
 
-function getPrefixedLogger(prefix): PrefixedLogger {
+function getPrefixedLogger(prefix: string): PrefixedLogger {
     const prefixLogger: PrefixedLogger = log.getLogger(`${DEFAULT_NAMESPACE}-${prefix}`);
     if (prefixLogger.prefix !== prefix) {
         // Only do this setup work the first time through, as loggers are saved by name.
