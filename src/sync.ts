@@ -95,7 +95,7 @@ interface ISyncOptions {
 }
 
 export interface ISyncStateData {
-    error?: Error;
+    error?: MatrixError;
     oldSyncToken?: string;
     nextSyncToken?: string;
     catchingUp?: boolean;
@@ -485,7 +485,7 @@ export class SyncApi {
         return this.syncStateData;
     }
 
-    public async recoverFromSyncStartupError(savedSyncPromise: Promise<void>, err: Error): Promise<void> {
+    public async recoverFromSyncStartupError(savedSyncPromise: Promise<void>, err: MatrixError): Promise<void> {
         // Wait for the saved sync to complete - we send the pushrules and filter requests
         // before the saved sync has finished so they can run in parallel, but only process
         // the results after the saved sync is done. Equivalently, we wait for it to finish

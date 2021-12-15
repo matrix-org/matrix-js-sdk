@@ -30,7 +30,7 @@ import type { Request as _Request, CoreOptions } from "request";
 // waiting for the delay to elapse.
 import * as callbacks from "./realtime-callbacks";
 import { IUploadOpts } from "./@types/requests";
-import { IAbortablePromise } from "./@types/partials";
+import { IAbortablePromise, IUsageLimit } from "./@types/partials";
 import { IDeferred } from "./utils";
 import { Callback } from "./client";
 import * as utils from "./utils";
@@ -1015,7 +1015,7 @@ function getResponseContentType(response: XMLHttpRequest | IncomingMessage): Par
     }
 }
 
-interface IErrorJson {
+interface IErrorJson extends Partial<IUsageLimit> {
     [key: string]: any; // extensible
     errcode?: string;
     error?: string;
