@@ -42,6 +42,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
     private _head: MatrixEvent;
     private eventToPreview: MatrixEvent = null;
     private replyCount = 0;
+    private _currentUserParticipated = false;
 
     public _hasServerSideSupport = false;
 
@@ -207,6 +208,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
             });
             EventTimeline.setEventMetadata(this.eventToPreview, this.roomState, false);
             this.replyCount = threadBundle.count;
+            this._currentUserParticipated = threadBundle.current_user_participated === true;
         } else {
             this.addEvent(this._head);
             this.replyCount = 0;
@@ -267,6 +269,10 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
             this.replyCount++;
             this.eventToPreview = event;
             this.emit(ThreadEvent.NewReply, this, event);
+        }
+
+        if (!this._currentUserParticipated) {
+            this._currentUserParticipated = event.getSender() === this.client.getUserId();
         }
 
         this.emit(ThreadEvent.Update, this);
@@ -331,5 +337,9 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
 
     public get ready(): boolean {
         return this._ready;
+    }
+
+    public get currentUserParticipated(): boolean {
+        return this._currentUserParticipated;
     }
 }
