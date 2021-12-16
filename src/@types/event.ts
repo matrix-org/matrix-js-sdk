@@ -115,11 +115,13 @@ export enum MsgType {
     KeyVerificationRequest = "m.key.verification.request",
 }
 
+/* eslint-disable camelcase */
 export interface IThreadBundledRelation {
-    // eslint-disable-next-line camelcase
     latest_event: IEvent;
     count: number;
+    current_user_participated?: boolean;
 }
+/* eslint-enable camelcase */
 
 export const RoomCreateTypeField = "type";
 
