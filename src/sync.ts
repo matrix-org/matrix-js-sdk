@@ -34,23 +34,22 @@ import { PushProcessor } from "./pushprocessor";
 import { logger } from './logger';
 import { InvalidStoreError } from './errors';
 import { IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
-import { SyncState } from "./sync.api";
 import {
     Category,
+    IEphemeral,
     IInvitedRoom,
     IInviteState,
     IJoinedRoom,
     ILeftRoom,
-    IStateEvent,
+    IMinimalEvent,
     IRoomEvent,
+    IStateEvent,
     IStrippedState,
     ISyncResponse,
     ITimeline,
-    IEphemeral,
-    IMinimalEvent,
 } from "./sync-accumulator";
 import { MatrixEvent } from "./models/event";
-import { MatrixError } from "./http-api";
+import { MatrixError, Method } from "./http-api";
 import { ISavedSync } from "./store";
 import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
@@ -67,6 +66,15 @@ const BUFFER_PERIOD_MS = 80 * 1000;
 // to RECONNECTING. This is needed to inform the client of server issues when the
 // keepAlive is successful but the server /sync fails.
 const FAILED_SYNC_ERROR_THRESHOLD = 3;
+
+export enum SyncState {
+    Error = "ERROR",
+    Prepared = "PREPARED",
+    Stopped = "STOPPED",
+    Syncing = "SYNCING",
+    Catchup = "CATCHUP",
+    Reconnecting = "RECONNECTING",
+}
 
 function getFilterName(userId: string, suffix?: string): string {
     // scope this on the user ID because people may login on many accounts
@@ -87,11 +95,17 @@ interface ISyncOptions {
 }
 
 export interface ISyncStateData {
-    error?: Error;
+    error?: MatrixError;
     oldSyncToken?: string;
     nextSyncToken?: string;
     catchingUp?: boolean;
     fromCache?: boolean;
+}
+
+enum SetPresence {
+    Offline = "offline",
+    Online = "online",
+    Unavailable = "unavailable",
 }
 
 interface ISyncParams {
@@ -101,7 +115,7 @@ interface ISyncParams {
     // eslint-disable-next-line camelcase
     full_state?: boolean;
     // eslint-disable-next-line camelcase
-    set_presence?: "offline" | "online" | "unavailable";
+    set_presence?: SetPresence;
     _cacheBuster?: string | number; // not part of the API itself
 }
 
@@ -260,12 +274,12 @@ export class SyncApi {
             getFilterName(client.credentials.userId, "LEFT_ROOMS"), filter,
         ).then(function(filterId) {
             qps.filter = filterId;
-            return client.http.authedRequest(
-                undefined, "GET", "/sync", qps, undefined, localTimeoutMs,
+            return client.http.authedRequest<any>( // TODO types
+                undefined, Method.Get, "/sync", qps as any, undefined, localTimeoutMs,
             );
         }).then((data) => {
             let leaveRooms = [];
-            if (data.rooms && data.rooms.leave) {
+            if (data.rooms?.leave) {
                 leaveRooms = this.mapSyncResponseToRoomArray(data.rooms.leave);
             }
             const rooms = [];
@@ -400,9 +414,10 @@ export class SyncApi {
         }
 
         // FIXME: gut wrenching; hard-coded timeout values
-        this.client.http.authedRequest(undefined, "GET", "/events", {
+        // TODO types
+        this.client.http.authedRequest<any>(undefined, Method.Get, "/events", {
             room_id: peekRoom.roomId,
-            timeout: 30 * 1000,
+            timeout: String(30 * 1000),
             from: token,
         }, undefined, 50 * 1000).then((res) => {
             if (this._peekRoom !== peekRoom) {
@@ -470,7 +485,7 @@ export class SyncApi {
         return this.syncStateData;
     }
 
-    public async recoverFromSyncStartupError(savedSyncPromise: Promise<void>, err: Error): Promise<void> {
+    public async recoverFromSyncStartupError(savedSyncPromise: Promise<void>, err: MatrixError): Promise<void> {
         // Wait for the saved sync to complete - we send the pushrules and filter requests
         // before the saved sync has finished so they can run in parallel, but only process
         // the results after the saved sync is done. Equivalently, we wait for it to finish
@@ -865,8 +880,8 @@ export class SyncApi {
 
     private doSyncRequest(syncOptions: ISyncOptions, syncToken: string): IRequestPromise<ISyncResponse> {
         const qps = this.getSyncParams(syncOptions, syncToken);
-        return this.client.http.authedRequest(
-            undefined, "GET", "/sync", qps, undefined,
+        return this.client.http.authedRequest( // TODO types
+            undefined, Method.Get, "/sync", qps as any, undefined,
             qps.timeout + BUFFER_PERIOD_MS,
         );
     }
@@ -901,7 +916,7 @@ export class SyncApi {
         };
 
         if (this.opts.disablePresence) {
-            qps.set_presence = "offline";
+            qps.set_presence = SetPresence.Offline;
         }
 
         if (syncToken) {
@@ -924,7 +939,7 @@ export class SyncApi {
         return qps;
     }
 
-    private onSyncError(err: Error, syncOptions: ISyncOptions): void {
+    private onSyncError(err: MatrixError, syncOptions: ISyncOptions): void {
         if (!this.running) {
             debuglog("Sync no longer running: exiting");
             if (this.connectionReturnedDefer) {
@@ -1477,7 +1492,7 @@ export class SyncApi {
 
         this.client.http.request(
             undefined, // callback
-            "GET", "/_matrix/client/versions",
+            Method.Get, "/_matrix/client/versions",
             undefined, // queryParams
             undefined, // data
             {

@@ -502,7 +502,7 @@ describe("MatrixClient event timelines", function() {
                     const params = req.queryParams;
                     expect(params.dir).toEqual("b");
                     expect(params.from).toEqual("start_token0");
-                    expect(params.limit).toEqual(30);
+                    expect(params.limit).toEqual("30");
                 }).respond(200, function() {
                     return {
                         chunk: [EVENTS[1], EVENTS[2]],
@@ -553,7 +553,7 @@ describe("MatrixClient event timelines", function() {
                     const params = req.queryParams;
                     expect(params.dir).toEqual("f");
                     expect(params.from).toEqual("end_token0");
-                    expect(params.limit).toEqual(20);
+                    expect(params.limit).toEqual("20");
                 }).respond(200, function() {
                     return {
                         chunk: [EVENTS[1], EVENTS[2]],

@@ -143,7 +143,7 @@ export interface IBindThreePidBody {
 export interface IRelationsRequestOpts {
     from?: string;
     to?: string;
-    limit?: string;
+    limit?: number;
 }
 
 export interface IRelationsResponse {

@@ -256,8 +256,8 @@ function removeByPrefix(store, prefix) {
     }
 }
 
-function debuglog() {
+function debuglog(...args) {
     if (DEBUG) {
-        logger.log(...arguments);
+        logger.log(...args);
     }
 }

@@ -28,7 +28,7 @@ import { CrossSigningInfo, ICrossSigningInfo } from './CrossSigning';
 import * as olmlib from './olmlib';
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { chunkPromises, defer, IDeferred, sleep } from '../utils';
-import { MatrixClient } from "../client";
+import { IDownloadKeyResult, MatrixClient } from "../client";
 import { OlmDevice } from "./OlmDevice";
 import { CryptoStore } from "./store/base";
 
@@ -756,17 +756,21 @@ class DeviceListUpdateSerialiser {
             opts.token = this.syncToken;
         }
 
-        const factories = [];
+        const factories: Array<() => Promise<IDownloadKeyResult>> = [];
         for (let i = 0; i < downloadUsers.length; i += this.deviceList.keyDownloadChunkSize) {
             const userSlice = downloadUsers.slice(i, i + this.deviceList.keyDownloadChunkSize);
             factories.push(() => this.baseApis.downloadKeysForUsers(userSlice, opts));
         }
 
-        chunkPromises(factories, 3).then(async (responses: any[]) => {
-            const dk = Object.assign({}, ...(responses.map(res => res.device_keys || {})));
-            const masterKeys = Object.assign({}, ...(responses.map(res => res.master_keys || {})));
-            const ssks = Object.assign({}, ...(responses.map(res => res.self_signing_keys || {})));
-            const usks = Object.assign({}, ...(responses.map(res => res.user_signing_keys || {})));
+        chunkPromises(factories, 3).then(async (responses: IDownloadKeyResult[]) => {
+            const dk: IDownloadKeyResult["device_keys"]
+                = Object.assign({}, ...(responses.map(res => res.device_keys || {})));
+            const masterKeys: IDownloadKeyResult["master_keys"]
+                = Object.assign({}, ...(responses.map(res => res.master_keys || {})));
+            const ssks: IDownloadKeyResult["self_signing_keys"]
+                = Object.assign({}, ...(responses.map(res => res.self_signing_keys || {})));
+            const usks: IDownloadKeyResult["user_signing_keys"]
+                = Object.assign({}, ...(responses.map(res => res.user_signing_keys || {})));
 
             // yield to other things that want to execute in between users, to
             // avoid wedging the CPU
@@ -811,8 +815,12 @@ class DeviceListUpdateSerialiser {
 
     private async processQueryResponseForUser(
         userId: string,
-        dkResponse: object,
-        crossSigningResponse: any, // TODO types
+        dkResponse: IDownloadKeyResult["device_keys"]["user_id"],
+        crossSigningResponse: {
+            master: IDownloadKeyResult["master_keys"]["user_id"];
+            self_signing: IDownloadKeyResult["master_keys"]["user_id"]; // eslint-disable-line camelcase
+            user_signing: IDownloadKeyResult["user_signing_keys"]["user_id"]; // eslint-disable-line camelcase
+        },
     ): Promise<void> {
         logger.log('got device keys for ' + userId + ':', dkResponse);
         logger.log('got cross-signing keys for ' + userId + ':', crossSigningResponse);
@@ -869,7 +877,7 @@ async function updateStoredDeviceKeysForUser(
     olmDevice: OlmDevice,
     userId: string,
     userStore: Record<string, DeviceInfo>,
-    userResult: object,
+    userResult: IDownloadKeyResult["device_keys"]["user_id"],
     localUserId: string,
     localDeviceId: string,
 ): Promise<boolean> {
