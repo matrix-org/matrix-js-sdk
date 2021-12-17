@@ -18,6 +18,7 @@ import { MatrixClient } from "../client";
 import { IEncryptedFile, RelationType, UNSTABLE_MSC3089_BRANCH } from "../@types/event";
 import { IContent, MatrixEvent } from "./event";
 import { MSC3089TreeSpace } from "./MSC3089TreeSpace";
+import { EventTimeline } from "./event-timeline";
 import { FileType } from "../http-api";
 
 /**
@@ -140,7 +141,14 @@ export class MSC3089Branch {
         const room = this.client.getRoom(this.roomId);
         if (!room) throw new Error("Unknown room");
 
-        const event = room.getUnfilteredTimelineSet().findEventById(this.id);
+        let event: MatrixEvent | undefined = room.getUnfilteredTimelineSet().findEventById(this.id);
+
+        // keep scrolling back if needed until we find the event or reach the start of the room:
+        while (!event && room.getLiveTimeline().getState(EventTimeline.FORWARDS).paginationToken) {
+            await this.client.scrollback(room, 100);
+            event = room.getUnfilteredTimelineSet().findEventById(this.id);
+        }
+
         if (!event) throw new Error("Failed to find event");
 
         // Sometimes the event isn't decrypted for us, so do that. We specifically set `emit: true`
