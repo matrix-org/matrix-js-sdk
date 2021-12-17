@@ -50,7 +50,6 @@ import {
     PREFIX_IDENTITY_V2,
     PREFIX_MEDIA_R0,
     PREFIX_R0,
-    PREFIX_V1,
     PREFIX_UNSTABLE,
     retryNetworkOperation,
     UploadContentResponseType,
@@ -8394,21 +8393,7 @@ export class MatrixClient extends EventEmitter {
             from: fromToken,
             limit: limit?.toString(),
         }, undefined, {
-            prefix: PREFIX_V1,
-        }).catch(e => {
-            if (e.errcode === "M_UNRECOGNIZED") {
-                // fall back to the development prefix
-                return this.http.authedRequest<IRoomHierarchy>(undefined, Method.Get, path, {
-                    suggested_only: String(suggestedOnly),
-                    max_depth: String(maxDepth),
-                    from: fromToken,
-                    limit: String(limit),
-                }, undefined, {
-                    prefix: "/_matrix/client/unstable/org.matrix.msc2946",
-                });
-            }
-
-            throw e;
+            prefix: "/_matrix/client/unstable/org.matrix.msc2946",
         }).catch(e => {
             if (e.errcode === "M_UNRECOGNIZED") {
                 // fall back to the older space summary API as it exposes the same data just in a different shape.
