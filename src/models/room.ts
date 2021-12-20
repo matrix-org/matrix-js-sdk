@@ -1229,6 +1229,8 @@ export class Room extends EventEmitter {
     /**
      * Add a timelineSet for this room with the given filter
      * @param {Filter} filter The filter to be applied to this timelineSet
+     * @param {Object=} opts Configuration options
+     * @param {*} opts.storageToken Optional.
      * @return {EventTimelineSet} The timelineSet
      */
     public getOrCreateFilteredTimelineSet(

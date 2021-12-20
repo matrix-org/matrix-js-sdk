@@ -5031,7 +5031,7 @@ export class MatrixClient extends EventEmitter {
     ): Promise<IMessagesResponse> {
         const path = utils.encodeUri("/rooms/$roomId/messages", { $roomId: roomId });
 
-        const params: Record<string, string | number> = {
+        const params: Record<string, string> = {
             limit: limit.toString(),
             dir: dir,
         };
