@@ -90,8 +90,8 @@ export class FilterComponent {
             senders: this.filterJson.senders || null,
             not_senders: this.filterJson.not_senders || [],
             contains_url: this.filterJson.contains_url || null,
-            [UNSTABLE_FILTER_RELATION_SENDERS.name]: this.filterJson[UNSTABLE_FILTER_RELATION_SENDERS.name],
-            [UNSTABLE_FILTER_RELATION_TYPES.name]: this.filterJson[UNSTABLE_FILTER_RELATION_TYPES.name],
+            [UNSTABLE_FILTER_RELATION_SENDERS.name]: UNSTABLE_FILTER_RELATION_SENDERS.findIn(this.filterJson),
+            [UNSTABLE_FILTER_RELATION_TYPES.name]: UNSTABLE_FILTER_RELATION_TYPES.findIn(this.filterJson),
         };
     }
 

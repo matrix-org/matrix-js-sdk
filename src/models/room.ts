@@ -111,6 +111,9 @@ export enum NotificationCountType {
 }
 
 export interface ICreateFilterOpts {
+    // Populate the filtered timeline with already loaded events in the room
+    // timeline. Useful to disable for some filters that can't be achieved by the
+    // client in an efficient manner
     prepopulateTimeline?: boolean;
 }
 
