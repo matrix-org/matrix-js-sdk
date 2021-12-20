@@ -2244,7 +2244,7 @@ export class MatrixClient extends EventEmitter {
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    public isSecretStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo>> {
+    public isSecretStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo> | null> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2275,7 +2275,7 @@ export class MatrixClient extends EventEmitter {
      *
      * @return {string} The default key ID or null if no default key ID is set
      */
-    public getDefaultSecretStorageKeyId(): Promise<string> {
+    public getDefaultSecretStorageKeyId(): Promise<string | null> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2457,9 +2457,9 @@ export class MatrixClient extends EventEmitter {
 
     /**
      * Get information about the current key backup.
-     * @returns {Promise} Information object from API or null
+     * @returns {Promise<IKeyBackupInfo | null>} Information object from API or null
      */
-    public async getKeyBackupVersion(): Promise<IKeyBackupInfo> {
+    public async getKeyBackupVersion(): Promise<IKeyBackupInfo | null> {
         let res;
         try {
             res = await this.http.authedRequest(
@@ -2578,7 +2578,7 @@ export class MatrixClient extends EventEmitter {
      *     encrypted with, or null if it is not present or not encrypted with a
      *     trusted key
      */
-    public isKeyBackupKeyStored(): Promise<Record<string, ISecretStorageKeyInfo>> {
+    public isKeyBackupKeyStored(): Promise<Record<string, ISecretStorageKeyInfo> | null> {
         return Promise.resolve(this.isSecretStored("m.megolm_backup.v1", false /* checkKey */));
     }
 

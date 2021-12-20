@@ -1024,7 +1024,7 @@ export class Crypto extends EventEmitter {
     public isSecretStored(
         name: string,
         checkKey?: boolean,
-    ): Promise<Record<string, ISecretStorageKeyInfo>> {
+    ): Promise<Record<string, ISecretStorageKeyInfo> | null> {
         return this.secretStorage.isStored(name, checkKey);
     }
 
@@ -1035,7 +1035,7 @@ export class Crypto extends EventEmitter {
         return this.secretStorage.request(name, devices);
     }
 
-    public getDefaultSecretStorageKeyId(): Promise<string> {
+    public getDefaultSecretStorageKeyId(): Promise<string | null> {
         return this.secretStorage.getDefaultKeyId();
     }
 

@@ -83,7 +83,7 @@ export class SecretStorage {
         private readonly baseApis?: MatrixClient,
     ) {}
 
-    public async getDefaultKeyId(): Promise<string> {
+    public async getDefaultKeyId(): Promise<string | null> {
         const defaultKey = await this.accountDataAdapter.getAccountDataFromServer<{ key: string }>(
             'm.secret_storage.default_key',
         );
@@ -345,7 +345,7 @@ export class SecretStorage {
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    public async isStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo>> {
+    public async isStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo> | null> {
         // check if secret exists
         const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretInfo>(name);
         if (!secretInfo) return null;
