@@ -209,7 +209,7 @@ export class EventTimelineSet extends EventEmitter {
      *
      * @fires module:client~MatrixClient#event:"Room.timelineReset"
      */
-    public resetLiveTimeline(backPaginationToken: string, forwardPaginationToken?: string): void {
+    public resetLiveTimeline(backPaginationToken?: string, forwardPaginationToken?: string): void {
         // Each EventTimeline has RoomState objects tracking the state at the start
         // and end of that timeline. The copies at the end of the live timeline are
         // special because they will have listeners attached to monitor changes to
