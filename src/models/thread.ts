@@ -17,6 +17,7 @@ limitations under the License.
 import { RelationType, IThreadBundledRelation } from "../@types/event";
 import { IRelationsRequestOpts } from "../@types/requests";
 import { MatrixClient } from "../client";
+import { ReEmitter } from "../ReEmitter";
 import { TimelineWindow } from "../timeline-window";
 import { MatrixEvent } from "./event";
 import { Direction, EventTimeline } from "./event-timeline";
@@ -54,17 +55,26 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
      */
     public readonly timelineSet: EventTimelineSet;
 
+    private reEmitter: ReEmitter;
+
     constructor(
         public threadHeadId: string,
         public readonly room: Room,
         public readonly client: MatrixClient,
     ) {
         super();
+
+        this.reEmitter = new ReEmitter(this);
         this.timelineSet = new EventTimelineSet(this.room, {
             unstableClientRelationAggregation: true,
             timelineSupport: true,
             pendingEvents: true,
         });
+
+        this.reEmitter.reEmit(this.timelineSet, [
+            "Room.timeline",
+            "Room.timelineReset",
+        ]);
 
         let head = this.room.findEventById(threadHeadId);
 

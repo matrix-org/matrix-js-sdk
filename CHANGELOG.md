@@ -1,3 +1,29 @@
+Changes in [15.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.3.0) (2021-12-20)
+==================================================================================================
+
+## ✨ Features
+ * Improve fallback key behaviour ([\#2037](https://github.com/matrix-org/matrix-js-sdk/pull/2037)).
+ * Add new room event filter fields ([\#2051](https://github.com/matrix-org/matrix-js-sdk/pull/2051)).
+ * Add method to fetch /account/whoami ([\#2046](https://github.com/matrix-org/matrix-js-sdk/pull/2046)).
+
+## 🐛 Bug Fixes
+ * Filter out falsey opts in /relations API hits ([\#2059](https://github.com/matrix-org/matrix-js-sdk/pull/2059)). Fixes vector-im/element-web#20137.
+ * Fix paginateEventTimeline resolve to boolean ([\#2054](https://github.com/matrix-org/matrix-js-sdk/pull/2054)).
+ * Fix incorrect MSC3089 typings and add null checks ([\#2049](https://github.com/matrix-org/matrix-js-sdk/pull/2049)).
+
+Changes in [15.3.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.3.0-rc.1) (2021-12-14)
+============================================================================================================
+
+## ✨ Features
+ * Improve fallback key behaviour ([\#2037](https://github.com/matrix-org/matrix-js-sdk/pull/2037)).
+ * Add new room event filter fields ([\#2051](https://github.com/matrix-org/matrix-js-sdk/pull/2051)).
+ * Add method to fetch /account/whoami ([\#2046](https://github.com/matrix-org/matrix-js-sdk/pull/2046)).
+
+## 🐛 Bug Fixes
+ * Filter out falsey opts in /relations API hits ([\#2059](https://github.com/matrix-org/matrix-js-sdk/pull/2059)). Fixes vector-im/element-web#20137.
+ * Fix paginateEventTimeline resolve to boolean ([\#2054](https://github.com/matrix-org/matrix-js-sdk/pull/2054)).
+ * Fix incorrect MSC3089 typings and add null checks ([\#2049](https://github.com/matrix-org/matrix-js-sdk/pull/2049)).
+
 Changes in [15.2.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.2.1) (2021-12-13)
 ==================================================================================================
 

@@ -35,7 +35,7 @@ import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersio
 import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
 import { Filter } from "../filter";
 import { RoomState } from "./room-state";
-import { Thread } from "./thread";
+import { Thread, ThreadEvent } from "./thread";
 import { Method } from "../http-api";
 
 // These constants are used as sane defaults when the homeserver doesn't support
@@ -108,6 +108,13 @@ type Receipts = Record<string, Record<string, IWrappedReceipt>>;
 export enum NotificationCountType {
     Highlight = "highlight",
     Total = "total",
+}
+
+export interface ICreateFilterOpts {
+    // Populate the filtered timeline with already loaded events in the room
+    // timeline. Useful to disable for some filters that can't be achieved by the
+    // client in an efficient manner
+    prepopulateTimeline?: boolean;
 }
 
 export class Room extends EventEmitter {
@@ -793,7 +800,7 @@ export class Room extends EventEmitter {
      * timeline which would otherwise be unable to paginate forwards without this token).
      * Removing just the old live timeline whilst preserving previous ones is not supported.
      */
-    public resetLiveTimeline(backPaginationToken: string, forwardPaginationToken: string): void {
+    public resetLiveTimeline(backPaginationToken: string | null, forwardPaginationToken: string | null): void {
         for (let i = 0; i < this.timelineSets.length; i++) {
             this.timelineSets[i].resetLiveTimeline(
                 backPaginationToken, forwardPaginationToken,
@@ -1222,9 +1229,14 @@ export class Room extends EventEmitter {
     /**
      * Add a timelineSet for this room with the given filter
      * @param {Filter} filter The filter to be applied to this timelineSet
+     * @param {Object=} opts Configuration options
+     * @param {*} opts.storageToken Optional.
      * @return {EventTimelineSet} The timelineSet
      */
-    public getOrCreateFilteredTimelineSet(filter: Filter): EventTimelineSet {
+    public getOrCreateFilteredTimelineSet(
+        filter: Filter,
+        { prepopulateTimeline = true }: ICreateFilterOpts = {},
+    ): EventTimelineSet {
         if (this.filteredTimelineSets[filter.filterId]) {
             return this.filteredTimelineSets[filter.filterId];
         }
@@ -1234,29 +1246,38 @@ export class Room extends EventEmitter {
         this.filteredTimelineSets[filter.filterId] = timelineSet;
         this.timelineSets.push(timelineSet);
 
-        // populate up the new timelineSet with filtered events from our live
-        // unfiltered timeline.
-        //
-        // XXX: This is risky as our timeline
-        // may have grown huge and so take a long time to filter.
-        // see https://github.com/vector-im/vector-web/issues/2109
-
         const unfilteredLiveTimeline = this.getLiveTimeline();
+        // Not all filter are possible to replicate client-side only
+        // When that's the case we do not want to prepopulate from the live timeline
+        // as we would get incorrect results compared to what the server would send back
+        if (prepopulateTimeline) {
+            // populate up the new timelineSet with filtered events from our live
+            // unfiltered timeline.
+            //
+            // XXX: This is risky as our timeline
+            // may have grown huge and so take a long time to filter.
+            // see https://github.com/vector-im/vector-web/issues/2109
 
-        unfilteredLiveTimeline.getEvents().forEach(function(event) {
-            timelineSet.addLiveEvent(event);
-        });
+            unfilteredLiveTimeline.getEvents().forEach(function(event) {
+                timelineSet.addLiveEvent(event);
+            });
 
-        // find the earliest unfiltered timeline
-        let timeline = unfilteredLiveTimeline;
-        while (timeline.getNeighbouringTimeline(EventTimeline.BACKWARDS)) {
-            timeline = timeline.getNeighbouringTimeline(EventTimeline.BACKWARDS);
+            // find the earliest unfiltered timeline
+            let timeline = unfilteredLiveTimeline;
+            while (timeline.getNeighbouringTimeline(EventTimeline.BACKWARDS)) {
+                timeline = timeline.getNeighbouringTimeline(EventTimeline.BACKWARDS);
+            }
+
+            timelineSet.getLiveTimeline().setPaginationToken(
+                timeline.getPaginationToken(EventTimeline.BACKWARDS),
+                EventTimeline.BACKWARDS,
+            );
+        } else {
+            const livePaginationToken = unfilteredLiveTimeline.getPaginationToken(Direction.Forward);
+            timelineSet
+                .getLiveTimeline()
+                .setPaginationToken(livePaginationToken, Direction.Backward);
         }
-
-        timelineSet.getLiveTimeline().setPaginationToken(
-            timeline.getPaginationToken(EventTimeline.BACKWARDS),
-            EventTimeline.BACKWARDS,
-        );
 
         // alternatively, we could try to do something like this to try and re-paginate
         // in the filtered events from nothing, but Mark says it's an abuse of the API
@@ -1296,6 +1317,19 @@ export class Room extends EventEmitter {
             const parentEvent = this.findEventById(event.parentEventId);
             return this.findThreadForEvent(parentEvent);
         }
+    }
+
+    public createThread(threadId: string): Thread {
+        const thread = new Thread(threadId, this, this.client);
+        this.threads.set(threadId, thread);
+        this.reEmitter.reEmit(thread, [
+            ThreadEvent.Update,
+            ThreadEvent.Ready,
+            "Room.timeline",
+            "Room.timelineReset",
+        ]);
+        this.emit(ThreadEvent.New, thread);
+        return thread;
     }
 
     /**

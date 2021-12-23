@@ -34,7 +34,6 @@ import { PushProcessor } from "./pushprocessor";
 import { logger } from './logger';
 import { InvalidStoreError } from './errors';
 import { IProcessEventsOpts, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
-import { SyncState } from "./sync.api";
 import {
     Category,
     IEphemeral,
@@ -68,6 +67,15 @@ const BUFFER_PERIOD_MS = 80 * 1000;
 // keepAlive is successful but the server /sync fails.
 const FAILED_SYNC_ERROR_THRESHOLD = 3;
 
+export enum SyncState {
+    Error = "ERROR",
+    Prepared = "PREPARED",
+    Stopped = "STOPPED",
+    Syncing = "SYNCING",
+    Catchup = "CATCHUP",
+    Reconnecting = "RECONNECTING",
+}
+
 function getFilterName(userId: string, suffix?: string): string {
     // scope this on the user ID because people may login on many accounts
     // and they all need to be stored!
@@ -87,7 +95,7 @@ interface ISyncOptions {
 }
 
 export interface ISyncStateData {
-    error?: Error;
+    error?: MatrixError;
     oldSyncToken?: string;
     nextSyncToken?: string;
     catchingUp?: boolean;
@@ -479,7 +487,7 @@ export class SyncApi {
         return this.syncStateData;
     }
 
-    public async recoverFromSyncStartupError(savedSyncPromise: Promise<void>, err: Error): Promise<void> {
+    public async recoverFromSyncStartupError(savedSyncPromise: Promise<void>, err: MatrixError): Promise<void> {
         // Wait for the saved sync to complete - we send the pushrules and filter requests
         // before the saved sync has finished so they can run in parallel, but only process
         // the results after the saved sync is done. Equivalently, we wait for it to finish

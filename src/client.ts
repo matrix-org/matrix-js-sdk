@@ -50,7 +50,6 @@ import {
     PREFIX_IDENTITY_V2,
     PREFIX_MEDIA_R0,
     PREFIX_R0,
-    PREFIX_V1,
     PREFIX_UNSTABLE,
     retryNetworkOperation,
     UploadContentResponseType,
@@ -97,7 +96,7 @@ import {
     IRecoveryKey,
     ISecretStorageKeyInfo,
 } from "./crypto/api";
-import { SyncState } from "./sync.api";
+import { SyncState } from "./sync";
 import { EventTimelineSet } from "./models/event-timeline-set";
 import { VerificationRequest } from "./crypto/verification/request/VerificationRequest";
 import { VerificationBase as Verification } from "./crypto/verification/Base";
@@ -2252,7 +2251,7 @@ export class MatrixClient extends EventEmitter {
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    public isSecretStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo>> {
+    public isSecretStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo> | null> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2283,7 +2282,7 @@ export class MatrixClient extends EventEmitter {
      *
      * @return {string} The default key ID or null if no default key ID is set
      */
-    public getDefaultSecretStorageKeyId(): Promise<string> {
+    public getDefaultSecretStorageKeyId(): Promise<string | null> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2465,9 +2464,9 @@ export class MatrixClient extends EventEmitter {
 
     /**
      * Get information about the current key backup.
-     * @returns {Promise} Information object from API or null
+     * @returns {Promise<IKeyBackupInfo | null>} Information object from API or null
      */
-    public async getKeyBackupVersion(): Promise<IKeyBackupInfo> {
+    public async getKeyBackupVersion(): Promise<IKeyBackupInfo | null> {
         let res;
         try {
             res = await this.http.authedRequest(
@@ -2586,7 +2585,7 @@ export class MatrixClient extends EventEmitter {
      *     encrypted with, or null if it is not present or not encrypted with a
      *     trusted key
      */
-    public isKeyBackupKeyStored(): Promise<Record<string, ISecretStorageKeyInfo>> {
+    public isKeyBackupKeyStored(): Promise<Record<string, ISecretStorageKeyInfo> | null> {
         return Promise.resolve(this.isSecretStored("m.megolm_backup.v1", false /* checkKey */));
     }
 
@@ -4847,12 +4846,11 @@ export class MatrixClient extends EventEmitter {
      * <code>null</code>.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public scrollback(room: Room, limit: number, callback?: Callback): Promise<Room> {
+    public scrollback(room: Room, limit = 30, callback?: Callback): Promise<Room> {
         if (utils.isFunction(limit)) {
             callback = limit as any as Callback; // legacy
             limit = undefined;
         }
-        limit = limit || 30;
         let timeToWaitMs = 0;
 
         let info = this.ongoingScrollbacks[room.roomId] || {};
@@ -5033,7 +5031,7 @@ export class MatrixClient extends EventEmitter {
     // XXX: Intended private, used in code.
     public createMessagesRequest(
         roomId: string,
-        fromToken: string,
+        fromToken: string | null,
         limit = 30,
         dir: Direction,
         timelineFilter?: Filter,
@@ -5041,10 +5039,13 @@ export class MatrixClient extends EventEmitter {
         const path = utils.encodeUri("/rooms/$roomId/messages", { $roomId: roomId });
 
         const params: Record<string, string> = {
-            from: fromToken,
             limit: limit.toString(),
-            dir,
+            dir: dir,
         };
+
+        if (fromToken) {
+            params.from = fromToken;
+        }
 
         let filter = null;
         if (this.clientOpts.lazyLoadMembers) {
@@ -5094,11 +5095,6 @@ export class MatrixClient extends EventEmitter {
         const dir = backwards ? EventTimeline.BACKWARDS : EventTimeline.FORWARDS;
 
         const token = eventTimeline.getPaginationToken(dir);
-        if (!token) {
-            // no token - no results.
-            return Promise.resolve(false);
-        }
-
         const pendingRequest = eventTimeline.paginationRequests[dir];
 
         if (pendingRequest) {
@@ -8399,21 +8395,7 @@ export class MatrixClient extends EventEmitter {
             from: fromToken,
             limit: limit?.toString(),
         }, undefined, {
-            prefix: PREFIX_V1,
-        }).catch(e => {
-            if (e.errcode === "M_UNRECOGNIZED") {
-                // fall back to the development prefix
-                return this.http.authedRequest<IRoomHierarchy>(undefined, Method.Get, path, {
-                    suggested_only: String(suggestedOnly),
-                    max_depth: String(maxDepth),
-                    from: fromToken,
-                    limit: String(limit),
-                }, undefined, {
-                    prefix: "/_matrix/client/unstable/org.matrix.msc2946",
-                });
-            }
-
-            throw e;
+            prefix: "/_matrix/client/unstable/org.matrix.msc2946",
         }).catch(e => {
             if (e.errcode === "M_UNRECOGNIZED") {
                 // fall back to the older space summary API as it exposes the same data just in a different shape.
@@ -8940,12 +8922,8 @@ export class MatrixClient extends EventEmitter {
     ): void {
         for (const event of threadedEvents) {
             if ((event.isThreadRelation || event.isThreadRoot) && !room.threads.has(event.threadRootId)) {
-                const thread = new Thread(event.threadRootId, room, this);
+                const thread = room.createThread(event.threadRootId);
                 event.setThread(thread);
-                room.threads.set(
-                    event.threadRootId,
-                    thread,
-                );
             }
 
             const thread = room.findThreadForEvent(event);

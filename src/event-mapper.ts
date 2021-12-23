@@ -36,11 +36,7 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
         if (event.isThreadRoot && room) {
             let thread = room.threads.get(event.getId());
             if (!thread) {
-                thread = new Thread(event.getId(), room, client);
-                room.threads.set(
-                    event.getId(),
-                    thread,
-                );
+                thread = room.createThread(event.getId());
             }
             event.setThread(thread);
         }
