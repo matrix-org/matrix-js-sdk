@@ -1337,10 +1337,7 @@ export class Room extends EventEmitter {
                 rootEvent = new MatrixEvent(eventData);
             }
             events.unshift(rootEvent);
-            thread = new Thread(events, this, this.client);
-            this.threads.set(thread.id, thread);
-            this.reEmitter.reEmit(thread, [ThreadEvent.Update, ThreadEvent.Ready]);
-            this.emit(ThreadEvent.New, thread);
+            thread = this.createThread(events);
         }
 
         if (event.getUnsigned().transaction_id) {
@@ -1353,6 +1350,19 @@ export class Room extends EventEmitter {
         }
 
         this.emit(ThreadEvent.Update, thread);
+    }
+
+    public createThread(events: MatrixEvent[]): Thread {
+        const thread = new Thread(events, this, this.client);
+        this.threads.set(thread.id, thread);
+        this.reEmitter.reEmit(thread, [
+            ThreadEvent.Update,
+            ThreadEvent.Ready,
+            "Room.timeline",
+            "Room.timelineReset",
+        ]);
+        this.emit(ThreadEvent.New, thread);
+        return thread;
     }
 
     /**
