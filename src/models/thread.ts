@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { MatrixClient } from "../matrix";
+import { ReEmitter } from "../ReEmitter";
 import { MatrixEvent } from "./event";
 import { EventTimeline } from "./event-timeline";
 import { EventTimelineSet } from './event-timeline-set';
@@ -44,6 +45,8 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
 
     private _currentUserParticipated = false;
 
+    private reEmitter: ReEmitter;
+
     constructor(
         events: MatrixEvent[] = [],
         public readonly room: Room,
@@ -54,11 +57,19 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
             throw new Error("Can't create an empty thread");
         }
 
+        this.reEmitter = new ReEmitter(this);
+
         this.timelineSet = new EventTimelineSet(this.room, {
             unstableClientRelationAggregation: true,
             timelineSupport: true,
             pendingEvents: true,
         });
+
+        this.reEmitter.reEmit(this.timelineSet, [
+            "Room.timeline",
+            "Room.timelineReset",
+        ]);
+
         events.forEach(event => this.addEvent(event));
 
         room.on("Room.localEchoUpdated", this.onEcho);
