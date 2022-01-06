@@ -281,8 +281,7 @@ export class MatrixEvent extends EventEmitter {
      *
      * @deprecated Use stable functions where possible.
      */
-    // eslint-disable-next-line @typescript-eslint/naming-convention camelcase
-    public get unstable_extensibleEvent(): Optional<ExtensibleEvent> {
+    public get unstableExtensibleEvent(): Optional<ExtensibleEvent> {
         if (!this._hasCachedExtEv) {
             this._cachedExtEv = ExtensibleEvents.parse(this.getEffectiveEvent());
         }
