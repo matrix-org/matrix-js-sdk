@@ -20,6 +20,7 @@ limitations under the License.
  */
 
 import { EventEmitter } from "events";
+import { EmoteEvent, MessageEvent, NoticeEvent } from "matrix-events-sdk";
 
 import { ISyncStateData, SyncApi, SyncState } from "./sync";
 import { EventStatus, IContent, IDecryptOptions, IEvent, MatrixEvent } from "./models/event";
@@ -159,7 +160,6 @@ import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, Rule
 import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
 import { MediaHandler } from "./webrtc/mediaHandler";
-import { EmoteEvent, MessageEvent, NoticeEvent } from "matrix-events-sdk/lib";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;

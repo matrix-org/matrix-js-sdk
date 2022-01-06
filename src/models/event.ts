@@ -21,6 +21,7 @@ limitations under the License.
  */
 
 import { EventEmitter } from 'events';
+import { ExtensibleEvent, ExtensibleEvents, Optional } from "matrix-events-sdk";
 
 import { logger } from '../logger';
 import { VerificationRequest } from "../crypto/verification/request/VerificationRequest";
@@ -36,7 +37,6 @@ import { Thread, ThreadEvent } from "./thread";
 import { IActionsObject } from '../pushprocessor';
 import { ReEmitter } from '../ReEmitter';
 import { MatrixError } from "../http-api";
-import { ExtensibleEvent, ExtensibleEvents, Optional } from "matrix-events-sdk/lib";
 
 /**
  * Enum for event statuses.
@@ -281,6 +281,7 @@ export class MatrixEvent extends EventEmitter {
      *
      * @deprecated Use stable functions where possible.
      */
+    // eslint-disable-next-line @typescript-eslint/naming-convention camelcase
     public get unstable_extensibleEvent(): Optional<ExtensibleEvent> {
         if (!this._hasCachedExtEv) {
             this._cachedExtEv = ExtensibleEvents.parse(this.getEffectiveEvent());
