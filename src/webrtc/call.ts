@@ -2001,6 +2001,7 @@ export class MatrixCall extends EventEmitter {
                 type: "toDevice",
                 eventType,
                 userId: this.invitee || this.getOpponentMember().userId,
+                opponentDeviceId: this.opponentDeviceId,
                 content: { ...realContent, device_id: this.client.deviceId },
             });
 
