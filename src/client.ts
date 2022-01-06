@@ -411,14 +411,19 @@ export interface IRoomVersionsCapability {
     "org.matrix.msc3244.room_capabilities"?: Record<string, IRoomCapability>; // MSC3244
 }
 
-export interface IChangePasswordCapability {
+export interface ICapability {
     enabled: boolean;
 }
+
+export interface IChangePasswordCapability extends ICapability {}
+
+export interface IThreadsCapability extends ICapability {}
 
 interface ICapabilities {
     [key: string]: any;
     "m.change_password"?: IChangePasswordCapability;
     "m.room_versions"?: IRoomVersionsCapability;
+    "io.element.thread"?: IThreadsCapability;
 }
 
 /* eslint-disable camelcase */
@@ -1035,6 +1040,8 @@ export class MatrixClient extends EventEmitter {
             logger.error("Still have sync object whilst not running: stopping old one");
             this.syncApi.stop();
         }
+
+        await this.getCapabilities();
 
         // shallow-copy the opts dict before modifying and storing it
         this.clientOpts = Object.assign({}, opts) as IStoredClientOpts;
