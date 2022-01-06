@@ -134,6 +134,8 @@ export enum CallEvent {
     LengthChanged = 'length_changed',
 
     DataChannel = 'datachannel',
+
+    SendVoipEvent = "send_voip_event",
 }
 
 export enum CallErrorCode {
@@ -1995,6 +1997,13 @@ export class MatrixCall extends EventEmitter {
         });
 
         if (this.opponentDeviceId) {
+            this.emit(CallEvent.SendVoipEvent, {
+                type: "toDevice",
+                eventType,
+                userId: this.invitee || this.getOpponentMember().userId,
+                content: { ...realContent, device_id: this.client.deviceId },
+            });
+
             return this.client.sendToDevice(eventType, {
                 [this.invitee || this.getOpponentMember().userId]: {
                     [this.opponentDeviceId]: {
@@ -2004,6 +2013,13 @@ export class MatrixCall extends EventEmitter {
                 },
             });
         } else {
+            this.emit(CallEvent.SendVoipEvent, {
+                type: "sendEvent",
+                eventType,
+                roomId: this.roomId,
+                content: realContent,
+            });
+
             return this.client.sendEvent(this.roomId, eventType, realContent);
         }
     }
