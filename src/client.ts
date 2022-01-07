@@ -21,7 +21,7 @@ limitations under the License.
 
 import { EventEmitter } from "events";
 
-import { ISyncStateData, SyncApi } from "./sync";
+import { ISyncStateData, SyncApi, SyncState } from "./sync";
 import { EventStatus, IContent, IDecryptOptions, IEvent, MatrixEvent } from "./models/event";
 import { StubStore } from "./store/stub";
 import { createNewMatrixCall, MatrixCall } from "./webrtc/call";
@@ -96,7 +96,6 @@ import {
     IRecoveryKey,
     ISecretStorageKeyInfo,
 } from "./crypto/api";
-import { SyncState } from "./sync";
 import { EventTimelineSet } from "./models/event-timeline-set";
 import { VerificationRequest } from "./crypto/verification/request/VerificationRequest";
 import { VerificationBase as Verification } from "./crypto/verification/Base";
@@ -811,6 +810,7 @@ export class MatrixClient extends EventEmitter {
     protected exportedOlmDeviceToImport: IOlmDevice;
     protected txnCtr = 0;
     protected mediaHandler = new MediaHandler();
+    protected pendingEventEncryption = new Map<string, Promise<void>>();
 
     constructor(opts: IMatrixClientCreateOpts) {
         super();
@@ -865,7 +865,7 @@ export class MatrixClient extends EventEmitter {
 
         this.scheduler = opts.scheduler;
         if (this.scheduler) {
-            this.scheduler.setProcessFunction(async (eventToSend) => {
+            this.scheduler.setProcessFunction(async (eventToSend: MatrixEvent) => {
                 const room = this.getRoom(eventToSend.getRoomId());
                 if (eventToSend.status !== EventStatus.SENDING) {
                     this.updatePendingEventStatus(room, eventToSend, EventStatus.SENDING);
@@ -3390,15 +3390,18 @@ export class MatrixClient extends EventEmitter {
      * Cancel a queued or unsent event.
      *
      * @param {MatrixEvent} event   Event to cancel
-     * @throws Error if the event is not in QUEUED or NOT_SENT state
+     * @throws Error if the event is not in QUEUED, NOT_SENT or ENCRYPTING state
      */
     public cancelPendingEvent(event: MatrixEvent) {
-        if ([EventStatus.QUEUED, EventStatus.NOT_SENT].indexOf(event.status) < 0) {
+        if (![EventStatus.QUEUED, EventStatus.NOT_SENT, EventStatus.ENCRYPTING].includes(event.status)) {
             throw new Error("cannot cancel an event with status " + event.status);
         }
 
-        // first tell the scheduler to forget about it, if it's queued
-        if (this.scheduler) {
+        // if the event is currently being encrypted then
+        if (event.status === EventStatus.ENCRYPTING) {
+            this.pendingEventEncryption.delete(event.getId());
+        } else if (this.scheduler && event.status === EventStatus.QUEUED) {
+            // tell the scheduler to forget about it, if it's queued
             this.scheduler.removeEventFromQueue(event);
         }
 
@@ -3660,16 +3663,26 @@ export class MatrixClient extends EventEmitter {
      * @private
      */
     private encryptAndSendEvent(room: Room, event: MatrixEvent, callback?: Callback): Promise<ISendEventResponse> {
+        let cancelled = false;
         // Add an extra Promise.resolve() to turn synchronous exceptions into promise rejections,
         // so that we can handle synchronous and asynchronous exceptions with the
         // same code path.
         return Promise.resolve().then(() => {
             const encryptionPromise = this.encryptEventIfNeeded(event, room);
-            if (!encryptionPromise) return null;
+            if (!encryptionPromise) return null; // doesn't need encryption
 
+            this.pendingEventEncryption.set(event.getId(), encryptionPromise);
             this.updatePendingEventStatus(room, event, EventStatus.ENCRYPTING);
-            return encryptionPromise.then(() => this.updatePendingEventStatus(room, event, EventStatus.SENDING));
+            return encryptionPromise.then(() => {
+                if (!this.pendingEventEncryption.has(event.getId())) {
+                    // cancelled via MatrixClient::cancelPendingEvent
+                    cancelled = true;
+                    return;
+                }
+                this.updatePendingEventStatus(room, event, EventStatus.SENDING);
+            });
         }).then(() => {
+            if (cancelled) return {} as ISendEventResponse;
             let promise: Promise<ISendEventResponse>;
             if (this.scheduler) {
                 // if this returns a promise then the scheduler has control now and will
