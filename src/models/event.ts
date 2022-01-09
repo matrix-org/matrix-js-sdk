@@ -921,6 +921,10 @@ export class MatrixEvent extends EventEmitter {
             this.event.unsigned = {};
         }
         this.event.unsigned.redacted_because = redactionEvent.event as IEvent;
+
+        if (this.isEncrypted()) {
+            this.clearEvent.unsigned = { redacted_because: Object.assign({}, redactionEvent.event) as IEvent };
+        }
     }
 
     /**
