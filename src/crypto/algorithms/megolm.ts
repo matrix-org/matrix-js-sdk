@@ -1114,8 +1114,8 @@ class MegolmEncryption extends EncryptionAlgorithm {
     private checkForUnknownDevices(devicesInRoom: DeviceInfoMap): void {
         const unknownDevices: Record<string, Record<string, DeviceInfo>> = {};
 
-        Object.keys(devicesInRoom).forEach((userId)=>{
-            Object.keys(devicesInRoom[userId]).forEach((deviceId)=>{
+        Object.keys(devicesInRoom).forEach((userId) => {
+            Object.keys(devicesInRoom[userId]).forEach((deviceId) => {
                 const device = devicesInRoom[userId][deviceId];
                 if (device.isUnverified() && !device.isKnown()) {
                     if (!unknownDevices[userId]) {
