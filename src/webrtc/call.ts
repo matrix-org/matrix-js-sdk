@@ -319,6 +319,7 @@ export class MatrixCall extends EventEmitter {
     private callLength = 0;
 
     private opponentDeviceId: string;
+    private opponentSessionId: string;
     public groupCallId: string;
 
     constructor(opts: CallOpts) {
@@ -372,6 +373,10 @@ export class MatrixCall extends EventEmitter {
 
     public getOpponentMember(): RoomMember {
         return this.opponentMember;
+    }
+
+    public getOpponentSessionId(): string {
+        return this.opponentSessionId;
     }
 
     public opponentCanBeTransferred(): boolean {
@@ -2002,7 +2007,7 @@ export class MatrixCall extends EventEmitter {
                 eventType,
                 userId: this.invitee || this.getOpponentMember().userId,
                 opponentDeviceId: this.opponentDeviceId,
-                content: { ...realContent, device_id: this.client.deviceId },
+                content: { ...realContent, device_id: this.client.deviceId, session_id: this.client.getSessionId() },
             });
 
             return this.client.sendToDevice(eventType, {
@@ -2010,6 +2015,7 @@ export class MatrixCall extends EventEmitter {
                     [this.opponentDeviceId]: {
                         ...realContent,
                         device_id: this.client.deviceId,
+                        session_id: this.client.getSessionId(),
                     },
                 },
             });
@@ -2339,6 +2345,7 @@ export class MatrixCall extends EventEmitter {
         }
         this.opponentCaps = msg.capabilities || {} as CallCapabilities;
         this.opponentMember = this.client.getRoom(this.roomId).getMember(ev.getSender());
+        this.opponentSessionId = msg.session_id;
     }
 
     private async addBufferedIceCandidates(): Promise<void> {

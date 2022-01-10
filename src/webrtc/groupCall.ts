@@ -73,6 +73,7 @@ export interface IGroupCallRoomMemberFeed {
 
 export interface IGroupCallRoomMemberDevice {
     "device_id": string;
+    "session_id": string;
     "feeds": IGroupCallRoomMemberFeed[];
 }
 
@@ -532,6 +533,7 @@ export class GroupCall extends EventEmitter {
             "m.devices": [
                 {
                     "device_id": deviceId,
+                    "session_id": this.client.getSessionId(),
                     "feeds": this.getLocalFeeds().map((feed) => ({
                         purpose: feed.purpose,
                     })),
@@ -632,12 +634,6 @@ export class GroupCall extends EventEmitter {
             return;
         }
 
-        const existingCall = this.getCallByUserId(member.userId);
-
-        if (existingCall) {
-            return;
-        }
-
         const opponentDevice = this.getDeviceForMember(member.userId);
 
         if (!opponentDevice) {
@@ -649,6 +645,12 @@ export class GroupCall extends EventEmitter {
                     `Outgoing Call: No opponent device found for ${member.userId}, ignoring.`,
                 ),
             );
+            return;
+        }
+
+        const existingCall = this.getCallByUserId(member.userId);
+
+        if (existingCall && existingCall.getOpponentSessionId() === opponentDevice.session_id) {
             return;
         }
 
@@ -668,7 +670,11 @@ export class GroupCall extends EventEmitter {
             newCall.createDataChannel("datachannel", this.dataChannelOptions);
         }
 
-        this.addCall(newCall);
+        if (existingCall) {
+            this.replaceCall(existingCall, newCall);
+        } else {
+            this.addCall(newCall);
+        }
     };
 
     public getDeviceForMember(userId: string): IGroupCallRoomMemberDevice {
