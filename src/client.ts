@@ -3733,6 +3733,12 @@ export class MatrixClient extends EventEmitter {
             return null;
         }
 
+        if (event.isRedaction()) {
+            // Redactions do not support encryption in the spec at this time,
+            // whilst it mostly worked in some clients, it wasn't compliant.
+            return null;
+        }
+
         if (!this.isRoomEncrypted(event.getRoomId())) {
             return null;
         }
@@ -3859,7 +3865,7 @@ export class MatrixClient extends EventEmitter {
         txnId?: string | Callback | IRedactOpts,
         cbOrOpts?: Callback | IRedactOpts,
     ): Promise<ISendEventResponse> {
-        if (!eventId || eventId.startsWith(EVENT_ID_PREFIX)) {
+        if (!eventId?.startsWith(EVENT_ID_PREFIX)) {
             cbOrOpts = txnId as (Callback | IRedactOpts);
             txnId = eventId;
             eventId = threadId;
@@ -3870,7 +3876,7 @@ export class MatrixClient extends EventEmitter {
         const callback = typeof (cbOrOpts) === 'function' ? cbOrOpts : undefined;
         return this.sendCompleteEvent(roomId, threadId, {
             type: EventType.RoomRedaction,
-            content: { reason: reason },
+            content: { reason },
             redacts: eventId,
         }, txnId as string, callback);
     }
