@@ -728,4 +728,128 @@ describe("MatrixClient", function() {
             expect(httpLookups.length).toEqual(0);
         });
     });
+
+    describe("sendEvent", () => {
+        const roomId = "!room:example.org";
+        const body = "This is the body";
+        const content = { body };
+
+        it("overload without threadId works", async () => {
+            const eventId = "$eventId:example.org";
+            const txnId = client.makeTxnId();
+            httpLookups = [{
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                data: { event_id: eventId },
+                expectBody: content,
+            }];
+
+            await client.sendEvent(roomId, EventType.RoomMessage, content, txnId);
+        });
+
+        it("overload with null threadId works", async () => {
+            const eventId = "$eventId:example.org";
+            const txnId = client.makeTxnId();
+            httpLookups = [{
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                data: { event_id: eventId },
+                expectBody: content,
+            }];
+
+            await client.sendEvent(roomId, null, EventType.RoomMessage, content, txnId);
+        });
+
+        it("overload with threadId works", async () => {
+            const eventId = "$eventId:example.org";
+            const txnId = client.makeTxnId();
+            httpLookups = [{
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                data: { event_id: eventId },
+                expectBody: content,
+            }];
+
+            await client.sendEvent(roomId, "$threadId:server", EventType.RoomMessage, content, txnId);
+        });
+    });
+
+    describe("redactEvent", () => {
+        const roomId = "!room:example.org";
+        const mockRoom = {
+            getMyMembership: () => "join",
+            currentState: {
+                getStateEvents: (eventType, stateKey) => {
+                    if (eventType === EventType.RoomEncryption) {
+                        expect(stateKey).toEqual("");
+                        return new MatrixEvent({ content: {} });
+                    } else {
+                        throw new Error("Unexpected event type or state key");
+                    }
+                },
+            },
+            threads: {
+                get: jest.fn(),
+            },
+            addPendingEvent: jest.fn(),
+            updatePendingEvent: jest.fn(),
+        };
+
+        beforeEach(() => {
+            client.getRoom = (getRoomId) => {
+                expect(getRoomId).toEqual(roomId);
+                return mockRoom;
+            };
+        });
+
+        it("overload without threadId works", async () => {
+            const eventId = "$eventId:example.org";
+            const txnId = client.makeTxnId();
+            httpLookups = [{
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}/${txnId}`,
+                data: { event_id: eventId },
+            }];
+
+            await client.redactEvent(roomId, eventId, txnId);
+        });
+
+        it("overload with null threadId works", async () => {
+            const eventId = "$eventId:example.org";
+            const txnId = client.makeTxnId();
+            httpLookups = [{
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}/${txnId}`,
+                data: { event_id: eventId },
+            }];
+
+            await client.redactEvent(roomId, null, eventId, txnId);
+        });
+
+        it("overload with threadId works", async () => {
+            const eventId = "$eventId:example.org";
+            const txnId = client.makeTxnId();
+            httpLookups = [{
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}/${txnId}`,
+                data: { event_id: eventId },
+            }];
+
+            await client.redactEvent(roomId, "$threadId:server", eventId, txnId);
+        });
+
+        it("does not get wrongly encrypted", async () => {
+            const eventId = "$eventId:example.org";
+            const txnId = client.makeTxnId();
+            const reason = "This is the redaction reason";
+            httpLookups = [{
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}/${txnId}`,
+                expectBody: { reason }, // NOT ENCRYPTED
+                data: { event_id: eventId },
+            }];
+
+            await client.redactEvent(roomId, eventId, txnId, { reason });
+        });
+    });
 });
