@@ -622,6 +622,11 @@ describe("Room", function() {
                 }, event: true,
             })]);
         };
+        const setAlias = function(alias) {
+            room.addLiveEvents([utils.mkEvent({
+                type: "m.room.canonical_alias", room: roomId, skey: "", content: { alias }, event: true,
+            })]);
+        };
         const setRoomName = function(name) {
             room.addLiveEvents([utils.mkEvent({
                 type: "m.room.name", room: roomId, user: userA, content: {
@@ -857,7 +862,7 @@ describe("Room", function() {
             "(invite join_rules) rooms if a room name doesn't exist.", function() {
                 const alias = "#room_alias:here";
                 setJoinRule("invite");
-                setAltAliases([alias, "#another:here"]);
+                setAlias(alias);
                 room.recalculate();
                 const name = room.name;
                 expect(name).toEqual(alias);
@@ -867,10 +872,18 @@ describe("Room", function() {
             "(public join_rules) rooms if a room name doesn't exist.", function() {
                 const alias = "#room_alias:here";
                 setJoinRule("public");
-                setAltAliases([alias, "#another:here"]);
+                setAlias(alias);
                 room.recalculate();
                 const name = room.name;
                 expect(name).toEqual(alias);
+            });
+
+            it("should not show alt aliases if a room name does not exist", () => {
+                const alias = "#room_alias:here";
+                setAltAliases([alias, "#another:here"]);
+                room.recalculate();
+                const name = room.name;
+                expect(name).not.toEqual(alias);
             });
 
             it("should show the room name if one exists for private " +
