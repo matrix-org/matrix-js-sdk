@@ -2003,7 +2003,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
 
         // generate a local redaction event
         const redactionEvent = new MatrixEvent({
-            event_id: '~'+Math.random(), // TODO
+            event_id: '$was-'+event.getId(),
             type: 'm.room.redaction',
             redacts: event.getId(),
             origin_server_ts: event.getWireContent()['org.matrix.self_destruct_after'],
