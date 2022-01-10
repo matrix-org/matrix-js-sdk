@@ -3,7 +3,6 @@ import './olm-loader';
 
 import { logger } from '../src/logger';
 import { MatrixEvent } from "../src/models/event";
-import { EventEmitter } from "events";
 
 /**
  * Return a promise that is resolved when the client next emits a
