@@ -3,6 +3,7 @@ import './olm-loader';
 
 import { logger } from '../src/logger';
 import { MatrixEvent } from "../src/models/event";
+import { EventEmitter } from "events";
 
 /**
  * Return a promise that is resolved when the client next emits a
@@ -366,3 +367,5 @@ export function setHttpResponses(
     client.http.requestWithPrefix.mockImplementation(httpReq);
     client.http.request.mockImplementation(httpReq);
 }
+
+export const emitPromise = (e, k) => new Promise(r => e.once(k, r));
