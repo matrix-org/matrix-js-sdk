@@ -3726,6 +3726,12 @@ export class MatrixClient extends EventEmitter {
             return null;
         }
 
+        if (event.isRedaction()) {
+            // Redactions do not support encryption in the spec at this time,
+            // whilst it mostly worked in some clients, it wasn't compliant.
+            return null;
+        }
+
         if (!this.isRoomEncrypted(event.getRoomId())) {
             return null;
         }
