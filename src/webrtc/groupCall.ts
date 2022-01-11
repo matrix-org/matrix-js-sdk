@@ -1,7 +1,7 @@
 import EventEmitter from "events";
 import { CallFeed, SPEAKING_THRESHOLD } from "./callFeed";
 import { MatrixClient } from "../client";
-import { CallErrorCode, CallEvent, CallState, genCallID, MatrixCall, setTracksEnabled } from "./call";
+import { CallDirection, CallErrorCode, CallEvent, CallState, genCallID, MatrixCall, setTracksEnabled } from "./call";
 import { RoomMember } from "../models/room-member";
 import { Room } from "../models/room";
 import { logger } from "../logger";
@@ -650,7 +650,11 @@ export class GroupCall extends EventEmitter {
 
         const existingCall = this.getCallByUserId(member.userId);
 
-        if (existingCall && existingCall.getOpponentSessionId() === opponentDevice.session_id) {
+        if (
+            existingCall &&
+            existingCall.getOpponentSessionId() === opponentDevice.session_id &&
+            existingCall.direction === CallDirection.Inbound
+        ) {
             return;
         }
 
@@ -671,6 +675,7 @@ export class GroupCall extends EventEmitter {
         }
 
         if (existingCall) {
+            console.log("!!!!!!!!!!!!!!!!!!!! IT WORKED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
             this.replaceCall(existingCall, newCall, true);
         } else {
             this.addCall(newCall);
