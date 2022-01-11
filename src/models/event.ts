@@ -771,7 +771,7 @@ export class MatrixEvent extends EventEmitter {
     private badEncryptedMessage(reason: string): IEventDecryptionResult {
         return {
             clearEvent: {
-                type: "m.room.message",
+                type: EventType.RoomMessage,
                 content: {
                     msgtype: "m.bad.encrypted",
                     body: "** Unable to decrypt: " + reason + " **",
@@ -818,7 +818,7 @@ export class MatrixEvent extends EventEmitter {
      * @return {boolean} True if this event is encrypted.
      */
     public isEncrypted(): boolean {
-        return !this.isState() && this.event.type === "m.room.encrypted";
+        return !this.isState() && this.event.type === EventType.RoomMessageEncrypted;
     }
 
     /**
@@ -989,7 +989,7 @@ export class MatrixEvent extends EventEmitter {
      * @return {boolean} True if this event is a redaction
      */
     public isRedaction(): boolean {
-        return this.getType() === "m.room.redaction";
+        return this.getType() === EventType.RoomRedaction;
     }
 
     /**
@@ -1371,15 +1371,15 @@ const REDACT_KEEP_KEYS = new Set([
 
 // a map from event type to the .content keys we keep when an event is redacted
 const REDACT_KEEP_CONTENT_MAP = {
-    'm.room.member': { 'membership': 1 },
-    'm.room.create': { 'creator': 1 },
-    'm.room.join_rules': { 'join_rule': 1 },
-    'm.room.power_levels': {
+    [EventType.RoomMember]: { 'membership': 1 },
+    [EventType.RoomCreate]: { 'creator': 1 },
+    [EventType.RoomJoinRules]: { 'join_rule': 1 },
+    [EventType.RoomPowerLevels]: {
         'ban': 1, 'events': 1, 'events_default': 1,
         'kick': 1, 'redact': 1, 'state_default': 1,
         'users': 1, 'users_default': 1,
     },
-    'm.room.aliases': { 'aliases': 1 },
+    [EventType.RoomAliases]: { 'aliases': 1 },
 };
 
 /**
