@@ -231,7 +231,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * @returns {null} in case the members for this room haven't been stored yet
      */
     public getOutOfBandMembers(roomId: string): Promise<IEvent[] | null> {
-        return new Promise<IEvent[] | null>((resolve, reject) =>{
+        return new Promise<IEvent[] | null>((resolve, reject) => {
             const tx = this.db.transaction(["oob_membership_events"], "readonly");
             const store = tx.objectStore("oob_membership_events");
             const roomIndex = store.index("room");

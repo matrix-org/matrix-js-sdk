@@ -412,14 +412,19 @@ export interface IRoomVersionsCapability {
     "org.matrix.msc3244.room_capabilities"?: Record<string, IRoomCapability>; // MSC3244
 }
 
-export interface IChangePasswordCapability {
+export interface ICapability {
     enabled: boolean;
 }
+
+export interface IChangePasswordCapability extends ICapability {}
+
+export interface IThreadsCapability extends ICapability {}
 
 interface ICapabilities {
     [key: string]: any;
     "m.change_password"?: IChangePasswordCapability;
     "m.room_versions"?: IRoomVersionsCapability;
+    "io.element.thread"?: IThreadsCapability;
 }
 
 /* eslint-disable camelcase */
@@ -1003,7 +1008,7 @@ export class MatrixClient extends EventEmitter {
      * state change events.
      * @param {Object=} opts Options to apply when syncing.
      */
-    public async startClient(opts: IStartClientOpts) {
+    public async startClient(opts: IStartClientOpts): Promise<void> {
         if (this.clientRunning) {
             // client is already running.
             return;
@@ -1041,6 +1046,10 @@ export class MatrixClient extends EventEmitter {
             // This shouldn't happen since we thought the client was not running
             logger.error("Still have sync object whilst not running: stopping old one");
             this.syncApi.stop();
+        }
+
+        if (!this.isGuest()) {
+            await this.getCapabilities(true);
         }
 
         // shallow-copy the opts dict before modifying and storing it
@@ -3733,6 +3742,12 @@ export class MatrixClient extends EventEmitter {
             return null;
         }
 
+        if (event.isRedaction()) {
+            // Redactions do not support encryption in the spec at this time,
+            // whilst it mostly worked in some clients, it wasn't compliant.
+            return null;
+        }
+
         if (!this.isRoomEncrypted(event.getRoomId())) {
             return null;
         }
@@ -3859,7 +3874,7 @@ export class MatrixClient extends EventEmitter {
         txnId?: string | Callback | IRedactOpts,
         cbOrOpts?: Callback | IRedactOpts,
     ): Promise<ISendEventResponse> {
-        if (!eventId || eventId.startsWith(EVENT_ID_PREFIX)) {
+        if (!eventId?.startsWith(EVENT_ID_PREFIX)) {
             cbOrOpts = txnId as (Callback | IRedactOpts);
             txnId = eventId;
             eventId = threadId;
@@ -3870,7 +3885,7 @@ export class MatrixClient extends EventEmitter {
         const callback = typeof (cbOrOpts) === 'function' ? cbOrOpts : undefined;
         return this.sendCompleteEvent(roomId, threadId, {
             type: EventType.RoomRedaction,
-            content: { reason: reason },
+            content: { reason },
             redacts: eventId,
         }, txnId as string, callback);
     }

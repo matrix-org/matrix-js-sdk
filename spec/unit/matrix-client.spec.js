@@ -52,6 +52,12 @@ describe("MatrixClient", function() {
         data: SYNC_DATA,
     };
 
+    const CAPABILITIES_RESPONSE = {
+        method: "GET",
+        path: "/capabilities",
+        data: { capabilities: {} },
+    };
+
     let httpLookups = [
         // items are objects which look like:
         // {
@@ -167,6 +173,7 @@ describe("MatrixClient", function() {
         acceptKeepalives = true;
         pendingLookup = null;
         httpLookups = [];
+        httpLookups.push(CAPABILITIES_RESPONSE);
         httpLookups.push(PUSH_RULES_RESPONSE);
         httpLookups.push(FILTER_RESPONSE);
         httpLookups.push(SYNC_RESPONSE);
@@ -364,9 +371,11 @@ describe("MatrixClient", function() {
     });
 
     it("should not POST /filter if a matching filter already exists", async function() {
-        httpLookups = [];
-        httpLookups.push(PUSH_RULES_RESPONSE);
-        httpLookups.push(SYNC_RESPONSE);
+        httpLookups = [
+            CAPABILITIES_RESPONSE,
+            PUSH_RULES_RESPONSE,
+            SYNC_RESPONSE,
+        ];
         const filterId = "ehfewf";
         store.getFilterIdByName.mockReturnValue(filterId);
         const filter = new Filter(0, filterId);
@@ -447,12 +456,15 @@ describe("MatrixClient", function() {
 
     describe("retryImmediately", function() {
         it("should return false if there is no request waiting", async function() {
+            httpLookups = [];
+            httpLookups.push(CAPABILITIES_RESPONSE);
             await client.startClient();
             expect(client.retryImmediately()).toBe(false);
         });
 
         it("should work on /filter", function(done) {
             httpLookups = [];
+            httpLookups.push(CAPABILITIES_RESPONSE);
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push({
                 method: "POST", path: FILTER_PATH, error: { errcode: "NOPE_NOPE_NOPE" },
@@ -503,6 +515,7 @@ describe("MatrixClient", function() {
 
         it("should work on /pushrules", function(done) {
             httpLookups = [];
+            httpLookups.push(CAPABILITIES_RESPONSE);
             httpLookups.push({
                 method: "GET", path: "/pushrules/", error: { errcode: "NOPE_NOPE_NOPE" },
             });
@@ -559,6 +572,7 @@ describe("MatrixClient", function() {
         it("should transition null -> ERROR after a failed /filter", function(done) {
             const expectedStates = [];
             httpLookups = [];
+            httpLookups.push(CAPABILITIES_RESPONSE);
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push({
                 method: "POST", path: FILTER_PATH, error: { errcode: "NOPE_NOPE_NOPE" },
@@ -573,6 +587,7 @@ describe("MatrixClient", function() {
             const expectedStates = [];
             acceptKeepalives = false;
             httpLookups = [];
+            httpLookups.push(CAPABILITIES_RESPONSE);
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push(FILTER_RESPONSE);
             httpLookups.push({
@@ -697,7 +712,7 @@ describe("MatrixClient", function() {
 
     describe("guest rooms", function() {
         it("should only do /sync calls (without filter/pushrules)", function(done) {
-            httpLookups = []; // no /pushrules or /filter
+            httpLookups = []; // no /pushrules or /filterw
             httpLookups.push({
                 method: "GET",
                 path: "/sync",
@@ -726,6 +741,130 @@ describe("MatrixClient", function() {
             }];
             client.getPresence(userId);
             expect(httpLookups.length).toEqual(0);
+        });
+    });
+
+    describe("sendEvent", () => {
+        const roomId = "!room:example.org";
+        const body = "This is the body";
+        const content = { body };
+
+        it("overload without threadId works", async () => {
+            const eventId = "$eventId:example.org";
+            const txnId = client.makeTxnId();
+            httpLookups = [{
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                data: { event_id: eventId },
+                expectBody: content,
+            }];
+
+            await client.sendEvent(roomId, EventType.RoomMessage, content, txnId);
+        });
+
+        it("overload with null threadId works", async () => {
+            const eventId = "$eventId:example.org";
+            const txnId = client.makeTxnId();
+            httpLookups = [{
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                data: { event_id: eventId },
+                expectBody: content,
+            }];
+
+            await client.sendEvent(roomId, null, EventType.RoomMessage, content, txnId);
+        });
+
+        it("overload with threadId works", async () => {
+            const eventId = "$eventId:example.org";
+            const txnId = client.makeTxnId();
+            httpLookups = [{
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                data: { event_id: eventId },
+                expectBody: content,
+            }];
+
+            await client.sendEvent(roomId, "$threadId:server", EventType.RoomMessage, content, txnId);
+        });
+    });
+
+    describe("redactEvent", () => {
+        const roomId = "!room:example.org";
+        const mockRoom = {
+            getMyMembership: () => "join",
+            currentState: {
+                getStateEvents: (eventType, stateKey) => {
+                    if (eventType === EventType.RoomEncryption) {
+                        expect(stateKey).toEqual("");
+                        return new MatrixEvent({ content: {} });
+                    } else {
+                        throw new Error("Unexpected event type or state key");
+                    }
+                },
+            },
+            threads: {
+                get: jest.fn(),
+            },
+            addPendingEvent: jest.fn(),
+            updatePendingEvent: jest.fn(),
+        };
+
+        beforeEach(() => {
+            client.getRoom = (getRoomId) => {
+                expect(getRoomId).toEqual(roomId);
+                return mockRoom;
+            };
+        });
+
+        it("overload without threadId works", async () => {
+            const eventId = "$eventId:example.org";
+            const txnId = client.makeTxnId();
+            httpLookups = [{
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}/${txnId}`,
+                data: { event_id: eventId },
+            }];
+
+            await client.redactEvent(roomId, eventId, txnId);
+        });
+
+        it("overload with null threadId works", async () => {
+            const eventId = "$eventId:example.org";
+            const txnId = client.makeTxnId();
+            httpLookups = [{
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}/${txnId}`,
+                data: { event_id: eventId },
+            }];
+
+            await client.redactEvent(roomId, null, eventId, txnId);
+        });
+
+        it("overload with threadId works", async () => {
+            const eventId = "$eventId:example.org";
+            const txnId = client.makeTxnId();
+            httpLookups = [{
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}/${txnId}`,
+                data: { event_id: eventId },
+            }];
+
+            await client.redactEvent(roomId, "$threadId:server", eventId, txnId);
+        });
+
+        it("does not get wrongly encrypted", async () => {
+            const eventId = "$eventId:example.org";
+            const txnId = client.makeTxnId();
+            const reason = "This is the redaction reason";
+            httpLookups = [{
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}/${txnId}`,
+                expectBody: { reason }, // NOT ENCRYPTED
+                data: { event_id: eventId },
+            }];
+
+            await client.redactEvent(roomId, eventId, txnId, { reason });
         });
     });
 });

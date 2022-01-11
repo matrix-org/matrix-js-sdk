@@ -2171,15 +2171,7 @@ export class Room extends EventEmitter {
             }
         }
 
-        let alias = this.getCanonicalAlias();
-
-        if (!alias) {
-            const aliases = this.getAltAliases();
-
-            if (aliases.length) {
-                alias = aliases[0];
-            }
-        }
+        const alias = this.getCanonicalAlias();
         if (alias) {
             return alias;
         }
