@@ -1041,7 +1041,9 @@ export class MatrixClient extends EventEmitter {
             this.syncApi.stop();
         }
 
-        await this.getCapabilities(true);
+        if (!this.isGuest()) {
+            await this.getCapabilities(true);
+        }
 
         // shallow-copy the opts dict before modifying and storing it
         this.clientOpts = Object.assign({}, opts) as IStoredClientOpts;

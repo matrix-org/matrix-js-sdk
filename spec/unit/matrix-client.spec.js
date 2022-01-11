@@ -713,7 +713,6 @@ describe("MatrixClient", function() {
     describe("guest rooms", function() {
         it("should only do /sync calls (without filter/pushrules)", function(done) {
             httpLookups = []; // no /pushrules or /filterw
-            httpLookups.push(CAPABILITIES_RESPONSE);
             httpLookups.push({
                 method: "GET",
                 path: "/sync",
