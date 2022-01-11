@@ -96,7 +96,7 @@ describe("MatrixClient room timelines", function() {
         });
     }
 
-    beforeEach(function() {
+    beforeEach(async function() {
         // these tests should work with or without timelineSupport
         const testClient = new TestClient(
             userId,
@@ -117,11 +117,10 @@ describe("MatrixClient room timelines", function() {
             return NEXT_SYNC_DATA;
         });
         client.startClient();
-        return httpBackend.flush("/capabilities").then(function() {
-            return httpBackend.flush("/pushrules").then(function() {
-                return httpBackend.flush("/filter");
-            });
-        });
+
+        await httpBackend.flush("/capabilities");
+        await httpBackend.flush("/pushrules");
+        await httpBackend.flush("/filter");
     });
 
     afterEach(function() {
