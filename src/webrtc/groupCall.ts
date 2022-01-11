@@ -671,7 +671,7 @@ export class GroupCall extends EventEmitter {
         }
 
         if (existingCall) {
-            this.replaceCall(existingCall, newCall);
+            this.replaceCall(existingCall, newCall, true);
         } else {
             this.addCall(newCall);
         }
@@ -734,7 +734,7 @@ export class GroupCall extends EventEmitter {
         this.emit(GroupCallEvent.CallsChanged, this.calls);
     }
 
-    private replaceCall(existingCall: MatrixCall, replacementCall: MatrixCall) {
+    private replaceCall(existingCall: MatrixCall, replacementCall: MatrixCall, forceHangup = false) {
         const existingCallIndex = this.calls.indexOf(existingCall);
 
         if (existingCallIndex === -1) {
@@ -743,7 +743,7 @@ export class GroupCall extends EventEmitter {
 
         this.calls.splice(existingCallIndex, 1, replacementCall);
 
-        this.disposeCall(existingCall, CallErrorCode.Replaced);
+        this.disposeCall(existingCall, CallErrorCode.Replaced, forceHangup);
         this.initCall(replacementCall);
 
         this.emit(GroupCallEvent.CallsChanged, this.calls);
@@ -793,7 +793,7 @@ export class GroupCall extends EventEmitter {
         onCallFeedsChanged();
     }
 
-    private disposeCall(call: MatrixCall, hangupReason: CallErrorCode) {
+    private disposeCall(call: MatrixCall, hangupReason: CallErrorCode, forceHangup = false) {
         const opponentMemberId = getCallUserId(call);
 
         if (!opponentMemberId) {
@@ -814,7 +814,7 @@ export class GroupCall extends EventEmitter {
 
         this.callHandlers.delete(opponentMemberId);
 
-        if (call.hangupReason === CallErrorCode.Replaced) {
+        if (call.hangupReason === CallErrorCode.Replaced && !forceHangup) {
             return;
         }
 
