@@ -349,10 +349,10 @@ HttpResponse.CAPABILITIES_RESPONSE = {
 
 HttpResponse.defaultResponses = function(userId) {
     return [
+        HttpResponse.CAPABILITIES_RESPONSE,
         HttpResponse.PUSH_RULES_RESPONSE,
         HttpResponse.filterResponse(userId),
         HttpResponse.SYNC_RESPONSE,
-        HttpResponse.CAPABILITIES_RESPONSE,
     ];
 };
 
@@ -364,6 +364,4 @@ export function setHttpResponses(
             .when(response.method, response.path)
             .respond(200, response.data);
     });
-
-    httpBackend.flushAllExpected();
 }

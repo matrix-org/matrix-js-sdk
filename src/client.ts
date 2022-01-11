@@ -1001,7 +1001,7 @@ export class MatrixClient extends EventEmitter {
      * state change events.
      * @param {Object=} opts Options to apply when syncing.
      */
-    public async startClient(opts: IStartClientOpts) {
+    public async startClient(opts: IStartClientOpts): Promise<void> {
         if (this.clientRunning) {
             // client is already running.
             return;

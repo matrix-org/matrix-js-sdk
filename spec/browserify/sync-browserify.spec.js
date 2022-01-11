@@ -44,7 +44,7 @@ describe("Browserify Test", function() {
 
     afterEach(async () => {
         client.stopClient();
-        await httpBackend.stop();
+        httpBackend.stop();
     });
 
     it("Sync", async function() {
