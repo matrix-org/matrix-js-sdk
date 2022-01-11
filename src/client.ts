@@ -1041,7 +1041,9 @@ export class MatrixClient extends EventEmitter {
             this.syncApi.stop();
         }
 
-        await this.getCapabilities(true);
+        if (!this.isGuest()) {
+            await this.getCapabilities(true);
+        }
 
         // shallow-copy the opts dict before modifying and storing it
         this.clientOpts = Object.assign({}, opts) as IStoredClientOpts;
@@ -1467,7 +1469,7 @@ export class MatrixClient extends EventEmitter {
             }
         }
 
-        return this.http.authedRequest(
+        return this.http.request(
             undefined, Method.Get, "/capabilities",
         ).catch((e: Error): void => {
             // We swallow errors because we need a default object anyhow
