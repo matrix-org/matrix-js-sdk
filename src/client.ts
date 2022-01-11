@@ -1469,7 +1469,7 @@ export class MatrixClient extends EventEmitter {
             }
         }
 
-        return this.http.request(
+        return this.http.authedRequest(
             undefined, Method.Get, "/capabilities",
         ).catch((e: Error): void => {
             // We swallow errors because we need a default object anyhow
