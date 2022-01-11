@@ -357,7 +357,7 @@ HttpResponse.defaultResponses = function(userId) {
 };
 
 export function setHttpResponses(
-    httpBackend, responses
+    httpBackend, responses,
 ) {
     responses.forEach(response => {
         httpBackend

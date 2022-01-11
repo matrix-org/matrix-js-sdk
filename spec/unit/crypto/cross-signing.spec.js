@@ -47,7 +47,7 @@ async function makeTestClient(userInfo, options, keys) {
 
     await client.initCrypto();
 
-    return { client, httpBackend: testClient.httpBackend  };
+    return { client, httpBackend: testClient.httpBackend };
 }
 
 describe("Cross Signing", function() {
