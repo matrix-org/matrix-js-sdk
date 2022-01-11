@@ -36,6 +36,7 @@ export interface MCallBase {
     call_id: string;
     version: string | number;
     party_id?: string;
+    session_id?: string;
 }
 
 export interface MCallAnswer extends MCallBase {
@@ -54,6 +55,7 @@ export interface MCallInviteNegotiate extends MCallBase {
     lifetime: number;
     capabilities?: CallCapabilities;
     invitee?: string;
+    session_id?: string;
     [SDPStreamMetadataKey]: SDPStreamMetadata;
 }
 

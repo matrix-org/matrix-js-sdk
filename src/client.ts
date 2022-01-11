@@ -758,6 +758,7 @@ export class MatrixClient extends EventEmitter {
     protected exportedOlmDeviceToImport: IOlmDevice;
     protected txnCtr = 0;
     protected mediaHandler = new MediaHandler(this);
+    protected sessionId: string;
 
     constructor(opts: IMatrixClientCreateOpts) {
         super();
@@ -771,6 +772,7 @@ export class MatrixClient extends EventEmitter {
         this.usingExternalCrypto = opts.usingExternalCrypto;
         this.store = opts.store || new StubStore();
         this.deviceId = opts.deviceId || null;
+        this.sessionId = randomString(10);
 
         const userId = opts.userId || null;
         this.credentials = { userId };
@@ -1257,6 +1259,14 @@ export class MatrixClient extends EventEmitter {
      */
     public getDeviceId(): string {
         return this.deviceId;
+    }
+
+    /**
+     * Get the session ID of this client
+     * @return {string} session ID
+     */
+    public getSessionId(): string {
+        return this.sessionId;
     }
 
     /**

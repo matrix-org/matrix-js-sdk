@@ -73,6 +73,7 @@ export interface IGroupCallRoomMemberFeed {
 
 export interface IGroupCallRoomMemberDevice {
     "device_id": string;
+    "session_id": string;
     "feeds": IGroupCallRoomMemberFeed[];
 }
 
@@ -532,6 +533,7 @@ export class GroupCall extends EventEmitter {
             "m.devices": [
                 {
                     "device_id": deviceId,
+                    "session_id": this.client.getSessionId(),
                     "feeds": this.getLocalFeeds().map((feed) => ({
                         purpose: feed.purpose,
                     })),
@@ -632,12 +634,6 @@ export class GroupCall extends EventEmitter {
             return;
         }
 
-        const existingCall = this.getCallByUserId(member.userId);
-
-        if (existingCall) {
-            return;
-        }
-
         const opponentDevice = this.getDeviceForMember(member.userId);
 
         if (!opponentDevice) {
@@ -649,6 +645,12 @@ export class GroupCall extends EventEmitter {
                     `Outgoing Call: No opponent device found for ${member.userId}, ignoring.`,
                 ),
             );
+            return;
+        }
+
+        const existingCall = this.getCallByUserId(member.userId);
+
+        if (existingCall && existingCall.getOpponentSessionId() === opponentDevice.session_id) {
             return;
         }
 
@@ -668,7 +670,11 @@ export class GroupCall extends EventEmitter {
             newCall.createDataChannel("datachannel", this.dataChannelOptions);
         }
 
-        this.addCall(newCall);
+        if (existingCall) {
+            this.replaceCall(existingCall, newCall, true);
+        } else {
+            this.addCall(newCall);
+        }
     };
 
     public getDeviceForMember(userId: string): IGroupCallRoomMemberDevice {
@@ -728,7 +734,7 @@ export class GroupCall extends EventEmitter {
         this.emit(GroupCallEvent.CallsChanged, this.calls);
     }
 
-    private replaceCall(existingCall: MatrixCall, replacementCall: MatrixCall) {
+    private replaceCall(existingCall: MatrixCall, replacementCall: MatrixCall, forceHangup = false) {
         const existingCallIndex = this.calls.indexOf(existingCall);
 
         if (existingCallIndex === -1) {
@@ -737,7 +743,7 @@ export class GroupCall extends EventEmitter {
 
         this.calls.splice(existingCallIndex, 1, replacementCall);
 
-        this.disposeCall(existingCall, CallErrorCode.Replaced);
+        this.disposeCall(existingCall, CallErrorCode.Replaced, forceHangup);
         this.initCall(replacementCall);
 
         this.emit(GroupCallEvent.CallsChanged, this.calls);
@@ -787,7 +793,7 @@ export class GroupCall extends EventEmitter {
         onCallFeedsChanged();
     }
 
-    private disposeCall(call: MatrixCall, hangupReason: CallErrorCode) {
+    private disposeCall(call: MatrixCall, hangupReason: CallErrorCode, forceHangup = false) {
         const opponentMemberId = getCallUserId(call);
 
         if (!opponentMemberId) {
@@ -808,7 +814,7 @@ export class GroupCall extends EventEmitter {
 
         this.callHandlers.delete(opponentMemberId);
 
-        if (call.hangupReason === CallErrorCode.Replaced) {
+        if (call.hangupReason === CallErrorCode.Replaced && !forceHangup) {
             return;
         }
 
