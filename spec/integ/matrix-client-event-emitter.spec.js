@@ -13,6 +13,7 @@ describe("MatrixClient events", function() {
         httpBackend = testClient.httpBackend;
         httpBackend.when("GET", "/pushrules").respond(200, {});
         httpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+        httpBackend.when("GET", "/capabilities").respond(200, { capabilities: {} });
     });
 
     afterEach(function() {

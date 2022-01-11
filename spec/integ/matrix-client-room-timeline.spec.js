@@ -109,6 +109,7 @@ describe("MatrixClient room timelines", function() {
         client = testClient.client;
 
         setNextSyncData();
+        httpBackend.when("GET", "/capabilities").respond(200, { capabilities: {} });
         httpBackend.when("GET", "/pushrules").respond(200, {});
         httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
         httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
@@ -116,8 +117,10 @@ describe("MatrixClient room timelines", function() {
             return NEXT_SYNC_DATA;
         });
         client.startClient();
-        return httpBackend.flush("/pushrules").then(function() {
-            return httpBackend.flush("/filter");
+        return httpBackend.flush("/capabilities").then(function() {
+            return httpBackend.flush("/pushrules").then(function() {
+                return httpBackend.flush("/filter");
+            });
         });
     });
 

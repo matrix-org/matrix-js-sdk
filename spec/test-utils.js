@@ -341,28 +341,29 @@ HttpResponse.SYNC_RESPONSE = {
     data: HttpResponse.SYNC_DATA,
 };
 
+HttpResponse.CAPABILITIES_RESPONSE = {
+    method: "GET",
+    path: "/capabilities",
+    data: { capabilities: {} },
+};
+
 HttpResponse.defaultResponses = function(userId) {
     return [
         HttpResponse.PUSH_RULES_RESPONSE,
         HttpResponse.filterResponse(userId),
         HttpResponse.SYNC_RESPONSE,
+        HttpResponse.CAPABILITIES_RESPONSE,
     ];
 };
 
 export function setHttpResponses(
-    client, responses, acceptKeepalives, ignoreUnhandledSyncs,
+    httpBackend, responses
 ) {
-    const httpResponseObj = new HttpResponse(
-        responses, acceptKeepalives, ignoreUnhandledSyncs,
-    );
+    responses.forEach(response => {
+        httpBackend
+            .when(response.method, response.path)
+            .respond(200, response.data);
+    });
 
-    const httpReq = httpResponseObj.request.bind(httpResponseObj);
-    client.http = [
-        "authedRequest", "authedRequestWithPrefix", "getContentUri",
-        "request", "requestWithPrefix", "uploadContent",
-    ].reduce((r, k) => {r[k] = jest.fn(); return r;}, {});
-    client.http.authedRequest.mockImplementation(httpReq);
-    client.http.authedRequestWithPrefix.mockImplementation(httpReq);
-    client.http.requestWithPrefix.mockImplementation(httpReq);
-    client.http.request.mockImplementation(httpReq);
+    httpBackend.flushAllExpected();
 }

@@ -52,6 +52,12 @@ describe("MatrixClient", function() {
         data: SYNC_DATA,
     };
 
+    const CAPABILITIES_RESPONSE = {
+        method: "GET",
+        path: "/capabilities",
+        data: { capabilities: {} },
+    };
+
     let httpLookups = [
         // items are objects which look like:
         // {
@@ -167,6 +173,7 @@ describe("MatrixClient", function() {
         acceptKeepalives = true;
         pendingLookup = null;
         httpLookups = [];
+        httpLookups.push(CAPABILITIES_RESPONSE);
         httpLookups.push(PUSH_RULES_RESPONSE);
         httpLookups.push(FILTER_RESPONSE);
         httpLookups.push(SYNC_RESPONSE);
@@ -364,9 +371,11 @@ describe("MatrixClient", function() {
     });
 
     it("should not POST /filter if a matching filter already exists", async function() {
-        httpLookups = [];
-        httpLookups.push(PUSH_RULES_RESPONSE);
-        httpLookups.push(SYNC_RESPONSE);
+        httpLookups = [
+            CAPABILITIES_RESPONSE,
+            PUSH_RULES_RESPONSE,
+            SYNC_RESPONSE,
+        ];
         const filterId = "ehfewf";
         store.getFilterIdByName.mockReturnValue(filterId);
         const filter = new Filter(0, filterId);
@@ -447,12 +456,15 @@ describe("MatrixClient", function() {
 
     describe("retryImmediately", function() {
         it("should return false if there is no request waiting", async function() {
+            httpLookups = [];
+            httpLookups.push(CAPABILITIES_RESPONSE);
             await client.startClient();
             expect(client.retryImmediately()).toBe(false);
         });
 
         it("should work on /filter", function(done) {
             httpLookups = [];
+            httpLookups.push(CAPABILITIES_RESPONSE);
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push({
                 method: "POST", path: FILTER_PATH, error: { errcode: "NOPE_NOPE_NOPE" },
@@ -503,6 +515,7 @@ describe("MatrixClient", function() {
 
         it("should work on /pushrules", function(done) {
             httpLookups = [];
+            httpLookups.push(CAPABILITIES_RESPONSE);
             httpLookups.push({
                 method: "GET", path: "/pushrules/", error: { errcode: "NOPE_NOPE_NOPE" },
             });
@@ -559,6 +572,7 @@ describe("MatrixClient", function() {
         it("should transition null -> ERROR after a failed /filter", function(done) {
             const expectedStates = [];
             httpLookups = [];
+            httpLookups.push(CAPABILITIES_RESPONSE);
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push({
                 method: "POST", path: FILTER_PATH, error: { errcode: "NOPE_NOPE_NOPE" },
@@ -573,6 +587,7 @@ describe("MatrixClient", function() {
             const expectedStates = [];
             acceptKeepalives = false;
             httpLookups = [];
+            httpLookups.push(CAPABILITIES_RESPONSE);
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push(FILTER_RESPONSE);
             httpLookups.push({
@@ -697,7 +712,8 @@ describe("MatrixClient", function() {
 
     describe("guest rooms", function() {
         it("should only do /sync calls (without filter/pushrules)", function(done) {
-            httpLookups = []; // no /pushrules or /filter
+            httpLookups = []; // no /pushrules or /filterw
+            httpLookups.push(CAPABILITIES_RESPONSE);
             httpLookups.push({
                 method: "GET",
                 path: "/sync",

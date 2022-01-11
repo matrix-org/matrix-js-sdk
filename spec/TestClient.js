@@ -90,6 +90,8 @@ TestClient.prototype.start = function() {
     this.httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
     this.expectDeviceKeyUpload();
 
+    this.httpBackend.when("GET", "/capabilities").respond(200, { capabilities: {} });
+
     // we let the client do a very basic initial sync, which it needs before
     // it will upload one-time keys.
     this.httpBackend.when("GET", "/sync").respond(200, { next_batch: 1 });
