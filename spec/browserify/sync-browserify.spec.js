@@ -25,8 +25,6 @@ const DEVICE_ID = "device_id";
 const ACCESS_TOKEN = "access_token";
 const ROOM_ID = "!room_id:server.test";
 
-/* global matrixcs */
-
 describe("Browserify Test", function() {
     let client;
     let httpBackend;
