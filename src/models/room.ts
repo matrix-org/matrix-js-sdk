@@ -2302,12 +2302,12 @@ function pendingEventsKey(roomId: string): string {
     return `mx_pending_events_${roomId}`;
 }
 
-/* a map from current event status to a list of allowed next statuses
-     */
+// a map from current event status to a list of allowed next statuses
 const ALLOWED_TRANSITIONS: Record<EventStatus, EventStatus[]> = {
     [EventStatus.ENCRYPTING]: [
         EventStatus.SENDING,
         EventStatus.NOT_SENT,
+        EventStatus.CANCELLED,
     ],
     [EventStatus.SENDING]: [
         EventStatus.ENCRYPTING,
