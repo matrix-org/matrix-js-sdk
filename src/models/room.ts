@@ -1441,6 +1441,15 @@ export class Room extends EventEmitter {
                 // (in the sender and target fields). We should get those
                 // RoomMember objects to update themselves when the events that
                 // they are based on are changed.
+
+                // Remove any visibility change on this event.
+                this.visibilityEvents.delete(redactId);
+
+                // If this event is a visibility change event, remove it from the
+                // list of visibility changes and update any event affected by it.
+                if (redactedEvent.isVisibilityEvent()) {
+                    this.redactVisibilityChangeEvent(event);
+                }
             }
 
             // FIXME: apply redactions to notification list
@@ -1448,15 +1457,6 @@ export class Room extends EventEmitter {
             // NB: We continue to add the redaction event to the timeline so
             // clients can say "so and so redacted an event" if they wish to. Also
             // this may be needed to trigger an update.
-
-            // Remove any visibility change on this event.
-            this.visibilityEvents.delete(redactId);
-
-            // If this event is a visibility change event, remove it from the
-            // list of visibility changes and update any event affected by it.
-            if (redactedEvent.isVisibilityEvent()) {
-                this.redactVisibilityChangeEvent(event);
-            }
         }
 
         // Implement MSC3531: hiding messages.
