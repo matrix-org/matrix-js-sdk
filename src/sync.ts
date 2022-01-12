@@ -201,6 +201,7 @@ export class SyncApi {
             "Room.accountData",
             "Room.myMembership",
             "Room.replaceEvent",
+            "Room.visibilityChange",
         ]);
         this.registerStateListeners(room);
         return room;

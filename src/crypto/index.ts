@@ -2728,7 +2728,6 @@ export class Crypto extends EventEmitter {
         }
     }
 
-    /* eslint-disable valid-jsdoc */    //https://github.com/eslint/eslint/issues/7307
     /**
      * Encrypt an event according to the configuration of the room.
      *
@@ -2739,8 +2738,6 @@ export class Crypto extends EventEmitter {
      * @return {Promise?} Promise which resolves when the event has been
      *     encrypted, or null if nothing was needed
      */
-    /* eslint-enable valid-jsdoc */
-    // TODO this return type lies
     public async encryptEvent(event: MatrixEvent, room: Room): Promise<void> {
         if (!room) {
             throw new Error("Cannot send encrypted messages in unknown rooms");
