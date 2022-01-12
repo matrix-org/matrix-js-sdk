@@ -177,6 +177,16 @@ export const UNSTABLE_ELEMENT_FUNCTIONAL_USERS = new UnstableValue(
     "io.element.functional_members",
     "io.element.functional_members");
 
+/**
+ * A type of message that affects visibility of a message,
+ * as per https://github.com/matrix-org/matrix-doc/pull/3531
+ *
+ * @experimental
+ */
+export const EVENT_VISIBILITY_CHANGE_TYPE = new UnstableValue(
+    "m.visibility",
+    "org.matrix.msc3531.visibility");
+
 export interface IEncryptedFile {
     url: string;
     mimetype?: string;
