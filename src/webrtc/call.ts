@@ -217,6 +217,11 @@ export enum CallErrorCode {
      * We transferred the call off to somewhere else
      */
     Transfered = 'transferred',
+
+    /**
+     * A call from the same user was found with a new session id
+     */
+    NewSession = 'new_session',
 }
 
 /**

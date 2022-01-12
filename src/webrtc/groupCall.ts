@@ -512,7 +512,7 @@ export class GroupCall extends EventEmitter {
 
         // Check if the user calling has an existing call and use this call instead.
         if (existingCall) {
-            this.replaceCall(existingCall, newCall);
+            this.replaceCall(existingCall, newCall, CallErrorCode.NewSession);
         } else {
             this.addCall(newCall);
         }
@@ -675,8 +675,7 @@ export class GroupCall extends EventEmitter {
         }
 
         if (existingCall) {
-            console.log("!!!!!!!!!!!!!!!!!!!! IT WORKED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-            this.replaceCall(existingCall, newCall, true);
+            this.replaceCall(existingCall, newCall, CallErrorCode.NewSession);
         } else {
             this.addCall(newCall);
         }
@@ -739,7 +738,7 @@ export class GroupCall extends EventEmitter {
         this.emit(GroupCallEvent.CallsChanged, this.calls);
     }
 
-    private replaceCall(existingCall: MatrixCall, replacementCall: MatrixCall, forceHangup = false) {
+    private replaceCall(existingCall: MatrixCall, replacementCall: MatrixCall, hangupReason = CallErrorCode.Replaced) {
         const existingCallIndex = this.calls.indexOf(existingCall);
 
         if (existingCallIndex === -1) {
@@ -748,7 +747,7 @@ export class GroupCall extends EventEmitter {
 
         this.calls.splice(existingCallIndex, 1, replacementCall);
 
-        this.disposeCall(existingCall, CallErrorCode.Replaced, forceHangup);
+        this.disposeCall(existingCall, hangupReason);
         this.initCall(replacementCall);
 
         this.emit(GroupCallEvent.CallsChanged, this.calls);
@@ -798,7 +797,7 @@ export class GroupCall extends EventEmitter {
         onCallFeedsChanged();
     }
 
-    private disposeCall(call: MatrixCall, hangupReason: CallErrorCode, forceHangup = false) {
+    private disposeCall(call: MatrixCall, hangupReason: CallErrorCode) {
         const opponentMemberId = getCallUserId(call);
 
         if (!opponentMemberId) {
@@ -819,7 +818,7 @@ export class GroupCall extends EventEmitter {
 
         this.callHandlers.delete(opponentMemberId);
 
-        if (call.hangupReason === CallErrorCode.Replaced && !forceHangup) {
+        if (call.hangupReason === CallErrorCode.Replaced) {
             return;
         }
 
