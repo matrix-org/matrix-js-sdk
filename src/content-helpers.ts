@@ -1,6 +1,5 @@
 /*
-Copyright 2018 New Vector Ltd
-Copyright 2018 - 2021 The Matrix.org Foundation C.I.C.
+Copyright 2018 - 2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +19,6 @@ limitations under the License.
 import { MsgType } from "./@types/event";
 import { TEXT_NODE_TYPE } from "./@types/extensible_events";
 import { ILocationContent, LOCATION_EVENT_TYPE, TIMESTAMP_NODE_TYPE } from "./@types/location";
-import { IPollContent, POLL_START_EVENT_TYPE } from "./@types/polls";
 
 /**
  * Generates the content for a HTML Message event
@@ -100,35 +98,6 @@ export function makeEmoteMessage(body: string) {
     return {
         msgtype: MsgType.Emote,
         body: body,
-    };
-}
-
-/**
- * Generates the content for a Poll Start event
- * @param question the poll question
- * @param answers the possible answers
- * @param kind whether the poll is disclosed or undisclosed. Allowed values are
- *             "m.poll.disclosed" or "m.poll.undisclosed", or the unstable equivalents
- */
-export function makePollContent(
-    question: string,
-    answers: string[],
-    kind: string,
-): IPollContent {
-    question = question.trim();
-    answers = answers.map(a => a.trim()).filter(a => !!a);
-    return {
-        [TEXT_NODE_TYPE.name]:
-            `${question}\n${answers.map((a, i) => `${i + 1}. ${a}`).join('\n')}`,
-        [POLL_START_EVENT_TYPE.name]: {
-            kind: kind,
-            question: {
-                [TEXT_NODE_TYPE.name]: question,
-            },
-            answers: answers.map(
-                (a, i) => ({ id: `${i}-${a}`, [TEXT_NODE_TYPE.name]: a }),
-            ),
-        },
     };
 }
 
