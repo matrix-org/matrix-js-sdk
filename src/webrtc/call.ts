@@ -2161,6 +2161,8 @@ export class MatrixCall extends EventEmitter {
         if (shouldEmit) {
             this.emit(CallEvent.Hangup, this);
         }
+
+        this.client.callEventHandler.calls.delete(this.callId);
     }
 
     private stopAllMedia(): void {
