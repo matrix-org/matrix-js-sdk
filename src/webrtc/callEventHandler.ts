@@ -20,7 +20,6 @@ import { createNewMatrixCall, MatrixCall, CallErrorCode, CallState, CallDirectio
 import { EventType } from '../@types/event';
 import { MatrixClient } from '../client';
 import { MCallAnswer, MCallHangupReject } from "./callEventTypes";
-import { SyncState } from "../sync.api";
 import { GroupCallError, GroupCallErrorCode, GroupCallEvent } from './groupCall';
 
 // Don't ring unless we'd be ringing for at least 3 seconds: the user needs some
@@ -33,7 +32,7 @@ export class CallEventHandler {
     callEventBuffer: MatrixEvent[];
     candidateEventsByCall: Map<string, Array<MatrixEvent>>;
 
-    private toDeviceCallEventBuffer: MatrixEvent[] = [];
+    private eventBufferPromiseChain?: Promise<void>;
 
     constructor(client: MatrixClient) {
         this.client = client;
@@ -63,101 +62,60 @@ export class CallEventHandler {
     }
 
     private onSync = (): void => {
-        this.evaluateEventBuffer();
-        this.evaluateToDeviceEventBuffer();
+        // Process the current event buffer and start queuing into a new one.
+        const currentEventBuffer = this.callEventBuffer;
+        this.callEventBuffer = [];
+
+        // Ensure correct ordering by only processing this queue after the previous one has finished processing
+        if (this.eventBufferPromiseChain) {
+            this.eventBufferPromiseChain =
+                this.eventBufferPromiseChain.then(() => this.evaluateEventBuffer(currentEventBuffer));
+        } else {
+            this.eventBufferPromiseChain = this.evaluateEventBuffer(currentEventBuffer);
+        }
     };
 
-    private async evaluateEventBuffer() {
-        if (this.client.getSyncState() === SyncState.Syncing) {
-            await Promise.all(this.callEventBuffer.map(event => {
-                this.client.decryptEventIfNeeded(event);
-            }));
-
-            const ignoreCallIds = new Set<String>();
-            // inspect the buffer and mark all calls which have been answered
-            // or hung up before passing them to the call event handler.
-            for (const ev of this.callEventBuffer) {
-                if (ev.getType() === EventType.CallAnswer ||
-                        ev.getType() === EventType.CallHangup) {
-                    ignoreCallIds.add(ev.getContent().call_id);
-                }
-            }
-            // now loop through the buffer chronologically and inject them
-            for (const e of this.callEventBuffer) {
-                if (
-                    e.getType() === EventType.CallInvite &&
-                    ignoreCallIds.has(e.getContent().call_id)
-                ) {
-                    // This call has previously been answered or hung up: ignore it
-                    continue;
-                }
-                try {
-                    await this.handleCallEvent(e);
-                } catch (e) {
-                    logger.error("Caught exception handling call event", e);
-                }
-            }
-            this.callEventBuffer = [];
-        }
-    }
-
     private onRoomTimeline = (event: MatrixEvent) => {
-        this.client.decryptEventIfNeeded(event);
-        // any call events or ones that might be once they're decrypted
-        if (this.eventIsACall(event) || event.isBeingDecrypted()) {
-            // queue up for processing once all events from this sync have been
-            // processed (see above).
-            this.callEventBuffer.push(event);
-        }
-
-        if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
-            // add an event listener for once the event is decrypted.
-            event.once("Event.decrypted", async () => {
-                if (!this.eventIsACall(event)) return;
-
-                if (this.callEventBuffer.includes(event)) {
-                    // we were waiting for that event to decrypt, so recheck the buffer
-                    this.evaluateEventBuffer();
-                } else {
-                    // This one wasn't buffered so just run the event handler for it
-                    // straight away
-                    try {
-                        await this.handleCallEvent(event);
-                    } catch (e) {
-                        logger.error("Caught exception handling call event", e);
-                    }
-                }
-            });
-        }
+        this.callEventBuffer.push(event);
     };
 
     private onToDeviceEvent = (event: MatrixEvent): void => {
-        if (!this.eventIsACall(event)) return;
-
-        this.toDeviceCallEventBuffer.push(event);
+        this.callEventBuffer.push(event);
     };
 
-    private async evaluateToDeviceEventBuffer(): Promise<void> {
-        if (this.client.getSyncState() !== SyncState.Syncing) return;
+    private async evaluateEventBuffer(eventBuffer: MatrixEvent[]) {
+        await Promise.all(eventBuffer.map((event) => this.client.decryptEventIfNeeded(event)));
 
-        for (const event of this.toDeviceCallEventBuffer) {
+        const callEvents = eventBuffer.filter((event) => event.getType().startsWith("m.call."));
+
+        const ignoreCallIds = new Set<String>();
+
+        // inspect the buffer and mark all calls which have been answered
+        // or hung up before passing them to the call event handler.
+        for (const event of callEvents) {
+            const eventType = event.getType();
+
+            if (eventType=== EventType.CallAnswer || eventType === EventType.CallHangup) {
+                ignoreCallIds.add(event.getContent().call_id);
+            }
+        }
+
+        // Process call events in the order that they were received
+        for (const event of callEvents) {
+            const eventType = event.getType();
+            const callId = event.getContent().call_id;
+
+            if (eventType === EventType.CallInvite && ignoreCallIds.has(callId)) {
+                // This call has previously been answered or hung up: ignore it
+                continue;
+            }
+
             try {
                 await this.handleCallEvent(event);
             } catch (e) {
                 logger.error("Caught exception handling call event", e);
             }
         }
-
-        this.toDeviceCallEventBuffer = [];
-    }
-
-    private eventIsACall(event: MatrixEvent): boolean {
-        const type = event.getType();
-        /**
-         * Unstable prefixes:
-         *   - org.matrix.call. : MSC3086 https://github.com/matrix-org/matrix-doc/pull/3086
-         */
-        return type.startsWith("m.call.") || type.startsWith("org.matrix.call.");
     }
 
     private async handleCallEvent(event: MatrixEvent) {
