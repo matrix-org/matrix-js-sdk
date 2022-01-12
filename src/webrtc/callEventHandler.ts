@@ -86,7 +86,10 @@ export class CallEventHandler {
     private async evaluateEventBuffer(eventBuffer: MatrixEvent[]) {
         await Promise.all(eventBuffer.map((event) => this.client.decryptEventIfNeeded(event)));
 
-        const callEvents = eventBuffer.filter((event) => event.getType().startsWith("m.call."));
+        const callEvents = eventBuffer.filter((event) => {
+            const eventType = event.getType();
+            return eventType.startsWith("m.call.") || eventType.startsWith("org.matrix.call.");
+        });
 
         const ignoreCallIds = new Set<String>();
 
