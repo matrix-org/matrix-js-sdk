@@ -512,7 +512,7 @@ export class GroupCall extends EventEmitter {
 
         // Check if the user calling has an existing call and use this call instead.
         if (existingCall) {
-            this.replaceCall(existingCall, newCall, CallErrorCode.NewSession);
+            this.replaceCall(existingCall, newCall);
         } else {
             this.addCall(newCall);
         }
