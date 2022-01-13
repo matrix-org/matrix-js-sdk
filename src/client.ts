@@ -20,7 +20,7 @@ limitations under the License.
  */
 
 import { EventEmitter } from "events";
-import { EmoteEvent, MessageEvent, NoticeEvent } from "matrix-events-sdk";
+import { EmoteEvent, MessageEvent, NoticeEvent, IPartialEvent } from "matrix-events-sdk";
 
 import { ISyncStateData, SyncApi, SyncState } from "./sync";
 import { EventStatus, IContent, IDecryptOptions, IEvent, MatrixEvent } from "./models/event";
@@ -160,7 +160,6 @@ import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, Rule
 import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
 import { MediaHandler } from "./webrtc/mediaHandler";
-import { IPartialEvent } from "matrix-events-sdk";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -3955,9 +3954,9 @@ export class MatrixClient extends EventEmitter {
             if (content['msgtype'] === MsgType.Text) {
                 newEvent = MessageEvent.from(content['body'], content['formatted_body']).serialize();
             } else if (content['msgtype'] === MsgType.Emote) {
-                newEvent =  EmoteEvent.from(content['body'], content['formatted_body']).serialize();
+                newEvent = EmoteEvent.from(content['body'], content['formatted_body']).serialize();
             } else if (content['msgtype'] === MsgType.Notice) {
-                newEvent =  NoticeEvent.from(content['body'], content['formatted_body']).serialize();
+                newEvent = NoticeEvent.from(content['body'], content['formatted_body']).serialize();
             }
 
             if (newEvent && content['m.new_content'] && recurse) {
