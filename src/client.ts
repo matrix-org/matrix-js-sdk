@@ -20,7 +20,7 @@ limitations under the License.
  */
 
 import { EventEmitter } from "events";
-import { EmoteEvent, MessageEvent, NoticeEvent } from "matrix-events-sdk";
+import { EmoteEvent, MessageEvent, NoticeEvent, IPartialEvent } from "matrix-events-sdk";
 
 import { ISyncStateData, SyncApi, SyncState } from "./sync";
 import { EventStatus, IContent, IDecryptOptions, IEvent, MatrixEvent } from "./models/event";
@@ -3948,18 +3948,39 @@ export class MatrixClient extends EventEmitter {
         // reasonably large pool of messages to parse.
         let eventType: string = EventType.RoomMessage;
         let sendContent: IContent = content as IContent;
-        if (sendContent['msgtype'] === MsgType.Text) {
-            const serialized = MessageEvent.from(sendContent['body'], sendContent['formatted_body']).serialize();
-            eventType = serialized.type;
-            sendContent = serialized.content;
-        } else if (sendContent['msgtype'] === MsgType.Emote) {
-            const serialized = EmoteEvent.from(sendContent['body'], sendContent['formatted_body']).serialize();
-            eventType = serialized.type;
-            sendContent = serialized.content;
-        } else if (sendContent['msgtype'] === MsgType.Notice) {
-            const serialized = NoticeEvent.from(sendContent['body'], sendContent['formatted_body']).serialize();
-            eventType = serialized.type;
-            sendContent = serialized.content;
+        const makeContentExtensible = (content: IContent, recurse = true): IPartialEvent<object> => {
+            let newEvent: IPartialEvent<object> = null;
+
+            if (content['msgtype'] === MsgType.Text) {
+                newEvent = MessageEvent.from(content['body'], content['formatted_body']).serialize();
+            } else if (content['msgtype'] === MsgType.Emote) {
+                newEvent = EmoteEvent.from(content['body'], content['formatted_body']).serialize();
+            } else if (content['msgtype'] === MsgType.Notice) {
+                newEvent = NoticeEvent.from(content['body'], content['formatted_body']).serialize();
+            }
+
+            if (newEvent && content['m.new_content'] && recurse) {
+                const newContent = makeContentExtensible(content['m.new_content'], false);
+                if (newContent) {
+                    newEvent.content['m.new_content'] = newContent.content;
+                }
+            }
+
+            if (newEvent) {
+                // copy over all other fields we don't know about
+                for (const [k, v] of Object.entries(content)) {
+                    if (!newEvent.content.hasOwnProperty(k)) {
+                        newEvent.content[k] = v;
+                    }
+                }
+            }
+
+            return newEvent;
+        };
+        const result = makeContentExtensible(sendContent);
+        if (result) {
+            eventType = result.type;
+            sendContent = result.content;
         }
 
         return this.sendEvent(
