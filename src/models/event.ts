@@ -1,5 +1,5 @@
 /*
-Copyright 2015 - 2021 The Matrix.org Foundation C.I.C.
+Copyright 2015 - 2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ limitations under the License.
  */
 
 import { EventEmitter } from 'events';
+import { ExtensibleEvent, ExtensibleEvents, Optional } from "matrix-events-sdk";
 
 import { logger } from '../logger';
 import { VerificationRequest } from "../crypto/verification/request/VerificationRequest";
@@ -210,6 +211,12 @@ export class MatrixEvent extends EventEmitter {
     */
     private visibility: MessageVisibility = MESSAGE_VISIBLE;
 
+    // Not all events will be extensible-event compatible, so cache a flag in
+    // addition to a falsy cached event value. We check the flag later on in
+    // a public getter to decide if the cache is valid.
+    private _hasCachedExtEv = false;
+    private _cachedExtEv: Optional<ExtensibleEvent> = undefined;
+
     /* curve25519 key which we believe belongs to the sender of the event. See
      * getSenderKey()
      */
@@ -325,6 +332,25 @@ export class MatrixEvent extends EventEmitter {
         this.txnId = event.txn_id || null;
         this.localTimestamp = Date.now() - this.getAge();
         this.reEmitter = new ReEmitter(this);
+    }
+
+    /**
+     * Unstable getter to try and get an extensible event. Note that this might
+     * return a falsy value if the event could not be parsed as an extensible
+     * event.
+     *
+     * @deprecated Use stable functions where possible.
+     */
+    public get unstableExtensibleEvent(): Optional<ExtensibleEvent> {
+        if (!this._hasCachedExtEv) {
+            this._cachedExtEv = ExtensibleEvents.parse(this.getEffectiveEvent());
+        }
+        return this._cachedExtEv;
+    }
+
+    private invalidateExtensibleEvent() {
+        // just reset the flag - that'll trick the getter into parsing a new event
+        this._hasCachedExtEv = false;
     }
 
     /**
@@ -861,6 +887,7 @@ export class MatrixEvent extends EventEmitter {
         this.forwardingCurve25519KeyChain =
             decryptionResult.forwardingCurve25519KeyChain || [];
         this.untrusted = decryptionResult.untrusted || false;
+        this.invalidateExtensibleEvent();
     }
 
     /**
@@ -1079,6 +1106,8 @@ export class MatrixEvent extends EventEmitter {
                 delete content[key];
             }
         }
+
+        this.invalidateExtensibleEvent();
     }
 
     /**
@@ -1282,6 +1311,7 @@ export class MatrixEvent extends EventEmitter {
         if (this._replacingEvent !== newEvent) {
             this._replacingEvent = newEvent;
             this.emit("Event.replaced", this);
+            this.invalidateExtensibleEvent();
         }
     }
 

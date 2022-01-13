@@ -20,6 +20,7 @@ limitations under the License.
  */
 
 import { EventEmitter } from "events";
+import { EmoteEvent, MessageEvent, NoticeEvent } from "matrix-events-sdk";
 
 import { ISyncStateData, SyncApi, SyncState } from "./sync";
 import { EventStatus, IContent, IDecryptOptions, IEvent, MatrixEvent } from "./models/event";
@@ -86,7 +87,14 @@ import {
 } from "./crypto/keybackup";
 import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
 import { MatrixScheduler } from "./scheduler";
-import { IAuthData, ICryptoCallbacks, IMinimalEvent, IRoomEvent, IStateEvent, NotificationCountType } from "./matrix";
+import {
+    IAuthData,
+    ICryptoCallbacks,
+    IMinimalEvent,
+    IRoomEvent,
+    IStateEvent,
+    NotificationCountType,
+} from "./matrix";
 import {
     CrossSigningKey,
     IAddSecretStorageKeyOpts,
@@ -3935,11 +3943,30 @@ export class MatrixClient extends EventEmitter {
             callback = txnId as any as Callback; // for legacy
             txnId = undefined;
         }
+
+        // Populate all outbound events with Extensible Events metadata to ensure there's a
+        // reasonably large pool of messages to parse.
+        let eventType: string = EventType.RoomMessage;
+        let sendContent: IContent = content as IContent;
+        if (sendContent['msgtype'] === MsgType.Text) {
+            const serialized = MessageEvent.from(sendContent['body'], sendContent['formatted_body']).serialize();
+            eventType = serialized.type;
+            sendContent = serialized.content;
+        } else if (sendContent['msgtype'] === MsgType.Emote) {
+            const serialized = EmoteEvent.from(sendContent['body'], sendContent['formatted_body']).serialize();
+            eventType = serialized.type;
+            sendContent = serialized.content;
+        } else if (sendContent['msgtype'] === MsgType.Notice) {
+            const serialized = NoticeEvent.from(sendContent['body'], sendContent['formatted_body']).serialize();
+            eventType = serialized.type;
+            sendContent = serialized.content;
+        }
+
         return this.sendEvent(
             roomId,
             threadId as (string | null),
-            EventType.RoomMessage,
-            content as IContent,
+            eventType,
+            sendContent,
             txnId as string,
             callback,
         );
