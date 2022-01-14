@@ -1888,8 +1888,10 @@ export class MatrixCall extends EventEmitter {
         const stream = ev.streams[0];
         this.pushRemoteFeed(stream);
         stream.addEventListener("removetrack", () => {
-            logger.log(`Call ${this.callId} removing track streamId: ${stream.id}`);
-            this.deleteFeedByStream(stream);
+            if (stream.getTracks().length === 0) {
+                logger.log(`Call ${this.callId} removing track streamId: ${stream.id}`);
+                this.deleteFeedByStream(stream);
+            }
         });
     };
 
