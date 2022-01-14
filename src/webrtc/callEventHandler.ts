@@ -157,6 +157,11 @@ export class CallEventHandler {
                 );
                 return;
             }
+
+            if (content.dest_session_id !== this.client.getSessionId()) {
+                logger.warn("Call event does not match current session id, ignoring.");
+                return;
+            }
         }
 
         if (!callRoomId) return;
@@ -185,7 +190,11 @@ export class CallEventHandler {
             call = createNewMatrixCall(
                 this.client,
                 callRoomId,
-                { forceTURN: this.client.forceTURN, opponentDeviceId, groupCallId },
+                {
+                    forceTURN: this.client.forceTURN, opponentDeviceId,
+                    groupCallId,
+                    opponentSessionId: content.sender_session_id,
+                },
             );
             if (!call) {
                 logger.log(
@@ -266,7 +275,12 @@ export class CallEventHandler {
                 // we're probably getting events backwards so
                 // the hangup will come before the invite
                 call = createNewMatrixCall(
-                    this.client, callRoomId, { opponentDeviceId },
+                    this.client,
+                    callRoomId,
+                    {
+                        opponentDeviceId,
+                        opponentSessionId: content.sender_session_id,
+                    },
                 );
                 if (call) {
                     call.callId = content.call_id;

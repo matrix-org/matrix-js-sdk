@@ -1,7 +1,7 @@
 import EventEmitter from "events";
 import { CallFeed, SPEAKING_THRESHOLD } from "./callFeed";
 import { MatrixClient } from "../client";
-import { CallDirection, CallErrorCode, CallEvent, CallState, genCallID, MatrixCall, setTracksEnabled } from "./call";
+import { CallErrorCode, CallEvent, CallState, genCallID, MatrixCall, setTracksEnabled } from "./call";
 import { RoomMember } from "../models/room-member";
 import { Room } from "../models/room";
 import { logger } from "../logger";
@@ -652,8 +652,7 @@ export class GroupCall extends EventEmitter {
 
         if (
             existingCall &&
-            existingCall.getOpponentSessionId() === opponentDevice.session_id &&
-            existingCall.direction === CallDirection.Inbound
+            existingCall.getOpponentSessionId() === opponentDevice.session_id
         ) {
             return;
         }
@@ -661,7 +660,12 @@ export class GroupCall extends EventEmitter {
         const newCall = createNewMatrixCall(
             this.client,
             this.room.roomId,
-            { invitee: member.userId, opponentDeviceId: opponentDevice.device_id, groupCallId: this.groupCallId },
+            {
+                invitee: member.userId,
+                opponentDeviceId: opponentDevice.device_id,
+                opponentSessionId: opponentDevice.session_id,
+                groupCallId: this.groupCallId,
+            },
         );
 
         const requestScreenshareFeed = opponentDevice.feeds.some(

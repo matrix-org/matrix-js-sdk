@@ -72,6 +72,7 @@ interface CallOpts {
     forceTURN?: boolean;
     turnServers?: Array<TurnServer>;
     opponentDeviceId?: string;
+    opponentSessionId?: string;
     groupCallId?: string;
 }
 
@@ -335,6 +336,7 @@ export class MatrixCall extends EventEmitter {
         this.forceTURN = opts.forceTURN;
         this.ourPartyId = this.client.deviceId;
         this.opponentDeviceId = opts.opponentDeviceId;
+        this.opponentSessionId = opts.opponentSessionId;
         this.groupCallId = opts.groupCallId;
         // Array of Objects with urls, username, credential keys
         this.turnServers = opts.turnServers || [];
@@ -2007,12 +2009,19 @@ export class MatrixCall extends EventEmitter {
         });
 
         if (this.opponentDeviceId) {
+            logger.log(`sendVoipEvent localSessionId: ${
+                this.client.getSessionId()} destSessionId: ${this.opponentSessionId}`);
             this.emit(CallEvent.SendVoipEvent, {
                 type: "toDevice",
                 eventType,
                 userId: this.invitee || this.getOpponentMember().userId,
                 opponentDeviceId: this.opponentDeviceId,
-                content: { ...realContent, device_id: this.client.deviceId, session_id: this.client.getSessionId() },
+                content: {
+                    ...realContent,
+                    device_id: this.client.deviceId,
+                    sender_session_id: this.client.getSessionId(),
+                    dest_session_id: this.opponentSessionId,
+                },
             });
 
             return this.client.sendToDevice(eventType, {
@@ -2020,7 +2029,8 @@ export class MatrixCall extends EventEmitter {
                     [this.opponentDeviceId]: {
                         ...realContent,
                         device_id: this.client.deviceId,
-                        session_id: this.client.getSessionId(),
+                        sender_session_id: this.client.getSessionId(),
+                        dest_session_id: this.opponentSessionId,
                     },
                 },
             });
@@ -2353,7 +2363,6 @@ export class MatrixCall extends EventEmitter {
         }
         this.opponentCaps = msg.capabilities || {} as CallCapabilities;
         this.opponentMember = this.client.getRoom(this.roomId).getMember(ev.getSender());
-        this.opponentSessionId = msg.session_id;
     }
 
     private async addBufferedIceCandidates(): Promise<void> {
@@ -2450,6 +2459,7 @@ export function createNewMatrixCall(client: any, roomId: string, options?: CallO
         // call level options
         forceTURN: client.forceTURN || optionsForceTURN,
         opponentDeviceId: options?.opponentDeviceId,
+        opponentSessionId: options?.opponentSessionId,
         groupCallId: options?.groupCallId,
     };
     const call = new MatrixCall(opts);
