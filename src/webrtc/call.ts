@@ -2009,8 +2009,6 @@ export class MatrixCall extends EventEmitter {
         });
 
         if (this.opponentDeviceId) {
-            logger.log(`sendVoipEvent localSessionId: ${
-                this.client.getSessionId()} destSessionId: ${this.opponentSessionId}`);
             this.emit(CallEvent.SendVoipEvent, {
                 type: "toDevice",
                 eventType,
