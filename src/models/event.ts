@@ -129,7 +129,6 @@ export interface IEventRelation {
         "m.render_in"?: string[];
     };
     key?: string;
-
 }
 
 export interface IVisibilityEventRelation extends IEventRelation {
