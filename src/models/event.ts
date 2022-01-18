@@ -124,7 +124,12 @@ interface IAggregatedRelation {
 export interface IEventRelation {
     rel_type: RelationType | string;
     event_id: string;
+    "m.in_reply_to"?: {
+        event_id: string;
+        "m.render_in"?: string[];
+    };
     key?: string;
+
 }
 
 export interface IVisibilityEventRelation extends IEventRelation {
