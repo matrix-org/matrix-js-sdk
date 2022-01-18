@@ -271,7 +271,7 @@ export class GroupCall extends EventEmitter {
             this.onMemberStateChanged(stateEvent);
         }
 
-        // this.retryCallLoopTimeout = setTimeout(this.onRetryCallLoop, this.retryCallInterval);
+        this.retryCallLoopTimeout = setTimeout(this.onRetryCallLoop, this.retryCallInterval);
 
         this.onActiveSpeakerLoop();
     }
