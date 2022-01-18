@@ -23,7 +23,11 @@ import { TEXT_NODE_TYPE } from "./extensible_events";
 export const LOCATION_EVENT_TYPE = new UnstableValue(
     "m.location", "org.matrix.msc3488.location");
 
+export const ASSET_NODE_TYPE = new UnstableValue("m.asset", "org.matrix.msc3488.asset");
+
 export const TIMESTAMP_NODE_TYPE = new UnstableValue("m.ts", "org.matrix.msc3488.ts");
+
+export const ASSET_TYPE_SELF = "m.self";
 
 /* From the spec at:
  * https://github.com/matrix-org/matrix-doc/blob/matthew/location/proposals/3488-location.md
@@ -36,6 +40,9 @@ export const TIMESTAMP_NODE_TYPE = new UnstableValue("m.ts", "org.matrix.msc3488
         "m.location": {
             "uri": "geo:51.5008,0.1247;u=35",
             "description": "Matthew's whereabouts",
+        },
+        "m.asset": {
+            "type": "m.self"
         },
         "m.text": "Matthew was at geo:51.5008,0.1247;u=35 as of Sat Nov 13 18:50:58 2021",
         "m.ts": 1636829458432,
@@ -51,6 +58,9 @@ export interface ILocationContent extends IContent {
     [LOCATION_EVENT_TYPE.name]: {
         uri: string;
         description?: string;
+    };
+    [ASSET_NODE_TYPE.name]: {
+        type: string;
     };
     [TEXT_NODE_TYPE.name]: string;
     [TIMESTAMP_NODE_TYPE.name]: number;

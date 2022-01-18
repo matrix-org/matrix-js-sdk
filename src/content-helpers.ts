@@ -18,7 +18,13 @@ limitations under the License.
 
 import { MsgType } from "./@types/event";
 import { TEXT_NODE_TYPE } from "./@types/extensible_events";
-import { ILocationContent, LOCATION_EVENT_TYPE, TIMESTAMP_NODE_TYPE } from "./@types/location";
+import {
+    ASSET_NODE_TYPE,
+    ASSET_TYPE_SELF,
+    ILocationContent,
+    LOCATION_EVENT_TYPE,
+    TIMESTAMP_NODE_TYPE,
+} from "./@types/location";
 
 /**
  * Generates the content for a HTML Message event
@@ -108,12 +114,14 @@ export function makeEmoteMessage(body: string) {
  * @param ts the timestamp when the location was correct (milliseconds since
  *           the UNIX epoch)
  * @param description the (optional) label for this location on the map
+ * @param asset_type the (optional) asset type of this location e.g. "m.self"
  */
 export function makeLocationContent(
     text: string,
     uri: string,
     ts: number,
     description?: string,
+    assetType?: string,
 ): ILocationContent {
     return {
         "body": text,
@@ -123,8 +131,11 @@ export function makeLocationContent(
             uri,
             description,
         },
-        [TIMESTAMP_NODE_TYPE.name]: ts,
+        [ASSET_NODE_TYPE.name]: {
+            type: assetType ?? ASSET_TYPE_SELF,
+        },
         [TEXT_NODE_TYPE.name]: text,
+        [TIMESTAMP_NODE_TYPE.name]: ts,
         // TODO: MSC1767 fallbacks m.image thumbnail
     };
 }
