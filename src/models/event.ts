@@ -124,6 +124,10 @@ interface IAggregatedRelation {
 export interface IEventRelation {
     rel_type: RelationType | string;
     event_id: string;
+    "m.in_reply_to"?: {
+        event_id: string;
+        "m.render_in"?: string[];
+    };
     key?: string;
 }
 
@@ -524,8 +528,13 @@ export class MatrixEvent extends EventEmitter {
     }
 
     public get replyEventId(): string {
-        const relations = this.getWireContent()["m.relates_to"];
-        return relations?.["m.in_reply_to"]?.["event_id"];
+        // We're prefer ev.getContent() over ev.getWireContent() to make sure
+        // we grab the latest edit with potentially new relations. But we also
+        // can't just rely on ev.getContent() by itself because historically we
+        // still show the reply from the original message even though the edit
+        // event does not include the relation reply.
+        const mRelatesTo = this.getContent()['m.relates_to'] || this.getWireContent()['m.relates_to'];
+        return mRelatesTo?.['m.in_reply_to']?.event_id;
     }
 
     public get relationEventId(): string {
