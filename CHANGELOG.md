@@ -1,3 +1,33 @@
+Changes in [15.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.4.0) (2022-01-17)
+==================================================================================================
+
+## ✨ Features
+ * Don't consider alt_aliases when calculating room name ([\#2094](https://github.com/matrix-org/matrix-js-sdk/pull/2094)). Fixes vector-im/element-web#13887.
+ * Load room history if necessary when searching for MSC3089 getFileEvent() ([\#2066](https://github.com/matrix-org/matrix-js-sdk/pull/2066)).
+ * Add support for MSC3030 `/timestamp_to_event` ([\#2072](https://github.com/matrix-org/matrix-js-sdk/pull/2072)).
+
+## 🐛 Bug Fixes
+ * Stop encrypting redactions as it isn't spec compliant ([\#2098](https://github.com/matrix-org/matrix-js-sdk/pull/2098)). Fixes vector-im/element-web#20460.
+ * Fix more function typings relating to key backup ([\#2086](https://github.com/matrix-org/matrix-js-sdk/pull/2086)).
+ * Fix timeline search in MSC3089 getFileEvent() ([\#2085](https://github.com/matrix-org/matrix-js-sdk/pull/2085)).
+ * Set a `deviceId` for VoIP example and use `const`/`let` ([\#2090](https://github.com/matrix-org/matrix-js-sdk/pull/2090)). Fixes #2083. Contributed by @SimonBrandner.
+ * Fix incorrect TS return type for secret storage and key backup functions ([\#2082](https://github.com/matrix-org/matrix-js-sdk/pull/2082)).
+
+Changes in [15.4.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.4.0-rc.1) (2022-01-11)
+============================================================================================================
+
+## ✨ Features
+ * Don't consider alt_aliases when calculating room name ([\#2094](https://github.com/matrix-org/matrix-js-sdk/pull/2094)). Fixes vector-im/element-web#13887.
+ * Load room history if necessary when searching for MSC3089 getFileEvent() ([\#2066](https://github.com/matrix-org/matrix-js-sdk/pull/2066)).
+ * Add support for MSC3030 `/timestamp_to_event` ([\#2072](https://github.com/matrix-org/matrix-js-sdk/pull/2072)).
+
+## 🐛 Bug Fixes
+ * Stop encrypting redactions as it isn't spec compliant ([\#2098](https://github.com/matrix-org/matrix-js-sdk/pull/2098)). Fixes vector-im/element-web#20460.
+ * Fix more function typings relating to key backup ([\#2086](https://github.com/matrix-org/matrix-js-sdk/pull/2086)).
+ * Fix timeline search in MSC3089 getFileEvent() ([\#2085](https://github.com/matrix-org/matrix-js-sdk/pull/2085)).
+ * Set a `deviceId` for VoIP example and use `const`/`let` ([\#2090](https://github.com/matrix-org/matrix-js-sdk/pull/2090)). Fixes #2083. Contributed by @SimonBrandner.
+ * Fix incorrect TS return type for secret storage and key backup functions ([\#2082](https://github.com/matrix-org/matrix-js-sdk/pull/2082)).
+
 Changes in [15.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.3.0) (2021-12-20)
 ==================================================================================================
 

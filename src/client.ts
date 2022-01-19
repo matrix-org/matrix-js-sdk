@@ -20,8 +20,9 @@ limitations under the License.
  */
 
 import { EventEmitter } from "events";
+import { EmoteEvent, MessageEvent, NoticeEvent, IPartialEvent } from "matrix-events-sdk";
 
-import { ISyncStateData, SyncApi } from "./sync";
+import { ISyncStateData, SyncApi, SyncState } from "./sync";
 import { EventStatus, IContent, IDecryptOptions, IEvent, MatrixEvent } from "./models/event";
 import { StubStore } from "./store/stub";
 import { createNewMatrixCall, MatrixCall } from "./webrtc/call";
@@ -86,7 +87,14 @@ import {
 } from "./crypto/keybackup";
 import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
 import { MatrixScheduler } from "./scheduler";
-import { IAuthData, ICryptoCallbacks, IMinimalEvent, IRoomEvent, IStateEvent, NotificationCountType } from "./matrix";
+import {
+    IAuthData,
+    ICryptoCallbacks,
+    IMinimalEvent,
+    IRoomEvent,
+    IStateEvent,
+    NotificationCountType,
+} from "./matrix";
 import {
     CrossSigningKey,
     IAddSecretStorageKeyOpts,
@@ -96,7 +104,6 @@ import {
     IRecoveryKey,
     ISecretStorageKeyInfo,
 } from "./crypto/api";
-import { SyncState } from "./sync";
 import { EventTimelineSet } from "./models/event-timeline-set";
 import { VerificationRequest } from "./crypto/verification/request/VerificationRequest";
 import { VerificationBase as Verification } from "./crypto/verification/Base";
@@ -823,6 +830,7 @@ export class MatrixClient extends EventEmitter {
     protected exportedOlmDeviceToImport: IOlmDevice;
     protected txnCtr = 0;
     protected mediaHandler = new MediaHandler();
+    protected pendingEventEncryption = new Map<string, Promise<void>>();
 
     constructor(opts: IMatrixClientCreateOpts) {
         super();
@@ -877,7 +885,7 @@ export class MatrixClient extends EventEmitter {
 
         this.scheduler = opts.scheduler;
         if (this.scheduler) {
-            this.scheduler.setProcessFunction(async (eventToSend) => {
+            this.scheduler.setProcessFunction(async (eventToSend: MatrixEvent) => {
                 const room = this.getRoom(eventToSend.getRoomId());
                 if (eventToSend.status !== EventStatus.SENDING) {
                     this.updatePendingEventStatus(room, eventToSend, EventStatus.SENDING);
@@ -1048,9 +1056,7 @@ export class MatrixClient extends EventEmitter {
             this.syncApi.stop();
         }
 
-        if (!this.isGuest()) {
-            await this.getCapabilities(true);
-        }
+        await this.getCapabilities(true);
 
         // shallow-copy the opts dict before modifying and storing it
         this.clientOpts = Object.assign({}, opts) as IStoredClientOpts;
@@ -3406,15 +3412,18 @@ export class MatrixClient extends EventEmitter {
      * Cancel a queued or unsent event.
      *
      * @param {MatrixEvent} event   Event to cancel
-     * @throws Error if the event is not in QUEUED or NOT_SENT state
+     * @throws Error if the event is not in QUEUED, NOT_SENT or ENCRYPTING state
      */
     public cancelPendingEvent(event: MatrixEvent) {
-        if ([EventStatus.QUEUED, EventStatus.NOT_SENT].indexOf(event.status) < 0) {
+        if (![EventStatus.QUEUED, EventStatus.NOT_SENT, EventStatus.ENCRYPTING].includes(event.status)) {
             throw new Error("cannot cancel an event with status " + event.status);
         }
 
-        // first tell the scheduler to forget about it, if it's queued
-        if (this.scheduler) {
+        // if the event is currently being encrypted then
+        if (event.status === EventStatus.ENCRYPTING) {
+            this.pendingEventEncryption.delete(event.getId());
+        } else if (this.scheduler && event.status === EventStatus.QUEUED) {
+            // tell the scheduler to forget about it, if it's queued
             this.scheduler.removeEventFromQueue(event);
         }
 
@@ -3676,16 +3685,26 @@ export class MatrixClient extends EventEmitter {
      * @private
      */
     private encryptAndSendEvent(room: Room, event: MatrixEvent, callback?: Callback): Promise<ISendEventResponse> {
+        let cancelled = false;
         // Add an extra Promise.resolve() to turn synchronous exceptions into promise rejections,
         // so that we can handle synchronous and asynchronous exceptions with the
         // same code path.
         return Promise.resolve().then(() => {
             const encryptionPromise = this.encryptEventIfNeeded(event, room);
-            if (!encryptionPromise) return null;
+            if (!encryptionPromise) return null; // doesn't need encryption
 
+            this.pendingEventEncryption.set(event.getId(), encryptionPromise);
             this.updatePendingEventStatus(room, event, EventStatus.ENCRYPTING);
-            return encryptionPromise.then(() => this.updatePendingEventStatus(room, event, EventStatus.SENDING));
+            return encryptionPromise.then(() => {
+                if (!this.pendingEventEncryption.has(event.getId())) {
+                    // cancelled via MatrixClient::cancelPendingEvent
+                    cancelled = true;
+                    return;
+                }
+                this.updatePendingEventStatus(room, event, EventStatus.SENDING);
+            });
         }).then(() => {
+            if (cancelled) return {} as ISendEventResponse;
             let promise: Promise<ISendEventResponse>;
             if (this.scheduler) {
                 // if this returns a promise then the scheduler has control now and will
@@ -3929,11 +3948,51 @@ export class MatrixClient extends EventEmitter {
             callback = txnId as any as Callback; // for legacy
             txnId = undefined;
         }
+
+        // Populate all outbound events with Extensible Events metadata to ensure there's a
+        // reasonably large pool of messages to parse.
+        let eventType: string = EventType.RoomMessage;
+        let sendContent: IContent = content as IContent;
+        const makeContentExtensible = (content: IContent, recurse = true): IPartialEvent<object> => {
+            let newEvent: IPartialEvent<object> = null;
+
+            if (content['msgtype'] === MsgType.Text) {
+                newEvent = MessageEvent.from(content['body'], content['formatted_body']).serialize();
+            } else if (content['msgtype'] === MsgType.Emote) {
+                newEvent = EmoteEvent.from(content['body'], content['formatted_body']).serialize();
+            } else if (content['msgtype'] === MsgType.Notice) {
+                newEvent = NoticeEvent.from(content['body'], content['formatted_body']).serialize();
+            }
+
+            if (newEvent && content['m.new_content'] && recurse) {
+                const newContent = makeContentExtensible(content['m.new_content'], false);
+                if (newContent) {
+                    newEvent.content['m.new_content'] = newContent.content;
+                }
+            }
+
+            if (newEvent) {
+                // copy over all other fields we don't know about
+                for (const [k, v] of Object.entries(content)) {
+                    if (!newEvent.content.hasOwnProperty(k)) {
+                        newEvent.content[k] = v;
+                    }
+                }
+            }
+
+            return newEvent;
+        };
+        const result = makeContentExtensible(sendContent);
+        if (result) {
+            eventType = result.type;
+            sendContent = result.content;
+        }
+
         return this.sendEvent(
             roomId,
             threadId as (string | null),
-            EventType.RoomMessage,
-            content as IContent,
+            eventType,
+            sendContent,
             txnId as string,
             callback,
         );

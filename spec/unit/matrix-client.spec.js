@@ -11,8 +11,9 @@ import {
     UNSTABLE_MSC3089_TREE_SUBTYPE,
 } from "../../src/@types/event";
 import { MEGOLM_ALGORITHM } from "../../src/crypto/olmlib";
-import { MatrixEvent } from "../../src/models/event";
+import { EventStatus, MatrixEvent } from "../../src/models/event";
 import { Preset } from "../../src/@types/partials";
+import * as testUtils from "../test-utils";
 
 jest.useFakeTimers();
 
@@ -713,6 +714,7 @@ describe("MatrixClient", function() {
     describe("guest rooms", function() {
         it("should only do /sync calls (without filter/pushrules)", function(done) {
             httpLookups = []; // no /pushrules or /filterw
+            httpLookups.push(CAPABILITIES_RESPONSE);
             httpLookups.push({
                 method: "GET",
                 path: "/sync",
@@ -865,6 +867,85 @@ describe("MatrixClient", function() {
             }];
 
             await client.redactEvent(roomId, eventId, txnId, { reason });
+        });
+    });
+
+    describe("cancelPendingEvent", () => {
+        const roomId = "!room:server";
+        const txnId = "m12345";
+
+        const mockRoom = {
+            getMyMembership: () => "join",
+            updatePendingEvent: (event, status) => event.setStatus(status),
+            currentState: {
+                getStateEvents: (eventType, stateKey) => {
+                    if (eventType === EventType.RoomCreate) {
+                        expect(stateKey).toEqual("");
+                        return new MatrixEvent({
+                            content: {
+                                [RoomCreateTypeField]: RoomType.Space,
+                            },
+                        });
+                    } else if (eventType === EventType.RoomEncryption) {
+                        expect(stateKey).toEqual("");
+                        return new MatrixEvent({ content: {} });
+                    } else {
+                        throw new Error("Unexpected event type or state key");
+                    }
+                },
+            },
+        };
+
+        let event;
+        beforeEach(async () => {
+            event = new MatrixEvent({
+                event_id: "~" + roomId + ":" + txnId,
+                user_id: client.credentials.userId,
+                sender: client.credentials.userId,
+                room_id: roomId,
+                origin_server_ts: new Date().getTime(),
+            });
+            event.setTxnId(txnId);
+
+            client.getRoom = (getRoomId) => {
+                expect(getRoomId).toEqual(roomId);
+                return mockRoom;
+            };
+            client.crypto = { // mock crypto
+                encryptEvent: (event, room) => new Promise(() => {}),
+            };
+        });
+
+        function assertCancelled() {
+            expect(event.status).toBe(EventStatus.CANCELLED);
+            expect(client.scheduler.removeEventFromQueue(event)).toBeFalsy();
+            expect(httpLookups.filter(h => h.path.includes("/send/")).length).toBe(0);
+        }
+
+        it("should cancel an event which is queued", () => {
+            event.setStatus(EventStatus.QUEUED);
+            client.scheduler.queueEvent(event);
+            client.cancelPendingEvent(event);
+            assertCancelled();
+        });
+
+        it("should cancel an event which is encrypting", async () => {
+            client.encryptAndSendEvent(null, event);
+            await testUtils.emitPromise(event, "Event.status");
+            client.cancelPendingEvent(event);
+            assertCancelled();
+        });
+
+        it("should cancel an event which is not sent", () => {
+            event.setStatus(EventStatus.NOT_SENT);
+            client.cancelPendingEvent(event);
+            assertCancelled();
+        });
+
+        it("should error when given any other event status", () => {
+            event.setStatus(EventStatus.SENDING);
+            expect(() => client.cancelPendingEvent(event)).toThrow("cannot cancel an event with status sending");
+            expect(event.status).toBe(EventStatus.SENDING);
         });
     });
 });

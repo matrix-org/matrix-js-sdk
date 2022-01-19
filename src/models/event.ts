@@ -1,5 +1,5 @@
 /*
-Copyright 2015 - 2021 The Matrix.org Foundation C.I.C.
+Copyright 2015 - 2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ limitations under the License.
  */
 
 import { EventEmitter } from 'events';
+import { ExtensibleEvent, ExtensibleEvents, Optional } from "matrix-events-sdk";
 
 import { logger } from '../logger';
 import { VerificationRequest } from "../crypto/verification/request/VerificationRequest";
@@ -29,6 +30,7 @@ import {
     MsgType,
     RelationType,
     IThreadBundledRelation,
+    EVENT_VISIBILITY_CHANGE_TYPE,
 } from "../@types/event";
 import { Crypto, IEventDecryptionResult } from "../crypto";
 import { deepSortedObjectEntries } from "../utils";
@@ -124,7 +126,40 @@ interface IAggregatedRelation {
 export interface IEventRelation {
     rel_type: RelationType | string;
     event_id: string;
+    "m.in_reply_to"?: {
+        event_id: string;
+        "m.render_in"?: string[];
+    };
     key?: string;
+}
+
+export interface IVisibilityEventRelation extends IEventRelation {
+    visibility: "visible" | "hidden";
+    reason?: string;
+}
+
+/**
+ * When an event is a visibility change event, as per MSC3531,
+ * the visibility change implied by the event.
+ */
+export interface IVisibilityChange {
+    /**
+     * If `true`, the target event should be made visible.
+     * Otherwise, it should be hidden.
+     */
+    visible: boolean;
+
+    /**
+     * The event id affected.
+     */
+    eventId: string;
+
+    /**
+     * Optionally, a human-readable reason explaining why
+     * the event was hidden. Ignored if the event was made
+     * visible.
+     */
+    reason: string | null;
 }
 
 export interface IClearEvent {
@@ -145,12 +180,48 @@ export interface IDecryptOptions {
     isRetry?: boolean;
 }
 
+/**
+ * Message hiding, as specified by https://github.com/matrix-org/matrix-doc/pull/3531.
+ */
+export type MessageVisibility = IMessageVisibilityHidden | IMessageVisibilityVisible;
+/**
+ * Variant of `MessageVisibility` for the case in which the message should be displayed.
+ */
+export interface IMessageVisibilityVisible {
+    readonly visible: true;
+}
+/**
+ * Variant of `MessageVisibility` for the case in which the message should be hidden.
+ */
+export interface IMessageVisibilityHidden {
+    readonly visible: false;
+    /**
+     * Optionally, a human-readable reason to show to the user indicating why the
+     * message has been hidden (e.g. "Message Pending Moderation").
+     */
+    readonly reason: string | null;
+}
+// A singleton implementing `IMessageVisibilityVisible`.
+const MESSAGE_VISIBLE: IMessageVisibilityVisible = Object.freeze({ visible: true });
+
 export class MatrixEvent extends EventEmitter {
     private pushActions: IActionsObject = null;
     private _replacingEvent: MatrixEvent = null;
     private _localRedactionEvent: MatrixEvent = null;
     private _isCancelled = false;
     private clearEvent?: IClearEvent;
+
+    /* Message hiding, as specified by https://github.com/matrix-org/matrix-doc/pull/3531.
+
+    Note: We're returning this object, so any value stored here MUST be frozen.
+    */
+    private visibility: MessageVisibility = MESSAGE_VISIBLE;
+
+    // Not all events will be extensible-event compatible, so cache a flag in
+    // addition to a falsy cached event value. We check the flag later on in
+    // a public getter to decide if the cache is valid.
+    private _hasCachedExtEv = false;
+    private _cachedExtEv: Optional<ExtensibleEvent> = undefined;
 
     /* curve25519 key which we believe belongs to the sender of the event. See
      * getSenderKey()
@@ -267,6 +338,25 @@ export class MatrixEvent extends EventEmitter {
         this.txnId = event.txn_id || null;
         this.localTimestamp = Date.now() - this.getAge();
         this.reEmitter = new ReEmitter(this);
+    }
+
+    /**
+     * Unstable getter to try and get an extensible event. Note that this might
+     * return a falsy value if the event could not be parsed as an extensible
+     * event.
+     *
+     * @deprecated Use stable functions where possible.
+     */
+    public get unstableExtensibleEvent(): Optional<ExtensibleEvent> {
+        if (!this._hasCachedExtEv) {
+            this._cachedExtEv = ExtensibleEvents.parse(this.getEffectiveEvent());
+        }
+        return this._cachedExtEv;
+    }
+
+    private invalidateExtensibleEvent() {
+        // just reset the flag - that'll trick the getter into parsing a new event
+        this._hasCachedExtEv = false;
     }
 
     /**
@@ -447,8 +537,13 @@ export class MatrixEvent extends EventEmitter {
     }
 
     public get replyEventId(): string {
-        const relations = this.getWireContent()["m.relates_to"];
-        return relations?.["m.in_reply_to"]?.["event_id"];
+        // We're prefer ev.getContent() over ev.getWireContent() to make sure
+        // we grab the latest edit with potentially new relations. But we also
+        // can't just rely on ev.getContent() by itself because historically we
+        // still show the reply from the original message even though the edit
+        // event does not include the relation reply.
+        const mRelatesTo = this.getContent()['m.relates_to'] || this.getWireContent()['m.relates_to'];
+        return mRelatesTo?.['m.in_reply_to']?.event_id;
     }
 
     public get relationEventId(): string {
@@ -810,6 +905,7 @@ export class MatrixEvent extends EventEmitter {
         this.forwardingCurve25519KeyChain =
             decryptionResult.forwardingCurve25519KeyChain || [];
         this.untrusted = decryptionResult.untrusted || false;
+        this.invalidateExtensibleEvent();
     }
 
     /**
@@ -937,6 +1033,53 @@ export class MatrixEvent extends EventEmitter {
     }
 
     /**
+     * Change the visibility of an event, as per https://github.com/matrix-org/matrix-doc/pull/3531 .
+     *
+     * @fires module:models/event.MatrixEvent#"Event.visibilityChange" if `visibilityEvent`
+     *   caused a change in the actual visibility of this event, either by making it
+     *   visible (if it was hidden), by making it hidden (if it was visible) or by
+     *   changing the reason (if it was hidden).
+     * @param visibilityEvent event holding a hide/unhide payload, or nothing
+     *   if the event is being reset to its original visibility (presumably
+     *   by a visibility event being redacted).
+     */
+    public applyVisibilityEvent(visibilityChange?: IVisibilityChange): void {
+        const visible = visibilityChange ? visibilityChange.visible : true;
+        const reason = visibilityChange ? visibilityChange.reason : null;
+        let change = false;
+        if (this.visibility.visible !== visibilityChange.visible) {
+            change = true;
+        } else if (!this.visibility.visible && this.visibility["reason"] !== reason) {
+            change = true;
+        }
+        if (change) {
+            if (visible) {
+                this.visibility = MESSAGE_VISIBLE;
+            } else {
+                this.visibility = Object.freeze({
+                    visible: false,
+                    reason: reason,
+                });
+            }
+            if (change) {
+                this.emit("Event.visibilityChange", this, visible);
+            }
+        }
+    }
+
+    /**
+     * Return instructions to display or hide the message.
+     *
+     * @returns Instructions determining whether the message
+     * should be displayed.
+     */
+    public messageVisibility(): MessageVisibility {
+        // Note: We may return `this.visibility` without fear, as
+        // this is a shallow frozen object.
+        return this.visibility;
+    }
+
+    /**
      * Update the content of an event in the same way it would be by the server
      * if it were redacted before it was sent to us
      *
@@ -985,6 +1128,8 @@ export class MatrixEvent extends EventEmitter {
                 delete content[key];
             }
         }
+
+        this.invalidateExtensibleEvent();
     }
 
     /**
@@ -1003,6 +1148,54 @@ export class MatrixEvent extends EventEmitter {
      */
     public isRedaction(): boolean {
         return this.getType() === EventType.RoomRedaction;
+    }
+
+    /**
+     * Return the visibility change caused by this event,
+     * as per https://github.com/matrix-org/matrix-doc/pull/3531.
+     *
+     * @returns If the event is a well-formed visibility change event,
+     * an instance of `IVisibilityChange`, otherwise `null`.
+     */
+    public asVisibilityChange(): IVisibilityChange | null {
+        if (!EVENT_VISIBILITY_CHANGE_TYPE.matches(this.getType())) {
+            // Not a visibility change event.
+            return null;
+        }
+        const relation = this.getRelation();
+        if (!relation || relation.rel_type != "m.reference") {
+            // Ill-formed, ignore this event.
+            return null;
+        }
+        const eventId = relation.event_id;
+        if (!eventId) {
+            // Ill-formed, ignore this event.
+            return null;
+        }
+        const content = this.getWireContent();
+        const visible = !!content.visible;
+        const reason = content.reason;
+        if (reason && typeof reason != "string") {
+            // Ill-formed, ignore this event.
+            return null;
+        }
+        // Well-formed visibility change event.
+        return {
+            visible,
+            reason,
+            eventId,
+        };
+    }
+
+    /**
+     * Check if this event alters the visibility of another event,
+     * as per https://github.com/matrix-org/matrix-doc/pull/3531.
+     *
+     * @returns {boolean} True if this event alters the visibility
+     * of another event.
+     */
+    public isVisibilityEvent(): boolean {
+        return EVENT_VISIBILITY_CHANGE_TYPE.matches(this.getType());
     }
 
     /**
@@ -1140,6 +1333,7 @@ export class MatrixEvent extends EventEmitter {
         if (this._replacingEvent !== newEvent) {
             this._replacingEvent = newEvent;
             this.emit("Event.replaced", this);
+            this.invalidateExtensibleEvent();
         }
     }
 

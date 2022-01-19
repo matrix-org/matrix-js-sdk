@@ -30,7 +30,10 @@ import { RoomMember } from "./room-member";
 import { IRoomSummary, RoomSummary } from "./room-summary";
 import { logger } from '../logger';
 import { ReEmitter } from '../ReEmitter';
-import { EventType, RoomCreateTypeField, RoomType, UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../@types/event";
+import {
+    EventType, RoomCreateTypeField, RoomType, UNSTABLE_ELEMENT_FUNCTIONAL_USERS,
+    EVENT_VISIBILITY_CHANGE_TYPE,
+} from "../@types/event";
 import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
 import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
 import { Filter } from "../filter";
@@ -104,6 +107,22 @@ interface IReceiptContent {
 }
 
 type Receipts = Record<string, Record<string, IWrappedReceipt>>;
+
+// When inserting a visibility event affecting event `eventId`, we
+// need to scan through existing visibility events for `eventId`.
+// In theory, this could take an unlimited amount of time if:
+//
+// - the visibility event was sent by a moderator; and
+// - `eventId` already has many visibility changes (usually, it should
+//   be 2 or less); and
+// - for some reason, the visibility changes are received out of order
+//   (usually, this shouldn't happen at all).
+//
+// For this reason, we limit the number of events to scan through,
+// expecting that a broken visibility change for a single event in
+// an extremely uncommon case (possibly a DoS) is a small
+// price to pay to keep matrix-js-sdk responsive.
+const MAX_NUMBER_OF_VISIBILITY_EVENTS_TO_SCAN_THROUGH = 30;
 
 export enum NotificationCountType {
     Highlight = "highlight",
@@ -194,6 +213,24 @@ export class Room extends EventEmitter {
     public threads = new Map<string, Thread>();
 
     /**
+     * A mapping of eventId to all visibility changes to apply
+     * to the event, by chronological order, as per
+     * https://github.com/matrix-org/matrix-doc/pull/3531
+     *
+     * # Invariants
+     *
+     * - within each list, all events are classed by
+     *   chronological order;
+     * - all events are events such that
+     *  `asVisibilityEvent()` returns a non-null `IVisibilityChange`;
+     * - within each list with key `eventId`, all events
+     *   are in relation to `eventId`.
+     *
+     * @experimental
+     */
+    private visibilityEvents = new Map<string, MatrixEvent[]>();
+
+    /**
      * Construct a new Room.
      *
      * <p>For a room, we store an ordered sequence of timelines, which may or may not
@@ -253,7 +290,9 @@ export class Room extends EventEmitter {
         // all our per-room timeline sets. the first one is the unfiltered ones;
         // the subsequent ones are the filtered ones in no particular order.
         this.timelineSets = [new EventTimelineSet(this, opts)];
-        this.reEmitter.reEmit(this.getUnfilteredTimelineSet(), ["Room.timeline", "Room.timelineReset"]);
+        this.reEmitter.reEmit(this.getUnfilteredTimelineSet(), [
+            "Room.timeline", "Room.timelineReset",
+        ]);
 
         this.fixUpLegacyTimelineFields();
 
@@ -1369,6 +1408,15 @@ export class Room extends EventEmitter {
                 // (in the sender and target fields). We should get those
                 // RoomMember objects to update themselves when the events that
                 // they are based on are changed.
+
+                // Remove any visibility change on this event.
+                this.visibilityEvents.delete(redactId);
+
+                // If this event is a visibility change event, remove it from the
+                // list of visibility changes and update any event affected by it.
+                if (redactedEvent.isVisibilityEvent()) {
+                    this.redactVisibilityChangeEvent(event);
+                }
             }
 
             // FIXME: apply redactions to notification list
@@ -1377,6 +1425,15 @@ export class Room extends EventEmitter {
             // clients can say "so and so redacted an event" if they wish to. Also
             // this may be needed to trigger an update.
         }
+
+        // Implement MSC3531: hiding messages.
+        if (event.isVisibilityEvent()) {
+            // This event changes the visibility of another event, record
+            // the visibility change, inform clients if necessary.
+            this.applyNewVisibilityEvent(event);
+        }
+        // If any pending visibility change is waiting for this (older) event,
+        this.applyPendingVisibilityEvents(event);
 
         if (event.getUnsigned().transaction_id) {
             const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id];
@@ -2258,6 +2315,161 @@ export class Room extends EventEmitter {
             return "Empty room";
         }
     }
+
+    /**
+     * When we receive a new visibility change event:
+     *
+     * - store this visibility change alongside the timeline, in case we
+     *   later need to apply it to an event that we haven't received yet;
+     * - if we have already received the event whose visibility has changed,
+     *   patch it to reflect the visibility change and inform listeners.
+     */
+    private applyNewVisibilityEvent(event: MatrixEvent): void {
+        const visibilityChange = event.asVisibilityChange();
+        if (!visibilityChange) {
+            // The event is ill-formed.
+            return;
+        }
+
+        // Ignore visibility change events that are not emitted by moderators.
+        const userId = event.getSender();
+        if (!userId) {
+            return;
+        }
+        const isPowerSufficient =
+            (
+                EVENT_VISIBILITY_CHANGE_TYPE.name
+                && this.currentState.maySendStateEvent(EVENT_VISIBILITY_CHANGE_TYPE.name, userId)
+            )
+            || (
+                EVENT_VISIBILITY_CHANGE_TYPE.altName
+                && this.currentState.maySendStateEvent(EVENT_VISIBILITY_CHANGE_TYPE.altName, userId)
+            );
+        if (!isPowerSufficient) {
+            // Powerlevel is insufficient.
+            return;
+        }
+
+        // Record this change in visibility.
+        // If the event is not in our timeline and we only receive it later,
+        // we may need to apply the visibility change at a later date.
+
+        const visibilityEventsOnOriginalEvent = this.visibilityEvents.get(visibilityChange.eventId);
+        if (visibilityEventsOnOriginalEvent) {
+            // It would be tempting to simply erase the latest visibility change
+            // but we need to record all of the changes in case the latest change
+            // is ever redacted.
+            //
+            // In practice, linear scans through `visibilityEvents` should be fast.
+            // However, to protect against a potential DoS attack, we limit the
+            // number of iterations in this loop.
+            let index = visibilityEventsOnOriginalEvent.length - 1;
+            const min = Math.max(0,
+                visibilityEventsOnOriginalEvent.length - MAX_NUMBER_OF_VISIBILITY_EVENTS_TO_SCAN_THROUGH);
+            for (; index >= min; --index) {
+                const target = visibilityEventsOnOriginalEvent[index];
+                if (target.getTs() < event.getTs()) {
+                    break;
+                }
+            }
+            if (index === -1) {
+                visibilityEventsOnOriginalEvent.unshift(event);
+            } else {
+                visibilityEventsOnOriginalEvent.splice(index + 1, 0, event);
+            }
+        } else {
+            this.visibilityEvents.set(visibilityChange.eventId, [event]);
+        }
+
+        // Finally, let's check if the event is already in our timeline.
+        // If so, we need to patch it and inform listeners.
+
+        const originalEvent = this.findEventById(visibilityChange.eventId);
+        if (!originalEvent) {
+            return;
+        }
+        originalEvent.applyVisibilityEvent(visibilityChange);
+    }
+
+    private redactVisibilityChangeEvent(event: MatrixEvent) {
+        // Sanity checks.
+        if (!event.isVisibilityEvent) {
+            throw new Error("expected a visibility change event");
+        }
+        const relation = event.getRelation();
+        const originalEventId = relation.event_id;
+        const visibilityEventsOnOriginalEvent = this.visibilityEvents.get(originalEventId);
+        if (!visibilityEventsOnOriginalEvent) {
+            // No visibility changes on the original event.
+            // In particular, this change event was not recorded,
+            // most likely because it was ill-formed.
+            return;
+        }
+        const index = visibilityEventsOnOriginalEvent.findIndex(change => change.getId() === event.getId());
+        if (index === -1) {
+            // This change event was not recorded, most likely because
+            // it was ill-formed.
+            return;
+        }
+        // Remove visibility change.
+        visibilityEventsOnOriginalEvent.splice(index, 1);
+
+        // If we removed the latest visibility change event, propagate changes.
+        if (index === visibilityEventsOnOriginalEvent.length) {
+            const originalEvent = this.findEventById(originalEventId);
+            if (!originalEvent) {
+                return;
+            }
+            if (index === 0) {
+                // We have just removed the only visibility change event.
+                this.visibilityEvents.delete(originalEventId);
+                originalEvent.applyVisibilityEvent();
+            } else {
+                const newEvent = visibilityEventsOnOriginalEvent[visibilityEventsOnOriginalEvent.length - 1];
+                const newVisibility = newEvent.asVisibilityChange();
+                if (!newVisibility) {
+                    // Event is ill-formed.
+                    // This breaks our invariant.
+                    throw new Error("at this stage, visibility changes should be well-formed");
+                }
+                originalEvent.applyVisibilityEvent(newVisibility);
+            }
+        }
+    }
+
+    /**
+     * When we receive an event whose visibility has been altered by
+     * a (more recent) visibility change event, patch the event in
+     * place so that clients now not to display it.
+     *
+     * @param event Any matrix event. If this event has at least one a
+     * pending visibility change event, apply the latest visibility
+     * change event.
+     */
+    private applyPendingVisibilityEvents(event: MatrixEvent): void {
+        const visibilityEvents = this.visibilityEvents.get(event.getId());
+        if (!visibilityEvents || visibilityEvents.length == 0) {
+            // No pending visibility change in store.
+            return;
+        }
+        const visibilityEvent = visibilityEvents[visibilityEvents.length - 1];
+        const visibilityChange = visibilityEvent.asVisibilityChange();
+        if (!visibilityChange) {
+            return;
+        }
+        if (visibilityChange.visible) {
+            // Events are visible by default, no need to apply a visibility change.
+            // Note that we need to keep the visibility changes in `visibilityEvents`,
+            // in case we later fetch an older visibility change event that is superseded
+            // by `visibilityChange`.
+        }
+        if (visibilityEvent.getTs() < event.getTs()) {
+            // Something is wrong, the visibility change cannot happen before the
+            // event. Presumably an ill-formed event.
+            return;
+        }
+        event.applyVisibilityEvent(visibilityChange);
+    }
 }
 
 /**
@@ -2268,12 +2480,12 @@ function pendingEventsKey(roomId: string): string {
     return `mx_pending_events_${roomId}`;
 }
 
-/* a map from current event status to a list of allowed next statuses
-     */
+// a map from current event status to a list of allowed next statuses
 const ALLOWED_TRANSITIONS: Record<EventStatus, EventStatus[]> = {
     [EventStatus.ENCRYPTING]: [
         EventStatus.SENDING,
         EventStatus.NOT_SENT,
+        EventStatus.CANCELLED,
     ],
     [EventStatus.SENDING]: [
         EventStatus.ENCRYPTING,
@@ -2426,3 +2638,4 @@ function memberNamesToRoomName(names: string[], count = (names.length + 1)) {
  * @param {string} membership The new membership value
  * @param {string} prevMembership The previous membership value
  */
+

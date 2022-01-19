@@ -348,7 +348,7 @@ function recvMessage(httpBackend, client, sender, message) {
         return testUtils.awaitDecryption(event);
     }).then((event) => {
         expect(event.getType()).toEqual("m.room.message");
-        expect(event.getContent()).toEqual({
+        expect(event.getContent()).toMatchObject({
             msgtype: "m.text",
             body: "Hello, World",
         });

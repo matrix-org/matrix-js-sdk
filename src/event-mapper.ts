@@ -52,7 +52,7 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
             }
         }
         if (!preventReEmit) {
-            client.reEmitter.reEmit(event, ["Event.replaced"]);
+            client.reEmitter.reEmit(event, ["Event.replaced", "Event.visibilityChange"]);
         }
         return event;
     }

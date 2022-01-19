@@ -1,6 +1,5 @@
 /*
-Copyright 2018 New Vector Ltd
-Copyright 2018 - 2021 The Matrix.org Foundation C.I.C.
+Copyright 2018 - 2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,8 +18,13 @@ limitations under the License.
 
 import { MsgType } from "./@types/event";
 import { TEXT_NODE_TYPE } from "./@types/extensible_events";
-import { ILocationContent, LOCATION_EVENT_TYPE, TIMESTAMP_NODE_TYPE } from "./@types/location";
-import { IPollContent, POLL_START_EVENT_TYPE } from "./@types/polls";
+import {
+    ASSET_NODE_TYPE,
+    ASSET_TYPE_SELF,
+    ILocationContent,
+    LOCATION_EVENT_TYPE,
+    TIMESTAMP_NODE_TYPE,
+} from "./@types/location";
 
 /**
  * Generates the content for a HTML Message event
@@ -104,47 +108,20 @@ export function makeEmoteMessage(body: string) {
 }
 
 /**
- * Generates the content for a Poll Start event
- * @param question the poll question
- * @param answers the possible answers
- * @param kind whether the poll is disclosed or undisclosed. Allowed values are
- *             "m.poll.disclosed" or "m.poll.undisclosed", or the unstable equivalents
- */
-export function makePollContent(
-    question: string,
-    answers: string[],
-    kind: string,
-): IPollContent {
-    question = question.trim();
-    answers = answers.map(a => a.trim()).filter(a => !!a);
-    return {
-        [TEXT_NODE_TYPE.name]:
-            `${question}\n${answers.map((a, i) => `${i + 1}. ${a}`).join('\n')}`,
-        [POLL_START_EVENT_TYPE.name]: {
-            kind: kind,
-            question: {
-                [TEXT_NODE_TYPE.name]: question,
-            },
-            answers: answers.map(
-                (a, i) => ({ id: `${i}-${a}`, [TEXT_NODE_TYPE.name]: a }),
-            ),
-        },
-    };
-}
-
-/**
  * Generates the content for a Location event
  * @param text a text for of our location
  * @param uri a geo:// uri for the location
  * @param ts the timestamp when the location was correct (milliseconds since
  *           the UNIX epoch)
  * @param description the (optional) label for this location on the map
+ * @param asset_type the (optional) asset type of this location e.g. "m.self"
  */
 export function makeLocationContent(
     text: string,
     uri: string,
     ts: number,
     description?: string,
+    assetType?: string,
 ): ILocationContent {
     return {
         "body": text,
@@ -154,8 +131,11 @@ export function makeLocationContent(
             uri,
             description,
         },
-        [TIMESTAMP_NODE_TYPE.name]: ts,
+        [ASSET_NODE_TYPE.name]: {
+            type: assetType ?? ASSET_TYPE_SELF,
+        },
         [TEXT_NODE_TYPE.name]: text,
+        [TIMESTAMP_NODE_TYPE.name]: ts,
         // TODO: MSC1767 fallbacks m.image thumbnail
     };
 }

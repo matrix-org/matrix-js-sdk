@@ -365,3 +365,5 @@ export function setHttpResponses(
             .respond(200, response.data);
     });
 }
+
+export const emitPromise = (e, k) => new Promise(r => e.once(k, r));
