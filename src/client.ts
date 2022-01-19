@@ -2582,8 +2582,10 @@ export class MatrixClient extends EventEmitter {
 
         return {
             algorithm,
+            /* eslint-disable camelcase */
             auth_data,
             recovery_key,
+            /* eslint-enable camelcase */
         };
     }
 
@@ -3651,12 +3653,12 @@ export class MatrixClient extends EventEmitter {
         const type = localEvent.getType();
         logger.log(`sendEvent of type ${type} in ${roomId} with txnId ${txnId}`);
 
-        localEvent.setTxnId(txnId as string);
+        localEvent.setTxnId(txnId);
         localEvent.setStatus(EventStatus.SENDING);
 
         // add this event immediately to the local store as 'sending'.
         if (room) {
-            room.addPendingEvent(localEvent, txnId as string);
+            room.addPendingEvent(localEvent, txnId);
         }
 
         // addPendingEvent can change the state to NOT_SENT if it believes
