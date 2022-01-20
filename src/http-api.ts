@@ -111,6 +111,12 @@ interface IRequestOpts<T> {
     json?: boolean; // defaults to true
     qsStringifyOptions?: CoreOptions["qsStringifyOptions"];
     bodyParser?(body: string): T;
+
+    // Set to true to prevent the request function from emitting
+    // a Session.logged_out event. This is intended for use on
+    // endpoints where M_UNKNOWN_TOKEN is a valid/notable error
+    // response, such as with token refreshes.
+    inhibitLogoutEmit?: boolean;
 }
 
 export interface IUpload {
@@ -596,7 +602,7 @@ export class MatrixHttpApi {
         const requestPromise = this.request<T, O>(callback, method, path, queryParams, data, requestOpts);
 
         requestPromise.catch((err: MatrixError) => {
-            if (err.errcode == 'M_UNKNOWN_TOKEN') {
+            if (err.errcode == 'M_UNKNOWN_TOKEN' && !requestOpts?.inhibitLogoutEmit) {
                 this.eventEmitter.emit("Session.logged_out", err);
             } else if (err.errcode == 'M_CONSENT_NOT_GIVEN') {
                 this.eventEmitter.emit(
