@@ -6614,6 +6614,14 @@ export class MatrixClient extends EventEmitter {
     }
 
     /**
+     * Set the access token associated with this account.
+     * @param {string} token The new access token.
+     */
+    public setAccessToken(token: string) {
+        this.http.opts.accessToken = token;
+    }
+
+    /**
      * @return {boolean} true if there is a valid access_token for this client.
      */
     public isLoggedIn(): boolean {
