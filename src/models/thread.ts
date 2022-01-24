@@ -138,10 +138,13 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
     /**
      * Return last reply to the thread
      */
-    public get lastReply(): MatrixEvent {
-        const threadReplies = this.events
-            .filter(event => event.isThreadRelation);
-        return threadReplies[threadReplies.length - 1];
+    public lastReply(matches: (ev: MatrixEvent) => boolean = () => true): MatrixEvent {
+        for (let i = this.events.length - 1; i >= 0; i--) {
+            const event = this.events[i];
+            if (event.isThreadRelation && matches(event)) {
+                return event;
+            }
+        }
     }
 
     /**
