@@ -1343,7 +1343,7 @@ export class Room extends EventEmitter {
         }
     }
 
-    public findThreadForEvent(event: MatrixEvent): Thread {
+    public findThreadForEvent(event: MatrixEvent): Thread | null {
         if (!event) {
             return null;
         }
@@ -1534,7 +1534,7 @@ export class Room extends EventEmitter {
         EventTimeline.setEventMetadata(event, this.getLiveTimeline().getState(EventTimeline.FORWARDS), false);
 
         this.txnToEvent[txnId] = event;
-        const thread = this.threads.get(event.threadRootId);
+        const thread = this.findThreadForEvent(event);
         if (this.opts.pendingEventOrdering === PendingEventOrdering.Detached && !thread) {
             if (this.pendingEventList.some((e) => e.status === EventStatus.NOT_SENT)) {
                 logger.warn("Setting event as NOT_SENT due to messages in the same state");
@@ -1689,7 +1689,7 @@ export class Room extends EventEmitter {
         // any, which is good, because we don't want to try decoding it again).
         localEvent.handleRemoteEcho(remoteEvent.event);
 
-        const thread = this.threads.get(remoteEvent.threadRootId);
+        const thread = this.findThreadForEvent(remoteEvent);
         if (thread) {
             thread.timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
         } else {
@@ -1850,7 +1850,7 @@ export class Room extends EventEmitter {
             // TODO: We should have a filter to say "only add state event
             // types X Y Z to the timeline".
             this.addLiveEvent(events[i], duplicateStrategy, fromCache);
-            const thread = this.threads.get(events[i].getId());
+            const thread = this.findThreadForEvent(events[i]);
             if (thread) {
                 thread.addEvent(events[i], true);
             }
