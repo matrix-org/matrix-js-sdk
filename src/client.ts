@@ -3948,7 +3948,7 @@ export class MatrixClient extends EventEmitter {
         // reasonably large pool of messages to parse.
         let eventType: string = EventType.RoomMessage;
         let sendContent: IContent = content as IContent;
-        const makeContentExtensible = (content: IContent, recurse = true): IPartialEvent<object> => {
+        const makeContentExtensible = (content: IContent = {}, recurse = true): IPartialEvent<object> => {
             let newEvent: IPartialEvent<object> = null;
 
             if (content['msgtype'] === MsgType.Text) {
