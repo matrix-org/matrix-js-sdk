@@ -9062,7 +9062,10 @@ export class MatrixClient extends EventEmitter {
                     const parentEvent = room?.findEventById(parentEventId) || events.find((mxEv: MatrixEvent) => {
                         return mxEv.getId() === parentEventId;
                     });
-                    shouldLiveInThreadTimeline = parentEvent?.isThreadRelation;
+                    if (parentEvent?.isThreadRelation) {
+                        shouldLiveInThreadTimeline = true;
+                        event.setThreadId(parentEvent.threadRootId);
+                    }
 
                     // Copy all the reactions and annotations to the root event
                     // to the thread timeline. They will end up living in both

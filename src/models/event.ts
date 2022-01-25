@@ -262,6 +262,7 @@ export class MatrixEvent extends EventEmitter {
      * A reference to the thread this event belongs to
      */
     private thread: Thread = null;
+    private threadId: string;
 
     /* Set an approximate timestamp for the event relative the local clock.
      * This will inherently be approximate because it doesn't take into account
@@ -499,10 +500,13 @@ export class MatrixEvent extends EventEmitter {
      * @experimental
      * Get the event ID of the thread head
      */
-    public get threadRootId(): string {
+    public get threadRootId(): string | undefined {
         const relatesTo = this.getWireContent()?.["m.relates_to"];
         if (relatesTo?.rel_type === RelationType.Thread) {
             return relatesTo.event_id;
+        } else {
+            return this.threadId
+                || this.getThread()?.id;
         }
     }
 
@@ -1544,8 +1548,12 @@ export class MatrixEvent extends EventEmitter {
     /**
      * @experimental
      */
-    public getThread(): Thread {
+    public getThread(): Thread | undefined {
         return this.thread;
+    }
+
+    public setThreadId(threadId: string): void {
+        this.threadId = threadId;
     }
 }
 
