@@ -18,27 +18,19 @@ import { IUploadKeySignaturesResponse } from "./client";
 
 export class InvalidStoreError extends Error {
     public static TOGGLED_LAZY_LOADING = "TOGGLED_LAZY_LOADING";
-    public reason: string;
-    public value: boolean;
 
-    constructor(reason: string, value: boolean) {
-        const message = `Store is invalid because ${reason}, `
-            + `please stop the client, delete all data and start the client again`;
-        super(message);
-        this.reason = reason;
-        this.value = value;
+    constructor(public reason: string, public value: boolean) {
+        super(`Store is invalid because ${reason}, `
+        + `please stop the client, delete all data and start the client again`);
     }
 }
 
 export class InvalidCryptoStoreError extends Error {
     public static TOO_NEW = "TOO_NEW";
-    public reason: string;
 
-    constructor(reason: string) {
-        const message = `Crypto store is invalid because ${reason}, ` +
-            `please stop the client, delete all data and start the client again`;
-        super(message);
-        this.reason = reason;
+    constructor(public reason: string) {
+        super(`Crypto store is invalid because ${reason}, ` +
+        `please stop the client, delete all data and start the client again`);
     }
 }
 
