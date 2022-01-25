@@ -6622,7 +6622,7 @@ export class MatrixClient extends EventEmitter {
      */
     public isUsernameAvailable(username: string): Promise<boolean> {
         return this.http.authedRequest<{ available: true }>(
-            undefined, Method.Get, '/register/available', { username: username },
+            undefined, Method.Get, '/register/available', { username },
         ).then((response) => {
             return response.available;
         }).catch(response => {
