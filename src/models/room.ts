@@ -1393,6 +1393,7 @@ export class Room extends EventEmitter {
 
     public createThread(events: MatrixEvent[]): Thread {
         const thread = new Thread(events, this, this.client);
+        logger.log("createThread", thread.id);
         this.threads.set(thread.id, thread);
         this.reEmitter.reEmit(thread, [
             ThreadEvent.Update,

@@ -5055,7 +5055,7 @@ export class MatrixClient extends EventEmitter {
                     limit,
                     Direction.Backward,
                 );
-            }).then((res: IMessagesResponse) => {
+            }).then(async (res: IMessagesResponse) => {
                 const matrixEvents = res.chunk.map(this.getEventMapper());
                 if (res.state) {
                     const stateEvents = res.state.map(this.getEventMapper());
@@ -5065,7 +5065,7 @@ export class MatrixClient extends EventEmitter {
                 const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(matrixEvents);
 
                 room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
-                this.processThreadEvents(room, threadedEvents);
+                await this.processThreadEvents(room, threadedEvents);
 
                 room.oldState.paginationToken = res.end;
                 if (res.chunk.length === 0) {
@@ -5143,7 +5143,7 @@ export class MatrixClient extends EventEmitter {
 
         // TODO: we should implement a backoff (as per scrollback()) to deal more
         // nicely with HTTP errors.
-        const promise = this.http.authedRequest<any>(undefined, Method.Get, path, params).then((res) => { // TODO types
+        const promise = this.http.authedRequest<any>(undefined, Method.Get, path, params).then(async (res) => { // TODO types
             if (!res.event) {
                 throw new Error("'event' not in '/context' result - homeserver too old?");
             }
@@ -5176,7 +5176,7 @@ export class MatrixClient extends EventEmitter {
             const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(matrixEvents);
 
             timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
-            this.processThreadEvents(timelineSet.room, threadedEvents);
+            await this.processThreadEvents(timelineSet.room, threadedEvents);
 
             // there is no guarantee that the event ended up in "timeline" (we
             // might have switched to a neighbouring timeline) - so check the
@@ -5291,7 +5291,7 @@ export class MatrixClient extends EventEmitter {
 
             promise = this.http.authedRequest<any>( // TODO types
                 undefined, Method.Get, path, params, undefined,
-            ).then((res) => {
+            ).then(async (res) => {
                 const token = res.next_token;
                 const matrixEvents = [];
 
@@ -5309,7 +5309,7 @@ export class MatrixClient extends EventEmitter {
 
                 const timelineSet = eventTimeline.getTimelineSet();
                 timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
-                this.processThreadEvents(timelineSet.room, threadedEvents);
+                await this.processThreadEvents(timelineSet.room, threadedEvents);
 
                 // if we've hit the end of the timeline, we need to stop trying to
                 // paginate. We need to keep the 'forwards' token though, to make sure
@@ -5334,7 +5334,7 @@ export class MatrixClient extends EventEmitter {
                 opts.limit,
                 dir,
                 eventTimeline.getFilter(),
-            ).then((res) => {
+            ).then(async (res) => {
                 if (res.state) {
                     const roomState = eventTimeline.getState(dir);
                     const stateEvents = res.state.map(this.getEventMapper());
@@ -5347,7 +5347,7 @@ export class MatrixClient extends EventEmitter {
 
                 eventTimeline.getTimelineSet()
                     .addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
-                this.processThreadEvents(room, threadedEvents);
+                await this.processThreadEvents(room, threadedEvents);
 
                 // if we've hit the end of the timeline, we need to stop trying to
                 // paginate. We need to keep the 'forwards' token though, to make sure
@@ -9092,12 +9092,11 @@ export class MatrixClient extends EventEmitter {
     /**
      * @experimental
      */
-    public processThreadEvents(room: Room, threadedEvents: MatrixEvent[]): void {
-        threadedEvents
-            .sort((a, b) => a.getTs() - b.getTs())
-            .forEach(event => {
-                room.addThreadedEvent(event);
-            });
+    public async processThreadEvents(room: Room, threadedEvents: MatrixEvent[]): Promise<void> {
+        threadedEvents.sort((a, b) => a.getTs() - b.getTs());
+        for (const event of threadedEvents) {
+            await room.addThreadedEvent(event);
+        }
     }
 
     /**
