@@ -6618,13 +6618,18 @@ export class MatrixClient extends EventEmitter {
      * Check whether a username is available prior to registration. An error response
      * indicates an invalid/unavailable username.
      * @param {string} username The username to check the availability of.
-     * @return {Promise} Resolves: to `true`.
+     * @return {Promise} Resolves: to boolean of whether the username is available.
      */
-    public isUsernameAvailable(username: string): Promise<true> {
+    public isUsernameAvailable(username: string): Promise<boolean> {
         return this.http.authedRequest<{ available: true }>(
             undefined, Method.Get, '/register/available', { username: username },
         ).then((response) => {
             return response.available;
+        }).catch(response => {
+            if (response.errcode === "M_USER_IN_USE") {
+                return false;
+            }
+            return Promise.reject(response);
         });
     }
 
