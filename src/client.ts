@@ -458,7 +458,7 @@ export interface ISignedKey {
 }
 
 export type KeySignatures = Record<string, Record<string, ICrossSigningKey | ISignedKey>>;
-interface IUploadKeySignaturesResponse {
+export interface IUploadKeySignaturesResponse {
     failures: Record<string, Record<string, {
         errcode: string;
         error: string;

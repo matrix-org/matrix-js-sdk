@@ -1,5 +1,5 @@
 /*
-Copyright 2015-2022 The Matrix.org Foundation C.I.C.
+Copyright 2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,12 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export class InvalidStoreError extends Error {
-    static TOGGLED_LAZY_LOADING = "TOGGLED_LAZY_LOADING";
-    reason: string;
-    value: unknown;
+import { IUploadKeySignaturesResponse } from "./client";
 
-    constructor(reason: string, value: unknown) {
+export class InvalidStoreError extends Error {
+    public static TOGGLED_LAZY_LOADING = "TOGGLED_LAZY_LOADING";
+    public reason: string;
+    public value: boolean;
+
+    constructor(reason: string, value: boolean) {
         const message = `Store is invalid because ${reason}, `
             + `please stop the client, delete all data and start the client again`;
         super(message);
@@ -29,8 +31,8 @@ export class InvalidStoreError extends Error {
 }
 
 export class InvalidCryptoStoreError extends Error {
-    static TOO_NEW = "TOO_NEW";
-    reason: string;
+    public static TOO_NEW = "TOO_NEW";
+    public reason: string;
 
     constructor(reason: string) {
         const message = `Crypto store is invalid because ${reason}, ` +
@@ -41,10 +43,7 @@ export class InvalidCryptoStoreError extends Error {
 }
 
 export class KeySignatureUploadError extends Error {
-    value: unknown;
-
-    constructor(message: string, value: unknown) {
+    constructor(message: string, public value: IUploadKeySignaturesResponse) {
         super(message);
-        this.value = value;
     }
 }

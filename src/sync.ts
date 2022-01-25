@@ -602,6 +602,9 @@ export class SyncApi {
             if (shouldClear) {
                 this.storeIsInvalid = true;
                 const reason = InvalidStoreError.TOGGLED_LAZY_LOADING;
+                // TODO - InvalidStoreError, or rather all the custom error classes, should extend
+                // the MatrixError class. For a quickfix, `error` has been casted to `any` because `updateSyncState` requires
+                // it to be an instance of MatrixError class.
                 const error = new InvalidStoreError(reason, !!this.opts.lazyLoadMembers) as any;
                 this.updateSyncState(SyncState.Error, { error });
                 // bail out of the sync loop now: the app needs to respond to this error.
