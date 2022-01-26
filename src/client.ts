@@ -811,7 +811,7 @@ export class MatrixClient extends EventEmitter {
     // TODO: This should expire: https://github.com/matrix-org/matrix-js-sdk/issues/1020
     protected serverVersionsPromise: Promise<IServerVersions>;
 
-    protected cachedCapabilities: {
+    public cachedCapabilities: {
         capabilities: ICapabilities;
         expiration: number;
     };

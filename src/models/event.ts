@@ -94,6 +94,12 @@ export interface IUnsigned {
     "m.relations"?: Record<RelationType | string, any>; // No common pattern for aggregated relations
 }
 
+export interface IThreadBundledRelationship {
+    latest_event: IEvent;
+    count: number;
+    current_user_participated?: boolean;
+}
+
 export interface IEvent {
     event_id: string;
     type: string;
@@ -1003,6 +1009,10 @@ export class MatrixEvent extends EventEmitter {
 
     public getUnsigned(): IUnsigned {
         return this.event.unsigned || {};
+    }
+
+    public setUnsigned(unsigned: IUnsigned): void {
+        this.event.unsigned = unsigned;
     }
 
     public unmarkLocallyRedacted(): boolean {

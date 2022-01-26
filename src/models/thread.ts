@@ -16,7 +16,8 @@ limitations under the License.
 
 import { MatrixClient } from "../matrix";
 import { ReEmitter } from "../ReEmitter";
-import { MatrixEvent } from "./event";
+import { RelationType } from "../@types/event";
+import { MatrixEvent, IThreadBundledRelationship } from "./event";
 import { EventTimeline } from "./event-timeline";
 import { EventTimelineSet } from './event-timeline-set';
 import { Room } from './room';
@@ -47,6 +48,9 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
 
     private reEmitter: ReEmitter;
 
+    private _lastReply: MatrixEvent;
+    private _replyCount = 0;
+
     constructor(
         events: MatrixEvent[] = [],
         public readonly room: Room,
@@ -76,6 +80,11 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         room.on("Room.timeline", this.onEcho);
     }
 
+    public get hasServerSideSupport(): boolean {
+        return this.client.cachedCapabilities
+            ?.capabilities?.[RelationType.Thread]?.enabled;
+    }
+
     onEcho = (event: MatrixEvent) => {
         if (this.timelineSet.eventIdToTimeline(event.getId())) {
             this.emit(ThreadEvent.Update, this);
@@ -89,7 +98,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
      * @param event The event to add
      */
     public async addEvent(event: MatrixEvent, toStartOfTimeline = false): Promise<void> {
-        if (this.timelineSet.findEventById(event.getId()) || event.status !== null) {
+        if (this.timelineSet.findEventById(event.getId())) {
             return;
         }
 
@@ -122,9 +131,31 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
 
         await this.client.decryptEventIfNeeded(event, {});
         this.emit(ThreadEvent.Update, this);
+        const isThreadReply = event.getRelation()?.rel_type === RelationType.Thread;
+        if (!this._lastReply || (isThreadReply && event.getTs() > this._lastReply.getTs())) {
+            this._lastReply = event;
+            if (this._lastReply.getId() !== this.root) {
+                this._replyCount++;
+                this.emit(ThreadEvent.NewReply, this, event);
+            }
+        }
 
-        if (event.isThreadRelation) {
-            this.emit(ThreadEvent.NewReply, this, event);
+        if (event.getId() === this.root) {
+            const bundledRelationship = event
+                .getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
+
+            if (this.hasServerSideSupport && bundledRelationship) {
+                this._replyCount = bundledRelationship.count;
+                this._currentUserParticipated = bundledRelationship.current_user_participated;
+
+                const lastReply = this.findEventById(bundledRelationship.latest_event.event_id);
+                if (lastReply) {
+                    this._lastReply = lastReply;
+                } else {
+                    const event = new MatrixEvent(bundledRelationship.latest_event);
+                    this._lastReply = event;
+                }
+            }
         }
     }
 
@@ -168,17 +199,14 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
      * exclude annotations from that number
      */
     public get length(): number {
-        return this.events
-            .filter(event => event.isThreadRelation)
-            .length;
+        return this._replyCount;
     }
 
     /**
      * A getter for the last event added to the thread
      */
     public get replyToEvent(): MatrixEvent {
-        const events = this.events;
-        return events[events.length -1];
+        return this._lastReply;
     }
 
     public get events(): MatrixEvent[] {
