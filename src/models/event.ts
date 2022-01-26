@@ -91,6 +91,7 @@ export interface IUnsigned {
     redacted_because?: IEvent;
     transaction_id?: string;
     invite_room_state?: StrippedState[];
+    "m.relations"?: Record<RelationType | string, any>; // No common pattern for aggregated relations
 }
 
 export interface IEvent {
@@ -1344,11 +1345,8 @@ export class MatrixEvent extends EventEmitter {
         return this.status;
     }
 
-    public getServerAggregatedRelation(relType: RelationType): IAggregatedRelation {
-        const relations = this.getUnsigned()["m.relations"];
-        if (relations) {
-            return relations[relType];
-        }
+    public getServerAggregatedRelation<T>(relType: RelationType): T | undefined {
+        return this.getUnsigned()["m.relations"]?.[relType];
     }
 
     /**
@@ -1357,7 +1355,7 @@ export class MatrixEvent extends EventEmitter {
      * @return {string?}
      */
     public replacingEventId(): string | undefined {
-        const replaceRelation = this.getServerAggregatedRelation(RelationType.Replace);
+        const replaceRelation = this.getServerAggregatedRelation<IAggregatedRelation>(RelationType.Replace);
         if (replaceRelation) {
             return replaceRelation.event_id;
         } else if (this._replacingEvent) {
@@ -1382,7 +1380,7 @@ export class MatrixEvent extends EventEmitter {
      * @return {Date?}
      */
     public replacingEventDate(): Date | undefined {
-        const replaceRelation = this.getServerAggregatedRelation(RelationType.Replace);
+        const replaceRelation = this.getServerAggregatedRelation<IAggregatedRelation>(RelationType.Replace);
         if (replaceRelation) {
             const ts = replaceRelation.origin_server_ts;
             if (Number.isFinite(ts)) {
