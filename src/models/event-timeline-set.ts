@@ -53,6 +53,11 @@ export enum DuplicateStrategy {
     Replace = "replace",
 }
 
+export interface IRoomTimelineData {
+    timeline: EventTimeline;
+    liveEvent?: boolean;
+}
+
 export class EventTimelineSet extends EventEmitter {
     private readonly timelineSupport: boolean;
     private unstableClientRelationAggregation: boolean;
@@ -594,7 +599,7 @@ export class EventTimelineSet extends EventEmitter {
         this.setRelationsTarget(event);
         this.aggregateRelations(event);
 
-        const data = {
+        const data: IRoomTimelineData = {
             timeline: timeline,
             liveEvent: !toStartOfTimeline && timeline == this.liveTimeline && !fromCache,
         };
