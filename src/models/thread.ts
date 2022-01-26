@@ -48,8 +48,8 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
 
     private reEmitter: ReEmitter;
 
-    private _lastReply: MatrixEvent;
-    private _replyCount = 0;
+    private lastReply: MatrixEvent;
+    private replyCount = 0;
 
     constructor(
         events: MatrixEvent[] = [],
