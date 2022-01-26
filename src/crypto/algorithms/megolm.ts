@@ -213,6 +213,8 @@ class OutboundSessionInfo {
                 }
             }
         }
+
+        return false;
     }
 }
 
@@ -231,7 +233,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
     // are using, and which devices we have shared the keys with. It resolves
     // with an OutboundSessionInfo (or undefined, for the first message in the
     // room).
-    private setupPromise = Promise.resolve<OutboundSessionInfo>(undefined);
+    private setupPromise = Promise.resolve<OutboundSessionInfo | null>(null);
 
     // Map of outbound sessions by sessions ID. Used if we need a particular
     // session (the session we're currently using to send is always obtained
@@ -240,8 +242,8 @@ class MegolmEncryption extends EncryptionAlgorithm {
 
     private readonly sessionRotationPeriodMsgs: number;
     private readonly sessionRotationPeriodMs: number;
-    private encryptionPreparation: Promise<void>;
-    private encryptionPreparationMetadata: {
+    private encryptionPreparation?: {
+        promise: Promise<void>;
         startTime: number;
     };
 
@@ -277,36 +279,36 @@ class MegolmEncryption extends EncryptionAlgorithm {
         // Updates `session` to hold the final OutboundSessionInfo.
         //
         // returns a promise which resolves once the keyshare is successful.
-        const prepareSession = async (oldSession: OutboundSessionInfo) => {
-            session = oldSession;
-
+        const prepareSession = async (oldSession: OutboundSessionInfo | null) => {
             const sharedHistory = isRoomSharedHistory(room);
 
             // history visibility changed
-            if (session && sharedHistory !== session.sharedHistory) {
-                session = null;
+            if (oldSession != null && sharedHistory !== oldSession.sharedHistory) {
+                oldSession = null;
             }
 
             // need to make a brand new session?
-            if (session && session.needsRotation(this.sessionRotationPeriodMsgs,
+            if (oldSession != null && oldSession.needsRotation(this.sessionRotationPeriodMsgs,
                 this.sessionRotationPeriodMs)
             ) {
                 logger.log("Starting new megolm session because we need to rotate.");
-                session = null;
+                oldSession = null;
             }
 
             // determine if we have shared with anyone we shouldn't have
-            if (session && session.sharedWithTooManyDevices(devicesInRoom)) {
-                session = null;
+            if (oldSession != null && oldSession.sharedWithTooManyDevices(devicesInRoom)) {
+                oldSession = null;
             }
 
-            if (!session) {
+            if (oldSession == null) {
                 logger.log(`Starting new megolm session for room ${this.roomId}`);
-                session = await this.prepareNewSession(sharedHistory);
-                logger.log(`Started new megolm session ${session.sessionId} ` +
+                oldSession = await this.prepareNewSession(sharedHistory);
+                logger.log(`Started new megolm session ${oldSession.sessionId} ` +
                     `for room ${this.roomId}`);
-                this.outboundSessions[session.sessionId] = session;
+                this.outboundSessions[oldSession.sessionId] = oldSession;
             }
+
+            session = oldSession;
 
             // now check if we need to share with any devices
             const shareMap: Record<string, DeviceInfo[]> = {};
@@ -386,7 +388,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
                             for (const server of failedServers) {
                                 failedServerMap.add(server);
                             }
-                            const failedDevices = [];
+                            const failedDevices: IOlmDevice[] = [];
                             for (const { userId, deviceInfo } of errorDevices) {
                                 const userHS = userId.slice(userId.indexOf(":") + 1);
                                 if (failedServerMap.has(userHS)) {
@@ -853,7 +855,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
         logger.debug(`Ensuring Olm sessions for devices in ${this.roomId}`);
         const devicemap = await olmlib.ensureOlmSessionsForDevices(
             this.olmDevice, this.baseApis, devicesByUser, false, otkTimeout, failedServers,
-            logger.withPrefix(`[${this.roomId}]`),
+            logger.withPrefix?.(`[${this.roomId}]`),
         );
         logger.debug(`Ensured Olm sessions for devices in ${this.roomId}`);
 
@@ -993,11 +995,11 @@ class MegolmEncryption extends EncryptionAlgorithm {
      * @param {module:models/room} room the room the event is in
      */
     public prepareToEncrypt(room: Room): void {
-        if (this.encryptionPreparation) {
+        if (this.encryptionPreparation != null) {
             // We're already preparing something, so don't do anything else.
             // FIXME: check if we need to restart
             // (https://github.com/matrix-org/matrix-js-sdk/issues/1255)
-            const elapsedTime = Date.now() - this.encryptionPreparationMetadata.startTime;
+            const elapsedTime = Date.now() - this.encryptionPreparation.startTime;
             logger.debug(
                 `Already started preparing to encrypt for ${this.roomId} ` +
                 `${elapsedTime} ms ago, skipping`,
@@ -1007,32 +1009,31 @@ class MegolmEncryption extends EncryptionAlgorithm {
 
         logger.debug(`Preparing to encrypt events for ${this.roomId}`);
 
-        this.encryptionPreparationMetadata = {
+        this.encryptionPreparation = {
             startTime: Date.now(),
-        };
-        this.encryptionPreparation = (async () => {
-            try {
-                logger.debug(`Getting devices in ${this.roomId}`);
-                const [devicesInRoom, blocked] = await this.getDevicesInRoom(room);
+            promise: (async () => {
+                try {
+                    logger.debug(`Getting devices in ${this.roomId}`);
+                    const [devicesInRoom, blocked] = await this.getDevicesInRoom(room);
 
-                if (this.crypto.getGlobalErrorOnUnknownDevices()) {
-                    // Drop unknown devices for now.  When the message gets sent, we'll
-                    // throw an error, but we'll still be prepared to send to the known
-                    // devices.
-                    this.removeUnknownDevices(devicesInRoom);
+                    if (this.crypto.getGlobalErrorOnUnknownDevices()) {
+                        // Drop unknown devices for now.  When the message gets sent, we'll
+                        // throw an error, but we'll still be prepared to send to the known
+                        // devices.
+                        this.removeUnknownDevices(devicesInRoom);
+                    }
+
+                    logger.debug(`Ensuring outbound session in ${this.roomId}`);
+                    await this.ensureOutboundSession(room, devicesInRoom, blocked, true);
+
+                    logger.debug(`Ready to encrypt events for ${this.roomId}`);
+                } catch (e) {
+                    logger.error(`Failed to prepare to encrypt events for ${this.roomId}`, e);
+                } finally {
+                    delete this.encryptionPreparation;
                 }
-
-                logger.debug(`Ensuring outbound session in ${this.roomId}`);
-                await this.ensureOutboundSession(room, devicesInRoom, blocked, true);
-
-                logger.debug(`Ready to encrypt events for ${this.roomId}`);
-            } catch (e) {
-                logger.error(`Failed to prepare to encrypt events for ${this.roomId}`, e);
-            } finally {
-                delete this.encryptionPreparationMetadata;
-                delete this.encryptionPreparation;
-            }
-        })();
+            })(),
+        };
     }
 
     /**
@@ -1047,12 +1048,12 @@ class MegolmEncryption extends EncryptionAlgorithm {
     public async encryptMessage(room: Room, eventType: string, content: object): Promise<object> {
         logger.log(`Starting to encrypt event for ${this.roomId}`);
 
-        if (this.encryptionPreparation) {
+        if (this.encryptionPreparation != null) {
             // If we started sending keys, wait for it to be done.
             // FIXME: check if we need to cancel
             // (https://github.com/matrix-org/matrix-js-sdk/issues/1255)
             try {
-                await this.encryptionPreparation;
+                await this.encryptionPreparation.promise;
             } catch (e) {
                 // ignore any errors -- if the preparation failed, we'll just
                 // restart everything here
@@ -1390,6 +1391,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
         if (!senderPendingEvents.has(sessionId)) {
             senderPendingEvents.set(sessionId, new Set());
         }
+        // @ts-ignore: TS isn't smart enough to figure out `has` + `set` above makes this non-null
         senderPendingEvents.get(sessionId).add(event);
     }
 
@@ -1424,17 +1426,17 @@ class MegolmDecryption extends DecryptionAlgorithm {
      *
      * @param {module:models/event.MatrixEvent} event key event
      */
-    public onRoomKeyEvent(event: MatrixEvent): Promise<void> {
-        const content = event.getContent();
-        const sessionId = content.session_id;
+    public async onRoomKeyEvent(event: MatrixEvent): Promise<void> {
+        const content: Partial<IMessage["content"]> = event.getContent();
         let senderKey = event.getSenderKey();
-        let forwardingKeyChain = [];
+        let forwardingKeyChain: string[] = [];
         let exportFormat = false;
         let keysClaimed;
 
         if (!content.room_id ||
-            !sessionId ||
-            !content.session_key
+            !content.session_key ||
+            !content.session_id ||
+            !content.algorithm
         ) {
             logger.error("key event is missing fields");
             return;
@@ -1447,19 +1449,17 @@ class MegolmDecryption extends DecryptionAlgorithm {
 
         if (event.getType() == "m.forwarded_room_key") {
             exportFormat = true;
-            forwardingKeyChain = content.forwarding_curve25519_key_chain;
-            if (!Array.isArray(forwardingKeyChain)) {
-                forwardingKeyChain = [];
-            }
+            forwardingKeyChain = content.forwarding_curve25519_key_chain ?? [];
 
             // copy content before we modify it
             forwardingKeyChain = forwardingKeyChain.slice();
             forwardingKeyChain.push(senderKey);
 
-            senderKey = content.sender_key;
-            if (!senderKey) {
+            if (!content.sender_key) {
                 logger.error("forwarded_room_key event is missing sender_key field");
                 return;
+            } else {
+                senderKey = content.sender_key;
             }
 
             const ed25519Key = content.sender_claimed_ed25519_key;
@@ -1481,34 +1481,34 @@ class MegolmDecryption extends DecryptionAlgorithm {
         if (content["org.matrix.msc3061.shared_history"]) {
             extraSessionData.sharedHistory = true;
         }
-        return this.olmDevice.addInboundGroupSession(
-            content.room_id, senderKey, forwardingKeyChain, sessionId,
-            content.session_key, keysClaimed,
-            exportFormat, extraSessionData,
-        ).then(() => {
+
+        try {
+            await this.olmDevice.addInboundGroupSession(
+                content.room_id, senderKey, forwardingKeyChain, content.session_id,
+                content.session_key, keysClaimed,
+                exportFormat, extraSessionData,
+            );
+
             // have another go at decrypting events sent with this session.
-            this.retryDecryption(senderKey, sessionId)
-                .then((success) => {
-                    // cancel any outstanding room key requests for this session.
-                    // Only do this if we managed to decrypt every message in the
-                    // session, because if we didn't, we leave the other key
-                    // requests in the hopes that someone sends us a key that
-                    // includes an earlier index.
-                    if (success) {
-                        this.crypto.cancelRoomKeyRequest({
-                            algorithm: content.algorithm,
-                            room_id: content.room_id,
-                            session_id: content.session_id,
-                            sender_key: senderKey,
-                        });
-                    }
+            if (await this.retryDecryption(senderKey, content.session_id)) {
+                // cancel any outstanding room key requests for this session.
+                // Only do this if we managed to decrypt every message in the
+                // session, because if we didn't, we leave the other key
+                // requests in the hopes that someone sends us a key that
+                // includes an earlier index.
+                this.crypto.cancelRoomKeyRequest({
+                    algorithm: content.algorithm,
+                    room_id: content.room_id,
+                    session_id: content.session_id,
+                    sender_key: senderKey,
                 });
-        }).then(() => {
+            }
+
             // don't wait for the keys to be backed up for the server
-            this.crypto.backupManager.backupGroupSession(senderKey, content.session_id);
-        }).catch((e) => {
+            await this.crypto.backupManager.backupGroupSession(senderKey, content.session_id);
+        } catch (e) {
             logger.error(`Error handling m.room_key_event: ${e}`);
-        });
+        }
     }
 
     /**
@@ -1701,7 +1701,10 @@ class MegolmDecryption extends DecryptionAlgorithm {
      * @param {boolean} [opts.untrusted] whether the key should be considered as untrusted
      * @param {string} [opts.source] where the key came from
      */
-    public importRoomKey(session: IMegolmSessionData, opts: any = {}): Promise<void> {
+    public importRoomKey(
+        session: IMegolmSessionData,
+        opts: { untrusted?: boolean, source?: string } = {},
+    ): Promise<void> {
         const extraSessionData: any = {};
         if (opts.untrusted || session.untrusted) {
             extraSessionData.untrusted = true;

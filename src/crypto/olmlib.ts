@@ -76,7 +76,7 @@ export interface IOlmSessionResult {
 export async function encryptMessageForDevice(
     resultsObject: Record<string, string>,
     ourUserId: string,
-    ourDeviceId: string,
+    ourDeviceId: string | undefined,
     olmDevice: OlmDevice,
     recipientUserId: string,
     recipientDevice: DeviceInfo,

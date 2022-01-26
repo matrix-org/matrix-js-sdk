@@ -51,7 +51,7 @@ interface IMessage {
  */
 class OlmEncryption extends EncryptionAlgorithm {
     private sessionPrepared = false;
-    private prepPromise: Promise<void> = null;
+    private prepPromise: Promise<void> | null = null;
 
     /**
      * @private
@@ -116,7 +116,7 @@ class OlmEncryption extends EncryptionAlgorithm {
             ciphertext: {},
         };
 
-        const promises = [];
+        const promises: Promise<void>[] = [];
 
         for (let i = 0; i < users.length; ++i) {
             const userId = users[i];
