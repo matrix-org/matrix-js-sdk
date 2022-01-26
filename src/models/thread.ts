@@ -48,7 +48,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
 
     private reEmitter: ReEmitter;
 
-    private lastReply: MatrixEvent;
+    private lastEvent: MatrixEvent;
     private replyCount = 0;
 
     constructor(
@@ -135,17 +135,17 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         // If no thread support exists we want to count all thread relation
         // added as a reply. We can't rely on the bundled relationships count
         if (!this.hasServerSideSupport && isThreadReply) {
-            this._replyCount++;
+            this.replyCount++;
         }
 
-        if (!this._lastReply || (isThreadReply && event.getTs() > this._lastReply.getTs())) {
-            this._lastReply = event;
-            if (this._lastReply.getId() !== this.root) {
+        if (!this.lastEvent || (isThreadReply && event.getTs() > this.lastEvent.getTs())) {
+            this.lastEvent = event;
+            if (this.lastEvent.getId() !== this.root) {
                 // This counting only works when server side support is enabled
                 // as we started the counting from the value returned in the
                 // bundled relationship
                 if (this.hasServerSideSupport) {
-                    this._replyCount++;
+                    this.replyCount++;
                 }
                 this.emit(ThreadEvent.NewReply, this, event);
             }
@@ -156,15 +156,15 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
                 .getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
 
             if (this.hasServerSideSupport && bundledRelationship) {
-                this._replyCount = bundledRelationship.count;
+                this.replyCount = bundledRelationship.count;
                 this._currentUserParticipated = bundledRelationship.current_user_participated;
 
                 const lastReply = this.findEventById(bundledRelationship.latest_event.event_id);
                 if (lastReply) {
-                    this._lastReply = lastReply;
+                    this.lastEvent = lastReply;
                 } else {
                     const event = new MatrixEvent(bundledRelationship.latest_event);
-                    this._lastReply = event;
+                    this.lastEvent = event;
                 }
             }
         }
@@ -215,14 +215,14 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
      * exclude annotations from that number
      */
     public get length(): number {
-        return this._replyCount;
+        return this.replyCount;
     }
 
     /**
      * A getter for the last event added to the thread
      */
     public get replyToEvent(): MatrixEvent {
-        return this._lastReply;
+        return this.lastEvent;
     }
 
     public get events(): MatrixEvent[] {
