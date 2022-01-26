@@ -16,7 +16,7 @@ limitations under the License.
 
 import { EventEmitter } from 'events';
 
-import { EventStatus, MatrixEvent } from './event';
+import { EventStatus, MatrixEvent, IAggregatedRelation } from './event';
 import { Room } from './room';
 import { logger } from '../logger';
 import { RelationType } from "../@types/event";
@@ -319,7 +319,7 @@ export class Relations extends EventEmitter {
 
         // the all-knowning server tells us that the event at some point had
         // this timestamp for its replacement, so any following replacement should definitely not be less
-        const replaceRelation = this.targetEvent.getServerAggregatedRelation(RelationType.Replace);
+        const replaceRelation = this.targetEvent.getServerAggregatedRelation<IAggregatedRelation>(RelationType.Replace);
         const minTs = replaceRelation && replaceRelation.origin_server_ts;
 
         const lastReplacement = this.getRelations().reduce((last, event) => {

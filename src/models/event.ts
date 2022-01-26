@@ -119,7 +119,7 @@ export interface IEvent {
     age?: number;
 }
 
-interface IAggregatedRelation {
+export interface IAggregatedRelation {
     origin_server_ts: number;
     event_id?: string;
     sender?: string;
