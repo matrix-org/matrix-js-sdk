@@ -32,6 +32,7 @@ interface IOpts {
 export interface IMinimalEvent {
     content: IContent;
     type: EventType | string;
+    unsigned?: IUnsigned;
 }
 
 export interface IEphemeral {
