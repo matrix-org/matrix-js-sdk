@@ -508,7 +508,7 @@ export class MatrixHttpApi {
         if (method === Method.Get) {
             opts.qs = params;
         } else if (typeof params === "object") {
-            opts.json = !!params; // XXX: this feels strange
+            opts.json = params;
         }
 
         if (accessToken) {
