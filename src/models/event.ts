@@ -528,10 +528,13 @@ export class MatrixEvent extends EventEmitter {
      * @experimental
      */
     public get isThreadRoot(): boolean {
-        // TODO, change the inner working of this getter for it to use the
-        // bundled relationship return on the event, view MSC3440
-        const thread = this.getThread();
-        return thread?.id === this.getId();
+        const threadDetails = this
+            .getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
+
+        // Bundled relationships only returned when the sync response is limited
+        // hence us having to check both bundled relation and inspect the thread
+        // model
+        return !!threadDetails || (this.getThread()?.id === this.getId());
     }
 
     public get parentEventId(): string {
