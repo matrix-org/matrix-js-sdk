@@ -130,12 +130,23 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         }
 
         await this.client.decryptEventIfNeeded(event, {});
-        this.emit(ThreadEvent.Update, this);
+
         const isThreadReply = event.getRelation()?.rel_type === RelationType.Thread;
+        // If no thread support exists we want to count all thread relation
+        // added as a reply. We can't rely on the bundled relationships count
+        if (!this.hasServerSideSupport && isThreadReply) {
+            this._replyCount++;
+        }
+
         if (!this._lastReply || (isThreadReply && event.getTs() > this._lastReply.getTs())) {
             this._lastReply = event;
             if (this._lastReply.getId() !== this.root) {
-                this._replyCount++;
+                // This counting only works when server side support is enabled
+                // as we started the counting from the value returned in the
+                // bundled relationship
+                if (this.hasServerSideSupport) {
+                    this._replyCount++;
+                }
                 this.emit(ThreadEvent.NewReply, this, event);
             }
         }
@@ -157,6 +168,8 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
                 }
             }
         }
+
+        this.emit(ThreadEvent.Update, this);
     }
 
     /**

@@ -521,7 +521,7 @@ export class MatrixEvent extends EventEmitter {
      * @experimental
      */
     public get isThreadRelation(): boolean {
-        return !!this.threadRootId;
+        return !!this.threadRootId && this.threadId !== this.getId();
     }
 
     /**
