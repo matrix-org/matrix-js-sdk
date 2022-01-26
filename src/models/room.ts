@@ -1571,10 +1571,12 @@ export class Room extends EventEmitter {
                     const timelineSet = this.timelineSets[i];
                     if (timelineSet.getFilter()) {
                         if (timelineSet.getFilter().filterRoomTimeline([event]).length) {
-                            thread.addEvent(event, false);
+                            timelineSet.addEventToTimeline(event,
+                                timelineSet.getLiveTimeline(), false);
                         }
                     } else {
-                        thread.addEvent(event, false);
+                        timelineSet.addEventToTimeline(event,
+                            timelineSet.getLiveTimeline(), false);
                     }
                 }
             }
