@@ -188,7 +188,7 @@ export class FilterComponent {
      * @param {MatrixEvent[]} events  Events to be checked against the filter component
      * @return {MatrixEvent[]} events which matched the filter component
      */
-    filter(events: MatrixEvent[]): MatrixEvent[] {
+    public filter(events: MatrixEvent[]): MatrixEvent[] {
         return events.filter(this.check, this);
     }
 
@@ -197,7 +197,7 @@ export class FilterComponent {
      * 10 if none is otherwise specified. Cargo-culted from Synapse.
      * @return {Number} the limit for this filter component.
      */
-    limit(): number {
+    public limit(): number {
         return this.filterJson.limit !== undefined ? this.filterJson.limit : 10;
     }
 }
