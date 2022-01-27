@@ -64,7 +64,7 @@ export interface IFilterComponent {
  * @param {Object} filterJson the definition of this filter JSON, e.g. { 'contains_url': true }
  */
 export class FilterComponent {
-    constructor(private filterJson: IFilterComponent) {}
+    constructor(private filterJson: IFilterComponent, public readonly userId?: string) {}
 
     /**
      * Checks with the filter component matches the given event
@@ -72,13 +72,24 @@ export class FilterComponent {
      * @return {boolean} true if the event matches the filter
      */
     public check(event: MatrixEvent): boolean {
-        const relations: Array<string | RelationType> = Object.keys(event.getUnsigned()?.["m.relations"] || {});
+        const bundledRelationships = event.getUnsigned()?.["m.relations"] || {};
+        const relations: Array<string | RelationType> = Object.keys(bundledRelationships);
+        // Relation senders allows in theory a look-up of any senders
+        // however clients can only know about the current user participation status
+        // as sending a whole list of participants could be proven problematic in terms
+        // of performance
+        // This should be improved when bundled relationships solve that problem
+        const relationSenders = [];
+        if (this.userId && relations?.[RelationType.Thread]?.current_user_participated) {
+            relationSenders.push(this.userId);
+        }
         return this.checkFields(
             event.getRoomId(),
             event.getSender(),
             event.getType(),
             event.getContent() ? event.getContent().url !== undefined : false,
             relations,
+            relationSenders,
         );
     }
 
@@ -106,6 +117,7 @@ export class FilterComponent {
      * @param {String} eventType     the type of the event being checked
      * @param {boolean} containsUrl  whether the event contains a content.url field
      * @param {boolean} relationTypes  whether has aggregated relation of the given type
+     * @param {boolean} relationSenders whether one of the relation is sent by the user listed
      * @return {boolean} true if the event fields match the filter
      */
     private checkFields(
@@ -114,6 +126,7 @@ export class FilterComponent {
         eventType: string,
         containsUrl: boolean,
         relationTypes: Array<RelationType | string>,
+        relationSenders: string[],
     ): boolean {
         const literalKeys = {
             "rooms": function(v: string): boolean {
@@ -149,15 +162,25 @@ export class FilterComponent {
 
         const relationTypesFilter = this.filterJson[UNSTABLE_FILTER_RELATION_TYPES.name];
         if (relationTypesFilter !== undefined) {
-            const matchesRelations = relationTypes.length > 0 && relationTypes.every(relationType => {
-                return relationTypesFilter.includes(relationType);
-            });
-            if (!matchesRelations) {
+            if (!this.arrayMatchesFilter(relationTypesFilter, relationTypes)) {
+                return false;
+            }
+        }
+
+        const relationSendersFilter = this.filterJson[UNSTABLE_FILTER_RELATION_SENDERS.name];
+        if (relationSendersFilter !== undefined) {
+            if (!this.arrayMatchesFilter(relationSendersFilter, relationSenders)) {
                 return false;
             }
         }
 
         return true;
+    }
+
+    private arrayMatchesFilter(filter: any[], values: any[]): boolean {
+        return values.length > 0 && values.every(value => {
+            return filter.includes(value);
+        });
     }
 
     /**
