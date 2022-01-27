@@ -283,24 +283,22 @@ class MegolmEncryption extends EncryptionAlgorithm {
             const sharedHistory = isRoomSharedHistory(room);
 
             // history visibility changed
-            if (oldSession != null && sharedHistory !== oldSession.sharedHistory) {
+            if (oldSession && sharedHistory !== oldSession.sharedHistory) {
                 oldSession = null;
             }
 
             // need to make a brand new session?
-            if (oldSession != null && oldSession.needsRotation(this.sessionRotationPeriodMsgs,
-                this.sessionRotationPeriodMs)
-            ) {
+            if (oldSession?.needsRotation(this.sessionRotationPeriodMsgs, this.sessionRotationPeriodMs)) {
                 logger.log("Starting new megolm session because we need to rotate.");
                 oldSession = null;
             }
 
             // determine if we have shared with anyone we shouldn't have
-            if (oldSession != null && oldSession.sharedWithTooManyDevices(devicesInRoom)) {
+            if (oldSession?.sharedWithTooManyDevices(devicesInRoom)) {
                 oldSession = null;
             }
 
-            if (oldSession == null) {
+            if (!oldSession) {
                 logger.log(`Starting new megolm session for room ${this.roomId}`);
                 oldSession = await this.prepareNewSession(sharedHistory);
                 logger.log(`Started new megolm session ${oldSession.sessionId} ` +
@@ -1427,7 +1425,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
      * @param {module:models/event.MatrixEvent} event key event
      */
     public async onRoomKeyEvent(event: MatrixEvent): Promise<void> {
-        const content: Partial<IMessage["content"]> = event.getContent();
+        const content = event.getContent<Partial<IMessage["content"]>>();
         let senderKey = event.getSenderKey();
         let forwardingKeyChain: string[] = [];
         let exportFormat = false;
@@ -1458,9 +1456,8 @@ class MegolmDecryption extends DecryptionAlgorithm {
             if (!content.sender_key) {
                 logger.error("forwarded_room_key event is missing sender_key field");
                 return;
-            } else {
-                senderKey = content.sender_key;
             }
+            senderKey = content.sender_key;
 
             const ed25519Key = content.sender_claimed_ed25519_key;
             if (!ed25519Key) {
@@ -1484,9 +1481,14 @@ class MegolmDecryption extends DecryptionAlgorithm {
 
         try {
             await this.olmDevice.addInboundGroupSession(
-                content.room_id, senderKey, forwardingKeyChain, content.session_id,
-                content.session_key, keysClaimed,
-                exportFormat, extraSessionData,
+                content.room_id,
+                senderKey,
+                forwardingKeyChain,
+                content.session_id,
+                content.session_key,
+                keysClaimed,
+                exportFormat,
+                extraSessionData,
             );
 
             // have another go at decrypting events sent with this session.
