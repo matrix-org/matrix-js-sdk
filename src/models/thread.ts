@@ -17,12 +17,13 @@ limitations under the License.
 import { MatrixClient } from "../matrix";
 import { ReEmitter } from "../ReEmitter";
 import { RelationType } from "../@types/event";
+import { IRelationsRequestOpts } from "../@types/requests";
 import { MatrixEvent, IThreadBundledRelationship } from "./event";
-import { EventTimeline } from "./event-timeline";
+import { Direction, EventTimeline } from "./event-timeline";
 import { EventTimelineSet } from './event-timeline-set';
 import { Room } from './room';
 import { TypedEventEmitter } from "./typed-event-emitter";
-import { RoomState } from "..";
+import { RoomState } from "./room-state";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -56,6 +57,8 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
 
     public readonly room: Room;
     public readonly client: MatrixClient;
+
+    public initialEventsFetched = false;
 
     constructor(
         public readonly rootEvent: MatrixEvent,
@@ -121,13 +124,25 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
             event.setThread(this);
             this.timelineSet.addEventToTimeline(
                 event,
-                this.timelineSet.getLiveTimeline(),
+                this.liveTimeline,
                 toStartOfTimeline,
                 false,
                 this.roomState,
             );
 
             await this.client.decryptEventIfNeeded(event, {});
+        }
+
+        if (this.hasServerSideSupport && this.initialEventsFetched) {
+            if (event.getTs() > this.lastReply().getTs() && !this.findEventById(event.getId())) {
+                this.timelineSet.addEventToTimeline(
+                    event,
+                    this.liveTimeline,
+                    false,
+                    false,
+                    this.roomState,
+                );
+            }
         }
 
         if (!this._currentUserParticipated && event.getSender() === this.client.getUserId()) {
@@ -150,6 +165,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
                 if (this.hasServerSideSupport) {
                     this.replyCount++;
                 }
+
                 this.emit(ThreadEvent.NewReply, this, event);
             }
         }
@@ -166,14 +182,28 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
             this._currentUserParticipated = bundledRelationship.current_user_participated;
 
             const event = new MatrixEvent(bundledRelationship.latest_event);
-            EventTimeline.setEventMetadata(event, this.roomState, false);
-            event.setThread(this);
+            this.setEventMetadata(event);
             this.lastEvent = event;
         }
 
         if (!bundledRelationship) {
             this.addEvent(rootEvent);
         }
+    }
+
+    public async fetchInitialEvents(): Promise<boolean> {
+        try {
+            await this.fetchEvents();
+            this.initialEventsFetched = true;
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    private setEventMetadata(event: MatrixEvent): void {
+        EventTimeline.setEventMetadata(event, this.roomState, false);
+        event.setThread(this);
     }
 
     /**
@@ -189,7 +219,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
     public lastReply(matches: (ev: MatrixEvent) => boolean = () => true): MatrixEvent {
         for (let i = this.events.length - 1; i >= 0; i--) {
             const event = this.events[i];
-            if (event.isThreadRelation && matches(event)) {
+            if (matches(event)) {
                 return event;
             }
         }
@@ -223,14 +253,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
     }
 
     public get events(): MatrixEvent[] {
-        return this.timelineSet.getLiveTimeline().getEvents();
-    }
-
-    public merge(thread: Thread): void {
-        thread.events.forEach(event => {
-            this.addEvent(event);
-        });
-        this.events.forEach(event => event.setThread(this));
+        return this.liveTimeline.getEvents();
     }
 
     public has(eventId: string): boolean {
@@ -239,5 +262,56 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
 
     public get hasCurrentUserParticipated(): boolean {
         return this._currentUserParticipated;
+    }
+
+    public get liveTimeline(): EventTimeline {
+        return this.timelineSet.getLiveTimeline();
+    }
+
+    public async fetchEvents(opts: IRelationsRequestOpts = { limit: 20 }): Promise<{
+        originalEvent: MatrixEvent;
+        events: MatrixEvent[];
+        nextBatch?: string;
+        prevBatch?: string;
+    }> {
+        let {
+            originalEvent,
+            events,
+            prevBatch,
+            nextBatch,
+        } = await this.client.relations(
+            this.room.roomId,
+            this.id,
+            RelationType.Thread,
+            null,
+            opts,
+        );
+
+        // When there's no nextBatch returned with a `from` request we have reached
+        // the end of the thread, and therefore want to return an empty one
+        if (!opts.to && !nextBatch) {
+            events = [originalEvent, ...events];
+        }
+
+        for (const event of events) {
+            await this.client.decryptEventIfNeeded(event);
+            this.setEventMetadata(event);
+        }
+
+        const prependEvents = !opts.direction || opts.direction === Direction.Backward;
+
+        this.timelineSet.addEventsToTimeline(
+            events,
+            prependEvents,
+            this.liveTimeline,
+            prependEvents ? nextBatch : prevBatch,
+        );
+
+        return {
+            originalEvent,
+            events,
+            prevBatch,
+            nextBatch,
+        };
     }
 }
