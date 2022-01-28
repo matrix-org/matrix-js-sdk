@@ -91,6 +91,13 @@ export interface IUnsigned {
     redacted_because?: IEvent;
     transaction_id?: string;
     invite_room_state?: StrippedState[];
+    "m.relations"?: Record<RelationType | string, any>; // No common pattern for aggregated relations
+}
+
+export interface IThreadBundledRelationship {
+    latest_event: IEvent;
+    count: number;
+    current_user_participated?: boolean;
 }
 
 export interface IEvent {
@@ -112,7 +119,7 @@ export interface IEvent {
     age?: number;
 }
 
-interface IAggregatedRelation {
+export interface IAggregatedRelation {
     origin_server_ts: number;
     event_id?: string;
     sender?: string;
@@ -262,6 +269,7 @@ export class MatrixEvent extends EventEmitter {
      * A reference to the thread this event belongs to
      */
     private thread: Thread = null;
+    private threadId: string;
 
     /* Set an approximate timestamp for the event relative the local clock.
      * This will inherently be approximate because it doesn't take into account
@@ -499,10 +507,13 @@ export class MatrixEvent extends EventEmitter {
      * @experimental
      * Get the event ID of the thread head
      */
-    public get threadRootId(): string {
+    public get threadRootId(): string | undefined {
         const relatesTo = this.getWireContent()?.["m.relates_to"];
         if (relatesTo?.rel_type === RelationType.Thread) {
             return relatesTo.event_id;
+        } else {
+            return this.threadId
+                || this.getThread()?.id;
         }
     }
 
@@ -510,17 +521,20 @@ export class MatrixEvent extends EventEmitter {
      * @experimental
      */
     public get isThreadRelation(): boolean {
-        return !!this.threadRootId;
+        return !!this.threadRootId && this.threadId !== this.getId();
     }
 
     /**
      * @experimental
      */
     public get isThreadRoot(): boolean {
-        // TODO, change the inner working of this getter for it to use the
-        // bundled relationship return on the event, view MSC3440
-        const thread = this.getThread();
-        return thread?.id === this.getId();
+        const threadDetails = this
+            .getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
+
+        // Bundled relationships only returned when the sync response is limited
+        // hence us having to check both bundled relation and inspect the thread
+        // model
+        return !!threadDetails || (this.getThread()?.id === this.getId());
     }
 
     public get parentEventId(): string {
@@ -1005,6 +1019,10 @@ export class MatrixEvent extends EventEmitter {
         return this.event.unsigned || {};
     }
 
+    public setUnsigned(unsigned: IUnsigned): void {
+        this.event.unsigned = unsigned;
+    }
+
     public unmarkLocallyRedacted(): boolean {
         const value = this._localRedactionEvent;
         this._localRedactionEvent = null;
@@ -1345,11 +1363,8 @@ export class MatrixEvent extends EventEmitter {
         return this.status;
     }
 
-    public getServerAggregatedRelation(relType: RelationType): IAggregatedRelation {
-        const relations = this.getUnsigned()["m.relations"];
-        if (relations) {
-            return relations[relType];
-        }
+    public getServerAggregatedRelation<T>(relType: RelationType): T | undefined {
+        return this.getUnsigned()["m.relations"]?.[relType];
     }
 
     /**
@@ -1358,7 +1373,7 @@ export class MatrixEvent extends EventEmitter {
      * @return {string?}
      */
     public replacingEventId(): string | undefined {
-        const replaceRelation = this.getServerAggregatedRelation(RelationType.Replace);
+        const replaceRelation = this.getServerAggregatedRelation<IAggregatedRelation>(RelationType.Replace);
         if (replaceRelation) {
             return replaceRelation.event_id;
         } else if (this._replacingEvent) {
@@ -1383,7 +1398,7 @@ export class MatrixEvent extends EventEmitter {
      * @return {Date?}
      */
     public replacingEventDate(): Date | undefined {
-        const replaceRelation = this.getServerAggregatedRelation(RelationType.Replace);
+        const replaceRelation = this.getServerAggregatedRelation<IAggregatedRelation>(RelationType.Replace);
         if (replaceRelation) {
             const ts = replaceRelation.origin_server_ts;
             if (Number.isFinite(ts)) {
@@ -1549,8 +1564,12 @@ export class MatrixEvent extends EventEmitter {
     /**
      * @experimental
      */
-    public getThread(): Thread {
+    public getThread(): Thread | undefined {
         return this.thread;
+    }
+
+    public setThreadId(threadId: string): void {
+        this.threadId = threadId;
     }
 }
 

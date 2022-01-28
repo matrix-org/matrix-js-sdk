@@ -1371,9 +1371,11 @@ export class Room extends EventEmitter {
             let rootEvent = this.findEventById(event.threadRootId);
             // If the rootEvent does not exist in the current sync, then look for
             // it over the network
+            const eventData = await this.client.fetchRoomEvent(this.roomId, event.threadRootId);
             if (!rootEvent) {
-                const eventData = await this.client.fetchRoomEvent(this.roomId, event.threadRootId);
                 rootEvent = new MatrixEvent(eventData);
+            } else {
+                rootEvent.setUnsigned(eventData.unsigned);
             }
             events.unshift(rootEvent);
             thread = this.createThread(events);
@@ -1563,8 +1565,7 @@ export class Room extends EventEmitter {
             }
         } else {
             if (thread) {
-                thread.timelineSet.addEventToTimeline(event,
-                    thread.timelineSet.getLiveTimeline(), false);
+                thread.addEvent(event, false);
             } else {
                 for (let i = 0; i < this.timelineSets.length; i++) {
                     const timelineSet = this.timelineSets[i];
