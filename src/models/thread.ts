@@ -110,7 +110,8 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
      * @param event The event to add
      */
     public async addEvent(event: MatrixEvent, toStartOfTimeline = false): Promise<void> {
-        // When there's no server side support we man
+        // Add all incoming events to the thread's timeline set when there's
+        // no server support
         if (!this.hasServerSideSupport) {
             if (this.timelineSet.findEventById(event.getId())) {
                 return;
