@@ -277,7 +277,7 @@ export class MatrixEvent extends EventEmitter {
      * it to us and the time we're now constructing this event, but that's better
      * than assuming the local clock is in sync with the origin HS's clock.
      */
-    private readonly localTimestamp: number;
+    public readonly localTimestamp: number;
 
     // XXX: these should be read-only
     public sender: RoomMember = null;

@@ -135,7 +135,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         }
 
         if (this.hasServerSideSupport && this.initialEventsFetched) {
-            if (event.getTs() > this.lastReply().getTs() && !this.findEventById(event.getId())) {
+            if (event.localTimestamp > this.lastReply().localTimestamp && !this.findEventById(event.getId())) {
                 this.timelineSet.addEventToTimeline(
                     event,
                     this.liveTimeline,
@@ -157,7 +157,10 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
             this.replyCount++;
         }
 
-        if (!this.lastEvent || (isThreadReply && event.getTs() > this.replyToEvent.getTs())) {
+        // There is a risk that the `localTimestamp` approximation will not be accurate
+        // when threads are used over federation. That could results in the reply
+        // count value drifting away from the value returned by the server
+        if (!this.lastEvent || (isThreadReply && event.localTimestamp > this.replyToEvent.localTimestamp)) {
             this.lastEvent = event;
             if (this.lastEvent.getId() !== this.id) {
                 // This counting only works when server side support is enabled
