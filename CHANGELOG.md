@@ -1,3 +1,27 @@
+Changes in [15.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.5.0) (2022-01-31)
+==================================================================================================
+
+## ✨ Features
+ * Support m.asset in m.location event content ([\#2109](https://github.com/matrix-org/matrix-js-sdk/pull/2109)).
+ * Send extensible events structure and support on-demand parsing ([\#2091](https://github.com/matrix-org/matrix-js-sdk/pull/2091)).
+ * Support cancelling events whilst they are in status = ENCRYPTING ([\#2095](https://github.com/matrix-org/matrix-js-sdk/pull/2095)).
+
+## 🐛 Bug Fixes
+ * Fix http-api butchering idServer requests ([\#2134](https://github.com/matrix-org/matrix-js-sdk/pull/2134)). Fixes vector-im/element-web#20680.
+ * Don't remove streams that still have tracks ([\#2104](https://github.com/matrix-org/matrix-js-sdk/pull/2104)).
+
+Changes in [15.5.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.5.0-rc.1) (2022-01-26)
+============================================================================================================
+
+## ✨ Features
+ * Support m.asset in m.location event content ([\#2109](https://github.com/matrix-org/matrix-js-sdk/pull/2109)).
+ * Send extensible events structure and support on-demand parsing ([\#2091](https://github.com/matrix-org/matrix-js-sdk/pull/2091)).
+ * Support cancelling events whilst they are in status = ENCRYPTING ([\#2095](https://github.com/matrix-org/matrix-js-sdk/pull/2095)).
+
+## 🐛 Bug Fixes
+ * Fix http-api butchering idServer requests ([\#2134](https://github.com/matrix-org/matrix-js-sdk/pull/2134)). Fixes vector-im/element-web#20680.
+ * Don't remove streams that still have tracks ([\#2104](https://github.com/matrix-org/matrix-js-sdk/pull/2104)).
+
 Changes in [15.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.4.0) (2022-01-17)
 ==================================================================================================
 
