@@ -679,7 +679,12 @@ export class MatrixEvent extends EventEmitter {
     }
 
     public shouldAttemptDecryption() {
-        return this.isEncrypted() && !this.isBeingDecrypted() && !this.clearEvent;
+        if (this.isRedacted()) return false;
+        if (this.isBeingDecrypted()) return false;
+        if (this.clearEvent) return false;
+        if (!this.isEncrypted()) return false;
+
+        return true;
     }
 
     /**
