@@ -82,7 +82,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
             "Room.timelineReset",
         ]);
 
-        opts?.initialEvents.forEach(event => this.addEvent(event));
+        opts?.initialEvents?.forEach(event => this.addEvent(event));
 
         this.room.on("Room.localEchoUpdated", this.onEcho);
         this.room.on("Room.timeline", this.onEcho);

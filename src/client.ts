@@ -4212,6 +4212,18 @@ export class MatrixClient extends EventEmitter {
             info: info,
             body: text,
         };
+
+        const thread = this.getRoom(roomId)?.threads.get(threadId);
+        if (thread) {
+            content["m.relates_to"] = {
+                "rel_type": RelationType.Thread,
+                "event_id": threadId,
+                "m.in_reply_to": {
+                    "event_id": thread.replyToEvent.getId(),
+                },
+            };
+        }
+
         return this.sendEvent(roomId, threadId, EventType.Sticker, content, undefined, callback);
     }
 
