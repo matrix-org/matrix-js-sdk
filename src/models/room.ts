@@ -211,6 +211,7 @@ export class Room extends EventEmitter {
      * @experimental
      */
     public threads = new Map<string, Thread>();
+    public lastThread: Thread;
 
     /**
      * A mapping of eventId to all visibility changes to apply
@@ -1405,6 +1406,11 @@ export class Room extends EventEmitter {
             "Room.timeline",
             "Room.timelineReset",
         ]);
+
+        if (!this.lastThread || this.lastThread.rootEvent.localTimestamp < rootEvent.localTimestamp) {
+            this.lastThread = thread;
+        }
+
         this.emit(ThreadEvent.New, thread);
         return thread;
     }
