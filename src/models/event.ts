@@ -437,10 +437,10 @@ export class MatrixEvent extends EventEmitter {
     /**
      * Get the room_id for this event. This will return <code>undefined</code>
      * for <code>m.presence</code> events.
-     * @return {string} The room ID, e.g. <code>!cURbafjkfsMDVwdRDQ:matrix.org
+     * @return {string?} The room ID, e.g. <code>!cURbafjkfsMDVwdRDQ:matrix.org
      * </code>
      */
-    public getRoomId(): string {
+    public getRoomId(): string | undefined {
         return this.event.room_id;
     }
 
