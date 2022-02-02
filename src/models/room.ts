@@ -1372,13 +1372,24 @@ export class Room extends EventEmitter {
             let rootEvent = this.findEventById(event.threadRootId);
             // If the rootEvent does not exist in the current sync, then look for
             // it over the network
-            const eventData = await this.client.fetchRoomEvent(this.roomId, event.threadRootId);
-            if (!rootEvent) {
-                rootEvent = new MatrixEvent(eventData);
-            } else {
-                rootEvent.setUnsigned(eventData.unsigned);
+            try {
+                let eventData;
+                if (event.threadRootId) {
+                    eventData = await this.client.fetchRoomEvent(this.roomId, event.threadRootId);
+                }
+
+                if (!rootEvent) {
+                    rootEvent = new MatrixEvent(eventData);
+                } else {
+                    rootEvent.setUnsigned(eventData.unsigned);
+                }
+            } finally {
+                // The root event might be not be visible to the person requesting
+                // it. If it wasn't fetched successfully the thread will work
+                // in "limited" mode and won't benefit from all the APIs a homeserver
+                // can provide to enhance the thread experience
+                thread = this.createThread(rootEvent, events);
             }
-            thread = this.createThread(rootEvent, events);
         }
 
         if (event.getUnsigned().transaction_id) {
@@ -1393,26 +1404,30 @@ export class Room extends EventEmitter {
         this.emit(ThreadEvent.Update, thread);
     }
 
-    public createThread(rootEvent: MatrixEvent, events?: MatrixEvent[]): Thread {
+    public createThread(rootEvent: MatrixEvent, events?: MatrixEvent[]): Thread | undefined {
         const thread = new Thread(rootEvent, {
             initialEvents: events,
             room: this,
             client: this.client,
         });
-        this.threads.set(thread.id, thread);
-        this.reEmitter.reEmit(thread, [
-            ThreadEvent.Update,
-            ThreadEvent.Ready,
-            "Room.timeline",
-            "Room.timelineReset",
-        ]);
+        // If we managed to create a thread and figure out its `id`
+        // then we can use it
+        if (thread.id) {
+            this.threads.set(thread.id, thread);
+            this.reEmitter.reEmit(thread, [
+                ThreadEvent.Update,
+                ThreadEvent.Ready,
+                "Room.timeline",
+                "Room.timelineReset",
+            ]);
 
-        if (!this.lastThread || this.lastThread.rootEvent.localTimestamp < rootEvent.localTimestamp) {
-            this.lastThread = thread;
+            if (!this.lastThread || this.lastThread.rootEvent.localTimestamp < rootEvent.localTimestamp) {
+                this.lastThread = thread;
+            }
+
+            this.emit(ThreadEvent.New, thread);
+            return thread;
         }
-
-        this.emit(ThreadEvent.New, thread);
-        return thread;
     }
 
     /**
