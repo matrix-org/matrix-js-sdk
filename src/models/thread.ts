@@ -60,8 +60,10 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
 
     public initialEventsFetched = false;
 
+    public readonly id: string;
+
     constructor(
-        public readonly rootEvent: MatrixEvent,
+        public readonly rootEvent: MatrixEvent | undefined,
         opts: IThreadOpts,
     ) {
         super();
@@ -81,6 +83,15 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
             "Room.timeline",
             "Room.timelineReset",
         ]);
+
+        // If we weren't able to find the root event, it's probably missing
+        // and we define the thread ID from one of the thread relation
+        if (!rootEvent) {
+            this.id = opts?.initialEvents
+                ?.find(event => event.isThreadRelation)?.relationEventId;
+        } else {
+            this.id = rootEvent.getId();
+        }
 
         opts?.initialEvents?.forEach(event => this.addEvent(event));
 
@@ -177,9 +188,9 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         this.emit(ThreadEvent.Update, this);
     }
 
-    private initialiseThread(rootEvent: MatrixEvent): void {
+    private initialiseThread(rootEvent: MatrixEvent | undefined): void {
         const bundledRelationship = rootEvent
-            .getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
+            ?.getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
 
         if (this.hasServerSideSupport && bundledRelationship) {
             this.replyCount = bundledRelationship.count;
@@ -190,7 +201,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
             this.lastEvent = event;
         }
 
-        if (!bundledRelationship) {
+        if (!bundledRelationship && rootEvent) {
             this.addEvent(rootEvent);
         }
     }
@@ -229,15 +240,8 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         }
     }
 
-    /**
-     * The thread ID, which is the same as the root event ID
-     */
-    public get id(): string {
-        return this.rootEvent.getId();
-    }
-
     public get roomId(): string {
-        return this.rootEvent.getRoomId();
+        return this.room.roomId;
     }
 
     /**
