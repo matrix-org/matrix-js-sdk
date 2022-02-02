@@ -3595,15 +3595,18 @@ export class MatrixClient extends EventEmitter {
         }
 
         if (threadId && content["m.relates_to"]?.rel_type !== RelationType.Thread) {
-            const thread = this.getRoom(roomId)?.threads.get(threadId);
             content["m.relates_to"] = {
                 ...content["m.relates_to"],
                 "rel_type": RelationType.Thread,
                 "event_id": threadId,
-                "m.in_reply_to": {
-                    "event_id": thread.replyToEvent.getId(),
-                },
             };
+
+            const thread = this.getRoom(roomId)?.threads.get(threadId);
+            if (thread) {
+                content["m.relates_to"]["m.in_reply_to"] = {
+                    "event_id": thread.replyToEvent.getId(),
+                };
+            }
         }
 
         return this.sendCompleteEvent(roomId, threadId, { type: eventType, content }, txnId as string, callback);
