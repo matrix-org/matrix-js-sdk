@@ -2050,8 +2050,7 @@ export class Room extends EventEmitter {
             // we don't bother caching real receipts by event ID
             // as there's nothing that would read it.
         }
-        this.addReceiptsToStructure(event, this.receipts);
-        this.updateReceiptCache(event);
+        this.addReceiptsToStructure(event, this.receipts, this.receiptCacheByEventId);
 
         // send events after we've regenerated the cache, otherwise things that
         // listened for the event would read from a stale cache
@@ -2061,9 +2060,10 @@ export class Room extends EventEmitter {
     /**
      * Add a receipt event to the room.
      * @param {MatrixEvent} event The m.receipt event.
-     * @param {Object} receipts The object to add receipts to
+     * @param {Object} receipts The object to add receipts to.
+     * @param {Object} cache The optional eventId->CachedReceipt[] object to add receipts to.
      */
-    private addReceiptsToStructure(event: MatrixEvent, receipts: Receipts): void {
+    private addReceiptsToStructure(event: MatrixEvent, receipts: Receipts, cache?: ReceiptCache): void {
         const content = event.getContent<IReceiptContent>();
         Object.keys(content).forEach((eventId) => {
             Object.keys(content[eventId]).forEach((receiptType) => {
@@ -2094,34 +2094,29 @@ export class Room extends EventEmitter {
                         eventId: eventId,
                         data: receipt,
                     };
-                });
-            });
-        });
-    }
 
-    /**
-     * Update the cached map of receipts by event ID based on the new receipts received.
-     * @param {MatrixEvent} event The m.receipt event.
-     */
-    private updateReceiptCache(event: MatrixEvent): void {
-        const content = event.getContent<IReceiptContent>();
+                    if (cache) {
+                        if (existingReceipt && cache[existingReceipt.eventId]) {
+                            const previousEventId = existingReceipt.eventId;
+                            // Remove the receipt we just clobbered out of existence from the cache
+                            cache[previousEventId] = cache[previousEventId].filter(r => {
+                                return r.type !== receiptType || r.userId !== userId;
+                            });
 
-        Object.keys(content).forEach(eventId => {
-            delete this.receiptCacheByEventId[eventId];
-        });
+                            if (cache[previousEventId].length < 1) {
+                                delete cache[previousEventId]; // clean up the cache keys
+                            }
+                        }
 
-        Object.keys(this.receipts).forEach((receiptType) => {
-            Object.keys(this.receipts[receiptType]).forEach((userId) => {
-                const receipt = this.receipts[receiptType][userId];
-                if (!content[receipt.eventId]) return; // no changes
-
-                if (!this.receiptCacheByEventId[receipt.eventId]) {
-                    this.receiptCacheByEventId[receipt.eventId] = [];
-                }
-                this.receiptCacheByEventId[receipt.eventId].push({
-                    userId: userId,
-                    type: receiptType,
-                    data: receipt.data,
+                        if (!cache[eventId]) {
+                            cache[eventId] = [];
+                        }
+                        cache[eventId].push({
+                            userId: userId,
+                            type: receiptType,
+                            data: receipt,
+                        });
+                    }
                 });
             });
         });
