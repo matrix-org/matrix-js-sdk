@@ -17,55 +17,34 @@ limitations under the License.
 // load XmlHttpRequest mock
 import "./setupTests";
 import "../../dist/browser-matrix"; // uses browser-matrix instead of the src
-import MockHttpBackend from "matrix-mock-request";
-
-import { MockStorageApi } from "../MockStorageApi";
-import { WebStorageSessionStore } from "../../src/store/session/webstorage";
-import { LocalStorageCryptoStore } from "../../src/crypto/store/localStorage-crypto-store";
 import * as utils from "../test-utils";
+import { TestClient } from "../TestClient";
 
 const USER_ID = "@user:test.server";
 const DEVICE_ID = "device_id";
 const ACCESS_TOKEN = "access_token";
 const ROOM_ID = "!room_id:server.test";
 
-/* global matrixcs */
-
 describe("Browserify Test", function() {
     let client;
     let httpBackend;
 
-    async function createTestClient() {
-        const sessionStoreBackend = new MockStorageApi();
-        const sessionStore = new WebStorageSessionStore(sessionStoreBackend);
-        const httpBackend = new MockHttpBackend();
+    beforeEach(() => {
+        const testClient = new TestClient(USER_ID, DEVICE_ID, ACCESS_TOKEN);
 
-        const options = {
-            baseUrl: "http://" + USER_ID + ".test.server",
-            userId: USER_ID,
-            accessToken: ACCESS_TOKEN,
-            deviceId: DEVICE_ID,
-            sessionStore: sessionStore,
-            request: httpBackend.requestFn,
-            cryptoStore: new LocalStorageCryptoStore(sessionStoreBackend),
-        };
+        client = testClient.client;
+        httpBackend = testClient.httpBackend;
 
-        const client = matrixcs.createClient(options);
-
+        httpBackend.when("GET", "/capabilities").respond(200, { capabilities: {} });
         httpBackend.when("GET", "/pushrules").respond(200, {});
         httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
 
-        return { client, httpBackend };
-    }
-
-    beforeEach(async () => {
-        ({ client, httpBackend } = await createTestClient());
-        await client.startClient();
+        client.startClient();
     });
 
     afterEach(async () => {
         client.stopClient();
-        await httpBackend.stop();
+        httpBackend.stop();
     });
 
     it("Sync", async function() {
@@ -92,10 +71,8 @@ describe("Browserify Test", function() {
         };
 
         httpBackend.when("GET", "/sync").respond(200, syncData);
-        await Promise.race([
-            Promise.all([
-                httpBackend.flushAllExpected(),
-            ]),
+        return await Promise.race([
+            httpBackend.flushAllExpected(),
             new Promise((_, reject) => {
                 client.once("sync.unexpectedError", reject);
             }),

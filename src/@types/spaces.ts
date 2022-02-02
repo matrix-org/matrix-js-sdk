@@ -44,7 +44,6 @@ export interface ISpaceSummaryEvent {
 }
 
 export interface IHierarchyRelation extends IStrippedState {
-    room_id: string;
     origin_server_ts: number;
     content: {
         order?: string;

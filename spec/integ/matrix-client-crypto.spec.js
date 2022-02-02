@@ -348,7 +348,7 @@ function recvMessage(httpBackend, client, sender, message) {
         return testUtils.awaitDecryption(event);
     }).then((event) => {
         expect(event.getType()).toEqual("m.room.message");
-        expect(event.getContent()).toEqual({
+        expect(event.getContent()).toMatchObject({
             msgtype: "m.text",
             body: "Hello, World",
         });
@@ -722,6 +722,7 @@ describe("MatrixClient crypto", function() {
         return Promise.resolve()
             .then(() => {
                 logger.log(aliTestClient + ': starting');
+                httpBackend.when("GET", "/capabilities").respond(200, {});
                 httpBackend.when("GET", "/pushrules").respond(200, {});
                 httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
                 aliTestClient.expectDeviceKeyUpload();

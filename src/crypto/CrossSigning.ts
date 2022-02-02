@@ -33,6 +33,7 @@ import { OlmDevice } from "./OlmDevice";
 import { ICryptoCallbacks } from "../matrix";
 import { ISignatures } from "../@types/signed";
 import { CryptoStore } from "./store/base";
+import { ISecretStorageKeyInfo } from "./api";
 
 const KEY_REQUEST_TIMEOUT_MS = 1000 * 60;
 
@@ -175,7 +176,7 @@ export class CrossSigningInfo extends EventEmitter {
         // check what SSSS keys have encrypted the master key (if any)
         const stored = await secretStorage.isStored("m.cross_signing.master", false) || {};
         // then check which of those SSSS keys have also encrypted the SSK and USK
-        function intersect(s) {
+        function intersect(s: Record<string, ISecretStorageKeyInfo>) {
             for (const k of Object.keys(stored)) {
                 if (!s[k]) {
                     delete stored[k];

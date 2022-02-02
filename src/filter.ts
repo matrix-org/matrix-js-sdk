@@ -65,7 +65,7 @@ export interface IFilterDefinition {
 export interface IRoomEventFilter extends IFilterComponent {
     lazy_load_members?: boolean;
     include_redundant_members?: boolean;
-    types?: EventType[] | string[];
+    types?: Array<EventType | string>;
     [UNSTABLE_FILTER_RELATION_TYPES.name]?: Array<RelationType | string>;
     [UNSTABLE_FILTER_RELATION_SENDERS.name]?: string[];
 }
@@ -185,8 +185,8 @@ export class Filter {
             }
         }
 
-        this.roomFilter = new FilterComponent(roomFilterFields);
-        this.roomTimelineFilter = new FilterComponent(roomFilterJson?.timeline || {});
+        this.roomFilter = new FilterComponent(roomFilterFields, this.userId);
+        this.roomTimelineFilter = new FilterComponent(roomFilterJson?.timeline || {}, this.userId);
 
         // don't bother porting this from synapse yet:
         // this._room_state_filter =

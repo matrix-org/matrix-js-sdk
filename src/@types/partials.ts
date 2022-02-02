@@ -82,3 +82,12 @@ export enum HistoryVisibility {
     Shared = "shared",
     WorldReadable = "world_readable",
 }
+
+export interface IUsageLimit {
+    // "hs_disabled" is NOT a specced string, but is used in Synapse
+    // This is tracked over at https://github.com/matrix-org/synapse/issues/9237
+    // eslint-disable-next-line camelcase
+    limit_type: "monthly_active_user" | "hs_disabled" | string;
+    // eslint-disable-next-line camelcase
+    admin_contact?: string;
+}

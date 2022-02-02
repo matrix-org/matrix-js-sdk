@@ -1,6 +1,6 @@
 {
   "name": "matrix-js-sdk",
-  "version": "15.3.0",
+  "version": "15.5.0",
   "description": "Matrix Client-Server SDK for Javascript",
   "scripts": {
     "prepublishOnly": "yarn build",
@@ -15,7 +15,7 @@
     "build:minify-browser": "terser dist/browser-matrix.js --compress --mangle --source-map --output dist/browser-matrix.min.js",
     "gendoc": "jsdoc -c jsdoc.json -P package.json",
     "lint": "yarn lint:types && yarn lint:js",
-    "lint:js": "eslint --max-warnings 4 src spec",
+    "lint:js": "eslint --max-warnings 0 src spec",
     "lint:js-fix": "eslint --fix src spec",
     "lint:types": "tsc --noEmit",
     "test": "jest",
@@ -29,7 +29,7 @@
   "keywords": [
     "matrix-org"
   ],
-  "main": "./lib/index.js",
+  "main": "./src/index.ts",
   "browser": "./lib/browser-index.js",
   "matrix_src_main": "./src/index.ts",
   "matrix_src_browser": "./src/browser-index.js",
@@ -55,8 +55,8 @@
     "browser-request": "^0.3.3",
     "bs58": "^4.0.1",
     "content-type": "^1.0.4",
-    "eslint-plugin-import": "^2.25.2",
     "loglevel": "^1.7.1",
+    "matrix-events-sdk": "^0.0.1-beta.6",
     "p-retry": "^4.5.0",
     "qs": "^6.9.6",
     "request": "^2.88.2",
@@ -77,6 +77,7 @@
     "@babel/register": "^7.12.10",
     "@matrix-org/olm": "https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.8.tgz",
     "@types/bs58": "^4.0.1",
+    "@types/content-type": "^1.1.5",
     "@types/jest": "^26.0.20",
     "@types/node": "12",
     "@types/request": "^2.48.5",
@@ -90,7 +91,8 @@
     "docdash": "^1.2.0",
     "eslint": "7.18.0",
     "eslint-config-google": "^0.14.0",
-    "eslint-plugin-matrix-org": "github:matrix-org/eslint-plugin-matrix-org#48ec1e6af2cfb8310b9a6e23edf2dc7a26ddd580",
+    "eslint-plugin-import": "^2.25.4",
+    "eslint-plugin-matrix-org": "^0.4.0",
     "exorcist": "^1.0.1",
     "fake-indexeddb": "^3.1.2",
     "jest": "^26.6.3",
@@ -113,6 +115,5 @@
     "coverageReporters": [
       "text"
     ]
-  },
-  "typings": "./lib/index.d.ts"
+  }
 }

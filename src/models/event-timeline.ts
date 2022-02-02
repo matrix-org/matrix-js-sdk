@@ -34,13 +34,13 @@ export class EventTimeline {
      * Symbolic constant for methods which take a 'direction' argument:
      * refers to the start of the timeline, or backwards in time.
      */
-    static BACKWARDS = Direction.Backward;
+    public static readonly BACKWARDS = Direction.Backward;
 
     /**
      * Symbolic constant for methods which take a 'direction' argument:
      * refers to the end of the timeline, or forwards in time.
      */
-    static FORWARDS = Direction.Forward;
+    public static readonly FORWARDS = Direction.Forward;
 
     /**
      * Static helper method to set sender and target properties

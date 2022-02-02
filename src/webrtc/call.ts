@@ -1717,7 +1717,12 @@ export class MatrixCall extends EventEmitter {
 
         const stream = ev.streams[0];
         this.pushRemoteFeed(stream);
-        stream.addEventListener("removetrack", () => this.deleteFeedByStream(stream));
+        stream.addEventListener("removetrack", () => {
+            if (stream.getTracks().length === 0) {
+                logger.info(`Stream ID ${stream.id} has no tracks remaining - removing`);
+                this.deleteFeedByStream(stream);
+            }
+        });
     };
 
     private onDataChannel = (ev: RTCDataChannelEvent): void => {

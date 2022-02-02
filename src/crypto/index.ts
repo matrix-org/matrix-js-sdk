@@ -179,6 +179,13 @@ export interface IEventDecryptionResult {
     untrusted?: boolean;
 }
 
+export interface IRequestsMap {
+    getRequest(event: MatrixEvent): VerificationRequest;
+    getRequestByChannel(channel: IVerificationChannel): VerificationRequest;
+    setRequest(event: MatrixEvent, request: VerificationRequest): void;
+    setRequestByChannel(channel: IVerificationChannel, request: VerificationRequest): void;
+}
+
 export class Crypto extends EventEmitter {
     /**
      * @return {string} The version of Olm.
@@ -808,7 +815,7 @@ export class Crypto extends EventEmitter {
             }
         };
 
-        const signKeyBackupWithCrossSigning = async (keyBackupAuthData) => {
+        const signKeyBackupWithCrossSigning = async (keyBackupAuthData: IKeyBackupInfo["auth_data"]) => {
             if (
                 this.crossSigningInfo.getId() &&
                 await this.crossSigningInfo.isStoredInKeyCache("master")
@@ -1017,7 +1024,7 @@ export class Crypto extends EventEmitter {
     public isSecretStored(
         name: string,
         checkKey?: boolean,
-    ): Promise<Record<string, ISecretStorageKeyInfo>> {
+    ): Promise<Record<string, ISecretStorageKeyInfo> | null> {
         return this.secretStorage.isStored(name, checkKey);
     }
 
@@ -1028,7 +1035,7 @@ export class Crypto extends EventEmitter {
         return this.secretStorage.request(name, devices);
     }
 
-    public getDefaultSecretStorageKeyId(): Promise<string> {
+    public getDefaultSecretStorageKeyId(): Promise<string | null> {
         return this.secretStorage.getDefaultKeyId();
     }
 
@@ -1148,7 +1155,7 @@ export class Crypto extends EventEmitter {
         const signedDevice = await this.crossSigningInfo.signDevice(this.userId, device);
         logger.info(`Starting background key sig upload for ${this.deviceId}`);
 
-        const upload = ({ shouldEmit }) => {
+        const upload = ({ shouldEmit = false }) => {
             return this.baseApis.uploadKeySignatures({
                 [this.userId]: {
                     [this.deviceId]: signedDevice,
@@ -1184,7 +1191,7 @@ export class Crypto extends EventEmitter {
 
             // Check all users for signatures if upgrade callback present
             // FIXME: do this in batches
-            const users = {};
+            const users: Record<string, IDeviceVerificationUpgrade> = {};
             for (const [userId, crossSigningInfo]
                 of Object.entries(this.deviceList.crossSigningInfo)) {
                 const upgradeInfo = await this.checkForDeviceVerificationUpgrade(
@@ -1482,7 +1489,7 @@ export class Crypto extends EventEmitter {
             !crossSigningPrivateKeys.has("user_signing")
         );
 
-        const keySignatures = {};
+        const keySignatures: Record<string, ISignedKey> = {};
 
         if (selfSigningChanged) {
             logger.info("Got new self-signing key", newCrossSigning.getId("self_signing"));
@@ -1537,7 +1544,7 @@ export class Crypto extends EventEmitter {
             // We may have existing signatures from deleted devices, which will cause
             // the entire upload to fail.
             keySignatures[this.crossSigningInfo.getId()] = Object.assign(
-                {},
+                {} as ISignedKey,
                 masterKey,
                 {
                     signatures: {
@@ -1551,7 +1558,7 @@ export class Crypto extends EventEmitter {
 
         const keysToUpload = Object.keys(keySignatures);
         if (keysToUpload.length) {
-            const upload = ({ shouldEmit }) => {
+            const upload = ({ shouldEmit = false }) => {
                 logger.info(`Starting background key sig upload for ${keysToUpload}`);
                 return this.baseApis.uploadKeySignatures({ [this.userId]: keySignatures })
                     .then((response) => {
@@ -1927,7 +1934,7 @@ export class Crypto extends EventEmitter {
         }
 
         const oneTimeKeys = await this.olmDevice.getOneTimeKeys();
-        const oneTimeJson = {};
+        const oneTimeJson: Record<string, { key: string }> = {};
 
         for (const keyId in oneTimeKeys.curve25519) {
             if (oneTimeKeys.curve25519.hasOwnProperty(keyId)) {
@@ -2076,7 +2083,7 @@ export class Crypto extends EventEmitter {
                 );
                 const device = await this.crossSigningInfo.signUser(xsk);
                 if (device) {
-                    const upload = async ({ shouldEmit }) => {
+                    const upload = async ({ shouldEmit = false }) => {
                         logger.info("Uploading signature for " + userId + "...");
                         const response = await this.baseApis.uploadKeySignatures({
                             [userId]: {
@@ -2149,7 +2156,7 @@ export class Crypto extends EventEmitter {
             logger.info("Own device " + deviceId + " marked verified: signing");
 
             // Signing only needed if other device not already signed
-            let device;
+            let device: ISignedKey;
             const deviceTrust = this.checkDeviceTrust(userId, deviceId);
             if (deviceTrust.isCrossSigningVerified()) {
                 logger.log(`Own device ${deviceId} already cross-signing verified`);
@@ -2160,7 +2167,7 @@ export class Crypto extends EventEmitter {
             }
 
             if (device) {
-                const upload = async ({ shouldEmit }) => {
+                const upload = async ({ shouldEmit = false }) => {
                     logger.info("Uploading signature for " + deviceId);
                     const response = await this.baseApis.uploadKeySignatures({
                         [userId]: {
@@ -2204,11 +2211,7 @@ export class Crypto extends EventEmitter {
             return Promise.resolve(existingRequest);
         }
         const channel = new InRoomChannel(this.baseApis, roomId, userId);
-        return this.requestVerificationWithChannel(
-            userId,
-            channel,
-            this.inRoomVerificationRequests,
-        );
+        return this.requestVerificationWithChannel(userId, channel, this.inRoomVerificationRequests);
     }
 
     public requestVerification(userId: string, devices: string[]): Promise<VerificationRequest> {
@@ -2220,17 +2223,13 @@ export class Crypto extends EventEmitter {
             return Promise.resolve(existingRequest);
         }
         const channel = new ToDeviceChannel(this.baseApis, userId, devices, ToDeviceChannel.makeTransactionId());
-        return this.requestVerificationWithChannel(
-            userId,
-            channel,
-            this.toDeviceVerificationRequests,
-        );
+        return this.requestVerificationWithChannel(userId, channel, this.toDeviceVerificationRequests);
     }
 
     private async requestVerificationWithChannel(
         userId: string,
         channel: IVerificationChannel,
-        requestsMap: any, // TODO types
+        requestsMap: IRequestsMap,
     ): Promise<VerificationRequest> {
         let request = new VerificationRequest(channel, this.verificationMethods, this.baseApis);
         // if transaction id is already known, add request
@@ -2618,7 +2617,7 @@ export class Crypto extends EventEmitter {
         users: string[],
         force?: boolean,
     ): Promise<Record<string, Record<string, olmlib.IOlmSessionResult>>> {
-        const devicesByUser = {};
+        const devicesByUser: Record<string, DeviceInfo[]> = {};
 
         for (let i = 0; i < users.length; ++i) {
             const userId = users[i];
@@ -2651,7 +2650,7 @@ export class Crypto extends EventEmitter {
      * @return {module:crypto/OlmDevice.MegolmSessionData[]} a list of session export objects
      */
     public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
-        const exportedSessions = [];
+        const exportedSessions: IMegolmSessionData[] = [];
         await this.cryptoStore.doTxn(
             'readonly', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
                 this.cryptoStore.getAllEndToEndInboundGroupSessions(txn, (s) => {
@@ -2729,7 +2728,6 @@ export class Crypto extends EventEmitter {
         }
     }
 
-    /* eslint-disable valid-jsdoc */    //https://github.com/eslint/eslint/issues/7307
     /**
      * Encrypt an event according to the configuration of the room.
      *
@@ -2740,8 +2738,6 @@ export class Crypto extends EventEmitter {
      * @return {Promise?} Promise which resolves when the event has been
      *     encrypted, or null if nothing was needed
      */
-    /* eslint-enable valid-jsdoc */
-    // TODO this return type lies
     public async encryptEvent(event: MatrixEvent, room: Room): Promise<void> {
         if (!room) {
             throw new Error("Cannot send encrypted messages in unknown rooms");
@@ -2783,8 +2779,7 @@ export class Crypto extends EventEmitter {
             delete content['io.element.performance_metrics'];
         }
 
-        const encryptedContent = await alg.encryptMessage(
-            room, event.getType(), content);
+        const encryptedContent = await alg.encryptMessage(room, event.getType(), content);
 
         if (mRelatesTo) {
             encryptedContent['m.relates_to'] = mRelatesTo;
@@ -3154,7 +3149,7 @@ export class Crypto extends EventEmitter {
         if (!ToDeviceChannel.validateEvent(event, this.baseApis)) {
             return;
         }
-        const createRequest = event => {
+        const createRequest = (event: MatrixEvent) => {
             if (!ToDeviceChannel.canCreateRequest(ToDeviceChannel.getEventType(event))) {
                 return;
             }
@@ -3172,11 +3167,7 @@ export class Crypto extends EventEmitter {
             return new VerificationRequest(
                 channel, this.verificationMethods, this.baseApis);
         };
-        this.handleVerificationEvent(
-            event,
-            this.toDeviceVerificationRequests,
-            createRequest,
-        );
+        this.handleVerificationEvent(event, this.toDeviceVerificationRequests, createRequest);
     }
 
     /**
@@ -3199,7 +3190,7 @@ export class Crypto extends EventEmitter {
         if (!InRoomChannel.validateEvent(event, this.baseApis)) {
             return;
         }
-        const createRequest = event => {
+        const createRequest = (event: MatrixEvent) => {
             const channel = new InRoomChannel(
                 this.baseApis,
                 event.getRoomId(),
@@ -3207,18 +3198,13 @@ export class Crypto extends EventEmitter {
             return new VerificationRequest(
                 channel, this.verificationMethods, this.baseApis);
         };
-        this.handleVerificationEvent(
-            event,
-            this.inRoomVerificationRequests,
-            createRequest,
-            liveEvent,
-        );
+        this.handleVerificationEvent(event, this.inRoomVerificationRequests, createRequest, liveEvent);
     };
 
     private async handleVerificationEvent(
         event: MatrixEvent,
-        requestsMap: any, // TODO types
-        createRequest: any, // TODO types
+        requestsMap: IRequestsMap,
+        createRequest: (event: MatrixEvent) => VerificationRequest,
         isLiveEvent = true,
     ): Promise<void> {
         // Wait for event to get its final ID with pendingEventOrdering: "chronological", since DM channels depend on it.
@@ -3332,7 +3318,7 @@ export class Crypto extends EventEmitter {
                 return;
             }
         }
-        const devicesByUser = {};
+        const devicesByUser: Record<string, DeviceInfo[]> = {};
         devicesByUser[sender] = [device];
         await olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, devicesByUser, true);
 

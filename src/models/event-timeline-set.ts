@@ -53,6 +53,11 @@ export enum DuplicateStrategy {
     Replace = "replace",
 }
 
+export interface IRoomTimelineData {
+    timeline: EventTimeline;
+    liveEvent?: boolean;
+}
+
 export class EventTimelineSet extends EventEmitter {
     private readonly timelineSupport: boolean;
     private unstableClientRelationAggregation: boolean;
@@ -209,7 +214,7 @@ export class EventTimelineSet extends EventEmitter {
      *
      * @fires module:client~MatrixClient#event:"Room.timelineReset"
      */
-    public resetLiveTimeline(backPaginationToken: string, forwardPaginationToken?: string): void {
+    public resetLiveTimeline(backPaginationToken?: string, forwardPaginationToken?: string): void {
         // Each EventTimeline has RoomState objects tracking the state at the start
         // and end of that timeline. The copies at the end of the live timeline are
         // special because they will have listeners attached to monitor changes to
@@ -594,7 +599,7 @@ export class EventTimelineSet extends EventEmitter {
         this.setRelationsTarget(event);
         this.aggregateRelations(event);
 
-        const data = {
+        const data: IRoomTimelineData = {
             timeline: timeline,
             liveEvent: !toStartOfTimeline && timeline == this.liveTimeline && !fromCache,
         };
