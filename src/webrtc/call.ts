@@ -937,7 +937,7 @@ export class MatrixCall extends EventEmitter {
             const upgradeVideo = video && !this.hasLocalUserMediaVideoTrack;
             logger.debug(`Upgrading call: audio?=${upgradeAudio} video?=${upgradeVideo}`);
 
-            const stream = await this.client.getMediaHandler().getUserMediaStream(upgradeAudio, upgradeVideo);
+            const stream = await this.client.getMediaHandler().getUserMediaStream(upgradeAudio, upgradeVideo, false);
             if (upgradeAudio && upgradeVideo) {
                 if (this.hasLocalUserMediaAudioTrack) return;
                 if (this.hasLocalUserMediaVideoTrack) return;
@@ -1978,7 +1978,7 @@ export class MatrixCall extends EventEmitter {
     }
 
     private stopAllMedia(): void {
-        logger.debug(`stopAllMedia (stream=${this.localUsermediaStream})`);
+        logger.debug("Stopping all media for call", this.callId);
 
         for (const feed of this.feeds) {
             if (feed.isLocal() && feed.purpose === SDPStreamMetadataPurpose.Usermedia) {
@@ -1986,6 +1986,7 @@ export class MatrixCall extends EventEmitter {
             } else if (feed.isLocal() && feed.purpose === SDPStreamMetadataPurpose.Screenshare) {
                 this.client.getMediaHandler().stopScreensharingStream(feed.stream);
             } else {
+                logger.debug("Stopping remote stream", feed.stream.id);
                 for (const track of feed.stream.getTracks()) {
                     track.stop();
                 }

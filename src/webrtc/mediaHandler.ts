@@ -54,9 +54,12 @@ export class MediaHandler {
     }
 
     /**
+     * @param audio should have an audio track
+     * @param video should have a video track
+     * @param reusable is allowed to be reused by the MediaHandler
      * @returns {MediaStream} based on passed parameters
      */
-    public async getUserMediaStream(audio: boolean, video: boolean): Promise<MediaStream> {
+    public async getUserMediaStream(audio: boolean, video: boolean, reusable = true): Promise<MediaStream> {
         const shouldRequestAudio = audio && await this.hasAudioDevice();
         const shouldRequestVideo = video && await this.hasVideoDevice();
 
@@ -78,7 +81,9 @@ export class MediaHandler {
             stream = await navigator.mediaDevices.getUserMedia(constraints);
         }
 
-        this.userMediaStreams.push(stream);
+        if (reusable) {
+            this.userMediaStreams.push(stream);
+        }
 
         return stream;
     }
@@ -101,9 +106,11 @@ export class MediaHandler {
     }
 
     /**
+     * @param desktopCapturerSourceId sourceId for Electron DesktopCapturer
+     * @param reusable is allowed to be reused by the MediaHandler
      * @returns {MediaStream} based on passed parameters
      */
-    public async getScreensharingStream(desktopCapturerSourceId: string): Promise<MediaStream | null> {
+    public async getScreensharingStream(desktopCapturerSourceId: string, reusable = true): Promise<MediaStream | null> {
         let stream: MediaStream;
 
         if (this.screensharingStreams.length === 0) {
@@ -125,7 +132,9 @@ export class MediaHandler {
             stream = matchingStream.clone();
         }
 
-        this.screensharingStreams.push(stream);
+        if (reusable) {
+            this.screensharingStreams.push(stream);
+        }
 
         return stream;
     }
