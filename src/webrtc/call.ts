@@ -1854,7 +1854,12 @@ export class MatrixCall extends EventEmitter {
                 }, 1000);
             }
         } else if (this.peerConn.iceConnectionState == 'failed') {
-            this.peerConn.restartIce();
+            // Firefox for Android does not yet have support for restartIce()
+            if (this.peerConn.restartIce) {
+                this.peerConn.restartIce();
+            } else {
+                this.hangup(CallErrorCode.IceFailed, false);
+            }
         } else if (this.peerConn.iceConnectionState == 'disconnected') {
             this.iceDisconnectedTimeout = setTimeout(() => {
                 this.hangup(CallErrorCode.IceFailed, false);
