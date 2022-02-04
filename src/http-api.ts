@@ -437,10 +437,19 @@ export class MatrixHttpApi {
                 queryParams.filename = fileName;
             }
 
+            const headers: Record<string, string> = { "Content-Type": contentType };
+
+            // authedRequest uses `request` (which is no longer maintained) that has the body is zero bytes then you can an error: `Argument error, options.body`
+            // See https://github.com/request/request/issues/920
+            // if body looks like a byte array and empty then set the Content-Length explicitly as a workaround:
+            if (body.hasOwnProperty("length") && (body as unknown as ArrayLike<number>).length === 0) {
+                headers["Content-Length"] = "0";
+            }
+
             promise = this.authedRequest(
                 opts.callback, Method.Post, "/upload", queryParams, body, {
                     prefix: "/_matrix/media/r0",
-                    headers: { "Content-Type": contentType },
+                    headers,
                     json: false,
                     bodyParser,
                 },
