@@ -29,7 +29,19 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
     const decrypt = options.decrypt !== false;
 
     function mapper(plainOldJsObject: Partial<IEvent>) {
-        const event = new MatrixEvent(plainOldJsObject);
+        const room = client.getRoom(plainOldJsObject.room_id);
+        let event;
+
+        // If the event is already known to the room, let's re-use the model
+        // rather than creating a duplicate
+        if (room) {
+            event = room.findEventById(plainOldJsObject.event_id);
+        }
+
+        if (!event) {
+            event = new MatrixEvent(plainOldJsObject);
+        }
+
         if (event.isEncrypted()) {
             if (!preventReEmit) {
                 client.reEmitter.reEmit(event, [
