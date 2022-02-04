@@ -6881,7 +6881,17 @@ export class MatrixClient extends EventEmitter {
      * @param {module:client.callback} callback Optional.
      * @return {Promise} Resolves: On success, the empty object
      */
-    public logout(callback?: Callback): Promise<{}> {
+    public async logout(callback?: Callback): Promise<{}> {
+        if (this.crypto && this.crypto.backupManager) {
+            try {
+                while (await this.crypto.backupManager.backupPendingKeys(200) > 0);
+            } catch (err) {
+                logger.log(
+                    "Key backup request failed when logging out. Some keys may be missing from backup",
+                    err,
+                );
+            }
+        }
         return this.http.authedRequest(
             callback, Method.Post, '/logout',
         );
