@@ -948,13 +948,13 @@ export class MatrixCall extends EventEmitter {
 
                 const audioTrack = stream.getAudioTracks()[0];
                 this.localUsermediaStream.addTrack(audioTrack);
-                this.peerConn.addTrack(audioTrack, this.localUsermediaStream);
+                this.usermediaSenders.push(this.peerConn.addTrack(audioTrack, this.localUsermediaStream));
             } else if (upgradeVideo) {
                 if (this.hasLocalUserMediaVideoTrack) return;
 
                 const videoTrack = stream.getVideoTracks()[0];
                 this.localUsermediaStream.addTrack(videoTrack);
-                this.peerConn.addTrack(videoTrack, this.localUsermediaStream);
+                this.usermediaSenders.push(this.peerConn.addTrack(videoTrack, this.localUsermediaStream));
             }
         } catch (error) {
             logger.error("Failed to upgrade the call", error);
