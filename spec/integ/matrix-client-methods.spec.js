@@ -432,6 +432,27 @@ describe("MatrixClient", function() {
             ]);
         });
 
+        it("copies pre-thread in-timeline reactions onto both timelines", function() {
+            client.clientOpts = { experimentalThreadSupport: true };
+            const events = [
+                eventMessageInThread,
+                eventReaction,
+                eventPollStartThreadRoot,
+            ];
+
+            const [timeline, threaded] = client.partitionThreadedEvents(events);
+
+            expect(timeline).toEqual([
+                eventReaction,
+                eventPollStartThreadRoot,
+            ]);
+
+            expect(threaded).toEqual([
+                eventMessageInThread,
+                withThreadId(eventReaction, eventPollStartThreadRoot.getId()),
+            ]);
+        });
+
         it("copies post-thread in-timeline vote events onto both timelines", function() {
             client.clientOpts = { experimentalThreadSupport: true };
             const events = [
@@ -449,6 +470,27 @@ describe("MatrixClient", function() {
 
             expect(threaded).toEqual([
                 withThreadId(eventPollResponseReference, eventPollStartThreadRoot.getId()),
+                eventMessageInThread,
+            ]);
+        });
+
+        it("copies post-thread in-timeline reactions onto both timelines", function() {
+            client.clientOpts = { experimentalThreadSupport: true };
+            const events = [
+                eventReaction,
+                eventMessageInThread,
+                eventPollStartThreadRoot,
+            ];
+
+            const [timeline, threaded] = client.partitionThreadedEvents(events);
+
+            expect(timeline).toEqual([
+                eventReaction,
+                eventPollStartThreadRoot,
+            ]);
+
+            expect(threaded).toEqual([
+                withThreadId(eventReaction, eventPollStartThreadRoot.getId()),
                 eventMessageInThread,
             ]);
         });
@@ -546,6 +588,25 @@ const eventPollResponseReference = new MatrixEvent({
     "type": "m.room.encrypted",
     "unsigned": { "age": 80106237 },
     "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const eventReaction = new MatrixEvent({
+    "content": {
+        "m.relates_to": {
+            "event_id": "$VLS2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
+            "key": "🤗",
+            "rel_type": "m.annotation",
+        },
+    },
+    "origin_server_ts": 1643977249238,
+    "sender": "@andybalaam-test1:matrix.org",
+    "type": "m.reaction",
+    "unsigned": {
+        "age": 22598,
+        "transaction_id": "m1643977249073.16",
+    },
+    "event_id": "$86B2b-x3LgE4DlV4y24b7UHnt72LIA3rzjvMysTtAfA",
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
 });
 
 const eventPollStartThreadRoot = new MatrixEvent({
