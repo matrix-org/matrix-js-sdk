@@ -9105,7 +9105,7 @@ export class MatrixClient extends EventEmitter {
                         const copiedEvent = event.toSnapshot();
 
                         // The copied event is in this thread:
-                        copiedEvent.setThreadId(parentEvent.getId());
+                        copiedEvent.setThreadId(parentEventId);
                         memo[THREAD].push(copiedEvent);
                     } else if (parentEvent?.isThreadRelation) {
                         // If our parent is in a thread, we are in that
