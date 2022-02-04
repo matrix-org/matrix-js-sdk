@@ -30,7 +30,7 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
 
     function mapper(plainOldJsObject: Partial<IEvent>) {
         const room = client.getRoom(plainOldJsObject.room_id);
-        let event;
+        let event: MatrixEvent;
 
         // If the event is already known to the room, let's re-use the model
         // rather than creating a duplicate

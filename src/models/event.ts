@@ -585,7 +585,7 @@ export class MatrixEvent extends EventEmitter {
      * event arrived at the device, and not the age of the event when this
      * function was called.
      * Can only be returned once the server has echo'ed back
-     * @return {Number} The age of this event in milliseconds.
+     * @return {Number|undefined} The age of this event in milliseconds.
      */
     public getAge(): number | undefined {
         return this.getUnsigned().age || this.event.age; // v2 / v1
