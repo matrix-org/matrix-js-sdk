@@ -409,6 +409,8 @@ describe("MatrixClient", function() {
                 eventPollResponseReference,
                 eventPollStartThreadRoot,
             ];
+            // Vote has no threadId yet
+            expect(eventPollResponseReference.threadId).toBeFalsy();
 
             const [timeline, threaded] = client.partitionThreadedEvents(events);
 
@@ -418,9 +420,14 @@ describe("MatrixClient", function() {
                 eventPollStartThreadRoot,
             ]);
 
+            // The vote event has been copied into the thread
+            const eventRefWithThreadId = withThreadId(
+                eventPollResponseReference, eventPollStartThreadRoot.getId());
+            expect(eventRefWithThreadId.threadId).toBeTruthy();
+
             expect(threaded).toEqual([
                 eventMessageInThread,
-                eventPollResponseReference,
+                eventRefWithThreadId,
                 // Thread does not see thread root
             ]);
         });
@@ -441,7 +448,7 @@ describe("MatrixClient", function() {
             ]);
 
             expect(threaded).toEqual([
-                eventPollResponseReference,
+                withThreadId(eventPollResponseReference, eventPollStartThreadRoot.getId()),
                 eventMessageInThread,
             ]);
         });
@@ -482,11 +489,17 @@ describe("MatrixClient", function() {
             // no thread root, and no room state events
             expect(threaded).toEqual([
                 eventMessageInThread,
-                eventPollResponseReference,
+                withThreadId(eventPollResponseReference, eventPollStartThreadRoot.getId()),
             ]);
         });
     });
 });
+
+function withThreadId(event, newThreadId) {
+    const ret = event.toSnapshot();
+    ret.setThreadId(newThreadId);
+    return ret;
+}
 
 const eventMessageInThread = new MatrixEvent({
     "age": 80098509,

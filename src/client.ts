@@ -9097,16 +9097,22 @@ export class MatrixClient extends EventEmitter {
                         return mxEv.getId() === parentEventId;
                     });
                     if (parentEvent?.isThreadRelation) {
+                        // If our parent is in a thread, we are in that
+                        // same thread too.
                         shouldLiveInThreadTimeline = true;
                         event.setThreadId(parentEvent.threadRootId);
                     }
 
-                    // Copy all the reactions and annotations to the root event
-                    // to the thread timeline. They will end up living in both
-                    // timelines at the same time
                     const targetingThreadRoot = parentEvent?.isThreadRoot || threadRoots.has(event.relationEventId);
                     if (targetingThreadRoot && !event.isThreadRelation && event.relationEventId) {
-                        memo[THREAD].push(event);
+                        // If we refer to the thread root, we should be copied
+                        // into the thread as well as the main timeline.
+                        // This happens for reactions, annotations, poll votes etc.
+                        const copiedEvent = event.toSnapshot();
+
+                        // The copied event is in this thread:
+                        copiedEvent.setThreadId(parentEvent.getId());
+                        memo[THREAD].push(copiedEvent);
                     }
                 }
                 const targetTimeline = shouldLiveInThreadTimeline ? THREAD : ROOM;
