@@ -277,7 +277,7 @@ export class MatrixEvent extends EventEmitter {
      * it to us and the time we're now constructing this event, but that's better
      * than assuming the local clock is in sync with the origin HS's clock.
      */
-    public readonly localTimestamp: number;
+    public localTimestamp: number;
 
     // XXX: these should be read-only
     public sender: RoomMember = null;
@@ -342,7 +342,7 @@ export class MatrixEvent extends EventEmitter {
         });
 
         this.txnId = event.txn_id || null;
-        this.localTimestamp = Date.now() - this.getAge();
+        this.localTimestamp = Date.now() - (this.getAge() ?? 0);
         this.reEmitter = new ReEmitter(this);
     }
 
@@ -584,9 +584,10 @@ export class MatrixEvent extends EventEmitter {
      * Get the age of this event. This represents the age of the event when the
      * event arrived at the device, and not the age of the event when this
      * function was called.
+     * Can only be returned once the server has echo'ed back
      * @return {Number} The age of this event in milliseconds.
      */
-    public getAge(): number {
+    public getAge(): number | undefined {
         return this.getUnsigned().age || this.event.age; // v2 / v1
     }
 
@@ -1269,6 +1270,8 @@ export class MatrixEvent extends EventEmitter {
             // emit the event if it changed
             this.emit("Event.localEventIdReplaced", this);
         }
+
+        this.localTimestamp = Date.now() - this.getAge();
     }
 
     /**
