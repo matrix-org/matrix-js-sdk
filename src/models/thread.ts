@@ -77,8 +77,6 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         });
         this.reEmitter = new ReEmitter(this);
 
-        this.initialiseThread(this.rootEvent);
-
         this.reEmitter.reEmit(this.timelineSet, [
             "Room.timeline",
             "Room.timelineReset",
@@ -92,6 +90,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         } else {
             this.id = rootEvent.getId();
         }
+        this.initialiseThread(this.rootEvent);
 
         opts?.initialEvents?.forEach(event => this.addEvent(event));
 
