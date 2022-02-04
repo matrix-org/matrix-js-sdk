@@ -9096,14 +9096,8 @@ export class MatrixClient extends EventEmitter {
                     const parentEvent = room?.findEventById(parentEventId) || events.find((mxEv: MatrixEvent) => {
                         return mxEv.getId() === parentEventId;
                     });
-                    if (parentEvent?.isThreadRelation) {
-                        // If our parent is in a thread, we are in that
-                        // same thread too.
-                        shouldLiveInThreadTimeline = true;
-                        event.setThreadId(parentEvent.threadRootId);
-                    }
-
                     const targetingThreadRoot = parentEvent?.isThreadRoot || threadRoots.has(event.relationEventId);
+
                     if (targetingThreadRoot && !event.isThreadRelation && event.relationEventId) {
                         // If we refer to the thread root, we should be copied
                         // into the thread as well as the main timeline.
@@ -9113,6 +9107,11 @@ export class MatrixClient extends EventEmitter {
                         // The copied event is in this thread:
                         copiedEvent.setThreadId(parentEvent.getId());
                         memo[THREAD].push(copiedEvent);
+                    } else if (parentEvent?.isThreadRelation) {
+                        // If our parent is in a thread, we are in that
+                        // same thread too.  (E.g. if I reply within a thread.)
+                        shouldLiveInThreadTimeline = true;
+                        event.setThreadId(parentEvent.threadRootId);
                     }
                 }
                 const targetTimeline = shouldLiveInThreadTimeline ? THREAD : ROOM;
