@@ -9065,36 +9065,53 @@ export class MatrixClient extends EventEmitter {
         });
     }
 
+    /**
+     * Given some events, find the IDs of all the thread roots that are
+     * referred to by them.
+     */
+    private findThreadRoots(events: MatrixEvent[]): Set<string> {
+        const threadRoots = new Set<string>();
+        for (const event of events) {
+            if (event.isThreadRelation) {
+                threadRoots.add(event.relationEventId);
+            }
+        }
+        return threadRoots;
+    }
+
     public partitionThreadedEvents(events: MatrixEvent[]): [MatrixEvent[], MatrixEvent[]] {
         // Indices to the events array, for readibility
         const ROOM = 0;
         const THREAD = 1;
-        const threadRoots = new Set<string>();
         if (this.supportsExperimentalThreads()) {
+            const threadRoots = this.findThreadRoots(events);
             return events.reduce((memo, event: MatrixEvent) => {
                 const room = this.getRoom(event.getRoomId());
                 // An event should live in the thread timeline if
                 // - It's a reply in thread event
                 // - It's related to a reply in thread event
                 let shouldLiveInThreadTimeline = event.isThreadRelation;
-                if (shouldLiveInThreadTimeline) {
-                    threadRoots.add(event.relationEventId);
-                } else {
+                if (!shouldLiveInThreadTimeline) {
                     const parentEventId = event.parentEventId;
                     const parentEvent = room?.findEventById(parentEventId) || events.find((mxEv: MatrixEvent) => {
                         return mxEv.getId() === parentEventId;
                     });
-                    if (parentEvent?.isThreadRelation) {
+                    const targetingThreadRoot = parentEvent?.isThreadRoot || threadRoots.has(event.relationEventId);
+
+                    if (targetingThreadRoot && !event.isThreadRelation && event.relationEventId) {
+                        // If we refer to the thread root, we should be copied
+                        // into the thread as well as the main timeline.
+                        // This happens for reactions, annotations, poll votes etc.
+                        const copiedEvent = event.toSnapshot();
+
+                        // The copied event is in this thread:
+                        copiedEvent.setThreadId(parentEventId);
+                        memo[THREAD].push(copiedEvent);
+                    } else if (parentEvent?.isThreadRelation) {
+                        // If our parent is in a thread, we are in that
+                        // same thread too.  (E.g. if I reply within a thread.)
                         shouldLiveInThreadTimeline = true;
                         event.setThreadId(parentEvent.threadRootId);
-                    }
-
-                    // Copy all the reactions and annotations to the root event
-                    // to the thread timeline. They will end up living in both
-                    // timelines at the same time
-                    const targetingThreadRoot = parentEvent?.isThreadRoot || threadRoots.has(event.relationEventId);
-                    if (targetingThreadRoot && !event.isThreadRelation && event.relationEventId) {
-                        memo[THREAD].push(event);
                     }
                 }
                 const targetTimeline = shouldLiveInThreadTimeline ? THREAD : ROOM;
