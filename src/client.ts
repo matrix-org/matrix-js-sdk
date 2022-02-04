@@ -9065,21 +9065,33 @@ export class MatrixClient extends EventEmitter {
         });
     }
 
+    /**
+     * Given some events, find the IDs of all the thread roots that are
+     * referred to by them.
+     */
+    private findThreadRoots(events: MatrixEvent[]): Set<string> {
+        const threadRoots = new Set<string>();
+        for (const event of events) {
+            if (event.isThreadRelation) {
+                threadRoots.add(event.relationEventId);
+            }
+        }
+        return threadRoots;
+    }
+
     public partitionThreadedEvents(events: MatrixEvent[]): [MatrixEvent[], MatrixEvent[]] {
         // Indices to the events array, for readibility
         const ROOM = 0;
         const THREAD = 1;
-        const threadRoots = new Set<string>();
         if (this.supportsExperimentalThreads()) {
+            const threadRoots = this.findThreadRoots(events);
             return events.reduce((memo, event: MatrixEvent) => {
                 const room = this.getRoom(event.getRoomId());
                 // An event should live in the thread timeline if
                 // - It's a reply in thread event
                 // - It's related to a reply in thread event
                 let shouldLiveInThreadTimeline = event.isThreadRelation;
-                if (shouldLiveInThreadTimeline) {
-                    threadRoots.add(event.relationEventId);
-                } else {
+                if (!shouldLiveInThreadTimeline) {
                     const parentEventId = event.parentEventId;
                     const parentEvent = room?.findEventById(parentEventId) || events.find((mxEv: MatrixEvent) => {
                         return mxEv.getId() === parentEventId;
