@@ -38,7 +38,9 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
             event = room.findEventById(plainOldJsObject.event_id);
         }
 
-        if (!event) {
+        // If no event is found or if the event found was only local we can
+        // safely create a new model
+        if (!event || event.status) {
             event = new MatrixEvent(plainOldJsObject);
         }
 
