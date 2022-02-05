@@ -427,4 +427,82 @@ describe('Call', function() {
         expect(client.client.mediaHandler.getUserMediaStream).toHaveBeenNthCalledWith(1, true, true);
         expect(client.client.mediaHandler.getUserMediaStream).toHaveBeenNthCalledWith(2, true, false);
     });
+
+    it("should handle mid-call device changes", async () => {
+        client.client.mediaHandler.getUserMediaStream = jest.fn().mockReturnValue(
+            new MockMediaStream(
+                "stream", [
+                    new MockMediaStreamTrack("audio_track", "audio"),
+                    new MockMediaStreamTrack("video_track", "video"),
+                ],
+            ),
+        );
+
+        const callPromise = call.placeVideoCall();
+        await client.httpBackend.flush();
+        await callPromise;
+
+        await call.onAnswerReceived({
+            getContent: () => {
+                return {
+                    version: 1,
+                    call_id: call.callId,
+                    party_id: 'party_id',
+                    answer: {
+                        sdp: DUMMY_SDP,
+                    },
+                };
+            },
+        });
+
+        await call.updateLocalUsermediaStream(
+            new MockMediaStream(
+                "replacement_stream",
+                [
+                    new MockMediaStreamTrack("new_audio_track", "audio"),
+                    new MockMediaStreamTrack("video_track", "video"),
+                ],
+            ),
+        );
+        expect(call.localUsermediaStream.id).toBe("stream");
+        expect(call.localUsermediaStream.getAudioTracks()[0].id).toBe("new_audio_track");
+        expect(call.localUsermediaStream.getVideoTracks()[0].id).toBe("video_track");
+        expect(call.usermediaSenders.find((sender) => {
+            return sender?.track?.kind === "audio";
+        }).track.id).toBe("new_audio_track");
+        expect(call.usermediaSenders.find((sender) => {
+            return sender?.track?.kind === "video";
+        }).track.id).toBe("video_track");
+    });
+
+    it("should handle upgrade to video call", async () => {
+        const callPromise = call.placeVoiceCall();
+        await client.httpBackend.flush();
+        await callPromise;
+
+        await call.onAnswerReceived({
+            getContent: () => {
+                return {
+                    version: 1,
+                    call_id: call.callId,
+                    party_id: 'party_id',
+                    answer: {
+                        sdp: DUMMY_SDP,
+                    },
+                    [SDPStreamMetadataKey]: {},
+                };
+            },
+        });
+
+        await call.upgradeCall(false, true);
+
+        expect(call.localUsermediaStream.getAudioTracks()[0].id).toBe("audio_track");
+        expect(call.localUsermediaStream.getVideoTracks()[0].id).toBe("video_track");
+        expect(call.usermediaSenders.find((sender) => {
+            return sender?.track?.kind === "audio";
+        }).track.id).toBe("audio_track");
+        expect(call.usermediaSenders.find((sender) => {
+            return sender?.track?.kind === "video";
+        }).track.id).toBe("video_track");
+    });
 });
