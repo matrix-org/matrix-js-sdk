@@ -82,17 +82,34 @@ class MockRTCPeerConnection {
     }
     close() {}
     getStats() { return []; }
+    addTrack(track: MockMediaStreamTrack) {return new MockRTCRtpSender(track);}
+}
+
+class MockRTCRtpSender {
+    constructor(public track: MockMediaStreamTrack) {}
+
+    replaceTrack(track: MockMediaStreamTrack) {this.track = track;}
+}
+
+class MockMediaStreamTrack {
+    constructor(public readonly id: string, public readonly kind: "audio" | "video", public enabled = true) {}
+
+    stop() {}
 }
 
 class MockMediaStream {
     constructor(
         public id: string,
+        private tracks: MockMediaStreamTrack[] = [],
     ) {}
 
-    getTracks() { return []; }
-    getAudioTracks() { return [{ enabled: true }]; }
-    getVideoTracks() { return [{ enabled: true }]; }
+    getTracks() { return this.tracks; }
+    getAudioTracks() { return this.tracks.filter((track) => track.kind === "audio"); }
+    getVideoTracks() { return this.tracks.filter((track) => track.kind === "video"); }
     addEventListener() {}
+    removeEventListener() { }
+    addTrack(track: MockMediaStreamTrack) {this.tracks.push(track);}
+    removeTrack(track: MockMediaStreamTrack) {this.tracks.splice(this.tracks.indexOf(track), 1);}
 }
 
 class MockMediaDeviceInfo {
@@ -102,7 +119,13 @@ class MockMediaDeviceInfo {
 }
 
 class MockMediaHandler {
-    getUserMediaStream() { return new MockMediaStream("mock_stream_from_media_handler"); }
+    getUserMediaStream(audio: boolean, video: boolean) {
+        const tracks = [];
+        if (audio) tracks.push(new MockMediaStreamTrack("audio_track", "audio"));
+        if (video) tracks.push(new MockMediaStreamTrack("video_track", "video"));
+
+        return new MockMediaStream("mock_stream_from_media_handler", tracks);
+    }
     stopUserMediaStream() {}
 }
 
@@ -350,7 +373,15 @@ describe('Call', function() {
             },
         });
 
-        call.pushRemoteFeed(new MockMediaStream("remote_stream"));
+        call.pushRemoteFeed(
+            new MockMediaStream(
+                "remote_stream",
+                [
+                    new MockMediaStreamTrack("remote_audio_track", "audio"),
+                    new MockMediaStreamTrack("remote_video_track", "video"),
+                ],
+            ),
+        );
         const feed = call.getFeeds().find((feed) => feed.stream.id === "remote_stream");
         expect(feed?.purpose).toBe(SDPStreamMetadataPurpose.Usermedia);
         expect(feed?.isAudioMuted()).toBeTruthy();
