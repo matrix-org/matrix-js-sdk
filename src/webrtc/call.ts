@@ -1078,6 +1078,63 @@ export class MatrixCall extends EventEmitter {
     }
 
     /**
+     * Replaces/adds the tracks from the passed stream to the localUsermediaStream
+     * @param {MediaStream} stream to use a replacement for the local usermedia stream
+     */
+    public async updateLocalUsermediaStream(
+        stream: MediaStream, forceAudio = false, forceVideo = false,
+    ): Promise<void> {
+        const callFeed = this.localUsermediaFeed;
+        const audioEnabled = forceAudio || (!callFeed.isAudioMuted() && !this.remoteOnHold);
+        const videoEnabled = forceVideo || (!callFeed.isVideoMuted() && !this.remoteOnHold);
+        setTracksEnabled(stream.getAudioTracks(), audioEnabled);
+        setTracksEnabled(stream.getVideoTracks(), videoEnabled);
+
+        // We want to keep the same stream id, so we replace the tracks rather than the whole stream
+        for (const track of this.localUsermediaStream.getTracks()) {
+            this.localUsermediaStream.removeTrack(track);
+            track.stop();
+        }
+        for (const track of stream.getTracks()) {
+            this.localUsermediaStream.addTrack(track);
+        }
+
+        const newSenders = [];
+
+        for (const track of stream.getTracks()) {
+            const oldSender = this.usermediaSenders.find((sender) => sender.track?.kind === track.kind);
+            let newSender: RTCRtpSender;
+
+            if (oldSender) {
+                logger.info(
+                    `Replacing track (` +
+                    `id="${track.id}", ` +
+                    `kind="${track.kind}", ` +
+                    `streamId="${stream.id}", ` +
+                    `streamPurpose="${callFeed.purpose}"` +
+                    `) to peer connection`,
+                );
+                await oldSender.replaceTrack(track);
+                newSender = oldSender;
+            } else {
+                logger.info(
+                    `Adding track (` +
+                    `id="${track.id}", ` +
+                    `kind="${track.kind}", ` +
+                    `streamId="${stream.id}", ` +
+                    `streamPurpose="${callFeed.purpose}"` +
+                    `) to peer connection`,
+                );
+                newSender = this.peerConn.addTrack(track, this.localUsermediaStream);
+            }
+
+            newSenders.push(newSender);
+        }
+
+        this.usermediaSenders = newSenders;
+    }
+
+    /**
      * Set whether our outbound video should be muted or not.
      * @param {boolean} muted True to mute the outbound video.
      * @returns the new mute state
