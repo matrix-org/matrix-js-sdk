@@ -1204,8 +1204,8 @@ export class MatrixCall extends EventEmitter {
             [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(),
         });
 
-        const micShouldBeMuted = this.localUsermediaFeed?.isAudioMuted() || this.remoteOnHold;
-        const vidShouldBeMuted = this.localUsermediaFeed?.isVideoMuted() || this.remoteOnHold;
+        const micShouldBeMuted = this.isMicrophoneMuted() || this.remoteOnHold;
+        const vidShouldBeMuted = this.isLocalVideoMuted() || this.remoteOnHold;
 
         setTracksEnabled(this.localUsermediaStream.getAudioTracks(), !micShouldBeMuted);
         setTracksEnabled(this.localUsermediaStream.getVideoTracks(), !vidShouldBeMuted);
