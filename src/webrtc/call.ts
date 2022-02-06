@@ -956,6 +956,11 @@ export class MatrixCall extends EventEmitter {
                 this.localUsermediaStream.addTrack(videoTrack);
                 this.usermediaSenders.push(this.peerConn.addTrack(videoTrack, this.localUsermediaStream));
             }
+
+            const micShouldBeMuted = this.localUsermediaFeed.isAudioMuted() || this.remoteOnHold;
+            const vidShouldBeMuted = this.localUsermediaFeed.isVideoMuted() || this.remoteOnHold;
+            setTracksEnabled(stream.getAudioTracks(), !micShouldBeMuted);
+            setTracksEnabled(stream.getVideoTracks(), !vidShouldBeMuted);
         } catch (error) {
             logger.error("Failed to upgrade the call", error);
             this.emit(CallEvent.Error,
