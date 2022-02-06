@@ -934,34 +934,13 @@ export class MatrixCall extends EventEmitter {
         if (!this.opponentSupportsSDPStreamMetadata()) return;
 
         try {
-            const upgradeAudio = audio && !this.hasLocalUserMediaAudioTrack;
-            const upgradeVideo = video && !this.hasLocalUserMediaVideoTrack;
-            logger.debug(`Upgrading call: audio?=${upgradeAudio} video?=${upgradeVideo}`);
+            const getAudio = audio || this.hasLocalUserMediaAudioTrack;
+            const getVideo = video || this.hasLocalUserMediaVideoTrack;
 
-            const stream = await this.client.getMediaHandler().getUserMediaStream(upgradeAudio, upgradeVideo, false);
-            if (upgradeAudio && upgradeVideo) {
-                if (this.hasLocalUserMediaAudioTrack) return;
-                if (this.hasLocalUserMediaVideoTrack) return;
-
-                this.pushNewLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
-            } else if (upgradeAudio) {
-                if (this.hasLocalUserMediaAudioTrack) return;
-
-                const audioTrack = stream.getAudioTracks()[0];
-                this.localUsermediaStream.addTrack(audioTrack);
-                this.usermediaSenders.push(this.peerConn.addTrack(audioTrack, this.localUsermediaStream));
-            } else if (upgradeVideo) {
-                if (this.hasLocalUserMediaVideoTrack) return;
-
-                const videoTrack = stream.getVideoTracks()[0];
-                this.localUsermediaStream.addTrack(videoTrack);
-                this.usermediaSenders.push(this.peerConn.addTrack(videoTrack, this.localUsermediaStream));
-            }
-
-            const micShouldBeMuted = this.localUsermediaFeed.isAudioMuted() || this.remoteOnHold;
-            const vidShouldBeMuted = this.localUsermediaFeed.isVideoMuted() || this.remoteOnHold;
-            setTracksEnabled(stream.getAudioTracks(), !micShouldBeMuted);
-            setTracksEnabled(stream.getVideoTracks(), !vidShouldBeMuted);
+            // updateLocalUsermediaStream() will take the tracks, use them as
+            // replacement and throw the stream away, so it isn't reusable
+            const stream = await this.client.getMediaHandler().getUserMediaStream(getAudio, getVideo, false);
+            await this.updateLocalUsermediaStream(stream, audio, video);
         } catch (error) {
             logger.error("Failed to upgrade the call", error);
             this.emit(CallEvent.Error,
