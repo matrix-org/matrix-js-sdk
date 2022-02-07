@@ -2083,12 +2083,12 @@ export class Room extends EventEmitter {
 
                     const pair = this.receipts[receiptType][userId];
 
-                    const existingMatchingReceipt = fake ? pair[ReceiptPairSyntheticIndex] : pair[ReceiptPairRealIndex];
-                    if (existingMatchingReceipt) {
+                    const existingReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
+                    if (existingReceipt) {
                         // we only want to add this receipt if we think it is later than the one we already have.
                         // This is managed server-side, but because we synthesize RRs locally we have to do it here too.
                         const ordering = this.getUnfilteredTimelineSet().compareEventOrdering(
-                            existingMatchingReceipt.eventId, eventId);
+                            existingReceipt.eventId, eventId);
                         if (ordering !== null && ordering >= 0) {
                             return;
                         }
@@ -2100,7 +2100,6 @@ export class Room extends EventEmitter {
                     };
 
                     // we don't bother caching just real receipts by event ID as there's nothing that would read it.
-                    const existingReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
                     if (existingReceipt && this.receiptCacheByEventId[existingReceipt.eventId]) {
                         const previousEventId = existingReceipt.eventId;
                         // Remove the receipt we're about to clobber out of existence from the cache
