@@ -2211,7 +2211,7 @@ export class MatrixCall extends EventEmitter {
     }
 
     private async sendCandidateQueue(): Promise<void> {
-        if (this.candidateSendQueue.length === 0) {
+        if (this.candidateSendQueue.length === 0 || this.callHasEnded()) {
             return;
         }
 
