@@ -1461,7 +1461,7 @@ describe("Room", function() {
     describe("maySendMessage", function() {
         it("should return false if synced membership not join",
         function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, { isRoomEncrypted: () => false }, userA);
             room.updateMyMembership("invite");
             expect(room.maySendMessage()).toEqual(false);
             room.updateMyMembership("leave");
