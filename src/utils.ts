@@ -24,6 +24,8 @@ import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
 
 import type NodeCrypto from "crypto";
+import { IEvent, MatrixEvent } from "./models/event";
+import { MatrixClient } from "./client";
 
 /**
  * Encode a dictionary of query parameters.
@@ -707,4 +709,22 @@ export function recursivelyAssign(target: Object, source: Object, ignoreNullish 
         }
     }
     return target;
+}
+
+export function findOrCreateEvent(client: MatrixClient, eventData: Partial<IEvent>): MatrixEvent {
+    let event: MatrixEvent;
+    const room = client.getRoom(eventData.room_id);
+    // If the event is already known to the room, let's re-use the model
+    // rather than creating a duplicate
+    if (room) {
+        event = room.findEventById(eventData.event_id);
+    }
+
+    // If no event is found or if the event found was only local we can
+    // safely create a new model
+    if (!event || event.status) {
+        event = new MatrixEvent(eventData);
+    }
+
+    return event;
 }
