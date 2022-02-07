@@ -439,7 +439,8 @@ export class MatrixHttpApi {
 
             const headers: Record<string, string> = { "Content-Type": contentType };
 
-            // authedRequest uses `request` (which is no longer maintained) that has the body is zero bytes then you can an error: `Argument error, options.body`
+            // authedRequest uses `request` which is no longer maintained.
+            // `request` has a bug where if the body is zero bytes then you get an error: `Argument error, options.body`.
             // See https://github.com/request/request/issues/920
             // if body looks like a byte array and empty then set the Content-Length explicitly as a workaround:
             if ((body as unknown as ArrayLike<number>).length === 0) {
