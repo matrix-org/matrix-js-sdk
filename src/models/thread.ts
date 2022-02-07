@@ -110,7 +110,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         }
     };
 
-    private get roomState(): RoomState {
+    public get roomState(): RoomState {
         return this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
     }
 
