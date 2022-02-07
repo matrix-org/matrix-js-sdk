@@ -2199,8 +2199,9 @@ export class Room extends EventEmitter {
      *                   message events into the room.
      */
     public maySendMessage(): boolean {
-        return this.getMyMembership() === 'join' &&
-            this.currentState.maySendEvent(EventType.RoomMessage, this.myUserId);
+        return this.getMyMembership() === 'join' && this.client.isRoomEncrypted(this.roomId)
+            ? this.currentState.maySendEvent(EventType.RoomMessageEncrypted, this.myUserId)
+            : this.currentState.maySendEvent(EventType.RoomMessage, this.myUserId);
     }
 
     /**
