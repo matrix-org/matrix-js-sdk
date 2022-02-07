@@ -442,7 +442,7 @@ export class MatrixHttpApi {
             // authedRequest uses `request` (which is no longer maintained) that has the body is zero bytes then you can an error: `Argument error, options.body`
             // See https://github.com/request/request/issues/920
             // if body looks like a byte array and empty then set the Content-Length explicitly as a workaround:
-            if (body.hasOwnProperty("length") && (body as unknown as ArrayLike<number>).length === 0) {
+            if ((body as unknown as ArrayLike<number>).length === 0) {
                 headers["Content-Length"] = "0";
             }
 
