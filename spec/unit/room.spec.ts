@@ -34,8 +34,10 @@ import {
 import { EventTimeline } from "../../src/models/event-timeline";
 import { IWrappedReceipt, Room } from "../../src/models/room";
 import { RoomState } from "../../src/models/room-state";
-import { UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../../src/@types/event";
-import { TestClient } from "../TestClient";
+import {
+    UNSTABLE_ELEMENT_FUNCTIONAL_USERS,
+    UNSTABLE_MSC2228_SELF_DESTRUCT_AFTER,
+} from "../../src/@types/event";import { TestClient } from "../TestClient";
 import { emitPromise } from "../test-utils/test-utils";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import { Thread, ThreadEvent } from "../../src/models/thread";
@@ -2378,6 +2380,72 @@ describe("Room", function() {
             room.getUnfilteredTimelineSet = () => ({ compareEventOrdering: (event1, event2) => 1 } as EventTimelineSet);
 
             expect(room.getEventReadUpTo(userA)).toEqual("eventId1");
+        });
+    });
+
+    describe("MSC2228_selfDestructAfter", function() {
+        it("should redact an event with a `self_destruct_after` value in the past immediately", function() {
+            const client = {
+                store: {
+                    replaceEvent: jest.fn(() => Promise.resolve()),
+                    save: jest.fn(() => Promise.resolve()),
+                },
+            };
+            const room = new Room(roomId, client, userA);
+            let callCount = 0;
+            room.on("Room.redaction", function(redactionEvent, room) {
+                callCount += 1;
+                expect(redactionEvent.getType()).toBe("m.room.redaction");
+            });
+            room.addLiveEvents([
+                utils.mkEvent({
+                    type: "m.room.message",
+                    room: roomId, event: true,
+                    content: {
+                        msgtype: "m.text",
+                        body: "TOPSECRET",
+                        [UNSTABLE_MSC2228_SELF_DESTRUCT_AFTER.name]: Date.now()-1000,
+                    },
+                }),
+            ]);
+            const event = room.timeline[0];
+            expect(event.isRedacted()).toBeTruthy();
+            expect(event.getContent().body).toBeFalsy();
+            expect(client.store.replaceEvent).toBeCalled();
+            expect(callCount).toBe(1);
+        });
+        it("should redact an event with a future `self_destruct_after` value after that time", function(done) {
+            const client = {
+                store: {
+                    replaceEvent: jest.fn(() => Promise.resolve()),
+                    save: jest.fn(() => Promise.resolve()),
+                },
+            };
+            const room = new Room(roomId, client, userA);
+            room.addLiveEvents([
+                utils.mkEvent({
+                    type: "m.room.message",
+                    room: roomId, event: true,
+                    content: {
+                        msgtype: "m.text",
+                        body: "TOPSECRET",
+                        [UNSTABLE_MSC2228_SELF_DESTRUCT_AFTER.name]: Date.now()+50,
+                    },
+                }),
+            ]);
+
+            // not deleted yet
+            const event = room.timeline[0];
+            expect(event.isRedacted()).toBeFalsy();
+            expect(event.getContent().body).toBe("TOPSECRET");
+
+            // deleted soon
+            room.on("Room.redaction", function(redactionEvent, room) {
+                expect(redactionEvent.getType()).toBe("m.room.redaction");
+                expect(event.getContent().body).toBeFalsy();
+                expect(client.store.replaceEvent).toBeCalled();
+                done();
+            });
         });
     });
 });

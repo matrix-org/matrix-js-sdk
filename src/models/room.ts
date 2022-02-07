@@ -1996,7 +1996,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @param {module:models/event.MatrixEvent} event The event to destruct
      */
     // eslint-disable-next-line
-    private async unstable_selfDestructEvent(event: MatrixEvent): Promise<void> {
+    private unstable_selfDestructEvent(event: MatrixEvent): Promise<void> {
         // maybe the server has already sent a m.redaction event or
         // it got redacted manually by a client?
         if (event.isRedacted()) return;
@@ -2018,8 +2018,11 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         event.makeRedacted(redactionEvent);
 
         // redact also stored event
-        await this.client.store.replaceEvent(event);
-        this.client.store.save(true);
+        this.client.store.replaceEvent(event).then(() => {
+            return this.client.store.save(true);
+        }).catch((err) => {
+            logger.error(`error while redacting event from store: ${err.message}`);
+        });
 
         this.emit("Room.redaction", redactionEvent, this);
     }
