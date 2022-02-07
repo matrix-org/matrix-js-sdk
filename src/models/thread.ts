@@ -24,7 +24,6 @@ import { EventTimelineSet } from './event-timeline-set';
 import { Room } from './room';
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { RoomState } from "./room-state";
-import { findOrCreateEvent } from "../utils";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -171,8 +170,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         // There is a risk that the `localTimestamp` approximation will not be accurate
         // when threads are used over federation. That could results in the reply
         // count value drifting away from the value returned by the server
-        if (isThreadReply
-                && (!this.lastEvent || (isThreadReply && event.localTimestamp > this.replyToEvent.localTimestamp))) {
+        if (!this.lastEvent || (isThreadReply && event.localTimestamp > this.replyToEvent.localTimestamp)) {
             this.lastEvent = event;
             if (this.lastEvent.getId() !== this.id) {
                 // This counting only works when server side support is enabled
@@ -197,11 +195,9 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
             this.replyCount = bundledRelationship.count;
             this._currentUserParticipated = bundledRelationship.current_user_participated;
 
-            const event = findOrCreateEvent(this.client, bundledRelationship.latest_event);
+            const event = new MatrixEvent(bundledRelationship.latest_event);
             this.setEventMetadata(event);
             this.lastEvent = event;
-
-            this.emit(ThreadEvent.Update, this);
         }
 
         if (!bundledRelationship && rootEvent) {
@@ -305,8 +301,8 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         }
 
         for (const event of events) {
-            this.setEventMetadata(event);
             await this.client.decryptEventIfNeeded(event);
+            this.setEventMetadata(event);
         }
 
         const prependEvents = !opts.direction || opts.direction === Direction.Backward;

@@ -16,7 +16,6 @@ limitations under the License.
 
 import { MatrixClient } from "./client";
 import { IEvent, MatrixEvent } from "./models/event";
-import { findOrCreateEvent } from "./utils";
 
 export type EventMapper = (obj: Partial<IEvent>) => MatrixEvent;
 
@@ -30,7 +29,20 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
     const decrypt = options.decrypt !== false;
 
     function mapper(plainOldJsObject: Partial<IEvent>) {
-        const event = findOrCreateEvent(client, plainOldJsObject);
+        const room = client.getRoom(plainOldJsObject.room_id);
+        let event: MatrixEvent;
+
+        // If the event is already known to the room, let's re-use the model
+        // rather than creating a duplicate
+        if (room) {
+            event = room.findEventById(plainOldJsObject.event_id);
+        }
+
+        // If no event is found or if the event found was only local we can
+        // safely create a new model
+        if (!event || event.status) {
+            event = new MatrixEvent(plainOldJsObject);
+        }
 
         if (event.isEncrypted()) {
             if (!preventReEmit) {

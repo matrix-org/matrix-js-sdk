@@ -280,10 +280,10 @@ export class MatrixEvent extends EventEmitter {
     public localTimestamp: number;
 
     // XXX: these should be read-only
-    public sender: RoomMember | null = null;
-    public target: RoomMember | null = null;
-    public status: EventStatus | null = null;
-    public error: MatrixError | null = null;
+    public sender: RoomMember = null;
+    public target: RoomMember = null;
+    public status: EventStatus = null;
+    public error: MatrixError = null;
     public forwardLooking = true;
 
     /* If the event is a `m.key.verification.request` (or to_device `m.key.verification.start`) event,
@@ -1561,7 +1561,6 @@ export class MatrixEvent extends EventEmitter {
      */
     public setThread(thread: Thread): void {
         this.thread = thread;
-        this.setThreadId(thread.id);
         this.reEmitter.reEmit(thread, [ThreadEvent.Ready, ThreadEvent.Update]);
     }
 
