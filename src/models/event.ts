@@ -537,10 +537,6 @@ export class MatrixEvent extends EventEmitter {
         return !!threadDetails || (this.getThread()?.id === this.getId());
     }
 
-    public get parentEventId(): string {
-        return this.replyEventId || this.relationEventId;
-    }
-
     public get replyEventId(): string {
         // We're prefer ev.getContent() over ev.getWireContent() to make sure
         // we grab the latest edit with potentially new relations. But we also
@@ -1427,7 +1423,9 @@ export class MatrixEvent extends EventEmitter {
      */
     public getAssociatedId(): string | undefined {
         const relation = this.getRelation();
-        if (relation) {
+        if (this.replyEventId) {
+            return this.replyEventId;
+        } else if (relation) {
             return relation.event_id;
         } else if (this.isRedaction()) {
             return this.event.redacts;

@@ -1727,7 +1727,7 @@ export class SyncApi {
     // extractRelatedEvents(event: MatrixEvent, events: MatrixEvent[], relatedEvents: MatrixEvent[] = []): MatrixEvent[] {
     //     relatedEvents.push(event);
 
-    //     const parentEventId = event.parentEventId;
+    //     const parentEventId = event.getAssociatedId();
     //     const parentEventIndex = events.findIndex(event => event.getId() === parentEventId);
 
     //     if (parentEventIndex > -1) {

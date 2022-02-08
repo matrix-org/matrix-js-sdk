@@ -1358,7 +1358,7 @@ export class Room extends EventEmitter {
         } else if (event.isThreadRoot) {
             return this.threads.get(event.getId());
         } else {
-            const parentEvent = this.findEventById(event.parentEventId);
+            const parentEvent = this.findEventById(event.getAssociatedId());
             return this.findThreadForEvent(parentEvent);
         }
     }
@@ -1564,8 +1564,7 @@ export class Room extends EventEmitter {
         EventTimeline.setEventMetadata(event, this.getLiveTimeline().getState(EventTimeline.FORWARDS), false);
 
         this.txnToEvent[txnId] = event;
-        const thread = this.findThreadForEvent(event);
-        if (this.opts.pendingEventOrdering === PendingEventOrdering.Detached && !thread) {
+        if (this.opts.pendingEventOrdering === PendingEventOrdering.Detached) {
             if (this.pendingEventList.some((e) => e.status === EventStatus.NOT_SENT)) {
                 logger.warn("Setting event as NOT_SENT due to messages in the same state");
                 event.setStatus(EventStatus.NOT_SENT);
@@ -1581,8 +1580,7 @@ export class Room extends EventEmitter {
 
             if (event.isRedaction()) {
                 const redactId = event.event.redacts;
-                let redactedEvent = this.pendingEventList &&
-                    this.pendingEventList.find(e => e.getId() === redactId);
+                let redactedEvent = this.pendingEventList && this.pendingEventList.find(e => e.getId() === redactId);
                 if (!redactedEvent) {
                     redactedEvent = this.findEventById(redactId);
                 }
@@ -1592,20 +1590,16 @@ export class Room extends EventEmitter {
                 }
             }
         } else {
-            if (thread) {
-                thread.addEvent(event, false);
-            } else {
-                for (let i = 0; i < this.timelineSets.length; i++) {
-                    const timelineSet = this.timelineSets[i];
-                    if (timelineSet.getFilter()) {
-                        if (timelineSet.getFilter().filterRoomTimeline([event]).length) {
-                            timelineSet.addEventToTimeline(event,
-                                timelineSet.getLiveTimeline(), false);
-                        }
-                    } else {
+            for (let i = 0; i < this.timelineSets.length; i++) {
+                const timelineSet = this.timelineSets[i];
+                if (timelineSet.getFilter()) {
+                    if (timelineSet.getFilter().filterRoomTimeline([event]).length) {
                         timelineSet.addEventToTimeline(event,
                             timelineSet.getLiveTimeline(), false);
                     }
+                } else {
+                    timelineSet.addEventToTimeline(event,
+                        timelineSet.getLiveTimeline(), false);
                 }
             }
         }
@@ -1666,7 +1660,9 @@ export class Room extends EventEmitter {
         const thread = this.findThreadForEvent(event);
         if (thread) {
             thread.timelineSet.aggregateRelations(event);
-        } else {
+        }
+
+        if (thread?.id === event.getAssociatedId() || !thread) {
             // TODO: We should consider whether this means it would be a better
             // design to lift the relations handling up to the room instead.
             for (let i = 0; i < this.timelineSets.length; i++) {
@@ -1721,7 +1717,9 @@ export class Room extends EventEmitter {
         const thread = this.findThreadForEvent(remoteEvent);
         if (thread) {
             thread.timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
-        } else {
+        }
+
+        if (thread?.id === remoteEvent.getAssociatedId() || !thread) {
             for (let i = 0; i < this.timelineSets.length; i++) {
                 const timelineSet = this.timelineSets[i];
 
@@ -1791,7 +1789,8 @@ export class Room extends EventEmitter {
             const thread = this.findThreadForEvent(event);
             if (thread) {
                 thread.timelineSet.replaceEventId(oldEventId, newEventId);
-            } else {
+            }
+            if (thread?.id === event.getAssociatedId() || !thread) {
                 // if the event was already in the timeline (which will be the case if
                 // opts.pendingEventOrdering==chronological), we need to update the
                 // timeline map.
