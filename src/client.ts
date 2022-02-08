@@ -9085,12 +9085,14 @@ export class MatrixClient extends EventEmitter {
     private eventShouldLiveIn(event: MatrixEvent, room: Room, events: MatrixEvent[], roots: Set<string>): {
         shouldLiveInRoom: boolean;
         shouldLiveInThread: boolean;
+        threadId?: string;
     } {
         // A thread relation is always only shown in a thread
         if (event.isThreadRelation) {
             return {
                 shouldLiveInRoom: false,
                 shouldLiveInThread: true,
+                threadId: event.relationEventId,
             };
         }
 
@@ -9106,6 +9108,7 @@ export class MatrixClient extends EventEmitter {
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: true,
+                threadId: event.relationEventId,
             };
         }
 
@@ -9137,6 +9140,7 @@ export class MatrixClient extends EventEmitter {
                 const {
                     shouldLiveInRoom,
                     shouldLiveInThread,
+                    threadId,
                 } = this.eventShouldLiveIn(event, room, events, threadRoots);
 
                 if (shouldLiveInRoom) {
@@ -9144,6 +9148,7 @@ export class MatrixClient extends EventEmitter {
                 }
 
                 if (shouldLiveInThread) {
+                    event.setThreadId(threadId);
                     memo[THREAD].push(event);
                 }
 
