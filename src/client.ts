@@ -3594,17 +3594,20 @@ export class MatrixClient extends EventEmitter {
             threadId = null;
         }
 
-        if (threadId && content["m.relates_to"]?.rel_type !== RelationType.Thread) {
+        // If we expect that an event is part of a thread but is missing the relation
+        // we need to add it manually, as well as the reply fallback
+        if (threadId && !content["m.relates_to"]?.rel_type) {
             content["m.relates_to"] = {
                 ...content["m.relates_to"],
                 "rel_type": RelationType.Thread,
                 "event_id": threadId,
             };
-
             const thread = this.getRoom(roomId)?.threads.get(threadId);
             if (thread) {
                 content["m.relates_to"]["m.in_reply_to"] = {
-                    "event_id": thread.replyToEvent.getId(),
+                    "event_id": thread.lastReply((ev: MatrixEvent) => {
+                        return ev.isThreadRelation && !ev.status;
+                    }),
                 };
             }
         }
