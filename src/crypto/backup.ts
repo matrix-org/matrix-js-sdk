@@ -467,7 +467,7 @@ export class BackupManager {
      * @param {integer} limit Maximum number of keys to back up
      * @returns {integer} Number of sessions backed up
      */
-    private async backupPendingKeys(limit: number): Promise<number> {
+    public async backupPendingKeys(limit: number): Promise<number> {
         const sessions = await this.baseApis.crypto.cryptoStore.getSessionsNeedingBackup(limit);
         if (!sessions.length) {
             return 0;

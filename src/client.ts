@@ -6882,7 +6882,7 @@ export class MatrixClient extends EventEmitter {
      * @return {Promise} Resolves: On success, the empty object
      */
     public async logout(callback?: Callback): Promise<{}> {
-        if (this.crypto && this.crypto.backupManager) {
+        if (this.crypto?.backupManager?.getKeyBackupEnabled()) {
             try {
                 while (await this.crypto.backupManager.backupPendingKeys(200) > 0);
             } catch (err) {
