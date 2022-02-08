@@ -55,11 +55,11 @@
     "browser-request": "^0.3.3",
     "bs58": "^4.0.1",
     "content-type": "^1.0.4",
+    "cross-fetch": "^3.1.5",
     "loglevel": "^1.7.1",
     "matrix-events-sdk": "^0.0.1-beta.6",
     "p-retry": "^4.5.0",
-    "qs": "^6.9.6",
-    "request": "^2.88.2",
+    "qs": "^6.10.3",
     "unhomoglyph": "^1.0.6"
   },
   "devDependencies": {

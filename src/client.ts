@@ -161,6 +161,8 @@ import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
 import { MediaHandler } from "./webrtc/mediaHandler";
 
+import fetch from 'cross-fetch';
+
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
 
@@ -212,12 +214,10 @@ export interface ICreateClientOpts {
     scheduler?: MatrixScheduler;
 
     /**
-     * The function to invoke for HTTP
-     * requests. The value of this property is typically <code>require("request")
-     * </code> as it returns a function which meets the required interface. See
-     * {@link requestFunction} for more information.
+     * The function to invoke for HTTP requests.
+     * See {@link fetch} for more information.
      */
-    request?: IHttpOpts["request"];
+    fetch?: typeof fetch;
 
     userId?: string;
 
@@ -845,7 +845,7 @@ export class MatrixClient extends EventEmitter {
             baseUrl: opts.baseUrl,
             idBaseUrl: opts.idBaseUrl,
             accessToken: opts.accessToken,
-            request: opts.request,
+            fetch: opts.fetch,
             prefix: PREFIX_R0,
             onlyData: true,
             extraParams: opts.queryParams,

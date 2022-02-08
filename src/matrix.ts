@@ -56,41 +56,6 @@ export {
     createNewMatrixCall,
 } from "./webrtc/call";
 
-// expose the underlying request object so different environments can use
-// different request libs (e.g. request or browser-request)
-let requestInstance;
-
-/**
- * The function used to perform HTTP requests. Only use this if you want to
- * use a different HTTP library, e.g. Angular's <code>$http</code>. This should
- * be set prior to calling {@link createClient}.
- * @param {requestFunction} r The request function to use.
- */
-export function request(r) {
-    requestInstance = r;
-}
-
-/**
- * Return the currently-set request function.
- * @return {requestFunction} The current request function.
- */
-export function getRequest() {
-    return requestInstance;
-}
-
-/**
- * Apply wrapping code around the request function. The wrapper function is
- * installed as the new request handler, and when invoked it is passed the
- * previous value, along with the options and callback arguments.
- * @param {requestWrapperFunction} wrapper The wrapping function.
- */
-export function wrapRequest(wrapper) {
-    const origRequest = requestInstance;
-    requestInstance = function(options, callback) {
-        return wrapper(origRequest, options, callback);
-    };
-}
-
 let cryptoStoreFactory = () => new MemoryCryptoStore;
 
 /**
@@ -136,8 +101,8 @@ export interface ICryptoCallbacks {
  * {@link module:store/memory.MemoryStore}.
  * @param {Object} opts.scheduler If not set, defaults to
  * {@link module:scheduler~MatrixScheduler}.
- * @param {requestFunction} opts.request If not set, defaults to the function
- * supplied to {@link request} which defaults to the request module from NPM.
+ * @param {function} opts.fetch If not set, defaults to the native fetch
+ * implementation.
  *
  * @param {module:crypto.store.base~CryptoStore=} opts.cryptoStore
  *    crypto store implementation. Calls the factory supplied to
@@ -155,7 +120,7 @@ export function createClient(opts: ICreateClientOpts | string) {
             "baseUrl": opts as string,
         };
     }
-    opts.request = opts.request || requestInstance;
+    opts.fetch = opts.fetch || fetch;
     opts.store = opts.store || new MemoryStore({
         localStorage: global.localStorage,
     });
@@ -163,42 +128,3 @@ export function createClient(opts: ICreateClientOpts | string) {
     opts.cryptoStore = opts.cryptoStore || cryptoStoreFactory();
     return new MatrixClient(opts);
 }
-
-/**
- * The request function interface for performing HTTP requests. This matches the
- * API for the {@link https://github.com/request/request#requestoptions-callback|
- * request NPM module}. The SDK will attempt to call this function in order to
- * perform an HTTP request.
- * @callback requestFunction
- * @param {Object} opts The options for this HTTP request.
- * @param {string} opts.uri The complete URI.
- * @param {string} opts.method The HTTP method.
- * @param {Object} opts.qs The query parameters to append to the URI.
- * @param {Object} opts.body The JSON-serializable object.
- * @param {boolean} opts.json True if this is a JSON request.
- * @param {Object} opts._matrix_opts The underlying options set for
- * {@link MatrixHttpApi}.
- * @param {requestCallback} callback The request callback.
- */
-
-/**
- * A wrapper for the request function interface.
- * @callback requestWrapperFunction
- * @param {requestFunction} origRequest The underlying request function being
- * wrapped
- * @param {Object} opts The options for this HTTP request, given in the same
- * form as {@link requestFunction}.
- * @param {requestCallback} callback The request callback.
- */
-
-/**
-  * The request callback interface for performing HTTP requests. This matches the
-  * API for the {@link https://github.com/request/request#requestoptions-callback|
-  * request NPM module}. The SDK will implement a callback which meets this
-  * interface in order to handle the HTTP response.
-  * @callback requestCallback
-  * @param {Error} err The error if one occurred, else falsey.
-  * @param {Object} response The HTTP response which consists of
-  * <code>{statusCode: {Number}, headers: {Object}}</code>
-  * @param {Object} body The parsed HTTP response body.
-  */

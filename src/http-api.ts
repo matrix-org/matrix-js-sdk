@@ -35,6 +35,7 @@ import { IDeferred } from "./utils";
 import { Callback } from "./client";
 import * as utils from "./utils";
 import { logger } from './logger';
+const queryString = require('qs');
 
 /*
 TODO:
@@ -73,16 +74,6 @@ export const PREFIX_IDENTITY_V2 = "/_matrix/identity/v2";
  */
 export const PREFIX_MEDIA_R0 = "/_matrix/media/r0";
 
-type RequestProps = "method"
-    | "withCredentials"
-    | "json"
-    | "headers"
-    | "qs"
-    | "body"
-    | "qsStringifyOptions"
-    | "useQuerystring"
-    | "timeout";
-
 export interface IHttpOpts {
     baseUrl: string;
     idBaseUrl?: string;
@@ -92,16 +83,7 @@ export interface IHttpOpts {
     extraParams?: Record<string, string>;
     localTimeoutMs?: number;
     useAuthorizationHeader?: boolean;
-    request(opts: Pick<CoreOptions, RequestProps> & {
-        uri: string;
-        method: Method;
-        // eslint-disable-next-line camelcase
-        _matrix_opts: IHttpOpts;
-    }, callback: RequestCallback): IRequest;
-}
-
-interface IRequest extends _Request {
-    onprogress?(e: unknown): void;
+    fetch: typeof fetch;
 }
 
 interface IRequestOpts<T> {
@@ -333,7 +315,7 @@ export class MatrixHttpApi {
         // (browser-request doesn't support progress either, which is also kind
         // of important here)
 
-        const upload = { loaded: 0, total: 0 } as IUpload;
+        const upload = {loaded: 0, total: 0} as IUpload;
         let promise: IAbortablePromise<UploadContentResponseType<O>>;
 
         // XMLHttpRequest doesn't parse JSON for us. request normally does, but
@@ -342,7 +324,7 @@ export class MatrixHttpApi {
         // way, we have to JSON-parse the response ourselves.
         let bodyParser = null;
         if (!rawResponse) {
-            bodyParser = function(rawBody: string) {
+            bodyParser = function (rawBody: string) {
                 let body = JSON.parse(rawBody);
                 if (onlyContentUri) {
                     body = body.content_uri;
@@ -359,7 +341,7 @@ export class MatrixHttpApi {
             const xhr = new global.XMLHttpRequest();
             const cb = requestCallback(defer, opts.callback, this.opts.onlyData);
 
-            const timeoutFn = function() {
+            const timeoutFn = function () {
                 xhr.abort();
                 cb(new Error('Timeout'));
             };
@@ -367,7 +349,7 @@ export class MatrixHttpApi {
             // set an initial timeout of 30s; we'll advance it each time we get a progress notification
             let timeoutTimer = callbacks.setTimeout(timeoutFn, 30000);
 
-            xhr.onreadystatechange = function() {
+            xhr.onreadystatechange = function () {
                 let resp: string;
                 switch (xhr.readyState) {
                     case global.XMLHttpRequest.DONE:
@@ -392,7 +374,7 @@ export class MatrixHttpApi {
                         break;
                 }
             };
-            xhr.upload.addEventListener("progress", function(ev) {
+            xhr.upload.addEventListener("progress", function (ev) {
                 callbacks.clearTimeout(timeoutTimer);
                 upload.loaded = ev.loaded;
                 upload.total = ev.total;
@@ -440,7 +422,7 @@ export class MatrixHttpApi {
             promise = this.authedRequest(
                 opts.callback, Method.Post, "/upload", queryParams, body, {
                     prefix: "/_matrix/media/r0",
-                    headers: { "Content-Type": contentType },
+                    headers: {"Content-Type": contentType},
                     json: false,
                     bodyParser,
                 },
@@ -782,7 +764,7 @@ export class MatrixHttpApi {
             }
 
             if (bodyParser === undefined) {
-                bodyParser = function(rawBody: string) {
+                bodyParser = function (rawBody: string) {
                     return JSON.parse(rawBody);
                 };
             }
@@ -792,7 +774,6 @@ export class MatrixHttpApi {
 
         let timeoutId: number;
         let timedOut = false;
-        let req: IRequest;
         const localTimeoutMs = opts.localTimeoutMs || this.opts.localTimeoutMs;
 
         const resetTimeout = () => {
@@ -800,9 +781,8 @@ export class MatrixHttpApi {
                 if (timeoutId) {
                     callbacks.clearTimeout(timeoutId);
                 }
-                timeoutId = callbacks.setTimeout(function() {
+                timeoutId = callbacks.setTimeout(function () {
                     timedOut = true;
-                    req?.abort?.();
                     defer.reject(new MatrixError({
                         error: "Locally timed out waiting for a response",
                         errcode: "ORG.MATRIX.JSSDK_TIMEOUT",
@@ -815,58 +795,38 @@ export class MatrixHttpApi {
 
         const reqPromise = defer.promise as IAbortablePromise<ResponseType<T, O>>;
 
-        try {
-            req = this.opts.request(
-                {
-                    uri: uri,
-                    method: method,
-                    withCredentials: false,
-                    qs: queryParams,
-                    qsStringifyOptions: opts.qsStringifyOptions,
-                    useQuerystring: true,
-                    body: data,
-                    json: false,
-                    timeout: localTimeoutMs,
-                    headers: headers || {},
-                    _matrix_opts: this.opts,
-                },
-                (err, response, body) => {
-                    if (localTimeoutMs) {
-                        callbacks.clearTimeout(timeoutId);
-                        if (timedOut) {
-                            return; // already rejected promise
-                        }
-                    }
-
-                    const handlerFn = requestCallback(defer, callback, this.opts.onlyData, bodyParser);
-                    handlerFn(err, response, body);
-                },
+        const qs = queryString.stringify(queryParams || {}, opts.qsStringifyOptions);
+        let res;
+        const controller = new AbortController();
+        const signal = controller.signal;
+        this.opts.fetch(qs ? `${uri}?${qs}` : uri, {
+            method,
+            headers: headers || [],
+            body: data,
+            mode: "cors",
+            credentials: "omit",
+            signal,
+        }).then((_res) => {
+            res = _res;
+            if (localTimeoutMs) {
+                callbacks.clearTimeout(timeoutId);
+                if (timedOut) {
+                    return; // already rejected promise
+                }
+            }
+            return res.json();
+        }).then((body) => {
+            const handlerFn = requestCallback(defer, callback, this.opts.onlyData, bodyParser);
+            handlerFn(null, res, body.toString());
+        }).catch((ex) => {
+            const handlerFn = requestCallback(
+                defer, callback, this.opts.onlyData,
             );
-            if (req) {
-                // This will only work in a browser, where opts.request is the
-                // `browser-request` import. Currently, `request` does not support progress
-                // updates - see https://github.com/request/request/pull/2346.
-                // `browser-request` returns an XHRHttpRequest which exposes `onprogress`
-                if ('onprogress' in req) {
-                    req.onprogress = (e) => {
-                        // Prevent the timeout from rejecting the deferred promise if progress is
-                        // seen with the request
-                        resetTimeout();
-                    };
-                }
-
-                // FIXME: This is EVIL, but I can't think of a better way to expose
-                // abort() operations on underlying HTTP requests :(
-                if (req.abort) {
-                    reqPromise.abort = req.abort.bind(req);
-                }
-            }
-        } catch (ex) {
-            defer.reject(ex);
-            if (callback) {
-                callback(ex);
-            }
-        }
+            handlerFn(ex, null, null);
+        });
+        reqPromise.abort = () => {
+            controller.abort();
+        };
         return reqPromise;
     }
 }
