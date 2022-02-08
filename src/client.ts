@@ -3655,6 +3655,7 @@ export class MatrixClient extends EventEmitter {
         const thread = room?.threads.get(threadId);
         if (thread) {
             localEvent.setThread(thread);
+            localEvent.setThreadId(thread.id);
         }
 
         // if this is a relation or redaction of an event
