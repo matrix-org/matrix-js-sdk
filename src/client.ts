@@ -9117,7 +9117,7 @@ export class MatrixClient extends EventEmitter {
             return this.eventShouldLiveIn(parentEvent, room, events, roots);
         } else {
             // We've exhausted all scenarios, can safely same that this event
-            // should live in the
+            // should live in the room timeline
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: false,

@@ -1580,7 +1580,7 @@ export class Room extends EventEmitter {
 
             if (event.isRedaction()) {
                 const redactId = event.event.redacts;
-                let redactedEvent = this.pendingEventList && this.pendingEventList.find(e => e.getId() === redactId);
+                let redactedEvent = this.pendingEventList?.find(e => e.getId() === redactId);
                 if (!redactedEvent) {
                     redactedEvent = this.findEventById(redactId);
                 }
