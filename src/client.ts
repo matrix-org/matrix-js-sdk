@@ -6886,7 +6886,7 @@ export class MatrixClient extends EventEmitter {
             try {
                 while (await this.crypto.backupManager.backupPendingKeys(200) > 0);
             } catch (err) {
-                logger.log(
+                logger.error(
                     "Key backup request failed when logging out. Some keys may be missing from backup",
                     err,
                 );
