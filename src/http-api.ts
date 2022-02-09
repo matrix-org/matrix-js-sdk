@@ -24,7 +24,6 @@ import { parse as parseContentType, ParsedMediaType } from "content-type";
 import EventEmitter from "events";
 
 import type { IncomingHttpHeaders, IncomingMessage } from "http";
-import type { Request as _Request, CoreOptions } from "request";
 // we use our own implementation of setTimeout, so that if we get suspended in
 // the middle of a /sync, we cancel the sync as soon as we awake, rather than
 // waiting for the delay to elapse.
@@ -89,9 +88,6 @@ export interface IHttpOpts {
 interface IRequestOpts<T> {
     prefix?: string;
     localTimeoutMs?: number;
-    headers?: Record<string, string>;
-    json?: boolean; // defaults to true
-    qsStringifyOptions?: CoreOptions["qsStringifyOptions"];
     bodyParser?(body: string): T;
 }
 
@@ -479,26 +475,21 @@ export class MatrixHttpApi {
         }
 
         const opts = {
-            uri: fullUri,
-            method,
             withCredentials: false,
-            json: true, // we want a JSON response if we can
             _matrix_opts: this.opts,
-            headers: {},
-        } as Parameters<IHttpOpts["request"]>[0];
-
-        if (method === Method.Get) {
-            opts.qs = params;
-        } else if (typeof params === "object") {
-            opts.json = params;
-        }
-
-        if (accessToken) {
-            opts.headers['Authorization'] = `Bearer ${accessToken}`;
-        }
+            headers: accessToken
+                ? {Authorization: `Bearer ${accessToken}`}
+                : {},
+            body: (method !== Method.Get)
+                ? JSON.stringify(params)
+                : null,
+        } as RequestInfo;
 
         const defer = utils.defer<T>();
-        this.opts.request(opts, requestCallback(defer, callback, this.opts.onlyData));
+        const url = (method === Method.Get)
+                ? fullUri + queryString.stringify(params)
+                : fullUri;
+        this.requestOtherUrl(callback, method, url, null, null, opts);
         return defer.promise;
     }
 
