@@ -323,6 +323,9 @@ export class BackupManager {
                     logger.info("Backup is trusted locally");
                     ret.trusted_locally = true;
                 }
+            } catch {
+                // do nothing -- if we have an error, then we don't mark it as
+                // locally trusted
             } finally {
                 if (algorithm) {
                     algorithm.free();
