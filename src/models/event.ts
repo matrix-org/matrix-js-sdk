@@ -1558,6 +1558,7 @@ export class MatrixEvent extends EventEmitter {
      */
     public setThread(thread: Thread): void {
         this.thread = thread;
+        this.setThreadId(thread.id);
         this.reEmitter.reEmit(thread, [ThreadEvent.Ready, ThreadEvent.Update]);
     }
 
