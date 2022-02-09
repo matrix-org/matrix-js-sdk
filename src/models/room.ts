@@ -512,16 +512,14 @@ export class Room extends EventEmitter {
      *
      * @throws If <code>opts.pendingEventOrdering</code> was not 'detached'
      */
-    public getPendingEvents(thread?: Thread): MatrixEvent[] {
+    public getPendingEvents(): MatrixEvent[] {
         if (this.opts.pendingEventOrdering !== PendingEventOrdering.Detached) {
             throw new Error(
                 "Cannot call getPendingEvents with pendingEventOrdering == " +
                 this.opts.pendingEventOrdering);
         }
 
-        return this.pendingEventList.filter(event => {
-            return !thread || thread.id === event.threadRootId;
-        });
+        return this.pendingEventList;
     }
 
     /**

@@ -28,7 +28,6 @@ import { Room } from "./room";
 import { Filter } from "../filter";
 import { EventType, RelationType } from "../@types/event";
 import { RoomState } from "./room-state";
-import { Thread } from "./thread";
 
 // var DEBUG = false;
 const DEBUG = true;
@@ -159,17 +158,12 @@ export class EventTimelineSet extends EventEmitter {
      *
      * @throws If <code>opts.pendingEventOrdering</code> was not 'detached'
      */
-    public getPendingEvents(thread?: Thread): MatrixEvent[] {
+    public getPendingEvents(): MatrixEvent[] {
         if (!this.room || !this.displayPendingEvents) {
             return [];
         }
 
-        const pendingEvents = this.room.getPendingEvents(thread);
-        if (this.filter) {
-            return this.filter.filterRoomTimeline(pendingEvents);
-        } else {
-            return pendingEvents;
-        }
+        return this.room.getPendingEvents();
     }
     /**
      * Get the live timeline for this room.
