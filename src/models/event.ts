@@ -512,8 +512,7 @@ export class MatrixEvent extends EventEmitter {
         if (relatesTo?.rel_type === RelationType.Thread) {
             return relatesTo.event_id;
         } else {
-            return this.threadId
-                || this.getThread()?.id;
+            return this.getThread()?.id;
         }
     }
 

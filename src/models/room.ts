@@ -1408,9 +1408,12 @@ export class Room extends EventEmitter {
         this.emit(ThreadEvent.Update, thread);
     }
 
-    public createThread(rootEvent: MatrixEvent, events?: MatrixEvent[]): Thread | undefined {
+    public createThread(rootEvent: MatrixEvent, events: MatrixEvent[] = []): Thread | undefined {
+        const tl = this.getTimelineForEvent(rootEvent.getId());
+        const relatedEvents = tl?.getTimelineSet().getAllRelationsEventForEvent(rootEvent.getId()) ?? [];
+
         const thread = new Thread(rootEvent, {
-            initialEvents: events,
+            initialEvents: events.concat(relatedEvents),
             room: this,
             client: this.client,
         });
