@@ -1368,7 +1368,16 @@ export class Room extends EventEmitter {
     public async addThreadedEvent(event: MatrixEvent): Promise<void> {
         let thread = this.findThreadForEvent(event);
         if (thread) {
-            thread.addEvent(event);
+            if (event.getUnsigned().transaction_id) {
+                const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id];
+                if (existingEvent) {
+                    // remote echo of an event we sent earlier
+                    this.handleRemoteEcho(event, existingEvent);
+                    return;
+                }
+            } else {
+                thread.addEvent(event);
+            }
         } else {
             const events = [event];
             let rootEvent = this.findEventById(event.threadRootId);
@@ -1391,15 +1400,6 @@ export class Room extends EventEmitter {
                 // in "limited" mode and won't benefit from all the APIs a homeserver
                 // can provide to enhance the thread experience
                 thread = this.createThread(rootEvent, events);
-            }
-        }
-
-        if (event.getUnsigned().transaction_id) {
-            const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id];
-            if (existingEvent) {
-                // remote echo of an event we sent earlier
-                this.handleRemoteEcho(event, existingEvent);
-                return;
             }
         }
 
