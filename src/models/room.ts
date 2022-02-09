@@ -1368,16 +1368,7 @@ export class Room extends EventEmitter {
     public async addThreadedEvent(event: MatrixEvent): Promise<void> {
         let thread = this.findThreadForEvent(event);
         if (thread) {
-            if (event.getUnsigned().transaction_id) {
-                const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id];
-                if (existingEvent) {
-                    // remote echo of an event we sent earlier
-                    this.handleRemoteEcho(event, existingEvent);
-                    return;
-                }
-            } else {
-                thread.addEvent(event);
-            }
+            thread.addEvent(event);
         } else {
             const events = [event];
             let rootEvent = this.findEventById(event.threadRootId);
@@ -1679,6 +1670,10 @@ export class Room extends EventEmitter {
         }
     }
 
+    public getEventForTxnId(txnId: string): MatrixEvent {
+        return this.txnToEvent[txnId];
+    }
+
     /**
      * Deal with the echo of a message we sent.
      *
@@ -1693,7 +1688,7 @@ export class Room extends EventEmitter {
      * @fires module:client~MatrixClient#event:"Room.localEchoUpdated"
      * @private
      */
-    private handleRemoteEcho(remoteEvent: MatrixEvent, localEvent: MatrixEvent): void {
+    public handleRemoteEcho(remoteEvent: MatrixEvent, localEvent: MatrixEvent): void {
         const oldEventId = localEvent.getId();
         const newEventId = remoteEvent.getId();
         const oldStatus = localEvent.status;

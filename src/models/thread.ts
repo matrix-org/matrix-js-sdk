@@ -113,6 +113,25 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         return this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
     }
 
+    private addEventToTimeline(event: MatrixEvent, toStartOfTimeline: boolean): void {
+        if (event.getUnsigned().transaction_id) {
+            const existingEvent = this.room.getEventForTxnId(event.getUnsigned().transaction_id);
+            if (existingEvent) {
+                // remote echo of an event we sent earlier
+                this.room.handleRemoteEcho(event, existingEvent);
+                return;
+            }
+        } else {
+            this.timelineSet.addEventToTimeline(
+                event,
+                this.liveTimeline,
+                toStartOfTimeline,
+                false,
+                this.roomState,
+            );
+        }
+    }
+
     /**
      * Add an event to the thread and updates
      * the tail/root references if needed
@@ -133,26 +152,14 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
             // timeline set to let it reconcile an event with its relevant RoomMember
 
             event.setThread(this);
-            this.timelineSet.addEventToTimeline(
-                event,
-                this.liveTimeline,
-                toStartOfTimeline,
-                false,
-                this.roomState,
-            );
+            this.addEventToTimeline(event, toStartOfTimeline);
 
             await this.client.decryptEventIfNeeded(event, {});
         }
 
         if (this.hasServerSideSupport && this.initialEventsFetched) {
             if (event.localTimestamp > this.lastReply().localTimestamp && !this.findEventById(event.getId())) {
-                this.timelineSet.addEventToTimeline(
-                    event,
-                    this.liveTimeline,
-                    false,
-                    false,
-                    this.roomState,
-                );
+                this.addEventToTimeline(event, false);
             }
         }
 
