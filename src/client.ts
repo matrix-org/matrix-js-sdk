@@ -9120,7 +9120,7 @@ export class MatrixClient extends EventEmitter {
         if (parentEvent?.getAssociatedId()) {
             return this.eventShouldLiveIn(parentEvent, room, events, roots);
         } else {
-            // We've exhausted all scenarios, can safely same that this event
+            // We've exhausted all scenarios, can safely assume that this event
             // should live in the room timeline
             return {
                 shouldLiveInRoom: true,
