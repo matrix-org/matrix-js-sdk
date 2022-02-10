@@ -120,7 +120,7 @@ export class RoomMember extends EventEmitter {
         if (this.membership === undefined) {
             // logging to diagnose https://github.com/vector-im/element-web/issues/20962
             // (logs event content, although only of membership events)
-            logger.error(
+            logger.trace(
                 `membership event with membership undefined (forwardLooking: ${event.forwardLooking})!`,
                 event.getContent(),
                 `prevcontent is `, event.getPrevContent(),
