@@ -312,6 +312,8 @@ export class MatrixCall extends EventEmitter {
     private makingOffer = false;
     private ignoreOffer: boolean;
 
+    private responsePromiseChain?: Promise<void>;
+
     // If candidates arrive before we've picked an opponent (which, in particular,
     // will happen if the opponent sends candidates eagerly before the user answers
     // the call) we buffer them up here so we can then add the ones from the party we pick
@@ -895,7 +897,7 @@ export class MatrixCall extends EventEmitter {
 
         logger.debug(`Answering call ${this.callId}`);
 
-        this.gotCallFeedsForAnswer(callFeeds);
+        this.queueGotCallFeedsForAnswer(callFeeds);
     }
 
     /**
@@ -909,7 +911,7 @@ export class MatrixCall extends EventEmitter {
             newCall.waitForLocalAVStream = true;
         } else if ([CallState.CreateOffer, CallState.InviteSent].includes(this.state)) {
             logger.debug("Handing local stream to new call");
-            newCall.gotCallFeedsForAnswer(this.getLocalFeeds());
+            newCall.queueGotCallFeedsForAnswer(this.getLocalFeeds());
         }
         this.successor = newCall;
         this.emit(CallEvent.Replaced, newCall);
@@ -1296,7 +1298,7 @@ export class MatrixCall extends EventEmitter {
 
     private gotCallFeedsForInvite(callFeeds: CallFeed[], requestScreenshareFeed = false): void {
         if (this.successor) {
-            this.successor.gotCallFeedsForAnswer(callFeeds);
+            this.successor.queueGotCallFeedsForAnswer(callFeeds);
             return;
         }
         if (this.callHasEnded()) {
@@ -1365,6 +1367,16 @@ export class MatrixCall extends EventEmitter {
         // error handler re-throws so this won't happen on error, but
         // we don't want the same error handling on the candidate queue
         this.sendCandidateQueue();
+    }
+
+    private queueGotCallFeedsForAnswer(callFeeds: CallFeed[]): void {
+        // Ensure only one negotiate/answer event is being processed at a time.
+        if (this.responsePromiseChain) {
+            this.responsePromiseChain =
+                this.responsePromiseChain.then(() => this.gotCallFeedsForAnswer(callFeeds));
+        } else {
+            this.responsePromiseChain = this.gotCallFeedsForAnswer(callFeeds);
+        }
     }
 
     private async gotCallFeedsForAnswer(callFeeds: CallFeed[]): Promise<void> {
@@ -1714,7 +1726,30 @@ export class MatrixCall extends EventEmitter {
         return this.state === CallState.Ended;
     }
 
-    private gotLocalOffer = async (): Promise<void> => {
+    private queueGotLocalOffer(): void {
+        // Ensure only one negotiate/answer event is being processed at a time.
+        if (this.responsePromiseChain) {
+            this.responsePromiseChain =
+                this.responsePromiseChain.then(() => this.wrappedGotLocalOffer());
+        } else {
+            this.responsePromiseChain = this.wrappedGotLocalOffer();
+        }
+    }
+
+    private async wrappedGotLocalOffer(): Promise<void> {
+        this.makingOffer = true;
+        try {
+            this.getRidOfRTXCodecs();
+            await this.gotLocalOffer();
+        } catch (e) {
+            this.getLocalOfferFailed(e);
+            return;
+        } finally {
+            this.makingOffer = false;
+        }
+    }
+
+    private async gotLocalOffer(): Promise<void> {
         logger.debug("Setting local description");
 
         if (this.callHasEnded()) {
@@ -1805,7 +1840,7 @@ export class MatrixCall extends EventEmitter {
                 }
             }, CALL_TIMEOUT_MS);
         }
-    };
+    }
 
     private getLocalOfferFailed = (err: Error): void => {
         logger.error("Failed to get local offer", err);
@@ -1946,16 +1981,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        this.makingOffer = true;
-        try {
-            this.getRidOfRTXCodecs();
-            await this.gotLocalOffer();
-        } catch (e) {
-            this.getLocalOfferFailed(e);
-            return;
-        } finally {
-            this.makingOffer = false;
-        }
+        this.queueGotLocalOffer();
     };
 
     public onHangupReceived = (msg: MCallHangupReject): void => {
