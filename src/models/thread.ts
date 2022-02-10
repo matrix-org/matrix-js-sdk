@@ -121,7 +121,9 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
                 this.room.handleRemoteEcho(event, existingEvent);
                 return;
             }
-        } else {
+        }
+
+        if (!this.findEventById(event.getId())) {
             this.timelineSet.addEventToTimeline(
                 event,
                 this.liveTimeline,
@@ -142,10 +144,6 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         // Add all incoming events to the thread's timeline set when there's
         // no server support
         if (!this.hasServerSideSupport) {
-            if (this.timelineSet.findEventById(event.getId())) {
-                return;
-            }
-
             // all the relevant membership info to hydrate events with a sender
             // is held in the main room timeline
             // We want to fetch the room state from there and pass it down to this thread
@@ -158,7 +156,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         }
 
         if (this.hasServerSideSupport && this.initialEventsFetched) {
-            if (event.localTimestamp > this.lastReply().localTimestamp && !this.findEventById(event.getId())) {
+            if (event.localTimestamp > this.lastReply().localTimestamp) {
                 this.addEventToTimeline(event, false);
             }
         }
