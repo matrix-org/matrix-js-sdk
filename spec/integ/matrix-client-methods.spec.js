@@ -3,7 +3,6 @@ import { CRYPTO_ENABLED } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
 import { Filter, MemoryStore, Room } from "../../src/matrix";
 import { TestClient } from "../TestClient";
-import { Thread } from "../../src/models/thread";
 
 describe("MatrixClient", function() {
     let client = null;
@@ -624,7 +623,7 @@ describe("MatrixClient", function() {
                 "unsigned": { "age": 80126105 },
                 "user_id": "@andybalaam-test1:matrix.org",
             });
-        })
+        });
 
         it("returns empty arrays when given an empty arrays", function() {
             const events = [];
