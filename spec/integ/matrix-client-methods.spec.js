@@ -395,7 +395,6 @@ describe("MatrixClient", function() {
     });
 
     describe("partitionThreadedEvents", function() {
-
         beforeEach(() => {
             eventMessageInThread = new MatrixEvent({
                 "age": 80098509,
