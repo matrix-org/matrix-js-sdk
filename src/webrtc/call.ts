@@ -630,6 +630,11 @@ export class MatrixCall extends EventEmitter {
      * @param {boolean} addToPeerConnection whether to add the tracks to the peer connection
      */
     public pushLocalFeed(callFeed: CallFeed, addToPeerConnection = true): void {
+        if (this.feeds.some((feed) => callFeed.stream.id === feed.stream.id)) {
+            logger.info(`Ignoring duplicate local stream ${callFeed.stream.id} in call ${this.callId}`);
+            return;
+        }
+
         this.feeds.push(callFeed);
 
         if (addToPeerConnection) {
