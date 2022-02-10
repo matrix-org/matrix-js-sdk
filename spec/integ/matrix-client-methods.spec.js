@@ -395,235 +395,6 @@ describe("MatrixClient", function() {
     });
 
     describe("partitionThreadedEvents", function() {
-        beforeEach(() => {
-            eventMessageInThread = new MatrixEvent({
-                "age": 80098509,
-                "content": {
-                    "algorithm": "m.megolm.v1.aes-sha2",
-                    "ciphertext": "ENCRYPTEDSTUFF",
-                    "device_id": "XISFUZSKHH",
-                    "m.relates_to": {
-                        "event_id": "$VLS2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
-                        "m.in_reply_to": {
-                            "event_id": "$VLS2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
-                        },
-                        "rel_type": "io.element.thread",
-                    },
-                    "sender_key": "i3N3CtG/CD2bGB8rA9fW6adLYSDvlUhf2iuU73L65Vg",
-                    "session_id": "Ja11R/KG6ua0wdk8zAzognrxjio1Gm/RK2Gn6lFL804",
-                },
-                "event_id": "$W4chKIGYowtBblVLkRimeIg8TcdjETnxhDPGfi6NpDg",
-                "origin_server_ts": 1643815466378,
-                "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
-                "sender": "@andybalaam-test1:matrix.org",
-                "type": "m.room.encrypted",
-                "unsigned": { "age": 80098509 },
-                "user_id": "@andybalaam-test1:matrix.org",
-            });
-
-            eventPollResponseReference = new MatrixEvent({
-                "age": 80098509,
-                "content": {
-                    "algorithm": "m.megolm.v1.aes-sha2",
-                    "ciphertext": "ENCRYPTEDSTUFF",
-                    "device_id": "XISFUZSKHH",
-                    "m.relates_to": {
-                        "event_id": "$VLS2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
-                        "rel_type": "m.reference",
-                    },
-                    "sender_key": "i3N3CtG/CD2bGB8rA9fW6adLYSDvlUhf2iuU73L65Vg",
-                    "session_id": "Ja11R/KG6ua0wdk8zAzognrxjio1Gm/RK2Gn6lFL804",
-                },
-                "event_id": "$91JvpezvsF0cKgav3g8W-uEVS4WkDHgxbJZvL3uMR1g",
-                "origin_server_ts": 1643815458650,
-                "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
-                "sender": "@andybalaam-test1:matrix.org",
-                "type": "m.room.encrypted",
-                "unsigned": { "age": 80106237 },
-                "user_id": "@andybalaam-test1:matrix.org",
-            });
-
-            eventReaction = new MatrixEvent({
-                "content": {
-                    "m.relates_to": {
-                        "event_id": "$VLS2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
-                        "key": "🤗",
-                        "rel_type": "m.annotation",
-                    },
-                },
-                "origin_server_ts": 1643977249238,
-                "sender": "@andybalaam-test1:matrix.org",
-                "type": "m.reaction",
-                "unsigned": {
-                    "age": 22598,
-                    "transaction_id": "m1643977249073.16",
-                },
-                "event_id": "$86B2b-x3LgE4DlV4y24b7UHnt72LIA3rzjvMysTtAfA",
-                "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
-            });
-
-            eventPollStartThreadRoot = new MatrixEvent({
-                "age": 80108647,
-                "content": {
-                    "algorithm": "m.megolm.v1.aes-sha2",
-                    "ciphertext": "ENCRYPTEDSTUFF",
-                    "device_id": "XISFUZSKHH",
-                    "sender_key": "i3N3CtG/CD2bGB8rA9fW6adLYSDvlUhf2iuU73L65Vg",
-                    "session_id": "Ja11R/KG6ua0wdk8zAzognrxjio1Gm/RK2Gn6lFL804",
-                },
-                "event_id": "$VLS2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
-                "origin_server_ts": 1643815456240,
-                "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
-                "sender": "@andybalaam-test1:matrix.org",
-                "type": "m.room.encrypted",
-                "unsigned": { "age": 80108647 },
-                "user_id": "@andybalaam-test1:matrix.org",
-            });
-
-            eventRoomName = new MatrixEvent({
-                "age": 80123249,
-                "content": {
-                    "name": "1 poll, 1 vote, 1 thread",
-                },
-                "event_id": "$QAdyNJtKnl1j7or2yMycbOCvb6bCgvHs5lg3ZMd5xWk",
-                "origin_server_ts": 1643815441638,
-                "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
-                "sender": "@andybalaam-test1:matrix.org",
-                "state_key": "",
-                "type": "m.room.name",
-                "unsigned": { "age": 80123249 },
-                "user_id": "@andybalaam-test1:matrix.org",
-            });
-
-            eventEncryption = new MatrixEvent({
-                "age": 80123383,
-                "content": {
-                    "algorithm": "m.megolm.v1.aes-sha2",
-                },
-                "event_id": "$1hGykogKQkXbHw8bVuyE3BjHnFBEJBcUWnakd0ck2K0",
-                "origin_server_ts": 1643815441504,
-                "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
-                "sender": "@andybalaam-test1:matrix.org",
-                "state_key": "",
-                "type": "m.room.encryption",
-                "unsigned": { "age": 80123383 },
-                "user_id": "@andybalaam-test1:matrix.org",
-            });
-
-            eventGuestAccess = new MatrixEvent({
-                "age": 80123473,
-                "content": {
-                    "guest_access": "can_join",
-                },
-                "event_id": "$4_2n-H6K9-0nPbnjjtIue2SU44tGJsnuTmi6UuSrh-U",
-                "origin_server_ts": 1643815441414,
-                "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
-                "sender": "@andybalaam-test1:matrix.org",
-                "state_key": "",
-                "type": "m.room.guest_access",
-                "unsigned": { "age": 80123473 },
-                "user_id": "@andybalaam-test1:matrix.org",
-            });
-
-            eventHistoryVisibility = new MatrixEvent({
-                "age": 80123556,
-                "content": {
-                    "history_visibility": "shared",
-                },
-                "event_id": "$W6kp44CTnvciOiHSPyhp8dh4n2v1_9kclUPddeaQj0E",
-                "origin_server_ts": 1643815441331,
-                "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
-                "sender": "@andybalaam-test1:matrix.org",
-                "state_key": "",
-                "type": "m.room.history_visibility",
-                "unsigned": { "age": 80123556 },
-                "user_id": "@andybalaam-test1:matrix.org",
-            });
-
-            eventJoinRules = new MatrixEvent({
-                "age": 80123696,
-                "content": {
-                    "join_rule": "invite",
-                },
-                "event_id": "$6JDDeDp7fEc0F6YnTWMruNcKWFltR3e9wk7wWDDJrAU",
-                "origin_server_ts": 1643815441191,
-                "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
-                "sender": "@andybalaam-test1:matrix.org",
-                "state_key": "",
-                "type": "m.room.join_rules",
-                "unsigned": { "age": 80123696 },
-                "user_id": "@andybalaam-test1:matrix.org",
-            });
-
-            eventPowerLevels = new MatrixEvent({
-                "age": 80124105,
-                "content": {
-                    "ban": 50,
-                    "events": {
-                        "m.room.avatar": 50,
-                        "m.room.canonical_alias": 50,
-                        "m.room.encryption": 100,
-                        "m.room.history_visibility": 100,
-                        "m.room.name": 50,
-                        "m.room.power_levels": 100,
-                        "m.room.server_acl": 100,
-                        "m.room.tombstone": 100,
-                    },
-                    "events_default": 0,
-                    "historical": 100,
-                    "invite": 0,
-                    "kick": 50,
-                    "redact": 50,
-                    "state_default": 50,
-                    "users": {
-                        "@andybalaam-test1:matrix.org": 100,
-                    },
-                    "users_default": 0,
-                },
-                "event_id": "$XZY2YgQhXskpc7gmJJG3S0VmS9_QjjCUVeeFTfgfC2E",
-                "origin_server_ts": 1643815440782,
-                "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
-                "sender": "@andybalaam-test1:matrix.org",
-                "state_key": "",
-                "type": "m.room.power_levels",
-                "unsigned": { "age": 80124105 },
-                "user_id": "@andybalaam-test1:matrix.org",
-            });
-
-            eventMember = new MatrixEvent({
-                "age": 80125279,
-                "content": {
-                    "avatar_url": "mxc://matrix.org/aNtbVcFfwotudypZcHsIcPOc",
-                    "displayname": "andybalaam-test1",
-                    "membership": "join",
-                },
-                "event_id": "$Ex5eVmMs_ti784mo8bgddynbwLvy6231lCycJr7Cl9M",
-                "origin_server_ts": 1643815439608,
-                "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
-                "sender": "@andybalaam-test1:matrix.org",
-                "state_key": "@andybalaam-test1:matrix.org",
-                "type": "m.room.member",
-                "unsigned": { "age": 80125279 },
-                "user_id": "@andybalaam-test1:matrix.org",
-            });
-
-            eventCreate = new MatrixEvent({
-                "age": 80126105,
-                "content": {
-                    "creator": "@andybalaam-test1:matrix.org",
-                    "room_version": "6",
-                },
-                "event_id": "$e7j2Gt37k5NPwB6lz2N3V9lO5pUdNK8Ai7i2FPEK-oI",
-                "origin_server_ts": 1643815438782,
-                "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
-                "sender": "@andybalaam-test1:matrix.org",
-                "state_key": "",
-                "type": "m.room.create",
-                "unsigned": { "age": 80126105 },
-                "user_id": "@andybalaam-test1:matrix.org",
-            });
-        });
-
         it("returns empty arrays when given an empty arrays", function() {
             const events = [];
             const [timeline, threaded] = client.partitionThreadedEvents(events);
@@ -633,6 +404,11 @@ describe("MatrixClient", function() {
 
         it("copies pre-thread in-timeline vote events onto both timelines", function() {
             client.clientOpts = { experimentalThreadSupport: true };
+
+            const eventMessageInThread = buildEventMessageInThread();
+            const eventPollResponseReference = buildEventPollResponseReference();
+            const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
+
             const events = [
                 eventMessageInThread,
                 eventPollResponseReference,
@@ -663,6 +439,11 @@ describe("MatrixClient", function() {
 
         it("copies pre-thread in-timeline reactions onto both timelines", function() {
             client.clientOpts = { experimentalThreadSupport: true };
+
+            const eventMessageInThread = buildEventMessageInThread();
+            const eventReaction = buildEventReaction();
+            const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
+
             const events = [
                 eventMessageInThread,
                 eventReaction,
@@ -684,6 +465,11 @@ describe("MatrixClient", function() {
 
         it("copies post-thread in-timeline vote events onto both timelines", function() {
             client.clientOpts = { experimentalThreadSupport: true };
+
+            const eventPollResponseReference = buildEventPollResponseReference();
+            const eventMessageInThread = buildEventMessageInThread();
+            const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
+
             const events = [
                 eventPollResponseReference,
                 eventMessageInThread,
@@ -705,6 +491,11 @@ describe("MatrixClient", function() {
 
         it("copies post-thread in-timeline reactions onto both timelines", function() {
             client.clientOpts = { experimentalThreadSupport: true };
+
+            const eventReaction = buildEventReaction();
+            const eventMessageInThread = buildEventMessageInThread();
+            const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
+
             const events = [
                 eventReaction,
                 eventMessageInThread,
@@ -727,6 +518,19 @@ describe("MatrixClient", function() {
         it("sends room state events to the main timeline only", function() {
             client.clientOpts = { experimentalThreadSupport: true };
             // This is based on recording the events in a real room:
+
+            const eventMessageInThread = buildEventMessageInThread();
+            const eventPollResponseReference = buildEventPollResponseReference();
+            const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
+            const eventRoomName = buildEventRoomName();
+            const eventEncryption = buildEventEncryption();
+            const eventGuestAccess = buildEventGuestAccess();
+            const eventHistoryVisibility = buildEventHistoryVisibility();
+            const eventJoinRules = buildEventJoinRules();
+            const eventPowerLevels = buildEventPowerLevels();
+            const eventMember = buildEventMember();
+            const eventCreate = buildEventCreate();
+
             const events = [
                 eventMessageInThread,
                 eventPollResponseReference,
@@ -772,18 +576,232 @@ function withThreadId(event, newThreadId) {
     return ret;
 }
 
-let eventMessageInThread;
-let eventPollResponseReference;
-let eventReaction;
-let eventCreate;
-let eventMember;
-let eventPowerLevels;
-let eventJoinRules;
-let eventHistoryVisibility;
-let eventGuestAccess;
-let eventEncryption;
-let eventRoomName;
-let eventPollStartThreadRoot;
+const buildEventMessageInThread = () => new MatrixEvent({
+    "age": 80098509,
+    "content": {
+        "algorithm": "m.megolm.v1.aes-sha2",
+        "ciphertext": "ENCRYPTEDSTUFF",
+        "device_id": "XISFUZSKHH",
+        "m.relates_to": {
+            "event_id": "$VLS2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
+            "m.in_reply_to": {
+                "event_id": "$VLS2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
+            },
+            "rel_type": "io.element.thread",
+        },
+        "sender_key": "i3N3CtG/CD2bGB8rA9fW6adLYSDvlUhf2iuU73L65Vg",
+        "session_id": "Ja11R/KG6ua0wdk8zAzognrxjio1Gm/RK2Gn6lFL804",
+    },
+    "event_id": "$W4chKIGYowtBblVLkRimeIg8TcdjETnxhDPGfi6NpDg",
+    "origin_server_ts": 1643815466378,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "type": "m.room.encrypted",
+    "unsigned": { "age": 80098509 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventPollResponseReference = () => new MatrixEvent({
+    "age": 80098509,
+    "content": {
+        "algorithm": "m.megolm.v1.aes-sha2",
+        "ciphertext": "ENCRYPTEDSTUFF",
+        "device_id": "XISFUZSKHH",
+        "m.relates_to": {
+            "event_id": "$VLS2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
+            "rel_type": "m.reference",
+        },
+        "sender_key": "i3N3CtG/CD2bGB8rA9fW6adLYSDvlUhf2iuU73L65Vg",
+        "session_id": "Ja11R/KG6ua0wdk8zAzognrxjio1Gm/RK2Gn6lFL804",
+    },
+    "event_id": "$91JvpezvsF0cKgav3g8W-uEVS4WkDHgxbJZvL3uMR1g",
+    "origin_server_ts": 1643815458650,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "type": "m.room.encrypted",
+    "unsigned": { "age": 80106237 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventReaction = () => new MatrixEvent({
+    "content": {
+        "m.relates_to": {
+            "event_id": "$VLS2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
+            "key": "🤗",
+            "rel_type": "m.annotation",
+        },
+    },
+    "origin_server_ts": 1643977249238,
+    "sender": "@andybalaam-test1:matrix.org",
+    "type": "m.reaction",
+    "unsigned": {
+        "age": 22598,
+        "transaction_id": "m1643977249073.16",
+    },
+    "event_id": "$86B2b-x3LgE4DlV4y24b7UHnt72LIA3rzjvMysTtAfA",
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+});
+
+const buildEventPollStartThreadRoot = () => new MatrixEvent({
+    "age": 80108647,
+    "content": {
+        "algorithm": "m.megolm.v1.aes-sha2",
+        "ciphertext": "ENCRYPTEDSTUFF",
+        "device_id": "XISFUZSKHH",
+        "sender_key": "i3N3CtG/CD2bGB8rA9fW6adLYSDvlUhf2iuU73L65Vg",
+        "session_id": "Ja11R/KG6ua0wdk8zAzognrxjio1Gm/RK2Gn6lFL804",
+    },
+    "event_id": "$VLS2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
+    "origin_server_ts": 1643815456240,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "type": "m.room.encrypted",
+    "unsigned": { "age": 80108647 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventRoomName = () => new MatrixEvent({
+    "age": 80123249,
+    "content": {
+        "name": "1 poll, 1 vote, 1 thread",
+    },
+    "event_id": "$QAdyNJtKnl1j7or2yMycbOCvb6bCgvHs5lg3ZMd5xWk",
+    "origin_server_ts": 1643815441638,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "state_key": "",
+    "type": "m.room.name",
+    "unsigned": { "age": 80123249 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventEncryption = () => new MatrixEvent({
+    "age": 80123383,
+    "content": {
+        "algorithm": "m.megolm.v1.aes-sha2",
+    },
+    "event_id": "$1hGykogKQkXbHw8bVuyE3BjHnFBEJBcUWnakd0ck2K0",
+    "origin_server_ts": 1643815441504,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "state_key": "",
+    "type": "m.room.encryption",
+    "unsigned": { "age": 80123383 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventGuestAccess = () => new MatrixEvent({
+    "age": 80123473,
+    "content": {
+        "guest_access": "can_join",
+    },
+    "event_id": "$4_2n-H6K9-0nPbnjjtIue2SU44tGJsnuTmi6UuSrh-U",
+    "origin_server_ts": 1643815441414,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "state_key": "",
+    "type": "m.room.guest_access",
+    "unsigned": { "age": 80123473 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventHistoryVisibility = () => new MatrixEvent({
+    "age": 80123556,
+    "content": {
+        "history_visibility": "shared",
+    },
+    "event_id": "$W6kp44CTnvciOiHSPyhp8dh4n2v1_9kclUPddeaQj0E",
+    "origin_server_ts": 1643815441331,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "state_key": "",
+    "type": "m.room.history_visibility",
+    "unsigned": { "age": 80123556 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventJoinRules = () => new MatrixEvent({
+    "age": 80123696,
+    "content": {
+        "join_rule": "invite",
+    },
+    "event_id": "$6JDDeDp7fEc0F6YnTWMruNcKWFltR3e9wk7wWDDJrAU",
+    "origin_server_ts": 1643815441191,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "state_key": "",
+    "type": "m.room.join_rules",
+    "unsigned": { "age": 80123696 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventPowerLevels = () => new MatrixEvent({
+    "age": 80124105,
+    "content": {
+        "ban": 50,
+        "events": {
+            "m.room.avatar": 50,
+            "m.room.canonical_alias": 50,
+            "m.room.encryption": 100,
+            "m.room.history_visibility": 100,
+            "m.room.name": 50,
+            "m.room.power_levels": 100,
+            "m.room.server_acl": 100,
+            "m.room.tombstone": 100,
+        },
+        "events_default": 0,
+        "historical": 100,
+        "invite": 0,
+        "kick": 50,
+        "redact": 50,
+        "state_default": 50,
+        "users": {
+            "@andybalaam-test1:matrix.org": 100,
+        },
+        "users_default": 0,
+    },
+    "event_id": "$XZY2YgQhXskpc7gmJJG3S0VmS9_QjjCUVeeFTfgfC2E",
+    "origin_server_ts": 1643815440782,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "state_key": "",
+    "type": "m.room.power_levels",
+    "unsigned": { "age": 80124105 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventMember = () => new MatrixEvent({
+    "age": 80125279,
+    "content": {
+        "avatar_url": "mxc://matrix.org/aNtbVcFfwotudypZcHsIcPOc",
+        "displayname": "andybalaam-test1",
+        "membership": "join",
+    },
+    "event_id": "$Ex5eVmMs_ti784mo8bgddynbwLvy6231lCycJr7Cl9M",
+    "origin_server_ts": 1643815439608,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "state_key": "@andybalaam-test1:matrix.org",
+    "type": "m.room.member",
+    "unsigned": { "age": 80125279 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventCreate = () => new MatrixEvent({
+    "age": 80126105,
+    "content": {
+        "creator": "@andybalaam-test1:matrix.org",
+        "room_version": "6",
+    },
+    "event_id": "$e7j2Gt37k5NPwB6lz2N3V9lO5pUdNK8Ai7i2FPEK-oI",
+    "origin_server_ts": 1643815438782,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "state_key": "",
+    "type": "m.room.create",
+    "unsigned": { "age": 80126105 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
 
 function assertObjectContains(obj, expected) {
     for (const k in expected) {
