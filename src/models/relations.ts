@@ -171,11 +171,11 @@ export class Relations extends EventEmitter {
      * @return {Array}
      * Relation events in insertion order.
      */
-    public getRelations() {
+    public getRelations(): MatrixEvent[] {
         return [...this.relations];
     }
 
-    private addAnnotationToAggregation(event: MatrixEvent) {
+    private addAnnotationToAggregation(event: MatrixEvent): void {
         const { key } = event.getRelation();
         if (!key) {
             return;
@@ -204,7 +204,7 @@ export class Relations extends EventEmitter {
         eventsFromSender.add(event);
     }
 
-    private removeAnnotationFromAggregation(event: MatrixEvent) {
+    private removeAnnotationFromAggregation(event: MatrixEvent): void {
         const { key } = event.getRelation();
         if (!key) {
             return;
@@ -240,7 +240,7 @@ export class Relations extends EventEmitter {
      * @param {MatrixEvent} redactedEvent
      * The original relation event that is about to be redacted.
      */
-    private onBeforeRedaction = async (redactedEvent: MatrixEvent) => {
+    private onBeforeRedaction = async (redactedEvent: MatrixEvent): Promise<void> => {
         if (!this.relations.has(redactedEvent)) {
             return;
         }

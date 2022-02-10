@@ -3,7 +3,6 @@ import { CRYPTO_ENABLED } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
 import { Filter, MemoryStore, Room } from "../../src/matrix";
 import { TestClient } from "../TestClient";
-import { Thread } from "../../src/models/thread";
 
 describe("MatrixClient", function() {
     let client = null;
@@ -405,6 +404,11 @@ describe("MatrixClient", function() {
 
         it("copies pre-thread in-timeline vote events onto both timelines", function() {
             client.clientOpts = { experimentalThreadSupport: true };
+
+            const eventMessageInThread = buildEventMessageInThread();
+            const eventPollResponseReference = buildEventPollResponseReference();
+            const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
+
             const events = [
                 eventMessageInThread,
                 eventPollResponseReference,
@@ -435,6 +439,11 @@ describe("MatrixClient", function() {
 
         it("copies pre-thread in-timeline reactions onto both timelines", function() {
             client.clientOpts = { experimentalThreadSupport: true };
+
+            const eventMessageInThread = buildEventMessageInThread();
+            const eventReaction = buildEventReaction();
+            const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
+
             const events = [
                 eventMessageInThread,
                 eventReaction,
@@ -456,6 +465,11 @@ describe("MatrixClient", function() {
 
         it("copies post-thread in-timeline vote events onto both timelines", function() {
             client.clientOpts = { experimentalThreadSupport: true };
+
+            const eventPollResponseReference = buildEventPollResponseReference();
+            const eventMessageInThread = buildEventMessageInThread();
+            const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
+
             const events = [
                 eventPollResponseReference,
                 eventMessageInThread,
@@ -475,119 +489,13 @@ describe("MatrixClient", function() {
             ]);
         });
 
-        it("copies post-thread in-thread vote events onto both timelines", function() {
-            client.clientOpts = { experimentalThreadSupport: true };
-
-            // Events for this test only, because we hack around with them
-            const eventMessageInThread2 = new MatrixEvent({
-                "age": 80098509,
-                "content": {
-                    "algorithm": "m.megolm.v1.aes-sha2",
-                    "ciphertext": "ENCRYPTEDSTUFF",
-                    "device_id": "XISFUZSKHH",
-                    "m.relates_to": {
-                        "event_id": "$AAA2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
-                        "m.in_reply_to": {
-                            "event_id": "$AAA2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
-                        },
-                        "rel_type": "io.element.thread",
-                    },
-                    "sender_key": "i3N3CtG/CD2bGB8rA9fW6adLYSDvlUhf2iuU73L65Vg",
-                    "session_id": "Ja11R/KG6ua0wdk8zAzognrxjio1Gm/RK2Gn6lFL804",
-                },
-                "event_id": "$AAAhKIGYowtBblVLkRimeIg8TcdjETnxhDPGfi6NpDg",
-                "origin_server_ts": 1643815466378,
-                "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
-                "sender": "@andybalaam-test1:matrix.org",
-                "type": "m.room.encrypted",
-                "unsigned": { "age": 80098509 },
-                "user_id": "@andybalaam-test1:matrix.org",
-            });
-
-            const eventPollStartThreadRoot2 = new MatrixEvent({
-                "age": 80108647,
-                "content": {
-                    "algorithm": "m.megolm.v1.aes-sha2",
-                    "ciphertext": "ENCRYPTEDSTUFF",
-                    "device_id": "XISFUZSKHH",
-                    "sender_key": "i3N3CtG/CD2bGB8rA9fW6adLYSDvlUhf2iuU73L65Vg",
-                    "session_id": "Ja11R/KG6ua0wdk8zAzognrxjio1Gm/RK2Gn6lFL804",
-                },
-                "event_id": "$AAA2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
-                "origin_server_ts": 1643815456240,
-                "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
-                "sender": "@andybalaam-test1:matrix.org",
-                "type": "m.room.encrypted",
-                "unsigned": { "age": 80108647 },
-                "user_id": "@andybalaam-test1:matrix.org",
-            });
-
-            const eventPollResponseReference2 = new MatrixEvent({
-                "age": 80098509,
-                "content": {
-                    "algorithm": "m.megolm.v1.aes-sha2",
-                    "ciphertext": "ENCRYPTEDSTUFF",
-                    "device_id": "XISFUZSKHH",
-                    "m.relates_to": {
-                        "event_id": "$AAA2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
-                        "rel_type": "m.reference",
-                    },
-                    "sender_key": "i3N3CtG/CD2bGB8rA9fW6adLYSDvlUhf2iuU73L65Vg",
-                    "session_id": "Ja11R/KG6ua0wdk8zAzognrxjio1Gm/RK2Gn6lFL804",
-                },
-                "event_id": "$AAAvpezvsF0cKgav3g8W-uEVS4WkDHgxbJZvL3uMR1g",
-                "origin_server_ts": 1643815458650,
-                "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
-                "sender": "@andybalaam-test1:matrix.org",
-                "type": "m.room.encrypted",
-                "unsigned": { "age": 80106237 },
-                "user_id": "@andybalaam-test1:matrix.org",
-            });
-
-            // When we react within a thread, sometimes the thread root
-            // has isThreadRelation === true, because thread is set on it,
-            // but threadId is not.
-            eventPollStartThreadRoot2.setThread(
-                new Thread(
-                    eventPollStartThreadRoot2,
-                    {
-                        client,
-                        room: new Room(),
-                    },
-                ),
-            );
-
-            const events = [
-                eventPollResponseReference2,
-                eventMessageInThread2,
-                eventPollStartThreadRoot2,
-            ];
-
-            const [timeline, threaded] = client.partitionThreadedEvents(events);
-
-            expect(timeline).toEqual([
-                eventPollResponseReference2,
-                // eventPollStartThreadRoot2,
-                // This is weird: by hacking the thread root to have an inconsistency
-                // between thread and threadId (which is what I have observed in the
-                // wild), we have persuaded the code that the thread root is actually
-                // within the thread, so it is not provided to the main timeline.
-                //
-                // This should go away when we fix this inconsistency.  When that
-                // happens, we should probably delete this test.
-            ]);
-
-            expect(threaded).toEqual([
-                withThreadId(
-                    eventPollResponseReference2, eventPollStartThreadRoot2.getId(),
-                ),
-                eventMessageInThread2,
-                eventPollStartThreadRoot2, // See note above for why this appears here.
-            ]);
-        });
-
         it("copies post-thread in-timeline reactions onto both timelines", function() {
             client.clientOpts = { experimentalThreadSupport: true };
+
+            const eventReaction = buildEventReaction();
+            const eventMessageInThread = buildEventMessageInThread();
+            const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
+
             const events = [
                 eventReaction,
                 eventMessageInThread,
@@ -610,6 +518,19 @@ describe("MatrixClient", function() {
         it("sends room state events to the main timeline only", function() {
             client.clientOpts = { experimentalThreadSupport: true };
             // This is based on recording the events in a real room:
+
+            const eventMessageInThread = buildEventMessageInThread();
+            const eventPollResponseReference = buildEventPollResponseReference();
+            const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
+            const eventRoomName = buildEventRoomName();
+            const eventEncryption = buildEventEncryption();
+            const eventGuestAccess = buildEventGuestAccess();
+            const eventHistoryVisibility = buildEventHistoryVisibility();
+            const eventJoinRules = buildEventJoinRules();
+            const eventPowerLevels = buildEventPowerLevels();
+            const eventMember = buildEventMember();
+            const eventCreate = buildEventCreate();
+
             const events = [
                 eventMessageInThread,
                 eventPollResponseReference,
@@ -655,7 +576,7 @@ function withThreadId(event, newThreadId) {
     return ret;
 }
 
-const eventMessageInThread = new MatrixEvent({
+const buildEventMessageInThread = () => new MatrixEvent({
     "age": 80098509,
     "content": {
         "algorithm": "m.megolm.v1.aes-sha2",
@@ -680,7 +601,7 @@ const eventMessageInThread = new MatrixEvent({
     "user_id": "@andybalaam-test1:matrix.org",
 });
 
-const eventPollResponseReference = new MatrixEvent({
+const buildEventPollResponseReference = () => new MatrixEvent({
     "age": 80098509,
     "content": {
         "algorithm": "m.megolm.v1.aes-sha2",
@@ -702,7 +623,7 @@ const eventPollResponseReference = new MatrixEvent({
     "user_id": "@andybalaam-test1:matrix.org",
 });
 
-const eventReaction = new MatrixEvent({
+const buildEventReaction = () => new MatrixEvent({
     "content": {
         "m.relates_to": {
             "event_id": "$VLS2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
@@ -721,7 +642,7 @@ const eventReaction = new MatrixEvent({
     "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
 });
 
-const eventPollStartThreadRoot = new MatrixEvent({
+const buildEventPollStartThreadRoot = () => new MatrixEvent({
     "age": 80108647,
     "content": {
         "algorithm": "m.megolm.v1.aes-sha2",
@@ -739,7 +660,7 @@ const eventPollStartThreadRoot = new MatrixEvent({
     "user_id": "@andybalaam-test1:matrix.org",
 });
 
-const eventRoomName = new MatrixEvent({
+const buildEventRoomName = () => new MatrixEvent({
     "age": 80123249,
     "content": {
         "name": "1 poll, 1 vote, 1 thread",
@@ -754,7 +675,7 @@ const eventRoomName = new MatrixEvent({
     "user_id": "@andybalaam-test1:matrix.org",
 });
 
-const eventEncryption = new MatrixEvent({
+const buildEventEncryption = () => new MatrixEvent({
     "age": 80123383,
     "content": {
         "algorithm": "m.megolm.v1.aes-sha2",
@@ -769,7 +690,7 @@ const eventEncryption = new MatrixEvent({
     "user_id": "@andybalaam-test1:matrix.org",
 });
 
-const eventGuestAccess = new MatrixEvent({
+const buildEventGuestAccess = () => new MatrixEvent({
     "age": 80123473,
     "content": {
         "guest_access": "can_join",
@@ -784,7 +705,7 @@ const eventGuestAccess = new MatrixEvent({
     "user_id": "@andybalaam-test1:matrix.org",
 });
 
-const eventHistoryVisibility = new MatrixEvent({
+const buildEventHistoryVisibility = () => new MatrixEvent({
     "age": 80123556,
     "content": {
         "history_visibility": "shared",
@@ -799,7 +720,7 @@ const eventHistoryVisibility = new MatrixEvent({
     "user_id": "@andybalaam-test1:matrix.org",
 });
 
-const eventJoinRules = new MatrixEvent({
+const buildEventJoinRules = () => new MatrixEvent({
     "age": 80123696,
     "content": {
         "join_rule": "invite",
@@ -814,7 +735,7 @@ const eventJoinRules = new MatrixEvent({
     "user_id": "@andybalaam-test1:matrix.org",
 });
 
-const eventPowerLevels = new MatrixEvent({
+const buildEventPowerLevels = () => new MatrixEvent({
     "age": 80124105,
     "content": {
         "ban": 50,
@@ -849,7 +770,7 @@ const eventPowerLevels = new MatrixEvent({
     "user_id": "@andybalaam-test1:matrix.org",
 });
 
-const eventMember = new MatrixEvent({
+const buildEventMember = () => new MatrixEvent({
     "age": 80125279,
     "content": {
         "avatar_url": "mxc://matrix.org/aNtbVcFfwotudypZcHsIcPOc",
@@ -866,7 +787,7 @@ const eventMember = new MatrixEvent({
     "user_id": "@andybalaam-test1:matrix.org",
 });
 
-const eventCreate = new MatrixEvent({
+const buildEventCreate = () => new MatrixEvent({
     "age": 80126105,
     "content": {
         "creator": "@andybalaam-test1:matrix.org",

@@ -92,6 +92,7 @@ export enum EventType {
 export enum RelationType {
     Annotation = "m.annotation",
     Replace = "m.replace",
+    Reference = "m.reference",
     /**
      * Note, "io.element.thread" is hardcoded
      * Should be replaced with "m.thread" once MSC3440 lands

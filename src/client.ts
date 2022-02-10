@@ -3594,17 +3594,20 @@ export class MatrixClient extends EventEmitter {
             threadId = null;
         }
 
-        if (threadId && content["m.relates_to"]?.rel_type !== RelationType.Thread) {
+        // If we expect that an event is part of a thread but is missing the relation
+        // we need to add it manually, as well as the reply fallback
+        if (threadId && !content["m.relates_to"]?.rel_type) {
             content["m.relates_to"] = {
                 ...content["m.relates_to"],
                 "rel_type": RelationType.Thread,
                 "event_id": threadId,
             };
-
             const thread = this.getRoom(roomId)?.threads.get(threadId);
             if (thread) {
                 content["m.relates_to"]["m.in_reply_to"] = {
-                    "event_id": thread.replyToEvent.getId(),
+                    "event_id": thread.lastReply((ev: MatrixEvent) => {
+                        return ev.isThreadRelation && !ev.status;
+                    }),
                 };
             }
         }
@@ -3652,6 +3655,7 @@ export class MatrixClient extends EventEmitter {
         const thread = room?.threads.get(threadId);
         if (thread) {
             localEvent.setThread(thread);
+            localEvent.setThreadId(thread.id);
         }
 
         // if this is a relation or redaction of an event
@@ -9089,6 +9093,52 @@ export class MatrixClient extends EventEmitter {
         return threadRoots;
     }
 
+    private eventShouldLiveIn(event: MatrixEvent, room: Room, events: MatrixEvent[], roots: Set<string>): {
+        shouldLiveInRoom: boolean;
+        shouldLiveInThread: boolean;
+        threadId?: string;
+    } {
+        // A thread relation is always only shown in a thread
+        if (event.isThreadRelation) {
+            return {
+                shouldLiveInRoom: false,
+                shouldLiveInThread: true,
+                threadId: event.relationEventId,
+            };
+        }
+
+        const parentEventId = event.getAssociatedId();
+        const parentEvent = room?.findEventById(parentEventId) || events.find((mxEv: MatrixEvent) => (
+            mxEv.getId() === parentEventId
+        ));
+
+        // A reaction targetting the thread root needs to be routed to both the
+        // the main timeline and the associated thread
+        const targetingThreadRoot = parentEvent?.isThreadRoot || roots.has(event.relationEventId);
+        if (targetingThreadRoot) {
+            return {
+                shouldLiveInRoom: true,
+                shouldLiveInThread: true,
+                threadId: event.relationEventId,
+            };
+        }
+
+        // If the parent event also has an associated ID we want to re-run the
+        // computation for that parent event.
+        // In the case of the redaction of a reaction that targets a root event
+        // we want that redaction to be pushed to both timeline
+        if (parentEvent?.getAssociatedId()) {
+            return this.eventShouldLiveIn(parentEvent, room, events, roots);
+        } else {
+            // We've exhausted all scenarios, can safely assume that this event
+            // should live in the room timeline
+            return {
+                shouldLiveInRoom: true,
+                shouldLiveInThread: false,
+            };
+        }
+    }
+
     public partitionThreadedEvents(events: MatrixEvent[]): [MatrixEvent[], MatrixEvent[]] {
         // Indices to the events array, for readibility
         const ROOM = 0;
@@ -9097,35 +9147,22 @@ export class MatrixClient extends EventEmitter {
             const threadRoots = this.findThreadRoots(events);
             return events.reduce((memo, event: MatrixEvent) => {
                 const room = this.getRoom(event.getRoomId());
-                // An event should live in the thread timeline if
-                // - It's a reply in thread event
-                // - It's related to a reply in thread event
-                let shouldLiveInThreadTimeline = event.isThreadRelation;
-                if (!shouldLiveInThreadTimeline) {
-                    const parentEventId = event.parentEventId;
-                    const parentEvent = room?.findEventById(parentEventId) || events.find((mxEv: MatrixEvent) => {
-                        return mxEv.getId() === parentEventId;
-                    });
-                    const targetingThreadRoot = parentEvent?.isThreadRoot || threadRoots.has(event.relationEventId);
 
-                    if (targetingThreadRoot && !event.isThreadRelation && event.relationEventId) {
-                        // If we refer to the thread root, we should be copied
-                        // into the thread as well as the main timeline.
-                        // This happens for reactions, annotations, poll votes etc.
-                        const copiedEvent = event.toSnapshot();
+                const {
+                    shouldLiveInRoom,
+                    shouldLiveInThread,
+                    threadId,
+                } = this.eventShouldLiveIn(event, room, events, threadRoots);
 
-                        // The copied event is in this thread:
-                        copiedEvent.setThreadId(parentEventId);
-                        memo[THREAD].push(copiedEvent);
-                    } else if (parentEvent?.isThreadRelation) {
-                        // If our parent is in a thread, we are in that
-                        // same thread too.  (E.g. if I reply within a thread.)
-                        shouldLiveInThreadTimeline = true;
-                        event.setThreadId(parentEvent.threadRootId);
-                    }
+                if (shouldLiveInRoom) {
+                    memo[ROOM].push(event);
                 }
-                const targetTimeline = shouldLiveInThreadTimeline ? THREAD : ROOM;
-                memo[targetTimeline].push(event);
+
+                if (shouldLiveInThread) {
+                    event.setThreadId(threadId);
+                    memo[THREAD].push(event);
+                }
+
                 return memo;
             }, [[], []]);
         } else {

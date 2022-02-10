@@ -28,7 +28,6 @@ import { Room } from "./room";
 import { Filter } from "../filter";
 import { EventType, RelationType } from "../@types/event";
 import { RoomState } from "./room-state";
-import { Thread } from "./thread";
 
 // var DEBUG = false;
 const DEBUG = true;
@@ -159,17 +158,12 @@ export class EventTimelineSet extends EventEmitter {
      *
      * @throws If <code>opts.pendingEventOrdering</code> was not 'detached'
      */
-    public getPendingEvents(thread?: Thread): MatrixEvent[] {
+    public getPendingEvents(): MatrixEvent[] {
         if (!this.room || !this.displayPendingEvents) {
             return [];
         }
 
-        const pendingEvents = this.room.getPendingEvents(thread);
-        if (this.filter) {
-            return this.filter.filterRoomTimeline(pendingEvents);
-        } else {
-            return pendingEvents;
-        }
+        return this.room.getPendingEvents();
     }
     /**
      * Get the live timeline for this room.
@@ -756,7 +750,7 @@ export class EventTimelineSet extends EventEmitter {
      */
     public getRelationsForEvent(
         eventId: string,
-        relationType: RelationType,
+        relationType: RelationType | string,
         eventType: EventType | string,
     ): Relations | undefined {
         if (!this.unstableClientRelationAggregation) {
@@ -772,6 +766,17 @@ export class EventTimelineSet extends EventEmitter {
         const relationsForEvent = this.relations[eventId] || {};
         const relationsWithRelType = relationsForEvent[relationType] || {};
         return relationsWithRelType[eventType];
+    }
+
+    public getAllRelationsEventForEvent(eventId: string): MatrixEvent[] {
+        const relationsForEvent = this.relations[eventId] || {};
+        const events = [];
+        for (const relationsRecord of Object.values(relationsForEvent)) {
+            for (const relations of Object.values(relationsRecord)) {
+                events.push(...relations.getRelations());
+            }
+        }
+        return events;
     }
 
     /**

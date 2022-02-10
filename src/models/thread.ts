@@ -113,6 +113,27 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         return this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
     }
 
+    private addEventToTimeline(event: MatrixEvent, toStartOfTimeline: boolean): void {
+        if (event.getUnsigned().transaction_id) {
+            const existingEvent = this.room.getEventForTxnId(event.getUnsigned().transaction_id);
+            if (existingEvent) {
+                // remote echo of an event we sent earlier
+                this.room.handleRemoteEcho(event, existingEvent);
+                return;
+            }
+        }
+
+        if (!this.findEventById(event.getId())) {
+            this.timelineSet.addEventToTimeline(
+                event,
+                this.liveTimeline,
+                toStartOfTimeline,
+                false,
+                this.roomState,
+            );
+        }
+    }
+
     /**
      * Add an event to the thread and updates
      * the tail/root references if needed
@@ -123,36 +144,20 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
         // Add all incoming events to the thread's timeline set when there's
         // no server support
         if (!this.hasServerSideSupport) {
-            if (this.timelineSet.findEventById(event.getId())) {
-                return;
-            }
-
             // all the relevant membership info to hydrate events with a sender
             // is held in the main room timeline
             // We want to fetch the room state from there and pass it down to this thread
             // timeline set to let it reconcile an event with its relevant RoomMember
 
             event.setThread(this);
-            this.timelineSet.addEventToTimeline(
-                event,
-                this.liveTimeline,
-                toStartOfTimeline,
-                false,
-                this.roomState,
-            );
+            this.addEventToTimeline(event, toStartOfTimeline);
 
             await this.client.decryptEventIfNeeded(event, {});
         }
 
         if (this.hasServerSideSupport && this.initialEventsFetched) {
-            if (event.localTimestamp > this.lastReply().localTimestamp && !this.findEventById(event.getId())) {
-                this.timelineSet.addEventToTimeline(
-                    event,
-                    this.liveTimeline,
-                    false,
-                    false,
-                    this.roomState,
-                );
+            if (event.localTimestamp > this.lastReply().localTimestamp) {
+                this.addEventToTimeline(event, false);
             }
         }
 

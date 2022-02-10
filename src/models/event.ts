@@ -512,8 +512,7 @@ export class MatrixEvent extends EventEmitter {
         if (relatesTo?.rel_type === RelationType.Thread) {
             return relatesTo.event_id;
         } else {
-            return this.threadId
-                || this.getThread()?.id;
+            return this.getThread()?.id || this.threadId;
         }
     }
 
@@ -535,10 +534,6 @@ export class MatrixEvent extends EventEmitter {
         // hence us having to check both bundled relation and inspect the thread
         // model
         return !!threadDetails || (this.getThread()?.id === this.getId());
-    }
-
-    public get parentEventId(): string {
-        return this.replyEventId || this.relationEventId;
     }
 
     public get replyEventId(): string {
@@ -1427,7 +1422,9 @@ export class MatrixEvent extends EventEmitter {
      */
     public getAssociatedId(): string | undefined {
         const relation = this.getRelation();
-        if (relation) {
+        if (this.replyEventId) {
+            return this.replyEventId;
+        } else if (relation) {
             return relation.event_id;
         } else if (this.isRedaction()) {
             return this.event.redacts;
@@ -1561,6 +1558,7 @@ export class MatrixEvent extends EventEmitter {
      */
     public setThread(thread: Thread): void {
         this.thread = thread;
+        this.setThreadId(thread.id);
         this.reEmitter.reEmit(thread, [ThreadEvent.Ready, ThreadEvent.Update]);
     }
 
