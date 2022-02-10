@@ -313,11 +313,24 @@ export class BackupManager {
             return ret;
         }
 
-        const trustedPubkey = this.baseApis.crypto.sessionStore.getLocalTrustedBackupPubKey();
+        const privKey = await this.baseApis.crypto.getSessionBackupPrivateKey();
+        if (privKey) {
+            let algorithm;
+            try {
+                algorithm = await BackupManager.makeAlgorithm(backupInfo, async () => privKey);
 
-        if ("public_key" in backupInfo.auth_data && backupInfo.auth_data.public_key === trustedPubkey) {
-            logger.info("Backup public key " + trustedPubkey + " is trusted locally");
-            ret.trusted_locally = true;
+                if (await algorithm.keyMatches(privKey)) {
+                    logger.info("Backup is trusted locally");
+                    ret.trusted_locally = true;
+                }
+            } catch {
+                // do nothing -- if we have an error, then we don't mark it as
+                // locally trusted
+            } finally {
+                if (algorithm) {
+                    algorithm.free();
+                }
+            }
         }
 
         const mySigs = backupInfo.auth_data.signatures[this.baseApis.getUserId()] || {};
