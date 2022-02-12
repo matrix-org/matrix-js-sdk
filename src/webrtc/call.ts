@@ -910,8 +910,12 @@ export class MatrixCall extends EventEmitter {
             logger.debug("Telling new call to wait for local media");
             newCall.waitForLocalAVStream = true;
         } else if ([CallState.CreateOffer, CallState.InviteSent].includes(this.state)) {
-            logger.debug("Handing local stream to new call");
-            newCall.queueGotCallFeedsForAnswer(this.getLocalFeeds());
+            if (newCall.direction === CallDirection.Outbound) {
+                newCall.queueGotCallFeedsForAnswer([]);
+            } else {
+                logger.debug("Handing local stream to new call");
+                newCall.queueGotCallFeedsForAnswer(this.getLocalFeeds().map(feed => feed.clone()));
+            }
         }
         this.successor = newCall;
         this.emit(CallEvent.Replaced, newCall);
@@ -2196,8 +2200,7 @@ export class MatrixCall extends EventEmitter {
         this.callStatsAtEnd = await this.collectCallStats();
 
         // Order is important here: first we stopAllMedia() and only then we can deleteAllFeeds()
-        // We don't stop media if the call was replaced as we want to re-use streams in the successor
-        if (hangupReason !== CallErrorCode.Replaced) this.stopAllMedia();
+        this.stopAllMedia();
         this.deleteAllFeeds();
 
         if (this.peerConn && this.peerConn.signalingState !== 'closed') {
