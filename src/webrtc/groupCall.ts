@@ -634,6 +634,13 @@ export class GroupCall extends EventEmitter {
             return;
         }
 
+        // Only initiate a call with a user who has a userId that is lexicographically
+        // less than your own. Otherwise, that user will call you.
+        if (member.userId < localUserId) {
+            logger.log(`Waiting for ${member.userId} to send call invite.`);
+            return;
+        }
+
         const opponentDevice = this.getDeviceForMember(member.userId);
 
         if (!opponentDevice) {
