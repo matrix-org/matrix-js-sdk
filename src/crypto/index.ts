@@ -953,8 +953,6 @@ export class Crypto extends EventEmitter {
             // sign with the device fingerprint
             await this.signObject(data.auth_data);
 
-            await this.backupManager.enableKeyBackup(data);
-
             builder.addSessionBackup(data);
         }
 
