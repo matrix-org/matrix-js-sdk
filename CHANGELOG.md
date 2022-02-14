@@ -1,3 +1,27 @@
+Changes in [15.5.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.5.1) (2022-02-14)
+==================================================================================================
+
+## 🐛 Bug Fixes
+ * Fix issue with rooms not getting marked as unread ([\#2163](https://github.com/matrix-org/matrix-js-sdk/pull/2163)). Fixes vector-im/element-web#20971.
+ * Don't store streams that are only used once ([\#2157](https://github.com/matrix-org/matrix-js-sdk/pull/2157)). Fixes vector-im/element-web#20932. Contributed by @SimonBrandner.
+ * Fix edge cases around RR calculations ([\#2160](https://github.com/matrix-org/matrix-js-sdk/pull/2160)). Fixes vector-im/element-web#20922.
+ * Account for encryption in `maySendMessage()` ([\#2159](https://github.com/matrix-org/matrix-js-sdk/pull/2159)). Contributed by @SimonBrandner.
+ * Send references to thread root to threads, even out of order ([\#2156](https://github.com/matrix-org/matrix-js-sdk/pull/2156)).
+ * Fix initial sync fail when event fetching unsuccessful ([\#2150](https://github.com/matrix-org/matrix-js-sdk/pull/2150)). Fixes vector-im/element-web#20862.
+ * Don't decrypt redacted messages ([\#2143](https://github.com/matrix-org/matrix-js-sdk/pull/2143)). Contributed by @SimonBrandner.
+
+Changes in [15.5.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.5.1-rc.1) (2022-02-08)
+============================================================================================================
+
+## 🐛 Bug Fixes
+ * Fix issue with rooms not getting marked as unread ([\#2163](https://github.com/matrix-org/matrix-js-sdk/pull/2163)). Fixes vector-im/element-web#20971.
+ * Don't store streams that are only used once ([\#2157](https://github.com/matrix-org/matrix-js-sdk/pull/2157)). Fixes vector-im/element-web#20932. Contributed by @SimonBrandner.
+ * Fix edge cases around RR calculations ([\#2160](https://github.com/matrix-org/matrix-js-sdk/pull/2160)). Fixes vector-im/element-web#20922.
+ * Account for encryption in `maySendMessage()` ([\#2159](https://github.com/matrix-org/matrix-js-sdk/pull/2159)). Contributed by @SimonBrandner.
+ * Send references to thread root to threads, even out of order ([\#2156](https://github.com/matrix-org/matrix-js-sdk/pull/2156)).
+ * Fix initial sync fail when event fetching unsuccessful ([\#2150](https://github.com/matrix-org/matrix-js-sdk/pull/2150)). Fixes vector-im/element-web#20862.
+ * Don't decrypt redacted messages ([\#2143](https://github.com/matrix-org/matrix-js-sdk/pull/2143)). Contributed by @SimonBrandner.
+
 Changes in [15.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.5.0) (2022-01-31)
 ==================================================================================================
 
