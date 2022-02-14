@@ -108,6 +108,7 @@ interface IReceiptContent {
 
 const ReceiptPairRealIndex = 0;
 const ReceiptPairSyntheticIndex = 1;
+// We will only hold a synthetic receipt if we do not have a real receipt or the synthetic is newer.
 type Receipts = {
     [receiptType: string]: {
         [userId: string]: [IWrappedReceipt, IWrappedReceipt]; // Pair<real receipt, synthetic receipt> (both nullable)
@@ -1980,11 +1981,12 @@ export class Room extends EventEmitter {
     }
 
     public getReadReceiptForUserId(userId: string, ignoreSynthesized = false): IWrappedReceipt | null {
-        const [realReceipt, syntheticReceipt] = this.receipts["m.read"]?.[userId] ?? [];
-        if (ignoreSynthesized || realReceipt) {
+        const [realReceipt, fakeReceipt] = this.receipts["m.read"]?.[userId] ?? [];
+        if (ignoreSynthesized) {
             return realReceipt;
         }
-        return syntheticReceipt;
+
+        return fakeReceipt ?? realReceipt;
     }
 
     /**
@@ -2079,15 +2081,17 @@ export class Room extends EventEmitter {
                     const pair = this.receipts[receiptType][userId];
 
                     let existingReceipt = pair[ReceiptPairRealIndex];
-                    if (fake && !existingReceipt) {
-                        existingReceipt = pair[ReceiptPairSyntheticIndex];
+                    if (fake) {
+                        existingReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
                     }
 
                     if (existingReceipt) {
                         // we only want to add this receipt if we think it is later than the one we already have.
                         // This is managed server-side, but because we synthesize RRs locally we have to do it here too.
                         const ordering = this.getUnfilteredTimelineSet().compareEventOrdering(
-                            existingReceipt.eventId, eventId);
+                            existingReceipt.eventId,
+                            eventId,
+                        );
                         if (ordering !== null && ordering >= 0) {
                             return;
                         }
@@ -2098,8 +2102,35 @@ export class Room extends EventEmitter {
                         data: receipt,
                     };
 
+                    const realReceipt = fake ? pair[ReceiptPairRealIndex] : wrappedReceipt;
+                    const fakeReceipt = fake ? wrappedReceipt : pair[ReceiptPairSyntheticIndex];
+
+                    let ordering: number | null = null;
+                    if (realReceipt && fakeReceipt) {
+                        ordering = this.getUnfilteredTimelineSet().compareEventOrdering(
+                            realReceipt.eventId,
+                            fakeReceipt.eventId,
+                        );
+                    }
+
+                    const preferSynthetic = ordering === null || ordering < 0;
+
                     // we don't bother caching just real receipts by event ID as there's nothing that would read it.
+                    // Take the current cached receipt before we overwrite the pair elements.
                     const cachedReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
+
+                    if (fake && preferSynthetic) {
+                        pair[ReceiptPairSyntheticIndex] = wrappedReceipt;
+                    } else if (!fake) {
+                        pair[ReceiptPairRealIndex] = wrappedReceipt;
+
+                        if (!preferSynthetic) {
+                            pair[ReceiptPairSyntheticIndex] = null;
+                        }
+                    }
+
+                    if (fake !== preferSynthetic) return; // bail as there's no update to the cache needed
+
                     // clean up any previous cache entry
                     if (cachedReceipt && this.receiptCacheByEventId[cachedReceipt.eventId]) {
                         const previousEventId = cachedReceipt.eventId;
@@ -2124,14 +2155,6 @@ export class Room extends EventEmitter {
                         type: receiptType,
                         data: receipt,
                     });
-
-                    if (fake) {
-                        pair[ReceiptPairSyntheticIndex] = wrappedReceipt;
-                    } else {
-                        pair[ReceiptPairRealIndex] = wrappedReceipt;
-                        // a real receipt for a receiptType+userId tuple should clobber any synthetic one
-                        pair[ReceiptPairSyntheticIndex] = null;
-                    }
                 });
             });
         });
