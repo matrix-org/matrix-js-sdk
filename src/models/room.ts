@@ -2129,7 +2129,8 @@ export class Room extends EventEmitter {
                         }
                     }
 
-                    if (fake !== preferSynthetic) return; // bail as there's no update to the cache needed
+                    const newCachedReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
+                    if (cachedReceipt === newCachedReceipt) return;
 
                     // clean up any previous cache entry
                     if (cachedReceipt && this.receiptCacheByEventId[cachedReceipt.eventId]) {
