@@ -1981,12 +1981,12 @@ export class Room extends EventEmitter {
     }
 
     public getReadReceiptForUserId(userId: string, ignoreSynthesized = false): IWrappedReceipt | null {
-        const [realReceipt, fakeReceipt] = this.receipts["m.read"]?.[userId] ?? [];
+        const [realReceipt, syntheticReceipt] = this.receipts["m.read"]?.[userId] ?? [];
         if (ignoreSynthesized) {
             return realReceipt;
         }
 
-        return fakeReceipt ?? realReceipt;
+        return syntheticReceipt ?? realReceipt;
     }
 
     /**
@@ -2050,10 +2050,10 @@ export class Room extends EventEmitter {
     /**
      * Add a receipt event to the room.
      * @param {MatrixEvent} event The m.receipt event.
-     * @param {Boolean} fake True if this event is implicit.
+     * @param {Boolean} synthetic True if this event is implicit.
      */
-    public addReceipt(event: MatrixEvent, fake = false): void {
-        this.addReceiptsToStructure(event, fake);
+    public addReceipt(event: MatrixEvent, synthetic = false): void {
+        this.addReceiptsToStructure(event, synthetic);
         // send events after we've regenerated the structure & cache, otherwise things that
         // listened for the event would read stale data.
         this.emit("Room.receipt", event, this);
@@ -2062,9 +2062,9 @@ export class Room extends EventEmitter {
     /**
      * Add a receipt event to the room.
      * @param {MatrixEvent} event The m.receipt event.
-     * @param {Boolean} fake True if this event is implicit.
+     * @param {Boolean} synthetic True if this event is implicit.
      */
-    private addReceiptsToStructure(event: MatrixEvent, fake: boolean): void {
+    private addReceiptsToStructure(event: MatrixEvent, synthetic: boolean): void {
         const content = event.getContent<IReceiptContent>();
         Object.keys(content).forEach((eventId) => {
             Object.keys(content[eventId]).forEach((receiptType) => {
@@ -2081,7 +2081,7 @@ export class Room extends EventEmitter {
                     const pair = this.receipts[receiptType][userId];
 
                     let existingReceipt = pair[ReceiptPairRealIndex];
-                    if (fake) {
+                    if (synthetic) {
                         existingReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
                     }
 
@@ -2102,14 +2102,14 @@ export class Room extends EventEmitter {
                         data: receipt,
                     };
 
-                    const realReceipt = fake ? pair[ReceiptPairRealIndex] : wrappedReceipt;
-                    const fakeReceipt = fake ? wrappedReceipt : pair[ReceiptPairSyntheticIndex];
+                    const realReceipt = synthetic ? pair[ReceiptPairRealIndex] : wrappedReceipt;
+                    const syntheticReceipt = synthetic ? wrappedReceipt : pair[ReceiptPairSyntheticIndex];
 
                     let ordering: number | null = null;
-                    if (realReceipt && fakeReceipt) {
+                    if (realReceipt && syntheticReceipt) {
                         ordering = this.getUnfilteredTimelineSet().compareEventOrdering(
                             realReceipt.eventId,
-                            fakeReceipt.eventId,
+                            syntheticReceipt.eventId,
                         );
                     }
 
@@ -2119,9 +2119,9 @@ export class Room extends EventEmitter {
                     // Take the current cached receipt before we overwrite the pair elements.
                     const cachedReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
 
-                    if (fake && preferSynthetic) {
+                    if (synthetic && preferSynthetic) {
                         pair[ReceiptPairSyntheticIndex] = wrappedReceipt;
-                    } else if (!fake) {
+                    } else if (!synthetic) {
                         pair[ReceiptPairRealIndex] = wrappedReceipt;
 
                         if (!preferSynthetic) {
