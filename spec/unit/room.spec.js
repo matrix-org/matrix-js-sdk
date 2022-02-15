@@ -1143,6 +1143,51 @@ describe("Room", function() {
                 ]));
                 expect(room.getEventReadUpTo(userB)).toEqual(events[2].getId());
             });
+
+            it("should prioritise the most recent event even if it is synthetic", () => {
+                const events = [
+                    utils.mkMessage({
+                        room: roomId, user: userA, msg: "1111",
+                        event: true,
+                    }),
+                    utils.mkMessage({
+                        room: roomId, user: userA, msg: "2222",
+                        event: true,
+                    }),
+                    utils.mkMessage({
+                        room: roomId, user: userA, msg: "3333",
+                        event: true,
+                    }),
+                ];
+
+                room.addLiveEvents(events);
+                const ts = 13787898424;
+
+                // check it initialises correctly
+                room.addReceipt(mkReceipt(roomId, [
+                    mkRecord(events[0].getId(), "m.read", userB, ts),
+                ]));
+                expect(room.getEventReadUpTo(userB)).toEqual(events[0].getId());
+
+                // 2>0, so it should move forward
+                room.addReceipt(mkReceipt(roomId, [
+                    mkRecord(events[2].getId(), "m.read", userB, ts),
+                ]), true);
+                expect(room.getEventReadUpTo(userB)).toEqual(events[2].getId());
+                expect(room.getReceiptsForEvent(events[2])).toEqual([
+                    { data: { ts }, type: "m.read", userId: userB },
+                ]);
+
+                // 1<2, so it should stay put
+                room.addReceipt(mkReceipt(roomId, [
+                    mkRecord(events[1].getId(), "m.read", userB, ts),
+                ]));
+                expect(room.getEventReadUpTo(userB)).toEqual(events[2].getId());
+                expect(room.getEventReadUpTo(userB, true)).toEqual(events[1].getId());
+                expect(room.getReceiptsForEvent(events[2])).toEqual([
+                    { data: { ts }, type: "m.read", userId: userB },
+                ]);
+            });
         });
 
         describe("getUsersReadUpTo", function() {
