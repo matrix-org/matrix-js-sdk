@@ -51,7 +51,7 @@ import {
     PREFIX_IDENTITY_V2,
     PREFIX_MEDIA_R0,
     PREFIX_R0,
-    PREFIX_UNSTABLE, 
+    PREFIX_UNSTABLE,
     PREFIX_V1,
     retryNetworkOperation,
     UploadContentResponseType,
