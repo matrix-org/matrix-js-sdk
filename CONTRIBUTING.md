@@ -110,7 +110,7 @@ must include:
    These are located in `/test/end-to-end-tests`. Ideally, you would also
    include tests for edge and error cases.
 
-For bugs in those repos, your change must include at least one unit tests or
+For bugs in those repos, your change must include at least one unit test or
 end-to-end test; which is best depends on what sort of test most concisely
 exercises the area.
 
