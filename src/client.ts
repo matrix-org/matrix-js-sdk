@@ -51,7 +51,8 @@ import {
     PREFIX_IDENTITY_V2,
     PREFIX_MEDIA_R0,
     PREFIX_R0,
-    PREFIX_UNSTABLE,
+    PREFIX_UNSTABLE, 
+    PREFIX_V1,
     retryNetworkOperation,
     UploadContentResponseType,
 } from "./http-api";
@@ -6788,11 +6789,13 @@ export class MatrixClient extends EventEmitter {
      */
     public refreshToken(refreshToken: string): Promise<IRefreshTokenResponse> {
         return this.http.authedRequest(
-            undefined, Method.Post, "/_matrix/client/v1/refresh",
-            undefined, {
-                refresh_token: refreshToken,
-            }, {
-                prefix: "", // set manually
+            undefined,
+            Method.Post,
+            "/refresh",
+            undefined,
+            { refresh_token: refreshToken },
+            {
+                prefix: PREFIX_V1,
                 inhibitLogoutEmit: true, // we don't want to cause logout loops
             },
         );
