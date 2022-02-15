@@ -1419,69 +1419,6 @@ export class MatrixCall extends EventEmitter {
             this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);
             return;
         }
-
-        // HACK: Safari doesn't like it when we reuse MediaStreams. In most cases
-        // we can get around this by calling MediaStream.clone(), however inbound
-        // calls seem to still be broken unless we getUserMedia again and replace
-        // all MediaStreams using sender.replaceTrack
-        if (isSafari) {
-            await new Promise(resolve => {
-                setTimeout(resolve, 200);
-            });
-
-            if (this.state === CallState.Ended) {
-                return;
-            }
-
-            const callFeed = this.localUsermediaFeed;
-            const stream = callFeed.stream;
-
-            if (!stream.active) {
-                throw new Error(`Call ${this.callId} has an inactive stream ${
-                    stream.id} and its tracks cannot be replaced`);
-            }
-
-            const newSenders = [];
-
-            for (const track of this.localUsermediaStream.getTracks()) {
-                const oldSender = this.usermediaSenders.find((sender) => {
-                    return sender.track?.kind === track.kind;
-                });
-
-                if (track.readyState === "ended") {
-                    throw new Error(`Call ${this.callId} tried to replace track ${track.id} in the ended state`);
-                }
-
-                let newSender: RTCRtpSender;
-
-                try {
-                    logger.info(
-                        `Replacing track (` +
-                        `id="${track.id}", ` +
-                        `kind="${track.kind}", ` +
-                        `streamId="${stream.id}", ` +
-                        `streamPurpose="${callFeed.purpose}"` +
-                        `) to peer connection`,
-                    );
-                    await oldSender.replaceTrack(track);
-                    newSender = oldSender;
-                } catch (error) {
-                    logger.info(
-                        `Adding track (` +
-                        `id="${track.id}", ` +
-                        `kind="${track.kind}", ` +
-                        `streamId="${stream.id}", ` +
-                        `streamPurpose="${callFeed.purpose}"` +
-                        `) to peer connection`,
-                    );
-                    newSender = this.peerConn.addTrack(track, stream);
-                }
-
-                newSenders.push(newSender);
-            }
-
-            this.usermediaSenders = newSenders;
-        }
     }
 
     /**
