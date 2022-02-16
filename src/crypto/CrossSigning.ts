@@ -19,7 +19,6 @@ limitations under the License.
  * @module crypto/CrossSigning
  */
 
-import { EventEmitter } from 'events';
 import { PkSigning } from "@matrix-org/olm";
 
 import { decodeBase64, encodeBase64, pkSign, pkVerify } from './olmlib';
@@ -55,7 +54,7 @@ export interface ICrossSigningInfo {
     crossSigningVerifiedBefore: boolean;
 }
 
-export class CrossSigningInfo extends EventEmitter {
+export class CrossSigningInfo {
     public keys: Record<string, ICrossSigningKey> = {};
     public firstUse = true;
     // This tracks whether we've ever verified this user with any identity.
@@ -79,9 +78,7 @@ export class CrossSigningInfo extends EventEmitter {
         public readonly userId: string,
         private callbacks: ICryptoCallbacks = {},
         private cacheCallbacks: ICacheCallbacks = {},
-    ) {
-        super();
-    }
+    ) {}
 
     public static fromStorage(obj: ICrossSigningInfo, userId: string): CrossSigningInfo {
         const res = new CrossSigningInfo(userId);
