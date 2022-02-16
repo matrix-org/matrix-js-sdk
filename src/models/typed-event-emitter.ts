@@ -27,7 +27,7 @@ export type ListenerMap<E extends string> = { [eventName in E]: AnyListener };
 type EventEmitterEventListener = (eventName: string, listener: AnyListener) => void;
 type EventEmitterErrorListener = (error: Error) => void;
 
-type Listener<
+export type Listener<
     E extends string,
     A extends ListenerMap<E>,
     T extends E | EventEmitterEvents,

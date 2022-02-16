@@ -14,12 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventEmitter } from 'events';
-
 import { EventStatus, IAggregatedRelation, MatrixEvent, MatrixEventEvents } from './event';
 import { Room } from './room';
 import { logger } from '../logger';
 import { RelationType } from "../@types/event";
+import { TypedEventEmitter } from "./typed-event-emitter";
+
+export enum RelationsEvents {
+    Add = "Relations.add",
+    Remove = "Relations.remove",
+    Redaction = "Relations.redaction",
+}
+
+export type EventHandlerMap = {
+    [RelationsEvents.Add]: (event: MatrixEvent) => void;
+    [RelationsEvents.Remove]: (event: MatrixEvent) => void;
+    [RelationsEvents.Redaction]: (event: MatrixEvent) => void;
+};
 
 /**
  * A container for relation events that supports easy access to common ways of
@@ -29,7 +40,7 @@ import { RelationType } from "../@types/event";
  * The typical way to get one of these containers is via
  * EventTimelineSet#getRelationsForEvent.
  */
-export class Relations extends EventEmitter {
+export class Relations extends TypedEventEmitter<RelationsEvents, EventHandlerMap> {
     private relationEventIds = new Set<string>();
     private relations = new Set<MatrixEvent>();
     private annotationsByKey: Record<string, Set<MatrixEvent>> = {};
@@ -99,7 +110,7 @@ export class Relations extends EventEmitter {
 
         event.on(MatrixEventEvents.BeforeRedaction, this.onBeforeRedaction);
 
-        this.emit("Relations.add", event);
+        this.emit(RelationsEvents.Add, event);
 
         this.maybeEmitCreated();
     }
@@ -138,7 +149,7 @@ export class Relations extends EventEmitter {
             this.targetEvent.makeReplaced(lastReplacement);
         }
 
-        this.emit("Relations.remove", event);
+        this.emit(RelationsEvents.Remove, event);
     }
 
     /**
@@ -257,7 +268,7 @@ export class Relations extends EventEmitter {
 
         redactedEvent.removeListener(MatrixEventEvents.BeforeRedaction, this.onBeforeRedaction);
 
-        this.emit("Relations.redaction", redactedEvent);
+        this.emit(RelationsEvents.Redaction, redactedEvent);
     };
 
     /**
