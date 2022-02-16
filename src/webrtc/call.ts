@@ -240,7 +240,7 @@ function genCallID(): string {
     return Date.now().toString() + randomString(16);
 }
 
-type EventHandlerMap = {
+export type CallEventHandlerMap = {
     [CallEvent.DataChannel]: (channel: RTCDataChannel) => void;
     [CallEvent.FeedsChanged]: (feeds: CallFeed[]) => void;
     [CallEvent.Replaced]: (newCall: MatrixCall) => void;
@@ -266,7 +266,7 @@ type EventHandlerMap = {
  * @param {Array<Object>} opts.turnServers Optional. A list of TURN servers.
  * @param {MatrixClient} opts.client The Matrix Client instance to send events to.
  */
-export class MatrixCall extends TypedEventEmitter<CallEvent, EventHandlerMap> {
+export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap> {
     public roomId: string;
     public callId: string;
     public state = CallState.Fledgling;

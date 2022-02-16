@@ -32,7 +32,7 @@ import {
     MatrixEventHandlerMap,
 } from "./models/event";
 import { StubStore } from "./store/stub";
-import { createNewMatrixCall, MatrixCall } from "./webrtc/call";
+import { CallEvent, CallEventHandlerMap, createNewMatrixCall, MatrixCall } from "./webrtc/call";
 import { Filter, IFilterDefinition } from "./filter";
 import { CallEventHandlerEvent, CallEventHandler, CallEventHandlerEventHandlerMap } from './webrtc/callEventHandler';
 import * as utils from './utils';
@@ -49,7 +49,7 @@ import { IRoomEncryption, RoomList } from './crypto/RoomList';
 import { logger } from './logger';
 import { SERVICE_TYPES } from './service-types';
 import {
-    FileType,
+    FileType, HttpApiEvent, HttpApiEventHandlerMap,
     IHttpOpts,
     IUpload,
     MatrixError,
@@ -835,7 +835,10 @@ type EmittedEvents = ClientEvent
     | MatrixEventEvents
     | RoomMemberEvents
     | UserEvents
-    | CallEventHandlerEvent.Incoming;
+    | CallEvent // re-emitted by call.ts using Object.values
+    | CallEventHandlerEvent.Incoming
+    | HttpApiEvent.SessionLoggedOut
+    | HttpApiEvent.NoConsent;
 
 export type ClientEventHandlerMap = {
     [ClientEvent.Sync]: (state: SyncState, lastState?: SyncState, data?: ISyncStateData) => void;
@@ -855,7 +858,9 @@ export type ClientEventHandlerMap = {
     & MatrixEventHandlerMap
     & RoomMemberEventHandlerMap
     & UserEventHandlerMap
-    & CallEventHandlerEventHandlerMap;
+    & CallEventHandlerEventHandlerMap
+    & CallEventHandlerMap
+    & HttpApiEventHandlerMap;
 
 /**
  * Represents a Matrix Client. Only directly construct this if you want to use
@@ -946,7 +951,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const userId = opts.userId || null;
         this.credentials = { userId };
 
-        this.http = new MatrixHttpApi(this, {
+        this.http = new MatrixHttpApi(this as ConstructorParameters<typeof MatrixHttpApi>[0], {
             baseUrl: opts.baseUrl,
             idBaseUrl: opts.idBaseUrl,
             accessToken: opts.accessToken,
