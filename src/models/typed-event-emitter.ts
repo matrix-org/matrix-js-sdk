@@ -45,6 +45,7 @@ export type Listener<
 export abstract class TypedEventEmitter<
     Events extends string,
     Arguments extends ListenerMap<Events>,
+    SuperclassArguments extends ListenerMap<any> = Arguments,
 > extends EventEmitter {
     public addListener<T extends Events | EventEmitterEvents>(
         event: T,
@@ -53,8 +54,9 @@ export abstract class TypedEventEmitter<
         return super.addListener(event, listener);
     }
 
-    public emit<T extends Events>(event: T, ...args: Parameters<Arguments[T]>): boolean {
-        // @ts-expect-error TS2488
+    public emit<T extends Events>(event: T, ...args: Parameters<SuperclassArguments[T]>): boolean;
+    public emit<T extends Events>(event: T, ...args: Parameters<Arguments[T]>): boolean;
+    public emit<T extends Events>(event: T, ...args: any[]): boolean {
         return super.emit(event, ...args);
     }
 

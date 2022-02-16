@@ -35,6 +35,7 @@ import * as algorithms from "./algorithms";
 import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from './CrossSigning';
 import { EncryptionSetupBuilder } from "./EncryptionSetup";
 import {
+    IAccountDataClient,
     ISecretRequest,
     SECRET_STORAGE_ALGORITHM_V1_AES,
     SecretStorage,
@@ -338,7 +339,7 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
                     if (defaultVerificationMethods[method]) {
                         this.verificationMethods.set(
                             method,
-                            defaultVerificationMethods[method],
+                            <typeof VerificationBase>defaultVerificationMethods[method],
                         );
                     }
                 } else if (method["NAME"]) {
@@ -351,7 +352,8 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
                 }
             }
         } else {
-            this.verificationMethods = new Map(Object.entries(defaultVerificationMethods));
+            this.verificationMethods =
+                new Map(Object.entries(defaultVerificationMethods)) as Map<VerificationMethod, typeof VerificationBase>;
         }
 
         this.backupManager = new BackupManager(baseApis, async () => {
@@ -406,7 +408,7 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
 
         this.crossSigningInfo = new CrossSigningInfo(userId, cryptoCallbacks, cacheCallbacks);
         // Yes, we pass the client twice here: see SecretStorage
-        this.secretStorage = new SecretStorage(baseApis, cryptoCallbacks, baseApis);
+        this.secretStorage = new SecretStorage(baseApis as IAccountDataClient, cryptoCallbacks, baseApis);
         this.dehydrationManager = new DehydrationManager(this);
 
         // Assuming no app-supplied callback, default to getting from SSSS.

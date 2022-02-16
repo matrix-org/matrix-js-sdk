@@ -1830,7 +1830,7 @@ export class MatrixClient extends EventEmitter {
      * @returns {Verification} a verification object
      * @deprecated Use `requestVerification` instead.
      */
-    public beginKeyVerification(method: string, userId: string, deviceId: string): Verification {
+    public beginKeyVerification(method: string, userId: string, deviceId: string): Verification<any, any> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }

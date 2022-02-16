@@ -113,7 +113,7 @@ export class VerificationRequest<
     private commonMethods: VerificationMethod[] = [];
     private _phase: Phase;
     private _cancellingUserId: string;
-    private _verifier: VerificationBase;
+    private _verifier: VerificationBase<any, any>;
 
     constructor(
         public readonly channel: C,
@@ -245,7 +245,7 @@ export class VerificationRequest<
     }
 
     /** The verifier to do the actual verification, once the method has been established. Only defined when the `phase` is PHASE_STARTED. */
-    public get verifier(): VerificationBase {
+    public get verifier(): VerificationBase<any, any> {
         return this._verifier;
     }
 
@@ -419,7 +419,10 @@ export class VerificationRequest<
      * @param {string?} targetDevice.deviceId the id of the device to direct this request to
      * @returns {VerifierBase} the verifier of the given method
      */
-    public beginKeyVerification(method: VerificationMethod, targetDevice: ITargetDevice = null): VerificationBase {
+    public beginKeyVerification(
+        method: VerificationMethod,
+        targetDevice: ITargetDevice = null,
+    ): VerificationBase<any, any> {
         // need to allow also when unsent in case of to_device
         if (!this.observeOnly && !this._verifier) {
             const validStartPhase =
@@ -889,7 +892,7 @@ export class VerificationRequest<
         method: VerificationMethod,
         startEvent: MatrixEvent = null,
         targetDevice: ITargetDevice = null,
-    ): VerificationBase {
+    ): VerificationBase<any, any> {
         if (!targetDevice) {
             targetDevice = this.targetDevice;
         }

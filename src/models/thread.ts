@@ -20,7 +20,7 @@ import { RelationType } from "../@types/event";
 import { IRelationsRequestOpts } from "../@types/requests";
 import { IThreadBundledRelationship, MatrixEvent } from "./event";
 import { Direction, EventTimeline } from "./event-timeline";
-import { EventTimelineSet, EventHandlerMap as EventTimelineSetHandlerMap } from './event-timeline-set';
+import { EventTimelineSet, EventTimelineSetHandlerMap } from './event-timeline-set';
 import { Room } from './room';
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { RoomState } from "./room-state";
