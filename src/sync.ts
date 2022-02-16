@@ -207,8 +207,6 @@ export class SyncApi {
             RoomEvent.MyMembership,
             RoomEvent.Timeline,
             RoomEvent.TimelineReset,
-            "Room.replaceEvent",
-            "Room.visibilityChange",
         ]);
         this.registerStateListeners(room);
         return room;
