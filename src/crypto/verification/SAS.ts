@@ -22,12 +22,7 @@ limitations under the License.
 import anotherjson from 'another-json';
 import { Utility, SAS as OlmSAS } from "@matrix-org/olm";
 
-import {
-    VerificationBase as Base,
-    SwitchStartEventError,
-    VerificationEvent,
-    VerificationEventHandlerMap
-} from "./Base";
+import { VerificationBase as Base, SwitchStartEventError, VerificationEventHandlerMap } from "./Base";
 import {
     errorFactory,
     newInvalidMessageError,
