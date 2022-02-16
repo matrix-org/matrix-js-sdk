@@ -67,7 +67,7 @@ export enum DeviceListEvents {
     UserCrossSigningUpdated = "userCrossSigningUpdated",
 }
 
-type EventHandlerMap = {
+export type EventHandlerMap = {
     [DeviceListEvents.WillUpdateDevices]: (users: string[], initialFetch: boolean) => void;
     [DeviceListEvents.DevicesUpdated]: (users: string[], initialFetch: boolean) => void;
     [DeviceListEvents.UserCrossSigningUpdated]: (userId: string) => void;
