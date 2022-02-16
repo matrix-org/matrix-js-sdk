@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventEmitter } from "events";
+import { TypedEventEmitter } from "../models/typed-event-emitter";
 
 export enum LocalStorageErrors {
     Global = 'Global',
@@ -25,6 +25,15 @@ export enum LocalStorageErrors {
     QuotaExceededError = 'QuotaExceededError'
 }
 
+type EventHandlerMap = {
+    [LocalStorageErrors.Global]: (error: Error) => void;
+    [LocalStorageErrors.SetItemError]: (error: Error) => void;
+    [LocalStorageErrors.GetItemError]: (error: Error) => void;
+    [LocalStorageErrors.RemoveItemError]: (error: Error) => void;
+    [LocalStorageErrors.ClearError]: (error: Error) => void;
+    [LocalStorageErrors.QuotaExceededError]: (error: Error) => void;
+};
+
 /**
  * Used in element-web as a temporary hack to handle all the localStorage errors on the highest level possible
  * As of 15.11.2021 (DD/MM/YYYY) we're not properly handling local storage exceptions anywhere.
@@ -33,5 +42,5 @@ export enum LocalStorageErrors {
  * maybe you should check out your disk, as it's probably dying and your session may die with it.
  * See: https://github.com/vector-im/element-web/issues/18423
  */
-class LocalStorageErrorsEventsEmitter extends EventEmitter {}
+class LocalStorageErrorsEventsEmitter extends TypedEventEmitter<LocalStorageErrors, EventHandlerMap> {}
 export const localStorageErrorsEventsEmitter = new LocalStorageErrorsEventsEmitter();
