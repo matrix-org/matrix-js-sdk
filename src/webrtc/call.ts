@@ -2291,6 +2291,7 @@ export class MatrixCall extends EventEmitter {
             iceTransportPolicy: this.forceTURN ? 'relay' : undefined,
             iceServers: this.turnServers,
             iceCandidatePoolSize: this.client.iceCandidatePoolSize,
+            bundlePolicy: 'max-bundle',
         });
 
         // 'connectionstatechange' would be better, but firefox doesn't implement that.
