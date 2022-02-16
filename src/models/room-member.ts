@@ -18,16 +18,30 @@ limitations under the License.
  * @module models/room-member
  */
 
-import { EventEmitter } from "events";
-
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
 import { User } from "./user";
 import { MatrixEvent } from "./event";
 import { RoomState } from "./room-state";
 import { logger } from "../logger";
+import { TypedEventEmitter } from "./typed-event-emitter";
+import { EventType } from "../@types/event";
 
-export class RoomMember extends EventEmitter {
+export enum RoomMemberEvents {
+    Membership = "RoomMember.membership",
+    Name = "RoomMember.name",
+    PowerLevel = "RoomMember.powerLevel",
+    Typing = "RoomMember.typing",
+}
+
+type EventHandlerMap = {
+    [RoomMemberEvents.Membership]: (event: MatrixEvent, member: RoomMember, oldMembership: string | null) => void;
+    [RoomMemberEvents.Name]: (event: MatrixEvent, member: RoomMember, oldName: string | null) => void;
+    [RoomMemberEvents.PowerLevel]: (event: MatrixEvent, member: RoomMember) => void;
+    [RoomMemberEvents.Typing]: (event: MatrixEvent, member: RoomMember) => void;
+};
+
+export class RoomMember extends TypedEventEmitter<RoomMemberEvents, EventHandlerMap> {
     private _isOutOfBand = false;
     private _modified: number;
     public _requestedProfileInfo: boolean; // used by sync.ts
@@ -107,7 +121,7 @@ export class RoomMember extends EventEmitter {
     public setMembershipEvent(event: MatrixEvent, roomState?: RoomState): void {
         const displayName = event.getDirectionalContent().displayname;
 
-        if (event.getType() !== "m.room.member") {
+        if (event.getType() !== EventType.RoomMember) {
             return;
         }
 
@@ -150,11 +164,11 @@ export class RoomMember extends EventEmitter {
 
         if (oldMembership !== this.membership) {
             this.updateModifiedTime();
-            this.emit("RoomMember.membership", event, this, oldMembership);
+            this.emit(RoomMemberEvents.Membership, event, this, oldMembership);
         }
         if (oldName !== this.name) {
             this.updateModifiedTime();
-            this.emit("RoomMember.name", event, this, oldName);
+            this.emit(RoomMemberEvents.Name, event, this, oldName);
         }
     }
 
@@ -196,7 +210,7 @@ export class RoomMember extends EventEmitter {
         // redraw everyone's level if the max has changed)
         if (oldPowerLevel !== this.powerLevel || oldPowerLevelNorm !== this.powerLevelNorm) {
             this.updateModifiedTime();
-            this.emit("RoomMember.powerLevel", powerLevelEvent, this);
+            this.emit(RoomMemberEvents.PowerLevel, powerLevelEvent, this);
         }
     }
 
@@ -222,7 +236,7 @@ export class RoomMember extends EventEmitter {
         }
         if (oldTyping !== this.typing) {
             this.updateModifiedTime();
-            this.emit("RoomMember.typing", event, this);
+            this.emit(RoomMemberEvents.Typing, event, this);
         }
     }
 
