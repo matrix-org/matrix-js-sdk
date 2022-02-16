@@ -23,7 +23,7 @@ import { EventEmitter } from "events";
 import { EmoteEvent, IPartialEvent, MessageEvent, NoticeEvent } from "matrix-events-sdk";
 
 import { ISyncStateData, SyncApi, SyncState } from "./sync";
-import { EventStatus, IContent, IDecryptOptions, IEvent, MatrixEvent, MatrixEventEvents } from "./models/event";
+import { EventStatus, IContent, IDecryptOptions, IEvent, MatrixEvent, MatrixEventEvent } from "./models/event";
 import { StubStore } from "./store/stub";
 import { createNewMatrixCall, MatrixCall } from "./webrtc/call";
 import { Filter, IFilterDefinition } from "./filter";
@@ -68,7 +68,7 @@ import {
 import { DeviceInfo, IDevice } from "./crypto/deviceinfo";
 import { decodeRecoveryKey } from './crypto/recoverykey';
 import { keyFromAuthData } from './crypto/key_passphrase';
-import { User, UserEvents } from "./models/user";
+import { User, UserEvent } from "./models/user";
 import { getHttpUriForMxc } from "./content-repo";
 import { SearchResult } from "./models/search-result";
 import {
@@ -3660,7 +3660,7 @@ export class MatrixClient extends EventEmitter {
         const targetId = localEvent.getAssociatedId();
         if (targetId && targetId.startsWith("~")) {
             const target = room.getPendingEvents().find(e => e.getId() === targetId);
-            target.once(MatrixEventEvents.LocalEventIdReplaced, () => {
+            target.once(MatrixEventEvent.LocalEventIdReplaced, () => {
                 localEvent.updateAssociatedId(target.getId());
             });
         }
@@ -4911,7 +4911,7 @@ export class MatrixClient extends EventEmitter {
         const user = this.getUser(this.getUserId());
         if (user) {
             user.displayName = name;
-            user.emit(UserEvents.DisplayName, user.events.presence, user);
+            user.emit(UserEvent.DisplayName, user.events.presence, user);
         }
         return prom;
     }
@@ -4928,7 +4928,7 @@ export class MatrixClient extends EventEmitter {
         const user = this.getUser(this.getUserId());
         if (user) {
             user.avatarUrl = url;
-            user.emit(UserEvents.AvatarUrl, user.events.presence, user);
+            user.emit(UserEvent.AvatarUrl, user.events.presence, user);
         }
         return prom;
     }
@@ -6510,7 +6510,7 @@ export class MatrixClient extends EventEmitter {
             const allEvents = originalEvent ? events.concat(originalEvent) : events;
             await Promise.all(allEvents.map(e => {
                 if (e.isEncrypted()) {
-                    return new Promise(resolve => e.once(MatrixEventEvents.Decrypted, resolve));
+                    return new Promise(resolve => e.once(MatrixEventEvent.Decrypted, resolve));
                 }
             }));
             events = events.filter(e => e.getType() === eventType);

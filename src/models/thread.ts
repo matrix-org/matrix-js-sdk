@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventTimelineSetEvents, MatrixClient, RoomEvents } from "../matrix";
+import { EventTimelineSetEvent, MatrixClient, RoomEvent } from "../matrix";
 import { TypedReEmitter } from "../ReEmitter";
 import { RelationType } from "../@types/event";
 import { IRelationsRequestOpts } from "../@types/requests";
@@ -33,14 +33,14 @@ export enum ThreadEvent {
 }
 
 type EmittedEvents = Exclude<ThreadEvent, ThreadEvent.New>
-    | EventTimelineSetEvents.RoomTimeline
-    | EventTimelineSetEvents.RoomTimelineReset;
+    | EventTimelineSetEvent.RoomTimeline
+    | EventTimelineSetEvent.RoomTimelineReset;
 
 export type EventHandlerMap = {
     [ThreadEvent.Update]: (thread: Thread) => void;
     [ThreadEvent.NewReply]: (thread: Thread, event: MatrixEvent) => void;
     [ThreadEvent.ViewThread]: () => void;
-} & Pick<EventTimelineSetHandlerMap, EventTimelineSetEvents.RoomTimeline | EventTimelineSetEvents.RoomTimelineReset>;
+} & Pick<EventTimelineSetHandlerMap, EventTimelineSetEvent.RoomTimeline | EventTimelineSetEvent.RoomTimelineReset>;
 
 interface IThreadOpts {
     initialEvents?: MatrixEvent[];
@@ -87,8 +87,8 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         this.reEmitter = new TypedReEmitter(this);
 
         this.reEmitter.reEmit(this.timelineSet, [
-            EventTimelineSetEvents.RoomTimeline,
-            EventTimelineSetEvents.RoomTimelineReset,
+            EventTimelineSetEvent.RoomTimeline,
+            EventTimelineSetEvent.RoomTimelineReset,
         ]);
 
         // If we weren't able to find the root event, it's probably missing
@@ -103,8 +103,8 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
 
         opts?.initialEvents?.forEach(event => this.addEvent(event));
 
-        this.room.on(RoomEvents.LocalEchoUpdated, this.onEcho);
-        this.room.on(EventTimelineSetEvents.RoomTimeline, this.onEcho);
+        this.room.on(RoomEvent.LocalEchoUpdated, this.onEcho);
+        this.room.on(EventTimelineSetEvent.RoomTimeline, this.onEcho);
     }
 
     public get hasServerSideSupport(): boolean {

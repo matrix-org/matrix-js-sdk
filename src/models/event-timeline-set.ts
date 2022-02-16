@@ -19,7 +19,7 @@ limitations under the License.
  */
 
 import { EventTimeline } from "./event-timeline";
-import { EventStatus, MatrixEvent, MatrixEventEvents } from "./event";
+import { EventStatus, MatrixEvent, MatrixEventEvent } from "./event";
 import { logger } from '../logger';
 import { Relations } from './relations';
 import { Room } from "./room";
@@ -56,19 +56,19 @@ export interface IRoomTimelineData {
     liveEvent?: boolean;
 }
 
-export enum EventTimelineSetEvents {
+export enum EventTimelineSetEvent {
     RoomTimeline = "Room.timeline",
     RoomTimelineReset = "Room.timelineReset",
 }
 
 export type EventHandlerMap = {
-    [EventTimelineSetEvents.RoomTimeline]:
+    [EventTimelineSetEvent.RoomTimeline]:
         (event: MatrixEvent, room: Room, toStartOfTimeline: boolean, removed: boolean, data: IRoomTimelineData) => void;
-    [EventTimelineSetEvents.RoomTimelineReset]:
+    [EventTimelineSetEvent.RoomTimelineReset]:
         (room: Room, eventTimelineSet: EventTimelineSet, resetAllTimelines: boolean) => void;
 };
 
-export class EventTimelineSet extends TypedEventEmitter<EventTimelineSetEvents, EventHandlerMap> {
+export class EventTimelineSet extends TypedEventEmitter<EventTimelineSetEvent, EventHandlerMap> {
     private readonly timelineSupport: boolean;
     private unstableClientRelationAggregation: boolean;
     private displayPendingEvents: boolean;
@@ -258,7 +258,7 @@ export class EventTimelineSet extends TypedEventEmitter<EventTimelineSetEvents, 
 
         // Now we can swap the live timeline to the new one.
         this.liveTimeline = newTimeline;
-        this.emit(EventTimelineSetEvents.RoomTimelineReset, this.room, this, resetAllTimelines);
+        this.emit(EventTimelineSetEvent.RoomTimelineReset, this.room, this, resetAllTimelines);
     }
 
     /**
@@ -608,7 +608,7 @@ export class EventTimelineSet extends TypedEventEmitter<EventTimelineSetEvents, 
             timeline: timeline,
             liveEvent: !toStartOfTimeline && timeline == this.liveTimeline && !fromCache,
         };
-        this.emit(EventTimelineSetEvents.RoomTimeline, event, this.room, Boolean(toStartOfTimeline), false, data);
+        this.emit(EventTimelineSetEvent.RoomTimeline, event, this.room, Boolean(toStartOfTimeline), false, data);
     }
 
     /**
@@ -662,7 +662,7 @@ export class EventTimelineSet extends TypedEventEmitter<EventTimelineSetEvents, 
             const data = {
                 timeline: timeline,
             };
-            this.emit(EventTimelineSetEvents.RoomTimeline, removed, this.room, undefined, true, data);
+            this.emit(EventTimelineSetEvent.RoomTimeline, removed, this.room, undefined, true, data);
         }
         return removed;
     }
@@ -829,7 +829,7 @@ export class EventTimelineSet extends TypedEventEmitter<EventTimelineSetEvents, 
 
         // If the event is currently encrypted, wait until it has been decrypted.
         if (event.isBeingDecrypted() || event.shouldAttemptDecryption()) {
-            event.once(MatrixEventEvents.Decrypted, () => {
+            event.once(MatrixEventEvent.Decrypted, () => {
                 this.aggregateRelations(event);
             });
             return;

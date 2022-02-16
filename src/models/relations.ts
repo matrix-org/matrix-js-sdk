@@ -14,22 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventStatus, IAggregatedRelation, MatrixEvent, MatrixEventEvents } from './event';
+import { EventStatus, IAggregatedRelation, MatrixEvent, MatrixEventEvent } from './event';
 import { Room } from './room';
 import { logger } from '../logger';
 import { RelationType } from "../@types/event";
 import { TypedEventEmitter } from "./typed-event-emitter";
 
-export enum RelationsEvents {
+export enum RelationsEvent {
     Add = "Relations.add",
     Remove = "Relations.remove",
     Redaction = "Relations.redaction",
 }
 
 export type EventHandlerMap = {
-    [RelationsEvents.Add]: (event: MatrixEvent) => void;
-    [RelationsEvents.Remove]: (event: MatrixEvent) => void;
-    [RelationsEvents.Redaction]: (event: MatrixEvent) => void;
+    [RelationsEvent.Add]: (event: MatrixEvent) => void;
+    [RelationsEvent.Remove]: (event: MatrixEvent) => void;
+    [RelationsEvent.Redaction]: (event: MatrixEvent) => void;
 };
 
 /**
@@ -40,7 +40,7 @@ export type EventHandlerMap = {
  * The typical way to get one of these containers is via
  * EventTimelineSet#getRelationsForEvent.
  */
-export class Relations extends TypedEventEmitter<RelationsEvents, EventHandlerMap> {
+export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap> {
     private relationEventIds = new Set<string>();
     private relations = new Set<MatrixEvent>();
     private annotationsByKey: Record<string, Set<MatrixEvent>> = {};
@@ -95,7 +95,7 @@ export class Relations extends TypedEventEmitter<RelationsEvents, EventHandlerMa
         // If the event is in the process of being sent, listen for cancellation
         // so we can remove the event from the collection.
         if (event.isSending()) {
-            event.on(MatrixEventEvents.Status, this.onEventStatus);
+            event.on(MatrixEventEvent.Status, this.onEventStatus);
         }
 
         this.relations.add(event);
@@ -108,9 +108,9 @@ export class Relations extends TypedEventEmitter<RelationsEvents, EventHandlerMa
             this.targetEvent.makeReplaced(lastReplacement);
         }
 
-        event.on(MatrixEventEvents.BeforeRedaction, this.onBeforeRedaction);
+        event.on(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
 
-        this.emit(RelationsEvents.Add, event);
+        this.emit(RelationsEvent.Add, event);
 
         this.maybeEmitCreated();
     }
@@ -149,7 +149,7 @@ export class Relations extends TypedEventEmitter<RelationsEvents, EventHandlerMa
             this.targetEvent.makeReplaced(lastReplacement);
         }
 
-        this.emit(RelationsEvents.Remove, event);
+        this.emit(RelationsEvent.Remove, event);
     }
 
     /**
@@ -161,14 +161,14 @@ export class Relations extends TypedEventEmitter<RelationsEvents, EventHandlerMa
     private onEventStatus = (event: MatrixEvent, status: EventStatus) => {
         if (!event.isSending()) {
             // Sending is done, so we don't need to listen anymore
-            event.removeListener(MatrixEventEvents.Status, this.onEventStatus);
+            event.removeListener(MatrixEventEvent.Status, this.onEventStatus);
             return;
         }
         if (status !== EventStatus.CANCELLED) {
             return;
         }
         // Event was cancelled, remove from the collection
-        event.removeListener(MatrixEventEvents.Status, this.onEventStatus);
+        event.removeListener(MatrixEventEvent.Status, this.onEventStatus);
         this.removeEvent(event);
     };
 
@@ -266,9 +266,9 @@ export class Relations extends TypedEventEmitter<RelationsEvents, EventHandlerMa
             this.targetEvent.makeReplaced(lastReplacement);
         }
 
-        redactedEvent.removeListener(MatrixEventEvents.BeforeRedaction, this.onBeforeRedaction);
+        redactedEvent.removeListener(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
 
-        this.emit(RelationsEvents.Redaction, redactedEvent);
+        this.emit(RelationsEvent.Redaction, redactedEvent);
     };
 
     /**
@@ -386,6 +386,6 @@ export class Relations extends TypedEventEmitter<RelationsEvents, EventHandlerMa
             return;
         }
         this.creationEmitted = true;
-        this.targetEvent.emit(MatrixEventEvents.RelationsCreated, this.relationType, this.eventType);
+        this.targetEvent.emit(MatrixEventEvent.RelationsCreated, this.relationType, this.eventType);
     }
 }

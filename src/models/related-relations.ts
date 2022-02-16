@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Relations, RelationsEvents, EventHandlerMap } from "./relations";
+import { Relations, RelationsEvent, EventHandlerMap } from "./relations";
 import { MatrixEvent } from "./event";
 import { Listener } from "./typed-event-emitter";
 
@@ -29,11 +29,11 @@ export class RelatedRelations {
         return this.relations.reduce((c, p) => [...c, ...p.getRelations()], []);
     }
 
-    public on<T extends RelationsEvents>(ev: T, fn: Listener<RelationsEvents, EventHandlerMap, T>) {
+    public on<T extends RelationsEvent>(ev: T, fn: Listener<RelationsEvent, EventHandlerMap, T>) {
         this.relations.forEach(r => r.on(ev, fn));
     }
 
-    public off<T extends RelationsEvents>(ev: T, fn: Listener<RelationsEvents, EventHandlerMap, T>) {
+    public off<T extends RelationsEvent>(ev: T, fn: Listener<RelationsEvent, EventHandlerMap, T>) {
         this.relations.forEach(r => r.off(ev, fn));
     }
 }

@@ -28,7 +28,7 @@ import { TypedReEmitter } from '../ReEmitter';
 import { logger } from '../logger';
 import { IExportedDevice, OlmDevice } from "./OlmDevice";
 import * as olmlib from "./olmlib";
-import { DeviceInfoMap, DeviceList, DeviceListEvents, EventHandlerMap as DeviceListHandlerMap } from "./DeviceList";
+import { DeviceInfoMap, DeviceList, DeviceListEvent, EventHandlerMap as DeviceListHandlerMap } from "./DeviceList";
 import { DeviceInfo, IDevice } from "./deviceinfo";
 import type { DecryptionAlgorithm, EncryptionAlgorithm } from "./algorithms";
 import * as algorithms from "./algorithms";
@@ -65,8 +65,8 @@ import { DehydrationManager, IDeviceKeys, IOneTimeKey } from './dehydration';
 import { BackupManager } from "./backup";
 import { IStore } from "../store";
 import { Room } from "../models/room";
-import { RoomMember, RoomMemberEvents } from "../models/room-member";
-import { EventStatus, IClearEvent, IEvent, MatrixEvent, MatrixEventEvents } from "../models/event";
+import { RoomMember, RoomMemberEvent } from "../models/room-member";
+import { EventStatus, IClearEvent, IEvent, MatrixEvent, MatrixEventEvent } from "../models/event";
 import { ICrossSigningKey, IKeysUploadResponse, ISignedKey, MatrixClient, SessionStore } from "../client";
 import type { IRoomEncryption, RoomList } from "./RoomList";
 import { IKeyBackupInfo } from "./keybackup";
@@ -75,7 +75,7 @@ import { CryptoStore } from "./store/base";
 import { IVerificationChannel } from "./verification/request/Channel";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { VerificationBase } from "./verification/Base";
-import { EventTimelineSetEvents } from "../models/event-timeline-set";
+import { EventTimelineSetEvent } from "../models/event-timeline-set";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -195,7 +195,7 @@ export interface IRequestsMap {
     setRequestByChannel(channel: IVerificationChannel, request: VerificationRequest): void;
 }
 
-export enum CryptoEvents {
+export enum CryptoEvent {
     DeviceVerificationChanged = "deviceVerificationChanged",
     UserTrustStatusChanged = "userTrustStatusChanged",
     RoomKeyRequest = "crypto.roomKeyRequest",
@@ -205,17 +205,17 @@ export enum CryptoEvents {
     KeysChanged = "crossSigning.keysChanged",
 }
 
-type EmittedEvents = CryptoEvents | DeviceListEvents.DevicesUpdated | DeviceListEvents.WillUpdateDevices;
+type EmittedEvents = CryptoEvent | DeviceListEvent.DevicesUpdated | DeviceListEvent.WillUpdateDevices;
 
 type EventHandlerMap = {
-    [CryptoEvents.DeviceVerificationChanged]: (userId: string, deviceId: string, device: DeviceInfo) => void;
-    [CryptoEvents.UserTrustStatusChanged]: (userId: string, trustLevel: UserTrustLevel) => void;
-    [CryptoEvents.RoomKeyRequest]: (request: IncomingRoomKeyRequest) => void;
-    [CryptoEvents.RoomKeyRequestCancellation]: (request: IncomingRoomKeyRequestCancellation) => void;
-    [CryptoEvents.KeyBackupFailed]: (errcode: string) => void;
-    [CryptoEvents.KeyBackupSessionsRemaining]: (remaining: number) => void;
-    [CryptoEvents.KeysChanged]: (data: {}) => void;
-} & Pick<DeviceListHandlerMap, DeviceListEvents.DevicesUpdated | DeviceListEvents.WillUpdateDevices>;
+    [CryptoEvent.DeviceVerificationChanged]: (userId: string, deviceId: string, device: DeviceInfo) => void;
+    [CryptoEvent.UserTrustStatusChanged]: (userId: string, trustLevel: UserTrustLevel) => void;
+    [CryptoEvent.RoomKeyRequest]: (request: IncomingRoomKeyRequest) => void;
+    [CryptoEvent.RoomKeyRequestCancellation]: (request: IncomingRoomKeyRequestCancellation) => void;
+    [CryptoEvent.KeyBackupFailed]: (errcode: string) => void;
+    [CryptoEvent.KeyBackupSessionsRemaining]: (remaining: number) => void;
+    [CryptoEvent.KeysChanged]: (data: {}) => void;
+} & Pick<DeviceListHandlerMap, DeviceListEvent.DevicesUpdated | DeviceListEvent.WillUpdateDevices>;
 
 export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     /**
@@ -389,8 +389,8 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
 
         // XXX: This isn't removed at any point, but then none of the event listeners
         // this class sets seem to be removed at any point... :/
-        this.deviceList.on(DeviceListEvents.UserCrossSigningUpdated, this.onDeviceListUserCrossSigningUpdated);
-        this.reEmitter.reEmit(this.deviceList, [DeviceListEvents.DevicesUpdated, DeviceListEvents.WillUpdateDevices]);
+        this.deviceList.on(DeviceListEvent.UserCrossSigningUpdated, this.onDeviceListUserCrossSigningUpdated);
+        this.reEmitter.reEmit(this.deviceList, [DeviceListEvent.DevicesUpdated, DeviceListEvent.WillUpdateDevices]);
 
         this.supportedAlgorithms = Object.keys(algorithms.DECRYPTION_CLASSES);
 
@@ -518,7 +518,7 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
                     deviceTrust.isCrossSigningVerified()
                 ) {
                     const deviceObj = this.deviceList.getStoredDevice(userId, deviceId);
-                    this.emit(CryptoEvents.DeviceVerificationChanged, userId, deviceId, deviceObj);
+                    this.emit(CryptoEvent.DeviceVerificationChanged, userId, deviceId, deviceObj);
                 }
             }
         }
@@ -1422,10 +1422,10 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
                 // that reset the keys
                 this.storeTrustedSelfKeys(null);
                 // emit cross-signing has been disabled
-                this.emit(CryptoEvents.KeysChanged, {});
+                this.emit(CryptoEvent.KeysChanged, {});
                 // as the trust for our own user has changed,
                 // also emit an event for this
-                this.emit(CryptoEvents.UserTrustStatusChanged, this.userId, this.checkUserTrust(userId));
+                this.emit(CryptoEvent.UserTrustStatusChanged, this.userId, this.checkUserTrust(userId));
             }
         } else {
             await this.checkDeviceVerifications(userId);
@@ -1440,7 +1440,7 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
                 this.deviceList.setRawStoredCrossSigningForUser(userId, crossSigning.toStorage());
             }
 
-            this.emit(CryptoEvents.UserTrustStatusChanged, userId, this.checkUserTrust(userId));
+            this.emit(CryptoEvent.UserTrustStatusChanged, userId, this.checkUserTrust(userId));
         }
     };
 
@@ -1615,10 +1615,10 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             upload({ shouldEmit: true });
         }
 
-        this.emit(CryptoEvents.UserTrustStatusChanged, userId, this.checkUserTrust(userId));
+        this.emit(CryptoEvent.UserTrustStatusChanged, userId, this.checkUserTrust(userId));
 
         if (masterChanged) {
-            this.emit(CryptoEvents.KeysChanged, {});
+            this.emit(CryptoEvent.KeysChanged, {});
             await this.afterCrossSigningLocalKeyChange();
         }
 
@@ -1707,10 +1707,10 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
      * @todo use a typed EventEmitter here
      */
     public registerEventHandlers(eventEmitter: EventEmitter): void {
-        eventEmitter.on(RoomMemberEvents.Membership, this.onMembership);
+        eventEmitter.on(RoomMemberEvent.Membership, this.onMembership);
         eventEmitter.on("toDeviceEvent", this.onToDeviceEvent);
-        eventEmitter.on(EventTimelineSetEvents.RoomTimeline, this.onTimelineEvent);
-        eventEmitter.on(MatrixEventEvents.Decrypted, this.onTimelineEvent);
+        eventEmitter.on(EventTimelineSetEvent.RoomTimeline, this.onTimelineEvent);
+        eventEmitter.on(MatrixEventEvent.Decrypted, this.onTimelineEvent);
     }
 
     /** Start background processes related to crypto */
@@ -2094,7 +2094,7 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             if (!this.crossSigningInfo.getId() && userId === this.crossSigningInfo.userId) {
                 this.storeTrustedSelfKeys(xsk.keys);
                 // This will cause our own user trust to change, so emit the event
-                this.emit(CryptoEvents.UserTrustStatusChanged, this.userId, this.checkUserTrust(userId));
+                this.emit(CryptoEvent.UserTrustStatusChanged, this.userId, this.checkUserTrust(userId));
             }
 
             // Now sign the master key with our user signing key (unless it's ourself)
@@ -2215,7 +2215,7 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         }
 
         const deviceObj = DeviceInfo.fromStorage(dev, deviceId);
-        this.emit(CryptoEvents.DeviceVerificationChanged, userId, deviceId, deviceObj);
+        this.emit(CryptoEvent.DeviceVerificationChanged, userId, deviceId, deviceObj);
         return deviceObj;
     }
 
@@ -3100,7 +3100,7 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
                     event.attemptDecryption(this);
                 }
                 // once the event has been decrypted, try again
-                event.once(MatrixEventEvents.Decrypted, (ev) => {
+                event.once(MatrixEventEvent.Decrypted, (ev) => {
                     this.onToDeviceEvent(ev);
                 });
             }
@@ -3249,15 +3249,15 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
                             reject(new Error("Event status set to CANCELLED."));
                         }
                     };
-                    event.once(MatrixEventEvents.LocalEventIdReplaced, eventIdListener);
-                    event.on(MatrixEventEvents.Status, statusListener);
+                    event.once(MatrixEventEvent.LocalEventIdReplaced, eventIdListener);
+                    event.on(MatrixEventEvent.Status, statusListener);
                 });
             } catch (err) {
                 logger.error("error while waiting for the verification event to be sent: " + err.message);
                 return;
             } finally {
-                event.removeListener(MatrixEventEvents.LocalEventIdReplaced, eventIdListener);
-                event.removeListener(MatrixEventEvents.Status, statusListener);
+                event.removeListener(MatrixEventEvent.LocalEventIdReplaced, eventIdListener);
+                event.removeListener(MatrixEventEvent.Status, statusListener);
             }
         }
         let request = requestsMap.getRequest(event);
@@ -3585,7 +3585,7 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             return;
         }
 
-        this.emit(CryptoEvents.RoomKeyRequest, req);
+        this.emit(CryptoEvent.RoomKeyRequest, req);
     }
 
     /**
@@ -3604,7 +3604,7 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         // we should probably only notify the app of cancellations we told it
         // about, but we don't currently have a record of that, so we just pass
         // everything through.
-        this.emit(CryptoEvents.RoomKeyRequestCancellation, cancellation);
+        this.emit(CryptoEvent.RoomKeyRequestCancellation, cancellation);
     }
 
     /**

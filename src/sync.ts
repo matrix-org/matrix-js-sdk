@@ -53,7 +53,7 @@ import { MatrixError, Method } from "./http-api";
 import { ISavedSync } from "./store";
 import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
-import { RoomStateEvents } from "./models/room-state";
+import { RoomStateEvent } from "./models/room-state";
 
 const DEBUG = true;
 
@@ -232,7 +232,7 @@ export class SyncApi {
         client.reEmitter.reEmit(room.currentState, [
             "RoomState.events", "RoomState.members", "RoomState.newMember",
         ]);
-        room.currentState.on(RoomStateEvents.NewMember, function(event, state, member) {
+        room.currentState.on(RoomStateEvent.NewMember, function(event, state, member) {
             member.user = client.getUser(member.userId);
             client.reEmitter.reEmit(
                 member,
@@ -252,9 +252,9 @@ export class SyncApi {
      */
     private deregisterStateListeners(room: Room): void {
         // could do with a better way of achieving this.
-        room.currentState.removeAllListeners(RoomStateEvents.Events);
-        room.currentState.removeAllListeners(RoomStateEvents.Members);
-        room.currentState.removeAllListeners(RoomStateEvents.NewMember);
+        room.currentState.removeAllListeners(RoomStateEvent.Events);
+        room.currentState.removeAllListeners(RoomStateEvent.Members);
+        room.currentState.removeAllListeners(RoomStateEvent.NewMember);
     }
 
     /**

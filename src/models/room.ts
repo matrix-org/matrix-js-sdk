@@ -18,7 +18,7 @@ limitations under the License.
  * @module models/room
  */
 
-import { EventTimelineSet, DuplicateStrategy, EventTimelineSetEvents } from "./event-timeline-set";
+import { EventTimelineSet, DuplicateStrategy, EventTimelineSetEvent } from "./event-timeline-set";
 import { Direction, EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
@@ -142,7 +142,7 @@ export interface ICreateFilterOpts {
     prepopulateTimeline?: boolean;
 }
 
-export enum RoomEvents {
+export enum RoomEvent {
     MyMembership = "Room.myMembership",
     Tags = "Room.tags",
     AccountData = "Room.accountData",
@@ -153,21 +153,21 @@ export enum RoomEvents {
     LocalEchoUpdated = "Room.localEchoUpdated",
 }
 
-type EmittedEvents = RoomEvents
+type EmittedEvents = RoomEvent
     | ThreadEvent.New
     | ThreadEvent.Update
-    | EventTimelineSetEvents.RoomTimeline
-    | EventTimelineSetEvents.RoomTimelineReset;
+    | EventTimelineSetEvent.RoomTimeline
+    | EventTimelineSetEvent.RoomTimelineReset;
 
 type EventHandlerMap = {
-    [RoomEvents.MyMembership]: (room: Room, membership: string, prevMembership?: string) => void;
-    [RoomEvents.Tags]: (event: MatrixEvent, room: Room) => void;
-    [RoomEvents.AccountData]: (event: MatrixEvent, room: Room, lastEvent?: MatrixEvent) => void;
-    [RoomEvents.Receipt]: (event: MatrixEvent, room: Room) => void;
-    [RoomEvents.Name]: (room: Room) => void;
-    [RoomEvents.Redaction]: (event: MatrixEvent, room: Room) => void;
-    [RoomEvents.RedactionCancelled]: (event: MatrixEvent, room: Room) => void;
-    [RoomEvents.LocalEchoUpdated]: (
+    [RoomEvent.MyMembership]: (room: Room, membership: string, prevMembership?: string) => void;
+    [RoomEvent.Tags]: (event: MatrixEvent, room: Room) => void;
+    [RoomEvent.AccountData]: (event: MatrixEvent, room: Room, lastEvent?: MatrixEvent) => void;
+    [RoomEvent.Receipt]: (event: MatrixEvent, room: Room) => void;
+    [RoomEvent.Name]: (room: Room) => void;
+    [RoomEvent.Redaction]: (event: MatrixEvent, room: Room) => void;
+    [RoomEvent.RedactionCancelled]: (event: MatrixEvent, room: Room) => void;
+    [RoomEvent.LocalEchoUpdated]: (
         event: MatrixEvent,
         room: Room,
         oldEventId?: string,
@@ -176,7 +176,7 @@ type EventHandlerMap = {
     [ThreadEvent.New]: (thread: Thread) => void;
 } & Pick<
     ThreadHandlerMap,
-    EventTimelineSetEvents.RoomTimeline | EventTimelineSetEvents.RoomTimelineReset | ThreadEvent.Update
+    EventTimelineSetEvent.RoomTimeline | EventTimelineSetEvent.RoomTimelineReset | ThreadEvent.Update
 >;
 
 export class Room extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
@@ -333,8 +333,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         // the subsequent ones are the filtered ones in no particular order.
         this.timelineSets = [new EventTimelineSet(this, opts)];
         this.reEmitter.reEmit(this.getUnfilteredTimelineSet(), [
-            EventTimelineSetEvents.RoomTimeline,
-            EventTimelineSetEvents.RoomTimelineReset,
+            EventTimelineSetEvent.RoomTimeline,
+            EventTimelineSetEvent.RoomTimelineReset,
         ]);
 
         this.fixUpLegacyTimelineFields();
@@ -749,7 +749,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             if (membership === "leave") {
                 this.cleanupAfterLeaving();
             }
-            this.emit(RoomEvents.MyMembership, this, membership, prevMembership);
+            this.emit(RoomEvent.MyMembership, this, membership, prevMembership);
         }
     }
 
@@ -1323,8 +1323,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         const opts = Object.assign({ filter: filter }, this.opts);
         const timelineSet = new EventTimelineSet(this, opts);
         this.reEmitter.reEmit(timelineSet, [
-            EventTimelineSetEvents.RoomTimeline,
-            EventTimelineSetEvents.RoomTimelineReset,
+            EventTimelineSetEvent.RoomTimeline,
+            EventTimelineSetEvent.RoomTimelineReset,
         ]);
         this.filteredTimelineSets[filter.filterId] = timelineSet;
         this.timelineSets.push(timelineSet);
@@ -1453,8 +1453,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             this.threads.set(thread.id, thread);
             this.reEmitter.reEmit(thread, [
                 ThreadEvent.Update,
-                EventTimelineSetEvents.RoomTimeline,
-                EventTimelineSetEvents.RoomTimelineReset,
+                EventTimelineSetEvent.RoomTimeline,
+                EventTimelineSetEvent.RoomTimelineReset,
             ]);
 
             if (!this.lastThread || this.lastThread.rootEvent.localTimestamp < rootEvent.localTimestamp) {
@@ -1496,7 +1496,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
                     }
                 }
 
-                this.emit(RoomEvents.Redaction, event, this);
+                this.emit(RoomEvent.Redaction, event, this);
 
                 // TODO: we stash user displaynames (among other things) in
                 // RoomMember objects which are then attached to other events
@@ -1618,7 +1618,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
                 }
                 if (redactedEvent) {
                     redactedEvent.markLocallyRedacted(event);
-                    this.emit(RoomEvents.Redaction, event, this);
+                    this.emit(RoomEvent.Redaction, event, this);
                 }
             }
         } else {
@@ -1636,7 +1636,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             }
         }
 
-        this.emit(RoomEvents.LocalEchoUpdated, event, this, null, null);
+        this.emit(RoomEvent.LocalEchoUpdated, event, this, null, null);
     }
 
     /**
@@ -1764,7 +1764,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             }
         }
 
-        this.emit(RoomEvents.LocalEchoUpdated, localEvent, this, oldEventId, oldStatus);
+        this.emit(RoomEvent.LocalEchoUpdated, localEvent, this, oldEventId, oldStatus);
     }
 
     /**
@@ -1848,7 +1848,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         }
         this.savePendingEvents();
 
-        this.emit(RoomEvents.LocalEchoUpdated, event, this, oldEventId, oldStatus);
+        this.emit(RoomEvent.LocalEchoUpdated, event, this, oldEventId, oldStatus);
     }
 
     private revertRedactionLocalEcho(redactionEvent: MatrixEvent): void {
@@ -1861,7 +1861,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         if (redactedEvent) {
             redactedEvent.unmarkLocallyRedacted();
             // re-render after undoing redaction
-            this.emit(RoomEvents.RedactionCancelled, redactionEvent, this);
+            this.emit(RoomEvent.RedactionCancelled, redactionEvent, this);
             // reapply relation now redaction failed
             if (redactedEvent.isRelation()) {
                 this.aggregateNonLiveRelation(redactedEvent);
@@ -2001,7 +2001,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         });
 
         if (oldName !== this.name) {
-            this.emit(RoomEvents.Name, this);
+            this.emit(RoomEvent.Name, this);
         }
     }
 
@@ -2094,7 +2094,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         this.addReceiptsToStructure(event, synthetic);
         // send events after we've regenerated the structure & cache, otherwise things that
         // listened for the event would read stale data.
-        this.emit(RoomEvents.Receipt, event, this);
+        this.emit(RoomEvent.Receipt, event, this);
     }
 
     /**
@@ -2228,7 +2228,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
 
         // XXX: we could do a deep-comparison to see if the tags have really
         // changed - but do we want to bother?
-        this.emit(RoomEvents.Tags, event, this);
+        this.emit(RoomEvent.Tags, event, this);
     }
 
     /**
@@ -2243,7 +2243,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             }
             const lastEvent = this.accountData[event.getType()];
             this.accountData[event.getType()] = event;
-            this.emit(RoomEvents.AccountData, event, this, lastEvent);
+            this.emit(RoomEvent.AccountData, event, this, lastEvent);
         }
     }
 

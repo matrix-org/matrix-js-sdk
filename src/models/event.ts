@@ -204,7 +204,7 @@ export interface IMessageVisibilityHidden {
 // A singleton implementing `IMessageVisibilityVisible`.
 const MESSAGE_VISIBLE: IMessageVisibilityVisible = Object.freeze({ visible: true });
 
-export enum MatrixEventEvents {
+export enum MatrixEventEvent {
     Decrypted = "Event.decrypted",
     BeforeRedaction = "Event.beforeRedaction",
     VisibilityChange = "Event.visibilityChange",
@@ -214,16 +214,16 @@ export enum MatrixEventEvents {
     RelationsCreated = "Event.relationsCreated",
 }
 
-type EmittedEvents = MatrixEventEvents | ThreadEvent.Update;
+type EmittedEvents = MatrixEventEvent | ThreadEvent.Update;
 
 type EventHandlerMap = {
-    [MatrixEventEvents.Decrypted]: (event: MatrixEvent, err?: Error) => void;
-    [MatrixEventEvents.BeforeRedaction]: (event: MatrixEvent, redactionEvent: MatrixEvent) => void;
-    [MatrixEventEvents.VisibilityChange]: (event: MatrixEvent, visible: boolean) => void;
-    [MatrixEventEvents.LocalEventIdReplaced]: (event: MatrixEvent) => void;
-    [MatrixEventEvents.Status]: (event: MatrixEvent, status: EventStatus) => void;
-    [MatrixEventEvents.Replaced]: (event: MatrixEvent) => void;
-    [MatrixEventEvents.RelationsCreated]: (relationType: string, eventType: string) => void;
+    [MatrixEventEvent.Decrypted]: (event: MatrixEvent, err?: Error) => void;
+    [MatrixEventEvent.BeforeRedaction]: (event: MatrixEvent, redactionEvent: MatrixEvent) => void;
+    [MatrixEventEvent.VisibilityChange]: (event: MatrixEvent, visible: boolean) => void;
+    [MatrixEventEvent.LocalEventIdReplaced]: (event: MatrixEvent) => void;
+    [MatrixEventEvent.Status]: (event: MatrixEvent, status: EventStatus) => void;
+    [MatrixEventEvent.Replaced]: (event: MatrixEvent) => void;
+    [MatrixEventEvent.RelationsCreated]: (relationType: string, eventType: string) => void;
 } & Pick<ThreadEventHandlerMap, ThreadEvent.Update>;
 
 export class MatrixEvent extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
@@ -888,7 +888,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, EventHandlerMa
             this.setPushActions(null);
 
             if (options.emit !== false) {
-                this.emit(MatrixEventEvents.Decrypted, this, err);
+                this.emit(MatrixEventEvent.Decrypted, this, err);
             }
 
             return;
@@ -1047,7 +1047,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, EventHandlerMa
 
     public markLocallyRedacted(redactionEvent: MatrixEvent): void {
         if (this._localRedactionEvent) return;
-        this.emit(MatrixEventEvents.BeforeRedaction, this, redactionEvent);
+        this.emit(MatrixEventEvent.BeforeRedaction, this, redactionEvent);
         this._localRedactionEvent = redactionEvent;
         if (!this.event.unsigned) {
             this.event.unsigned = {};
@@ -1085,7 +1085,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, EventHandlerMa
                 });
             }
             if (change) {
-                this.emit(MatrixEventEvents.VisibilityChange, this, visible);
+                this.emit(MatrixEventEvent.VisibilityChange, this, visible);
             }
         }
     }
@@ -1117,7 +1117,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, EventHandlerMa
 
         this._localRedactionEvent = null;
 
-        this.emit(MatrixEventEvents.BeforeRedaction, this, redactionEvent);
+        this.emit(MatrixEventEvent.BeforeRedaction, this, redactionEvent);
 
         this._replacingEvent = null;
         // we attempt to replicate what we would see from the server if
@@ -1280,7 +1280,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, EventHandlerMa
         this.setStatus(null);
         if (this.getId() !== oldId) {
             // emit the event if it changed
-            this.emit(MatrixEventEvents.LocalEventIdReplaced, this);
+            this.emit(MatrixEventEvent.LocalEventIdReplaced, this);
         }
 
         this.localTimestamp = Date.now() - this.getAge();
@@ -1303,12 +1303,12 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, EventHandlerMa
      */
     public setStatus(status: EventStatus): void {
         this.status = status;
-        this.emit(MatrixEventEvents.Status, this, status);
+        this.emit(MatrixEventEvent.Status, this, status);
     }
 
     public replaceLocalEventId(eventId: string): void {
         this.event.event_id = eventId;
-        this.emit(MatrixEventEvents.LocalEventIdReplaced, this);
+        this.emit(MatrixEventEvent.LocalEventIdReplaced, this);
     }
 
     /**
@@ -1357,7 +1357,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, EventHandlerMa
         }
         if (this._replacingEvent !== newEvent) {
             this._replacingEvent = newEvent;
-            this.emit(MatrixEventEvents.Replaced, this);
+            this.emit(MatrixEventEvent.Replaced, this);
             this.invalidateExtensibleEvent();
         }
     }

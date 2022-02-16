@@ -32,7 +32,7 @@ import { encodeRecoveryKey } from './recoverykey';
 import { calculateKeyCheck, decryptAES, encryptAES } from './aes';
 import { IAes256AuthData, ICurve25519AuthData, IKeyBackupInfo, IKeyBackupSession } from "./keybackup";
 import { UnstableValue } from "../NamespacedValue";
-import { CryptoEvents, IMegolmSessionData } from "./index";
+import { CryptoEvent, IMegolmSessionData } from "./index";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 
@@ -457,7 +457,7 @@ export class BackupManager {
                             await this.checkKeyBackup();
                             // Backup version has changed or this backup version
                             // has been deleted
-                            this.baseApis.crypto.emit(CryptoEvents.KeyBackupFailed, err.data.errcode);
+                            this.baseApis.crypto.emit(CryptoEvent.KeyBackupFailed, err.data.errcode);
                             throw err;
                         }
                     }
@@ -486,7 +486,7 @@ export class BackupManager {
         }
 
         let remaining = await this.baseApis.crypto.cryptoStore.countSessionsNeedingBackup();
-        this.baseApis.crypto.emit(CryptoEvents.KeyBackupSessionsRemaining, remaining);
+        this.baseApis.crypto.emit(CryptoEvent.KeyBackupSessionsRemaining, remaining);
 
         const rooms: IKeyBackup["rooms"] = {};
         for (const session of sessions) {
@@ -523,7 +523,7 @@ export class BackupManager {
 
         await this.baseApis.crypto.cryptoStore.unmarkSessionsNeedingBackup(sessions);
         remaining = await this.baseApis.crypto.cryptoStore.countSessionsNeedingBackup();
-        this.baseApis.crypto.emit(CryptoEvents.KeyBackupSessionsRemaining, remaining);
+        this.baseApis.crypto.emit(CryptoEvent.KeyBackupSessionsRemaining, remaining);
 
         return sessions.length;
     }

@@ -75,12 +75,12 @@ interface ITransition {
     event?: MatrixEvent;
 }
 
-export enum VerificationRequestEvents {
+export enum VerificationRequestEvent {
     Change = "change",
 }
 
 type EventHandlerMap = {
-    [VerificationRequestEvents.Change]: () => void;
+    [VerificationRequestEvent.Change]: () => void;
 };
 
 /**
@@ -91,7 +91,7 @@ type EventHandlerMap = {
  */
 export class VerificationRequest<
     C extends IVerificationChannel = IVerificationChannel,
-> extends TypedEventEmitter<VerificationRequestEvents, EventHandlerMap> {
+> extends TypedEventEmitter<VerificationRequestEvent, EventHandlerMap> {
     private eventsByUs = new Map<string, MatrixEvent>();
     private eventsByThem = new Map<string, MatrixEvent>();
     private _observeOnly = false;
@@ -462,7 +462,7 @@ export class VerificationRequest<
     public async cancel({ reason = "User declined", code = "m.user" } = {}): Promise<void> {
         if (!this.observeOnly && this._phase !== PHASE_CANCELLED) {
             this._declining = true;
-            this.emit(VerificationRequestEvents.Change);
+            this.emit(VerificationRequestEvent.Change);
             if (this._verifier) {
                 return this._verifier.cancel(errorFactory(code, reason)());
             } else {
@@ -480,7 +480,7 @@ export class VerificationRequest<
         if (!this.observeOnly && this.phase === PHASE_REQUESTED && !this.initiatedByMe) {
             const methods = [...this.verificationMethods.keys()];
             this._accepting = true;
-            this.emit(VerificationRequestEvents.Change);
+            this.emit(VerificationRequestEvent.Change);
             await this.channel.send(READY_TYPE, { methods });
         }
     }
@@ -504,12 +504,12 @@ export class VerificationRequest<
                     handled = true;
                 }
                 if (handled) {
-                    this.off(VerificationRequestEvents.Change, check);
+                    this.off(VerificationRequestEvent.Change, check);
                 }
                 return handled;
             };
             if (!check()) {
-                this.on(VerificationRequestEvents.Change, check);
+                this.on(VerificationRequestEvent.Change, check);
             }
         });
     }
@@ -517,7 +517,7 @@ export class VerificationRequest<
     private setPhase(phase: Phase, notify = true): void {
         this._phase = phase;
         if (notify) {
-            this.emit(VerificationRequestEvents.Change);
+            this.emit(VerificationRequestEvent.Change);
         }
     }
 
@@ -777,7 +777,7 @@ export class VerificationRequest<
                 // set phase as last thing as this emits the "change" event
                 this.setPhase(phase);
             } else if (this._observeOnly !== wasObserveOnly) {
-                this.emit(VerificationRequestEvents.Change);
+                this.emit(VerificationRequestEvent.Change);
             }
         } finally {
             // log events we processed so we can see from rageshakes what events were added to a request

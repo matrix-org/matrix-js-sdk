@@ -34,19 +34,19 @@ enum OobStatus {
     Finished,
 }
 
-export enum RoomStateEvents {
+export enum RoomStateEvent {
     Events = "RoomState.events",
     Members = "RoomState.members",
     NewMember = "RoomState.newMember",
 }
 
 type EventHandlerMap = {
-    [RoomStateEvents.Events]: (event: MatrixEvent, state: RoomState, lastStateEvent: MatrixEvent | null) => void;
-    [RoomStateEvents.Members]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
-    [RoomStateEvents.NewMember]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
+    [RoomStateEvent.Events]: (event: MatrixEvent, state: RoomState, lastStateEvent: MatrixEvent | null) => void;
+    [RoomStateEvent.Members]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
+    [RoomStateEvent.NewMember]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
 };
 
-export class RoomState extends TypedEventEmitter<RoomStateEvents, EventHandlerMap> {
+export class RoomState extends TypedEventEmitter<RoomStateEvent, EventHandlerMap> {
     private sentinels: Record<string, RoomMember> = {}; // userId: RoomMember
     // stores fuzzy matches to a list of userIDs (applies utils.removeHiddenChars to keys)
     private displayNameToUserIds: Record<string, string[]> = {};
@@ -318,7 +318,7 @@ export class RoomState extends TypedEventEmitter<RoomStateEvents, EventHandlerMa
                 this.updateDisplayNameCache(event.getStateKey(), event.getContent().displayname);
                 this.updateThirdPartyTokenCache(event);
             }
-            this.emit(RoomStateEvents.Events, event, this, lastStateEvent);
+            this.emit(RoomStateEvent.Events, event, this, lastStateEvent);
         });
 
         // update higher level data structures. This needs to be done AFTER the
@@ -353,7 +353,7 @@ export class RoomState extends TypedEventEmitter<RoomStateEvents, EventHandlerMa
                 member.setMembershipEvent(event, this);
 
                 this.updateMember(member);
-                this.emit(RoomStateEvents.Members, event, this, member);
+                this.emit(RoomStateEvent.Members, event, this, member);
             } else if (event.getType() === EventType.RoomPowerLevels) {
                 // events with unknown state keys should be ignored
                 // and should not aggregate onto members power levels
@@ -368,7 +368,7 @@ export class RoomState extends TypedEventEmitter<RoomStateEvents, EventHandlerMa
                     const oldLastModified = member.getLastModifiedTime();
                     member.setPowerLevelEvent(event);
                     if (oldLastModified !== member.getLastModifiedTime()) {
-                        this.emit(RoomStateEvents.Members, event, this, member);
+                        this.emit(RoomStateEvent.Members, event, this, member);
                     }
                 });
 
@@ -395,7 +395,7 @@ export class RoomState extends TypedEventEmitter<RoomStateEvents, EventHandlerMa
             // add member to members before emitting any events,
             // as event handlers often lookup the member
             this.members[userId] = member;
-            this.emit(RoomStateEvents.NewMember, event, this, member);
+            this.emit(RoomStateEvent.NewMember, event, this, member);
         }
         return member;
     }
@@ -513,7 +513,7 @@ export class RoomState extends TypedEventEmitter<RoomStateEvents, EventHandlerMa
 
         this.setStateEvent(stateEvent);
         this.updateMember(member);
-        this.emit(RoomStateEvents.Members, stateEvent, this, member);
+        this.emit(RoomStateEvent.Members, stateEvent, this, member);
     }
 
     /**

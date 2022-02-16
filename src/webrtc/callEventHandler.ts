@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent, MatrixEventEvents } from '../models/event';
+import { MatrixEvent, MatrixEventEvent } from '../models/event';
 import { logger } from '../logger';
 import { CallDirection, CallErrorCode, CallState, createNewMatrixCall, MatrixCall } from './call';
 import { EventType } from '../@types/event';
@@ -101,7 +101,7 @@ export class CallEventHandler {
 
         if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
             // add an event listener for once the event is decrypted.
-            event.once(MatrixEventEvents.Decrypted, async () => {
+            event.once(MatrixEventEvent.Decrypted, async () => {
                 if (!this.eventIsACall(event)) return;
 
                 if (this.callEventBuffer.includes(event)) {

@@ -21,7 +21,7 @@ limitations under the License.
 import { MatrixEvent } from "./event";
 import { TypedEventEmitter } from "./typed-event-emitter";
 
-export enum UserEvents {
+export enum UserEvent {
     DisplayName = "User.displayName",
     AvatarUrl = "User.avatarUrl",
     Presence = "User.presence",
@@ -32,15 +32,15 @@ export enum UserEvents {
 }
 
 type EventHandlerMap = {
-    [UserEvents.DisplayName]: (event: MatrixEvent | undefined, user: User) => void;
-    [UserEvents.AvatarUrl]: (event: MatrixEvent | undefined, user: User) => void;
-    [UserEvents.Presence]: (event: MatrixEvent | undefined, user: User) => void;
-    [UserEvents.CurrentlyActive]: (event: MatrixEvent | undefined, user: User) => void;
-    [UserEvents.LastPresenceTs]: (event: MatrixEvent | undefined, user: User) => void;
-    [UserEvents._UnstableStatusMessage]: (user: User) => void;
+    [UserEvent.DisplayName]: (event: MatrixEvent | undefined, user: User) => void;
+    [UserEvent.AvatarUrl]: (event: MatrixEvent | undefined, user: User) => void;
+    [UserEvent.Presence]: (event: MatrixEvent | undefined, user: User) => void;
+    [UserEvent.CurrentlyActive]: (event: MatrixEvent | undefined, user: User) => void;
+    [UserEvent.LastPresenceTs]: (event: MatrixEvent | undefined, user: User) => void;
+    [UserEvent._UnstableStatusMessage]: (user: User) => void;
 };
 
-export class User extends TypedEventEmitter<UserEvents, EventHandlerMap> {
+export class User extends TypedEventEmitter<UserEvent, EventHandlerMap> {
     private modified: number;
 
     // XXX these should be read-only
@@ -111,25 +111,25 @@ export class User extends TypedEventEmitter<UserEvents, EventHandlerMap> {
         const firstFire = this.events.presence === null;
         this.events.presence = event;
 
-        const eventsToFire: UserEvents[] = [];
+        const eventsToFire: UserEvent[] = [];
         if (event.getContent().presence !== this.presence || firstFire) {
-            eventsToFire.push(UserEvents.Presence);
+            eventsToFire.push(UserEvent.Presence);
         }
         if (event.getContent().avatar_url &&
             event.getContent().avatar_url !== this.avatarUrl) {
-            eventsToFire.push(UserEvents.AvatarUrl);
+            eventsToFire.push(UserEvent.AvatarUrl);
         }
         if (event.getContent().displayname &&
             event.getContent().displayname !== this.displayName) {
-            eventsToFire.push(UserEvents.DisplayName);
+            eventsToFire.push(UserEvent.DisplayName);
         }
         if (event.getContent().currently_active !== undefined &&
             event.getContent().currently_active !== this.currentlyActive) {
-            eventsToFire.push(UserEvents.CurrentlyActive);
+            eventsToFire.push(UserEvent.CurrentlyActive);
         }
 
         this.presence = event.getContent().presence;
-        eventsToFire.push(UserEvents.LastPresenceTs);
+        eventsToFire.push(UserEvent.LastPresenceTs);
 
         if (event.getContent().status_msg) {
             this.presenceStatusMsg = event.getContent().status_msg;
@@ -230,7 +230,7 @@ export class User extends TypedEventEmitter<UserEvents, EventHandlerMap> {
         if (!event.getContent()) this.unstable_statusMessage = "";
         else this.unstable_statusMessage = event.getContent()["status"];
         this.updateModifiedTime();
-        this.emit(UserEvents._UnstableStatusMessage, this);
+        this.emit(UserEvent._UnstableStatusMessage, this);
     }
 }
 
