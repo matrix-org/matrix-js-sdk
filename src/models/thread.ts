@@ -27,10 +27,9 @@ import { RoomState } from "./room-state";
 
 export enum ThreadEvent {
     New = "Thread.new",
-    Ready = "Thread.ready",
     Update = "Thread.update",
     NewReply = "Thread.newReply",
-    ViewThread = "Thred.viewThread",
+    ViewThread = "Thread.viewThread",
 }
 
 interface IThreadOpts {
@@ -103,7 +102,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
             ?.capabilities?.[RelationType.Thread]?.enabled;
     }
 
-    onEcho = (event: MatrixEvent) => {
+    private onEcho = (event: MatrixEvent) => {
         if (this.timelineSet.eventIdToTimeline(event.getId())) {
             this.emit(ThreadEvent.Update, this);
         }

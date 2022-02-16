@@ -1413,7 +1413,6 @@ export class Room extends EventEmitter {
             this.threads.set(thread.id, thread);
             this.reEmitter.reEmit(thread, [
                 ThreadEvent.Update,
-                ThreadEvent.Ready,
                 "Room.timeline",
                 "Room.timelineReset",
             ]);
