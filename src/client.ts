@@ -34,7 +34,7 @@ import {
 import { StubStore } from "./store/stub";
 import { createNewMatrixCall, MatrixCall } from "./webrtc/call";
 import { Filter, IFilterDefinition } from "./filter";
-import { CallEvent, CallEventHandler, CallEventHandlerMap } from './webrtc/callEventHandler';
+import { CallEventHandlerEvent, CallEventHandler, CallEventHandlerEventHandlerMap } from './webrtc/callEventHandler';
 import * as utils from './utils';
 import { sleep } from './utils';
 import { Group } from "./models/group";
@@ -178,7 +178,6 @@ import { CryptoStore } from "./crypto/store/base";
 import { MediaHandler } from "./webrtc/mediaHandler";
 import { IRefreshTokenResponse } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
-import { DeviceListEvent } from "./crypto/DeviceList";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -812,16 +811,13 @@ type CryptoEvents = CryptoEvent.KeySignatureUploadFailure
     | CryptoEvent.DeviceVerificationChanged
     | CryptoEvent.UserTrustStatusChanged
     | CryptoEvent.KeysChanged
-    | DeviceListEvent.DevicesUpdated
-    | DeviceListEvent.WillUpdateDevices;
+    | CryptoEvent.Warning
+    | CryptoEvent.DevicesUpdated
+    | CryptoEvent.WillUpdateDevices;
 
 type MatrixEventEvents = MatrixEventEvent.Decrypted | MatrixEventEvent.Replaced | MatrixEventEvent.VisibilityChange;
 
 type RoomMemberEvents = RoomMemberEvent.Name
-    | RoomMemberEvent.Typing
-    | RoomMemberEvent.PowerLevel
-    | RoomMemberEvent.Membership
-    | RoomMemberEvent.Name
     | RoomMemberEvent.Typing
     | RoomMemberEvent.PowerLevel
     | RoomMemberEvent.Membership;
@@ -839,7 +835,7 @@ type EmittedEvents = ClientEvent
     | MatrixEventEvents
     | RoomMemberEvents
     | UserEvents
-    | CallEvent.Incoming;
+    | CallEventHandlerEvent.Incoming;
 
 export type ClientEventHandlerMap = {
     [ClientEvent.Sync]: (state: SyncState, lastState?: SyncState, data?: ISyncStateData) => void;
@@ -859,7 +855,7 @@ export type ClientEventHandlerMap = {
     & MatrixEventHandlerMap
     & RoomMemberEventHandlerMap
     & UserEventHandlerMap
-    & CallEventHandlerMap;
+    & CallEventHandlerEventHandlerMap;
 
 /**
  * Represents a Matrix Client. Only directly construct this if you want to use
@@ -1675,9 +1671,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             CryptoEvent.KeyBackupSessionsRemaining,
             CryptoEvent.RoomKeyRequest,
             CryptoEvent.RoomKeyRequestCancellation,
-            "crypto.warning",
-            DeviceListEvent.DevicesUpdated,
-            DeviceListEvent.WillUpdateDevices,
+            CryptoEvent.Warning,
+            CryptoEvent.DevicesUpdated,
+            CryptoEvent.WillUpdateDevices,
             CryptoEvent.DeviceVerificationChanged,
             CryptoEvent.UserTrustStatusChanged,
             CryptoEvent.KeysChanged,

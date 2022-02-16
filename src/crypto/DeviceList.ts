@@ -30,6 +30,7 @@ import { IDownloadKeyResult, MatrixClient } from "../client";
 import { OlmDevice } from "./OlmDevice";
 import { CryptoStore } from "./store/base";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { CryptoEvent, CryptoEventHandlerMap } from "./index";
 
 /* State transition diagram for DeviceList.deviceTrackingStatus
  *
@@ -61,22 +62,12 @@ export enum TrackingStatus {
 
 export type DeviceInfoMap = Record<string, Record<string, DeviceInfo>>;
 
-export enum DeviceListEvent {
-    WillUpdateDevices = "crypto.willUpdateDevices",
-    DevicesUpdated = "crypto.devicesUpdated",
-    UserCrossSigningUpdated = "userCrossSigningUpdated",
-}
-
-export type EventHandlerMap = {
-    [DeviceListEvent.WillUpdateDevices]: (users: string[], initialFetch: boolean) => void;
-    [DeviceListEvent.DevicesUpdated]: (users: string[], initialFetch: boolean) => void;
-    [DeviceListEvent.UserCrossSigningUpdated]: (userId: string) => void;
-};
+type EmittedEvents = CryptoEvent.WillUpdateDevices | CryptoEvent.DevicesUpdated | CryptoEvent.UserCrossSigningUpdated;
 
 /**
  * @alias module:crypto/DeviceList
  */
-export class DeviceList extends TypedEventEmitter<DeviceListEvent, EventHandlerMap> {
+export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHandlerMap> {
     private devices: { [userId: string]: { [deviceId: string]: IDevice } } = {};
 
     public crossSigningInfo: { [userId: string]: ICrossSigningInfo } = {};
@@ -645,7 +636,7 @@ export class DeviceList extends TypedEventEmitter<DeviceListEvent, EventHandlerM
         });
 
         const finished = (success: boolean): void => {
-            this.emit(DeviceListEvent.WillUpdateDevices, users, !this.hasFetched);
+            this.emit(CryptoEvent.WillUpdateDevices, users, !this.hasFetched);
             users.forEach((u) => {
                 this.dirty = true;
 
@@ -670,7 +661,7 @@ export class DeviceList extends TypedEventEmitter<DeviceListEvent, EventHandlerM
                 }
             });
             this.saveIfDirty();
-            this.emit(DeviceListEvent.DevicesUpdated, users, !this.hasFetched);
+            this.emit(CryptoEvent.DevicesUpdated, users, !this.hasFetched);
             this.hasFetched = true;
         };
 
@@ -878,7 +869,7 @@ class DeviceListUpdateSerialiser {
 
                 // NB. Unlike most events in the js-sdk, this one is internal to the
                 // js-sdk and is not re-emitted
-                this.deviceList.emit(DeviceListEvent.UserCrossSigningUpdated, userId);
+                this.deviceList.emit(CryptoEvent.UserCrossSigningUpdated, userId);
             }
         }
     }

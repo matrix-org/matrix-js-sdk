@@ -27,7 +27,7 @@ import { TypedReEmitter } from '../ReEmitter';
 import { logger } from '../logger';
 import { IExportedDevice, OlmDevice } from "./OlmDevice";
 import * as olmlib from "./olmlib";
-import { DeviceInfoMap, DeviceList, DeviceListEvent, EventHandlerMap as DeviceListHandlerMap } from "./DeviceList";
+import { DeviceInfoMap, DeviceList } from "./DeviceList";
 import { DeviceInfo, IDevice } from "./deviceinfo";
 import type { DecryptionAlgorithm, EncryptionAlgorithm } from "./algorithms";
 import * as algorithms from "./algorithms";
@@ -205,6 +205,7 @@ export interface IRequestsMap {
 export enum CryptoEvent {
     DeviceVerificationChanged = "deviceVerificationChanged",
     UserTrustStatusChanged = "userTrustStatusChanged",
+    UserCrossSigningUpdated = "userCrossSigningUpdated",
     RoomKeyRequest = "crypto.roomKeyRequest",
     RoomKeyRequestCancellation = "crypto.roomKeyRequestCancellation",
     KeyBackupStatus = "crypto.keyBackupStatus",
@@ -212,10 +213,11 @@ export enum CryptoEvent {
     KeyBackupSessionsRemaining = "crypto.keyBackupSessionsRemaining",
     KeySignatureUploadFailure = "crypto.keySignatureUploadFailure",
     VerificationRequest = "crypto.verification.request",
+    Warning = "crypto.warning",
+    WillUpdateDevices = "crypto.willUpdateDevices",
+    DevicesUpdated = "crypto.devicesUpdated",
     KeysChanged = "crossSigning.keysChanged",
 }
-
-type EmittedEvents = CryptoEvent | DeviceListEvent.DevicesUpdated | DeviceListEvent.WillUpdateDevices;
 
 export type CryptoEventHandlerMap = {
     [CryptoEvent.DeviceVerificationChanged]: (userId: string, deviceId: string, device: DeviceInfo) => void;
@@ -231,10 +233,14 @@ export type CryptoEventHandlerMap = {
         upload: (opts: { shouldEmit: boolean }) => Promise<void>
     ) => void;
     [CryptoEvent.VerificationRequest]: (request: VerificationRequest<any>) => void;
+    [CryptoEvent.Warning]: (type: string) => void;
     [CryptoEvent.KeysChanged]: (data: {}) => void;
-} & DeviceListHandlerMap;
+    [CryptoEvent.WillUpdateDevices]: (users: string[], initialFetch: boolean) => void;
+    [CryptoEvent.DevicesUpdated]: (users: string[], initialFetch: boolean) => void;
+    [CryptoEvent.UserCrossSigningUpdated]: (userId: string) => void;
+};
 
-export class Crypto extends TypedEventEmitter<EmittedEvents, CryptoEventHandlerMap> {
+export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap> {
     /**
      * @return {string} The version of Olm.
      */
@@ -249,7 +255,7 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, CryptoEventHandlerM
     public readonly dehydrationManager: DehydrationManager;
     public readonly secretStorage: SecretStorage;
 
-    private readonly reEmitter: TypedReEmitter<EmittedEvents, CryptoEventHandlerMap>;
+    private readonly reEmitter: TypedReEmitter<CryptoEvent, CryptoEventHandlerMap>;
     private readonly verificationMethods: Map<VerificationMethod, typeof VerificationBase>;
     public readonly supportedAlgorithms: string[];
     private readonly outgoingRoomKeyRequestManager: OutgoingRoomKeyRequestManager;
@@ -407,8 +413,8 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, CryptoEventHandlerM
 
         // XXX: This isn't removed at any point, but then none of the event listeners
         // this class sets seem to be removed at any point... :/
-        this.deviceList.on(DeviceListEvent.UserCrossSigningUpdated, this.onDeviceListUserCrossSigningUpdated);
-        this.reEmitter.reEmit(this.deviceList, [DeviceListEvent.DevicesUpdated, DeviceListEvent.WillUpdateDevices]);
+        this.deviceList.on(CryptoEvent.UserCrossSigningUpdated, this.onDeviceListUserCrossSigningUpdated);
+        this.reEmitter.reEmit(this.deviceList, [CryptoEvent.DevicesUpdated, CryptoEvent.WillUpdateDevices]);
 
         this.supportedAlgorithms = Object.keys(algorithms.DECRYPTION_CLASSES);
 

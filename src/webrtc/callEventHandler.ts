@@ -27,12 +27,12 @@ import { RoomEvent } from "../models/room";
 // time to press the 'accept' button
 const RING_GRACE_PERIOD = 3000;
 
-export enum CallEvent {
+export enum CallEventHandlerEvent {
     Incoming = "Call.incoming",
 }
 
-export type CallEventHandlerMap = {
-    [CallEvent.Incoming]: (call: MatrixCall) => void;
+export type CallEventHandlerEventHandlerMap = {
+    [CallEventHandlerEvent.Incoming]: (call: MatrixCall) => void;
 };
 
 export class CallEventHandler {
@@ -231,7 +231,7 @@ export class CallEventHandler {
                     call.hangup(CallErrorCode.Replaced, true);
                 }
             } else {
-                this.client.emit(CallEvent.Incoming, call);
+                this.client.emit(CallEventHandlerEvent.Incoming, call);
             }
             return;
         } else if (type === EventType.CallCandidates) {
