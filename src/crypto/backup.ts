@@ -154,7 +154,7 @@ export class BackupManager {
 
         this.algorithm = await BackupManager.makeAlgorithm(info, this.getKey);
 
-        this.baseApis.emit('crypto.keyBackupStatus', true);
+        this.baseApis.emit(CryptoEvent.KeyBackupStatus, true);
 
         // There may be keys left over from a partially completed backup, so
         // schedule a send to check.
@@ -172,7 +172,7 @@ export class BackupManager {
 
         this.backupInfo = undefined;
 
-        this.baseApis.emit('crypto.keyBackupStatus', false);
+        this.baseApis.emit(CryptoEvent.KeyBackupStatus, false);
     }
 
     public getKeyBackupEnabled(): boolean | null {
@@ -579,7 +579,7 @@ export class BackupManager {
         );
 
         const remaining = await this.baseApis.crypto.cryptoStore.countSessionsNeedingBackup();
-        this.baseApis.emit("crypto.keyBackupSessionsRemaining", remaining);
+        this.baseApis.emit(CryptoEvent.KeyBackupSessionsRemaining, remaining);
         return remaining;
     }
 

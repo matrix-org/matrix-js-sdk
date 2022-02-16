@@ -18,7 +18,7 @@ limitations under the License.
  * @module models/room
  */
 
-import { EventTimelineSet, DuplicateStrategy, EventTimelineSetEvent } from "./event-timeline-set";
+import { EventTimelineSet, DuplicateStrategy } from "./event-timeline-set";
 import { Direction, EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
@@ -151,15 +151,17 @@ export enum RoomEvent {
     Redaction = "Room.redaction",
     RedactionCancelled = "Room.redactionCancelled",
     LocalEchoUpdated = "Room.localEchoUpdated",
+    Timeline = "Room.timeline",
+    TimelineReset = "Room.timelineReset",
 }
 
 type EmittedEvents = RoomEvent
     | ThreadEvent.New
     | ThreadEvent.Update
-    | EventTimelineSetEvent.RoomTimeline
-    | EventTimelineSetEvent.RoomTimelineReset;
+    | RoomEvent.Timeline
+    | RoomEvent.TimelineReset;
 
-type EventHandlerMap = {
+export type RoomEventHandlerMap = {
     [RoomEvent.MyMembership]: (room: Room, membership: string, prevMembership?: string) => void;
     [RoomEvent.Tags]: (event: MatrixEvent, room: Room) => void;
     [RoomEvent.AccountData]: (event: MatrixEvent, room: Room, lastEvent?: MatrixEvent) => void;
@@ -174,13 +176,10 @@ type EventHandlerMap = {
         oldStatus?: EventStatus,
     ) => void;
     [ThreadEvent.New]: (thread: Thread) => void;
-} & Pick<
-    ThreadHandlerMap,
-    EventTimelineSetEvent.RoomTimeline | EventTimelineSetEvent.RoomTimelineReset | ThreadEvent.Update
->;
+} & ThreadHandlerMap;
 
-export class Room extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
-    private readonly reEmitter: TypedReEmitter<EmittedEvents, EventHandlerMap>;
+export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> {
+    private readonly reEmitter: TypedReEmitter<EmittedEvents, RoomEventHandlerMap>;
     private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
     // receipts should clobber based on receipt_type and user_id pairs hence
     // the form of this structure. This is sub-optimal for the exposed APIs
@@ -333,8 +332,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         // the subsequent ones are the filtered ones in no particular order.
         this.timelineSets = [new EventTimelineSet(this, opts)];
         this.reEmitter.reEmit(this.getUnfilteredTimelineSet(), [
-            EventTimelineSetEvent.RoomTimeline,
-            EventTimelineSetEvent.RoomTimelineReset,
+            RoomEvent.Timeline,
+            RoomEvent.TimelineReset,
         ]);
 
         this.fixUpLegacyTimelineFields();
@@ -1323,8 +1322,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         const opts = Object.assign({ filter: filter }, this.opts);
         const timelineSet = new EventTimelineSet(this, opts);
         this.reEmitter.reEmit(timelineSet, [
-            EventTimelineSetEvent.RoomTimeline,
-            EventTimelineSetEvent.RoomTimelineReset,
+            RoomEvent.Timeline,
+            RoomEvent.TimelineReset,
         ]);
         this.filteredTimelineSets[filter.filterId] = timelineSet;
         this.timelineSets.push(timelineSet);
@@ -1453,8 +1452,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             this.threads.set(thread.id, thread);
             this.reEmitter.reEmit(thread, [
                 ThreadEvent.Update,
-                EventTimelineSetEvent.RoomTimeline,
-                EventTimelineSetEvent.RoomTimelineReset,
+                RoomEvent.Timeline,
+                RoomEvent.TimelineReset,
             ]);
 
             if (!this.lastThread || this.lastThread.rootEvent.localTimestamp < rootEvent.localTimestamp) {

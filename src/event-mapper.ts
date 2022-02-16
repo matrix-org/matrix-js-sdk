@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { MatrixClient } from "./client";
-import { IEvent, MatrixEvent } from "./models/event";
+import { IEvent, MatrixEvent, MatrixEventEvent } from "./models/event";
 
 export type EventMapper = (obj: Partial<IEvent>) => MatrixEvent;
 
@@ -33,7 +33,7 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
         if (event.isEncrypted()) {
             if (!preventReEmit) {
                 client.reEmitter.reEmit(event, [
-                    "Event.decrypted",
+                    MatrixEventEvent.Decrypted,
                 ]);
             }
             if (decrypt) {
@@ -41,7 +41,10 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
             }
         }
         if (!preventReEmit) {
-            client.reEmitter.reEmit(event, ["Event.replaced", "Event.visibilityChange"]);
+            client.reEmitter.reEmit(event, [
+                MatrixEventEvent.Replaced,
+                MatrixEventEvent.VisibilityChange,
+            ]);
         }
         return event;
     }

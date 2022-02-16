@@ -34,14 +34,14 @@ export enum RoomMemberEvent {
     Typing = "RoomMember.typing",
 }
 
-type EventHandlerMap = {
+export type RoomMemberEventHandlerMap = {
     [RoomMemberEvent.Membership]: (event: MatrixEvent, member: RoomMember, oldMembership: string | null) => void;
     [RoomMemberEvent.Name]: (event: MatrixEvent, member: RoomMember, oldName: string | null) => void;
     [RoomMemberEvent.PowerLevel]: (event: MatrixEvent, member: RoomMember) => void;
     [RoomMemberEvent.Typing]: (event: MatrixEvent, member: RoomMember) => void;
 };
 
-export class RoomMember extends TypedEventEmitter<RoomMemberEvent, EventHandlerMap> {
+export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEventHandlerMap> {
     private _isOutOfBand = false;
     private _modified: number;
     public _requestedProfileInfo: boolean; // used by sync.ts

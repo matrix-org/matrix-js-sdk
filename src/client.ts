@@ -19,15 +19,22 @@ limitations under the License.
  * @module client
  */
 
-import { EventEmitter } from "events";
 import { EmoteEvent, IPartialEvent, MessageEvent, NoticeEvent } from "matrix-events-sdk";
 
 import { ISyncStateData, SyncApi, SyncState } from "./sync";
-import { EventStatus, IContent, IDecryptOptions, IEvent, MatrixEvent, MatrixEventEvent } from "./models/event";
+import {
+    EventStatus,
+    IContent,
+    IDecryptOptions,
+    IEvent,
+    MatrixEvent,
+    MatrixEventEvent,
+    MatrixEventHandlerMap,
+} from "./models/event";
 import { StubStore } from "./store/stub";
 import { createNewMatrixCall, MatrixCall } from "./webrtc/call";
 import { Filter, IFilterDefinition } from "./filter";
-import { CallEventHandler } from './webrtc/callEventHandler';
+import { CallEvent, CallEventHandler, CallEventHandlerMap } from './webrtc/callEventHandler';
 import * as utils from './utils';
 import { sleep } from './utils';
 import { Group } from "./models/group";
@@ -37,7 +44,7 @@ import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery";
 import * as olmlib from "./crypto/olmlib";
 import { decodeBase64, encodeBase64 } from "./crypto/olmlib";
 import { IExportedDevice as IOlmDevice } from "./crypto/OlmDevice";
-import { ReEmitter } from './ReEmitter';
+import { TypedReEmitter } from './ReEmitter';
 import { IRoomEncryption, RoomList } from './crypto/RoomList';
 import { logger } from './logger';
 import { SERVICE_TYPES } from './service-types';
@@ -58,6 +65,8 @@ import {
 } from "./http-api";
 import {
     Crypto,
+    CryptoEvent,
+    CryptoEventHandlerMap,
     fixBackupKey,
     IBootstrapCrossSigningOpts,
     ICheckOwnCrossSigningTrustOpts,
@@ -68,7 +77,7 @@ import {
 import { DeviceInfo, IDevice } from "./crypto/deviceinfo";
 import { decodeRecoveryKey } from './crypto/recoverykey';
 import { keyFromAuthData } from './crypto/key_passphrase';
-import { User, UserEvent } from "./models/user";
+import { User, UserEvent, UserEventHandlerMap } from "./models/user";
 import { getHttpUriForMxc } from "./content-repo";
 import { SearchResult } from "./models/search-result";
 import {
@@ -88,7 +97,20 @@ import {
 } from "./crypto/keybackup";
 import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
 import { MatrixScheduler } from "./scheduler";
-import { IAuthData, ICryptoCallbacks, IMinimalEvent, IRoomEvent, IStateEvent, NotificationCountType } from "./matrix";
+import {
+    IAuthData,
+    ICryptoCallbacks,
+    IMinimalEvent,
+    IRoomEvent,
+    IStateEvent,
+    NotificationCountType,
+    RoomEvent,
+    RoomEventHandlerMap,
+    RoomMemberEvent,
+    RoomMemberEventHandlerMap,
+    RoomStateEvent,
+    RoomStateEventHandlerMap,
+} from "./matrix";
 import {
     CrossSigningKey,
     IAddSecretStorageKeyOpts,
@@ -155,6 +177,8 @@ import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
 import { MediaHandler } from "./webrtc/mediaHandler";
 import { IRefreshTokenResponse } from "./@types/auth";
+import { TypedEventEmitter } from "./models/typed-event-emitter";
+import { DeviceListEvent } from "./crypto/DeviceList";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -453,7 +477,7 @@ export interface ISignedKey {
 }
 
 export type KeySignatures = Record<string, Record<string, ICrossSigningKey | ISignedKey>>;
-interface IUploadKeySignaturesResponse {
+export interface IUploadKeySignaturesResponse {
     failures: Record<string, Record<string, {
         errcode: string;
         error: string;
@@ -748,24 +772,104 @@ interface ITimestampToEventResponse {
 const EVENT_ID_PREFIX = "$";
 
 export enum ClientEvent {
+    Sync = "sync",
+    Event = "event",
+    ToDeviceEvent = "toDeviceEvent",
     AccountData = "accountData",
+    Room = "Room",
+    DeleteRoom = "deleteRoom",
+    SyncUnexpectedError = "sync.unexpectedError",
+    ClientWellKnown = "WellKnown.client",
+    /* @deprecated */
+    Group = "Group",
+    // The following enum members are both deprecated and in the wrong place, Groups haven't been TSified
+    GroupProfile = "Group.profile",
+    GroupMyMembership = "Group.myMembership",
 }
 
-type EmittedEvents = ClientEvent;
+type RoomEvents = RoomEvent.Name
+    | RoomEvent.Redaction
+    | RoomEvent.RedactionCancelled
+    | RoomEvent.Receipt
+    | RoomEvent.Tags
+    | RoomEvent.LocalEchoUpdated
+    | RoomEvent.AccountData
+    | RoomEvent.MyMembership
+    | RoomEvent.Timeline
+    | RoomEvent.TimelineReset;
+
+type RoomStateEvents = RoomStateEvent.Events
+    | RoomStateEvent.Members
+    | RoomStateEvent.NewMember;
+
+type CryptoEvents = CryptoEvent.KeySignatureUploadFailure
+    | CryptoEvent.KeyBackupStatus
+    | CryptoEvent.KeyBackupFailed
+    | CryptoEvent.KeyBackupSessionsRemaining
+    | CryptoEvent.RoomKeyRequest
+    | CryptoEvent.RoomKeyRequestCancellation
+    | CryptoEvent.VerificationRequest
+    | CryptoEvent.DeviceVerificationChanged
+    | CryptoEvent.UserTrustStatusChanged
+    | CryptoEvent.KeysChanged
+    | DeviceListEvent.DevicesUpdated
+    | DeviceListEvent.WillUpdateDevices;
+
+type MatrixEventEvents = MatrixEventEvent.Decrypted | MatrixEventEvent.Replaced | MatrixEventEvent.VisibilityChange;
+
+type RoomMemberEvents = RoomMemberEvent.Name
+    | RoomMemberEvent.Typing
+    | RoomMemberEvent.PowerLevel
+    | RoomMemberEvent.Membership
+    | RoomMemberEvent.Name
+    | RoomMemberEvent.Typing
+    | RoomMemberEvent.PowerLevel
+    | RoomMemberEvent.Membership;
+
+type UserEvents = UserEvent.AvatarUrl
+    | UserEvent.DisplayName
+    | UserEvent.Presence
+    | UserEvent.CurrentlyActive
+    | UserEvent.LastPresenceTs;
+
+type EmittedEvents = ClientEvent
+    | RoomEvents
+    | RoomStateEvents
+    | CryptoEvents
+    | MatrixEventEvents
+    | RoomMemberEvents
+    | UserEvents
+    | CallEvent.Incoming;
 
 export type ClientEventHandlerMap = {
+    [ClientEvent.Sync]: (state: SyncState, lastState?: SyncState, data?: ISyncStateData) => void;
+    [ClientEvent.Event]: (event: MatrixEvent) => void;
+    [ClientEvent.ToDeviceEvent]: (event: MatrixEvent) => void;
     [ClientEvent.AccountData]: (event: MatrixEvent, lastEvent?: MatrixEvent) => void;
-};
+    [ClientEvent.Room]: (room: Room) => void;
+    [ClientEvent.DeleteRoom]: (roomId: string) => void;
+    [ClientEvent.SyncUnexpectedError]: (error: Error) => void;
+    [ClientEvent.ClientWellKnown]: (data: IClientWellKnown) => void;
+    [ClientEvent.Group]: (group: Group) => void;
+    [ClientEvent.GroupProfile]: (group: Group) => void;
+    [ClientEvent.GroupMyMembership]: (group: Group) => void;
+} & RoomEventHandlerMap
+    & RoomStateEventHandlerMap
+    & CryptoEventHandlerMap
+    & MatrixEventHandlerMap
+    & RoomMemberEventHandlerMap
+    & UserEventHandlerMap
+    & CallEventHandlerMap;
 
 /**
  * Represents a Matrix Client. Only directly construct this if you want to use
  * custom modules. Normally, {@link createClient} should be used
  * as it specifies 'sensible' defaults for these modules.
  */
-export class MatrixClient extends EventEmitter {
+export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHandlerMap> {
     public static readonly RESTORE_BACKUP_ERROR_BAD_KEY = 'RESTORE_BACKUP_ERROR_BAD_KEY';
 
-    public reEmitter = new ReEmitter(this);
+    public reEmitter = new TypedReEmitter<EmittedEvents, ClientEventHandlerMap>(this);
     public olmVersion: [number, number, number] = null; // populated after initCrypto
     public usingExternalCrypto = false;
     public store: Store;
@@ -907,7 +1011,7 @@ export class MatrixClient extends EventEmitter {
             // Start listening for calls after the initial sync is done
             // We do not need to backfill the call event buffer
             // with encrypted events that might never get decrypted
-            this.on("sync", this.startCallEventHandler);
+            this.on(ClientEvent.Sync, this.startCallEventHandler);
         }
 
         this.timelineSupport = Boolean(opts.timelineSupport);
@@ -932,7 +1036,7 @@ export class MatrixClient extends EventEmitter {
         // actions for themselves, so we have to kinda help them out when they are encrypted.
         // We do this so that push rules are correctly executed on events in their decrypted
         // state, such as highlights when the user's name is mentioned.
-        this.on("Event.decrypted", (event) => {
+        this.on(MatrixEventEvent.Decrypted, (event) => {
             const oldActions = event.getPushActions();
             const actions = this.getPushActionsForEvent(event, true);
 
@@ -967,7 +1071,7 @@ export class MatrixClient extends EventEmitter {
         // Like above, we have to listen for read receipts from ourselves in order to
         // correctly handle notification counts on encrypted rooms.
         // This fixes https://github.com/vector-im/element-web/issues/9421
-        this.on("Room.receipt", (event, room) => {
+        this.on(RoomEvent.Receipt, (event, room) => {
             if (room && this.isRoomEncrypted(room.roomId)) {
                 // Figure out if we've read something or if it's just informational
                 const content = event.getContent();
@@ -1002,7 +1106,7 @@ export class MatrixClient extends EventEmitter {
 
                 // Note: we don't need to handle 'total' notifications because the counts
                 // will come from the server.
-                room.setUnreadNotificationCount("highlight", highlightCount);
+                room.setUnreadNotificationCount(NotificationCountType.Highlight, highlightCount);
             }
         });
     }
@@ -1567,16 +1671,16 @@ export class MatrixClient extends EventEmitter {
         );
 
         this.reEmitter.reEmit(crypto, [
-            "crypto.keyBackupFailed",
-            "crypto.keyBackupSessionsRemaining",
-            "crypto.roomKeyRequest",
-            "crypto.roomKeyRequestCancellation",
+            CryptoEvent.KeyBackupFailed,
+            CryptoEvent.KeyBackupSessionsRemaining,
+            CryptoEvent.RoomKeyRequest,
+            CryptoEvent.RoomKeyRequestCancellation,
             "crypto.warning",
-            "crypto.devicesUpdated",
-            "crypto.willUpdateDevices",
-            "deviceVerificationChanged",
-            "userTrustStatusChanged",
-            "crossSigning.keysChanged",
+            DeviceListEvent.DevicesUpdated,
+            DeviceListEvent.WillUpdateDevices,
+            CryptoEvent.DeviceVerificationChanged,
+            CryptoEvent.UserTrustStatusChanged,
+            CryptoEvent.KeysChanged,
         ]);
 
         logger.log("Crypto: initialising crypto object...");
@@ -1588,9 +1692,8 @@ export class MatrixClient extends EventEmitter {
 
         this.olmVersion = Crypto.getOlmVersion();
 
-        // if crypto initialisation was successful, tell it to attach its event
-        // handlers.
-        crypto.registerEventHandlers(this);
+        // if crypto initialisation was successful, tell it to attach its event handlers.
+        crypto.registerEventHandlers(this as Parameters<Crypto["registerEventHandlers"]>[0]);
         this.crypto = crypto;
     }
 
@@ -4768,7 +4871,7 @@ export class MatrixClient extends EventEmitter {
         }
         return promise.then((response) => {
             this.store.removeRoom(roomId);
-            this.emit("deleteRoom", roomId);
+            this.emit(ClientEvent.DeleteRoom, roomId);
             return response;
         });
     }
@@ -6108,7 +6211,7 @@ export class MatrixClient extends EventEmitter {
     private startCallEventHandler = (): void => {
         if (this.isInitialSyncComplete()) {
             this.callEventHandler.start();
-            this.off("sync", this.startCallEventHandler);
+            this.off(ClientEvent.Sync, this.startCallEventHandler);
         }
     };
 
@@ -6256,7 +6359,7 @@ export class MatrixClient extends EventEmitter {
         // it absorbs errors and returns `{}`.
         this.clientWellKnownPromise = AutoDiscovery.getRawClientConfig(this.getDomain());
         this.clientWellKnown = await this.clientWellKnownPromise;
-        this.emit("WellKnown.client", this.clientWellKnown);
+        this.emit(ClientEvent.ClientWellKnown, this.clientWellKnown);
     }
 
     public getClientWellKnown(): IClientWellKnown {

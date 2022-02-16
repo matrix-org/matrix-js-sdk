@@ -22,7 +22,6 @@ limitations under the License.
  */
 
 import anotherjson from "another-json";
-import { EventEmitter } from 'events';
 
 import { TypedReEmitter } from '../ReEmitter';
 import { logger } from '../logger';
@@ -65,10 +64,18 @@ import { calculateKeyCheck, decryptAES, encryptAES } from './aes';
 import { DehydrationManager, IDeviceKeys, IOneTimeKey } from './dehydration';
 import { BackupManager } from "./backup";
 import { IStore } from "../store";
-import { Room } from "../models/room";
+import { Room, RoomEvent } from "../models/room";
 import { RoomMember, RoomMemberEvent } from "../models/room-member";
 import { EventStatus, IClearEvent, IEvent, MatrixEvent, MatrixEventEvent } from "../models/event";
-import { ICrossSigningKey, IKeysUploadResponse, ISignedKey, MatrixClient, SessionStore } from "../client";
+import {
+    ClientEvent,
+    ICrossSigningKey,
+    IKeysUploadResponse,
+    ISignedKey,
+    IUploadKeySignaturesResponse,
+    MatrixClient,
+    SessionStore,
+} from "../client";
 import type { IRoomEncryption, RoomList } from "./RoomList";
 import { IKeyBackupInfo } from "./keybackup";
 import { ISyncStateData } from "../sync";
@@ -76,7 +83,6 @@ import { CryptoStore } from "./store/base";
 import { IVerificationChannel } from "./verification/request/Channel";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { VerificationBase } from "./verification/Base";
-import { EventTimelineSetEvent } from "../models/event-timeline-set";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -201,24 +207,34 @@ export enum CryptoEvent {
     UserTrustStatusChanged = "userTrustStatusChanged",
     RoomKeyRequest = "crypto.roomKeyRequest",
     RoomKeyRequestCancellation = "crypto.roomKeyRequestCancellation",
+    KeyBackupStatus = "crypto.keyBackupStatus",
     KeyBackupFailed = "crypto.keyBackupFailed",
     KeyBackupSessionsRemaining = "crypto.keyBackupSessionsRemaining",
+    KeySignatureUploadFailure = "crypto.keySignatureUploadFailure",
+    VerificationRequest = "crypto.verification.request",
     KeysChanged = "crossSigning.keysChanged",
 }
 
 type EmittedEvents = CryptoEvent | DeviceListEvent.DevicesUpdated | DeviceListEvent.WillUpdateDevices;
 
-type EventHandlerMap = {
+export type CryptoEventHandlerMap = {
     [CryptoEvent.DeviceVerificationChanged]: (userId: string, deviceId: string, device: DeviceInfo) => void;
     [CryptoEvent.UserTrustStatusChanged]: (userId: string, trustLevel: UserTrustLevel) => void;
     [CryptoEvent.RoomKeyRequest]: (request: IncomingRoomKeyRequest) => void;
     [CryptoEvent.RoomKeyRequestCancellation]: (request: IncomingRoomKeyRequestCancellation) => void;
+    [CryptoEvent.KeyBackupStatus]: (enabled: boolean) => void;
     [CryptoEvent.KeyBackupFailed]: (errcode: string) => void;
     [CryptoEvent.KeyBackupSessionsRemaining]: (remaining: number) => void;
+    [CryptoEvent.KeySignatureUploadFailure]: (
+        failures: IUploadKeySignaturesResponse["failures"],
+        source: "checkOwnCrossSigningTrust" | "afterCrossSigningLocalKeyChange" | "setDeviceVerification",
+        upload: (opts: { shouldEmit: boolean }) => Promise<void>
+    ) => void;
+    [CryptoEvent.VerificationRequest]: (request: VerificationRequest<any>) => void;
     [CryptoEvent.KeysChanged]: (data: {}) => void;
-} & Pick<DeviceListHandlerMap, DeviceListEvent.DevicesUpdated | DeviceListEvent.WillUpdateDevices>;
+} & DeviceListHandlerMap;
 
-export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
+export class Crypto extends TypedEventEmitter<EmittedEvents, CryptoEventHandlerMap> {
     /**
      * @return {string} The version of Olm.
      */
@@ -233,7 +249,7 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     public readonly dehydrationManager: DehydrationManager;
     public readonly secretStorage: SecretStorage;
 
-    private readonly reEmitter: TypedReEmitter<EmittedEvents, EventHandlerMap>;
+    private readonly reEmitter: TypedReEmitter<EmittedEvents, CryptoEventHandlerMap>;
     private readonly verificationMethods: Map<VerificationMethod, typeof VerificationBase>;
     public readonly supportedAlgorithms: string[];
     private readonly outgoingRoomKeyRequestManager: OutgoingRoomKeyRequestManager;
@@ -1198,7 +1214,7 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
                 if (Object.keys(failures || []).length > 0) {
                     if (shouldEmit) {
                         this.baseApis.emit(
-                            "crypto.keySignatureUploadFailure",
+                            CryptoEvent.KeySignatureUploadFailure,
                             failures,
                             "afterCrossSigningLocalKeyChange",
                             upload, // continuation
@@ -1599,7 +1615,7 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
                         if (Object.keys(failures || []).length > 0) {
                             if (shouldEmit) {
                                 this.baseApis.emit(
-                                    "crypto.keySignatureUploadFailure",
+                                    CryptoEvent.KeySignatureUploadFailure,
                                     failures,
                                     "checkOwnCrossSigningTrust",
                                     upload,
@@ -1706,12 +1722,14 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
      *
      * @param {external:EventEmitter} eventEmitter event source where we can register
      *    for event notifications
-     * @todo use a typed EventEmitter here
      */
-    public registerEventHandlers(eventEmitter: EventEmitter): void {
+    public registerEventHandlers(eventEmitter: TypedEventEmitter<
+        RoomMemberEvent.Membership | ClientEvent.ToDeviceEvent | RoomEvent.Timeline | MatrixEventEvent.Decrypted,
+        any
+    >): void {
         eventEmitter.on(RoomMemberEvent.Membership, this.onMembership);
-        eventEmitter.on("toDeviceEvent", this.onToDeviceEvent);
-        eventEmitter.on(EventTimelineSetEvent.RoomTimeline, this.onTimelineEvent);
+        eventEmitter.on(ClientEvent.ToDeviceEvent, this.onToDeviceEvent);
+        eventEmitter.on(RoomEvent.Timeline, this.onTimelineEvent);
         eventEmitter.on(MatrixEventEvent.Decrypted, this.onTimelineEvent);
     }
 
@@ -2118,7 +2136,7 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
                         if (Object.keys(failures || []).length > 0) {
                             if (shouldEmit) {
                                 this.baseApis.emit(
-                                    "crypto.keySignatureUploadFailure",
+                                    CryptoEvent.KeySignatureUploadFailure,
                                     failures,
                                     "setDeviceVerification",
                                     upload,
@@ -2202,7 +2220,7 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
                     if (Object.keys(failures || []).length > 0) {
                         if (shouldEmit) {
                             this.baseApis.emit(
-                                "crypto.keySignatureUploadFailure",
+                                CryptoEvent.KeySignatureUploadFailure,
                                 failures,
                                 "setDeviceVerification",
                                 upload, // continuation
@@ -3286,7 +3304,7 @@ export class Crypto extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             !request.invalid && // check it has enough events to pass the UNSENT stage
             !request.observeOnly;
         if (shouldEmit) {
-            this.baseApis.emit("crypto.verification.request", request);
+            this.baseApis.emit(CryptoEvent.VerificationRequest, request);
         }
     }
 

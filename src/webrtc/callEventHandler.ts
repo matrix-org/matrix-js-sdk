@@ -18,12 +18,22 @@ import { MatrixEvent, MatrixEventEvent } from '../models/event';
 import { logger } from '../logger';
 import { CallDirection, CallErrorCode, CallState, createNewMatrixCall, MatrixCall } from './call';
 import { EventType } from '../@types/event';
-import { MatrixClient } from '../client';
+import { ClientEvent, MatrixClient } from '../client';
 import { MCallAnswer, MCallHangupReject } from "./callEventTypes";
+import { SyncState } from "../sync";
+import { RoomEvent } from "../models/room";
 
 // Don't ring unless we'd be ringing for at least 3 seconds: the user needs some
 // time to press the 'accept' button
 const RING_GRACE_PERIOD = 3000;
+
+export enum CallEvent {
+    Incoming = "Call.incoming",
+}
+
+export type CallEventHandlerMap = {
+    [CallEvent.Incoming]: (call: MatrixCall) => void;
+};
 
 export class CallEventHandler {
     client: MatrixClient;
@@ -47,17 +57,17 @@ export class CallEventHandler {
     }
 
     public start() {
-        this.client.on("sync", this.evaluateEventBuffer);
-        this.client.on("Room.timeline", this.onRoomTimeline);
+        this.client.on(ClientEvent.Sync, this.evaluateEventBuffer);
+        this.client.on(RoomEvent.Timeline, this.onRoomTimeline);
     }
 
     public stop() {
-        this.client.removeListener("sync", this.evaluateEventBuffer);
-        this.client.removeListener("Room.timeline", this.onRoomTimeline);
+        this.client.removeListener(ClientEvent.Sync, this.evaluateEventBuffer);
+        this.client.removeListener(RoomEvent.Timeline, this.onRoomTimeline);
     }
 
     private evaluateEventBuffer = async () => {
-        if (this.client.getSyncState() === "SYNCING") {
+        if (this.client.getSyncState() === SyncState.Syncing) {
             await Promise.all(this.callEventBuffer.map(event => {
                 this.client.decryptEventIfNeeded(event);
             }));
@@ -221,7 +231,7 @@ export class CallEventHandler {
                     call.hangup(CallErrorCode.Replaced, true);
                 }
             } else {
-                this.client.emit("Call.incoming", call);
+                this.client.emit(CallEvent.Incoming, call);
             }
             return;
         } else if (type === EventType.CallCandidates) {

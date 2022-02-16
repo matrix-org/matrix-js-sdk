@@ -31,7 +31,7 @@ export enum UserEvent {
     _UnstableStatusMessage = "User.unstable_statusMessage",
 }
 
-type EventHandlerMap = {
+export type UserEventHandlerMap = {
     [UserEvent.DisplayName]: (event: MatrixEvent | undefined, user: User) => void;
     [UserEvent.AvatarUrl]: (event: MatrixEvent | undefined, user: User) => void;
     [UserEvent.Presence]: (event: MatrixEvent | undefined, user: User) => void;
@@ -40,7 +40,7 @@ type EventHandlerMap = {
     [UserEvent._UnstableStatusMessage]: (user: User) => void;
 };
 
-export class User extends TypedEventEmitter<UserEvent, EventHandlerMap> {
+export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
     private modified: number;
 
     // XXX these should be read-only

@@ -40,13 +40,13 @@ export enum RoomStateEvent {
     NewMember = "RoomState.newMember",
 }
 
-type EventHandlerMap = {
+export type RoomStateEventHandlerMap = {
     [RoomStateEvent.Events]: (event: MatrixEvent, state: RoomState, lastStateEvent: MatrixEvent | null) => void;
     [RoomStateEvent.Members]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
     [RoomStateEvent.NewMember]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
 };
 
-export class RoomState extends TypedEventEmitter<RoomStateEvent, EventHandlerMap> {
+export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventHandlerMap> {
     private sentinels: Record<string, RoomMember> = {}; // userId: RoomMember
     // stores fuzzy matches to a list of userIDs (applies utils.removeHiddenChars to keys)
     private displayNameToUserIds: Record<string, string[]> = {};
