@@ -14,11 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import EventEmitter from "events";
-
 import { SDPStreamMetadataPurpose } from "./callEventTypes";
 import { MatrixClient } from "../client";
 import { RoomMember } from "../models/room-member";
+import { TypedEventEmitter } from "../models/typed-event-emitter";
 
 const POLLING_INTERVAL = 200; // ms
 export const SPEAKING_THRESHOLD = -60; // dB
@@ -47,7 +46,14 @@ export enum CallFeedEvent {
     Speaking = "speaking",
 }
 
-export class CallFeed extends EventEmitter {
+type EventHandlerMap = {
+    [CallFeedEvent.NewStream]: (stream: MediaStream) => void;
+    [CallFeedEvent.MuteStateChanged]: (audioMuted: boolean, videoMuted: boolean) => void;
+    [CallFeedEvent.VolumeChanged]: (volume: number) => void;
+    [CallFeedEvent.Speaking]: (speaking: boolean) => void;
+};
+
+export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> {
     public stream: MediaStream;
     public userId: string;
     public purpose: SDPStreamMetadataPurpose;
