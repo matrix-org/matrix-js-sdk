@@ -110,6 +110,13 @@ must include:
    These are located in `/test/end-to-end-tests`. Ideally, you would also
    include tests for edge and error cases.
 
+Unit tests are expected even when the feature is in labs. It's good practice
+to write tests alongside the code as it ensures the code is testable from
+the start, and gives you a fast feedback loop while you're developing the
+functionality. End-to-end tests should be added prior to the feature
+leaving labs, but don't have to be present from the start (although it might
+be beneficial to have some running early so you can test things faster).
+
 For bugs in those repos, your change must include at least one unit test or
 end-to-end test; which is best depends on what sort of test most concisely
 exercises the area.
