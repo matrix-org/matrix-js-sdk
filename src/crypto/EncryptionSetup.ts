@@ -14,17 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventEmitter } from "events";
-
 import { logger } from "../logger";
 import { MatrixEvent } from "../models/event";
 import { createCryptoStoreCacheCallbacks, ICacheCallbacks } from "./CrossSigning";
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { Method, PREFIX_UNSTABLE } from "../http-api";
 import { Crypto, IBootstrapCrossSigningOpts } from "./index";
-import { CrossSigningKeys, ICrossSigningKey, ICryptoCallbacks, ISignedKey, KeySignatures } from "../matrix";
+import {
+    ClientEvent,
+    CrossSigningKeys,
+    ClientEventHandlerMap,
+    ICrossSigningKey,
+    ICryptoCallbacks,
+    ISignedKey,
+    KeySignatures,
+} from "../matrix";
 import { ISecretStorageKeyInfo } from "./api";
 import { IKeyBackupInfo } from "./keybackup";
+import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { IAccountDataClient } from "./SecretStorage";
 
 interface ICrossSigningKeys {
     authUpload: IBootstrapCrossSigningOpts["authUploadDeviceSigningKeys"];
@@ -256,7 +264,10 @@ export class EncryptionSetupOperation {
  * Catches account data set by SecretStorage during bootstrapping by
  * implementing the methods related to account data in MatrixClient
  */
-class AccountDataClientAdapter extends EventEmitter {
+class AccountDataClientAdapter
+    extends TypedEventEmitter<ClientEvent.AccountData, ClientEventHandlerMap>
+    implements IAccountDataClient {
+    //
     public readonly values = new Map<string, MatrixEvent>();
 
     /**
@@ -303,7 +314,7 @@ class AccountDataClientAdapter extends EventEmitter {
         // and it seems to rely on this.
         return Promise.resolve().then(() => {
             const event = new MatrixEvent({ type, content });
-            this.emit("accountData", event, lastEvent);
+            this.emit(ClientEvent.AccountData, event, lastEvent);
             return {};
         });
     }

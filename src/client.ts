@@ -747,6 +747,16 @@ interface ITimestampToEventResponse {
 // Probably not the most graceful solution but does a good enough job for now
 const EVENT_ID_PREFIX = "$";
 
+export enum ClientEvent {
+    AccountData = "accountData",
+}
+
+type EmittedEvents = ClientEvent;
+
+export type ClientEventHandlerMap = {
+    [ClientEvent.AccountData]: (event: MatrixEvent, lastEvent?: MatrixEvent) => void;
+};
+
 /**
  * Represents a Matrix Client. Only directly construct this if you want to use
  * custom modules. Normally, {@link createClient} should be used

@@ -61,14 +61,14 @@ export enum EventTimelineSetEvent {
     RoomTimelineReset = "Room.timelineReset",
 }
 
-export type EventHandlerMap = {
+export type EventTimelineSetHandlerMap = {
     [EventTimelineSetEvent.RoomTimeline]:
         (event: MatrixEvent, room: Room, toStartOfTimeline: boolean, removed: boolean, data: IRoomTimelineData) => void;
     [EventTimelineSetEvent.RoomTimelineReset]:
         (room: Room, eventTimelineSet: EventTimelineSet, resetAllTimelines: boolean) => void;
 };
 
-export class EventTimelineSet extends TypedEventEmitter<EventTimelineSetEvent, EventHandlerMap> {
+export class EventTimelineSet extends TypedEventEmitter<EventTimelineSetEvent, EventTimelineSetHandlerMap> {
     private readonly timelineSupport: boolean;
     private unstableClientRelationAggregation: boolean;
     private displayPendingEvents: boolean;
