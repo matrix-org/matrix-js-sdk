@@ -23,7 +23,7 @@ import { EventEmitter } from "events";
 import { EmoteEvent, IPartialEvent, MessageEvent, NoticeEvent } from "matrix-events-sdk";
 
 import { ISyncStateData, SyncApi, SyncState } from "./sync";
-import { EventStatus, IContent, IDecryptOptions, IEvent, MatrixEvent } from "./models/event";
+import { EventStatus, IContent, IDecryptOptions, IEvent, MatrixEvent, MatrixEventEvents } from "./models/event";
 import { StubStore } from "./store/stub";
 import { createNewMatrixCall, MatrixCall } from "./webrtc/call";
 import { Filter, IFilterDefinition } from "./filter";
@@ -3660,7 +3660,7 @@ export class MatrixClient extends EventEmitter {
         const targetId = localEvent.getAssociatedId();
         if (targetId && targetId.startsWith("~")) {
             const target = room.getPendingEvents().find(e => e.getId() === targetId);
-            target.once("Event.localEventIdReplaced", () => {
+            target.once(MatrixEventEvents.LocalEventIdReplaced, () => {
                 localEvent.updateAssociatedId(target.getId());
             });
         }
@@ -6510,7 +6510,7 @@ export class MatrixClient extends EventEmitter {
             const allEvents = originalEvent ? events.concat(originalEvent) : events;
             await Promise.all(allEvents.map(e => {
                 if (e.isEncrypted()) {
-                    return new Promise(resolve => e.once("Event.decrypted", resolve));
+                    return new Promise(resolve => e.once(MatrixEventEvents.Decrypted, resolve));
                 }
             }));
             events = events.filter(e => e.getType() === eventType);

@@ -19,7 +19,7 @@ limitations under the License.
  */
 
 import { EventTimeline } from "./event-timeline";
-import { EventStatus, MatrixEvent } from "./event";
+import { EventStatus, MatrixEvent, MatrixEventEvents } from "./event";
 import { logger } from '../logger';
 import { Relations } from './relations';
 import { Room } from "./room";
@@ -829,7 +829,7 @@ export class EventTimelineSet extends TypedEventEmitter<EventTimelineSetEvents, 
 
         // If the event is currently encrypted, wait until it has been decrypted.
         if (event.isBeingDecrypted() || event.shouldAttemptDecryption()) {
-            event.once("Event.decrypted", () => {
+            event.once(MatrixEventEvents.Decrypted, () => {
                 this.aggregateRelations(event);
             });
             return;

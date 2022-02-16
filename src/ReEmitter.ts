@@ -47,8 +47,6 @@ export class ReEmitter {
     }
 }
 
-type Common<T1, T2> = Omit<T1, keyof Omit<T1, keyof T2>>;
-
 export class TypedReEmitter<
     Events extends string,
     Arguments extends ListenerMap<Events>,
@@ -57,8 +55,8 @@ export class TypedReEmitter<
         super(target);
     }
 
-    public reEmit<ReEmittedEvents extends string, T extends Common<ReEmittedEvents, Events> & string>(
-        source: TypedEventEmitter<T, any>,
+    public reEmit<ReEmittedEvents extends string, T extends Events & ReEmittedEvents>(
+        source: TypedEventEmitter<ReEmittedEvents, any>,
         eventNames: T[],
     ): void {
         super.reEmit(source, eventNames);

@@ -34,13 +34,20 @@ import * as algorithms from "./algorithms";
 import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from './CrossSigning';
 import { EncryptionSetupBuilder } from "./EncryptionSetup";
 import {
+    ISecretRequest,
     SECRET_STORAGE_ALGORITHM_V1_AES,
     SecretStorage,
-    SecretStorageKeyTuple,
-    ISecretRequest,
     SecretStorageKeyObject,
+    SecretStorageKeyTuple,
 } from './SecretStorage';
-import { IAddSecretStorageKeyOpts, ICreateSecretStorageOpts, IImportRoomKeysOpts, ISecretStorageKeyInfo } from "./api";
+import {
+    IAddSecretStorageKeyOpts,
+    ICreateSecretStorageOpts,
+    IEncryptedEventInfo,
+    IImportRoomKeysOpts,
+    IRecoveryKey,
+    ISecretStorageKeyInfo
+} from "./api";
 import { OutgoingRoomKeyRequestManager } from './OutgoingRoomKeyRequestManager';
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { ReciprocateQRCode, SCAN_QR_CODE_METHOD, SHOW_QR_CODE_METHOD } from './verification/QRCode';
@@ -52,17 +59,16 @@ import { InRoomChannel, InRoomRequests } from "./verification/request/InRoomChan
 import { ToDeviceChannel, ToDeviceRequests } from "./verification/request/ToDeviceChannel";
 import { IllegalMethod } from "./verification/IllegalMethod";
 import { KeySignatureUploadError } from "../errors";
-import { decryptAES, encryptAES, calculateKeyCheck } from './aes';
+import { calculateKeyCheck, decryptAES, encryptAES } from './aes';
 import { DehydrationManager, IDeviceKeys, IOneTimeKey } from './dehydration';
 import { BackupManager } from "./backup";
 import { IStore } from "../store";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
-import { MatrixEvent, EventStatus, IClearEvent, IEvent } from "../models/event";
-import { MatrixClient, IKeysUploadResponse, SessionStore, ISignedKey, ICrossSigningKey } from "../client";
-import type { EncryptionAlgorithm, DecryptionAlgorithm } from "./algorithms/base";
+import { EventStatus, IClearEvent, IEvent, MatrixEvent, MatrixEventEvents } from "../models/event";
+import { ICrossSigningKey, IKeysUploadResponse, ISignedKey, MatrixClient, SessionStore } from "../client";
+import type { DecryptionAlgorithm, EncryptionAlgorithm } from "./algorithms/base";
 import type { IRoomEncryption, RoomList } from "./RoomList";
-import { IRecoveryKey, IEncryptedEventInfo } from "./api";
 import { IKeyBackupInfo } from "./keybackup";
 import { ISyncStateData } from "../sync";
 import { CryptoStore } from "./store/base";
@@ -3070,7 +3076,7 @@ export class Crypto extends EventEmitter {
                     event.attemptDecryption(this);
                 }
                 // once the event has been decrypted, try again
-                event.once('Event.decrypted', (ev) => {
+                event.once(MatrixEventEvents.Decrypted, (ev) => {
                     this.onToDeviceEvent(ev);
                 });
             }
@@ -3219,15 +3225,15 @@ export class Crypto extends EventEmitter {
                             reject(new Error("Event status set to CANCELLED."));
                         }
                     };
-                    event.once("Event.localEventIdReplaced", eventIdListener);
-                    event.on("Event.status", statusListener);
+                    event.once(MatrixEventEvents.LocalEventIdReplaced, eventIdListener);
+                    event.on(MatrixEventEvents.Status, statusListener);
                 });
             } catch (err) {
                 logger.error("error while waiting for the verification event to be sent: " + err.message);
                 return;
             } finally {
-                event.removeListener("Event.localEventIdReplaced", eventIdListener);
-                event.removeListener("Event.status", statusListener);
+                event.removeListener(MatrixEventEvents.LocalEventIdReplaced, eventIdListener);
+                event.removeListener(MatrixEventEvents.Status, statusListener);
             }
         }
         let request = requestsMap.getRequest(event);

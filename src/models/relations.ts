@@ -16,7 +16,7 @@ limitations under the License.
 
 import { EventEmitter } from 'events';
 
-import { EventStatus, MatrixEvent, IAggregatedRelation } from './event';
+import { EventStatus, IAggregatedRelation, MatrixEvent, MatrixEventEvents } from './event';
 import { Room } from './room';
 import { logger } from '../logger';
 import { RelationType } from "../@types/event";
@@ -84,7 +84,7 @@ export class Relations extends EventEmitter {
         // If the event is in the process of being sent, listen for cancellation
         // so we can remove the event from the collection.
         if (event.isSending()) {
-            event.on("Event.status", this.onEventStatus);
+            event.on(MatrixEventEvents.Status, this.onEventStatus);
         }
 
         this.relations.add(event);
@@ -97,7 +97,7 @@ export class Relations extends EventEmitter {
             this.targetEvent.makeReplaced(lastReplacement);
         }
 
-        event.on("Event.beforeRedaction", this.onBeforeRedaction);
+        event.on(MatrixEventEvents.BeforeRedaction, this.onBeforeRedaction);
 
         this.emit("Relations.add", event);
 
@@ -150,14 +150,14 @@ export class Relations extends EventEmitter {
     private onEventStatus = (event: MatrixEvent, status: EventStatus) => {
         if (!event.isSending()) {
             // Sending is done, so we don't need to listen anymore
-            event.removeListener("Event.status", this.onEventStatus);
+            event.removeListener(MatrixEventEvents.Status, this.onEventStatus);
             return;
         }
         if (status !== EventStatus.CANCELLED) {
             return;
         }
         // Event was cancelled, remove from the collection
-        event.removeListener("Event.status", this.onEventStatus);
+        event.removeListener(MatrixEventEvents.Status, this.onEventStatus);
         this.removeEvent(event);
     };
 
@@ -255,7 +255,7 @@ export class Relations extends EventEmitter {
             this.targetEvent.makeReplaced(lastReplacement);
         }
 
-        redactedEvent.removeListener("Event.beforeRedaction", this.onBeforeRedaction);
+        redactedEvent.removeListener(MatrixEventEvents.BeforeRedaction, this.onBeforeRedaction);
 
         this.emit("Relations.redaction", redactedEvent);
     };
@@ -375,6 +375,6 @@ export class Relations extends EventEmitter {
             return;
         }
         this.creationEmitted = true;
-        this.targetEvent.emit("Event.relationsCreated", this.relationType, this.eventType);
+        this.targetEvent.emit(MatrixEventEvents.RelationsCreated, this.relationType, this.eventType);
     }
 }
