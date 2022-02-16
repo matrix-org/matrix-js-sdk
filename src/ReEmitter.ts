@@ -19,13 +19,9 @@ limitations under the License.
 import { EventEmitter } from "events";
 
 export class ReEmitter {
-    private target: EventEmitter;
+    constructor(private readonly target: EventEmitter) {}
 
-    constructor(target: EventEmitter) {
-        this.target = target;
-    }
-
-    reEmit(source: EventEmitter, eventNames: string[]) {
+    public reEmit(source: EventEmitter, eventNames: string[]): void {
         for (const eventName of eventNames) {
             // We include the source as the last argument for event handlers which may need it,
             // such as read receipt listeners on the client class which won't have the context
