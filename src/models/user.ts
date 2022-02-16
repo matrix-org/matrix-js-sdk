@@ -24,6 +24,9 @@ import { TypedEventEmitter } from "./typed-event-emitter";
 export enum UserEvents {
     DisplayName = "User.displayName",
     AvatarUrl = "User.avatarUrl",
+    Presence = "User.presence",
+    CurrentlyActive = "User.currentlyActive",
+    LastPresenceTs = "User.lastPresenceTs",
     /* @deprecated */
     _UnstableStatusMessage = "User.unstable_statusMessage",
 }
@@ -31,6 +34,9 @@ export enum UserEvents {
 type EventHandlerMap = {
     [UserEvents.DisplayName]: (event: MatrixEvent | undefined, user: User) => void;
     [UserEvents.AvatarUrl]: (event: MatrixEvent | undefined, user: User) => void;
+    [UserEvents.Presence]: (event: MatrixEvent | undefined, user: User) => void;
+    [UserEvents.CurrentlyActive]: (event: MatrixEvent | undefined, user: User) => void;
+    [UserEvents.LastPresenceTs]: (event: MatrixEvent | undefined, user: User) => void;
     [UserEvents._UnstableStatusMessage]: (user: User) => void;
 };
 
@@ -105,25 +111,25 @@ export class User extends TypedEventEmitter<UserEvents, EventHandlerMap> {
         const firstFire = this.events.presence === null;
         this.events.presence = event;
 
-        const eventsToFire = [];
+        const eventsToFire: UserEvents[] = [];
         if (event.getContent().presence !== this.presence || firstFire) {
-            eventsToFire.push("User.presence");
+            eventsToFire.push(UserEvents.Presence);
         }
         if (event.getContent().avatar_url &&
             event.getContent().avatar_url !== this.avatarUrl) {
-            eventsToFire.push("User.avatarUrl");
+            eventsToFire.push(UserEvents.AvatarUrl);
         }
         if (event.getContent().displayname &&
             event.getContent().displayname !== this.displayName) {
-            eventsToFire.push("User.displayName");
+            eventsToFire.push(UserEvents.DisplayName);
         }
         if (event.getContent().currently_active !== undefined &&
             event.getContent().currently_active !== this.currentlyActive) {
-            eventsToFire.push("User.currentlyActive");
+            eventsToFire.push(UserEvents.CurrentlyActive);
         }
 
         this.presence = event.getContent().presence;
-        eventsToFire.push("User.lastPresenceTs");
+        eventsToFire.push(UserEvents.LastPresenceTs);
 
         if (event.getContent().status_msg) {
             this.presenceStatusMsg = event.getContent().status_msg;
