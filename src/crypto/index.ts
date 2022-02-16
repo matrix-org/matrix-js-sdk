@@ -28,7 +28,7 @@ import { ReEmitter } from '../ReEmitter';
 import { logger } from '../logger';
 import { IExportedDevice, OlmDevice } from "./OlmDevice";
 import * as olmlib from "./olmlib";
-import { DeviceInfoMap, DeviceList } from "./DeviceList";
+import { DeviceInfoMap, DeviceList, DeviceListEvents } from "./DeviceList";
 import { DeviceInfo, IDevice } from "./deviceinfo";
 import * as algorithms from "./algorithms";
 import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from './CrossSigning';
@@ -364,7 +364,7 @@ export class Crypto extends EventEmitter {
 
         // XXX: This isn't removed at any point, but then none of the event listeners
         // this class sets seem to be removed at any point... :/
-        this.deviceList.on('userCrossSigningUpdated', this.onDeviceListUserCrossSigningUpdated);
+        this.deviceList.on(DeviceListEvents.UserCrossSigningUpdated, this.onDeviceListUserCrossSigningUpdated);
         this.reEmitter.reEmit(this.deviceList, ["crypto.devicesUpdated", "crypto.willUpdateDevices"]);
 
         this.supportedAlgorithms = Object.keys(algorithms.DECRYPTION_CLASSES);
