@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventEmitter } from 'events';
-
 import { logger } from '../../../logger';
 import {
     errorFactory,
@@ -29,6 +27,7 @@ import { MatrixClient } from "../../../client";
 import { MatrixEvent } from "../../../models/event";
 import { VerificationBase } from "../Base";
 import { VerificationMethod } from "../../index";
+import { TypedEventEmitter } from "../../../models/typed-event-emitter";
 
 // How long after the event's timestamp that the request times out
 const TIMEOUT_FROM_EVENT_TS = 10 * 60 * 1000; // 10 minutes
@@ -76,13 +75,23 @@ interface ITransition {
     event?: MatrixEvent;
 }
 
+export enum VerificationRequestEvents {
+    Change = "change",
+}
+
+type EventHandlerMap = {
+    [VerificationRequestEvents.Change]: () => void;
+};
+
 /**
  * State machine for verification requests.
  * Things that differ based on what channel is used to
  * send and receive verification events are put in `InRoomChannel` or `ToDeviceChannel`.
  * @event "change" whenever the state of the request object has changed.
  */
-export class VerificationRequest<C extends IVerificationChannel = IVerificationChannel> extends EventEmitter {
+export class VerificationRequest<
+    C extends IVerificationChannel = IVerificationChannel,
+> extends TypedEventEmitter<VerificationRequestEvents, EventHandlerMap> {
     private eventsByUs = new Map<string, MatrixEvent>();
     private eventsByThem = new Map<string, MatrixEvent>();
     private _observeOnly = false;
@@ -453,7 +462,7 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
     public async cancel({ reason = "User declined", code = "m.user" } = {}): Promise<void> {
         if (!this.observeOnly && this._phase !== PHASE_CANCELLED) {
             this._declining = true;
-            this.emit("change");
+            this.emit(VerificationRequestEvents.Change);
             if (this._verifier) {
                 return this._verifier.cancel(errorFactory(code, reason)());
             } else {
@@ -471,7 +480,7 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
         if (!this.observeOnly && this.phase === PHASE_REQUESTED && !this.initiatedByMe) {
             const methods = [...this.verificationMethods.keys()];
             this._accepting = true;
-            this.emit("change");
+            this.emit(VerificationRequestEvents.Change);
             await this.channel.send(READY_TYPE, { methods });
         }
     }
@@ -495,12 +504,12 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
                     handled = true;
                 }
                 if (handled) {
-                    this.off("change", check);
+                    this.off(VerificationRequestEvents.Change, check);
                 }
                 return handled;
             };
             if (!check()) {
-                this.on("change", check);
+                this.on(VerificationRequestEvents.Change, check);
             }
         });
     }
@@ -508,7 +517,7 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
     private setPhase(phase: Phase, notify = true): void {
         this._phase = phase;
         if (notify) {
-            this.emit("change");
+            this.emit(VerificationRequestEvents.Change);
         }
     }
 
@@ -768,7 +777,7 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
                 // set phase as last thing as this emits the "change" event
                 this.setPhase(phase);
             } else if (this._observeOnly !== wasObserveOnly) {
-                this.emit("change");
+                this.emit(VerificationRequestEvents.Change);
             }
         } finally {
             // log events we processed so we can see from rageshakes what events were added to a request
