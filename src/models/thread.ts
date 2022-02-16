@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixClient } from "../matrix";
-import { ReEmitter } from "../ReEmitter";
+import { EventTimelineSetEvents, MatrixClient, RoomEvents } from "../matrix";
+import { TypedReEmitter } from "../ReEmitter";
 import { RelationType } from "../@types/event";
 import { IRelationsRequestOpts } from "../@types/requests";
-import { MatrixEvent, IThreadBundledRelationship } from "./event";
+import { IThreadBundledRelationship, MatrixEvent } from "./event";
 import { Direction, EventTimeline } from "./event-timeline";
-import { EventTimelineSet } from './event-timeline-set';
+import { EventTimelineSet, EventHandlerMap as EventTimelineSetHandlerMap } from './event-timeline-set';
 import { Room } from './room';
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { RoomState } from "./room-state";
@@ -32,6 +32,16 @@ export enum ThreadEvent {
     ViewThread = "Thread.viewThread",
 }
 
+type EmittedEvents = Exclude<ThreadEvent, ThreadEvent.New>
+    | EventTimelineSetEvents.RoomTimeline
+    | EventTimelineSetEvents.RoomTimelineReset;
+
+export type EventHandlerMap = {
+    [ThreadEvent.Update]: (thread: Thread) => void;
+    [ThreadEvent.NewReply]: (thread: Thread, event: MatrixEvent) => void;
+    [ThreadEvent.ViewThread]: () => void;
+} & Pick<EventTimelineSetHandlerMap, EventTimelineSetEvents.RoomTimeline | EventTimelineSetEvents.RoomTimelineReset>;
+
 interface IThreadOpts {
     initialEvents?: MatrixEvent[];
     room: Room;
@@ -41,7 +51,7 @@ interface IThreadOpts {
 /**
  * @experimental
  */
-export class Thread extends TypedEventEmitter<ThreadEvent> {
+export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     /**
      * A reference to all the events ID at the bottom of the threads
      */
@@ -49,7 +59,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
 
     private _currentUserParticipated = false;
 
-    private reEmitter: ReEmitter;
+    private reEmitter: TypedReEmitter<EmittedEvents, EventHandlerMap>;
 
     private lastEvent: MatrixEvent;
     private replyCount = 0;
@@ -74,11 +84,11 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
             timelineSupport: true,
             pendingEvents: true,
         });
-        this.reEmitter = new ReEmitter(this);
+        this.reEmitter = new TypedReEmitter(this);
 
         this.reEmitter.reEmit(this.timelineSet, [
-            "Room.timeline",
-            "Room.timelineReset",
+            EventTimelineSetEvents.RoomTimeline,
+            EventTimelineSetEvents.RoomTimelineReset,
         ]);
 
         // If we weren't able to find the root event, it's probably missing
@@ -93,8 +103,8 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
 
         opts?.initialEvents?.forEach(event => this.addEvent(event));
 
-        this.room.on("Room.localEchoUpdated", this.onEcho);
-        this.room.on("Room.timeline", this.onEcho);
+        this.room.on(RoomEvents.LocalEchoUpdated, this.onEcho);
+        this.room.on(EventTimelineSetEvents.RoomTimeline, this.onEcho);
     }
 
     public get hasServerSideSupport(): boolean {

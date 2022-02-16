@@ -18,8 +18,6 @@ limitations under the License.
  * @module models/event-timeline-set
  */
 
-import { EventEmitter } from "events";
-
 import { EventTimeline } from "./event-timeline";
 import { EventStatus, MatrixEvent } from "./event";
 import { logger } from '../logger';
@@ -28,6 +26,7 @@ import { Room } from "./room";
 import { Filter } from "../filter";
 import { EventType, RelationType } from "../@types/event";
 import { RoomState } from "./room-state";
+import { TypedEventEmitter } from "./typed-event-emitter";
 
 // var DEBUG = false;
 const DEBUG = true;
@@ -57,7 +56,19 @@ export interface IRoomTimelineData {
     liveEvent?: boolean;
 }
 
-export class EventTimelineSet extends EventEmitter {
+export enum EventTimelineSetEvents {
+    RoomTimeline = "Room.timeline",
+    RoomTimelineReset = "Room.timelineReset",
+}
+
+export type EventHandlerMap = {
+    [EventTimelineSetEvents.RoomTimeline]:
+        (event: MatrixEvent, room: Room, toStartOfTimeline: boolean, removed: boolean, data: IRoomTimelineData) => void;
+    [EventTimelineSetEvents.RoomTimelineReset]:
+        (room: Room, eventTimelineSet: EventTimelineSet, resetAllTimelines: boolean) => void;
+};
+
+export class EventTimelineSet extends TypedEventEmitter<EventTimelineSetEvents, EventHandlerMap> {
     private readonly timelineSupport: boolean;
     private unstableClientRelationAggregation: boolean;
     private displayPendingEvents: boolean;
@@ -247,7 +258,7 @@ export class EventTimelineSet extends EventEmitter {
 
         // Now we can swap the live timeline to the new one.
         this.liveTimeline = newTimeline;
-        this.emit("Room.timelineReset", this.room, this, resetAllTimelines);
+        this.emit(EventTimelineSetEvents.RoomTimelineReset, this.room, this, resetAllTimelines);
     }
 
     /**
@@ -597,8 +608,7 @@ export class EventTimelineSet extends EventEmitter {
             timeline: timeline,
             liveEvent: !toStartOfTimeline && timeline == this.liveTimeline && !fromCache,
         };
-        this.emit("Room.timeline", event, this.room,
-            Boolean(toStartOfTimeline), false, data);
+        this.emit(EventTimelineSetEvents.RoomTimeline, event, this.room, Boolean(toStartOfTimeline), false, data);
     }
 
     /**
@@ -652,7 +662,7 @@ export class EventTimelineSet extends EventEmitter {
             const data = {
                 timeline: timeline,
             };
-            this.emit("Room.timeline", removed, this.room, undefined, true, data);
+            this.emit(EventTimelineSetEvents.RoomTimeline, removed, this.room, undefined, true, data);
         }
         return removed;
     }

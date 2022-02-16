@@ -21,6 +21,16 @@ enum EventEmitterEvents {
     RemoveListener = "removeListener",
 }
 
+type AnyListener = (...args: any) => any;
+export type ListenerMap<E extends string> = { [eventName in E]: AnyListener };
+type EventEmitterEventListener = (eventName: string, listener: AnyListener) => void;
+
+type Listener<
+    E extends string,
+    A extends ListenerMap<E>,
+    T extends E | EventEmitterEvents,
+> = T extends E ? A[T] : EventEmitterEventListener;
+
 /**
  * Typed Event Emitter class which can act as a Base Model for all our model
  * and communication events.
@@ -28,17 +38,24 @@ enum EventEmitterEvents {
  * to properly type this, so that our events are not stringly-based and prone
  * to silly typos.
  */
-export abstract class TypedEventEmitter<Events extends string> extends EventEmitter {
-    public addListener(event: Events | EventEmitterEvents, listener: (...args: any[]) => void): this {
+export abstract class TypedEventEmitter<
+    Events extends string,
+    Arguments extends ListenerMap<Events>,
+> extends EventEmitter {
+    public addListener<T extends Events | EventEmitterEvents>(
+        event: T,
+        listener: Listener<Events, Arguments, T>,
+    ): this {
         return super.addListener(event, listener);
     }
 
-    public emit(event: Events | EventEmitterEvents, ...args: any[]): boolean {
+    public emit<T extends Events>(event: T, ...args: Parameters<Arguments[T]>): boolean {
+        // @ts-expect-error TS2488
         return super.emit(event, ...args);
     }
 
     public eventNames(): (Events | EventEmitterEvents)[] {
-        return super.eventNames() as Events[];
+        return super.eventNames() as Array<Events | EventEmitterEvents>;
     }
 
     public listenerCount(event: Events | EventEmitterEvents): number {
@@ -49,23 +66,38 @@ export abstract class TypedEventEmitter<Events extends string> extends EventEmit
         return super.listeners(event);
     }
 
-    public off(event: Events | EventEmitterEvents, listener: (...args: any[]) => void): this {
+    public off<T extends Events | EventEmitterEvents>(
+        event: T,
+        listener: Listener<Events, Arguments, T>,
+    ): this {
         return super.off(event, listener);
     }
 
-    public on(event: Events | EventEmitterEvents, listener: (...args: any[]) => void): this {
+    public on<T extends Events | EventEmitterEvents>(
+        event: T,
+        listener: Listener<Events, Arguments, T>,
+    ): this {
         return super.on(event, listener);
     }
 
-    public once(event: Events | EventEmitterEvents, listener: (...args: any[]) => void): this {
+    public once<T extends Events | EventEmitterEvents>(
+        event: T,
+        listener: Listener<Events, Arguments, T>,
+    ): this {
         return super.once(event, listener);
     }
 
-    public prependListener(event: Events | EventEmitterEvents, listener: (...args: any[]) => void): this {
+    public prependListener<T extends Events | EventEmitterEvents>(
+        event: T,
+        listener: Listener<Events, Arguments, T>,
+    ): this {
         return super.prependListener(event, listener);
     }
 
-    public prependOnceListener(event: Events | EventEmitterEvents, listener: (...args: any[]) => void): this {
+    public prependOnceListener<T extends Events | EventEmitterEvents>(
+        event: T,
+        listener: Listener<Events, Arguments, T>,
+    ): this {
         return super.prependOnceListener(event, listener);
     }
 
@@ -73,7 +105,10 @@ export abstract class TypedEventEmitter<Events extends string> extends EventEmit
         return super.removeAllListeners(event);
     }
 
-    public removeListener(event: Events | EventEmitterEvents, listener: (...args: any[]) => void): this {
+    public removeListener<T extends Events | EventEmitterEvents>(
+        event: T,
+        listener: Listener<Events, Arguments, T>,
+    ): this {
         return super.removeListener(event, listener);
     }
 

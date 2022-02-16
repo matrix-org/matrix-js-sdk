@@ -18,6 +18,8 @@ limitations under the License.
 
 import { EventEmitter } from "events";
 
+import { ListenerMap, TypedEventEmitter } from "./models/typed-event-emitter";
+
 export class ReEmitter {
     constructor(private readonly target: EventEmitter) {}
 
@@ -42,5 +44,23 @@ export class ReEmitter {
             };
             source.on(eventName, forSource);
         }
+    }
+}
+
+type Common<T1, T2> = Omit<T1, keyof Omit<T1, keyof T2>>;
+
+export class TypedReEmitter<
+    Events extends string,
+    Arguments extends ListenerMap<Events>,
+> extends ReEmitter {
+    constructor(target: TypedEventEmitter<Events, Arguments>) {
+        super(target);
+    }
+
+    public reEmit<ReEmittedEvents extends string, T extends Common<ReEmittedEvents, Events> & string>(
+        source: TypedEventEmitter<T, any>,
+        eventNames: T[],
+    ): void {
+        super.reEmit(source, eventNames);
     }
 }

@@ -18,12 +18,23 @@ limitations under the License.
  * @module models/user
  */
 
-import { EventEmitter } from "events";
-
 import { MatrixEvent } from "./event";
+import { TypedEventEmitter } from "./typed-event-emitter";
 
-export class User extends EventEmitter {
-    // eslint-disable-next-line camelcase
+export enum UserEvents {
+    DisplayName = "User.displayName",
+    AvatarUrl = "User.avatarUrl",
+    /* @deprecated */
+    _UnstableStatusMessage = "User.unstable_statusMessage",
+}
+
+type EventHandlerMap = {
+    [UserEvents.DisplayName]: (event: MatrixEvent | undefined, user: User) => void;
+    [UserEvents.AvatarUrl]: (event: MatrixEvent | undefined, user: User) => void;
+    [UserEvents._UnstableStatusMessage]: (user: User) => void;
+};
+
+export class User extends TypedEventEmitter<UserEvents, EventHandlerMap> {
     private modified: number;
 
     // XXX these should be read-only
@@ -213,7 +224,7 @@ export class User extends EventEmitter {
         if (!event.getContent()) this.unstable_statusMessage = "";
         else this.unstable_statusMessage = event.getContent()["status"];
         this.updateModifiedTime();
-        this.emit("User.unstable_statusMessage", this);
+        this.emit(UserEvents._UnstableStatusMessage, this);
     }
 }
 

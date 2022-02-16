@@ -67,7 +67,7 @@ import {
 import { DeviceInfo, IDevice } from "./crypto/deviceinfo";
 import { decodeRecoveryKey } from './crypto/recoverykey';
 import { keyFromAuthData } from './crypto/key_passphrase';
-import { User } from "./models/user";
+import { User, UserEvents } from "./models/user";
 import { getHttpUriForMxc } from "./content-repo";
 import { SearchResult } from "./models/search-result";
 import {
@@ -4916,7 +4916,7 @@ export class MatrixClient extends EventEmitter {
         const user = this.getUser(this.getUserId());
         if (user) {
             user.displayName = name;
-            user.emit("User.displayName", user.events.presence, user);
+            user.emit(UserEvents.DisplayName, user.events.presence, user);
         }
         return prom;
     }
@@ -4933,7 +4933,7 @@ export class MatrixClient extends EventEmitter {
         const user = this.getUser(this.getUserId());
         if (user) {
             user.avatarUrl = url;
-            user.emit("User.avatarUrl", user.events.presence, user);
+            user.emit(UserEvents.AvatarUrl, user.events.presence, user);
         }
         return prom;
     }
