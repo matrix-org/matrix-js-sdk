@@ -16,20 +16,24 @@ limitations under the License.
 
 import { EventEmitter } from "events";
 
-enum EventEmitterEvents {
+export enum EventEmitterEvents {
     NewListener = "newListener",
     RemoveListener = "removeListener",
+    Error = "error",
 }
 
 type AnyListener = (...args: any) => any;
 export type ListenerMap<E extends string> = { [eventName in E]: AnyListener };
 type EventEmitterEventListener = (eventName: string, listener: AnyListener) => void;
+type EventEmitterErrorListener = (error: Error) => void;
 
 type Listener<
     E extends string,
     A extends ListenerMap<E>,
     T extends E | EventEmitterEvents,
-> = T extends E ? A[T] : EventEmitterEventListener;
+> = T extends E ? A[T]
+    : T extends EventEmitterEvents ? EventEmitterErrorListener
+    : EventEmitterEventListener;
 
 /**
  * Typed Event Emitter class which can act as a Base Model for all our model

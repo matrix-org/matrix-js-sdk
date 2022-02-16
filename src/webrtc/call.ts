@@ -21,8 +21,6 @@ limitations under the License.
  * @module webrtc/call
  */
 
-import { EventEmitter } from 'events';
-
 import { logger } from '../logger';
 import * as utils from '../utils';
 import { MatrixEvent } from '../models/event';
@@ -47,6 +45,7 @@ import {
 import { CallFeed } from './callFeed';
 import { MatrixClient } from "../client";
 import { ISendEventResponse } from "../@types/requests";
+import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter";
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
@@ -241,6 +240,21 @@ function genCallID(): string {
     return Date.now().toString() + randomString(16);
 }
 
+type EventHandlerMap = {
+    [CallEvent.DataChannel]: (channel: RTCDataChannel) => void;
+    [CallEvent.FeedsChanged]: (feeds: CallFeed[]) => void;
+    [CallEvent.Replaced]: (newCall: MatrixCall) => void;
+    [CallEvent.Error]: (error: CallError) => void;
+    [CallEvent.RemoteHoldUnhold]: (onHold: boolean) => void;
+    [CallEvent.LocalHoldUnhold]: (onHold: boolean) => void;
+    [CallEvent.LengthChanged]: (length: number) => void;
+    [CallEvent.State]: (state: CallState, oldState?: CallState) => void;
+    [CallEvent.Hangup]: () => void;
+    [CallEvent.AssertedIdentityChanged]: () => void;
+    /* @deprecated */
+    [CallEvent.HoldUnhold]: (onHold: boolean) => void;
+};
+
 /**
  * Construct a new Matrix Call.
  * @constructor
@@ -252,7 +266,7 @@ function genCallID(): string {
  * @param {Array<Object>} opts.turnServers Optional. A list of TURN servers.
  * @param {MatrixClient} opts.client The Matrix Client instance to send events to.
  */
-export class MatrixCall extends EventEmitter {
+export class MatrixCall extends TypedEventEmitter<CallEvent, EventHandlerMap> {
     public roomId: string;
     public callId: string;
     public state = CallState.Fledgling;
@@ -1973,7 +1987,7 @@ export class MatrixCall extends EventEmitter {
             this.peerConn.close();
         }
         if (shouldEmit) {
-            this.emit(CallEvent.Hangup, this);
+            this.emit(CallEvent.Hangup);
         }
     }
 
@@ -1995,7 +2009,7 @@ export class MatrixCall extends EventEmitter {
     }
 
     private checkForErrorListener(): void {
-        if (this.listeners("error").length === 0) {
+        if (this.listeners(EventEmitterEvents.Error).length === 0) {
             throw new Error(
                 "You MUST attach an error listener using call.on('error', function() {})",
             );
