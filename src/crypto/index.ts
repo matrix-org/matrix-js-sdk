@@ -46,7 +46,7 @@ import {
     IEncryptedEventInfo,
     IImportRoomKeysOpts,
     IRecoveryKey,
-    ISecretStorageKeyInfo
+    ISecretStorageKeyInfo,
 } from "./api";
 import { OutgoingRoomKeyRequestManager } from './OutgoingRoomKeyRequestManager';
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
@@ -67,7 +67,7 @@ import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
 import { EventStatus, IClearEvent, IEvent, MatrixEvent, MatrixEventEvents } from "../models/event";
 import { ICrossSigningKey, IKeysUploadResponse, ISignedKey, MatrixClient, SessionStore } from "../client";
-import type { DecryptionAlgorithm, EncryptionAlgorithm } from "./algorithms/base";
+import type { DecryptionAlgorithm, EncryptionAlgorithm } from "./algorithms";
 import type { IRoomEncryption, RoomList } from "./RoomList";
 import { IKeyBackupInfo } from "./keybackup";
 import { ISyncStateData } from "../sync";
@@ -208,7 +208,7 @@ export class Crypto extends EventEmitter {
     public readonly secretStorage: SecretStorage;
 
     private readonly reEmitter: ReEmitter;
-    private readonly verificationMethods: any; // TODO types
+    private readonly verificationMethods: Map<VerificationMethod, typeof VerificationBase>;
     public readonly supportedAlgorithms: string[];
     private readonly outgoingRoomKeyRequestManager: OutgoingRoomKeyRequestManager;
     private readonly toDeviceVerificationRequests: ToDeviceRequests;
@@ -301,7 +301,7 @@ export class Crypto extends EventEmitter {
         private readonly clientStore: IStore,
         public readonly cryptoStore: CryptoStore,
         private readonly roomList: RoomList,
-        verificationMethods: any[], // TODO types
+        verificationMethods: Array<keyof typeof defaultVerificationMethods | typeof VerificationBase>,
     ) {
         super();
         this.reEmitter = new ReEmitter(this);
@@ -316,17 +316,17 @@ export class Crypto extends EventEmitter {
                             defaultVerificationMethods[method],
                         );
                     }
-                } else if (method.NAME) {
+                } else if (method["NAME"]) {
                     this.verificationMethods.set(
-                        method.NAME,
-                        method,
+                        method["NAME"],
+                        method as typeof VerificationBase,
                     );
                 } else {
                     logger.warn(`Excluding unknown verification method ${method}`);
                 }
             }
         } else {
-            this.verificationMethods = defaultVerificationMethods;
+            this.verificationMethods = new Map(Object.entries(defaultVerificationMethods));
         }
 
         this.backupManager = new BackupManager(baseApis, async () => {
