@@ -151,7 +151,7 @@ export class Room extends EventEmitter {
     // which pass in an event ID and get back some receipts, so we also store
     // a pre-cached list for this purpose.
     private receipts: Receipts = {}; // { receipt_type: { user_id: IReceipt } }
-    private receiptCacheByEventId: ReceiptCache = {}; // { event_id: IReceipt2[] }
+    private receiptCacheByEventId: ReceiptCache = {}; // { event_id: ICachedReceipt[] }
     private notificationCounts: Partial<Record<NotificationCountType, number>> = {};
     private readonly timelineSets: EventTimelineSet[];
     // any filtered timeline sets we're maintaining for this room
