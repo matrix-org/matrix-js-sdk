@@ -31,6 +31,8 @@ export class CallEventHandler {
     calls: Map<string, MatrixCall>;
     callEventBuffer: MatrixEvent[];
     candidateEventsByCall: Map<string, Array<MatrixEvent>>;
+    nextSeqByCall: Map<string, number> = new Map();
+    toDeviceEventBuffers: Map<string, Array<MatrixEvent>> = new Map();
 
     private eventBufferPromiseChain?: Promise<void>;
 
@@ -80,7 +82,45 @@ export class CallEventHandler {
     };
 
     private onToDeviceEvent = (event: MatrixEvent): void => {
-        this.callEventBuffer.push(event);
+        const content = event.getContent();
+
+        if (!content.call_id) {
+            this.callEventBuffer.push(event);
+            return;
+        }
+
+        if (!this.nextSeqByCall.has(content.call_id)) {
+            this.nextSeqByCall.set(content.call_id, 0);
+        }
+
+        if (content.seq === undefined) {
+            this.callEventBuffer.push(event);
+            return;
+        }
+
+        const nextSeq = this.nextSeqByCall.get(content.call_id) || 0;
+
+        if (content.seq !== nextSeq) {
+            if (!this.toDeviceEventBuffers.has(content.call_id)) {
+                this.toDeviceEventBuffers.set(content.call_id, []);
+            }
+
+            const buffer = this.toDeviceEventBuffers.get(content.call_id);
+            const index = buffer.findIndex((e) => e.getContent().seq > content.seq);
+            buffer.splice(index, 0, event);
+        } else {
+            const callId = content.call_id;
+            this.callEventBuffer.push(event);
+            this.nextSeqByCall.set(callId, content.seq + 1);
+
+            const buffer = this.toDeviceEventBuffers.get(callId);
+
+            while (buffer.length > 0 && buffer[0].getContent().seq === content.seq + 1) {
+                const nextEvent = buffer.pop();
+                this.callEventBuffer.push(nextEvent);
+                this.nextSeqByCall.set(callId, nextEvent.getContent().seq + 1);
+            }
+        }
     };
 
     private async evaluateEventBuffer(eventBuffer: MatrixEvent[]) {
@@ -122,6 +162,8 @@ export class CallEventHandler {
     }
 
     private async handleCallEvent(event: MatrixEvent) {
+        this.client.emit("received_voip_event", event);
+
         const content = event.getContent();
         const callRoomId = (
             event.getRoomId() ||

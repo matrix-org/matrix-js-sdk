@@ -272,6 +272,7 @@ export class MatrixCall extends EventEmitter {
     public direction: CallDirection;
     public ourPartyId: string;
     public peerConn?: RTCPeerConnection;
+    public toDeviceSeq = 0;
 
     private client: MatrixClient;
     private forceTURN: boolean;
@@ -1984,6 +1985,8 @@ export class MatrixCall extends EventEmitter {
         });
 
         if (this.opponentDeviceId) {
+            const toDeviceSeq = this.toDeviceSeq++;
+
             this.emit(CallEvent.SendVoipEvent, {
                 type: "toDevice",
                 eventType,
@@ -1994,6 +1997,7 @@ export class MatrixCall extends EventEmitter {
                     device_id: this.client.deviceId,
                     sender_session_id: this.client.getSessionId(),
                     dest_session_id: this.opponentSessionId,
+                    seq: toDeviceSeq,
                 },
             });
 
@@ -2004,6 +2008,7 @@ export class MatrixCall extends EventEmitter {
                         device_id: this.client.deviceId,
                         sender_session_id: this.client.getSessionId(),
                         dest_session_id: this.opponentSessionId,
+                        seq: toDeviceSeq,
                     },
                 },
             });
