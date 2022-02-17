@@ -20,6 +20,7 @@ limitations under the License.
  * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
  */
 
+// eslint-disable-next-line no-restricted-imports
 import { EventEmitter } from "events";
 
 import * as utils from "../utils";

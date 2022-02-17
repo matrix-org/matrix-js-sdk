@@ -1,4 +1,5 @@
 import '../olm-loader';
+// eslint-disable-next-line no-restricted-imports
 import { EventEmitter } from "events";
 
 import { Crypto } from "../../src/crypto";

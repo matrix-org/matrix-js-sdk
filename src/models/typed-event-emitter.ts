@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// eslint-disable-next-line no-restricted-imports
 import { EventEmitter } from "events";
 
 export enum EventEmitterEvents {
@@ -42,7 +43,7 @@ export type Listener<
  * to properly type this, so that our events are not stringly-based and prone
  * to silly typos.
  */
-export abstract class TypedEventEmitter<
+export class TypedEventEmitter<
     Events extends string,
     Arguments extends ListenerMap<Events>,
     SuperclassArguments extends ListenerMap<any> = Arguments,
