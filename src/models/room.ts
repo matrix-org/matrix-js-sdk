@@ -108,6 +108,7 @@ interface IReceiptContent {
 
 const ReceiptPairRealIndex = 0;
 const ReceiptPairSyntheticIndex = 1;
+// We will only hold a synthetic receipt if we do not have a real receipt or the synthetic is newer.
 type Receipts = {
     [receiptType: string]: {
         [userId: string]: [IWrappedReceipt, IWrappedReceipt]; // Pair<real receipt, synthetic receipt> (both nullable)
@@ -1986,10 +1987,11 @@ export class Room extends EventEmitter {
 
     public getReadReceiptForUserId(userId: string, ignoreSynthesized = false): IWrappedReceipt | null {
         const [realReceipt, syntheticReceipt] = this.receipts["m.read"]?.[userId] ?? [];
-        if (ignoreSynthesized || realReceipt) {
+        if (ignoreSynthesized) {
             return realReceipt;
         }
-        return syntheticReceipt;
+
+        return syntheticReceipt ?? realReceipt;
     }
 
     /**
@@ -2053,10 +2055,10 @@ export class Room extends EventEmitter {
     /**
      * Add a receipt event to the room.
      * @param {MatrixEvent} event The m.receipt event.
-     * @param {Boolean} fake True if this event is implicit.
+     * @param {Boolean} synthetic True if this event is implicit.
      */
-    public addReceipt(event: MatrixEvent, fake = false): void {
-        this.addReceiptsToStructure(event, fake);
+    public addReceipt(event: MatrixEvent, synthetic = false): void {
+        this.addReceiptsToStructure(event, synthetic);
         // send events after we've regenerated the structure & cache, otherwise things that
         // listened for the event would read stale data.
         this.emit("Room.receipt", event, this);
@@ -2065,9 +2067,9 @@ export class Room extends EventEmitter {
     /**
      * Add a receipt event to the room.
      * @param {MatrixEvent} event The m.receipt event.
-     * @param {Boolean} fake True if this event is implicit.
+     * @param {Boolean} synthetic True if this event is implicit.
      */
-    private addReceiptsToStructure(event: MatrixEvent, fake: boolean): void {
+    private addReceiptsToStructure(event: MatrixEvent, synthetic: boolean): void {
         const content = event.getContent<IReceiptContent>();
         Object.keys(content).forEach((eventId) => {
             Object.keys(content[eventId]).forEach((receiptType) => {
@@ -2084,15 +2086,17 @@ export class Room extends EventEmitter {
                     const pair = this.receipts[receiptType][userId];
 
                     let existingReceipt = pair[ReceiptPairRealIndex];
-                    if (fake && !existingReceipt) {
-                        existingReceipt = pair[ReceiptPairSyntheticIndex];
+                    if (synthetic) {
+                        existingReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
                     }
 
                     if (existingReceipt) {
                         // we only want to add this receipt if we think it is later than the one we already have.
                         // This is managed server-side, but because we synthesize RRs locally we have to do it here too.
                         const ordering = this.getUnfilteredTimelineSet().compareEventOrdering(
-                            existingReceipt.eventId, eventId);
+                            existingReceipt.eventId,
+                            eventId,
+                        );
                         if (ordering !== null && ordering >= 0) {
                             return;
                         }
@@ -2103,8 +2107,36 @@ export class Room extends EventEmitter {
                         data: receipt,
                     };
 
+                    const realReceipt = synthetic ? pair[ReceiptPairRealIndex] : wrappedReceipt;
+                    const syntheticReceipt = synthetic ? wrappedReceipt : pair[ReceiptPairSyntheticIndex];
+
+                    let ordering: number | null = null;
+                    if (realReceipt && syntheticReceipt) {
+                        ordering = this.getUnfilteredTimelineSet().compareEventOrdering(
+                            realReceipt.eventId,
+                            syntheticReceipt.eventId,
+                        );
+                    }
+
+                    const preferSynthetic = ordering === null || ordering < 0;
+
                     // we don't bother caching just real receipts by event ID as there's nothing that would read it.
+                    // Take the current cached receipt before we overwrite the pair elements.
                     const cachedReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
+
+                    if (synthetic && preferSynthetic) {
+                        pair[ReceiptPairSyntheticIndex] = wrappedReceipt;
+                    } else if (!synthetic) {
+                        pair[ReceiptPairRealIndex] = wrappedReceipt;
+
+                        if (!preferSynthetic) {
+                            pair[ReceiptPairSyntheticIndex] = null;
+                        }
+                    }
+
+                    const newCachedReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
+                    if (cachedReceipt === newCachedReceipt) return;
+
                     // clean up any previous cache entry
                     if (cachedReceipt && this.receiptCacheByEventId[cachedReceipt.eventId]) {
                         const previousEventId = cachedReceipt.eventId;
@@ -2129,14 +2161,6 @@ export class Room extends EventEmitter {
                         type: receiptType,
                         data: receipt,
                     });
-
-                    if (fake) {
-                        pair[ReceiptPairSyntheticIndex] = wrappedReceipt;
-                    } else {
-                        pair[ReceiptPairRealIndex] = wrappedReceipt;
-                        // a real receipt for a receiptType+userId tuple should clobber any synthetic one
-                        pair[ReceiptPairSyntheticIndex] = null;
-                    }
                 });
             });
         });
