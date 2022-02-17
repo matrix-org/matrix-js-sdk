@@ -1,3 +1,9 @@
+Changes in [15.5.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.5.2) (2022-02-17)
+==================================================================================================
+
+## 🐛 Bug Fixes
+ * Fix synthetic read receipt handling
+
 Changes in [15.5.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.5.1) (2022-02-14)
 ==================================================================================================
 
