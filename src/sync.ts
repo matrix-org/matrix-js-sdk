@@ -821,7 +821,7 @@ export class SyncApi {
         } catch (e) {
             // log the exception with stack if we have it, else fall back
             // to the plain description
-            logger.error("Caught /sync error", e.stack || e);
+            logger.error(e);
 
             // Emit the exception for client handling
             this.client.emit("sync.unexpectedError", e);
