@@ -107,7 +107,12 @@ export class CallEventHandler {
 
             const buffer = this.toDeviceEventBuffers.get(content.call_id);
             const index = buffer.findIndex((e) => e.getContent().seq > content.seq);
-            buffer.splice(index, 0, event);
+
+            if (index === -1) {
+                buffer.push(event);
+            } else {
+                buffer.splice(index, 0, event);
+            }
         } else {
             const callId = content.call_id;
             this.callEventBuffer.push(event);
@@ -115,10 +120,12 @@ export class CallEventHandler {
 
             const buffer = this.toDeviceEventBuffers.get(callId);
 
-            while (buffer.length > 0 && buffer[0].getContent().seq === content.seq + 1) {
-                const nextEvent = buffer.pop();
+            let nextEvent = buffer && buffer.shift();
+
+            while (nextEvent && nextEvent.getContent().seq === this.nextSeqByCall.get(callId)) {
                 this.callEventBuffer.push(nextEvent);
                 this.nextSeqByCall.set(callId, nextEvent.getContent().seq + 1);
+                nextEvent = buffer.shift();
             }
         }
     };
