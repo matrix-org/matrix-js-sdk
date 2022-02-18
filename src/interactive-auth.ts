@@ -61,6 +61,10 @@ export enum AuthType {
     SsoUnstable = "org.matrix.login.sso",
     Dummy = "m.login.dummy",
     RegistrationToken = "m.login.registration_token",
+    // For backwards compatability with servers that have not yet updated to
+    // use the stable "m.login.registration_token" type.
+    // The authentication flow is the same in both cases.
+    UnstableRegistrationToken = "org.matrix.msc3231.login.registration_token",
 }
 
 export interface IAuthDict {
