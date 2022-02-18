@@ -36,7 +36,31 @@ export class MediaHandler extends EventEmitter {
 
     constructor(private client: MatrixClient) {
         super();
+
+        navigator.mediaDevices.addEventListener("devicechange", this.onDeviceChange);
     }
+
+    private onDeviceChange = async (e: Event) => {
+        const mediaDevices = await navigator.mediaDevices.enumerateDevices();
+
+        logger.log("Connected media devices changed");
+
+        const audioInputDevices = mediaDevices.filter((device) => device.kind === "audioinput");
+        const videoInputDevices = mediaDevices.filter((device) => device.kind === "audioinput");
+
+        const audioDeviceConnected = this.audioInput &&
+            audioInputDevices.some((device) => device.deviceId === this.audioInput);
+        const videoDeviceConnected = this.videoInput &&
+            videoInputDevices.some((device) => device.deviceId === this.videoInput);
+
+        if (!audioDeviceConnected && audioInputDevices.length > 0) {
+            this.setAudioInput(audioInputDevices[0].deviceId);
+        }
+
+        if (!videoDeviceConnected && videoInputDevices.length > 0) {
+            this.setVideoInput(videoInputDevices[0].deviceId);
+        }
+    };
 
     /**
      * Set an audio input device to use for MatrixCalls
@@ -298,5 +322,9 @@ export class MediaHandler extends EventEmitter {
                 video: true,
             };
         }
+    }
+
+    public stop() {
+        navigator.mediaDevices.removeEventListener("devicechange", this.onDeviceChange);
     }
 }

@@ -1028,6 +1028,8 @@ export class MatrixClient extends EventEmitter {
         this.groupCallEventHandler?.stop();
         this.callEventHandler = null;
 
+        this.mediaHandler.stop();
+
         global.clearInterval(this.checkTurnServersIntervalID);
         if (this.clientWellKnownIntervalID !== undefined) {
             global.clearInterval(this.clientWellKnownIntervalID);
