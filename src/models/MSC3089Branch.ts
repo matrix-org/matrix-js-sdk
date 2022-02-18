@@ -20,6 +20,7 @@ import { IContent, MatrixEvent } from "./event";
 import { MSC3089TreeSpace } from "./MSC3089TreeSpace";
 import { EventTimeline } from "./event-timeline";
 import { FileType } from "../http-api";
+import type { ISendEventResponse } from "..";
 
 /**
  * Represents a [MSC3089](https://github.com/matrix-org/matrix-doc/pull/3089) branch - a reference
@@ -171,7 +172,7 @@ export class MSC3089Branch {
         encryptedContents: FileType,
         info: Partial<IEncryptedFile>,
         additionalContent?: IContent,
-    ): Promise<void> {
+    ): Promise<ISendEventResponse> {
         const fileEventResponse = await this.directory.createFile(name, encryptedContents, info, {
             ...(additionalContent ?? {}),
             "m.new_content": true,
@@ -193,6 +194,8 @@ export class MSC3089Branch {
             ...(this.indexEvent.getContent()),
             active: false,
         }, this.id);
+
+        return fileEventResponse;
     }
 
     /**
