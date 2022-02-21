@@ -165,7 +165,7 @@ export class MSC3089Branch {
      * @param {File | String | Buffer | ReadStream | Blob} encryptedContents The encrypted contents.
      * @param {Partial<IEncryptedFile>} info The encrypted file information.
      * @param {IContent} additionalContent Optional event content fields to include in the message.
-     * @returns {Promise<void>} Resolves when uploaded.
+     * @returns {Promise<ISendEventResponse>} Resolves to the file event's sent response.
      */
     public async createNewVersion(
         name: string,
