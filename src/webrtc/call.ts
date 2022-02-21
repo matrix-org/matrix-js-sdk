@@ -1943,7 +1943,7 @@ export class MatrixCall extends EventEmitter {
 
         await this.sendVoipEvent(EventType.CallReplaces, bodyToTransferee);
 
-        await this.terminate(CallParty.Local, CallErrorCode.Replaced, true);
+        await this.terminate(CallParty.Local, CallErrorCode.Transfered, true);
         await transferTargetCall.terminate(CallParty.Local, CallErrorCode.Transfered, true);
     }
 
