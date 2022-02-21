@@ -258,7 +258,7 @@ export class CallEventHandler {
                         call.onRejectReceived(content as MCallHangupReject);
                     }
 
-                    // @ts-ignore typescript thinks the state can't be 'ended' because we're
+                    // @ts-expect-error typescript thinks the state can't be 'ended' because we're
                     // inside the if block where it wasn't, but it could have changed because
                     // on[Hangup|Reject]Received are side-effecty.
                     if (call.state === CallState.Ended) this.calls.delete(content.call_id);
