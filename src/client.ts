@@ -800,7 +800,8 @@ type RoomEvents = RoomEvent.Name
 type RoomStateEvents = RoomStateEvent.Events
     | RoomStateEvent.Members
     | RoomStateEvent.NewMember
-    | RoomStateEvent.Update;
+    | RoomStateEvent.Update
+    ;
 
 type CryptoEvents = CryptoEvent.KeySignatureUploadFailure
     | CryptoEvent.KeyBackupStatus
