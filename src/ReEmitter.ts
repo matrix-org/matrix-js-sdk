@@ -16,16 +16,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// eslint-disable-next-line no-restricted-imports
 import { EventEmitter } from "events";
 
+import { ListenerMap, TypedEventEmitter } from "./models/typed-event-emitter";
+
 export class ReEmitter {
-    private target: EventEmitter;
+    constructor(private readonly target: EventEmitter) {}
 
-    constructor(target: EventEmitter) {
-        this.target = target;
-    }
-
-    reEmit(source: EventEmitter, eventNames: string[]) {
+    public reEmit(source: EventEmitter, eventNames: string[]): void {
         for (const eventName of eventNames) {
             // We include the source as the last argument for event handlers which may need it,
             // such as read receipt listeners on the client class which won't have the context
@@ -46,5 +45,21 @@ export class ReEmitter {
             };
             source.on(eventName, forSource);
         }
+    }
+}
+
+export class TypedReEmitter<
+    Events extends string,
+    Arguments extends ListenerMap<Events>,
+> extends ReEmitter {
+    constructor(target: TypedEventEmitter<Events, Arguments>) {
+        super(target);
+    }
+
+    public reEmit<ReEmittedEvents extends string, T extends Events & ReEmittedEvents>(
+        source: TypedEventEmitter<ReEmittedEvents, any>,
+        eventNames: T[],
+    ): void {
+        super.reEmit(source, eventNames);
     }
 }

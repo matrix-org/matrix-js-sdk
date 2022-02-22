@@ -14,24 +14,33 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixClient } from "../matrix";
-import { ReEmitter } from "../ReEmitter";
+import { MatrixClient, RoomEvent } from "../matrix";
+import { TypedReEmitter } from "../ReEmitter";
 import { RelationType } from "../@types/event";
 import { IRelationsRequestOpts } from "../@types/requests";
-import { MatrixEvent, IThreadBundledRelationship } from "./event";
+import { IThreadBundledRelationship, MatrixEvent } from "./event";
 import { Direction, EventTimeline } from "./event-timeline";
-import { EventTimelineSet } from './event-timeline-set';
+import { EventTimelineSet, EventTimelineSetHandlerMap } from './event-timeline-set';
 import { Room } from './room';
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { RoomState } from "./room-state";
 
 export enum ThreadEvent {
     New = "Thread.new",
-    Ready = "Thread.ready",
     Update = "Thread.update",
     NewReply = "Thread.newReply",
-    ViewThread = "Thred.viewThread",
+    ViewThread = "Thread.viewThread",
 }
+
+type EmittedEvents = Exclude<ThreadEvent, ThreadEvent.New>
+    | RoomEvent.Timeline
+    | RoomEvent.TimelineReset;
+
+export type EventHandlerMap = {
+    [ThreadEvent.Update]: (thread: Thread) => void;
+    [ThreadEvent.NewReply]: (thread: Thread, event: MatrixEvent) => void;
+    [ThreadEvent.ViewThread]: () => void;
+} & EventTimelineSetHandlerMap;
 
 interface IThreadOpts {
     initialEvents?: MatrixEvent[];
@@ -42,15 +51,15 @@ interface IThreadOpts {
 /**
  * @experimental
  */
-export class Thread extends TypedEventEmitter<ThreadEvent> {
+export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     /**
      * A reference to all the events ID at the bottom of the threads
      */
-    public readonly timelineSet;
+    public readonly timelineSet: EventTimelineSet;
 
     private _currentUserParticipated = false;
 
-    private reEmitter: ReEmitter;
+    private reEmitter: TypedReEmitter<EmittedEvents, EventHandlerMap>;
 
     private lastEvent: MatrixEvent;
     private replyCount = 0;
@@ -75,11 +84,11 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
             timelineSupport: true,
             pendingEvents: true,
         });
-        this.reEmitter = new ReEmitter(this);
+        this.reEmitter = new TypedReEmitter(this);
 
         this.reEmitter.reEmit(this.timelineSet, [
-            "Room.timeline",
-            "Room.timelineReset",
+            RoomEvent.Timeline,
+            RoomEvent.TimelineReset,
         ]);
 
         // If we weren't able to find the root event, it's probably missing
@@ -94,8 +103,8 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
 
         opts?.initialEvents?.forEach(event => this.addEvent(event));
 
-        this.room.on("Room.localEchoUpdated", this.onEcho);
-        this.room.on("Room.timeline", this.onEcho);
+        this.room.on(RoomEvent.LocalEchoUpdated, this.onEcho);
+        this.room.on(RoomEvent.Timeline, this.onEcho);
     }
 
     public get hasServerSideSupport(): boolean {
@@ -103,7 +112,7 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
             ?.capabilities?.[RelationType.Thread]?.enabled;
     }
 
-    onEcho = (event: MatrixEvent) => {
+    private onEcho = (event: MatrixEvent) => {
         if (this.timelineSet.eventIdToTimeline(event.getId())) {
             this.emit(ThreadEvent.Update, this);
         }
@@ -139,10 +148,11 @@ export class Thread extends TypedEventEmitter<ThreadEvent> {
      * the tail/root references if needed
      * Will fire "Thread.update"
      * @param event The event to add
+     * @param {boolean} toStartOfTimeline whether the event is being added
+     * to the start (and not the end) of the timeline.
      */
     public async addEvent(event: MatrixEvent, toStartOfTimeline = false): Promise<void> {
-        // Add all incoming events to the thread's timeline set when there's
-        // no server support
+        // Add all incoming events to the thread's timeline set when there's  no server support
         if (!this.hasServerSideSupport) {
             // all the relevant membership info to hydrate events with a sender
             // is held in the main room timeline

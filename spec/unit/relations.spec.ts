@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { EventTimelineSet } from "../../src/models/event-timeline-set";
-import { MatrixEvent } from "../../src/models/event";
+import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { Room } from "../../src/models/room";
 import { Relations } from "../../src/models/relations";
 
@@ -103,7 +103,7 @@ describe("Relations", function() {
         // Add the target event first, then the relation event
         {
             const relationsCreated = new Promise(resolve => {
-                targetEvent.once("Event.relationsCreated", resolve);
+                targetEvent.once(MatrixEventEvent.RelationsCreated, resolve);
             });
 
             const timelineSet = new EventTimelineSet(room, {
@@ -118,7 +118,7 @@ describe("Relations", function() {
         // Add the relation event first, then the target event
         {
             const relationsCreated = new Promise(resolve => {
-                targetEvent.once("Event.relationsCreated", resolve);
+                targetEvent.once(MatrixEventEvent.RelationsCreated, resolve);
             });
 
             const timelineSet = new EventTimelineSet(room, {

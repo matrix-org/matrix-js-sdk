@@ -23,8 +23,8 @@ limitations under the License.
  * for HTTP and WS at some point.
  */
 
-import { User } from "./models/user";
-import { NotificationCountType, Room } from "./models/room";
+import { User, UserEvent } from "./models/user";
+import { NotificationCountType, Room, RoomEvent } from "./models/room";
 import { Group } from "./models/group";
 import * as utils from "./utils";
 import { IDeferred } from "./utils";
@@ -33,7 +33,7 @@ import { EventTimeline } from "./models/event-timeline";
 import { PushProcessor } from "./pushprocessor";
 import { logger } from './logger';
 import { InvalidStoreError } from './errors';
-import { IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
+import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
 import {
     Category,
     IEphemeral,
@@ -53,6 +53,8 @@ import { MatrixError, Method } from "./http-api";
 import { ISavedSync } from "./store";
 import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
+import { RoomStateEvent } from "./models/room-state";
+import { RoomMemberEvent } from "./models/room-member";
 
 const DEBUG = true;
 
@@ -171,8 +173,10 @@ export class SyncApi {
         }
 
         if (client.getNotifTimelineSet()) {
-            client.reEmitter.reEmit(client.getNotifTimelineSet(),
-                ["Room.timeline", "Room.timelineReset"]);
+            client.reEmitter.reEmit(client.getNotifTimelineSet(), [
+                RoomEvent.Timeline,
+                RoomEvent.TimelineReset,
+            ]);
         }
     }
 
@@ -192,16 +196,17 @@ export class SyncApi {
             timelineSupport,
             unstableClientRelationAggregation,
         });
-        client.reEmitter.reEmit(room, ["Room.name", "Room.timeline",
-            "Room.redaction",
-            "Room.redactionCancelled",
-            "Room.receipt", "Room.tags",
-            "Room.timelineReset",
-            "Room.localEchoUpdated",
-            "Room.accountData",
-            "Room.myMembership",
-            "Room.replaceEvent",
-            "Room.visibilityChange",
+        client.reEmitter.reEmit(room, [
+            RoomEvent.Name,
+            RoomEvent.Redaction,
+            RoomEvent.RedactionCancelled,
+            RoomEvent.Receipt,
+            RoomEvent.Tags,
+            RoomEvent.LocalEchoUpdated,
+            RoomEvent.AccountData,
+            RoomEvent.MyMembership,
+            RoomEvent.Timeline,
+            RoomEvent.TimelineReset,
         ]);
         this.registerStateListeners(room);
         return room;
@@ -214,7 +219,10 @@ export class SyncApi {
     public createGroup(groupId: string): Group {
         const client = this.client;
         const group = new Group(groupId);
-        client.reEmitter.reEmit(group, ["Group.profile", "Group.myMembership"]);
+        client.reEmitter.reEmit(group, [
+            ClientEvent.GroupProfile,
+            ClientEvent.GroupMyMembership,
+        ]);
         client.store.storeGroup(group);
         return group;
     }
@@ -229,17 +237,18 @@ export class SyncApi {
         // to the client now. We need to add a listener for RoomState.members in
         // order to hook them correctly. (TODO: find a better way?)
         client.reEmitter.reEmit(room.currentState, [
-            "RoomState.events", "RoomState.members", "RoomState.newMember",
+            RoomStateEvent.Events,
+            RoomStateEvent.Members,
+            RoomStateEvent.NewMember,
         ]);
-        room.currentState.on("RoomState.newMember", function(event, state, member) {
+        room.currentState.on(RoomStateEvent.NewMember, function(event, state, member) {
             member.user = client.getUser(member.userId);
-            client.reEmitter.reEmit(
-                member,
-                [
-                    "RoomMember.name", "RoomMember.typing", "RoomMember.powerLevel",
-                    "RoomMember.membership",
-                ],
-            );
+            client.reEmitter.reEmit(member, [
+                RoomMemberEvent.Name,
+                RoomMemberEvent.Typing,
+                RoomMemberEvent.PowerLevel,
+                RoomMemberEvent.Membership,
+            ]);
         });
     }
 
@@ -249,9 +258,9 @@ export class SyncApi {
      */
     private deregisterStateListeners(room: Room): void {
         // could do with a better way of achieving this.
-        room.currentState.removeAllListeners("RoomState.events");
-        room.currentState.removeAllListeners("RoomState.members");
-        room.currentState.removeAllListeners("RoomState.newMember");
+        room.currentState.removeAllListeners(RoomStateEvent.Events);
+        room.currentState.removeAllListeners(RoomStateEvent.Members);
+        room.currentState.removeAllListeners(RoomStateEvent.NewMember);
     }
 
     /**
@@ -314,7 +323,7 @@ export class SyncApi {
 
                 room.recalculate();
                 client.store.storeRoom(room);
-                client.emit("Room", room);
+                client.emit(ClientEvent.Room, room);
 
                 this.processEventsForNotifs(room, events);
             });
@@ -362,7 +371,7 @@ export class SyncApi {
                             user.setPresenceEvent(presenceEvent);
                             client.store.storeUser(user);
                         }
-                        client.emit("event", presenceEvent);
+                        client.emit(ClientEvent.Event, presenceEvent);
                     });
             }
 
@@ -388,7 +397,7 @@ export class SyncApi {
                 response.messages.start);
 
             client.store.storeRoom(this._peekRoom);
-            client.emit("Room", this._peekRoom);
+            client.emit(ClientEvent.Room, this._peekRoom);
 
             this.peekPoll(this._peekRoom);
             return this._peekRoom;
@@ -445,7 +454,7 @@ export class SyncApi {
                     user.setPresenceEvent(presenceEvent);
                     this.client.store.storeUser(user);
                 }
-                this.client.emit("event", presenceEvent);
+                this.client.emit(ClientEvent.Event, presenceEvent);
             });
 
             // strip out events which aren't for the given room_id (e.g presence)
@@ -840,7 +849,7 @@ export class SyncApi {
             logger.error("Caught /sync error", e.stack || e);
 
             // Emit the exception for client handling
-            this.client.emit("sync.unexpectedError", e);
+            this.client.emit(ClientEvent.SyncUnexpectedError, e);
         }
 
         // update this as it may have changed
@@ -1073,7 +1082,7 @@ export class SyncApi {
                         user.setPresenceEvent(presenceEvent);
                         client.store.storeUser(user);
                     }
-                    client.emit("event", presenceEvent);
+                    client.emit(ClientEvent.Event, presenceEvent);
                 });
         }
 
@@ -1096,7 +1105,7 @@ export class SyncApi {
                         client.pushRules = PushProcessor.rewriteDefaultRules(rules);
                     }
                     const prevEvent = prevEventsMap[accountDataEvent.getId()];
-                    client.emit("accountData", accountDataEvent, prevEvent);
+                    client.emit(ClientEvent.AccountData, accountDataEvent, prevEvent);
                     return accountDataEvent;
                 },
             );
@@ -1149,7 +1158,7 @@ export class SyncApi {
                             }
                         }
 
-                        client.emit("toDeviceEvent", toDeviceEvent);
+                        client.emit(ClientEvent.ToDeviceEvent, toDeviceEvent);
                     },
                 );
         } else {
@@ -1201,10 +1210,10 @@ export class SyncApi {
             if (inviteObj.isBrandNewRoom) {
                 room.recalculate();
                 client.store.storeRoom(room);
-                client.emit("Room", room);
+                client.emit(ClientEvent.Room, room);
             }
             stateEvents.forEach(function(e) {
-                client.emit("event", e);
+                client.emit(ClientEvent.Event, e);
             });
             room.updateMyMembership("invite");
         });
@@ -1325,13 +1334,13 @@ export class SyncApi {
             room.recalculate();
             if (joinObj.isBrandNewRoom) {
                 client.store.storeRoom(room);
-                client.emit("Room", room);
+                client.emit(ClientEvent.Room, room);
             }
 
             this.processEventsForNotifs(room, events);
 
             const processRoomEvent = async (e) => {
-                client.emit("event", e);
+                client.emit(ClientEvent.Event, e);
                 if (e.isState() && e.getType() == "m.room.encryption" && this.opts.crypto) {
                     await this.opts.crypto.onCryptoEvent(e);
                 }
@@ -1351,10 +1360,10 @@ export class SyncApi {
             await utils.promiseMapSeries(timelineEvents, processRoomEvent);
             await utils.promiseMapSeries(threadedEvents, processRoomEvent);
             ephemeralEvents.forEach(function(e) {
-                client.emit("event", e);
+                client.emit(ClientEvent.Event, e);
             });
             accountDataEvents.forEach(function(e) {
-                client.emit("event", e);
+                client.emit(ClientEvent.Event, e);
             });
 
             room.updateMyMembership("join");
@@ -1381,22 +1390,22 @@ export class SyncApi {
             room.recalculate();
             if (leaveObj.isBrandNewRoom) {
                 client.store.storeRoom(room);
-                client.emit("Room", room);
+                client.emit(ClientEvent.Room, room);
             }
 
             this.processEventsForNotifs(room, events);
 
             stateEvents.forEach(function(e) {
-                client.emit("event", e);
+                client.emit(ClientEvent.Event, e);
             });
             timelineEvents.forEach(function(e) {
-                client.emit("event", e);
+                client.emit(ClientEvent.Event, e);
             });
             threadedEvents.forEach(function(e) {
-                client.emit("event", e);
+                client.emit(ClientEvent.Event, e);
             });
             accountDataEvents.forEach(function(e) {
-                client.emit("event", e);
+                client.emit(ClientEvent.Event, e);
             });
 
             room.updateMyMembership("leave");
@@ -1551,7 +1560,7 @@ export class SyncApi {
             group.setMyMembership(sectionName);
             if (isBrandNew) {
                 // Now we've filled in all the fields, emit the Group event
-                this.client.emit("Group", group);
+                this.client.emit(ClientEvent.Group, group);
             }
         }
     }
@@ -1778,7 +1787,7 @@ export class SyncApi {
         const old = this.syncState;
         this.syncState = newState;
         this.syncStateData = data;
-        this.client.emit("sync", this.syncState, old, data);
+        this.client.emit(ClientEvent.Sync, this.syncState, old, data);
     }
 
     /**
@@ -1796,8 +1805,11 @@ export class SyncApi {
 function createNewUser(client: MatrixClient, userId: string): User {
     const user = new User(userId);
     client.reEmitter.reEmit(user, [
-        "User.avatarUrl", "User.displayName", "User.presence",
-        "User.currentlyActive", "User.lastPresenceTs",
+        UserEvent.AvatarUrl,
+        UserEvent.DisplayName,
+        UserEvent.Presence,
+        UserEvent.CurrentlyActive,
+        UserEvent.LastPresenceTs,
     ]);
     return user;
 }

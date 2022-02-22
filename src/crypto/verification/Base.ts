@@ -20,8 +20,6 @@ limitations under the License.
  * @module crypto/verification/Base
  */
 
-import { EventEmitter } from 'events';
-
 import { MatrixEvent } from '../../models/event';
 import { logger } from '../../logger';
 import { DeviceInfo } from '../deviceinfo';
@@ -30,6 +28,7 @@ import { KeysDuringVerification, requestKeysDuringVerification } from "../CrossS
 import { IVerificationChannel } from "./request/Channel";
 import { MatrixClient } from "../../client";
 import { VerificationRequest } from "./request/VerificationRequest";
+import { ListenerMap, TypedEventEmitter } from "../../models/typed-event-emitter";
 
 const timeoutException = new Error("Verification timed out");
 
@@ -41,7 +40,18 @@ export class SwitchStartEventError extends Error {
 
 export type KeyVerifier = (keyId: string, device: DeviceInfo, keyInfo: string) => void;
 
-export class VerificationBase extends EventEmitter {
+export enum VerificationEvent {
+    Cancel = "cancel",
+}
+
+export type VerificationEventHandlerMap = {
+    [VerificationEvent.Cancel]: (e: Error | MatrixEvent) => void;
+};
+
+export class VerificationBase<
+    Events extends string,
+    Arguments extends ListenerMap<Events | VerificationEvent>,
+> extends TypedEventEmitter<Events | VerificationEvent, Arguments, VerificationEventHandlerMap> {
     private cancelled = false;
     private _done = false;
     private promise: Promise<void> = null;
@@ -261,7 +271,7 @@ export class VerificationBase extends EventEmitter {
             }
             // Also emit a 'cancel' event that the app can listen for to detect cancellation
             // before calling verify()
-            this.emit('cancel', e);
+            this.emit(VerificationEvent.Cancel, e);
         }
     }
 

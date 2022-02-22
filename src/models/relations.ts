@@ -14,12 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventEmitter } from 'events';
-
-import { EventStatus, MatrixEvent, IAggregatedRelation } from './event';
+import { EventStatus, IAggregatedRelation, MatrixEvent, MatrixEventEvent } from './event';
 import { Room } from './room';
 import { logger } from '../logger';
 import { RelationType } from "../@types/event";
+import { TypedEventEmitter } from "./typed-event-emitter";
+
+export enum RelationsEvent {
+    Add = "Relations.add",
+    Remove = "Relations.remove",
+    Redaction = "Relations.redaction",
+}
+
+export type EventHandlerMap = {
+    [RelationsEvent.Add]: (event: MatrixEvent) => void;
+    [RelationsEvent.Remove]: (event: MatrixEvent) => void;
+    [RelationsEvent.Redaction]: (event: MatrixEvent) => void;
+};
 
 /**
  * A container for relation events that supports easy access to common ways of
@@ -29,7 +40,7 @@ import { RelationType } from "../@types/event";
  * The typical way to get one of these containers is via
  * EventTimelineSet#getRelationsForEvent.
  */
-export class Relations extends EventEmitter {
+export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap> {
     private relationEventIds = new Set<string>();
     private relations = new Set<MatrixEvent>();
     private annotationsByKey: Record<string, Set<MatrixEvent>> = {};
@@ -84,7 +95,7 @@ export class Relations extends EventEmitter {
         // If the event is in the process of being sent, listen for cancellation
         // so we can remove the event from the collection.
         if (event.isSending()) {
-            event.on("Event.status", this.onEventStatus);
+            event.on(MatrixEventEvent.Status, this.onEventStatus);
         }
 
         this.relations.add(event);
@@ -97,9 +108,9 @@ export class Relations extends EventEmitter {
             this.targetEvent.makeReplaced(lastReplacement);
         }
 
-        event.on("Event.beforeRedaction", this.onBeforeRedaction);
+        event.on(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
 
-        this.emit("Relations.add", event);
+        this.emit(RelationsEvent.Add, event);
 
         this.maybeEmitCreated();
     }
@@ -138,7 +149,7 @@ export class Relations extends EventEmitter {
             this.targetEvent.makeReplaced(lastReplacement);
         }
 
-        this.emit("Relations.remove", event);
+        this.emit(RelationsEvent.Remove, event);
     }
 
     /**
@@ -150,14 +161,14 @@ export class Relations extends EventEmitter {
     private onEventStatus = (event: MatrixEvent, status: EventStatus) => {
         if (!event.isSending()) {
             // Sending is done, so we don't need to listen anymore
-            event.removeListener("Event.status", this.onEventStatus);
+            event.removeListener(MatrixEventEvent.Status, this.onEventStatus);
             return;
         }
         if (status !== EventStatus.CANCELLED) {
             return;
         }
         // Event was cancelled, remove from the collection
-        event.removeListener("Event.status", this.onEventStatus);
+        event.removeListener(MatrixEventEvent.Status, this.onEventStatus);
         this.removeEvent(event);
     };
 
@@ -255,9 +266,9 @@ export class Relations extends EventEmitter {
             this.targetEvent.makeReplaced(lastReplacement);
         }
 
-        redactedEvent.removeListener("Event.beforeRedaction", this.onBeforeRedaction);
+        redactedEvent.removeListener(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
 
-        this.emit("Relations.redaction", redactedEvent);
+        this.emit(RelationsEvent.Redaction, redactedEvent);
     };
 
     /**
@@ -375,6 +386,6 @@ export class Relations extends EventEmitter {
             return;
         }
         this.creationEmitted = true;
-        this.targetEvent.emit("Event.relationsCreated", this.relationType, this.eventType);
+        this.targetEvent.emit(MatrixEventEvent.RelationsCreated, this.relationType, this.eventType);
     }
 }

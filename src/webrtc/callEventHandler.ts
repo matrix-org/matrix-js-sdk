@@ -14,16 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from '../models/event';
+import { MatrixEvent, MatrixEventEvent } from '../models/event';
 import { logger } from '../logger';
-import { createNewMatrixCall, MatrixCall, CallErrorCode, CallState, CallDirection } from './call';
+import { CallDirection, CallErrorCode, CallState, createNewMatrixCall, MatrixCall } from './call';
 import { EventType } from '../@types/event';
-import { MatrixClient } from '../client';
+import { ClientEvent, MatrixClient } from '../client';
 import { MCallAnswer, MCallHangupReject } from "./callEventTypes";
+import { SyncState } from "../sync";
+import { RoomEvent } from "../models/room";
 
 // Don't ring unless we'd be ringing for at least 3 seconds: the user needs some
 // time to press the 'accept' button
 const RING_GRACE_PERIOD = 3000;
+
+export enum CallEventHandlerEvent {
+    Incoming = "Call.incoming",
+}
+
+export type CallEventHandlerEventHandlerMap = {
+    [CallEventHandlerEvent.Incoming]: (call: MatrixCall) => void;
+};
 
 export class CallEventHandler {
     client: MatrixClient;
@@ -47,17 +57,17 @@ export class CallEventHandler {
     }
 
     public start() {
-        this.client.on("sync", this.evaluateEventBuffer);
-        this.client.on("Room.timeline", this.onRoomTimeline);
+        this.client.on(ClientEvent.Sync, this.evaluateEventBuffer);
+        this.client.on(RoomEvent.Timeline, this.onRoomTimeline);
     }
 
     public stop() {
-        this.client.removeListener("sync", this.evaluateEventBuffer);
-        this.client.removeListener("Room.timeline", this.onRoomTimeline);
+        this.client.removeListener(ClientEvent.Sync, this.evaluateEventBuffer);
+        this.client.removeListener(RoomEvent.Timeline, this.onRoomTimeline);
     }
 
     private evaluateEventBuffer = async () => {
-        if (this.client.getSyncState() === "SYNCING") {
+        if (this.client.getSyncState() === SyncState.Syncing) {
             await Promise.all(this.callEventBuffer.map(event => {
                 this.client.decryptEventIfNeeded(event);
             }));
@@ -101,7 +111,7 @@ export class CallEventHandler {
 
         if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
             // add an event listener for once the event is decrypted.
-            event.once("Event.decrypted", async () => {
+            event.once(MatrixEventEvent.Decrypted, async () => {
                 if (!this.eventIsACall(event)) return;
 
                 if (this.callEventBuffer.includes(event)) {
@@ -221,7 +231,7 @@ export class CallEventHandler {
                     call.hangup(CallErrorCode.Replaced, true);
                 }
             } else {
-                this.client.emit("Call.incoming", call);
+                this.client.emit(CallEventHandlerEvent.Incoming, call);
             }
             return;
         } else if (type === EventType.CallCandidates) {

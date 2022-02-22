@@ -26,14 +26,13 @@ import { MEGOLM_ALGORITHM, verifySignature } from "./olmlib";
 import { DeviceInfo } from "./deviceinfo";
 import { DeviceTrustLevel } from './CrossSigning';
 import { keyFromPassphrase } from './key_passphrase';
-import { sleep } from "../utils";
+import { getCrypto, sleep } from "../utils";
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { encodeRecoveryKey } from './recoverykey';
-import { encryptAES, decryptAES, calculateKeyCheck } from './aes';
-import { getCrypto } from '../utils';
-import { ICurve25519AuthData, IAes256AuthData, IKeyBackupInfo, IKeyBackupSession } from "./keybackup";
+import { calculateKeyCheck, decryptAES, encryptAES } from './aes';
+import { IAes256AuthData, ICurve25519AuthData, IKeyBackupInfo, IKeyBackupSession } from "./keybackup";
 import { UnstableValue } from "../NamespacedValue";
-import { IMegolmSessionData } from "./index";
+import { CryptoEvent, IMegolmSessionData } from "./index";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 
@@ -155,7 +154,7 @@ export class BackupManager {
 
         this.algorithm = await BackupManager.makeAlgorithm(info, this.getKey);
 
-        this.baseApis.emit('crypto.keyBackupStatus', true);
+        this.baseApis.emit(CryptoEvent.KeyBackupStatus, true);
 
         // There may be keys left over from a partially completed backup, so
         // schedule a send to check.
@@ -173,7 +172,7 @@ export class BackupManager {
 
         this.backupInfo = undefined;
 
-        this.baseApis.emit('crypto.keyBackupStatus', false);
+        this.baseApis.emit(CryptoEvent.KeyBackupStatus, false);
     }
 
     public getKeyBackupEnabled(): boolean | null {
@@ -458,7 +457,7 @@ export class BackupManager {
                             await this.checkKeyBackup();
                             // Backup version has changed or this backup version
                             // has been deleted
-                            this.baseApis.crypto.emit("crypto.keyBackupFailed", err.data.errcode);
+                            this.baseApis.crypto.emit(CryptoEvent.KeyBackupFailed, err.data.errcode);
                             throw err;
                         }
                     }
@@ -487,7 +486,7 @@ export class BackupManager {
         }
 
         let remaining = await this.baseApis.crypto.cryptoStore.countSessionsNeedingBackup();
-        this.baseApis.crypto.emit("crypto.keyBackupSessionsRemaining", remaining);
+        this.baseApis.crypto.emit(CryptoEvent.KeyBackupSessionsRemaining, remaining);
 
         const rooms: IKeyBackup["rooms"] = {};
         for (const session of sessions) {
@@ -524,7 +523,7 @@ export class BackupManager {
 
         await this.baseApis.crypto.cryptoStore.unmarkSessionsNeedingBackup(sessions);
         remaining = await this.baseApis.crypto.cryptoStore.countSessionsNeedingBackup();
-        this.baseApis.crypto.emit("crypto.keyBackupSessionsRemaining", remaining);
+        this.baseApis.crypto.emit(CryptoEvent.KeyBackupSessionsRemaining, remaining);
 
         return sessions.length;
     }
@@ -580,7 +579,7 @@ export class BackupManager {
         );
 
         const remaining = await this.baseApis.crypto.cryptoStore.countSessionsNeedingBackup();
-        this.baseApis.emit("crypto.keyBackupSessionsRemaining", remaining);
+        this.baseApis.emit(CryptoEvent.KeyBackupSessionsRemaining, remaining);
         return remaining;
     }
 

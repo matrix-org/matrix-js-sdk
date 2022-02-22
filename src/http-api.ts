@@ -21,7 +21,6 @@ limitations under the License.
  */
 
 import { parse as parseContentType, ParsedMediaType } from "content-type";
-import EventEmitter from "events";
 
 import type { IncomingHttpHeaders, IncomingMessage } from "http";
 import type { Request as _Request, CoreOptions } from "request";
@@ -35,6 +34,7 @@ import { IDeferred } from "./utils";
 import { Callback } from "./client";
 import * as utils from "./utils";
 import { logger } from './logger';
+import { TypedEventEmitter } from "./models/typed-event-emitter";
 
 /*
 TODO:
@@ -164,6 +164,16 @@ export enum Method {
 
 export type FileType = Document | XMLHttpRequestBodyInit;
 
+export enum HttpApiEvent {
+    SessionLoggedOut = "Session.logged_out",
+    NoConsent = "no_consent",
+}
+
+export type HttpApiEventHandlerMap = {
+    [HttpApiEvent.SessionLoggedOut]: (err: MatrixError) => void;
+    [HttpApiEvent.NoConsent]: (message: string, consentUri: string) => void;
+};
+
 /**
  * Construct a MatrixHttpApi.
  * @constructor
@@ -192,7 +202,10 @@ export type FileType = Document | XMLHttpRequestBodyInit;
 export class MatrixHttpApi {
     private uploads: IUpload[] = [];
 
-    constructor(private eventEmitter: EventEmitter, public readonly opts: IHttpOpts) {
+    constructor(
+        private eventEmitter: TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>,
+        public readonly opts: IHttpOpts,
+    ) {
         utils.checkObjectHasKeys(opts, ["baseUrl", "request", "prefix"]);
         opts.onlyData = !!opts.onlyData;
         opts.useAuthorizationHeader = !!opts.useAuthorizationHeader;
@@ -603,13 +616,9 @@ export class MatrixHttpApi {
 
         requestPromise.catch((err: MatrixError) => {
             if (err.errcode == 'M_UNKNOWN_TOKEN' && !requestOpts?.inhibitLogoutEmit) {
-                this.eventEmitter.emit("Session.logged_out", err);
+                this.eventEmitter.emit(HttpApiEvent.SessionLoggedOut, err);
             } else if (err.errcode == 'M_CONSENT_NOT_GIVEN') {
-                this.eventEmitter.emit(
-                    "no_consent",
-                    err.message,
-                    err.data.consent_uri,
-                );
+                this.eventEmitter.emit(HttpApiEvent.NoConsent, err.message, err.data.consent_uri);
             }
         });
 

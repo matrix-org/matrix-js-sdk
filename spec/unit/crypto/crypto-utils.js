@@ -26,7 +26,7 @@ export async function resetCrossSigningKeys(client, {
         crypto.crossSigningInfo.keys = oldKeys;
         throw e;
     }
-    crypto.baseApis.emit("crossSigning.keysChanged", {});
+    crypto.emit("crossSigning.keysChanged", {});
     await crypto.afterCrossSigningLocalKeyChange();
 }
 

@@ -24,7 +24,7 @@ import { Group } from "../models/group";
 import { Room } from "../models/room";
 import { User } from "../models/user";
 import { IEvent, MatrixEvent } from "../models/event";
-import { RoomState } from "../models/room-state";
+import { RoomState, RoomStateEvent } from "../models/room-state";
 import { RoomMember } from "../models/room-member";
 import { Filter } from "../filter";
 import { ISavedSync, IStore } from "./index";
@@ -126,7 +126,7 @@ export class MemoryStore implements IStore {
         this.rooms[room.roomId] = room;
         // add listeners for room member changes so we can keep the room member
         // map up-to-date.
-        room.currentState.on("RoomState.members", this.onRoomMember);
+        room.currentState.on(RoomStateEvent.Members, this.onRoomMember);
         // add existing members
         room.currentState.getMembers().forEach((m) => {
             this.onRoomMember(null, room.currentState, m);
@@ -185,7 +185,7 @@ export class MemoryStore implements IStore {
      */
     public removeRoom(roomId: string): void {
         if (this.rooms[roomId]) {
-            this.rooms[roomId].removeListener("RoomState.members", this.onRoomMember);
+            this.rooms[roomId].currentState.removeListener(RoomStateEvent.Members, this.onRoomMember);
         }
         delete this.rooms[roomId];
     }
