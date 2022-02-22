@@ -799,7 +799,8 @@ type RoomEvents = RoomEvent.Name
 
 type RoomStateEvents = RoomStateEvent.Events
     | RoomStateEvent.Members
-    | RoomStateEvent.NewMember;
+    | RoomStateEvent.NewMember
+    | RoomStateEvent.Update;
 
 type CryptoEvents = CryptoEvent.KeySignatureUploadFailure
     | CryptoEvent.KeyBackupStatus
