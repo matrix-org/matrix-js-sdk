@@ -187,7 +187,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     // which pass in an event ID and get back some receipts, so we also store
     // a pre-cached list for this purpose.
     private receipts: Receipts = {}; // { receipt_type: { user_id: IReceipt } }
-    private receiptCacheByEventId: ReceiptCache = {}; // { event_id: IReceipt2[] }
+    private receiptCacheByEventId: ReceiptCache = {}; // { event_id: ICachedReceipt[] }
     private notificationCounts: Partial<Record<NotificationCountType, number>> = {};
     private readonly timelineSets: EventTimelineSet[];
     // any filtered timeline sets we're maintaining for this room
@@ -1438,12 +1438,17 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         this.emit(ThreadEvent.Update, thread);
     }
 
-    public createThread(rootEvent: MatrixEvent, events: MatrixEvent[] = []): Thread | undefined {
-        const tl = this.getTimelineForEvent(rootEvent.getId());
-        const relatedEvents = tl?.getTimelineSet().getAllRelationsEventForEvent(rootEvent.getId()) ?? [];
+    public createThread(rootEvent: MatrixEvent | undefined, events: MatrixEvent[] = []): Thread | undefined {
+        if (rootEvent) {
+            const tl = this.getTimelineForEvent(rootEvent.getId());
+            const relatedEvents = tl?.getTimelineSet().getAllRelationsEventForEvent(rootEvent.getId());
+            if (relatedEvents) {
+                events = events.concat(relatedEvents);
+            }
+        }
 
         const thread = new Thread(rootEvent, {
-            initialEvents: events.concat(relatedEvents),
+            initialEvents: events,
             room: this,
             client: this.client,
         });
