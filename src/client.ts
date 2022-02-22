@@ -3268,9 +3268,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * has been emitted. Note in particular that other events, eg. RoomState.members
      * will be emitted for a room before this function will return the given room.
      * @param {string} roomId The room ID
-     * @return {Room} The Room or null if it doesn't exist or there is no data store.
+     * @return {Room|null} The Room or null if it doesn't exist or there is no data store.
      */
-    public getRoom(roomId: string): Room {
+    public getRoom(roomId: string): Room | null {
         return this.store.getRoom(roomId);
     }
 
