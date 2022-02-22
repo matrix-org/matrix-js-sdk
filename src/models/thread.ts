@@ -55,7 +55,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     /**
      * A reference to all the events ID at the bottom of the threads
      */
-    public readonly timelineSet;
+    public readonly timelineSet: EventTimelineSet;
 
     private _currentUserParticipated = false;
 
@@ -148,10 +148,11 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
      * the tail/root references if needed
      * Will fire "Thread.update"
      * @param event The event to add
+     * @param {boolean} toStartOfTimeline whether the event is being added
+     * to the start (and not the end) of the timeline.
      */
     public async addEvent(event: MatrixEvent, toStartOfTimeline = false): Promise<void> {
-        // Add all incoming events to the thread's timeline set when there's
-        // no server support
+        // Add all incoming events to the thread's timeline set when there's  no server support
         if (!this.hasServerSideSupport) {
             // all the relevant membership info to hydrate events with a sender
             // is held in the main room timeline
