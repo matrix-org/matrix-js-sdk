@@ -102,7 +102,7 @@ describe("Filter Component", function() {
             expect(filter.check(referenceRelationEvent)).toBe(false);
         });
 
-        it("should keep events by relation type", function () {
+        it("should keep events by relation type", function() {
             const filter = new FilterComponent({
                 [UNSTABLE_FILTER_RELATION_TYPES.name]: RelationType.Thread,
             });
