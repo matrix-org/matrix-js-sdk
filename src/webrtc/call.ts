@@ -2218,7 +2218,7 @@ export class MatrixCall extends EventEmitter {
         const content = {
             candidates: candidates,
         };
-        logger.debug(`Call ${this.callId} attempting to send " + candidates.length + " candidates`);
+        logger.debug(`Call ${this.callId} attempting to send ${candidates.length} candidates`);
         try {
             await this.sendVoipEvent(EventType.CallCandidates, content);
             // reset our retry count if we have successfully sent our candidates
