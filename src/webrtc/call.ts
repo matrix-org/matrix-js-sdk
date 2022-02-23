@@ -603,9 +603,11 @@ export class MatrixCall extends EventEmitter {
     private pushNewLocalFeed(stream: MediaStream, purpose: SDPStreamMetadataPurpose, addToPeerConnection = true): void {
         const userId = this.client.getUserId();
 
-        // TODO: Find out what is going on here
-        // why do we enable audio (and only audio) tracks here? -- matthew
+        // Tracks don't always start off enabled, eg. chrome will give a disabled
+        // audio track if you ask for user media audio and already had one that
+        // you'd set to disabled (presumably because it clones them internally).
         setTracksEnabled(stream.getAudioTracks(), true);
+        setTracksEnabled(stream.getVideoTracks(), true);
 
         // We try to replace an existing feed if there already is one with the same purpose
         const existingFeed = this.getLocalFeeds().find((feed) => feed.purpose === purpose);
@@ -654,7 +656,8 @@ export class MatrixCall extends EventEmitter {
                     `id="${track.id}", ` +
                     `kind="${track.kind}", ` +
                     `streamId="${callFeed.stream.id}", ` +
-                    `streamPurpose="${callFeed.purpose}"` +
+                    `streamPurpose="${callFeed.purpose}", ` +
+                    `enabled=${track.enabled}` +
                     `) to peer connection`,
                 );
                 senderArray.push(this.peerConn.addTrack(track, callFeed.stream));
@@ -2298,6 +2301,12 @@ export class MatrixCall extends EventEmitter {
 
         try {
             const stream = await this.client.getMediaHandler().getUserMediaStream(audio, video);
+
+            // make sure all the tracks are enabled (same as pushNewLocalFeed -
+            // we probably ought to just have one code path for adding streams)
+            setTracksEnabled(stream.getAudioTracks(), true);
+            setTracksEnabled(stream.getVideoTracks(), true);
+
             const callFeed = new CallFeed({
                 client: this.client,
                 roomId: this.roomId,
