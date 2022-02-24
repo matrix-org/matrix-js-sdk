@@ -191,6 +191,8 @@ export class GroupCall extends EventEmitter {
     }
 
     public async initLocalCallFeed(): Promise<CallFeed> {
+        logger.log(`groupCall ${this.groupCallId} initLocalCallFeed`);
+
         if (this.state !== GroupCallState.LocalCallFeedUninitialized) {
             throw new Error(`Cannot initialize local call feed in the "${this.state}" state.`);
         }
@@ -232,6 +234,9 @@ export class GroupCall extends EventEmitter {
             this.localCallFeed.setNewStream(stream);
             const micShouldBeMuted = this.localCallFeed.isAudioMuted();
             const vidShouldBeMuted = this.localCallFeed.isVideoMuted();
+            logger.log(`groupCall ${this.groupCallId} updateLocalUsermediaStream oldStream ${
+                oldStream.id} newStream ${stream.id} micShouldBeMuted ${
+                micShouldBeMuted} vidShouldBeMuted ${vidShouldBeMuted}`);
             setTracksEnabled(stream.getAudioTracks(), !micShouldBeMuted);
             setTracksEnabled(stream.getVideoTracks(), !vidShouldBeMuted);
             this.client.getMediaHandler().stopUserMediaStream(oldStream);
@@ -378,6 +383,8 @@ export class GroupCall extends EventEmitter {
         }
 
         if (this.localCallFeed) {
+            logger.log(`groupCall ${this.groupCallId} setMicrophoneMuted stream ${
+                this.localCallFeed.stream.id} muted ${muted}`);
             this.localCallFeed.setAudioMuted(muted);
             setTracksEnabled(this.localCallFeed.stream.getAudioTracks(), !muted);
         }
@@ -395,6 +402,8 @@ export class GroupCall extends EventEmitter {
         }
 
         if (this.localCallFeed) {
+            logger.log(`groupCall ${this.groupCallId} setLocalVideoMuted stream ${
+                this.localCallFeed.stream.id} muted ${muted}`);
             this.localCallFeed.setVideoMuted(muted);
             setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);
         }

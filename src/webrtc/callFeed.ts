@@ -18,6 +18,7 @@ import EventEmitter from "events";
 import { SDPStreamMetadataPurpose } from "./callEventTypes";
 import { MatrixClient } from "../client";
 import { RoomMember } from "../models/room-member";
+import { logger } from "../logger";
 
 const POLLING_INTERVAL = 200; // ms
 export const SPEAKING_THRESHOLD = -60; // dB
@@ -253,6 +254,7 @@ export class CallFeed extends EventEmitter {
     public clone(): CallFeed {
         const mediaHandler = this.client.getMediaHandler();
         const stream = this.stream.clone();
+        logger.log(`callFeed cloning stream ${this.stream.id} newStream ${stream.id}`);
 
         if (this.purpose === SDPStreamMetadataPurpose.Usermedia) {
             mediaHandler.userMediaStreams.push(stream);

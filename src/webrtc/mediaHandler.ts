@@ -49,6 +49,7 @@ export class MediaHandler extends EventEmitter {
      * undefined treated as unset
      */
     public async setAudioInput(deviceId: string): Promise<void> {
+        logger.log(`mediaHandler setAudioInput ${deviceId}`);
         this.audioInput = deviceId;
         await this.updateLocalUsermediaStreams();
     }
@@ -59,6 +60,7 @@ export class MediaHandler extends EventEmitter {
      * undefined treated as unset
      */
     public async setVideoInput(deviceId: string): Promise<void> {
+        logger.log(`mediaHandler setVideoInput ${deviceId}`);
         this.videoInput = deviceId;
         await this.updateLocalUsermediaStreams();
     }
@@ -69,6 +71,7 @@ export class MediaHandler extends EventEmitter {
      * undefined treated as unset
      */
     public async setMediaInputs(audioInput: string, videoInput: string): Promise<void> {
+        logger.log(`mediaHandler setMediaInputs audioInput: ${audioInput} videoInput: ${videoInput}`);
         this.audioInput = audioInput;
         this.videoInput = videoInput;
         await this.updateLocalUsermediaStreams();
@@ -84,6 +87,7 @@ export class MediaHandler extends EventEmitter {
         }
 
         for (const stream of this.userMediaStreams) {
+            logger.log(`mediaHandler stopping all tracks for stream ${stream.id}`);
             for (const track of stream.getTracks()) {
                 track.stop();
             }
@@ -99,6 +103,7 @@ export class MediaHandler extends EventEmitter {
 
             const { audio, video } = callMediaStreamParams.get(call.callId);
 
+            logger.log(`mediaHandler updateLocalUsermediaStreams getUserMediaStream call ${call.callId}`);
             const stream = await this.getUserMediaStream(audio, video);
 
             await call.updateLocalUsermediaStream(stream);
@@ -109,6 +114,8 @@ export class MediaHandler extends EventEmitter {
                 continue;
             }
 
+            logger.log(`mediaHandler updateLocalUsermediaStreams getUserMediaStream groupCall ${
+                groupCall.groupCallId}`);
             const stream = await this.getUserMediaStream(
                 true,
                 groupCall.type === GroupCallType.Video,
@@ -145,8 +152,9 @@ export class MediaHandler extends EventEmitter {
             (this.localUserMediaStream.getVideoTracks().length === 0 && shouldRequestVideo)
         ) {
             const constraints = this.getUserMediaContraints(shouldRequestAudio, shouldRequestVideo);
-            logger.log("Getting user media with constraints", constraints);
             stream = await navigator.mediaDevices.getUserMedia(constraints);
+            logger.log(`mediaHandler getUserMediaStream constraints ${constraints} streamId ${
+                stream.id} shouldRequestAudio ${shouldRequestVideo} shouldRequestVideo ${shouldRequestVideo}`);
 
             for (const track of stream.getTracks()) {
                 const settings = track.getSettings();
@@ -161,6 +169,8 @@ export class MediaHandler extends EventEmitter {
             this.localUserMediaStream = stream;
         } else {
             stream = this.localUserMediaStream.clone();
+            logger.log(`mediaHandler clone userMediaStream ${this.localUserMediaStream.id} new stream ${
+                stream.id} shouldRequestAudio ${shouldRequestVideo} shouldRequestVideo ${shouldRequestVideo}`);
 
             if (!shouldRequestAudio) {
                 for (const track of stream.getAudioTracks()) {
@@ -186,7 +196,7 @@ export class MediaHandler extends EventEmitter {
      * Stops all tracks on the provided usermedia stream
      */
     public stopUserMediaStream(mediaStream: MediaStream) {
-        logger.debug("Stopping usermedia stream", mediaStream.id);
+        logger.log(`mediaHandler stopUserMediaStream stopping stream ${mediaStream.id}`);
         for (const track of mediaStream.getTracks()) {
             track.stop();
         }
@@ -257,6 +267,7 @@ export class MediaHandler extends EventEmitter {
      */
     public stopAllStreams() {
         for (const stream of this.userMediaStreams) {
+            logger.log(`mediaHandler stopAllStreams stopping stream ${stream.id}`);
             for (const track of stream.getTracks()) {
                 track.stop();
             }

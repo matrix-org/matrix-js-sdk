@@ -1133,6 +1133,8 @@ export class MatrixCall extends EventEmitter {
         callFeed.setNewStream(stream);
         const micShouldBeMuted = callFeed.isAudioMuted() || this.remoteOnHold;
         const vidShouldBeMuted = callFeed.isVideoMuted() || this.remoteOnHold;
+        logger.log(`call ${this.callId} updateLocalUsermediaStream stream ${
+            stream.id} micShouldBeMuted ${micShouldBeMuted} vidShouldBeMuted ${vidShouldBeMuted}`);
         setTracksEnabled(stream.getAudioTracks(), !micShouldBeMuted);
         setTracksEnabled(stream.getVideoTracks(), !vidShouldBeMuted);
 
@@ -1182,6 +1184,7 @@ export class MatrixCall extends EventEmitter {
      * @returns the new mute state
      */
     public async setLocalVideoMuted(muted: boolean): Promise<boolean> {
+        logger.log(`call ${this.callId} setLocalVideoMuted ${muted}`);
         if (!await this.client.getMediaHandler().hasVideoDevice()) {
             return this.isLocalVideoMuted();
         }
@@ -1214,6 +1217,7 @@ export class MatrixCall extends EventEmitter {
      * @returns the new mute state
      */
     public async setMicrophoneMuted(muted: boolean): Promise<boolean> {
+        logger.log(`call ${this.callId} setMicrophoneMuted ${muted}`);
         if (!await this.client.getMediaHandler().hasAudioDevice()) {
             return this.isMicrophoneMuted();
         }
@@ -1307,6 +1311,8 @@ export class MatrixCall extends EventEmitter {
         const micShouldBeMuted = this.localUsermediaFeed?.isAudioMuted() || this.remoteOnHold;
         const vidShouldBeMuted = this.localUsermediaFeed?.isVideoMuted() || this.remoteOnHold;
 
+        logger.log(`call ${this.callId} updateMuteStatus stream ${this.localUsermediaStream.id} micShouldBeMuted ${
+            micShouldBeMuted} vidShouldBeMuted ${vidShouldBeMuted}`);
         setTracksEnabled(this.localUsermediaStream.getAudioTracks(), !micShouldBeMuted);
         setTracksEnabled(this.localUsermediaStream.getVideoTracks(), !vidShouldBeMuted);
     }
