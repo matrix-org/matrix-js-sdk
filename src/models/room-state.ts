@@ -38,12 +38,14 @@ export enum RoomStateEvent {
     Events = "RoomState.events",
     Members = "RoomState.members",
     NewMember = "RoomState.newMember",
+    Update = "RoomState.update", // signals batches of updates without specificity
 }
 
 export type RoomStateEventHandlerMap = {
     [RoomStateEvent.Events]: (event: MatrixEvent, state: RoomState, lastStateEvent: MatrixEvent | null) => void;
     [RoomStateEvent.Members]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
     [RoomStateEvent.NewMember]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
+    [RoomStateEvent.Update]: (state: RoomState) => void;
 };
 
 export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventHandlerMap> {
@@ -376,6 +378,8 @@ export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventH
                 this.sentinels = {};
             }
         });
+
+        this.emit(RoomStateEvent.Update, this);
     }
 
     /**
@@ -485,6 +489,7 @@ export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventH
         logger.log(`LL: RoomState put in finished state ...`);
         this.oobMemberFlags.status = OobStatus.Finished;
         stateEvents.forEach((e) => this.setOutOfBandMember(e));
+        this.emit(RoomStateEvent.Update, this);
     }
 
     /**
