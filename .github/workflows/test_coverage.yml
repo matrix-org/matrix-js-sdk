@@ -1,8 +1,7 @@
 name: Test coverage
 on:
   pull_request:
-    branches-ignore:
-      - 'develop'
+    types: [opened, edited]
   push:
     branches:
       - 'develop'
