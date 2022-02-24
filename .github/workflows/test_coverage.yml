@@ -4,14 +4,15 @@ on:
     branches-ignore:
       - 'master'
 jobs:
-  steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+  test-coverage:
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    - name: Run tests with coverage
-      run: "yarn install && yarn build && yarn coverage"
+      - name: Run tests with coverage
+        run: "yarn install && yarn build && yarn coverage"
 
-    - name: Upload coverage
-      uses: codecov/codecov-action@v2
-      with:
-        verbose: true
+      - name: Upload coverage
+        uses: codecov/codecov-action@v2
+        with:
+          verbose: true
