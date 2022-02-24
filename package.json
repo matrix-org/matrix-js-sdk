@@ -89,7 +89,7 @@
     "better-docs": "^2.4.0-beta.9",
     "browserify": "^17.0.0",
     "docdash": "^1.2.0",
-    "eslint": "7.18.0",
+    "eslint": "8.9.0",
     "eslint-config-google": "^0.14.0",
     "eslint-plugin-import": "^2.25.4",
     "eslint-plugin-matrix-org": "^0.4.0",

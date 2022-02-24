@@ -58,8 +58,8 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     public events: {
         member?: MatrixEvent;
     } = {
-        member: null,
-    };
+            member: null,
+        };
 
     /**
      * Construct a new room member.
