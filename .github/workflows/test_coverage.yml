@@ -1,6 +1,6 @@
 name: Test coverage
 on:
-  push
+  push: ~
 jobs:
   steps:
     - name: Checkout code
