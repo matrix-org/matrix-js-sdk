@@ -8628,12 +8628,21 @@ export class MatrixClient extends EventEmitter {
             $roomId: roomId,
         });
 
-        return this.http.authedRequest<IRoomHierarchy>(undefined, Method.Get, path, {
+        const queryParams: Record<string, string | string[]> = {
             suggested_only: String(suggestedOnly),
-            max_depth: maxDepth?.toString(),
-            from: fromToken,
-            limit: limit?.toString(),
-        }, undefined, {
+        };
+
+        if (limit !== undefined) {
+            queryParams["limit"] = limit.toString();
+        }
+        if (maxDepth !== undefined) {
+            queryParams["max_depth"] = maxDepth.toString();
+        }
+        if (fromToken !== undefined) {
+            queryParams["from"] = fromToken;
+        }
+
+        return this.http.authedRequest<IRoomHierarchy>(undefined, Method.Get, path, queryParams, undefined, {
             prefix: "/_matrix/client/unstable/org.matrix.msc2946",
         }).catch(e => {
             if (e.errcode === "M_UNRECOGNIZED") {
