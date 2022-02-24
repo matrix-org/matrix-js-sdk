@@ -1,0 +1,16 @@
+name: Test coverage
+on:
+  pull_request_target:
+    types: [ opened, edited ]
+jobs:
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Run tests with coverage
+      run: "yarn install && yarn build && yarn coverage"
+
+    - name: Upload coverage
+      uses: codecov/codecov-action@v2
+      with:
+        verbose: true
