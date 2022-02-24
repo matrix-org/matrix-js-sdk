@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/gh/matrix-org/matrix-js-sdk/branch/master/graph/badge.svg?token=3yjwaPBkAT)](https://codecov.io/gh/matrix-org/matrix-js-sdk)
+
 Matrix Javascript SDK
 =====================
 
