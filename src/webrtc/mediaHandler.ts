@@ -105,6 +105,10 @@ export class MediaHandler extends EventEmitter {
         }
 
         for (const groupCall of this.client.groupCallEventHandler.groupCalls.values()) {
+            if (!groupCall.localCallFeed) {
+                continue;
+            }
+
             const stream = await this.getUserMediaStream(
                 true,
                 groupCall.type === GroupCallType.Video,

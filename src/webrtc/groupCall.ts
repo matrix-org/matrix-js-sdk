@@ -230,6 +230,10 @@ export class GroupCall extends EventEmitter {
         if (this.localCallFeed) {
             const oldStream = this.localCallFeed.stream;
             this.localCallFeed.setNewStream(stream);
+            const micShouldBeMuted = this.localCallFeed.isAudioMuted();
+            const vidShouldBeMuted = this.localCallFeed.isVideoMuted();
+            setTracksEnabled(stream.getAudioTracks(), !micShouldBeMuted);
+            setTracksEnabled(stream.getVideoTracks(), !vidShouldBeMuted);
             this.client.getMediaHandler().stopUserMediaStream(oldStream);
         }
     }
