@@ -113,7 +113,8 @@
       "<rootDir>/src/**/*.{js,ts}"
     ],
     "coverageReporters": [
-      "text"
+      "text",
+      "json"
     ]
   }
 }
