@@ -18,10 +18,9 @@ limitations under the License.
 */
 
 import EventEmitter from "events";
-import { GroupCallType } from "../webrtc/groupCall";
+import { GroupCallType, GroupCallState } from "../webrtc/groupCall";
 import { MatrixClient } from "../client";
 import { logger } from "../logger";
-import { GroupCallState } from "..";
 
 export enum MediaHandlerEvent {
     LocalStreamsChanged = "local_streams_changed"
@@ -161,8 +160,8 @@ export class MediaHandler extends EventEmitter {
         ) {
             const constraints = this.getUserMediaContraints(shouldRequestAudio, shouldRequestVideo);
             stream = await navigator.mediaDevices.getUserMedia(constraints);
-            logger.log(`mediaHandler getUserMediaStream constraints ${constraints} streamId ${
-                stream.id} shouldRequestAudio ${shouldRequestVideo} shouldRequestVideo ${shouldRequestVideo}`);
+            logger.log(`mediaHandler getUserMediaStream streamId ${stream.id} shouldRequestAudio ${
+                shouldRequestVideo} shouldRequestVideo ${shouldRequestVideo}`, constraints);
 
             for (const track of stream.getTracks()) {
                 const settings = track.getSettings();
