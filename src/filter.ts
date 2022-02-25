@@ -26,13 +26,13 @@ import { FilterComponent, IFilterComponent } from "./filter-component";
 import { MatrixEvent } from "./models/event";
 import { UnstableValue } from "./NamespacedValue";
 
-export const UNSTABLE_FILTER_RELATION_SENDERS = new UnstableValue(
-    "relation_senders",
+export const UNSTABLE_FILTER_RELATED_BY_SENDERS = new UnstableValue(
+    "related_by_senders",
     "io.element.relation_senders",
 );
 
-export const UNSTABLE_FILTER_RELATION_TYPES = new UnstableValue(
-    "relation_types",
+export const UNSTABLE_FILTER_RELATED_BY_REL_TYPES = new UnstableValue(
+    "related_by_rel_types",
     "io.element.relation_types",
 );
 
@@ -66,8 +66,8 @@ export interface IRoomEventFilter extends IFilterComponent {
     lazy_load_members?: boolean;
     include_redundant_members?: boolean;
     types?: Array<EventType | string>;
-    [UNSTABLE_FILTER_RELATION_TYPES.name]?: Array<RelationType | string>;
-    [UNSTABLE_FILTER_RELATION_SENDERS.name]?: string[];
+    [UNSTABLE_FILTER_RELATED_BY_REL_TYPES.name]?: Array<RelationType | string>;
+    [UNSTABLE_FILTER_RELATED_BY_SENDERS.name]?: string[];
 }
 
 interface IStateFilter extends IRoomEventFilter {}

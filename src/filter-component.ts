@@ -15,7 +15,10 @@ limitations under the License.
 */
 
 import { RelationType } from "./@types/event";
-import { UNSTABLE_FILTER_RELATION_SENDERS, UNSTABLE_FILTER_RELATION_TYPES } from "./filter";
+import {
+    UNSTABLE_FILTER_RELATED_BY_REL_TYPES,
+    UNSTABLE_FILTER_RELATED_BY_SENDERS,
+} from "./filter";
 import { MatrixEvent } from "./models/event";
 
 /**
@@ -48,7 +51,7 @@ export interface IFilterComponent {
     not_senders?: string[];
     contains_url?: boolean;
     limit?: number;
-    [UNSTABLE_FILTER_RELATION_TYPES.name]?: Array<RelationType | string>;
+    [UNSTABLE_FILTER_RELATED_BY_REL_TYPES.name]?: Array<RelationType | string>;
 }
 /* eslint-enable camelcase */
 
@@ -105,8 +108,8 @@ export class FilterComponent {
             senders: this.filterJson.senders || null,
             not_senders: this.filterJson.not_senders || [],
             contains_url: this.filterJson.contains_url || null,
-            [UNSTABLE_FILTER_RELATION_SENDERS.name]: UNSTABLE_FILTER_RELATION_SENDERS.findIn(this.filterJson),
-            [UNSTABLE_FILTER_RELATION_TYPES.name]: UNSTABLE_FILTER_RELATION_TYPES.findIn(this.filterJson),
+            [UNSTABLE_FILTER_RELATED_BY_SENDERS.name]: UNSTABLE_FILTER_RELATED_BY_SENDERS.findIn(this.filterJson),
+            [UNSTABLE_FILTER_RELATED_BY_REL_TYPES.name]: UNSTABLE_FILTER_RELATED_BY_REL_TYPES.findIn(this.filterJson),
         };
     }
 
@@ -160,14 +163,14 @@ export class FilterComponent {
             return false;
         }
 
-        const relationTypesFilter = this.filterJson[UNSTABLE_FILTER_RELATION_TYPES.name];
+        const relationTypesFilter = this.filterJson[UNSTABLE_FILTER_RELATED_BY_REL_TYPES.name];
         if (relationTypesFilter !== undefined) {
             if (!this.arrayMatchesFilter(relationTypesFilter, relationTypes)) {
                 return false;
             }
         }
 
-        const relationSendersFilter = this.filterJson[UNSTABLE_FILTER_RELATION_SENDERS.name];
+        const relationSendersFilter = this.filterJson[UNSTABLE_FILTER_RELATED_BY_SENDERS.name];
         if (relationSendersFilter !== undefined) {
             if (!this.arrayMatchesFilter(relationSendersFilter, relationSenders)) {
                 return false;
