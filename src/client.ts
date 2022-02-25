@@ -934,7 +934,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected checkTurnServersIntervalID: number;
     protected exportedOlmDeviceToImport: IOlmDevice;
     protected txnCtr = 0;
-    protected mediaHandler = new MediaHandler();
+    protected mediaHandler = new MediaHandler(this);
     protected pendingEventEncryption = new Map<string, Promise<void>>();
 
     constructor(opts: IMatrixClientCreateOpts) {

@@ -2,7 +2,7 @@
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2017 New Vector Ltd
 Copyright 2019, 2020 The Matrix.org Foundation C.I.C.
-Copyright 2021 Šimon Brandner <simon.bra.ag@gmail.com>
+Copyright 2021 - 2022 Šimon Brandner <simon.bra.ag@gmail.com>
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,20 +18,30 @@ limitations under the License.
 */
 
 import { logger } from "../logger";
+import { MatrixClient } from "../client";
+import { CallState } from "./call";
 
 export class MediaHandler {
     private audioInput: string;
     private videoInput: string;
-    private userMediaStreams: MediaStream[] = [];
-    private screensharingStreams: MediaStream[] = [];
+    private localUserMediaStream?: MediaStream;
+    public userMediaStreams: MediaStream[] = [];
+    public screensharingStreams: MediaStream[] = [];
+
+    constructor(private client: MatrixClient) { }
 
     /**
      * Set an audio input device to use for MatrixCalls
      * @param {string} deviceId the identifier for the device
      * undefined treated as unset
      */
-    public setAudioInput(deviceId: string): void {
+    public async setAudioInput(deviceId: string): Promise<void> {
+        logger.info("LOG setting audio input to", deviceId);
+
+        if (this.audioInput === deviceId) return;
+
         this.audioInput = deviceId;
+        await this.updateLocalUsermediaStreams();
     }
 
     /**
@@ -39,8 +49,39 @@ export class MediaHandler {
      * @param {string} deviceId the identifier for the device
      * undefined treated as unset
      */
-    public setVideoInput(deviceId: string): void {
+    public async setVideoInput(deviceId: string): Promise<void> {
+        logger.info("LOG setting video input to", deviceId);
+
+        if (this.videoInput === deviceId) return;
+
         this.videoInput = deviceId;
+        await this.updateLocalUsermediaStreams();
+    }
+
+    /**
+     * Requests new usermedia streams and replace the old ones
+     */
+    public async updateLocalUsermediaStreams(): Promise<void> {
+        if (this.userMediaStreams.length === 0) return;
+
+        const callMediaStreamParams: Map<string, { audio: boolean, video: boolean }> = new Map();
+        for (const call of this.client.callEventHandler.calls.values()) {
+            callMediaStreamParams.set(call.callId, {
+                audio: call.hasLocalUserMediaAudioTrack,
+                video: call.hasLocalUserMediaVideoTrack,
+            });
+        }
+
+        for (const call of this.client.callEventHandler.calls.values()) {
+            if (call.state === CallState.Ended || !callMediaStreamParams.has(call.callId)) continue;
+
+            const { audio, video } = callMediaStreamParams.get(call.callId);
+
+            // This stream won't be reusable as we will replace the tracks of the old stream
+            const stream = await this.getUserMediaStream(audio, video, false);
+
+            await call.updateLocalUsermediaStream(stream);
+        }
     }
 
     public async hasAudioDevice(): Promise<boolean> {
@@ -65,20 +106,44 @@ export class MediaHandler {
 
         let stream: MediaStream;
 
-        // Find a stream with matching tracks
-        const matchingStream = this.userMediaStreams.find((stream) => {
-            if (shouldRequestAudio !== (stream.getAudioTracks().length > 0)) return false;
-            if (shouldRequestVideo !== (stream.getVideoTracks().length > 0)) return false;
-            return true;
-        });
-
-        if (matchingStream) {
-            logger.log("Cloning user media stream", matchingStream.id);
-            stream = matchingStream.clone();
-        } else {
+        if (
+            !this.localUserMediaStream ||
+            (this.localUserMediaStream.getAudioTracks().length === 0 && shouldRequestAudio) ||
+            (this.localUserMediaStream.getVideoTracks().length === 0 && shouldRequestVideo) ||
+            (this.localUserMediaStream.getAudioTracks()[0]?.getSettings()?.deviceId !== this.audioInput) ||
+            (this.localUserMediaStream.getVideoTracks()[0]?.getSettings()?.deviceId !== this.videoInput)
+        ) {
             const constraints = this.getUserMediaContraints(shouldRequestAudio, shouldRequestVideo);
             logger.log("Getting user media with constraints", constraints);
             stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+            for (const track of stream.getTracks()) {
+                const settings = track.getSettings();
+
+                if (track.kind === "audio") {
+                    this.audioInput = settings.deviceId;
+                } else if (track.kind === "video") {
+                    this.videoInput = settings.deviceId;
+                }
+            }
+
+            if (reusable) {
+                this.localUserMediaStream = stream;
+            }
+        } else {
+            stream = this.localUserMediaStream.clone();
+
+            if (!shouldRequestAudio) {
+                for (const track of stream.getAudioTracks()) {
+                    stream.removeTrack(track);
+                }
+            }
+
+            if (!shouldRequestVideo) {
+                for (const track of stream.getVideoTracks()) {
+                    stream.removeTrack(track);
+                }
+            }
         }
 
         if (reusable) {
@@ -102,6 +167,10 @@ export class MediaHandler {
         if (index !== -1) {
             logger.debug("Splicing usermedia stream out stream array", mediaStream.id);
             this.userMediaStreams.splice(index, 1);
+        }
+
+        if (this.localUserMediaStream === mediaStream) {
+            this.localUserMediaStream = undefined;
         }
     }
 
@@ -174,6 +243,7 @@ export class MediaHandler {
 
         this.userMediaStreams = [];
         this.screensharingStreams = [];
+        this.localUserMediaStream = undefined;
     }
 
     private getUserMediaContraints(audio: boolean, video: boolean): MediaStreamConstraints {
