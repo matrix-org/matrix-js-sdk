@@ -21,7 +21,7 @@ import EventEmitter from "events";
 import { GroupCallType } from "../webrtc/groupCall";
 import { MatrixClient } from "../client";
 import { logger } from "../logger";
-import { CallState } from "./call";
+import { GroupCallState } from "..";
 
 export enum MediaHandlerEvent {
     LocalStreamsChanged = "local_streams_changed"
@@ -97,7 +97,7 @@ export class MediaHandler extends EventEmitter {
         this.localUserMediaStream = undefined;
 
         for (const call of this.client.callEventHandler.calls.values()) {
-            if (call.state === CallState.Ended || !callMediaStreamParams.has(call.callId)) {
+            if (call.callHasEnded() || !callMediaStreamParams.has(call.callId)) {
                 continue;
             }
 
@@ -105,6 +105,10 @@ export class MediaHandler extends EventEmitter {
 
             logger.log(`mediaHandler updateLocalUsermediaStreams getUserMediaStream call ${call.callId}`);
             const stream = await this.getUserMediaStream(audio, video);
+
+            if (call.callHasEnded()) {
+                continue;
+            }
 
             await call.updateLocalUsermediaStream(stream);
         }
@@ -120,6 +124,10 @@ export class MediaHandler extends EventEmitter {
                 true,
                 groupCall.type === GroupCallType.Video,
             );
+
+            if (groupCall.state === GroupCallState.Ended) {
+                continue;
+            }
 
             await groupCall.updateLocalUsermediaStream(stream);
         }

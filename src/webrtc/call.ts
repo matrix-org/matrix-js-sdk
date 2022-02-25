@@ -1682,7 +1682,7 @@ export class MatrixCall extends EventEmitter {
         this.emit(CallEvent.AssertedIdentityChanged);
     }
 
-    private callHasEnded(): boolean {
+    public callHasEnded(): boolean {
         // This exists as workaround to typescript trying to be clever and erroring
         // when putting if (this.state === CallState.Ended) return; twice in the same
         // function, even though that function is async.
