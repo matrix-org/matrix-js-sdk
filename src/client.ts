@@ -171,7 +171,7 @@ import {
     SearchOrderBy,
 } from "./@types/search";
 import { ISynapseAdminDeactivateResponse, ISynapseAdminWhoisResponse } from "./@types/synapse";
-import { IHierarchyRoom, ISpaceSummaryEvent, ISpaceSummaryRoom } from "./@types/spaces";
+import { IHierarchyRoom } from "./@types/spaces";
 import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, RuleId } from "./@types/PushRules";
 import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
@@ -8690,40 +8690,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Fetches or paginates a summary of a space as defined by an initial version of MSC2946
-     * @param {string} roomId The ID of the space-room to use as the root of the summary.
-     * @param {number?} maxRoomsPerSpace The maximum number of rooms to return per subspace.
-     * @param {boolean?} suggestedOnly Whether to only return rooms with suggested=true.
-     * @param {boolean?} autoJoinOnly Whether to only return rooms with auto_join=true.
-     * @param {number?} limit The maximum number of rooms to return in total.
-     * @param {string?} batch The opaque token to paginate a previous summary request.
-     * @returns {Promise} the response, with next_token, rooms fields.
-     * @deprecated in favour of `getRoomHierarchy` due to the MSC changing paths.
-     */
-    public getSpaceSummary(
-        roomId: string,
-        maxRoomsPerSpace?: number,
-        suggestedOnly?: boolean,
-        autoJoinOnly?: boolean,
-        limit?: number,
-        batch?: string,
-    ): Promise<{rooms: ISpaceSummaryRoom[], events: ISpaceSummaryEvent[]}> {
-        const path = utils.encodeUri("/rooms/$roomId/spaces", {
-            $roomId: roomId,
-        });
-
-        return this.http.authedRequest(undefined, Method.Post, path, null, {
-            max_rooms_per_space: maxRoomsPerSpace,
-            suggested_only: suggestedOnly,
-            auto_join_only: autoJoinOnly,
-            limit,
-            batch,
-        }, {
-            prefix: "/_matrix/client/unstable/org.matrix.msc2946",
-        });
-    }
-
-    /**
      * Fetches or paginates a room hierarchy as defined by MSC2946.
      * Falls back gracefully to sourcing its data from `getSpaceSummary` if this API is not yet supported by the server.
      * @param {string} roomId The ID of the space-room to use as the root of the summary.
@@ -8759,24 +8725,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         return this.http.authedRequest<IRoomHierarchy>(undefined, Method.Get, path, queryParams, undefined, {
-            prefix: "/_matrix/client/unstable/org.matrix.msc2946",
+            prefix: PREFIX_V1,
         }).catch(e => {
             if (e.errcode === "M_UNRECOGNIZED") {
-                // fall back to the older space summary API as it exposes the same data just in a different shape.
-                return this.getSpaceSummary(roomId, undefined, suggestedOnly, undefined, limit)
-                    .then(({ rooms, events }) => {
-                        // Translate response from `/spaces` to that we expect in this API.
-                        const roomMap = new Map(rooms.map(r => {
-                            return [r.room_id, <IHierarchyRoom>{ ...r, children_state: [] }];
-                        }));
-                        events.forEach(e => {
-                            roomMap.get(e.room_id)?.children_state.push(e);
-                        });
-
-                        return {
-                            rooms: Array.from(roomMap.values()),
-                        };
-                    });
+                // fall back to the prefixed hierarchy API.
+                return this.http.authedRequest<IRoomHierarchy>(undefined, Method.Get, path, queryParams, undefined, {
+                    prefix: "/_matrix/client/unstable/org.matrix.msc2946",
+                });
             }
 
             throw e;
