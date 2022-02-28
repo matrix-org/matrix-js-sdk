@@ -240,6 +240,7 @@ export class SyncApi {
             RoomStateEvent.Events,
             RoomStateEvent.Members,
             RoomStateEvent.NewMember,
+            RoomStateEvent.Update,
         ]);
         room.currentState.on(RoomStateEvent.NewMember, function(event, state, member) {
             member.user = client.getUser(member.userId);

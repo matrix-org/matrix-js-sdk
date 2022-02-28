@@ -85,6 +85,7 @@ export function mkEvent(opts) {
         room_id: opts.room,
         sender: opts.sender || opts.user, // opts.user for backwards-compat
         content: opts.content,
+        unsigned: opts.unsigned,
         event_id: "$" + Math.random() + "-" + Math.random(),
     };
     if (opts.skey !== undefined) {

@@ -2,6 +2,7 @@
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2017 New Vector Ltd
 Copyright 2019, 2020 The Matrix.org Foundation C.I.C.
+Copyright 2021 - 2022 Šimon Brandner <simon.bra.ag@gmail.com>
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -585,9 +586,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private pushNewLocalFeed(stream: MediaStream, purpose: SDPStreamMetadataPurpose, addToPeerConnection = true): void {
         const userId = this.client.getUserId();
 
-        // TODO: Find out what is going on here
-        // why do we enable audio (and only audio) tracks here? -- matthew
+        // Tracks don't always start off enabled, eg. chrome will give a disabled
+        // audio track if you ask for user media audio and already had one that
+        // you'd set to disabled (presumably because it clones them internally).
         setTracksEnabled(stream.getAudioTracks(), true);
+        setTracksEnabled(stream.getVideoTracks(), true);
 
         // We try to replace an existing feed if there already is one with the same purpose
         const existingFeed = this.getLocalFeeds().find((feed) => feed.purpose === purpose);
@@ -630,7 +633,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     `id="${track.id}", ` +
                     `kind="${track.kind}", ` +
                     `streamId="${callFeed.stream.id}", ` +
-                    `streamPurpose="${callFeed.purpose}"` +
+                    `streamPurpose="${callFeed.purpose}", ` +
+                    `enabled=${track.enabled}` +
                     `) to peer connection`,
                 );
                 senderArray.push(this.peerConn.addTrack(track, callFeed.stream));
@@ -947,29 +951,13 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (!this.opponentSupportsSDPStreamMetadata()) return;
 
         try {
-            const upgradeAudio = audio && !this.hasLocalUserMediaAudioTrack;
-            const upgradeVideo = video && !this.hasLocalUserMediaVideoTrack;
-            logger.debug(`Upgrading call: audio?=${upgradeAudio} video?=${upgradeVideo}`);
+            const getAudio = audio || this.hasLocalUserMediaAudioTrack;
+            const getVideo = video || this.hasLocalUserMediaVideoTrack;
 
-            const stream = await this.client.getMediaHandler().getUserMediaStream(upgradeAudio, upgradeVideo, false);
-            if (upgradeAudio && upgradeVideo) {
-                if (this.hasLocalUserMediaAudioTrack) return;
-                if (this.hasLocalUserMediaVideoTrack) return;
-
-                this.pushNewLocalFeed(stream, SDPStreamMetadataPurpose.Usermedia);
-            } else if (upgradeAudio) {
-                if (this.hasLocalUserMediaAudioTrack) return;
-
-                const audioTrack = stream.getAudioTracks()[0];
-                this.localUsermediaStream.addTrack(audioTrack);
-                this.peerConn.addTrack(audioTrack, this.localUsermediaStream);
-            } else if (upgradeVideo) {
-                if (this.hasLocalUserMediaVideoTrack) return;
-
-                const videoTrack = stream.getVideoTracks()[0];
-                this.localUsermediaStream.addTrack(videoTrack);
-                this.peerConn.addTrack(videoTrack, this.localUsermediaStream);
-            }
+            // updateLocalUsermediaStream() will take the tracks, use them as
+            // replacement and throw the stream away, so it isn't reusable
+            const stream = await this.client.getMediaHandler().getUserMediaStream(getAudio, getVideo, false);
+            await this.updateLocalUsermediaStream(stream, audio, video);
         } catch (error) {
             logger.error("Failed to upgrade the call", error);
             this.emit(CallEvent.Error,
@@ -1083,6 +1071,63 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
             return false;
         }
+    }
+
+    /**
+     * Replaces/adds the tracks from the passed stream to the localUsermediaStream
+     * @param {MediaStream} stream to use a replacement for the local usermedia stream
+     */
+    public async updateLocalUsermediaStream(
+        stream: MediaStream, forceAudio = false, forceVideo = false,
+    ): Promise<void> {
+        const callFeed = this.localUsermediaFeed;
+        const audioEnabled = forceAudio || (!callFeed.isAudioMuted() && !this.remoteOnHold);
+        const videoEnabled = forceVideo || (!callFeed.isVideoMuted() && !this.remoteOnHold);
+        setTracksEnabled(stream.getAudioTracks(), audioEnabled);
+        setTracksEnabled(stream.getVideoTracks(), videoEnabled);
+
+        // We want to keep the same stream id, so we replace the tracks rather than the whole stream
+        for (const track of this.localUsermediaStream.getTracks()) {
+            this.localUsermediaStream.removeTrack(track);
+            track.stop();
+        }
+        for (const track of stream.getTracks()) {
+            this.localUsermediaStream.addTrack(track);
+        }
+
+        const newSenders = [];
+
+        for (const track of stream.getTracks()) {
+            const oldSender = this.usermediaSenders.find((sender) => sender.track?.kind === track.kind);
+            let newSender: RTCRtpSender;
+
+            if (oldSender) {
+                logger.info(
+                    `Replacing track (` +
+                    `id="${track.id}", ` +
+                    `kind="${track.kind}", ` +
+                    `streamId="${stream.id}", ` +
+                    `streamPurpose="${callFeed.purpose}"` +
+                    `) to peer connection`,
+                );
+                await oldSender.replaceTrack(track);
+                newSender = oldSender;
+            } else {
+                logger.info(
+                    `Adding track (` +
+                    `id="${track.id}", ` +
+                    `kind="${track.kind}", ` +
+                    `streamId="${stream.id}", ` +
+                    `streamPurpose="${callFeed.purpose}"` +
+                    `) to peer connection`,
+                );
+                newSender = this.peerConn.addTrack(track, this.localUsermediaStream);
+            }
+
+            newSenders.push(newSender);
+        }
+
+        this.usermediaSenders = newSenders;
     }
 
     /**
@@ -1213,8 +1258,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(),
         });
 
-        const micShouldBeMuted = this.localUsermediaFeed?.isAudioMuted() || this.remoteOnHold;
-        const vidShouldBeMuted = this.localUsermediaFeed?.isVideoMuted() || this.remoteOnHold;
+        const micShouldBeMuted = this.isMicrophoneMuted() || this.remoteOnHold;
+        const vidShouldBeMuted = this.isLocalVideoMuted() || this.remoteOnHold;
 
         setTracksEnabled(this.localUsermediaStream.getAudioTracks(), !micShouldBeMuted);
         setTracksEnabled(this.localUsermediaStream.getVideoTracks(), !vidShouldBeMuted);
@@ -2078,6 +2123,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         try {
             const stream = await this.client.getMediaHandler().getUserMediaStream(audio, video);
+
+            // make sure all the tracks are enabled (same as pushNewLocalFeed -
+            // we probably ought to just have one code path for adding streams)
+            setTracksEnabled(stream.getAudioTracks(), true);
+            setTracksEnabled(stream.getVideoTracks(), true);
+
             const callFeed = new CallFeed({
                 client: this.client,
                 roomId: this.roomId,

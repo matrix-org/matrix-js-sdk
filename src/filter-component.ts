@@ -83,9 +83,10 @@ export class FilterComponent {
         // of performance
         // This should be improved when bundled relationships solve that problem
         const relationSenders = [];
-        if (this.userId && relations?.[RelationType.Thread]?.current_user_participated) {
+        if (this.userId && bundledRelationships?.[RelationType.Thread]?.current_user_participated) {
             relationSenders.push(this.userId);
         }
+
         return this.checkFields(
             event.getRoomId(),
             event.getSender(),

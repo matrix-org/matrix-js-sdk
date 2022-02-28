@@ -48,6 +48,7 @@ export * from "./crypto/store/indexeddb-crypto-store";
 export * from "./content-repo";
 export * from './@types/event';
 export * from './@types/PushRules';
+export * from './@types/partials';
 export * from './@types/requests';
 export * from './@types/search';
 export * from './models/room-summary';
