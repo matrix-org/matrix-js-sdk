@@ -1,9 +1,9 @@
 import * as utils from "../test-utils";
-import { DuplicateStrategy, EventStatus, MatrixClient, MatrixEvent, PendingEventOrdering, RoomEvent } from "../../src";
+import { DuplicateStrategy, EventStatus, MatrixEvent, PendingEventOrdering, RoomEvent } from "../../src";
 import { EventTimeline } from "../../src/models/event-timeline";
 import { RoomState } from "../../src";
 import { Room } from "../../src";
-import { UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../../src/@types/event";
+import { RelationType, UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../../src/@types/event";
 import { TestClient } from "../TestClient";
 
 describe("Room", function() {
@@ -15,7 +15,7 @@ describe("Room", function() {
     let room;
 
     beforeEach(function() {
-        room = new Room(roomId);
+        room = new Room(roomId, null, userA);
         // mock RoomStates
         room.oldState = room.getLiveTimeline().startState =
             utils.mock(RoomState, "oldState");
@@ -1800,6 +1800,51 @@ describe("Room", function() {
                     ]);
                     expect(room.getDefaultRoomName(userA)).toEqual("User B");
                 });
+        });
+
+        describe("threads", function() {
+            beforeEach(() => {
+                const client = (new TestClient(
+                    "@alice:example.com", "alicedevice",
+                )).client;
+                room = new Room(roomId, client, userA);
+            });
+
+            it("allow create threads without a root event", function() {
+                const eventWithoutARootEvent = new MatrixEvent({
+                    event_id: "$123",
+                    room_id: roomId,
+                    content: {
+                        "m.relates_to": {
+                            "rel_type": RelationType.Thread,
+                            "event_id": "$000",
+                        },
+                    },
+                    unsigned: {
+                        "age": 1,
+                    },
+                });
+
+                room.createThread(undefined, [eventWithoutARootEvent]);
+
+                const rootEvent = new MatrixEvent({
+                    event_id: "$666",
+                    room_id: roomId,
+                    content: {},
+                    unsigned: {
+                        "age": 1,
+                        "m.relations": {
+                            [RelationType.Thread]: {
+                                latest_event: null,
+                                count: 1,
+                                current_user_participated: false,
+                            },
+                        },
+                    },
+                });
+
+                expect(() => room.createThread(rootEvent, [])).not.toThrow();
+            });
         });
     });
 });
