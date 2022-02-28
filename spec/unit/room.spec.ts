@@ -1,3 +1,6 @@
+import MockHttpBackend from "matrix-mock-request";
+import * as jssdk from "matrix-js-sdk";
+
 import * as utils from "../test-utils";
 import { DuplicateStrategy, EventStatus, MatrixEvent, PendingEventOrdering, RoomEvent } from "../../src";
 import { EventTimeline } from "../../src/models/event-timeline";
@@ -5,6 +8,7 @@ import { Room } from "../../src/models/room";
 import { RoomState } from "../../src/models/room-state";
 import { RelationType, UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../../src/@types/event";
 import { TestClient } from "../TestClient";
+import { Thread } from "../../src/models/thread";
 
 describe("Room", function() {
     const roomId = "!foo:bar";
@@ -1844,6 +1848,54 @@ describe("Room", function() {
                 });
 
                 expect(() => room.createThread(rootEvent, [])).not.toThrow();
+            });
+
+            it("should not add events before server supports is known", function() {
+                Thread.hasServerSideSupport = undefined;
+
+                const rootEvent = new MatrixEvent({
+                    event_id: "$666",
+                    room_id: roomId,
+                    content: {},
+                    unsigned: {
+                        "age": 1,
+                        "m.relations": {
+                            [RelationType.Thread]: {
+                                latest_event: null,
+                                count: 1,
+                                current_user_participated: false,
+                            },
+                        },
+                    },
+                });
+
+                let age = 1;
+                function mkEvt(id): MatrixEvent {
+                    return new MatrixEvent({
+                        event_id: id,
+                        room_id: roomId,
+                        content: {
+                            "m.relates_to": {
+                                "rel_type": RelationType.Thread,
+                                "event_id": "$666",
+                            },
+                        },
+                        unsigned: {
+                            "age": age++,
+                        },
+                    });
+                }
+
+                const thread = room.createThread(rootEvent, []);
+                expect(thread.length).toBe(0);
+
+                thread.addEvent(mkEvt("$1"));
+                expect(thread.length).toBe(0);
+
+                Thread.hasServerSideSupport = true;
+
+                thread.addEvent(mkEvt("$2"));
+                expect(thread.length).toBeGreaterThan(0);
             });
         });
     });
