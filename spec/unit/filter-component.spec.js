@@ -1,4 +1,4 @@
-import { RelationType, UNSTABLE_FILTER_RELATION_SENDERS, UNSTABLE_FILTER_RELATION_TYPES } from "../../src";
+import { RelationType, UNSTABLE_FILTER_RELATED_BY_REL_TYPES } from "../../src";
 import { FilterComponent } from "../../src/filter-component";
 import { mkEvent } from '../test-utils';
 
@@ -84,7 +84,7 @@ describe("Filter Component", function() {
 
         it("should filter out events by relation type", function() {
             const filter = new FilterComponent({
-                [UNSTABLE_FILTER_RELATION_TYPES.name]: RelationType.Thread,
+                [UNSTABLE_FILTER_RELATED_BY_REL_TYPES.name]: RelationType.Thread,
             });
 
             const referenceRelationEvent = mkEvent({
@@ -104,7 +104,7 @@ describe("Filter Component", function() {
 
         it("should keep events by relation type", function() {
             const filter = new FilterComponent({
-                [UNSTABLE_FILTER_RELATION_TYPES.name]: RelationType.Thread,
+                [UNSTABLE_FILTER_RELATED_BY_REL_TYPES.name]: RelationType.Thread,
             });
 
             const threadRootEvent = mkEvent({
