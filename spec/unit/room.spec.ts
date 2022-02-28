@@ -1,8 +1,8 @@
 import * as utils from "../test-utils";
 import { DuplicateStrategy, EventStatus, MatrixEvent, PendingEventOrdering, RoomEvent } from "../../src";
 import { EventTimeline } from "../../src/models/event-timeline";
-import { RoomState } from "../../src";
-import { Room } from "../../src";
+import { Room } from "../../src/models/room";
+import { RoomState } from "../../src/models/room-state";
 import { RelationType, UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../../src/@types/event";
 import { TestClient } from "../TestClient";
 
