@@ -51,6 +51,7 @@ export interface IFilterComponent {
     not_senders?: string[];
     contains_url?: boolean;
     limit?: number;
+    [UNSTABLE_FILTER_RELATED_BY_SENDERS.name]?: string[];
     [UNSTABLE_FILTER_RELATED_BY_REL_TYPES.name]?: Array<RelationType | string>;
 }
 /* eslint-enable camelcase */
