@@ -56,9 +56,9 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
         presence?: MatrixEvent;
         profile?: MatrixEvent;
     } = {
-            presence: null,
-            profile: null,
-        };
+        presence: null,
+        profile: null,
+    };
     // eslint-disable-next-line camelcase
     public unstable_statusMessage = "";
 
