@@ -1,6 +1,3 @@
-import MockHttpBackend from "matrix-mock-request";
-import * as jssdk from "matrix-js-sdk";
-
 import * as utils from "../test-utils";
 import { DuplicateStrategy, EventStatus, MatrixEvent, PendingEventOrdering, RoomEvent } from "../../src";
 import { EventTimeline } from "../../src/models/event-timeline";
