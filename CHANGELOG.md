@@ -1,3 +1,38 @@
+Changes in [15.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.6.0) (2022-02-28)
+==================================================================================================
+
+## ✨ Features
+ * Return send event response from MSC3089Branch.createNewVersion() ([\#2186](https://github.com/matrix-org/matrix-js-sdk/pull/2186)).
+ * Add functions to support refresh tokens ([\#2178](https://github.com/matrix-org/matrix-js-sdk/pull/2178)).
+
+## 🐛 Bug Fixes
+ * [Release] Fix bug with the /hierarchy API sending invalid requests ([\#2202](https://github.com/matrix-org/matrix-js-sdk/pull/2202)).
+ * Fix bug where calls could break if rejected from somewhere else ([\#2189](https://github.com/matrix-org/matrix-js-sdk/pull/2189)).
+ * Fix camera stuck on after call transfer ([\#2188](https://github.com/matrix-org/matrix-js-sdk/pull/2188)).
+ * Fix synthetic read receipt handling ([\#2174](https://github.com/matrix-org/matrix-js-sdk/pull/2174)). Fixes vector-im/element-web#21016.
+ * Revert "Sign backup with cross-signing key when we reset it." ([\#2175](https://github.com/matrix-org/matrix-js-sdk/pull/2175)).
+ * Sign backup with cross-signing key when we reset it. ([\#2170](https://github.com/matrix-org/matrix-js-sdk/pull/2170)).
+ * Fix error in uploadContent() when file is empty under Node.js ([\#2155](https://github.com/matrix-org/matrix-js-sdk/pull/2155)).
+ * Check the backup info against the stored private key when determining trust. ([\#2167](https://github.com/matrix-org/matrix-js-sdk/pull/2167)).
+ * Back up keys before logging out ([\#2158](https://github.com/matrix-org/matrix-js-sdk/pull/2158)). Fixes vector-im/element-web#13151.
+
+Changes in [15.6.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.6.0-rc.1) (2022-02-22)
+============================================================================================================
+
+## ✨ Features
+ * Return send event response from MSC3089Branch.createNewVersion() ([\#2186](https://github.com/matrix-org/matrix-js-sdk/pull/2186)).
+ * Add functions to support refresh tokens ([\#2178](https://github.com/matrix-org/matrix-js-sdk/pull/2178)).
+
+## 🐛 Bug Fixes
+ * Fix bug where calls could break if rejected from somewhere else ([\#2189](https://github.com/matrix-org/matrix-js-sdk/pull/2189)).
+ * Fix camera stuck on after call transfer ([\#2188](https://github.com/matrix-org/matrix-js-sdk/pull/2188)).
+ * Fix synthetic read receipt handling ([\#2174](https://github.com/matrix-org/matrix-js-sdk/pull/2174)). Fixes vector-im/element-web#21016.
+ * Revert "Sign backup with cross-signing key when we reset it." ([\#2175](https://github.com/matrix-org/matrix-js-sdk/pull/2175)).
+ * Sign backup with cross-signing key when we reset it. ([\#2170](https://github.com/matrix-org/matrix-js-sdk/pull/2170)).
+ * Fix error in uploadContent() when file is empty under Node.js ([\#2155](https://github.com/matrix-org/matrix-js-sdk/pull/2155)).
+ * Check the backup info against the stored private key when determining trust. ([\#2167](https://github.com/matrix-org/matrix-js-sdk/pull/2167)).
+ * Back up keys before logging out ([\#2158](https://github.com/matrix-org/matrix-js-sdk/pull/2158)). Fixes vector-im/element-web#13151.
+
 Changes in [15.5.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.5.2) (2022-02-17)
 ==================================================================================================
 
