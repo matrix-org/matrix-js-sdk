@@ -1362,9 +1362,8 @@ export class MatrixCall extends EventEmitter {
         // We have just taken the local description from the peerConn which will
         // contain all the local candidates added so far, so we can discard any candidates
         // we had queued up because they'll be in the answer.
-        logger.info(`Call ${this.callId} Discarding ${
-            this.candidateSendQueue.length} candidates that will be sent in answer`);
-        this.candidateSendQueue = [];
+        const discardCount = this.discardDuplicateCandidates();
+        logger.info(`Call ${this.callId} Discarding ${discardCount} candidates that will be sent in answer`);
 
         try {
             await this.sendVoipEvent(EventType.CallAnswer, answerContent);
@@ -1764,9 +1763,8 @@ export class MatrixCall extends EventEmitter {
 
         // Get rid of any candidates waiting to be sent: they'll be included in the local
         // description we just got and will send in the offer.
-        logger.info(`Call ${this.callId} Discarding ${
-            this.candidateSendQueue.length} candidates that will be sent in offer`);
-        this.candidateSendQueue = [];
+        const discardCount = this.discardDuplicateCandidates();
+        logger.info(`Call ${this.callId} Discarding ${discardCount} candidates that will be sent in offer`);
 
         try {
             await this.sendVoipEvent(eventType, content);
@@ -2082,6 +2080,27 @@ export class MatrixCall extends EventEmitter {
         }
     }
 
+    // Discard all non-end-of-candidates messages
+    // Return the number of candidate messages that were discarded.
+    // Call this method before sending an invite or answer message
+    private discardDuplicateCandidates(): number {
+        let discardCount = 0;
+        const newQueue = [];
+
+        for (let i = 0; i < this.candidateSendQueue.length; i++) {
+            const candidate = this.candidateSendQueue[i];
+            if (candidate.candidate === "") {
+                newQueue.push(candidate);
+            } else {
+                discardCount++;
+            }
+        }
+
+        this.candidateSendQueue = newQueue;
+
+        return discardCount;
+    }
+
     /*
      * Transfers this call to another user
      */
@@ -2389,10 +2408,12 @@ export class MatrixCall extends EventEmitter {
                 (candidate.sdpMid === null || candidate.sdpMid === undefined) &&
                 (candidate.sdpMLineIndex === null || candidate.sdpMLineIndex === undefined)
             ) {
-                logger.debug(`Call ${this.callId} ignoring remote ICE candidate with no sdpMid or sdpMLineIndex`);
-                continue;
+                logger.debug(`Call ${this.callId} got remote ICE end-of-candidates`);
+            } else {
+                logger.debug(`Call ${this.callId} got remote ICE ${
+                    candidate.sdpMid} candidate: ${candidate.candidate}`);
             }
-            logger.debug(`Call ${this.callId} got remote ICE ${candidate.sdpMid} candidate: ${candidate.candidate}`);
+
             try {
                 await this.peerConn.addIceCandidate(candidate);
             } catch (err) {
