@@ -20,6 +20,10 @@ import * as matrixcs from "./matrix";
 import * as utils from "./utils";
 import { logger } from './logger';
 
+if (matrixcs.getRequest()) {
+    throw new Error("Multiple matrix-js-sdk entrypoints detected!");
+}
+
 matrixcs.request(request);
 
 try {
