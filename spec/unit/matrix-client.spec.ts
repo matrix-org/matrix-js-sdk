@@ -91,11 +91,7 @@ describe("MatrixClient", function() {
                     return pendingLookup.promise;
                 }
                 // >1 pending thing, and they are different, whine.
-                expect(false).toBe(
-                    true, ">1 pending request. You should probably handle them. " +
-                    "PENDING: " + JSON.stringify(pendingLookup) + " JUST GOT: " +
-                    method + " " + path,
-                );
+                expect(false).toBe(true);
             }
             pendingLookup = {
                 promise: new Promise(() => {}),
@@ -123,6 +119,7 @@ describe("MatrixClient", function() {
             }
 
             if (next.error) {
+                // eslint-disable-next-line
                 return Promise.reject({
                     errcode: next.error.errcode,
                     httpStatus: next.error.httpStatus,
@@ -133,7 +130,7 @@ describe("MatrixClient", function() {
             }
             return Promise.resolve(next.data);
         }
-        expect(true).toBe(false, "Expected different request. " + logLine);
+        expect(true).toBe(false);
         return new Promise(() => {});
     }
 
@@ -158,7 +155,7 @@ describe("MatrixClient", function() {
             baseUrl: "https://my.home.server",
             idBaseUrl: identityServerUrl,
             accessToken: "my.access.token",
-            request: function() {}, // NOP
+            request: function() {} as any, // NOP
             store: store,
             scheduler: scheduler,
             userId: userId,
@@ -379,10 +376,10 @@ describe("MatrixClient", function() {
         ];
         const filterId = "ehfewf";
         store.getFilterIdByName.mockReturnValue(filterId);
-        const filter = new Filter(0, filterId);
+        const filter = new Filter("0", filterId);
         filter.setDefinition({ "room": { "timeline": { "limit": 8 } } });
         store.getFilter.mockReturnValue(filter);
-        const syncPromise = new Promise((resolve, reject) => {
+        const syncPromise = new Promise<void>((resolve, reject) => {
             client.on("sync", function syncListener(state) {
                 if (state === "SYNCING") {
                     expect(httpLookups.length).toEqual(0);
@@ -403,7 +400,7 @@ describe("MatrixClient", function() {
         });
 
         it("should return the same sync state as emitted sync events", async function() {
-            const syncingPromise = new Promise((resolve) => {
+            const syncingPromise = new Promise<void>((resolve) => {
                 client.on("sync", function syncListener(state) {
                     expect(state).toEqual(client.getSyncState());
                     if (state === "SYNCING") {
@@ -423,7 +420,7 @@ describe("MatrixClient", function() {
         it("should use an existing filter if id is present in localStorage", function() {
         });
         it("should handle localStorage filterId missing from the server", function(done) {
-            function getFilterName(userId, suffix) {
+            function getFilterName(userId, suffix?: string) {
                 // scope this on the user ID because people may login on many accounts
                 // and they all need to be stored!
                 return "FILTER_SYNC_" + userId + (suffix ? "_" + suffix : "");
@@ -501,7 +498,7 @@ describe("MatrixClient", function() {
                 if (state === "ERROR" && httpLookups.length > 0) {
                     expect(httpLookups.length).toEqual(1);
                     expect(client.retryImmediately()).toBe(
-                        true, "retryImmediately returned false",
+                        true,
                     );
                     jest.advanceTimersByTime(1);
                 } else if (state === "RECONNECTING" && httpLookups.length > 0) {
@@ -584,33 +581,33 @@ describe("MatrixClient", function() {
         });
 
         it("should transition ERROR -> CATCHUP after /sync if prev failed",
-        function(done) {
-            const expectedStates = [];
-            acceptKeepalives = false;
-            httpLookups = [];
-            httpLookups.push(CAPABILITIES_RESPONSE);
-            httpLookups.push(PUSH_RULES_RESPONSE);
-            httpLookups.push(FILTER_RESPONSE);
-            httpLookups.push({
-                method: "GET", path: "/sync", error: { errcode: "NOPE_NOPE_NOPE" },
-            });
-            httpLookups.push({
-                method: "GET", path: KEEP_ALIVE_PATH,
-                error: { errcode: "KEEPALIVE_FAIL" },
-            });
-            httpLookups.push({
-                method: "GET", path: KEEP_ALIVE_PATH, data: {},
-            });
-            httpLookups.push({
-                method: "GET", path: "/sync", data: SYNC_DATA,
-            });
+            function(done) {
+                const expectedStates = [];
+                acceptKeepalives = false;
+                httpLookups = [];
+                httpLookups.push(CAPABILITIES_RESPONSE);
+                httpLookups.push(PUSH_RULES_RESPONSE);
+                httpLookups.push(FILTER_RESPONSE);
+                httpLookups.push({
+                    method: "GET", path: "/sync", error: { errcode: "NOPE_NOPE_NOPE" },
+                });
+                httpLookups.push({
+                    method: "GET", path: KEEP_ALIVE_PATH,
+                    error: { errcode: "KEEPALIVE_FAIL" },
+                });
+                httpLookups.push({
+                    method: "GET", path: KEEP_ALIVE_PATH, data: {},
+                });
+                httpLookups.push({
+                    method: "GET", path: "/sync", data: SYNC_DATA,
+                });
 
-            expectedStates.push(["RECONNECTING", null]);
-            expectedStates.push(["ERROR", "RECONNECTING"]);
-            expectedStates.push(["CATCHUP", "ERROR"]);
-            client.on("sync", syncChecker(expectedStates, done));
-            client.startClient();
-        });
+                expectedStates.push(["RECONNECTING", null]);
+                expectedStates.push(["ERROR", "RECONNECTING"]);
+                expectedStates.push(["CATCHUP", "ERROR"]);
+                client.on("sync", syncChecker(expectedStates, done));
+                client.startClient();
+            });
 
         it("should transition PREPARED -> SYNCING after /sync", function(done) {
             const expectedStates = [];
@@ -640,32 +637,32 @@ describe("MatrixClient", function() {
         });
 
         xit("should transition ERROR -> SYNCING after /sync if prev failed",
-        function(done) {
-            const expectedStates = [];
-            httpLookups.push({
-                method: "GET", path: "/sync", error: { errcode: "NONONONONO" },
-            });
-            httpLookups.push(SYNC_RESPONSE);
+            function(done) {
+                const expectedStates = [];
+                httpLookups.push({
+                    method: "GET", path: "/sync", error: { errcode: "NONONONONO" },
+                });
+                httpLookups.push(SYNC_RESPONSE);
 
-            expectedStates.push(["PREPARED", null]);
-            expectedStates.push(["SYNCING", "PREPARED"]);
-            expectedStates.push(["ERROR", "SYNCING"]);
-            client.on("sync", syncChecker(expectedStates, done));
-            client.startClient();
-        });
+                expectedStates.push(["PREPARED", null]);
+                expectedStates.push(["SYNCING", "PREPARED"]);
+                expectedStates.push(["ERROR", "SYNCING"]);
+                client.on("sync", syncChecker(expectedStates, done));
+                client.startClient();
+            });
 
         it("should transition SYNCING -> SYNCING on subsequent /sync successes",
-        function(done) {
-            const expectedStates = [];
-            httpLookups.push(SYNC_RESPONSE);
-            httpLookups.push(SYNC_RESPONSE);
+            function(done) {
+                const expectedStates = [];
+                httpLookups.push(SYNC_RESPONSE);
+                httpLookups.push(SYNC_RESPONSE);
 
-            expectedStates.push(["PREPARED", null]);
-            expectedStates.push(["SYNCING", "PREPARED"]);
-            expectedStates.push(["SYNCING", "SYNCING"]);
-            client.on("sync", syncChecker(expectedStates, done));
-            client.startClient();
-        });
+                expectedStates.push(["PREPARED", null]);
+                expectedStates.push(["SYNCING", "PREPARED"]);
+                expectedStates.push(["SYNCING", "SYNCING"]);
+                client.on("sync", syncChecker(expectedStates, done));
+                client.startClient();
+            });
 
         it("should transition ERROR -> ERROR if keepalive keeps failing", function(done) {
             acceptKeepalives = false;
@@ -946,6 +943,41 @@ describe("MatrixClient", function() {
             event.setStatus(EventStatus.SENDING);
             expect(() => client.cancelPendingEvent(event)).toThrow("cannot cancel an event with status sending");
             expect(event.status).toBe(EventStatus.SENDING);
+        });
+    });
+
+    describe("threads", () => {
+        it("partitions root events to room timeline and thread timeline", () => {
+            const supportsExperimentalThreads = client.supportsExperimentalThreads;
+            client.supportsExperimentalThreads = () => true;
+
+            const rootEvent = new MatrixEvent({
+                "content": {},
+                "origin_server_ts": 1,
+                "room_id": "!room1:matrix.org",
+                "sender": "@alice:matrix.org",
+                "type": "m.room.message",
+                "unsigned": {
+                    "m.relations": {
+                        "io.element.thread": {
+                            "latest_event": {},
+                            "count": 33,
+                            "current_user_participated": false,
+                        },
+                    },
+                },
+                "event_id": "$ev1",
+                "user_id": "@alice:matrix.org",
+            });
+
+            expect(rootEvent.isThreadRoot).toBe(true);
+
+            const [room, threads] = client.partitionThreadedEvents([rootEvent]);
+            expect(room).toHaveLength(1);
+            expect(threads).toHaveLength(1);
+
+            // Restore method
+            client.supportsExperimentalThreads = supportsExperimentalThreads;
         });
     });
 });
