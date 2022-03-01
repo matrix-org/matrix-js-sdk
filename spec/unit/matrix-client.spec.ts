@@ -4,7 +4,6 @@ import { Filter } from "../../src/filter";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE } from "../../src/models/MSC3089TreeSpace";
 import {
     EventType,
-    RelationType,
     RoomCreateTypeField,
     RoomType,
     UNSTABLE_MSC3088_ENABLED,
