@@ -4,6 +4,7 @@ import { Filter } from "../../src/filter";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE } from "../../src/models/MSC3089TreeSpace";
 import {
     EventType,
+    RelationType,
     RoomCreateTypeField,
     RoomType,
     UNSTABLE_MSC3088_ENABLED,
@@ -943,6 +944,41 @@ describe("MatrixClient", function() {
             event.setStatus(EventStatus.SENDING);
             expect(() => client.cancelPendingEvent(event)).toThrow("cannot cancel an event with status sending");
             expect(event.status).toBe(EventStatus.SENDING);
+        });
+    });
+
+    describe("threads", () => {
+        it("partitions root events to room timeline and thread timeline", () => {
+            const supportsExperimentalThreads = client.supportsExperimentalThreads;
+            client.supportsExperimentalThreads = () => true;
+
+            const rootEvent = new MatrixEvent({
+                "content": {},
+                "origin_server_ts": 1,
+                "room_id": "!room1:matrix.org",
+                "sender": "@alice:matrix.org",
+                "type": "m.room.message",
+                "unsigned": {
+                    "m.relations": {
+                        "io.element.thread": {
+                            "latest_event": {},
+                            "count": 33,
+                            "current_user_participated": false,
+                        },
+                    },
+                },
+                "event_id": "$ev1",
+                "user_id": "@alice:matrix.org",
+            });
+
+            expect(rootEvent.isThreadRoot).toBe(true);
+
+            const [room, threads] = client.partitionThreadedEvents([rootEvent]);
+            expect(room).toHaveLength(1);
+            expect(threads).toHaveLength(1);
+
+            // Restore method
+            client.supportsExperimentalThreads = supportsExperimentalThreads;
         });
     });
 });
