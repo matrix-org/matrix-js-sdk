@@ -7152,11 +7152,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             templatedUrl += "/$relationType";
             if (eventType !== null) {
                 templatedUrl += "/$eventType";
-            } else {
-                logger.warn(`eventType: ${eventType} ignored when fetching
-                relations as relationType is null`);
-                eventType = null;
             }
+        } else if (eventType !== null) {
+            logger.warn(`eventType: ${eventType} ignored when fetching
+            relations as relationType is null`);
+            eventType = null;
         }
 
         const path = utils.encodeUri(
