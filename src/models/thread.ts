@@ -52,6 +52,9 @@ interface IThreadOpts {
  * @experimental
  */
 export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
+    public static hasServerSideSupport: boolean;
+    private static serverSupportPromise: Promise<boolean> | null;
+
     /**
      * A reference to all the events ID at the bottom of the threads
      */
@@ -91,6 +94,15 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             RoomEvent.TimelineReset,
         ]);
 
+        if (Thread.hasServerSideSupport === undefined) {
+            Thread.serverSupportPromise = this.client.doesServerSupportUnstableFeature("org.matrix.msc3440");
+            Thread.serverSupportPromise.then((serverSupportsThread) => {
+                Thread.hasServerSideSupport = serverSupportsThread;
+            }).catch(() => {
+                Thread.serverSupportPromise = null;
+            });
+        }
+
         // If we weren't able to find the root event, it's probably missing
         // and we define the thread ID from one of the thread relation
         if (!rootEvent) {
@@ -105,11 +117,6 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
 
         this.room.on(RoomEvent.LocalEchoUpdated, this.onEcho);
         this.room.on(RoomEvent.Timeline, this.onEcho);
-    }
-
-    public get hasServerSideSupport(): boolean {
-        return this.client.cachedCapabilities
-            ?.capabilities?.[RelationType.Thread]?.enabled;
     }
 
     private onEcho = (event: MatrixEvent) => {
@@ -152,8 +159,12 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
      * to the start (and not the end) of the timeline.
      */
     public async addEvent(event: MatrixEvent, toStartOfTimeline = false): Promise<void> {
+        if (Thread.hasServerSideSupport === undefined) {
+            await Thread.serverSupportPromise;
+        }
+
         // Add all incoming events to the thread's timeline set when there's  no server support
-        if (!this.hasServerSideSupport) {
+        if (!Thread.hasServerSideSupport) {
             // all the relevant membership info to hydrate events with a sender
             // is held in the main room timeline
             // We want to fetch the room state from there and pass it down to this thread
@@ -165,7 +176,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             await this.client.decryptEventIfNeeded(event, {});
         }
 
-        if (this.hasServerSideSupport && this.initialEventsFetched) {
+        if (Thread.hasServerSideSupport && this.initialEventsFetched) {
             if (event.localTimestamp > this.lastReply().localTimestamp) {
                 this.addEventToTimeline(event, false);
             }
@@ -178,7 +189,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         const isThreadReply = event.getRelation()?.rel_type === RelationType.Thread;
         // If no thread support exists we want to count all thread relation
         // added as a reply. We can't rely on the bundled relationships count
-        if (!this.hasServerSideSupport && isThreadReply) {
+        if (!Thread.hasServerSideSupport && isThreadReply) {
             this.replyCount++;
         }
 
@@ -191,7 +202,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
                 // This counting only works when server side support is enabled
                 // as we started the counting from the value returned in the
                 // bundled relationship
-                if (this.hasServerSideSupport) {
+                if (Thread.hasServerSideSupport) {
                     this.replyCount++;
                 }
 
@@ -203,10 +214,17 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     }
 
     private initialiseThread(rootEvent: MatrixEvent | undefined): void {
+        if (Thread.hasServerSideSupport === undefined) {
+            Thread.serverSupportPromise.then(() => {
+                this.initialiseThread(rootEvent);
+            });
+            return;
+        }
+
         const bundledRelationship = rootEvent
             ?.getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
 
-        if (this.hasServerSideSupport && bundledRelationship) {
+        if (Thread.hasServerSideSupport && bundledRelationship) {
             this.replyCount = bundledRelationship.count;
             this._currentUserParticipated = bundledRelationship.current_user_participated;
 
@@ -221,6 +239,9 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     }
 
     public async fetchInitialEvents(): Promise<boolean> {
+        if (Thread.hasServerSideSupport === undefined) {
+            await Thread.serverSupportPromise;
+        }
         try {
             await this.fetchEvents();
             this.initialEventsFetched = true;
@@ -296,6 +317,10 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         nextBatch?: string;
         prevBatch?: string;
     }> {
+        if (Thread.serverSupportPromise) {
+            await Thread.serverSupportPromise;
+        }
+
         let {
             originalEvent,
             events,
