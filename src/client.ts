@@ -6600,8 +6600,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public async relations(
         roomId: string,
         eventId: string,
-        relationType: RelationType | string | null,
-        eventType: EventType | string | null,
+        relationType?: RelationType | string | null,
+        eventType?: EventType | string | null,
         opts: IRelationsRequestOpts = {},
     ): Promise<{
         originalEvent: MatrixEvent;
@@ -6624,12 +6624,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         let events = result.chunk.map(mapper);
         if (fetchedEventType === EventType.RoomMessageEncrypted) {
             const allEvents = originalEvent ? events.concat(originalEvent) : events;
-            await Promise.all(allEvents.map(e => {
-                if (e.isEncrypted()) {
-                    return new Promise(resolve => e.once(MatrixEventEvent.Decrypted, resolve));
-                }
-            }));
-            events = events.filter(e => e.getType() === eventType);
+            await Promise.all(allEvents.map(e => this.decryptEventIfNeeded(e)));
+            if (eventType !== null) {
+                events = events.filter(e => e.getType() === eventType);
+            }
         }
         if (originalEvent && relationType === RelationType.Replace) {
             events = events.filter(e => e.getSender() === originalEvent.getSender());
@@ -7150,8 +7148,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const queryString = utils.encodeParams(opts as Record<string, string | number>);
 
         let templatedUrl = "/rooms/$roomId/relations/$eventId";
-        if (relationType !== null) templatedUrl += "/$relationType";
-        if (eventType !== null) templatedUrl += "/$eventType";
+        if (relationType !== null) {
+            templatedUrl += "/$relationType";
+            if (eventType !== null) {
+                templatedUrl += "/$eventType";
+            } else {
+                logger.warn(`eventType: ${eventType} ignored when fetching
+                relations as relationType is null`);
+                eventType = null;
+            }
+        }
 
         const path = utils.encodeUri(
             templatedUrl + "?" + queryString, {
