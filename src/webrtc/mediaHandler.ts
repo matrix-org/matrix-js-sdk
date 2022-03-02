@@ -161,7 +161,7 @@ export class MediaHandler extends EventEmitter {
             const constraints = this.getUserMediaContraints(shouldRequestAudio, shouldRequestVideo);
             stream = await navigator.mediaDevices.getUserMedia(constraints);
             logger.log(`mediaHandler getUserMediaStream streamId ${stream.id} shouldRequestAudio ${
-                shouldRequestVideo} shouldRequestVideo ${shouldRequestVideo}`, constraints);
+                shouldRequestAudio} shouldRequestVideo ${shouldRequestVideo}`, constraints);
 
             for (const track of stream.getTracks()) {
                 const settings = track.getSettings();
@@ -177,7 +177,7 @@ export class MediaHandler extends EventEmitter {
         } else {
             stream = this.localUserMediaStream.clone();
             logger.log(`mediaHandler clone userMediaStream ${this.localUserMediaStream.id} new stream ${
-                stream.id} shouldRequestAudio ${shouldRequestVideo} shouldRequestVideo ${shouldRequestVideo}`);
+                stream.id} shouldRequestAudio ${shouldRequestAudio} shouldRequestVideo ${shouldRequestVideo}`);
 
             if (!shouldRequestAudio) {
                 for (const track of stream.getAudioTracks()) {
