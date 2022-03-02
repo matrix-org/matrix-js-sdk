@@ -95,7 +95,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         ]);
 
         if (Thread.hasServerSideSupport === undefined) {
-            Thread.serverSupportPromise = this.client.doesServerSupportUnstableFeature(RelationType.Thread);
+            Thread.serverSupportPromise = this.client.doesServerSupportUnstableFeature("org.matrix.msc3440");
             Thread.serverSupportPromise.then((serverSupportsThread) => {
                 Thread.hasServerSideSupport = serverSupportsThread;
             }).catch(() => {
@@ -317,6 +317,10 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         nextBatch?: string;
         prevBatch?: string;
     }> {
+        if (Thread.serverSupportPromise) {
+            await Thread.serverSupportPromise;
+        }
+
         let {
             originalEvent,
             events,
