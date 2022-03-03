@@ -5197,7 +5197,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(matrixEvents);
 
                 room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
-                await this.processThreadEvents(room, threadedEvents);
+                await this.processThreadEvents(room, threadedEvents, true);
 
                 room.oldState.paginationToken = res.end;
                 if (res.chunk.length === 0) {
@@ -5308,7 +5308,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(matrixEvents);
 
             timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
-            await this.processThreadEvents(timelineSet.room, threadedEvents);
+            await this.processThreadEvents(timelineSet.room, threadedEvents, true);
 
             // there is no guarantee that the event ended up in "timeline" (we
             // might have switched to a neighbouring timeline) - so check the
@@ -5441,7 +5441,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
                 const timelineSet = eventTimeline.getTimelineSet();
                 timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
-                await this.processThreadEvents(timelineSet.room, threadedEvents);
+                await this.processThreadEvents(timelineSet.room, threadedEvents, backwards);
 
                 // if we've hit the end of the timeline, we need to stop trying to
                 // paginate. We need to keep the 'forwards' token though, to make sure
@@ -5479,7 +5479,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
                 eventTimeline.getTimelineSet()
                     .addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
-                await this.processThreadEvents(room, threadedEvents);
+                await this.processThreadEvents(room, threadedEvents, backwards);
 
                 // if we've hit the end of the timeline, we need to stop trying to
                 // paginate. We need to keep the 'forwards' token though, to make sure
@@ -9294,10 +9294,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * @experimental
      */
-    public async processThreadEvents(room: Room, threadedEvents: MatrixEvent[]): Promise<void> {
-        threadedEvents.sort((a, b) => a.getTs() - b.getTs());
+    public async processThreadEvents(
+        room: Room,
+        threadedEvents: MatrixEvent[],
+        toStartOfTimeline: boolean,
+    ): Promise<void> {
         for (const event of threadedEvents) {
-            await room.addThreadedEvent(event);
+            await room.addThreadedEvent(event, toStartOfTimeline);
         }
     }
 

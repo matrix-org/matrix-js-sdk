@@ -1406,10 +1406,10 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * Add an event to a thread's timeline. Will fire "Thread.update"
      * @experimental
      */
-    public async addThreadedEvent(event: MatrixEvent): Promise<void> {
+    public async addThreadedEvent(event: MatrixEvent, toStartOfTimeline: boolean): Promise<void> {
         let thread = this.findThreadForEvent(event);
         if (thread) {
-            thread.addEvent(event);
+            thread.addEvent(event, toStartOfTimeline);
         } else {
             const events = [event];
             let rootEvent = this.findEventById(event.threadRootId);

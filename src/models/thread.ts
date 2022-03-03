@@ -113,7 +113,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         }
         this.initialiseThread(this.rootEvent);
 
-        opts?.initialEvents?.forEach(event => this.addEvent(event));
+        opts?.initialEvents?.forEach(event => this.addEvent(event, false));
 
         this.room.on(RoomEvent.LocalEchoUpdated, this.onEcho);
         this.room.on(RoomEvent.Timeline, this.onEcho);
@@ -158,7 +158,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
      * @param {boolean} toStartOfTimeline whether the event is being added
      * to the start (and not the end) of the timeline.
      */
-    public async addEvent(event: MatrixEvent, toStartOfTimeline = false): Promise<void> {
+    public async addEvent(event: MatrixEvent, toStartOfTimeline: boolean): Promise<void> {
         if (Thread.hasServerSideSupport === undefined) {
             await Thread.serverSupportPromise;
         }
@@ -232,22 +232,28 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             this.setEventMetadata(event);
             this.lastEvent = event;
         }
-
-        if (!bundledRelationship && rootEvent) {
-            this.addEvent(rootEvent);
-        }
     }
 
-    public async fetchInitialEvents(): Promise<boolean> {
+    public async fetchInitialEvents(): Promise<{
+        originalEvent: MatrixEvent;
+        events: MatrixEvent[];
+        nextBatch?: string;
+        prevBatch?: string;
+    } | null> {
         if (Thread.hasServerSideSupport === undefined) {
             await Thread.serverSupportPromise;
         }
-        try {
-            await this.fetchEvents();
+
+        if (!Thread.hasServerSideSupport) {
             this.initialEventsFetched = true;
-            return true;
+            return null;
+        }
+        try {
+            const response = await this.fetchEvents();
+            this.initialEventsFetched = true;
+            return response;
         } catch (e) {
-            return false;
+            return null;
         }
     }
 
@@ -317,7 +323,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         nextBatch?: string;
         prevBatch?: string;
     }> {
-        if (Thread.serverSupportPromise) {
+        if (Thread.hasServerSideSupport === undefined) {
             await Thread.serverSupportPromise;
         }
 
@@ -337,13 +343,13 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         // When there's no nextBatch returned with a `from` request we have reached
         // the end of the thread, and therefore want to return an empty one
         if (!opts.to && !nextBatch) {
-            events = [originalEvent, ...events];
+            events = [...events, originalEvent];
         }
 
-        for (const event of events) {
-            await this.client.decryptEventIfNeeded(event);
+        await Promise.all(events.map(event => {
             this.setEventMetadata(event);
-        }
+            return this.client.decryptEventIfNeeded(event);
+        }));
 
         const prependEvents = !opts.direction || opts.direction === Direction.Backward;
 
