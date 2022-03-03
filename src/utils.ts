@@ -443,7 +443,7 @@ export function isNullOrUndefined(val: any): boolean {
 }
 
 export interface IDeferred<T> {
-    resolve: (value: T) => void;
+    resolve: (value: T | Promise<T>) => void;
     reject: (reason?: any) => void;
     promise: Promise<T>;
 }
