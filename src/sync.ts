@@ -320,7 +320,7 @@ export class SyncApi {
                     EventTimeline.BACKWARDS);
 
                 this.processRoomEvents(room, stateEvents, timelineEvents);
-                await this.processThreadEvents(room, threadedEvents);
+                await this.processThreadEvents(room, threadedEvents, false);
 
                 room.recalculate();
                 client.store.storeRoom(room);
@@ -1317,7 +1317,7 @@ export class SyncApi {
             const [timelineEvents, threadedEvents] = this.client.partitionThreadedEvents(events);
 
             this.processRoomEvents(room, stateEvents, timelineEvents, syncEventData.fromCache);
-            await this.processThreadEvents(room, threadedEvents);
+            await this.processThreadEvents(room, threadedEvents, false);
 
             // set summary after processing events,
             // because it will trigger a name calculation
@@ -1385,7 +1385,7 @@ export class SyncApi {
             const [timelineEvents, threadedEvents] = this.client.partitionThreadedEvents(events);
 
             this.processRoomEvents(room, stateEvents, timelineEvents);
-            await this.processThreadEvents(room, threadedEvents);
+            await this.processThreadEvents(room, threadedEvents, false);
             room.addAccountData(accountDataEvents);
 
             room.recalculate();
@@ -1730,8 +1730,12 @@ export class SyncApi {
     /**
      * @experimental
      */
-    private processThreadEvents(room: Room, threadedEvents: MatrixEvent[]): Promise<void> {
-        return this.client.processThreadEvents(room, threadedEvents);
+    private processThreadEvents(
+        room: Room,
+        threadedEvents: MatrixEvent[],
+        toStartOfTimeline: boolean,
+    ): Promise<void> {
+        return this.client.processThreadEvents(room, threadedEvents, toStartOfTimeline);
     }
 
     // extractRelatedEvents(event: MatrixEvent, events: MatrixEvent[], relatedEvents: MatrixEvent[] = []): MatrixEvent[] {
