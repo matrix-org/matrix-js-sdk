@@ -3718,7 +3718,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 content["m.relates_to"]["m.in_reply_to"] = {
                     "event_id": thread.lastReply((ev: MatrixEvent) => {
                         return ev.isThreadRelation && !ev.status;
-                    }),
+                    })?.getId(),
                 };
             }
         }
@@ -3774,7 +3774,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // then listen for the remote echo of that event so that by the time
         // this event does get sent, we have the correct event_id
         const targetId = localEvent.getAssociatedId();
-        if (targetId && targetId.startsWith("~")) {
+        if (targetId?.startsWith("~")) {
             const target = room.getPendingEvents().find(e => e.getId() === targetId);
             target.once(MatrixEventEvent.LocalEventIdReplaced, () => {
                 localEvent.updateAssociatedId(target.getId());

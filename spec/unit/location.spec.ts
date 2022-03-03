@@ -17,7 +17,7 @@ limitations under the License.
 import { makeLocationContent } from "../../src/content-helpers";
 import {
     ASSET_NODE_TYPE,
-    ASSET_TYPE_SELF,
+    LocationAssetType,
     LOCATION_EVENT_TYPE,
     TIMESTAMP_NODE_TYPE,
 } from "../../src/@types/location";
@@ -33,14 +33,14 @@ describe("Location", function() {
             uri: "geo:foo",
             description: undefined,
         });
-        expect(ASSET_NODE_TYPE.findIn(loc)).toEqual({ type: ASSET_TYPE_SELF });
+        expect(ASSET_NODE_TYPE.findIn(loc)).toEqual({ type: LocationAssetType.Self });
         expect(TEXT_NODE_TYPE.findIn(loc)).toEqual("txt");
         expect(TIMESTAMP_NODE_TYPE.findIn(loc)).toEqual(134235435);
     });
 
     it("should create a valid location with explicit properties", function() {
         const loc = makeLocationContent(
-            "txxt", "geo:bar", 134235436, "desc", "m.something");
+            "txxt", "geo:bar", 134235436, "desc", LocationAssetType.Pin);
 
         expect(loc.body).toEqual("txxt");
         expect(loc.msgtype).toEqual("m.location");
@@ -49,7 +49,7 @@ describe("Location", function() {
             uri: "geo:bar",
             description: "desc",
         });
-        expect(ASSET_NODE_TYPE.findIn(loc)).toEqual({ type: "m.something" });
+        expect(ASSET_NODE_TYPE.findIn(loc)).toEqual({ type: LocationAssetType.Pin });
         expect(TEXT_NODE_TYPE.findIn(loc)).toEqual("txxt");
         expect(TIMESTAMP_NODE_TYPE.findIn(loc)).toEqual(134235436);
     });
