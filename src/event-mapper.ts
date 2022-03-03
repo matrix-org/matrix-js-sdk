@@ -30,6 +30,12 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
 
     function mapper(plainOldJsObject: Partial<IEvent>) {
         const event = new MatrixEvent(plainOldJsObject);
+
+        const room = client.getRoom(event.getRoomId());
+        if (room?.threads.has(event.getId())) {
+            event.setThread(room.threads.get(event.getId()));
+        }
+
         if (event.isEncrypted()) {
             if (!preventReEmit) {
                 client.reEmitter.reEmit(event, [
