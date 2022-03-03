@@ -234,21 +234,26 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         }
     }
 
-    public async fetchInitialEvents(): Promise<boolean> {
+    public async fetchInitialEvents(): Promise<{
+        originalEvent: MatrixEvent;
+        events: MatrixEvent[];
+        nextBatch?: string;
+        prevBatch?: string;
+    } | null> {
         if (Thread.hasServerSideSupport === undefined) {
             await Thread.serverSupportPromise;
         }
 
         if (!Thread.hasServerSideSupport) {
             this.initialEventsFetched = true;
-            return false;
+            return null;
         }
         try {
-            await this.fetchEvents();
+            const response = await this.fetchEvents();
             this.initialEventsFetched = true;
-            return true;
+            return response;
         } catch (e) {
-            return false;
+            return null;
         }
     }
 
@@ -341,10 +346,10 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             events = [...events, originalEvent];
         }
 
-        for (const event of events) {
-            await this.client.decryptEventIfNeeded(event);
+        await Promise.all(events.map(event => {
             this.setEventMetadata(event);
-        }
+            return this.client.decryptEventIfNeeded(event);
+        }));
 
         const prependEvents = !opts.direction || opts.direction === Direction.Backward;
 
