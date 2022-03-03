@@ -27,7 +27,10 @@ export const ASSET_NODE_TYPE = new UnstableValue("m.asset", "org.matrix.msc3488.
 
 export const TIMESTAMP_NODE_TYPE = new UnstableValue("m.ts", "org.matrix.msc3488.ts");
 
-export const ASSET_TYPE_SELF = "m.self";
+export enum LocationAssetType {
+    Self = "m.self",
+    Pin = "m.pin",
+}
 
 /* From the spec at:
  * https://github.com/matrix-org/matrix-doc/blob/matthew/location/proposals/3488-location.md
@@ -60,7 +63,7 @@ export interface ILocationContent extends IContent {
         description?: string;
     };
     [ASSET_NODE_TYPE.name]: {
-        type: string;
+        type: LocationAssetType;
     };
     [TEXT_NODE_TYPE.name]: string;
     [TIMESTAMP_NODE_TYPE.name]: number;

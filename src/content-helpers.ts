@@ -20,8 +20,8 @@ import { MsgType } from "./@types/event";
 import { TEXT_NODE_TYPE } from "./@types/extensible_events";
 import {
     ASSET_NODE_TYPE,
-    ASSET_TYPE_SELF,
     ILocationContent,
+    LocationAssetType,
     LOCATION_EVENT_TYPE,
     TIMESTAMP_NODE_TYPE,
 } from "./@types/location";
@@ -121,7 +121,7 @@ export function makeLocationContent(
     uri: string,
     ts: number,
     description?: string,
-    assetType?: string,
+    assetType?: LocationAssetType,
 ): ILocationContent {
     return {
         "body": text,
@@ -132,7 +132,7 @@ export function makeLocationContent(
             description,
         },
         [ASSET_NODE_TYPE.name]: {
-            type: assetType ?? ASSET_TYPE_SELF,
+            type: assetType ?? LocationAssetType.Self,
         },
         [TEXT_NODE_TYPE.name]: text,
         [TIMESTAMP_NODE_TYPE.name]: ts,
