@@ -106,8 +106,8 @@ export interface IEventRelation {
     event_id: string;
     "m.in_reply_to"?: {
         event_id: string;
-        "m.display_reply_fallback"?: boolean;
-        "io.element.display_reply_fallback"?: boolean; // unstable variant of `m.display_reply_fallback`
+        hide_reply?: boolean;
+        "io.element.hide_reply"?: boolean; // unstable variant of `hide_reply` - MSC3440
     };
     key?: string;
 }
