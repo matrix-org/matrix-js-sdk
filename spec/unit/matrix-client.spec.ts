@@ -14,6 +14,7 @@ import { MEGOLM_ALGORITHM } from "../../src/crypto/olmlib";
 import { EventStatus, MatrixEvent } from "../../src/models/event";
 import { Preset } from "../../src/@types/partials";
 import * as testUtils from "../test-utils";
+import { ReceiptType } from "../../src/@types/read_receipts";
 
 jest.useFakeTimers();
 
@@ -978,6 +979,46 @@ describe("MatrixClient", function() {
 
             // Restore method
             client.supportsExperimentalThreads = supportsExperimentalThreads;
+        });
+    });
+
+    describe("read-markers and read-receipts", () => {
+        it("setRoomReadMarkers", () => {
+            client.setRoomReadMarkersHttpRequest = jest.fn();
+            const room = {
+                hasPendingEvent: jest.fn().mockReturnValue(false),
+                addLocalEchoReceipt: jest.fn(),
+            };
+            const rrEvent = new MatrixEvent({ event_id: "read_event_id" });
+            const rpEvent = new MatrixEvent({ event_id: "read_private_event_id" });
+            client.getRoom = () => room;
+
+            client.setRoomReadMarkers(
+                "room_id",
+                "read_marker_event_id",
+                rrEvent,
+                rpEvent,
+            );
+
+            expect(client.setRoomReadMarkersHttpRequest).toHaveBeenCalledWith(
+                "room_id",
+                "read_marker_event_id",
+                "read_event_id",
+                "read_private_event_id",
+            );
+            expect(room.addLocalEchoReceipt).toHaveBeenCalledTimes(2);
+            expect(room.addLocalEchoReceipt).toHaveBeenNthCalledWith(
+                1,
+                client.credentials.userId,
+                rrEvent,
+                ReceiptType.Read,
+            );
+            expect(room.addLocalEchoReceipt).toHaveBeenNthCalledWith(
+                2,
+                client.credentials.userId,
+                rpEvent,
+                ReceiptType.ReadPrivate,
+            );
         });
     });
 });
