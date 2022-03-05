@@ -40,6 +40,7 @@ import { RoomState } from "./room-state";
 import { Thread, ThreadEvent, EventHandlerMap as ThreadHandlerMap } from "./thread";
 import { Method } from "../http-api";
 import { TypedEventEmitter } from "./typed-event-emitter";
+import { ReceiptType } from "../@types/read_receipts";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -50,7 +51,7 @@ import { TypedEventEmitter } from "./typed-event-emitter";
 const KNOWN_SAFE_ROOM_VERSION = '6';
 const SAFE_ROOM_VERSIONS = ['1', '2', '3', '4', '5', '6'];
 
-function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: string): MatrixEvent {
+function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: ReceiptType): MatrixEvent {
     // console.log("synthesizing receipt for "+event.getId());
     return new MatrixEvent({
         content: {
@@ -91,7 +92,7 @@ interface IWrappedReceipt {
 }
 
 interface ICachedReceipt {
-    type: string;
+    type: ReceiptType;
     userId: string;
     data: IReceipt;
 }
@@ -100,7 +101,7 @@ type ReceiptCache = {[eventId: string]: ICachedReceipt[]};
 
 interface IReceiptContent {
     [eventId: string]: {
-        [type: string]: {
+        [key in ReceiptType]: {
             [userId: string]: IReceipt;
         };
     };
@@ -1555,7 +1556,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         // Don't synthesize RR for m.room.redaction as this causes the RR to go missing.
         if (event.sender && event.getType() !== EventType.RoomRedaction) {
             this.addReceipt(synthesizeReceipt(
-                event.sender.userId, event, "m.read",
+                event.sender.userId, event, ReceiptType.Read,
             ), true);
 
             // Any live events from a user could be taken as implicit
@@ -2017,7 +2018,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     public getUsersReadUpTo(event: MatrixEvent): string[] {
         return this.getReceiptsForEvent(event).filter(function(receipt) {
-            return receipt.type === "m.read";
+            return [ReceiptType.Read, ReceiptType.ReadPrivate].includes(receipt.type);
         }).map(function(receipt) {
             return receipt.userId;
         });
@@ -2196,7 +2197,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                     }
                     this.receiptCacheByEventId[eventId].push({
                         userId: userId,
-                        type: receiptType,
+                        type: receiptType as ReceiptType,
                         data: receipt,
                     });
                 });
@@ -2209,9 +2210,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * client the fact that we've sent one.
      * @param {string} userId The user ID if the receipt sender
      * @param {MatrixEvent} e The event that is to be acknowledged
-     * @param {string} receiptType The type of receipt
+     * @param {ReceiptType} receiptType The type of receipt
      */
-    public addLocalEchoReceipt(userId: string, e: MatrixEvent, receiptType: string): void {
+    public addLocalEchoReceipt(userId: string, e: MatrixEvent, receiptType: ReceiptType): void {
         this.addReceipt(synthesizeReceipt(userId, e, receiptType), true);
     }
 
