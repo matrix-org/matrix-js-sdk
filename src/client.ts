@@ -178,6 +178,7 @@ import { CryptoStore } from "./crypto/store/base";
 import { MediaHandler } from "./webrtc/mediaHandler";
 import { IRefreshTokenResponse } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
+import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse } from "./sliding-sync";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -8802,6 +8803,33 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (createEvent.getContent()?.[RoomCreateTypeField] !== RoomType.Space) return null;
 
         return new MSC3089TreeSpace(this, roomId);
+    }
+
+    /**
+     * Perform a single MSC3575 sliding sync request.
+     * @param {MSC3575SlidingSyncRequest} req The request to make.
+     * @returns {MSC3575SlidingSyncResponse} The sliding sync response, or a standard error.
+     */
+    public slidingSync(req: MSC3575SlidingSyncRequest): IAbortablePromise<MSC3575SlidingSyncResponse|MatrixError> {
+        const qps: Record<string, any> = {};
+        if (req.pos) {
+            qps.pos = req.pos;
+            delete req.pos;
+        }
+        if (req.timeout) {
+            qps.timeout = req.timeout;
+            delete req.timeout;
+        }
+        return this.http.authedRequest<MSC3575SlidingSyncResponse|MatrixError>(
+            undefined,
+            Method.Post,
+            "/sync",
+            qps,
+            req,
+            {
+                prefix: "/_matrix/client/unstable/org.matrix.msc3575",
+            },
+        );
     }
 
     // TODO: Remove this warning, alongside the functions
