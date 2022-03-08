@@ -1079,7 +1079,7 @@ export class MatrixError extends Error {
  * @constructor
  */
 export class ConnectionError extends Error {
-    constructor(message: string, private readonly cause: Error = undefined) {
+    constructor(message: string, cause: Error = undefined) {
         super(message + (cause ? `: ${cause.message}` : ""));
     }
 

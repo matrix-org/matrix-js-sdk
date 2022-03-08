@@ -112,7 +112,7 @@ export class VerificationRequest<
 
     private commonMethods: VerificationMethod[] = [];
     private _phase: Phase;
-    private _cancellingUserId: string;
+    public _cancellingUserId: string; // Used in tests only
     private _verifier: VerificationBase<any, any>;
 
     constructor(
