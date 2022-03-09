@@ -439,23 +439,27 @@ export class SyncAccumulator {
                         return;
                     }
                     const read = e.content[eventId][ReceiptType.Read];
-                    read && Object.keys(read).forEach((userId) => {
-                        // clobber on user ID
-                        currentData._readReceipts[userId] = {
-                            data: e.content[eventId][ReceiptType.Read][userId],
-                            type: ReceiptType.Read,
-                            eventId: eventId,
-                        };
-                    });
+                    if (read) {
+                        Object.keys(read).forEach((userId) => {
+                            // clobber on user ID
+                            currentData._readReceipts[userId] = {
+                                data: e.content[eventId][ReceiptType.Read][userId],
+                                type: ReceiptType.Read,
+                                eventId: eventId,
+                            };
+                        });
+                    }
                     const readPrivate = e.content[eventId][ReceiptType.ReadPrivate];
-                    readPrivate && Object.keys(readPrivate).forEach((userId) => {
-                        // clobber on user ID
-                        currentData._readReceipts[userId] = {
-                            data: e.content[eventId][ReceiptType.ReadPrivate][userId],
-                            type: ReceiptType.ReadPrivate,
-                            eventId: eventId,
-                        };
-                    });
+                    if (readPrivate) {
+                        Object.keys(readPrivate).forEach((userId) => {
+                            // clobber on user ID
+                            currentData._readReceipts[userId] = {
+                                data: e.content[eventId][ReceiptType.ReadPrivate][userId],
+                                type: ReceiptType.ReadPrivate,
+                                eventId: eventId,
+                            };
+                        });
+                    }
                 });
             });
         }

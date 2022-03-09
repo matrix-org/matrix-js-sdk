@@ -4548,27 +4548,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         // Add the optional RR update, do local echo like `sendReceipt`
-        let rrEventId;
+        let rrEventId: string;
         if (rrEvent) {
             rrEventId = rrEvent.getId();
-            if (room && room.hasPendingEvent(rrEventId)) {
+            if (room?.hasPendingEvent(rrEventId)) {
                 throw new Error(`Cannot set read receipt to a pending event (${rrEventId})`);
             }
-            if (room) {
-                room.addLocalEchoReceipt(this.credentials.userId, rrEvent, ReceiptType.Read);
-            }
+            room?.addLocalEchoReceipt(this.credentials.userId, rrEvent, ReceiptType.Read);
         }
 
         // Add the optional private RR update, do local echo like `sendReceipt`
-        let rpEventId;
+        let rpEventId: string;
         if (rpEvent) {
             rpEventId = rpEvent.getId();
-            if (room && room.hasPendingEvent(rpEventId)) {
+            if (room?.hasPendingEvent(rpEventId)) {
                 throw new Error(`Cannot set read receipt to a pending event (${rpEventId})`);
             }
-            if (room) {
-                room.addLocalEchoReceipt(this.credentials.userId, rpEvent, ReceiptType.ReadPrivate);
-            }
+            room?.addLocalEchoReceipt(this.credentials.userId, rpEvent, ReceiptType.ReadPrivate);
         }
 
         return this.setRoomReadMarkersHttpRequest(roomId, rmEventId, rrEventId, rpEventId);
