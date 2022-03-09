@@ -4924,40 +4924,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         );
     }
 
-    /**
-     * This is an internal method.
-     * @param {MatrixClient} client
-     * @param {string} roomId
-     * @param {string} userId
-     * @param {string} membershipValue
-     * @param {string} reason
-     * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     */
-    private setMembershipState(
-        roomId: string,
-        userId: string,
-        membershipValue: string,
-        reason?: string,
-        callback?: Callback,
-    ) {
-        if (utils.isFunction(reason)) {
-            callback = reason as any as Callback; // legacy
-            reason = undefined;
-        }
-
-        const path = utils.encodeUri(
-            "/rooms/$roomId/state/m.room.member/$userId",
-            { $roomId: roomId, $userId: userId },
-        );
-
-        return this.http.authedRequest(callback, Method.Put, path, undefined, {
-            membership: membershipValue,
-            reason: reason,
-        });
-    }
-
     private membershipChange(
         roomId: string,
         userId: string,
