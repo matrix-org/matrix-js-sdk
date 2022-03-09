@@ -142,6 +142,7 @@ export interface ICreateFilterOpts {
     // timeline. Useful to disable for some filters that can't be achieved by the
     // client in an efficient manner
     prepopulateTimeline?: boolean;
+    pendingEvents?: boolean;
 }
 
 export enum RoomEvent {
@@ -1316,12 +1317,15 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     public getOrCreateFilteredTimelineSet(
         filter: Filter,
-        { prepopulateTimeline = true }: ICreateFilterOpts = {},
+        {
+            prepopulateTimeline = true,
+            pendingEvents = true,
+        }: ICreateFilterOpts = {},
     ): EventTimelineSet {
         if (this.filteredTimelineSets[filter.filterId]) {
             return this.filteredTimelineSets[filter.filterId];
         }
-        const opts = Object.assign({ filter: filter }, this.opts);
+        const opts = Object.assign({ filter, pendingEvents }, this.opts);
         const timelineSet = new EventTimelineSet(this, opts);
         this.reEmitter.reEmit(timelineSet, [
             RoomEvent.Timeline,

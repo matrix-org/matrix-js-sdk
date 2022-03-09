@@ -3724,7 +3724,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             if (thread) {
                 content["m.relates_to"]["m.in_reply_to"] = {
                     "event_id": thread.lastReply((ev: MatrixEvent) => {
-                        return ev.isThreadRelation && !ev.status;
+                        return ev.isRelation(RelationType.Thread) && !ev.status;
                     })?.getId(),
                 };
             }
@@ -4924,40 +4924,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.http.authedRequest(
             callback, Method.Post, path, undefined, data,
         );
-    }
-
-    /**
-     * This is an internal method.
-     * @param {MatrixClient} client
-     * @param {string} roomId
-     * @param {string} userId
-     * @param {string} membershipValue
-     * @param {string} reason
-     * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     */
-    private setMembershipState(
-        roomId: string,
-        userId: string,
-        membershipValue: string,
-        reason?: string,
-        callback?: Callback,
-    ) {
-        if (utils.isFunction(reason)) {
-            callback = reason as any as Callback; // legacy
-            reason = undefined;
-        }
-
-        const path = utils.encodeUri(
-            "/rooms/$roomId/state/m.room.member/$userId",
-            { $roomId: roomId, $userId: userId },
-        );
-
-        return this.http.authedRequest(callback, Method.Put, path, undefined, {
-            membership: membershipValue,
-            reason: reason,
-        });
     }
 
     private membershipChange(
