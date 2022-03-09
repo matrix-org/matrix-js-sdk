@@ -106,7 +106,8 @@ export interface IEventRelation {
     event_id: string;
     "m.in_reply_to"?: {
         event_id: string;
-        "m.render_in"?: string[];
+        is_falling_back?: boolean;
+        "io.element.is_falling_back"?: boolean; // unstable variant of `is_falling_back` - MSC3440
     };
     key?: string;
 }
