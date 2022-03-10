@@ -82,8 +82,6 @@ export type MLocationEventContent = &
     MAssetEvent &
     MTextEvent &
     OptionalTimestampEvent;
-    // timestamp is optional
-    //(MTimestampEvent | undefined);
 
 export type LegacyLocationEventContent = {
     body: string;
