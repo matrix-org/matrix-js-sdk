@@ -53,10 +53,6 @@ interface IThreadOpts {
  */
 export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     public static hasServerSideSupport: boolean;
-    private static serverSupportPromise: Promise<{
-        serverSupport: boolean;
-        stable: boolean;
-    }> | null;
 
     /**
      * A reference to all the events ID at the bottom of the threads
