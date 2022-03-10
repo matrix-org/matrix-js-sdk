@@ -113,7 +113,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         this.room.on(RoomEvent.Timeline, this.onEcho);
     }
 
-    public static setServerSideSupport(hasServerSideSupport, useStable) {
+    public static setServerSideSupport(hasServerSideSupport: boolean, useStable: boolean): void {
         Thread.hasServerSideSupport = hasServerSideSupport;
         if (!useStable) {
             FILTER_RELATED_BY_SENDERS.setPreferUnstable(true);
