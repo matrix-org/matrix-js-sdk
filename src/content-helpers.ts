@@ -24,6 +24,11 @@ import {
     LocationAssetType,
     M_LOCATION,
     M_TIMESTAMP,
+    LocationEventWireContent,
+    MLocationEventContent,
+    MLocationContent,
+    MAssetContent,
+    LegacyLocationEventContent,
 } from "./@types/location";
 
 /**
@@ -107,6 +112,8 @@ export function makeEmoteMessage(body: string) {
     };
 }
 
+/** Location content helpers */
+
 /**
  * Generates the content for a Location event
  * @param text a text for of our location
@@ -139,3 +146,65 @@ export function makeLocationContent(
         // TODO: MSC1767 fallbacks m.image thumbnail
     };
 }
+
+export const getTextForLocationEvent = (
+    uri: string,
+    assetType: LocationAssetType,
+    timestamp: number,
+    description?: string,
+): string => {
+    const date = `at ${new Date(timestamp).toISOString()}`;
+    const assetName = assetType === LocationAssetType.Self ? 'User' : undefined;
+    const quotedDescription = description ? `"${description}"` : undefined;
+
+    return [
+        assetName,
+        'Location',
+        quotedDescription,
+        uri,
+        date,
+    ].filter(Boolean).join(' ');
+};
+
+export const makeLocationEventContent = (uri: string,
+    timestamp?: number,
+    description?: string,
+    assetType?: LocationAssetType,
+    text?: string,
+): LegacyLocationEventContent & MLocationEventContent => {
+    const defaultedText = text ??
+        getTextForLocationEvent(uri, assetType || LocationAssetType.Self, timestamp, description);
+    const timestampEvent = timestamp ? { [M_TIMESTAMP.name]: timestamp } : {};
+    return {
+        msgtype: "m.location",
+        body: defaultedText,
+        geo_uri: uri,
+        [M_LOCATION.name]: {
+            description,
+            uri,
+        },
+        [M_ASSET.name]: {
+            type: assetType || LocationAssetType.Self,
+        },
+        [TEXT_NODE_TYPE.name]: defaultedText,
+        ...timestampEvent,
+    } as LegacyLocationEventContent & MLocationEventContent;
+};
+
+/**
+ * Parse location event content and transform to
+ * a backwards compatible modern m.location event format
+ */
+export const parseLocationEvent = (wireEventContent: LocationEventWireContent): MLocationEventContent => {
+    const location = M_LOCATION.findIn<MLocationContent>(wireEventContent);
+    const asset = M_ASSET.findIn<MAssetContent>(wireEventContent);
+    const timestamp = M_TIMESTAMP.findIn<number>(wireEventContent);
+    const text = TEXT_NODE_TYPE.findIn<string>(wireEventContent);
+
+    const geoUri = location?.uri ?? wireEventContent?.geo_uri;
+    const description = location?.description;
+    const assetType = asset?.type ?? LocationAssetType.Self;
+    const fallbackText = text ?? wireEventContent.body;
+
+    return makeLocationEventContent(geoUri, timestamp, description, assetType, fallbackText);
+};

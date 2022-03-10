@@ -18,7 +18,6 @@ limitations under the License.
 import { EitherAnd } from "matrix-events-sdk";
 
 import { UnstableValue } from "../NamespacedValue";
-import { IContent } from "../models/event";
 import { TEXT_NODE_TYPE } from "./extensible_events";
 
 export enum LocationAssetType {
@@ -74,7 +73,7 @@ export type MTextEvent = EitherAnd<{ [TEXT_NODE_TYPE.name]: string }, { [TEXT_NO
     }
 }
 */
-
+type OptionalTimestampEvent = MTimestampEvent | undefined;
 /**
  * The content for an m.location event
 */
@@ -82,8 +81,9 @@ export type MLocationEventContent = &
     MLocationEvent &
     MAssetEvent &
     MTextEvent &
+    OptionalTimestampEvent;
     // timestamp is optional
-    (MTimestampEvent | undefined);
+    //(MTimestampEvent | undefined);
 
 export type LegacyLocationEventContent = {
     body: string;
@@ -91,6 +91,9 @@ export type LegacyLocationEventContent = {
     geo_uri: string;
 };
 
-/* eslint-disable camelcase */
+/**
+ * Possible content for location events as sent over the wire
+ */
+export type LocationEventWireContent = Partial<LegacyLocationEventContent & MLocationEventContent>;
+
 export type ILocationContent = MLocationEventContent & LegacyLocationEventContent;
-/* eslint-enable camelcase */
