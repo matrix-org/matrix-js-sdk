@@ -1,4 +1,3 @@
-import { resolve } from "dns";
 import { SlidingSync, SlidingSyncState, SlidingList } from "../../src/sliding-sync";
 import { TestClient } from "../TestClient";
 

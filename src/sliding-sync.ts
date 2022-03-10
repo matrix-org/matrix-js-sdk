@@ -26,11 +26,6 @@ const DEBUG = true;
 // to determine the max time we're willing to wait.
 const BUFFER_PERIOD_MS = 10 * 1000;
 
-// Number of consecutive failed syncs that will lead to a syncState of ERROR as opposed
-// to RECONNECTING. This is needed to inform the client of server issues when the
-// keepAlive is successful but the server /sync fails.
-const FAILED_SYNC_ERROR_THRESHOLD = 3;
-
 function debuglog(...params) {
     if (!DEBUG) {
         return;
@@ -128,7 +123,7 @@ export enum SlidingSyncState {
     }
 
     /**
-     * Return a copy of the list.
+     * Return a copy of the list suitable for a request body.
      * @param {boolean} includeSticky If true, includes sticky params. Else skips them.
      */
     getList(includeSticky: boolean): MSC3575List {
@@ -159,7 +154,8 @@ export enum SlidingSyncState {
 /**
  * SlidingSync is a high-level data structure which controls the majority of sliding sync.
  * It has no hooks into JS SDK with the exception of needing a MatrixClient to perform the HTTP request.
- * This means this class (and everything it uses) can be yanked somewhere else if need be.
+ * This means this class (and everything it uses) can be used in isolation from JS SDK if needed.
+ * To hook this up with the JS SDK, you need to use SlidingSyncApi.
  */
 export class SlidingSync {
     private proxyBaseUrl: string;
@@ -169,8 +165,8 @@ export class SlidingSync {
     private terminated: boolean;
     roomSubscriptions: Set<string>;
     private roomSubscriptionInfo: MSC3575RoomSubscription;
-    private roomDataCallbacks: Function[];
-    private lifecycleCallbacks: Function[];
+    private roomDataCallbacks: ((roomId: string, roomData: object) => void)[]; // array of functions
+    private lifecycleCallbacks: ((state: SlidingSyncState, resp: object, err: Error) => void)[];
 
     private pendingReq?: IAbortablePromise<MSC3575SlidingSyncResponse>;
 
@@ -199,7 +195,7 @@ export class SlidingSync {
      * Listen for high-level room events on the sync connection
      * @param {function} callback The callback to invoke.
      */
-    addRoomDataListener(callback) {
+    addRoomDataListener(callback: (roomId: string, roomData: object) => void) {
         this.roomDataCallbacks.push(callback);
     }
 
@@ -207,7 +203,7 @@ export class SlidingSync {
      * Listen for high-level lifecycle events on the sync connection
      * @param {function} callback The callback to invoke.
      */
-    addLifecycleListener(callback) {
+    addLifecycleListener(callback: (state: SlidingSyncState, resp: object, err: Error) => void) {
         this.lifecycleCallbacks.push(callback);
     }
 
@@ -237,7 +233,7 @@ export class SlidingSync {
     /**
      * Resend a Sliding Sync request. Used when something has changed in the request.
      */
-    resend() {
+    resend(): void {
         if (this.pendingReq) {
             this.pendingReq.abort();
         }
@@ -246,7 +242,7 @@ export class SlidingSync {
     /**
      * Stop syncing with the server.
      */
-    stop() {
+    stop(): void {
         this.terminated = true;
         if (this.pendingReq) {
             this.pendingReq.abort();
@@ -457,7 +453,7 @@ export class SlidingSync {
     }
 }
 
-function difference(setA: Set<string>, setB: Set<string>): Set<string> {
+const difference = (setA: Set<string>, setB: Set<string>): Set<string> => {
     let _difference = new Set(setA)
     for (let elem of setB) {
         _difference.delete(elem)
@@ -465,7 +461,7 @@ function difference(setA: Set<string>, setB: Set<string>): Set<string> {
     return _difference
 }
 
-const sleep = (ms) => {
+const sleep = (ms: number) => {
     return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
@@ -474,7 +470,7 @@ const sleep = (ms) => {
 // a b c       d e f
 // a b c       d _ f
 // e a b c       d f  <--- c=3 is wrong as we are not tracking it, ergo we need to see if `i` is in range else drop it
-const indexInRange = (ranges, i) => {
+const indexInRange = (ranges: number[][], i: number) => {
     let isInRange = false;
     ranges.forEach((r) => {
         if (r[0] <= i && i <= r[1]) {

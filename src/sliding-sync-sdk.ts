@@ -16,12 +16,12 @@ limitations under the License.
 
 import { User, UserEvent } from "./models/user";
 import { NotificationCountType, Room, RoomEvent } from "./models/room";
+import { IAbortablePromise } from "./@types/partials";
 import * as utils from "./utils";
 import { IDeferred } from "./utils";
 import { EventTimeline } from "./models/event-timeline";
 import { PushProcessor } from "./pushprocessor";
 import { logger } from './logger';
-import { InvalidStoreError } from './errors';
 import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
 import {
     IEphemeral,
@@ -38,7 +38,6 @@ import {
 } from "./sync-accumulator";
 import { MatrixEvent } from "./models/event";
 import { MatrixError, Method } from "./http-api";
-import { ISavedSync } from "./store";
 import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
 import { RoomStateEvent } from "./models/room-state";
@@ -46,8 +45,6 @@ import { RoomMemberEvent } from "./models/room-member";
 import {SyncState } from "./sync";
 
 const DEBUG = true;
-
-const BUFFER_PERIOD_MS = 80 * 1000;
 
 // Number of consecutive failed syncs that will lead to a syncState of ERROR as opposed
 // to RECONNECTING. This is needed to inform the client of server issues when the
@@ -74,17 +71,6 @@ export interface ISyncStateData {
     fromCache?: boolean;
 }
 
-interface ISyncQueryParams {
-    timeout: number;
-    pos?: string;
-    _cacheBuster?: string | number; // not part of the API itself
-}
-
-// http-api mangles an abort method onto its promises
-interface IRequestPromise<T> extends Promise<T> {
-    abort(): void;
-}
-
 type WrappedRoom<T> = T & {
     room: Room;
     isBrandNewRoom: boolean;
@@ -107,16 +93,15 @@ type WrappedRoom<T> = T & {
  */
 export class SlidingSyncApi {
     /*
-    createRoom
+createRoom
 getSyncState
 getSyncStateData
-recoverFromSyncStartupError
 retryImmediately
 stop
 sync
 syncLeftRooms
 */
-    private currentSyncRequest: IRequestPromise<ISyncResponse> = null;
+    private currentSyncRequest: IAbortablePromise<ISyncResponse> = null;
     private syncState: SyncState = null;
     private syncStateData: ISyncStateData = null; // additional data (eg. error object for failed sync)
     private catchingUp = false;
@@ -125,7 +110,6 @@ syncLeftRooms
     private connectionReturnedDefer: IDeferred<boolean> = null;
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
     private failedSyncCount = 0; // Number of consecutive failed /sync requests
-    private storeIsInvalid = false; // flag set if the store needs to be cleared before we can start
 
     constructor(private readonly client: MatrixClient, private readonly opts: Partial<IStoredClientOpts> = {}) {
         this.opts.initialSyncLimit = this.opts.initialSyncLimit ?? 8;
@@ -152,7 +136,7 @@ syncLeftRooms
      * @param {string} roomId
      * @return {Room}
      */
-    public createRoom(roomId: string): Room {
+    public createRoom(roomId: string): Room { // XXX cargoculted from sync.ts
         const client = this.client;
         const {
             timelineSupport,
@@ -184,7 +168,7 @@ syncLeftRooms
      * @param {Room} room
      * @private
      */
-    private registerStateListeners(room: Room): void {
+    private registerStateListeners(room: Room): void { // XXX cargoculted from sync.ts
         const client = this.client;
         // we need to also re-emit room state and room member events, so hook it up
         // to the client now. We need to add a listener for RoomState.members in
@@ -210,7 +194,7 @@ syncLeftRooms
      * @param {Room} room
      * @private
      */
-    private deregisterStateListeners(room: Room): void {
+    private deregisterStateListeners(room: Room): void { // XXX cargoculted from sync.ts
         // could do with a better way of achieving this.
         room.currentState.removeAllListeners(RoomStateEvent.Events);
         room.currentState.removeAllListeners(RoomStateEvent.Members);
@@ -265,36 +249,6 @@ syncLeftRooms
         return this.syncStateData;
     }
 
-    public async recoverFromSyncStartupError(savedSyncPromise: Promise<void>, err: MatrixError): Promise<void> {
-        // Wait for the saved sync to complete - we send the pushrules and filter requests
-        // before the saved sync has finished so they can run in parallel, but only process
-        // the results after the saved sync is done. Equivalently, we wait for it to finish
-        // before reporting failures from these functions.
-        await savedSyncPromise;
-        const keepaliveProm = this.startKeepAlives();
-        this.updateSyncState(SyncState.Error, { error: err });
-        await keepaliveProm;
-    }
-
-    /**
-     * Is the lazy loading option different than in previous session?
-     * @param {boolean} lazyLoadMembers current options for lazy loading
-     * @return {boolean} whether or not the option has changed compared to the previous session */
-    private async wasLazyLoadingToggled(lazyLoadMembers = false): Promise<boolean> {
-        // assume it was turned off before
-        // if we don't know any better
-        let lazyLoadMembersBefore = false;
-        const isStoreNewlyCreated = await this.client.store.isNewlyCreated();
-        if (!isStoreNewlyCreated) {
-            const prevClientOptions = await this.client.store.getClientOptions();
-            if (prevClientOptions) {
-                lazyLoadMembersBefore = !!prevClientOptions.lazyLoadMembers;
-            }
-            return lazyLoadMembersBefore !== lazyLoadMembers;
-        }
-        return false;
-    }
-
     private shouldAbortSync(error: MatrixError): boolean {
         if (error.errcode === "M_UNKNOWN_TOKEN") {
             // The logout already happened, we just need to stop.
@@ -309,16 +263,12 @@ syncLeftRooms
     /**
      * Main entry point
      */
-    public sync(): void {
+    public async sync() {
         const client = this.client;
-
         this.running = true;
-
         if (global.window && global.window.addEventListener) {
             global.window.addEventListener("online", this.onOnline, false);
         }
-
-        let savedSyncPromise = Promise.resolve();
         let savedSyncToken = null;
 
         // We need to do one-off checks before we can begin the /sync loop.
@@ -339,10 +289,6 @@ syncLeftRooms
             } catch (err) {
                 logger.error("Getting push rules failed", err);
                 if (this.shouldAbortSync(err)) return;
-                // wait for saved sync to complete before doing anything else,
-                // otherwise the sync state will end up being incorrect
-                debuglog("Waiting for saved sync before retrying push rules...");
-                await this.recoverFromSyncStartupError(savedSyncPromise, err);
                 getPushRules();
                 return;
             }
@@ -365,21 +311,6 @@ syncLeftRooms
                         "by server, so disabling");
                     this.opts.lazyLoadMembers = false;
                 }
-            }
-            // need to vape the store when enabling LL and wasn't enabled before
-            debuglog("Checking whether lazy loading has changed in store...");
-            const shouldClear = await this.wasLazyLoadingToggled(this.opts.lazyLoadMembers);
-            if (shouldClear) {
-                this.storeIsInvalid = true;
-                const reason = InvalidStoreError.TOGGLED_LAZY_LOADING;
-                const error = new InvalidStoreError(reason, !!this.opts.lazyLoadMembers);
-                this.updateSyncState(SyncState.Error, { error });
-                // bail out of the sync loop now: the app needs to respond to this error.
-                // we leave the state as 'ERROR' which isn't great since this normally means
-                // we're retrying. The client must be stopped before clearing the stores anyway
-                // so the app should stop the client, clear the store and start it again.
-                logger.warn("InvalidStoreError: store is not usable: stopping sync.");
-                return;
             }
             if (this.opts.lazyLoadMembers && this.opts.crypto) {
                 this.opts.crypto.enableLazyLoading();
@@ -408,41 +339,13 @@ syncLeftRooms
                 // Send this first sync request here so we can then wait for the saved
                 // sync data to finish processing before we process the results of this one.
                 debuglog("Sending first sync request...");
-                this.currentSyncRequest = this.doSyncRequest({ }, savedSyncToken);
+                // XXX TODO this.currentSyncRequest = this.doSyncRequest({ }, savedSyncToken);
             }
 
-            // Now wait for the saved sync to finish...
-            debuglog("Waiting for saved sync before starting sync processing...");
-            await savedSyncPromise;
-            this.doSync({ });
+            this.doSync({});
         };
 
-        if (client.isGuest()) {
-            // no push rules for guests, no access to POST filter for guests.
-            this.doSync({});
-        } else {
-            // Pull the saved sync token out first, before the worker starts sending
-            // all the sync data which could take a while. This will let us send our
-            // first incremental sync request before we've processed our saved data.
-            debuglog("Getting saved sync token...");
-            savedSyncPromise = client.store.getSavedSyncToken().then((tok) => {
-                debuglog("Got saved sync token");
-                savedSyncToken = tok;
-                debuglog("Getting saved sync...");
-                return client.store.getSavedSync();
-            }).then((savedSync) => {
-                debuglog(`Got reply from saved sync, exists? ${!!savedSync}`);
-                if (savedSync) {
-                    return this.syncFromCache(savedSync);
-                }
-            }).catch(err => {
-                logger.error("Getting saved sync failed", err);
-            });
-            // Now start the first incremental sync request: this can also
-            // take a while so if we set it going now, we can wait for it
-            // to finish while we process our saved sync data.
-            getPushRules();
-        }
+        await getPushRules();
     }
 
     /**
@@ -479,49 +382,6 @@ syncLeftRooms
         this.startKeepAlives(0);
         return true;
     }
-    /**
-     * Process a single set of cached sync data.
-     * @param {Object} savedSync a saved sync that was persisted by a store. This
-     * should have been acquired via client.store.getSavedSync().
-     */
-    private async syncFromCache(savedSync: ISavedSync): Promise<void> {
-        debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
-
-        const nextSyncToken = savedSync.nextBatch;
-
-        // Set sync token for future incremental syncing
-        this.client.store.setSyncToken(nextSyncToken);
-
-        // No previous sync, set old token to null
-        const syncEventData = {
-            oldSyncToken: null,
-            nextSyncToken,
-            catchingUp: false,
-            fromCache: true,
-        };
-
-        const data: ISyncResponse = {
-            next_batch: nextSyncToken,
-            rooms: savedSync.roomsData,
-            groups: savedSync.groupsData,
-            account_data: {
-                events: savedSync.accountData,
-            },
-        };
-
-        try {
-            await this.processSyncResponse(syncEventData, data);
-        } catch (e) {
-            logger.error("Error processing cached sync", e.stack || e);
-        }
-
-        // Don't emit a prepared if we've bailed because the store is invalid:
-        // in this case the client will not be usable until stopped & restarted
-        // so this would be useless and misleading.
-        if (!this.storeIsInvalid) {
-            this.updateSyncState(SyncState.Prepared, syncEventData);
-        }
-    }
 
     /**
      * Invoke me to do /sync calls
@@ -531,155 +391,100 @@ syncLeftRooms
      */
     private async doSync(syncOptions: ISyncOptions): Promise<void> {
         const client = this.client;
-
-        if (!this.running) {
-            debuglog("Sync no longer running: exiting.");
-            if (this.connectionReturnedDefer) {
-                this.connectionReturnedDefer.reject();
-                this.connectionReturnedDefer = null;
+        while (true) {
+            if (!this.running) {
+                debuglog("Sync no longer running: exiting.");
+                if (this.connectionReturnedDefer) {
+                    this.connectionReturnedDefer.reject();
+                    this.connectionReturnedDefer = null;
+                }
+                this.updateSyncState(SyncState.Stopped);
+                return;
             }
-            this.updateSyncState(SyncState.Stopped);
-            return;
-        }
 
-        const syncToken = client.store.getSyncToken();
+            const syncToken = client.store.getSyncToken();
 
-        let data;
-        try {
-            //debuglog('Starting sync since=' + syncToken);
-            if (this.currentSyncRequest === null) {
-                this.currentSyncRequest = this.doSyncRequest(syncOptions, syncToken);
+            let data;
+            try {
+                //debuglog('Starting sync since=' + syncToken);
+                if (this.currentSyncRequest === null) {
+                    // XXX TODO this.currentSyncRequest = this.doSyncRequest(syncOptions, syncToken);
+                }
+                data = await this.currentSyncRequest;
+            } catch (e) {
+                this.onSyncError(e, syncOptions);
+                return;
+            } finally {
+                this.currentSyncRequest = null;
             }
-            data = await this.currentSyncRequest;
-        } catch (e) {
-            this.onSyncError(e, syncOptions);
-            return;
-        } finally {
-            this.currentSyncRequest = null;
-        }
 
-        //debuglog('Completed sync, next_batch=' + data.next_batch);
+            //debuglog('Completed sync, next_batch=' + data.next_batch);
 
-        // set the sync token NOW *before* processing the events. We do this so
-        // if something barfs on an event we can skip it rather than constantly
-        // polling with the same token.
-        client.store.setSyncToken(data.next_batch);
+            // set the sync token NOW *before* processing the events. We do this so
+            // if something barfs on an event we can skip it rather than constantly
+            // polling with the same token.
+            client.store.setSyncToken(data.next_batch);
 
-        // Reset after a successful sync
-        this.failedSyncCount = 0;
+            // Reset after a successful sync
+            this.failedSyncCount = 0;
 
-        await client.store.setSyncData(data);
+            await client.store.setSyncData(data);
 
-        const syncEventData = {
-            oldSyncToken: syncToken,
-            nextSyncToken: data.next_batch,
-            catchingUp: this.catchingUp,
-        };
+            const syncEventData = {
+                oldSyncToken: syncToken,
+                nextSyncToken: data.next_batch,
+                catchingUp: this.catchingUp,
+            };
 
-        if (this.opts.crypto) {
-            // tell the crypto module we're about to process a sync
-            // response
-            await this.opts.crypto.onSyncWillProcess(syncEventData);
-        }
-
-        try {
-            await this.processSyncResponse(syncEventData, data);
-        } catch (e) {
-            // log the exception with stack if we have it, else fall back
-            // to the plain description
-            logger.error("Caught /sync error", e.stack || e);
-
-            // Emit the exception for client handling
-            this.client.emit(ClientEvent.SyncUnexpectedError, e);
-        }
-
-        // update this as it may have changed
-        syncEventData.catchingUp = this.catchingUp;
-
-        // emit synced events
-        if (!syncOptions.hasSyncedBefore) {
-            this.updateSyncState(SyncState.Prepared, syncEventData);
-            syncOptions.hasSyncedBefore = true;
-        }
-
-        // tell the crypto module to do its processing. It may block (to do a
-        // /keys/changes request).
-        if (this.opts.crypto) {
-            await this.opts.crypto.onSyncCompleted(syncEventData);
-        }
-
-        // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
-        this.updateSyncState(SyncState.Syncing, syncEventData);
-
-        if (client.store.wantsSave()) {
-            // We always save the device list (if it's dirty) before saving the sync data:
-            // this means we know the saved device list data is at least as fresh as the
-            // stored sync data which means we don't have to worry that we may have missed
-            // device changes. We can also skip the delay since we're not calling this very
-            // frequently (and we don't really want to delay the sync for it).
             if (this.opts.crypto) {
-                await this.opts.crypto.saveDeviceList(0);
+                // tell the crypto module we're about to process a sync
+                // response
+                await this.opts.crypto.onSyncWillProcess(syncEventData);
             }
 
-            // tell databases that everything is now in a consistent state and can be saved.
-            client.store.save();
+            try {
+                await this.processSyncResponse(syncEventData, data);
+            } catch (e) {
+                // log the exception with stack if we have it, else fall back
+                // to the plain description
+                logger.error("Caught /sync error", e.stack || e);
+
+                // Emit the exception for client handling
+                this.client.emit(ClientEvent.SyncUnexpectedError, e);
+            }
+
+            // update this as it may have changed
+            syncEventData.catchingUp = this.catchingUp;
+
+            // emit synced events
+            if (!syncOptions.hasSyncedBefore) {
+                this.updateSyncState(SyncState.Prepared, syncEventData);
+                syncOptions.hasSyncedBefore = true;
+            }
+
+            // tell the crypto module to do its processing. It may block (to do a
+            // /keys/changes request).
+            if (this.opts.crypto) {
+                await this.opts.crypto.onSyncCompleted(syncEventData);
+            }
+
+            // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
+            this.updateSyncState(SyncState.Syncing, syncEventData);
+
+            if (client.store.wantsSave()) {
+                // We always save the device list (if it's dirty) before saving the sync data:
+                // this means we know the saved device list data is at least as fresh as the
+                // stored sync data which means we don't have to worry that we may have missed
+                // device changes. We can also skip the delay since we're not calling this very
+                // frequently (and we don't really want to delay the sync for it).
+                if (this.opts.crypto) {
+                    await this.opts.crypto.saveDeviceList(0);
+                }
+
+                // tell databases that everything is now in a consistent state and can be saved.
+                client.store.save();
+            }
         }
-
-        // Begin next sync
-        this.doSync(syncOptions);
-    }
-
-    private doSyncRequest(syncOptions: ISyncOptions, pos: string): IRequestPromise<ISyncResponse> {
-        const qps = this.getSyncQueryParams(syncOptions, pos);
-        return this.client.http.authedRequest(
-            undefined, Method.Get, "/sync", qps as any, undefined,
-            {
-                localTimeoutMs: qps.timeout + BUFFER_PERIOD_MS,
-            },
-        );
-    }
-
-    private getSyncQueryParams(syncOptions: ISyncOptions, pos: string): ISyncQueryParams {
-        let pollTimeout = this.opts.pollTimeout;
-
-        if (this.getSyncState() !== 'SYNCING' || this.catchingUp) {
-            // unless we are happily syncing already, we want the server to return
-            // as quickly as possible, even if there are no events queued. This
-            // serves two purposes:
-            //
-            // * When the connection dies, we want to know asap when it comes back,
-            //   so that we can hide the error from the user. (We don't want to
-            //   have to wait for an event or a timeout).
-            //
-            // * We want to know if the server has any to_device messages queued up
-            //   for us. We do that by calling it with a zero timeout until it
-            //   doesn't give us any more to_device messages.
-            this.catchingUp = true;
-            pollTimeout = 0;
-        }
-
-        const qps: ISyncQueryParams = {
-            timeout: pollTimeout,
-        };
-
-        if (pos) {
-            qps.pos = pos;
-        } else {
-            // use a cachebuster for initialsyncs, to make sure that
-            // we don't get a stale sync
-            // (https://github.com/vector-im/vector-web/issues/1354)
-            qps._cacheBuster = Date.now();
-        }
-
-        if (this.getSyncState() == 'ERROR' || this.getSyncState() == 'RECONNECTING') {
-            // we think the connection is dead. If it comes back up, we won't know
-            // about it till /sync returns. If the timeout= is high, this could
-            // be a long time. Set it to 0 when doing retries so we don't have to wait
-            // for an event or a timeout before emiting the SYNCING event.
-            qps.timeout = 0;
-        }
-
-        return qps;
     }
 
     private onSyncError(err: MatrixError, syncOptions: ISyncOptions): void {
