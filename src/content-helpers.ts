@@ -20,7 +20,6 @@ import { MsgType } from "./@types/event";
 import { TEXT_NODE_TYPE } from "./@types/extensible_events";
 import {
     M_ASSET,
-    ILocationContent,
     LocationAssetType,
     M_LOCATION,
     M_TIMESTAMP,
@@ -114,39 +113,6 @@ export function makeEmoteMessage(body: string) {
 
 /** Location content helpers */
 
-/**
- * Generates the content for a Location event
- * @param text a text for of our location
- * @param uri a geo:// uri for the location
- * @param ts the timestamp when the location was correct (milliseconds since
- *           the UNIX epoch)
- * @param description the (optional) label for this location on the map
- * @param asset_type the (optional) asset type of this location e.g. "m.self"
- */
-export function makeLocationContent(
-    text: string,
-    uri: string,
-    ts: number,
-    description?: string,
-    assetType?: LocationAssetType,
-): ILocationContent {
-    return {
-        "body": text,
-        "msgtype": MsgType.Location,
-        "geo_uri": uri,
-        [M_LOCATION.name]: {
-            uri,
-            description,
-        },
-        [M_ASSET.name]: {
-            type: assetType ?? LocationAssetType.Self,
-        },
-        [TEXT_NODE_TYPE.name]: text,
-        [M_TIMESTAMP.name]: ts,
-        // TODO: MSC1767 fallbacks m.image thumbnail
-    };
-}
-
 export const getTextForLocationEvent = (
     uri: string,
     assetType: LocationAssetType,
@@ -166,7 +132,17 @@ export const getTextForLocationEvent = (
     ].filter(Boolean).join(' ');
 };
 
-export const makeLocationEventContent = (uri: string,
+/**
+ * Generates the content for a Location event
+ * @param uri a geo:// uri for the location
+ * @param ts the timestamp when the location was correct (milliseconds since
+ *           the UNIX epoch)
+ * @param description the (optional) label for this location on the map
+ * @param asset_type the (optional) asset type of this location e.g. "m.self"
+ * @param text optional. A text for the location
+ */
+export const makeLocationContent = (
+    uri: string,
     timestamp?: number,
     description?: string,
     assetType?: LocationAssetType,
@@ -206,5 +182,5 @@ export const parseLocationEvent = (wireEventContent: LocationEventWireContent): 
     const assetType = asset?.type ?? LocationAssetType.Self;
     const fallbackText = text ?? wireEventContent.body;
 
-    return makeLocationEventContent(geoUri, timestamp, description, assetType, fallbackText);
+    return makeLocationContent(geoUri, timestamp, description, assetType, fallbackText);
 };

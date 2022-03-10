@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { makeLocationEventContent, parseLocationEvent } from "../../src/content-helpers";
+import { makeLocationContent, parseLocationEvent } from "../../src/content-helpers";
 import {
     M_ASSET,
     LocationAssetType,
@@ -47,7 +47,7 @@ describe("Location", function() {
     } as LocationEventWireContent;
 
     it("should create a valid location with defaults", function() {
-        const loc = makeLocationEventContent("geo:foo", 134235435);
+        const loc = makeLocationContent("geo:foo", 134235435);
         expect(loc.body).toEqual('User Location geo:foo at 1970-01-02T13:17:15.435Z');
         expect(loc.msgtype).toEqual("m.location");
         expect(loc.geo_uri).toEqual("geo:foo");
@@ -61,7 +61,7 @@ describe("Location", function() {
     });
 
     it("should create a valid location with explicit properties", function() {
-        const loc = makeLocationEventContent(
+        const loc = makeLocationContent(
             "geo:bar", 134235436, "desc", LocationAssetType.Pin);
 
         expect(loc.body).toEqual('Location "desc" geo:bar at 1970-01-02T13:17:15.436Z');
