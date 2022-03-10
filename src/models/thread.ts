@@ -162,10 +162,6 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
      * to the start (and not the end) of the timeline.
      */
     public async addEvent(event: MatrixEvent, toStartOfTimeline: boolean): Promise<void> {
-        if (Thread.hasServerSideSupport === undefined) {
-            await Thread.serverSupportPromise;
-        }
-
         // Add all incoming events to the thread's timeline set when there's  no server support
         if (!Thread.hasServerSideSupport) {
             // all the relevant membership info to hydrate events with a sender
@@ -217,13 +213,6 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     }
 
     private initialiseThread(rootEvent: MatrixEvent | undefined): void {
-        if (Thread.hasServerSideSupport === undefined) {
-            Thread.serverSupportPromise.then(() => {
-                this.initialiseThread(rootEvent);
-            });
-            return;
-        }
-
         const bundledRelationship = rootEvent
             ?.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
 
@@ -243,10 +232,6 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         nextBatch?: string;
         prevBatch?: string;
     } | null> {
-        if (Thread.hasServerSideSupport === undefined) {
-            await Thread.serverSupportPromise;
-        }
-
         if (!Thread.hasServerSideSupport) {
             this.initialEventsFetched = true;
             return null;
@@ -326,10 +311,6 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         nextBatch?: string;
         prevBatch?: string;
     }> {
-        if (Thread.hasServerSideSupport === undefined) {
-            await Thread.serverSupportPromise;
-        }
-
         let {
             originalEvent,
             events,
