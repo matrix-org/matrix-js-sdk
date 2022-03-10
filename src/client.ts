@@ -8808,9 +8808,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Perform a single MSC3575 sliding sync request.
      * @param {MSC3575SlidingSyncRequest} req The request to make.
+     * @param {string} proxyBaseUrl The base URL for the sliding sync proxy.
      * @returns {MSC3575SlidingSyncResponse} The sliding sync response, or a standard error.
+     * @throws on non 2xx status codes with an object {"httpStatus":number}
      */
-    public slidingSync(req: MSC3575SlidingSyncRequest): IAbortablePromise<MSC3575SlidingSyncResponse|MatrixError> {
+    public slidingSync(req: MSC3575SlidingSyncRequest, proxyBaseUrl?: string): IAbortablePromise<MSC3575SlidingSyncResponse> {
         const qps: Record<string, any> = {};
         if (req.pos) {
             qps.pos = req.pos;
@@ -8820,7 +8822,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             qps.timeout = req.timeout;
             delete req.timeout;
         }
-        return this.http.authedRequest<MSC3575SlidingSyncResponse|MatrixError>(
+        const clientTimeout = req.clientTimeout;
+        delete req.clientTimeout;
+        return this.http.authedRequest<MSC3575SlidingSyncResponse>(
             undefined,
             Method.Post,
             "/sync",
@@ -8828,6 +8832,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             req,
             {
                 prefix: "/_matrix/client/unstable/org.matrix.msc3575",
+                baseUrl: proxyBaseUrl,
+                localTimeoutMs: clientTimeout,
             },
         );
     }
