@@ -47,6 +47,13 @@ export type MLocationContent = {
     description?: string | null;
 };
 
+export type MLocationEvent = EitherAnd<
+    { [M_LOCATION.name]: MLocationContent },
+    { [M_LOCATION.altName]: MLocationContent }
+>;
+
+export type MTextEvent = EitherAnd<{ [TEXT_NODE_TYPE.name]: string }, { [TEXT_NODE_TYPE.altName]: string }>;
+
 /* From the spec at:
  * https://github.com/matrix-org/matrix-doc/blob/matthew/location/proposals/3488-location.md
 {
@@ -68,19 +75,22 @@ export type MLocationContent = {
 }
 */
 
-/* eslint-disable camelcase */
-export interface ILocationContent extends IContent {
+/**
+ * The content for an m.location event
+*/
+export type MLocationEventContent = &
+    MLocationEvent &
+    MAssetEvent &
+    MTextEvent &
+    // timestamp is optional
+    (MTimestampEvent | undefined);
+
+export type LegacyLocationEventContent = {
     body: string;
     msgtype: string;
     geo_uri: string;
-    [M_LOCATION.name]: {
-        uri: string;
-        description?: string;
-    };
-    [M_ASSET.name]: {
-        type: LocationAssetType;
-    };
-    [TEXT_NODE_TYPE.name]: string;
-    [M_TIMESTAMP.name]: number;
-}
+};
+
+/* eslint-disable camelcase */
+export type ILocationContent = MLocationEventContent & LegacyLocationEventContent;
 /* eslint-enable camelcase */
