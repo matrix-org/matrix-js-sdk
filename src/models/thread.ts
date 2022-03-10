@@ -23,7 +23,7 @@ import { EventTimelineSet, EventTimelineSetHandlerMap } from './event-timeline-s
 import { Room } from './room';
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { RoomState } from "./room-state";
-import { NamespacedValue } from "../NamespacedValue";
+import { ServerControlledNamespacedValue } from "../NamespacedValue";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -349,15 +349,15 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     }
 }
 
-export const FILTER_RELATED_BY_SENDERS = new NamespacedValue(
+export const FILTER_RELATED_BY_SENDERS = new ServerControlledNamespacedValue(
     "related_by_senders",
     "io.element.relation_senders",
 );
-export const FILTER_RELATED_BY_REL_TYPES = new NamespacedValue(
+export const FILTER_RELATED_BY_REL_TYPES = new ServerControlledNamespacedValue(
     "related_by_rel_types",
     "io.element.relation_types",
 );
-export const THREAD_RELATION_TYPE = new NamespacedValue(
+export const THREAD_RELATION_TYPE = new ServerControlledNamespacedValue(
     "m.thread",
     "io.element.thread",
 );

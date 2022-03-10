@@ -1838,7 +1838,7 @@ describe("Room", function() {
                     room_id: roomId,
                     content: {
                         "m.relates_to": {
-                            "rel_type": RelationType.Thread,
+                            "rel_type": "m.thread",
                             "event_id": "$000",
                         },
                     },
@@ -1856,7 +1856,7 @@ describe("Room", function() {
                     unsigned: {
                         "age": 1,
                         "m.relations": {
-                            [RelationType.Thread]: {
+                            "m.thread": {
                                 latest_event: null,
                                 count: 1,
                                 current_user_participated: false,
@@ -1878,7 +1878,7 @@ describe("Room", function() {
                     unsigned: {
                         "age": 1,
                         "m.relations": {
-                            [RelationType.Thread]: {
+                            "m.thread": {
                                 latest_event: null,
                                 count: 1,
                                 current_user_participated: false,
@@ -1894,7 +1894,7 @@ describe("Room", function() {
                         room_id: roomId,
                         content: {
                             "m.relates_to": {
-                                "rel_type": RelationType.Thread,
+                                "rel_type": "m.thread",
                                 "event_id": "$666",
                             },
                         },
