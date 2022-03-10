@@ -19,7 +19,6 @@ describe("MatrixClient syncing", function() {
         const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
         httpBackend = testClient.httpBackend;
         client = testClient.client;
-        httpBackend.when("GET", "/capabilities").respond(200, { capabilities: {} });
         httpBackend.when("GET", "/pushrules").respond(200, {});
         httpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
     });

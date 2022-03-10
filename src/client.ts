@@ -178,7 +178,7 @@ import { CryptoStore } from "./crypto/store/base";
 import { MediaHandler } from "./webrtc/mediaHandler";
 import { IRefreshTokenResponse } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
-import { THREAD_RELATION_TYPE } from "./models/thread";
+import { Thread, THREAD_RELATION_TYPE } from "./models/thread";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -1162,7 +1162,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.syncApi.stop();
         }
 
-        await this.getCapabilities(true);
+        try {
+            const { serverSupport, stable } = await this.doesServerSupportThread();
+            Thread.setServerSideSupport(serverSupport, stable);
+        } catch (e) {
+            Thread.setServerSideSupport(false, true);
+        }
 
         // shallow-copy the opts dict before modifying and storing it
         this.clientOpts = Object.assign({}, opts) as IStoredClientOpts;

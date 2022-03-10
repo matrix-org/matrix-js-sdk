@@ -53,7 +53,6 @@ interface IThreadOpts {
  */
 export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     public static hasServerSideSupport: boolean;
-    public static hasStableSupport = false;
     private static serverSupportPromise: Promise<{
         serverSupport: boolean;
         stable: boolean;
@@ -98,22 +97,6 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             RoomEvent.TimelineReset,
         ]);
 
-        if (Thread.hasServerSideSupport === undefined) {
-            Thread.serverSupportPromise = this.client.doesServerSupportThread();
-            Thread.serverSupportPromise.then(({ serverSupport, stable }) => {
-                Thread.hasServerSideSupport = serverSupport;
-                Thread.hasStableSupport = stable;
-
-                if (!stable) {
-                    FILTER_RELATED_BY_SENDERS.setPreferUnstable(true);
-                    FILTER_RELATED_BY_REL_TYPES.setPreferUnstable(true);
-                    THREAD_RELATION_TYPE.setPreferUnstable(true);
-                }
-            }).catch(() => {
-                Thread.serverSupportPromise = null;
-            });
-        }
-
         // If we weren't able to find the root event, it's probably missing
         // and we define the thread ID from one of the thread relation
         if (!rootEvent) {
@@ -128,6 +111,15 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
 
         this.room.on(RoomEvent.LocalEchoUpdated, this.onEcho);
         this.room.on(RoomEvent.Timeline, this.onEcho);
+    }
+
+    public static setServerSideSupport(hasServerSideSupport, useStable) {
+        Thread.hasServerSideSupport = hasServerSideSupport;
+        if (!useStable) {
+            FILTER_RELATED_BY_SENDERS.setPreferUnstable(true);
+            FILTER_RELATED_BY_REL_TYPES.setPreferUnstable(true);
+            THREAD_RELATION_TYPE.setPreferUnstable(true);
+        }
     }
 
     private onEcho = (event: MatrixEvent) => {

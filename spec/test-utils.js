@@ -342,15 +342,8 @@ HttpResponse.SYNC_RESPONSE = {
     data: HttpResponse.SYNC_DATA,
 };
 
-HttpResponse.CAPABILITIES_RESPONSE = {
-    method: "GET",
-    path: "/capabilities",
-    data: { capabilities: {} },
-};
-
 HttpResponse.defaultResponses = function(userId) {
     return [
-        HttpResponse.CAPABILITIES_RESPONSE,
         HttpResponse.PUSH_RULES_RESPONSE,
         HttpResponse.filterResponse(userId),
         HttpResponse.SYNC_RESPONSE,
