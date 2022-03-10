@@ -22,7 +22,6 @@ import { EventTimeline } from "./models/event-timeline";
 import { PushProcessor } from "./pushprocessor";
 import { logger } from './logger';
 import { InvalidStoreError } from './errors';
-import { IAbortablePromise } from "./@types/partials";
 import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
 import {
     IEphemeral,
@@ -107,6 +106,16 @@ type WrappedRoom<T> = T & {
  * updating presence.
  */
 export class SlidingSyncApi {
+    /*
+    createRoom
+getSyncState
+getSyncStateData
+recoverFromSyncStartupError
+retryImmediately
+stop
+sync
+syncLeftRooms
+*/
     private currentSyncRequest: IRequestPromise<ISyncResponse> = null;
     private syncState: SyncState = null;
     private syncStateData: ISyncStateData = null; // additional data (eg. error object for failed sync)

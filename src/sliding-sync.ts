@@ -162,17 +162,17 @@ export enum SlidingSyncState {
  * This means this class (and everything it uses) can be yanked somewhere else if need be.
  */
 export class SlidingSync {
-    proxyBaseUrl: string;
+    private proxyBaseUrl: string;
     lists: SlidingList[];
     client: MatrixClient;
     timeoutMS: number;
-    terminated: boolean;
+    private terminated: boolean;
     roomSubscriptions: Set<string>;
-    roomSubscriptionInfo: MSC3575RoomSubscription;
-    roomDataCallbacks: Function[];
-    lifecycleCallbacks: Function[];
+    private roomSubscriptionInfo: MSC3575RoomSubscription;
+    private roomDataCallbacks: Function[];
+    private lifecycleCallbacks: Function[];
 
-    pendingReq?: IAbortablePromise<MSC3575SlidingSyncResponse>;
+    private pendingReq?: IAbortablePromise<MSC3575SlidingSyncResponse>;
 
     /**
      * Create a new sliding sync instance
@@ -285,7 +285,8 @@ export class SlidingSync {
                     }
                 }
                 this.pendingReq = this.client.slidingSync(reqBody, this.proxyBaseUrl);
-                let resp = await this.pendingReq;
+                resp = await this.pendingReq;
+                debuglog(resp);
                 currentPos = resp.pos;
                 // update what we think we're subscribed to.
                 for (let roomId of newSubscriptions) {
@@ -296,6 +297,9 @@ export class SlidingSync {
                 }
                 if (!resp.ops) {
                     resp.ops = [];
+                }
+                if (!resp.room_subscriptions) {
+                    resp.room_subscriptions = {};
                 }
                 if (resp.counts) {
                     resp.counts.forEach((count, index) => {
@@ -314,6 +318,12 @@ export class SlidingSync {
                         err
                     );
                     await sleep(3000);
+                } else if (err != "aborted") {
+                    // check for Jest style abortions and AbortController abortions before logging 
+                    const isAbort = err == "aborted" ||  (err.name && err.name == "AbortError");
+                    if (!isAbort) {
+                        console.error(err);
+                    }
                 }
             }
             if (!resp) {
@@ -334,11 +344,11 @@ export class SlidingSync {
             });
             resp.ops.forEach((op) => {
                 if (op.op === "DELETE") {
-                    console.log("DELETE", op.list, op.index, ";");
+                    debuglog("DELETE", op.list, op.index, ";");
                     delete this.lists[op.list].roomIndexToRoomId[op.index];
                     gapIndexes[op.list] = op.index;
                 } else if (op.op === "INSERT") {
-                    console.log(
+                    debuglog(
                         "INSERT",
                         op.list,
                         op.index,
@@ -349,7 +359,7 @@ export class SlidingSync {
                         const gapIndex = gapIndexes[op.list];
                         // something is in this space, shift items out of the way
                         if (gapIndex < 0) {
-                            console.log(
+                            debuglog(
                                 "cannot work out where gap is, INSERT without previous DELETE! List: ",
                                 op.list
                             );
@@ -395,7 +405,7 @@ export class SlidingSync {
                         op.room.room_id;
                     this._invokeRoomDataListeners(op.room.room_id, op.room);
                 } else if (op.op === "UPDATE") {
-                    console.log(
+                    debuglog(
                         "UPDATE",
                         op.list,
                         op.index,
@@ -415,7 +425,7 @@ export class SlidingSync {
                         syncRooms.push(r.room_id);
                         this._invokeRoomDataListeners(r.room_id, r);
                     }
-                    console.log(
+                    debuglog(
                         "SYNC",
                         op.list,
                         op.range[0],
@@ -432,7 +442,7 @@ export class SlidingSync {
                         );
                         delete this.lists[op.list].roomIndexToRoomId[i];
                     }
-                    console.log(
+                    debuglog(
                         "INVALIDATE",
                         op.list,
                         op.range[0],
