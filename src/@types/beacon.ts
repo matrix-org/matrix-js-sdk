@@ -1,0 +1,94 @@
+/*
+Copyright 2022 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+import { EitherAnd, RELATES_TO_RELATIONSHIP, REFERENCE_RELATION } from "matrix-events-sdk";
+
+import { UnstableValue } from "../NamespacedValue";
+import { MAssetEvent, MLocationEvent, MTimestampEvent } from "./location";
+
+/**
+ * Beacon info and beacon event types as described in MSC3489
+ * https://github.com/matrix-org/matrix-spec-proposals/pull/3489
+ */
+
+export const M_BEACON_INFO = new UnstableValue("m.beacon_info", "org.matrix.msc3489.beacon_info");
+export const M_BEACON = new UnstableValue("m.beacon", "org.matrix.msc3489.beacon");
+
+export type MBeaconInfoContent = {
+    description?: string;
+    // how long from the last event until we consider the beacon inactive in milliseconds
+    timeout: number;
+};
+
+export type MBeaconInfoEvent = EitherAnd<
+    { [M_BEACON_INFO.name]: MBeaconInfoContent },
+    { [M_BEACON_INFO.altName]: MBeaconInfoContent }
+>;
+
+/**
+ * m.beacon_info Event example from the spec
+ * https://github.com/matrix-org/matrix-spec-proposals/pull/3489
+ * {
+    "type": "m.beacon_info.@matthew:matrix.org",
+    "state_key": "@matthew:matrix.org",
+    "content": {
+        "m.beacon_info": {
+            "description": "The Matthew Tracker", // same as an `m.location` description
+            "timeout": 86400000, // how long from the last event until we consider the beacon inactive in milliseconds
+        },
+        "m.ts": 1436829458432, // creation timestamp of the beacon on the client
+        "m.asset": {
+            "type": "m.self" // the type of asset being tracked as per MSC3488
+        }
+    }
+}
+ */
+
+export type MBeaconInfoEventContent = &
+    MBeaconInfoEvent &
+    // creation timestamp of the beacon on the client
+    MTimestampEvent &
+    // the type of asset being tracked as per MSC3488
+    MAssetEvent;
+
+/**
+ * m.beacon event example
+ * https://github.com/matrix-org/matrix-spec-proposals/pull/3489
+ *
+ * {
+    "type": "m.beacon",
+    "sender": "@matthew:matrix.org",
+    "content": {
+        "m.relates_to": { // from MSC2674: https://github.com/matrix-org/matrix-doc/pull/2674
+            "rel_type": "m.reference", // from MSC3267: https://github.com/matrix-org/matrix-doc/pull/3267
+            "event_id": "$beacon_info"
+        },
+        "m.location": {
+            "uri": "geo:51.5008,0.1247;u=35",
+            "description": "Arbitrary beacon information"
+        },
+        "m.ts": 1636829458432,
+    }
+}
+*/
+
+export type MBeaconEventContent = &
+    MLocationEvent &
+    // timestamp when location was taken
+    MTimestampEvent &
+    // relates to a beacon_info event
+    RELATES_TO_RELATIONSHIP<typeof REFERENCE_RELATION>;
+
