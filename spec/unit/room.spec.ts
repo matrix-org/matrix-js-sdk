@@ -24,7 +24,7 @@ import { DuplicateStrategy, EventStatus, MatrixEvent, PendingEventOrdering, Room
 import { EventTimeline } from "../../src/models/event-timeline";
 import { Room } from "../../src/models/room";
 import { RoomState } from "../../src/models/room-state";
-import { RelationType, UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../../src/@types/event";
+import { UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../../src/@types/event";
 import { TestClient } from "../TestClient";
 import { Thread } from "../../src/models/thread";
 
