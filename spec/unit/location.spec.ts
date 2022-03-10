@@ -23,6 +23,7 @@ import {
     LocationEventWireContent,
 } from "../../src/@types/location";
 import { TEXT_NODE_TYPE } from "../../src/@types/extensible_events";
+import { MsgType } from "../../src/@types/event";
 
 describe("Location", function() {
     const defaultContent = {
@@ -47,9 +48,9 @@ describe("Location", function() {
     } as LocationEventWireContent;
 
     it("should create a valid location with defaults", function() {
-        const loc = makeLocationContent("geo:foo", 134235435);
+        const loc = makeLocationContent(undefined, "geo:foo", 134235435);
         expect(loc.body).toEqual('User Location geo:foo at 1970-01-02T13:17:15.435Z');
-        expect(loc.msgtype).toEqual("m.location");
+        expect(loc.msgtype).toEqual(MsgType.Location);
         expect(loc.geo_uri).toEqual("geo:foo");
         expect(M_LOCATION.findIn(loc)).toEqual({
             uri: "geo:foo",
@@ -62,10 +63,10 @@ describe("Location", function() {
 
     it("should create a valid location with explicit properties", function() {
         const loc = makeLocationContent(
-            "geo:bar", 134235436, "desc", LocationAssetType.Pin);
+            undefined, "geo:bar", 134235436, "desc", LocationAssetType.Pin);
 
         expect(loc.body).toEqual('Location "desc" geo:bar at 1970-01-02T13:17:15.436Z');
-        expect(loc.msgtype).toEqual("m.location");
+        expect(loc.msgtype).toEqual(MsgType.Location);
         expect(loc.geo_uri).toEqual("geo:bar");
         expect(M_LOCATION.findIn(loc)).toEqual({
             uri: "geo:bar",

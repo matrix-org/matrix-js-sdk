@@ -142,17 +142,19 @@ export const getTextForLocationEvent = (
  * @param text optional. A text for the location
  */
 export const makeLocationContent = (
+    // this is first but optional
+    // to avoid a breaking change
+    text: string | undefined,
     uri: string,
     timestamp?: number,
     description?: string,
     assetType?: LocationAssetType,
-    text?: string,
 ): LegacyLocationEventContent & MLocationEventContent => {
     const defaultedText = text ??
         getTextForLocationEvent(uri, assetType || LocationAssetType.Self, timestamp, description);
     const timestampEvent = timestamp ? { [M_TIMESTAMP.name]: timestamp } : {};
     return {
-        msgtype: "m.location",
+        msgtype: MsgType.Location,
         body: defaultedText,
         geo_uri: uri,
         [M_LOCATION.name]: {
@@ -182,5 +184,5 @@ export const parseLocationEvent = (wireEventContent: LocationEventWireContent): 
     const assetType = asset?.type ?? LocationAssetType.Self;
     const fallbackText = text ?? wireEventContent.body;
 
-    return makeLocationContent(geoUri, timestamp, description, assetType, fallbackText);
+    return makeLocationContent(fallbackText, geoUri, timestamp, description, assetType);
 };
