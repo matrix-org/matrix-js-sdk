@@ -19,7 +19,7 @@ limitations under the License.
 import { MsgType } from "./@types/event";
 import { TEXT_NODE_TYPE } from "./@types/extensible_events";
 import {
-    ASSET_NODE_TYPE,
+    M_ASSET,
     ILocationContent,
     LocationAssetType,
     LOCATION_EVENT_TYPE,
@@ -131,7 +131,7 @@ export function makeLocationContent(
             uri,
             description,
         },
-        [ASSET_NODE_TYPE.name]: {
+        [M_ASSET.name]: {
             type: assetType ?? LocationAssetType.Self,
         },
         [TEXT_NODE_TYPE.name]: text,

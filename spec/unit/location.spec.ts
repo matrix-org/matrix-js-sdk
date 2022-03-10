@@ -16,7 +16,7 @@ limitations under the License.
 
 import { makeLocationContent } from "../../src/content-helpers";
 import {
-    ASSET_NODE_TYPE,
+    M_ASSET,
     LocationAssetType,
     LOCATION_EVENT_TYPE,
     TIMESTAMP_NODE_TYPE,
@@ -33,7 +33,7 @@ describe("Location", function() {
             uri: "geo:foo",
             description: undefined,
         });
-        expect(ASSET_NODE_TYPE.findIn(loc)).toEqual({ type: LocationAssetType.Self });
+        expect(M_ASSET.findIn(loc)).toEqual({ type: LocationAssetType.Self });
         expect(TEXT_NODE_TYPE.findIn(loc)).toEqual("txt");
         expect(TIMESTAMP_NODE_TYPE.findIn(loc)).toEqual(134235435);
     });
@@ -49,7 +49,7 @@ describe("Location", function() {
             uri: "geo:bar",
             description: "desc",
         });
-        expect(ASSET_NODE_TYPE.findIn(loc)).toEqual({ type: LocationAssetType.Pin });
+        expect(M_ASSET.findIn(loc)).toEqual({ type: LocationAssetType.Pin });
         expect(TEXT_NODE_TYPE.findIn(loc)).toEqual("txxt");
         expect(TIMESTAMP_NODE_TYPE.findIn(loc)).toEqual(134235436);
     });

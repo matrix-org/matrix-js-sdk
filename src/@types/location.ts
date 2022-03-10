@@ -23,7 +23,7 @@ import { TEXT_NODE_TYPE } from "./extensible_events";
 export const LOCATION_EVENT_TYPE = new UnstableValue(
     "m.location", "org.matrix.msc3488.location");
 
-export const ASSET_NODE_TYPE = new UnstableValue("m.asset", "org.matrix.msc3488.asset");
+export const M_ASSET = new UnstableValue("m.asset", "org.matrix.msc3488.asset");
 
 export const TIMESTAMP_NODE_TYPE = new UnstableValue("m.ts", "org.matrix.msc3488.ts");
 
@@ -31,6 +31,13 @@ export enum LocationAssetType {
     Self = "m.self",
     Pin = "m.pin",
 }
+
+export const M_ASSET = new UnstableValue("m.asset", "org.matrix.msc3488.asset");
+export type MAssetContent = { type: LocationAssetType };
+/**
+ * The event definition for an m.asset event (in content)
+ */
+export type MAssetEvent = EitherAnd<{ [M_ASSET.name]: MAssetContent }, { [M_ASSET.altName]: MAssetContent }>;
 
 /* From the spec at:
  * https://github.com/matrix-org/matrix-doc/blob/matthew/location/proposals/3488-location.md
@@ -62,7 +69,7 @@ export interface ILocationContent extends IContent {
         uri: string;
         description?: string;
     };
-    [ASSET_NODE_TYPE.name]: {
+    [M_ASSET.name]: {
         type: LocationAssetType;
     };
     [TEXT_NODE_TYPE.name]: string;
