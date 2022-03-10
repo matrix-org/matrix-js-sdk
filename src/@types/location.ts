@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 // Types for MSC3488 - m.location: Extending events with location data
+import { EitherAnd } from "matrix-events-sdk";
 
 import { UnstableValue } from "../NamespacedValue";
 import { IContent } from "../models/event";
@@ -22,10 +23,6 @@ import { TEXT_NODE_TYPE } from "./extensible_events";
 
 export const LOCATION_EVENT_TYPE = new UnstableValue(
     "m.location", "org.matrix.msc3488.location");
-
-export const M_ASSET = new UnstableValue("m.asset", "org.matrix.msc3488.asset");
-
-export const TIMESTAMP_NODE_TYPE = new UnstableValue("m.ts", "org.matrix.msc3488.ts");
 
 export enum LocationAssetType {
     Self = "m.self",
@@ -38,6 +35,12 @@ export type MAssetContent = { type: LocationAssetType };
  * The event definition for an m.asset event (in content)
  */
 export type MAssetEvent = EitherAnd<{ [M_ASSET.name]: MAssetContent }, { [M_ASSET.altName]: MAssetContent }>;
+
+export const M_TIMESTAMP = new UnstableValue("m.ts", "org.matrix.msc3488.ts");
+/**
+ * The event definition for an m.ts event (in content)
+ */
+export type MTimestampEvent = EitherAnd<{ [M_TIMESTAMP.name]: number }, { [M_TIMESTAMP.altName]: number }>;
 
 /* From the spec at:
  * https://github.com/matrix-org/matrix-doc/blob/matthew/location/proposals/3488-location.md
@@ -73,6 +76,6 @@ export interface ILocationContent extends IContent {
         type: LocationAssetType;
     };
     [TEXT_NODE_TYPE.name]: string;
-    [TIMESTAMP_NODE_TYPE.name]: number;
+    [M_TIMESTAMP.name]: number;
 }
 /* eslint-enable camelcase */

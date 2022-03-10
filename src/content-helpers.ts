@@ -23,7 +23,7 @@ import {
     ILocationContent,
     LocationAssetType,
     LOCATION_EVENT_TYPE,
-    TIMESTAMP_NODE_TYPE,
+    M_TIMESTAMP,
 } from "./@types/location";
 
 /**
@@ -135,7 +135,7 @@ export function makeLocationContent(
             type: assetType ?? LocationAssetType.Self,
         },
         [TEXT_NODE_TYPE.name]: text,
-        [TIMESTAMP_NODE_TYPE.name]: ts,
+        [M_TIMESTAMP.name]: ts,
         // TODO: MSC1767 fallbacks m.image thumbnail
     };
 }

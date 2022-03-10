@@ -19,7 +19,7 @@ import {
     M_ASSET,
     LocationAssetType,
     LOCATION_EVENT_TYPE,
-    TIMESTAMP_NODE_TYPE,
+    M_TIMESTAMP,
 } from "../../src/@types/location";
 import { TEXT_NODE_TYPE } from "../../src/@types/extensible_events";
 
@@ -35,7 +35,7 @@ describe("Location", function() {
         });
         expect(M_ASSET.findIn(loc)).toEqual({ type: LocationAssetType.Self });
         expect(TEXT_NODE_TYPE.findIn(loc)).toEqual("txt");
-        expect(TIMESTAMP_NODE_TYPE.findIn(loc)).toEqual(134235435);
+        expect(M_TIMESTAMP.findIn(loc)).toEqual(134235435);
     });
 
     it("should create a valid location with explicit properties", function() {
@@ -51,6 +51,6 @@ describe("Location", function() {
         });
         expect(M_ASSET.findIn(loc)).toEqual({ type: LocationAssetType.Pin });
         expect(TEXT_NODE_TYPE.findIn(loc)).toEqual("txxt");
-        expect(TIMESTAMP_NODE_TYPE.findIn(loc)).toEqual(134235436);
+        expect(M_TIMESTAMP.findIn(loc)).toEqual(134235436);
     });
 });
