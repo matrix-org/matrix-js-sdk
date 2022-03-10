@@ -53,7 +53,11 @@ interface IThreadOpts {
  */
 export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     public static hasServerSideSupport: boolean;
-    private static serverSupportPromise: Promise<boolean> | null;
+    public static hasStableSupport = false;
+    private static serverSupportPromise: Promise<{
+        serverSupport: boolean;
+        stable: boolean;
+    }> | null;
 
     /**
      * A reference to all the events ID at the bottom of the threads
@@ -95,9 +99,10 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         ]);
 
         if (Thread.hasServerSideSupport === undefined) {
-            Thread.serverSupportPromise = this.client.doesServerSupportUnstableFeature("org.matrix.msc3440");
-            Thread.serverSupportPromise.then((serverSupportsThread) => {
-                Thread.hasServerSideSupport = serverSupportsThread;
+            Thread.serverSupportPromise = this.client.doesServerSupportThread();
+            Thread.serverSupportPromise.then(({ serverSupport, stable }) => {
+                Thread.hasServerSideSupport = serverSupport;
+                Thread.hasStableSupport = stable;
             }).catch(() => {
                 Thread.serverSupportPromise = null;
             });

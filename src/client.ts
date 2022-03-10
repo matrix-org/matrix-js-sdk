@@ -6523,6 +6523,24 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return unstableFeatures && !!unstableFeatures[`io.element.e2ee_forced.${versionsPresetName}`];
     }
 
+    public async doesServerSupportThread(): Promise<{
+        serverSupport: boolean;
+        stable: boolean;
+    } | null> {
+        try {
+            const hasUnstableSupport = await this.doesServerSupportUnstableFeature("org.matrix.msc3440");
+            const hasStableSupport = await this.doesServerSupportUnstableFeature("org.matrix.msc3440.stable")
+                || await this.isVersionSupported("v1.3");
+
+            return {
+                serverSupport: hasUnstableSupport || hasStableSupport,
+                stable: hasStableSupport,
+            };
+        } catch (e) {
+            return null;
+        }
+    }
+
     /**
      * Get if lazy loading members is being used.
      * @return {boolean} Whether or not members are lazy loaded by this client
