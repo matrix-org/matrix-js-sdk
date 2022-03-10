@@ -178,6 +178,7 @@ import { CryptoStore } from "./crypto/store/base";
 import { MediaHandler } from "./webrtc/mediaHandler";
 import { IRefreshTokenResponse } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
+import { THREAD_RELATION_TYPE } from "./models/thread";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -3710,14 +3711,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (threadId && !content["m.relates_to"]?.rel_type) {
             content["m.relates_to"] = {
                 ...content["m.relates_to"],
-                "rel_type": RelationType.Thread,
+                "rel_type": THREAD_RELATION_TYPE.name,
                 "event_id": threadId,
             };
             const thread = this.getRoom(roomId)?.threads.get(threadId);
             if (thread) {
                 content["m.relates_to"]["m.in_reply_to"] = {
                     "event_id": thread.lastReply((ev: MatrixEvent) => {
-                        return ev.isRelation(RelationType.Thread) && !ev.status;
+                        return ev.isRelation(THREAD_RELATION_TYPE.name) && !ev.status;
                     })?.getId(),
                 };
             }

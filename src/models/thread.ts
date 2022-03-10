@@ -16,7 +16,6 @@ limitations under the License.
 
 import { MatrixClient, RoomEvent } from "../matrix";
 import { TypedReEmitter } from "../ReEmitter";
-import { RelationType } from "../@types/event";
 import { IRelationsRequestOpts } from "../@types/requests";
 import { IThreadBundledRelationship, MatrixEvent } from "./event";
 import { Direction, EventTimeline } from "./event-timeline";
@@ -24,6 +23,7 @@ import { EventTimelineSet, EventTimelineSetHandlerMap } from './event-timeline-s
 import { Room } from './room';
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { RoomState } from "./room-state";
+import { NamespacedValue } from "../NamespacedValue";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -103,6 +103,12 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             Thread.serverSupportPromise.then(({ serverSupport, stable }) => {
                 Thread.hasServerSideSupport = serverSupport;
                 Thread.hasStableSupport = stable;
+
+                if (!stable) {
+                    FILTER_RELATED_BY_SENDERS.setPreferUnstable(true);
+                    FILTER_RELATED_BY_REL_TYPES.setPreferUnstable(true);
+                    THREAD_RELATION_TYPE.setPreferUnstable(true);
+                }
             }).catch(() => {
                 Thread.serverSupportPromise = null;
             });
@@ -191,7 +197,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             this._currentUserParticipated = true;
         }
 
-        const isThreadReply = event.getRelation()?.rel_type === RelationType.Thread;
+        const isThreadReply = event.getRelation()?.rel_type === THREAD_RELATION_TYPE.name;
         // If no thread support exists we want to count all thread relation
         // added as a reply. We can't rely on the bundled relationships count
         if (!Thread.hasServerSideSupport && isThreadReply) {
@@ -227,7 +233,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         }
 
         const bundledRelationship = rootEvent
-            ?.getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
+            ?.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
 
         if (Thread.hasServerSideSupport && bundledRelationship) {
             this.replyCount = bundledRelationship.count;
@@ -340,7 +346,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         } = await this.client.relations(
             this.room.roomId,
             this.id,
-            RelationType.Thread,
+            THREAD_RELATION_TYPE.name,
             null,
             opts,
         );
@@ -373,3 +379,16 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         };
     }
 }
+
+export const FILTER_RELATED_BY_SENDERS = new NamespacedValue(
+    "related_by_senders",
+    "io.element.relation_senders",
+);
+export const FILTER_RELATED_BY_REL_TYPES = new NamespacedValue(
+    "related_by_rel_types",
+    "io.element.relation_types",
+);
+export const THREAD_RELATION_TYPE = new NamespacedValue(
+    "m.thread",
+    "io.element.thread",
+);

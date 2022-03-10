@@ -19,6 +19,8 @@ limitations under the License.
  * is provided that the stable prefix should be used when representing the identifier.
  */
 export class NamespacedValue<S extends string, U extends string> {
+    private preferUnstable = false;
+
     // Stable is optional, but one of the two parameters is required, hence the weird-looking types.
     // Goal is to to have developers explicitly say there is no stable value (if applicable).
     public constructor(public readonly stable: S | null | undefined, public readonly unstable?: U) {
@@ -27,8 +29,12 @@ export class NamespacedValue<S extends string, U extends string> {
         }
     }
 
+    public setPreferUnstable(preferUnstable: boolean): void {
+        this.preferUnstable = preferUnstable;
+    }
+
     public get name(): U | S {
-        if (this.stable) {
+        if (this.stable && !this.preferUnstable) {
             return this.stable;
         }
         return this.unstable;
