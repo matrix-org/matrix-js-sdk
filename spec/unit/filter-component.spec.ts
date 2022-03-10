@@ -48,7 +48,7 @@ describe("Filter Component", function() {
                 event: true,
                 unsigned: {
                     "m.relations": {
-                        [RelationType.Thread]: {
+                        "m.thread": {
                             count: 2,
                             current_user_participated: false,
                         },
@@ -70,7 +70,7 @@ describe("Filter Component", function() {
                 content: {},
                 unsigned: {
                     "m.relations": {
-                        [RelationType.Thread]: {
+                        "m.thread": {
                             count: 2,
                             current_user_participated: true,
                         },
@@ -86,7 +86,7 @@ describe("Filter Component", function() {
 
         it("should filter out events by relation type", function() {
             const filter = new FilterComponent({
-                related_by_rel_types: [RelationType.Thread],
+                related_by_rel_types: ["m.thread"],
             });
 
             const referenceRelationEvent = mkEvent({
@@ -106,7 +106,7 @@ describe("Filter Component", function() {
 
         it("should keep events by relation type", function() {
             const filter = new FilterComponent({
-                related_by_rel_types: [RelationType.Thread],
+                related_by_rel_types: ["m.thread"],
             });
 
             const threadRootEvent = mkEvent({
@@ -114,7 +114,7 @@ describe("Filter Component", function() {
                 content: {},
                 unsigned: {
                     "m.relations": {
-                        [RelationType.Thread]: {
+                        "m.thread": {
                             count: 2,
                             current_user_participated: true,
                         },

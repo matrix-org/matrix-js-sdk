@@ -105,10 +105,12 @@ describe("MatrixClient opts", function() {
                     expectedEventTypes.indexOf(event.getType()), 1,
                 );
             });
+            httpBackend.when("GET", "/versions").respond(200, {});
             httpBackend.when("GET", "/pushrules").respond(200, {});
             httpBackend.when("POST", "/filter").respond(200, { filter_id: "foo" });
             httpBackend.when("GET", "/sync").respond(200, syncData);
             client.startClient();
+            await httpBackend.flush("/versions", 1);
             await httpBackend.flush("/pushrules", 1);
             await httpBackend.flush("/filter", 1);
             await Promise.all([

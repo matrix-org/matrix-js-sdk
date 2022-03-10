@@ -319,6 +319,12 @@ HttpResponse.PUSH_RULES_RESPONSE = {
     data: {},
 };
 
+HttpResponse.PUSH_RULES_RESPONSE = {
+    method: "GET",
+    path: "/pushrules/",
+    data: {},
+};
+
 HttpResponse.USER_ID = "@alice:bar";
 
 HttpResponse.filterResponse = function(userId) {

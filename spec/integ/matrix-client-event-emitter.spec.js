@@ -11,6 +11,7 @@ describe("MatrixClient events", function() {
         const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
         client = testClient.client;
         httpBackend = testClient.httpBackend;
+        httpBackend.when("GET", "/versions").respond(200, {});
         httpBackend.when("GET", "/pushrules").respond(200, {});
         httpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
     });
