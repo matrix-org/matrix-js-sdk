@@ -22,7 +22,7 @@ import {
     M_ASSET,
     ILocationContent,
     LocationAssetType,
-    LOCATION_EVENT_TYPE,
+    M_LOCATION,
     M_TIMESTAMP,
 } from "./@types/location";
 
@@ -127,7 +127,7 @@ export function makeLocationContent(
         "body": text,
         "msgtype": MsgType.Location,
         "geo_uri": uri,
-        [LOCATION_EVENT_TYPE.name]: {
+        [M_LOCATION.name]: {
             uri,
             description,
         },

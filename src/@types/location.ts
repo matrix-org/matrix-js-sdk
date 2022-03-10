@@ -21,9 +21,6 @@ import { UnstableValue } from "../NamespacedValue";
 import { IContent } from "../models/event";
 import { TEXT_NODE_TYPE } from "./extensible_events";
 
-export const LOCATION_EVENT_TYPE = new UnstableValue(
-    "m.location", "org.matrix.msc3488.location");
-
 export enum LocationAssetType {
     Self = "m.self",
     Pin = "m.pin",
@@ -41,6 +38,14 @@ export const M_TIMESTAMP = new UnstableValue("m.ts", "org.matrix.msc3488.ts");
  * The event definition for an m.ts event (in content)
  */
 export type MTimestampEvent = EitherAnd<{ [M_TIMESTAMP.name]: number }, { [M_TIMESTAMP.altName]: number }>;
+
+export const M_LOCATION = new UnstableValue(
+    "m.location", "org.matrix.msc3488.location");
+
+export type MLocationContent = {
+    uri: string;
+    description?: string | null;
+};
 
 /* From the spec at:
  * https://github.com/matrix-org/matrix-doc/blob/matthew/location/proposals/3488-location.md
@@ -68,7 +73,7 @@ export interface ILocationContent extends IContent {
     body: string;
     msgtype: string;
     geo_uri: string;
-    [LOCATION_EVENT_TYPE.name]: {
+    [M_LOCATION.name]: {
         uri: string;
         description?: string;
     };

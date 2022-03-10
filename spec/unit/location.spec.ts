@@ -18,7 +18,7 @@ import { makeLocationContent } from "../../src/content-helpers";
 import {
     M_ASSET,
     LocationAssetType,
-    LOCATION_EVENT_TYPE,
+    M_LOCATION,
     M_TIMESTAMP,
 } from "../../src/@types/location";
 import { TEXT_NODE_TYPE } from "../../src/@types/extensible_events";
@@ -29,7 +29,7 @@ describe("Location", function() {
         expect(loc.body).toEqual("txt");
         expect(loc.msgtype).toEqual("m.location");
         expect(loc.geo_uri).toEqual("geo:foo");
-        expect(LOCATION_EVENT_TYPE.findIn(loc)).toEqual({
+        expect(M_LOCATION.findIn(loc)).toEqual({
             uri: "geo:foo",
             description: undefined,
         });
@@ -45,7 +45,7 @@ describe("Location", function() {
         expect(loc.body).toEqual("txxt");
         expect(loc.msgtype).toEqual("m.location");
         expect(loc.geo_uri).toEqual("geo:bar");
-        expect(LOCATION_EVENT_TYPE.findIn(loc)).toEqual({
+        expect(M_LOCATION.findIn(loc)).toEqual({
             uri: "geo:bar",
             description: "desc",
         });
