@@ -237,7 +237,6 @@ describe("Cross Signing", function() {
 
         // feed sync result that includes master key, ssk, device key
         const responses = [
-            HttpResponse.CAPABILITIES_RESPONSE,
             HttpResponse.PUSH_RULES_RESPONSE,
             {
                 method: "POST",
@@ -494,7 +493,6 @@ describe("Cross Signing", function() {
         // - master key signed by her usk (pretend that it was signed by another
         //   of Alice's devices)
         const responses = [
-            HttpResponse.CAPABILITIES_RESPONSE,
             HttpResponse.PUSH_RULES_RESPONSE,
             {
                 method: "POST",

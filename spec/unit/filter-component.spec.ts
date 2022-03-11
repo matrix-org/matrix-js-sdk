@@ -1,7 +1,5 @@
 import {
     RelationType,
-    UNSTABLE_FILTER_RELATED_BY_REL_TYPES,
-    UNSTABLE_FILTER_RELATED_BY_SENDERS,
 } from "../../src";
 import { FilterComponent } from "../../src/filter-component";
 import { mkEvent } from '../test-utils';
@@ -39,7 +37,7 @@ describe("Filter Component", function() {
         it("should filter out events by relation participation", function() {
             const currentUserId = '@me:server.org';
             const filter = new FilterComponent({
-                [UNSTABLE_FILTER_RELATED_BY_SENDERS.name]: [currentUserId],
+                related_by_senders: [currentUserId],
             }, currentUserId);
 
             const threadRootNotParticipated = mkEvent({
@@ -50,7 +48,7 @@ describe("Filter Component", function() {
                 event: true,
                 unsigned: {
                     "m.relations": {
-                        [RelationType.Thread]: {
+                        "m.thread": {
                             count: 2,
                             current_user_participated: false,
                         },
@@ -64,7 +62,7 @@ describe("Filter Component", function() {
         it("should keep events by relation participation", function() {
             const currentUserId = '@me:server.org';
             const filter = new FilterComponent({
-                [UNSTABLE_FILTER_RELATED_BY_SENDERS.name]: [currentUserId],
+                related_by_senders: [currentUserId],
             }, currentUserId);
 
             const threadRootParticipated = mkEvent({
@@ -72,7 +70,7 @@ describe("Filter Component", function() {
                 content: {},
                 unsigned: {
                     "m.relations": {
-                        [RelationType.Thread]: {
+                        "m.thread": {
                             count: 2,
                             current_user_participated: true,
                         },
@@ -88,7 +86,7 @@ describe("Filter Component", function() {
 
         it("should filter out events by relation type", function() {
             const filter = new FilterComponent({
-                [UNSTABLE_FILTER_RELATED_BY_REL_TYPES.name]: [RelationType.Thread],
+                related_by_rel_types: ["m.thread"],
             });
 
             const referenceRelationEvent = mkEvent({
@@ -108,7 +106,7 @@ describe("Filter Component", function() {
 
         it("should keep events by relation type", function() {
             const filter = new FilterComponent({
-                [UNSTABLE_FILTER_RELATED_BY_REL_TYPES.name]: [RelationType.Thread],
+                related_by_rel_types: ["m.thread"],
             });
 
             const threadRootEvent = mkEvent({
@@ -116,7 +114,7 @@ describe("Filter Component", function() {
                 content: {},
                 unsigned: {
                     "m.relations": {
-                        [RelationType.Thread]: {
+                        "m.thread": {
                             count: 2,
                             current_user_participated: true,
                         },
@@ -141,7 +139,7 @@ describe("Filter Component", function() {
                                 },
                             ],
                         },
-                        [RelationType.Thread]: {
+                        "m.thread": {
                             count: 2,
                             current_user_participated: true,
                         },
