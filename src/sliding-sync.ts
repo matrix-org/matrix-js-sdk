@@ -225,6 +225,9 @@ export class SlidingSync {
      * @param {object} roomData The raw sliding sync response JSON.
      */
     private _invokeRoomDataListeners(roomId: string, roomData: MSC3575RoomData) {
+        if (!roomData.required_state) { roomData.required_state = []; }
+        if (!roomData.timeline) { roomData.timeline = []; }
+        if (!roomData.room_id) { roomData.room_id = roomId; }
         this.roomDataCallbacks.forEach((callback) => {
             callback(roomId, roomData);
         });

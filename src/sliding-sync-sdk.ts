@@ -107,15 +107,17 @@ export class SlidingSyncApi {
         this.slidingSync = new SlidingSync("http://localhost:8008", [
             new SlidingList({
                 ranges: [[0,20]],
-                sort: [],
+                sort: ["by_highlight_count", "by_notification_count", "by_recency"],
                 required_state: [
                     ["m.room.join_rules", ""],
                     ["m.room.avatar", ""],
                     ["m.room.tombstone", ""],
+                    ["m.room.encryption", ""],
+                    ["m.room.member", this.client.getUserId()],
                 ],
-                timeline_limit: 1,
+                timeline_limit: 20,
             }),
-        ], {}, client, 30 * 1000);
+        ], {}, client, 20 * 1000);
         this.slidingSync.addLifecycleListener(this.onLifecycle.bind(this));
         this.slidingSync.addRoomDataListener(this.onRoomData.bind(this));
     }
@@ -140,7 +142,18 @@ export class SlidingSyncApi {
         switch (state) {
             case SlidingSyncState.Complete:
                 this.purgeNotifications();
-                this.updateSyncState(this.lastPos ? SyncState.Syncing : SyncState.Prepared, {
+                // Element won't stop showing the initial loading spinner unless we fire SyncState.Prepared
+                if (!this.lastPos) {
+                    this.updateSyncState(SyncState.Prepared, {
+                        oldSyncToken: this.lastPos,
+                        nextSyncToken: resp.pos,
+                        catchingUp: false,
+                        fromCache: false,
+                    });
+                }
+                // Conversely, Element won't show the room list unless there is at least 1x SyncState.Syncing
+                // so hence for the very first sync we will fire prepared then immediately syncing.
+                this.updateSyncState(SyncState.Syncing, {
                     oldSyncToken: this.lastPos,
                     nextSyncToken: resp.pos,
                     catchingUp: false,
@@ -258,7 +271,7 @@ export class SlidingSyncApi {
             }
         }
 
-        const prevBatch = "prev_batch_token_TODO";
+        const prevBatch = null; //"prev_batch_token_TODO";
         if (roomData.initial) {
             // set the back-pagination token. Do this *before* adding any
             // events so that clients can start back-paginating.
@@ -495,7 +508,7 @@ export class SlidingSyncApi {
 
         //   1) We need to get push rules so we can check if events should bing as we get
         //      them from /sync.
-        while (true) {
+        while (!this.client.isGuest()) {
             try {
                 debuglog("Getting push rules...");
                 const result = await this.client.getPushRules();
