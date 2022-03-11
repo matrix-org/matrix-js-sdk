@@ -18,14 +18,30 @@ import { User, UserEvent } from "./models/user";
 import { NotificationCountType, Room, RoomEvent } from "./models/room";
 import {ConnectionManagement } from "./conn-management";
 import { logger } from './logger';
+import * as utils from "./utils";
+import { EventTimeline } from "./models/event-timeline";
 import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
 import { ISyncStateData } from "./sync";
 import { MatrixEvent } from "./models/event";
+import {
+    Category,
+    IEphemeral,
+    IInvitedRoom,
+    IInviteState,
+    IJoinedRoom,
+    ILeftRoom,
+    IMinimalEvent,
+    IRoomEvent,
+    IStateEvent,
+    IStrippedState,
+    ISyncResponse,
+    ITimeline,
+} from "./sync-accumulator";
 import { MatrixError } from "./http-api";
 import { RoomStateEvent } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
 import {SyncState } from "./sync";
-import { MSC3575SlidingSyncResponse, SlidingList, SlidingSync, SlidingSyncState } from "./sliding-sync";
+import { MSC3575RoomData, MSC3575SlidingSyncResponse, SlidingList, SlidingSync, SlidingSyncState } from "./sliding-sync";
 
 const DEBUG = true;
 
@@ -61,6 +77,7 @@ export class SlidingSyncApi {
     private connManagement: ConnectionManagement;
     private lastPos: string;
     private failCount: number;
+    private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
 
     constructor(private readonly client: MatrixClient, private readonly opts: Partial<IStoredClientOpts> = {}) {
         this.opts.initialSyncLimit = this.opts.initialSyncLimit ?? 8;
@@ -103,14 +120,26 @@ export class SlidingSyncApi {
         this.slidingSync.addRoomDataListener(this.onRoomData.bind(this));
     }
 
-    private onRoomData(roomId: string, roomData: object) {
+    private onRoomData(roomId: string, roomData: MSC3575RoomData) {
         console.log("onRoomData", roomId, JSON.stringify(roomData));
+        let room: Room;
+        if (roomData.initial) {
+            room = createRoom(this.client, roomData.room_id, this.opts);
+        } else {
+            room = this.client.store.getRoom(roomData.room_id);
+            if (!room) {
+                console.error("initial flag not set but no stored room exists for room ", roomData.room_id, roomData);
+                return;
+            }
+        }
+        this.processRoomData(this.client, room, roomData);
     }
 
     private onLifecycle(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err?: Error) {
         console.log("onLifecycle", state, err);
         switch (state) {
             case SlidingSyncState.Complete:
+                this.purgeNotifications();
                 this.updateSyncState(this.lastPos ? SyncState.Syncing : SyncState.Prepared, {
                     oldSyncToken: this.lastPos,
                     nextSyncToken: resp.pos,
@@ -195,6 +224,268 @@ export class SlidingSyncApi {
         return false;
     }
 
+    private async processRoomData(client: MatrixClient, room: Room, roomData: MSC3575RoomData) {
+        roomData = ensureNameEvent(client, roomData);
+        const stateEvents = this.mapEvents(room.roomId, roomData.required_state);
+        // Prevent events from being decrypted ahead of time
+        // this helps large account to speed up faster
+        // room::decryptCriticalEvent is in charge of decrypting all the events
+        // required for a client to function properly
+        const timelineEvents = this.mapEvents(room.roomId, roomData.timeline, false); // this.mapSyncEventsFormat(joinObj.timeline, room, false);
+        const ephemeralEvents = []; // TODO this.mapSyncEventsFormat(joinObj.ephemeral);
+        const accountDataEvents = []; // TODO this.mapSyncEventsFormat(joinObj.account_data);
+
+        const encrypted = this.client.isRoomEncrypted(room.roomId);
+        // we do this first so it's correct when any of the events fire
+        if (roomData.notification_count != null) {
+            room.setUnreadNotificationCount(
+                NotificationCountType.Total,
+                roomData.notification_count,
+            );
+        }
+
+        if (roomData.highlight_count != null) {
+            // We track unread notifications ourselves in encrypted rooms, so don't
+            // bother setting it here. We trust our calculations better than the
+            // server's for this case, and therefore will assume that our non-zero
+            // count is accurate.
+            if (!encrypted
+                || (encrypted && room.getUnreadNotificationCount(NotificationCountType.Highlight) <= 0)) {
+                room.setUnreadNotificationCount(
+                    NotificationCountType.Highlight,
+                    roomData.highlight_count,
+                );
+            }
+        }
+
+        const prevBatch = "prev_batch_token_TODO";
+        if (roomData.initial) {
+            // set the back-pagination token. Do this *before* adding any
+            // events so that clients can start back-paginating.
+            room.getLiveTimeline().setPaginationToken(
+                prevBatch, EventTimeline.BACKWARDS);
+        } else if (roomData.limited) {
+            let limited = true;
+
+            // we've got a limited sync, so we *probably* have a gap in the
+            // timeline, so should reset. But we might have been peeking or
+            // paginating and already have some of the events, in which
+            // case we just want to append any subsequent events to the end
+            // of the existing timeline.
+            //
+            // This is particularly important in the case that we already have
+            // *all* of the events in the timeline - in that case, if we reset
+            // the timeline, we'll end up with an entirely empty timeline,
+            // which we'll try to paginate but not get any new events (which
+            // will stop us linking the empty timeline into the chain).
+            //
+            for (let i = timelineEvents.length - 1; i >= 0; i--) {
+                const eventId = timelineEvents[i].getId();
+                if (room.getTimelineForEvent(eventId)) {
+                    debuglog("Already have event " + eventId + " in limited " +
+                        "sync - not resetting");
+                    limited = false;
+
+                    // we might still be missing some of the events before i;
+                    // we don't want to be adding them to the end of the
+                    // timeline because that would put them out of order.
+                    timelineEvents.splice(0, i);
+
+                    // XXX: there's a problem here if the skipped part of the
+                    // timeline modifies the state set in stateEvents, because
+                    // we'll end up using the state from stateEvents rather
+                    // than the later state from timelineEvents. We probably
+                    // need to wind stateEvents forward over the events we're
+                    // skipping.
+                    break;
+                }
+            }
+
+            if (limited) {
+                deregisterStateListeners(room);
+                room.resetLiveTimeline(
+                    prevBatch,
+                    null, // TODO this.opts.canResetEntireTimeline(room.roomId) ? null : syncEventData.oldSyncToken,
+                );
+
+                // We have to assume any gap in any timeline is
+                // reason to stop incrementally tracking notifications and
+                // reset the timeline.
+                this.client.resetNotifTimelineSet();
+                registerStateListeners(this.client, room);
+            }
+        }
+
+        this.processRoomEvents(room, stateEvents, timelineEvents, false);
+
+        // we deliberately don't add ephemeral events to the timeline
+        room.addEphemeralEvents(ephemeralEvents);
+
+        // we deliberately don't add accountData to the timeline
+        room.addAccountData(accountDataEvents);
+
+        room.recalculate();
+        if (roomData.initial) {
+            client.store.storeRoom(room);
+            client.emit(ClientEvent.Room, room);
+        }
+
+        // check if any timeline events should bing and add them to the notifEvents array:
+        // we'll purge this once we've fully processed the sync response
+        this.addNotifications(timelineEvents);
+
+        const processRoomEvent = async (e) => {
+            client.emit(ClientEvent.Event, e);
+            if (e.isState() && e.getType() == "m.room.encryption" && this.opts.crypto) {
+                await this.opts.crypto.onCryptoEvent(e);
+            }
+            if (e.isState() && e.getType() === "im.vector.user_status") {
+                let user = client.store.getUser(e.getStateKey());
+                if (user) {
+                    user.unstable_updateStatusMessage(e);
+                } else {
+                    user = createNewUser(client, e.getStateKey());
+                    user.unstable_updateStatusMessage(e);
+                    client.store.storeUser(user);
+                }
+            }
+        };
+
+        await utils.promiseMapSeries(stateEvents, processRoomEvent);
+        await utils.promiseMapSeries(timelineEvents, processRoomEvent);
+        ephemeralEvents.forEach(function(e) {
+            client.emit(ClientEvent.Event, e);
+        });
+        accountDataEvents.forEach(function(e) {
+            client.emit(ClientEvent.Event, e);
+        });
+
+        room.updateMyMembership("join");
+
+        // Decrypt only the last message in all rooms to make sure we can generate a preview
+        // And decrypt all events after the recorded read receipt to ensure an accurate
+        // notification count
+        room.decryptCriticalEvents();
+    }
+
+    private mapEvents(roomId: string, events: object[], decrypt = true): MatrixEvent[] {
+        const mapper = this.client.getEventMapper({ decrypt });
+        return (events as Array<IStrippedState | IRoomEvent | IStateEvent | IMinimalEvent>).map(function(e) {
+            e["room_id"] = roomId;
+            return mapper(e);
+        });
+    }
+
+    /**
+     * @param {Room} room
+     * @param {MatrixEvent[]} stateEventList A list of state events. This is the state
+     * at the *START* of the timeline list if it is supplied.
+     * @param {MatrixEvent[]} [timelineEventList] A list of timeline events. Lower index
+     * @param {boolean} fromCache whether the sync response came from cache
+     * is earlier in time. Higher index is later.
+     */
+    private processRoomEvents(
+        room: Room,
+        stateEventList: MatrixEvent[],
+        timelineEventList?: MatrixEvent[],
+        fromCache = false,
+    ): void {
+        // If there are no events in the timeline yet, initialise it with
+        // the given state events
+        const liveTimeline = room.getLiveTimeline();
+        const timelineWasEmpty = liveTimeline.getEvents().length == 0;
+        if (timelineWasEmpty) {
+            // Passing these events into initialiseState will freeze them, so we need
+            // to compute and cache the push actions for them now, otherwise sync dies
+            // with an attempt to assign to read only property.
+            // XXX: This is pretty horrible and is assuming all sorts of behaviour from
+            // these functions that it shouldn't be. We should probably either store the
+            // push actions cache elsewhere so we can freeze MatrixEvents, or otherwise
+            // find some solution where MatrixEvents are immutable but allow for a cache
+            // field.
+            for (const ev of stateEventList) {
+                this.client.getPushActionsForEvent(ev);
+            }
+            liveTimeline.initialiseState(stateEventList);
+        }
+
+        this.resolveInvites(room);
+
+        // recalculate the room name at this point as adding events to the timeline
+        // may make notifications appear which should have the right name.
+        // XXX: This looks suspect: we'll end up recalculating the room once here
+        // and then again after adding events (processSyncResponse calls it after
+        // calling us) even if no state events were added. It also means that if
+        // one of the room events in timelineEventList is something that needs
+        // a recalculation (like m.room.name) we won't recalculate until we've
+        // finished adding all the events, which will cause the notification to have
+        // the old room name rather than the new one.
+        room.recalculate();
+
+        // If the timeline wasn't empty, we process the state events here: they're
+        // defined as updates to the state before the start of the timeline, so this
+        // starts to roll the state forward.
+        // XXX: That's what we *should* do, but this can happen if we were previously
+        // peeking in a room, in which case we obviously do *not* want to add the
+        // state events here onto the end of the timeline. Historically, the js-sdk
+        // has just set these new state events on the old and new state. This seems
+        // very wrong because there could be events in the timeline that diverge the
+        // state, in which case this is going to leave things out of sync. However,
+        // for now I think it;s best to behave the same as the code has done previously.
+        if (!timelineWasEmpty) {
+            // XXX: As above, don't do this...
+            //room.addLiveEvents(stateEventList || []);
+            // Do this instead...
+            room.oldState.setStateEvents(stateEventList || []);
+            room.currentState.setStateEvents(stateEventList || []);
+        }
+        // execute the timeline events. This will continue to diverge the current state
+        // if the timeline has any state events in it.
+        // This also needs to be done before running push rules on the events as they need
+        // to be decorated with sender etc.
+        room.addLiveEvents(timelineEventList || [], null, fromCache);
+    }
+
+    private resolveInvites(room: Room): void {
+        if (!room || !this.opts.resolveInvitesToProfiles) {
+            return;
+        }
+        const client = this.client;
+        // For each invited room member we want to give them a displayname/avatar url
+        // if they have one (the m.room.member invites don't contain this).
+        room.getMembersWithMembership("invite").forEach(function(member) {
+            if (member._requestedProfileInfo) return;
+            member._requestedProfileInfo = true;
+            // try to get a cached copy first.
+            const user = client.getUser(member.userId);
+            let promise;
+            if (user) {
+                promise = Promise.resolve({
+                    avatar_url: user.avatarUrl,
+                    displayname: user.displayName,
+                });
+            } else {
+                promise = client.getProfileInfo(member.userId);
+            }
+            promise.then(function(info) {
+                // slightly naughty by doctoring the invite event but this means all
+                // the code paths remain the same between invite/join display name stuff
+                // which is a worthy trade-off for some minor pollution.
+                const inviteEvent = member.events.member;
+                if (inviteEvent.getContent().membership !== "invite") {
+                    // between resolving and now they have since joined, so don't clobber
+                    return;
+                }
+                inviteEvent.getContent().avatar_url = info.avatar_url;
+                inviteEvent.getContent().displayname = info.displayname;
+                // fire listeners
+                member.setMembershipEvent(inviteEvent, room.currentState);
+            }, function(err) {
+                // OH WELL.
+            });
+        });
+    }
+
     /**
      * Main entry point. Blocks until stop() is called.
      */
@@ -243,6 +534,73 @@ export class SlidingSyncApi {
         this.syncStateData = data;
         this.client.emit(ClientEvent.Sync, this.syncState, old, data);
     }
+
+    /**
+     * Takes a list of timelineEvents and adds and adds to notifEvents
+     * as appropriate.
+     * This must be called after the room the events belong to has been stored.
+     *
+     * @param {MatrixEvent[]} [timelineEventList] A list of timeline events. Lower index
+     * is earlier in time. Higher index is later.
+     */
+     private addNotifications(timelineEventList: MatrixEvent[]): void {
+        // gather our notifications into this.notifEvents
+        if (!this.client.getNotifTimelineSet()) {
+            return;
+        }
+        for (let i = 0; i < timelineEventList.length; i++) {
+            const pushActions = this.client.getPushActionsForEvent(timelineEventList[i]);
+            if (pushActions && pushActions.notify &&
+                pushActions.tweaks && pushActions.tweaks.highlight) {
+                this.notifEvents.push(timelineEventList[i]);
+            }
+        }
+    }
+
+    /**
+     * Purge any events in the notifEvents array. Used after a /sync has been complete.
+     * This should not be called at a per-room scope (e.g in onRoomData) because otherwise the ordering
+     * will be messed up e.g room A gets a bing, room B gets a newer bing, but both in the same /sync
+     * response. If we purge at a per-room scope then we could process room B before room A leading to
+     * room B appearing earlier in the notifications timeline, even though it has the higher origin_server_ts.
+     */
+    private purgeNotifications(): void {
+        this.notifEvents.sort(function(a, b) {
+            return a.getTs() - b.getTs();
+        });
+        this.notifEvents.forEach(function(event) {
+            this.client.getNotifTimelineSet().addLiveEvent(event);
+        });
+        this.notifEvents = [];
+    }
+}
+
+function ensureNameEvent(client: MatrixClient, roomData: MSC3575RoomData): MSC3575RoomData {
+    // make sure m.room.name is in required_state if there is a name, replacing anything previously
+    // there if need be. This ensures clients transparently 'calculate' the right room name. Native
+    // sliding sync clients should just read the "name" field.
+    if (!roomData.name) {
+        return roomData;
+    }
+    for (let i = 0; i < roomData.required_state.length; i++) {
+        if (roomData.required_state[i].type === "m.room.name" && roomData.required_state[i].state_key === "") {
+            roomData.required_state[i].content = {
+                name: roomData.name,
+            };
+            return roomData;
+        }
+    }
+    roomData.required_state.push({
+        event_id: "$fake-sliding-sync-name-event-" + roomData.room_id,
+        state_key: "",
+        type: "m.room.name",
+        content: {
+            name: roomData.name,
+        },
+        sender: client.getUserId(),
+        origin_server_ts: new Date().getTime(),
+    })
+    return roomData;
 }
 
 
@@ -262,7 +620,7 @@ function createNewUser(client: MatrixClient, userId: string): User {
 }
 
 
-function createRoom(client: MatrixClient, roomId: string, opts: IStoredClientOpts): Room { // XXX cargoculted from sync.ts
+function createRoom(client: MatrixClient, roomId: string, opts: Partial<IStoredClientOpts>): Room { // XXX cargoculted from sync.ts
     const {
         timelineSupport,
         unstableClientRelationAggregation,

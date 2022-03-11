@@ -17,6 +17,7 @@ limitations under the License.
 import { logger } from './logger';
 import { IAbortablePromise } from "./@types/partials";
 import { MatrixClient } from "./client";
+import { IRoomEvent, IStateEvent } from "./sync-accumulator";
 
 const DEBUG = true;
 
@@ -76,6 +77,17 @@ export interface MSC3575SlidingSyncRequest {
     clientTimeout?: number;
 };
 
+export interface MSC3575RoomData {
+    name: string;
+    required_state: IStateEvent[];
+    timeline: (IRoomEvent | IStateEvent)[];
+    notification_count?: number;
+    highlight_count?: number;
+    initial?: boolean;
+    limited?: boolean;
+    room_id: string;
+};
+
 /**
  * A complete Sliding Sync response
  */
@@ -83,7 +95,7 @@ export interface MSC3575SlidingSyncResponse {
     pos: string;
     ops: object[];
     counts: number[];
-    room_subscriptions: Record<string, object>;
+    room_subscriptions: Record<string, MSC3575RoomData>;
     extensions: object;
 };
 
@@ -165,7 +177,7 @@ export class SlidingSync {
     private terminated: boolean;
     roomSubscriptions: Set<string>;
     private roomSubscriptionInfo: MSC3575RoomSubscription;
-    private roomDataCallbacks: ((roomId: string, roomData: object) => void)[]; // array of functions
+    private roomDataCallbacks: ((roomId: string, roomData: MSC3575RoomData) => void)[]; // array of functions
     private lifecycleCallbacks: ((state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err: Error) => void)[];
 
     private pendingReq?: IAbortablePromise<MSC3575SlidingSyncResponse>;
@@ -195,7 +207,7 @@ export class SlidingSync {
      * Listen for high-level room events on the sync connection
      * @param {function} callback The callback to invoke.
      */
-    addRoomDataListener(callback: (roomId: string, roomData: object) => void) {
+    addRoomDataListener(callback: (roomId: string, roomData: MSC3575RoomData) => void) {
         this.roomDataCallbacks.push(callback);
     }
 
@@ -212,7 +224,7 @@ export class SlidingSync {
      * @param {string} roomId The room which received some data.
      * @param {object} roomData The raw sliding sync response JSON.
      */
-    private _invokeRoomDataListeners(roomId: string, roomData: object) {
+    private _invokeRoomDataListeners(roomId: string, roomData: MSC3575RoomData) {
         this.roomDataCallbacks.forEach((callback) => {
             callback(roomId, roomData);
         });
