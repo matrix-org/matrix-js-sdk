@@ -196,12 +196,14 @@ export const parseLocationEvent = (wireEventContent: LocationEventWireContent): 
 
 export const makeBeaconInfoContent = (
     timeout: number,
+    isLive?: boolean,
     description?: string,
     assetType?: LocationAssetType,
 ): MBeaconInfoEventContent => ({
     [M_BEACON_INFO.name]: {
         description,
         timeout,
+        live: isLive,
     },
     [M_TIMESTAMP.name]: Date.now(),
     [M_ASSET.name]: {

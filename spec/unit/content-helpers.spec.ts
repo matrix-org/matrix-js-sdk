@@ -32,12 +32,14 @@ describe('Beacon content helpers', () => {
         it('create fully defined event content', () => {
             expect(makeBeaconInfoContent(
                 1234,
+                true,
                 'nice beacon_info',
                 LocationAssetType.Pin,
             )).toEqual({
                 [M_BEACON_INFO.name]: {
                     description: 'nice beacon_info',
                     timeout: 1234,
+                    live: true,
                 },
                 [M_TIMESTAMP.name]: mockDateNow,
                 [M_ASSET.name]: {
@@ -49,6 +51,7 @@ describe('Beacon content helpers', () => {
         it('defaults timestamp to current time', () => {
             expect(makeBeaconInfoContent(
                 1234,
+                true,
                 'nice beacon_info',
                 LocationAssetType.Pin,
             )).toEqual(expect.objectContaining({
@@ -59,6 +62,7 @@ describe('Beacon content helpers', () => {
         it('defaults asset type to self when not set', () => {
             expect(makeBeaconInfoContent(
                 1234,
+                true,
                 'nice beacon_info',
                 // no assetType passed
             )).toEqual(expect.objectContaining({

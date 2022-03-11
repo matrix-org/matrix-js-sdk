@@ -75,6 +75,9 @@ export type MBeaconInfoContent = {
     description?: string;
     // how long from the last event until we consider the beacon inactive in milliseconds
     timeout: number;
+    // true when this is a live location beacon
+    // https://github.com/matrix-org/matrix-spec-proposals/pull/3672
+    live?: boolean;
 };
 
 export type MBeaconInfoEvent = EitherAnd<
