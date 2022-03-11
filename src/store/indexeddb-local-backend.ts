@@ -215,7 +215,6 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             this.syncAccumulator.accumulate({
                 next_batch: syncData.nextBatch,
                 rooms: syncData.roomsData,
-                groups: syncData.groupsData,
                 account_data: {
                     events: accountData,
                 },
@@ -405,7 +404,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         await Promise.all([
             this.persistUserPresenceEvents(userTuples),
             this.persistAccountData(syncData.accountData),
-            this.persistSyncData(syncData.nextBatch, syncData.roomsData, syncData.groupsData),
+            this.persistSyncData(syncData.nextBatch, syncData.roomsData),
         ]);
     }
 
@@ -413,13 +412,11 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * Persist rooms /sync data along with the next batch token.
      * @param {string} nextBatch The next_batch /sync value.
      * @param {Object} roomsData The 'rooms' /sync data from a SyncAccumulator
-     * @param {Object} groupsData The 'groups' /sync data from a SyncAccumulator
      * @return {Promise} Resolves if the data was persisted.
      */
     private persistSyncData(
         nextBatch: string,
         roomsData: ISyncResponse["rooms"],
-        groupsData: ISyncResponse["groups"],
     ): Promise<void> {
         logger.log("Persisting sync data up to", nextBatch);
         return utils.promiseTry<void>(() => {
@@ -429,7 +426,6 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
                 clobber: "-", // constant key so will always clobber
                 nextBatch,
                 roomsData,
-                groupsData,
             }); // put == UPSERT
             return txnAsPromise(txn).then();
         });

@@ -15,19 +15,17 @@ limitations under the License.
 */
 
 import { EventType } from "../@types/event";
-import { Group } from "../models/group";
 import { Room } from "../models/room";
 import { User } from "../models/user";
 import { IEvent, MatrixEvent } from "../models/event";
 import { Filter } from "../filter";
 import { RoomSummary } from "../models/room-summary";
-import { IMinimalEvent, IGroups, IRooms, ISyncResponse } from "../sync-accumulator";
+import { IMinimalEvent, IRooms, ISyncResponse } from "../sync-accumulator";
 import { IStartClientOpts } from "../client";
 
 export interface ISavedSync {
     nextBatch: string;
     roomsData: IRooms;
-    groupsData: IGroups;
     accountData: IMinimalEvent[];
 }
 
@@ -52,28 +50,6 @@ export interface IStore {
      * @param {string} token
      */
     setSyncToken(token: string): void;
-
-    /**
-     * No-op.
-     * @param {Group} group
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    storeGroup(group: Group): void;
-
-    /**
-     * No-op.
-     * @param {string} groupId
-     * @return {null}
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    getGroup(groupId: string): Group | null;
-
-    /**
-     * No-op.
-     * @return {Array} An empty array.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    getGroups(): Group[];
 
     /**
      * No-op.
