@@ -139,7 +139,7 @@ describe("Filter Component", function() {
                                 },
                             ],
                         },
-                        [RelationType.Thread]: {
+                        "m.thread": {
                             count: 2,
                             current_user_participated: true,
                         },
