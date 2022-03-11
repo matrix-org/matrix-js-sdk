@@ -16,7 +16,11 @@ limitations under the License.
 
 import { RelationType } from "./@types/event";
 import { MatrixEvent } from "./models/event";
-import { FILTER_RELATED_BY_REL_TYPES, FILTER_RELATED_BY_SENDERS, Thread, THREAD_RELATION_TYPE } from "./models/thread";
+import {
+    FILTER_RELATED_BY_REL_TYPES,
+    FILTER_RELATED_BY_SENDERS,
+    THREAD_RELATION_TYPE,
+} from "./models/thread";
 
 /**
  * @module filter-component
