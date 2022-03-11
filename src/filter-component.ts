@@ -16,7 +16,7 @@ limitations under the License.
 
 import { RelationType } from "./@types/event";
 import { MatrixEvent } from "./models/event";
-import { FILTER_RELATED_BY_REL_TYPES, FILTER_RELATED_BY_SENDERS, THREAD_RELATION_TYPE } from "./models/thread";
+import { FILTER_RELATED_BY_REL_TYPES, FILTER_RELATED_BY_SENDERS, Thread, THREAD_RELATION_TYPE } from "./models/thread";
 
 /**
  * @module filter-component
@@ -103,6 +103,7 @@ export class FilterComponent {
      * Converts the filter component into the form expected over the wire
      */
     public toJSON(): object {
+        FILTER_RELATED_BY_REL_TYPES;
         return {
             "types": this.filterJson.types || null,
             "not_types": this.filterJson.not_types || [],
@@ -111,10 +112,8 @@ export class FilterComponent {
             "senders": this.filterJson.senders || null,
             "not_senders": this.filterJson.not_senders || [],
             "contains_url": this.filterJson.contains_url || null,
-            "related_by_senders": this.filterJson.related_by_rel_types || [],
-            "related_by_rel_types": this.filterJson.related_by_rel_types || [],
-            "io.element.relation_senders": this.filterJson["io.element.relation_senders"] || [],
-            "io.element.relation_types": this.filterJson["io.element.relation_types"] || [],
+            [FILTER_RELATED_BY_SENDERS.name]: this.filterJson[FILTER_RELATED_BY_SENDERS.name] || [],
+            [FILTER_RELATED_BY_REL_TYPES.name]: this.filterJson[FILTER_RELATED_BY_REL_TYPES.name] || [],
         };
     }
 
