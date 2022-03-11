@@ -16,6 +16,9 @@ limitations under the License.
 
 /** @module ContentHelpers */
 
+import { REFERENCE_RELATION } from "matrix-events-sdk";
+
+import { MBeaconEventContent, MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
 import { MsgType } from "./@types/event";
 import { TEXT_NODE_TYPE } from "./@types/extensible_events";
 import {
@@ -186,3 +189,39 @@ export const parseLocationEvent = (wireEventContent: LocationEventWireContent): 
 
     return makeLocationContent(fallbackText, geoUri, timestamp, description, assetType);
 };
+
+/**
+ * Beacon event helpers
+ */
+
+export const makeBeaconInfoContent = (
+    timeout: number,
+    description?: string,
+    assetType?: LocationAssetType,
+): MBeaconInfoEventContent => ({
+    [M_BEACON_INFO.name]: {
+        description,
+        timeout,
+    },
+    [M_TIMESTAMP.name]: Date.now(),
+    [M_ASSET.name]: {
+        type: assetType ?? LocationAssetType.Self,
+    },
+});
+
+export const makeBeaconContent = (
+    uri: string,
+    timestamp: number,
+    beaconInfoId: string,
+    description?: string,
+): MBeaconEventContent => ({
+    [M_LOCATION.name]: {
+        description,
+        uri,
+    },
+    [M_TIMESTAMP.name]: timestamp,
+    "m.relates_to": {
+        rel_type: REFERENCE_RELATION.name,
+        event_id: beaconInfoId,
+    },
+});
