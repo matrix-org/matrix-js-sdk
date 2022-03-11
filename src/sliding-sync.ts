@@ -108,7 +108,7 @@ export enum SlidingSyncState {
      * @param {MSC3575List} list The default list values to apply for this list, including default
      * ranges, required_state, timeline_limit, etc.
      */
-    constructor(list: MSC3575List, defaultListRange: number[][]) {
+    constructor(list: MSC3575List, defaultListRange?: number[][]) {
         defaultListRange = defaultListRange || [[0,20]];
         list.filters = list.filters || {};
         list.ranges = list.ranges || defaultListRange;
@@ -166,7 +166,7 @@ export class SlidingSync {
     roomSubscriptions: Set<string>;
     private roomSubscriptionInfo: MSC3575RoomSubscription;
     private roomDataCallbacks: ((roomId: string, roomData: object) => void)[]; // array of functions
-    private lifecycleCallbacks: ((state: SlidingSyncState, resp: object, err: Error) => void)[];
+    private lifecycleCallbacks: ((state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err: Error) => void)[];
 
     private pendingReq?: IAbortablePromise<MSC3575SlidingSyncResponse>;
 
@@ -203,7 +203,7 @@ export class SlidingSync {
      * Listen for high-level lifecycle events on the sync connection
      * @param {function} callback The callback to invoke.
      */
-    addLifecycleListener(callback: (state: SlidingSyncState, resp: object, err: Error) => void) {
+    addLifecycleListener(callback: (state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err: Error) => void) {
         this.lifecycleCallbacks.push(callback);
     }
 
@@ -224,7 +224,7 @@ export class SlidingSync {
      * @param {object} resp The raw sync response JSON
      * @param {Error?} err Any error that occurred when making the request e.g network errors.
      */
-    private _invokeLifecycleListeners(state: SlidingSyncState, resp: object, err?: Error) {
+    private _invokeLifecycleListeners(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err?: Error) {
         this.lifecycleCallbacks.forEach((callback) => {
             callback(state, resp, err);
         });
