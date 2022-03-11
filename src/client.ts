@@ -5389,7 +5389,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 only: 'highlight',
             };
 
-            if (token && token !== "end") {
+            if (token !== "end") {
                 params.from = token;
             }
 

@@ -177,7 +177,7 @@ export type RoomEventHandlerMap = {
         oldEventId?: string,
         oldStatus?: EventStatus,
     ) => void;
-    [ThreadEvent.New]: (thread: Thread) => void;
+    [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
 } & ThreadHandlerMap;
 
 export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> {
@@ -1435,14 +1435,18 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 // it. If it wasn't fetched successfully the thread will work
                 // in "limited" mode and won't benefit from all the APIs a homeserver
                 // can provide to enhance the thread experience
-                thread = this.createThread(rootEvent, events);
+                thread = this.createThread(rootEvent, events, toStartOfTimeline);
             }
         }
 
         this.emit(ThreadEvent.Update, thread);
     }
 
-    public createThread(rootEvent: MatrixEvent | undefined, events: MatrixEvent[] = []): Thread | undefined {
+    public createThread(
+        rootEvent: MatrixEvent | undefined,
+        events: MatrixEvent[] = [],
+        toStartOfTimeline: boolean,
+    ): Thread | undefined {
         if (rootEvent) {
             const tl = this.getTimelineForEvent(rootEvent.getId());
             const relatedEvents = tl?.getTimelineSet().getAllRelationsEventForEvent(rootEvent.getId());
@@ -1470,7 +1474,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 this.lastThread = thread;
             }
 
-            this.emit(ThreadEvent.New, thread);
+            this.emit(ThreadEvent.New, thread, toStartOfTimeline);
             return thread;
         }
     }

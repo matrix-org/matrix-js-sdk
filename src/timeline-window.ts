@@ -240,7 +240,7 @@ export class TimelineWindow {
         }
 
         return Boolean(tl.timeline.getNeighbouringTimeline(direction) ||
-            tl.timeline.getPaginationToken(direction));
+            tl.timeline.getPaginationToken(direction) !== null);
     }
 
     /**
@@ -297,7 +297,7 @@ export class TimelineWindow {
 
         // try making a pagination request
         const token = tl.timeline.getPaginationToken(direction);
-        if (!token) {
+        if (token === null) {
             debuglog("TimelineWindow: no token");
             return Promise.resolve(false);
         }

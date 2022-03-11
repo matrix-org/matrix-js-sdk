@@ -186,8 +186,8 @@ export class FilterComponent {
     }
 
     private arrayMatchesFilter(filter: any[], values: any[]): boolean {
-        return values.length > 0 && values.every(value => {
-            return filter.includes(value);
+        return values.length > 0 && filter.every(value => {
+            return values.includes(value);
         });
     }
 

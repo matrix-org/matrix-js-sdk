@@ -191,7 +191,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         // There is a risk that the `localTimestamp` approximation will not be accurate
         // when threads are used over federation. That could results in the reply
         // count value drifting away from the value returned by the server
-        if (!this.lastEvent || (isThreadReply && event.localTimestamp > this.replyToEvent.localTimestamp)) {
+        if (!this.lastEvent || (isThreadReply && event.localTimestamp > this.lastEvent.localTimestamp)) {
             this.lastEvent = event;
             if (this.lastEvent.getId() !== this.id) {
                 // This counting only works when server side support is enabled

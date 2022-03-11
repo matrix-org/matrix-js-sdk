@@ -124,7 +124,46 @@ describe("Filter Component", function() {
                 event: true,
             });
 
+            const eventWithMultipleRelations = mkEvent({
+                "type": "m.room.message",
+                "content": {},
+                "unsigned": {
+                    "m.relations": {
+                        "testtesttest": {},
+                        "m.annotation": {
+                            "chunk": [
+                                {
+                                    "type": "m.reaction",
+                                    "key": "🤫",
+                                    "count": 1,
+                                },
+                            ],
+                        },
+                        [RelationType.Thread]: {
+                            count: 2,
+                            current_user_participated: true,
+                        },
+                    },
+                },
+                "room": 'roomId',
+                "event": true,
+            });
+
+            const noMatchEvent = mkEvent({
+                "type": "m.room.message",
+                "content": {},
+                "unsigned": {
+                    "m.relations": {
+                        "testtesttest": {},
+                    },
+                },
+                "room": 'roomId',
+                "event": true,
+            });
+
             expect(filter.check(threadRootEvent)).toBe(true);
+            expect(filter.check(eventWithMultipleRelations)).toBe(true);
+            expect(filter.check(noMatchEvent)).toBe(false);
         });
     });
 });
