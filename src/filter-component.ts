@@ -103,7 +103,6 @@ export class FilterComponent {
      * Converts the filter component into the form expected over the wire
      */
     public toJSON(): object {
-        FILTER_RELATED_BY_REL_TYPES;
         return {
             "types": this.filterJson.types || null,
             "not_types": this.filterJson.not_types || [],
