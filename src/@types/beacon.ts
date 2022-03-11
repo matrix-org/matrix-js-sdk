@@ -24,6 +24,41 @@ import { MAssetEvent, MLocationEvent, MTimestampEvent } from "./location";
  * https://github.com/matrix-org/matrix-spec-proposals/pull/3489
  */
 
+/**
+ * Beacon info events are state events. We have two requirements for these events:
+ * 1. they can only be written by their owner
+ * 2. a user can have an arbitrary number of beacon_info events
+ * 
+ * 1. is achieved by setting the state_key to the owners mxid.
+ * Event keys in room state are a combination of `type` + `state_key`.
+ * To achieve an arbitrary number of only owner-writable state events 
+ * we introduce a variable suffix to the event type
+ * 
+ * Eg
+ * {
+ *      "type": "m.beacon_info.@matthew:matrix.org.1",
+ *      "state_key": "@matthew:matrix.org",
+ *      "content": {
+ *          "m.beacon_info": {
+ *              "description": "The Matthew Tracker",
+ *              "timeout": 86400000,
+ *          },
+ *          // more content as described below
+ *      }
+ * },
+ * {
+ *      "type": "m.beacon_info.@matthew:matrix.org.2",
+ *      "state_key": "@matthew:matrix.org",
+ *      "content": {
+ *          "m.beacon_info": {
+ *              "description": "Another different Matthew tracker",
+ *              "timeout": 400000,
+ *          },
+ *          // more content as described below
+ *      }
+ * }
+ */
+export const M_BEACON_INFO_VARIABLE = new UnstableValue("m.beacon_info.*", "org.matrix.msc3489.beacon_info.*");
 export const M_BEACON_INFO = new UnstableValue("m.beacon_info", "org.matrix.msc3489.beacon_info");
 export const M_BEACON = new UnstableValue("m.beacon", "org.matrix.msc3489.beacon");
 
@@ -42,7 +77,7 @@ export type MBeaconInfoEvent = EitherAnd<
  * m.beacon_info Event example from the spec
  * https://github.com/matrix-org/matrix-spec-proposals/pull/3489
  * {
-    "type": "m.beacon_info.@matthew:matrix.org",
+    "type": "m.beacon_info.@matthew:matrix.org.1",
     "state_key": "@matthew:matrix.org",
     "content": {
         "m.beacon_info": {
