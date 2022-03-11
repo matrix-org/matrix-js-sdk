@@ -178,6 +178,7 @@ import { CryptoStore } from "./crypto/store/base";
 import { MediaHandler } from "./webrtc/mediaHandler";
 import { IRefreshTokenResponse } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
+import { Thread, THREAD_RELATION_TYPE } from "./models/thread";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -1161,7 +1162,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.syncApi.stop();
         }
 
-        await this.getCapabilities(true);
+        try {
+            const { serverSupport, stable } = await this.doesServerSupportThread();
+            Thread.setServerSideSupport(serverSupport, stable);
+        } catch (e) {
+            Thread.setServerSideSupport(false, true);
+        }
 
         // shallow-copy the opts dict before modifying and storing it
         this.clientOpts = Object.assign({}, opts) as IStoredClientOpts;
@@ -3710,14 +3716,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (threadId && !content["m.relates_to"]?.rel_type) {
             content["m.relates_to"] = {
                 ...content["m.relates_to"],
-                "rel_type": RelationType.Thread,
+                "rel_type": THREAD_RELATION_TYPE.name,
                 "event_id": threadId,
             };
             const thread = this.getRoom(roomId)?.threads.get(threadId);
             if (thread) {
                 content["m.relates_to"]["m.in_reply_to"] = {
                     "event_id": thread.lastReply((ev: MatrixEvent) => {
-                        return ev.isRelation(RelationType.Thread) && !ev.status;
+                        return ev.isRelation(THREAD_RELATION_TYPE.name) && !ev.status;
                     })?.getId(),
                 };
             }
@@ -6521,6 +6527,24 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             : presetName;
 
         return unstableFeatures && !!unstableFeatures[`io.element.e2ee_forced.${versionsPresetName}`];
+    }
+
+    public async doesServerSupportThread(): Promise<{
+        serverSupport: boolean;
+        stable: boolean;
+    } | null> {
+        try {
+            const hasUnstableSupport = await this.doesServerSupportUnstableFeature("org.matrix.msc3440");
+            const hasStableSupport = await this.doesServerSupportUnstableFeature("org.matrix.msc3440.stable")
+                || await this.isVersionSupported("v1.3");
+
+            return {
+                serverSupport: hasUnstableSupport || hasStableSupport,
+                stable: hasStableSupport,
+            };
+        } catch (e) {
+            return null;
+        }
     }
 
     /**

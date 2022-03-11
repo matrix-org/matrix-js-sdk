@@ -319,6 +319,12 @@ HttpResponse.PUSH_RULES_RESPONSE = {
     data: {},
 };
 
+HttpResponse.PUSH_RULES_RESPONSE = {
+    method: "GET",
+    path: "/pushrules/",
+    data: {},
+};
+
 HttpResponse.USER_ID = "@alice:bar";
 
 HttpResponse.filterResponse = function(userId) {
@@ -342,15 +348,8 @@ HttpResponse.SYNC_RESPONSE = {
     data: HttpResponse.SYNC_DATA,
 };
 
-HttpResponse.CAPABILITIES_RESPONSE = {
-    method: "GET",
-    path: "/capabilities",
-    data: { capabilities: {} },
-};
-
 HttpResponse.defaultResponses = function(userId) {
     return [
-        HttpResponse.CAPABILITIES_RESPONSE,
         HttpResponse.PUSH_RULES_RESPONSE,
         HttpResponse.filterResponse(userId),
         HttpResponse.SYNC_RESPONSE,

@@ -722,7 +722,7 @@ describe("MatrixClient crypto", function() {
         return Promise.resolve()
             .then(() => {
                 logger.log(aliTestClient + ': starting');
-                httpBackend.when("GET", "/capabilities").respond(200, {});
+                httpBackend.when("GET", "/versions").respond(200, {});
                 httpBackend.when("GET", "/pushrules").respond(200, {});
                 httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
                 aliTestClient.expectDeviceKeyUpload();

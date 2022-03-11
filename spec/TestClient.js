@@ -86,7 +86,7 @@ TestClient.prototype.toString = function() {
  */
 TestClient.prototype.start = function() {
     logger.log(this + ': starting');
-    this.httpBackend.when("GET", "/capabilities").respond(200, { capabilities: {} });
+    this.httpBackend.when("GET", "/versions").respond(200, {});
     this.httpBackend.when("GET", "/pushrules").respond(200, {});
     this.httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
     this.expectDeviceKeyUpload();
