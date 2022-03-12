@@ -2416,7 +2416,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
 
         if (inviteJoinCount) {
-            return memberNamesToRoomName(otherNames, inviteJoinCount);
+            return _td(memberNamesToRoomName(otherNames, inviteJoinCount));
         }
 
         const myMembership = this.getMyMembership();
@@ -2431,7 +2431,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                     return i.getContent().display_name;
                 });
 
-                return `Inviting ${memberNamesToRoomName(thirdPartyNames)}`;
+                return _td(`Inviting ${memberNamesToRoomName(thirdPartyNames)}`);
             }
         }
         // let's try to figure out who was here before
@@ -2445,9 +2445,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             }).map((m) => m.name);
         }
         if (leftNames.length) {
-            return `Empty room (was ${memberNamesToRoomName(leftNames)})`;
+            return _td(`Empty room (was ${memberNamesToRoomName(leftNames)})`);
         } else {
-            return "Empty room";
+            return _td("Empty room");
         }
     }
 
@@ -2647,15 +2647,15 @@ function memberNamesToRoomName(names: string[], count = (names.length + 1)) {
     if (!names.length) {
         return "Empty room";
     } else if (names.length === 1 && countWithoutMe <= 1) {
-        return names[0];
+        return `%(${names[0]})`;
     } else if (names.length === 2 && countWithoutMe <= 2) {
-        return `${names[0]} and ${names[1]}`;
+        return `%(${names[0]}) and %(${names[1]})`;
     } else {
         const plural = countWithoutMe > 1;
         if (plural) {
-            return `${names[0]} and ${countWithoutMe} others`;
+            return `%(${names[0]}) and %(${countWithoutMe}) others`;
         } else {
-            return `${names[0]} and 1 other`;
+            return `%(${names[0]}) and 1 other`;
         }
     }
 }
