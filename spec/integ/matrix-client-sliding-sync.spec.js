@@ -31,14 +31,15 @@ describe("SlidingSync", () => {
                 room_subscriptions: {},
             };
             httpBackend.when("POST", syncUrl).respond(200, fakeResp);
-            let deliver = callbackPromise(500, "lifecycle callback was not called");
-            slidingSync.on("SlidingSync.Lifecycle", deliver.callback);
+            let p = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state, resp, err) => {
+                expect(state).toEqual(SlidingSyncState.RequestFinished);
+                expect(resp).toEqual(fakeResp);
+                expect(err).toBeFalsy();
+                return true;
+            });
             slidingSync.start();
             await httpBackend.flush(syncUrl, 1);
-            let lifecycleData = await deliver.promise;
-            expect(lifecycleData[0]).toEqual(SlidingSyncState.RequestFinished);
-            expect(lifecycleData[1]).toEqual(fakeResp);
-            expect(lifecycleData[2]).toBeFalsy();
+            await p;
             slidingSync.stop();
             done();
         });
@@ -80,13 +81,15 @@ describe("SlidingSync", () => {
                 expect(body.room_subscriptions).toBeTruthy();
                 expect(body.room_subscriptions[roomId]).toEqual(roomSubInfo);
             }).respond(200, fakeResp);
-            let deliver = callbackPromise(500, "room callback was not called");
-            slidingSync.on("SlidingSync.RoomData", deliver.callback);
+
+            let p = listenUntil(slidingSync, "SlidingSync.RoomData", (gotRoomId, gotRoomData) => {
+                expect(gotRoomId).toEqual(roomId);
+                expect(gotRoomData).toEqual(wantRoomData);
+                return true;
+            });
             slidingSync.start();
             await httpBackend.flush(syncUrl, 1);
-            let roomData = await deliver.promise;
-            expect(roomData[0]).toEqual(roomId);
-            expect(roomData[1]).toEqual(wantRoomData);
+            await p;
 
             httpBackend.when("POST", syncUrl).check(function(req) {
                 let body = req.data;
@@ -98,8 +101,9 @@ describe("SlidingSync", () => {
                 expect(body.unsubscribe_rooms).toEqual([roomId]);
             }).respond(200, fakeResp);
         
-            deliver = callbackPromise(500, "lifecycle callback was not called");
-            slidingSync.on("SlidingSync.Lifecycle", deliver.callback);
+            p = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+                return state === SlidingSyncState.Complete;
+            });
         
             // remove the subscription
             slidingSync.modifyRoomSubscriptions(new Set());
@@ -107,9 +111,16 @@ describe("SlidingSync", () => {
             // kick the connection to resend the unsub
             slidingSync.resend();
             await httpBackend.flush(syncUrl, 2); // flush 2, the one made before the req change and the req change
-            await deliver.promise;
+            await p;
             slidingSync.stop();
             done();
+        });
+
+        it("should be possible to adjust room subscription info whislt syncing", () => {
+            // add 1 sync, modify info, sync, check it is resent
+        });
+        it("should be possible to add room subscriptions whilst syncing", () => {
+            // add 1, sync, add 1, sync, check only 1 is sent
         });
     });
 
@@ -174,13 +185,9 @@ describe("SlidingSync", () => {
                 expect(listenerData[roomId]).toBeFalsy();
                 listenerData[roomId] = roomData;
             });
-            let responseProcessed = new Promise((resolve) => {
-                slidingSync.on("SlidingSync.Lifecycle", (state)=> {
-                    if (state === SlidingSyncState.Complete) {
-                        resolve();
-                    }
-                });
-            });
+            let responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+                return state === SlidingSyncState.Complete;
+            })
             slidingSync.start();
             await httpBackend.flush(syncUrl, 1);
             await responseProcessed;
@@ -191,6 +198,15 @@ describe("SlidingSync", () => {
             slidingSync.stop();
             done();
         });
+
+        it("should be possible to adjust list ranges", () => {
+            // make 1 list, modify range, check it gets submitted
+        });
+
+        it("should be possible to get list updates", () => {
+            // make 2 lists, issue INSERT, check right one gets updated with right values
+        });
+
     });
 });
 
@@ -202,17 +218,31 @@ function timeout(delayMs, reason) {
     });
 }
 
-// resolves the promise when the callback is invoked. Rejects the promise after the timeout with reason.
-function callbackPromise(timeoutMs, reason) {
-    let r;
-    const cb = (...rest) => {
-        r(rest);
-    };
-    const p = new Promise((resolve) => {
-        r = resolve;
-    });
-    return {
-        promise: Promise.race([p, timeout(timeoutMs, reason)]),
-        callback: cb,
+/**
+ * Listen until a callback returns data.
+ * @param {EventEmitter} emitter The event emitter
+ * @param {string} eventName The event to listen for
+ * @param {function} callback The callback which will be invoked when events fire. Return something truthy from this to resolve the promise.
+ * @param {number} timeoutMs The number of milliseconds to wait for the callback to return data. Default: 500ms.
+ * @returns A promise which will be resolved when the callback returns data. If the callback throws or the timeout is reached,
+ * the promise is rejected.
+ */
+function listenUntil(emitter, eventName, callback, timeoutMs) {
+    if (!timeoutMs) {
+        timeoutMs = 500;
     }
+    return Promise.race([new Promise((resolve, reject) => {
+        const wrapper = (...args) => {
+            try {
+                const data = callback(...args)
+                if (data) {
+                    emitter.off(eventName, wrapper);
+                    resolve(data);
+                }
+            } catch (err) {
+                reject(err);
+            }
+        }
+        emitter.on(eventName, wrapper);
+    }), timeout(timeoutMs, "timed out waiting for event " + eventName)]);
 }
