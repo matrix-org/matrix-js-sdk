@@ -19,7 +19,7 @@ limitations under the License.
  * @module client
  */
 
-import * as utils from "../test-utils";
+import * as utils from "../test-utils/test-utils";
 import { DuplicateStrategy, EventStatus, MatrixEvent, PendingEventOrdering, RoomEvent } from "../../src";
 import { EventTimeline } from "../../src/models/event-timeline";
 import { Room } from "../../src/models/room";
