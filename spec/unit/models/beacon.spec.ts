@@ -20,6 +20,7 @@ import {
     isTimestampInDuration,
     isBeaconInfoEventType,
     Beacon,
+    BeaconEvent,
 } from "../../../src/models/beacon";
 import { makeBeaconInfoEvent } from "../../test-utils/beacon";
 
@@ -87,8 +88,8 @@ describe('Beacon', () => {
         beforeEach(() => {
             // go back in time to create the beacon
             jest.spyOn(global.Date, 'now').mockReturnValue(now - HOUR_MS);
-            liveBeaconEvent = makeBeaconInfoEvent(userId, { timeout: HOUR_MS * 3, isLive: true });
-            notLiveBeaconEvent = makeBeaconInfoEvent(userId, { timeout: HOUR_MS * 3, isLive: false });
+            liveBeaconEvent = makeBeaconInfoEvent(userId, { timeout: HOUR_MS * 3, isLive: true }, '$live123');
+            notLiveBeaconEvent = makeBeaconInfoEvent(userId, { timeout: HOUR_MS * 3, isLive: false }, '$dead123');
 
             // back to now
             jest.spyOn(global.Date, 'now').mockReturnValue(now);
@@ -130,6 +131,31 @@ describe('Beacon', () => {
                 // liveBeaconEvent was created 1 hour ago
                 const beacon = new Beacon(liveBeaconEvent);
                 expect(beacon.isLive).toEqual(true);
+            });
+        });
+
+        describe('update()', () => {
+            it('does not update with different event', () => {
+                const beacon = new Beacon(liveBeaconEvent);
+
+                expect(beacon.beaconInfoId).toEqual(liveBeaconEvent.getId());
+
+                expect(() => beacon.update(notLiveBeaconEvent)).toThrow();
+                expect(beacon.isLive).toEqual(true);
+            });
+
+            it('updates event', () => {
+                const beacon = new Beacon(liveBeaconEvent);
+                const emitSpy = jest.spyOn(beacon, 'emit');
+
+                expect(beacon.isLive).toEqual(true);
+
+                const updatedBeaconEvent = makeBeaconInfoEvent(
+                    userId, { timeout: HOUR_MS * 3, isLive: false }, '$live123');
+
+                beacon.update(updatedBeaconEvent);
+                expect(beacon.isLive).toEqual(false);
+                expect(emitSpy).toHaveBeenCalledWith(BeaconEvent.Update, updatedBeaconEvent, beacon);
             });
         });
     });

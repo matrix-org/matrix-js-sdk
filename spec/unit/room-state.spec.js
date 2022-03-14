@@ -248,6 +248,7 @@ describe("RoomState", function() {
                 memberEvent, state,
             );
         });
+
     });
 
     describe("setOutOfBandMembers", function() {

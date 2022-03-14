@@ -419,8 +419,6 @@ export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventH
     }
 
     private setBeacon(event: MatrixEvent): void {
-        // @TODO reuse and update? existing events here
-        // at least need to kill them once they start listening to events
         if (this.beacons.has(event.getId())) {
             return this.beacons.get(event.getId()).update(event);
         }
