@@ -108,8 +108,6 @@ describe("SlidingSync", () => {
             // remove the subscription
             slidingSync.modifyRoomSubscriptions(new Set());
         
-            // kick the connection to resend the unsub
-            slidingSync.resend();
             await httpBackend.flush(syncUrl, 2); // flush 2, the one made before the req change and the req change
             await p;
             slidingSync.stop();
