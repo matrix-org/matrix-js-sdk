@@ -5,6 +5,7 @@ import {
     isBeaconInfoEventType,
     Beacon,
 } from "../../../src/models/beacon";
+import { makeBeaconInfoEvent } from "../../test-utils/beacon";
 
 describe('Beacon', () => {
     describe('isTimestampInDuration()', () => {
@@ -57,6 +58,19 @@ describe('Beacon', () => {
     });
 
     describe('Beacon', () => {
+        const userId = '@user:server.org';
+        // 14.03.2022 16:15
+        const now = 1647270879403;
+        beforeEach(() => {
+            jest.spyOn(global.Date, 'now').mockReturnValue(now);
+        });
 
+        afterAll(() => {
+            jest.spyOn(global.Date, 'now').mockRestore();
+        });
+
+        it('creates beacon from event', () => {
+            const liveBeacon = makeBeaconInfoEvent(userId, 1000, true);
+        });
     });
 });
