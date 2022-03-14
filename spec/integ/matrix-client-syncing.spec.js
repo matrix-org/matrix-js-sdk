@@ -1,6 +1,6 @@
 import { MatrixEvent } from "../../src/models/event";
 import { EventTimeline } from "../../src/models/event-timeline";
-import * as utils from "../test-utils";
+import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 
 describe("MatrixClient syncing", function() {

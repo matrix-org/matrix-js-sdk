@@ -20,7 +20,7 @@ import anotherjson from 'another-json';
 
 import * as olmlib from "../../../src/crypto/olmlib";
 import { TestClient } from '../../TestClient';
-import { HttpResponse, setHttpResponses } from '../../test-utils';
+import { HttpResponse, setHttpResponses } from '../../test-utils/test-utils';
 import { resetCrossSigningKeys } from "./crypto-utils";
 import { MatrixError } from '../../../src/http-api';
 import { logger } from '../../../src/logger';

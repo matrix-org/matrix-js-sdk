@@ -17,7 +17,7 @@ limitations under the License.
 // load XmlHttpRequest mock
 import "./setupTests";
 import "../../dist/browser-matrix"; // uses browser-matrix instead of the src
-import * as utils from "../test-utils";
+import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 
 const USER_ID = "@user:test.server";
