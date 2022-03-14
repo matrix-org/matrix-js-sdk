@@ -54,6 +54,7 @@ describe("SlidingSync", () => {
         };
         const wantRoomData = {
             name: "foo bar",
+            room_id: roomId,
             required_state: [],
             timeline: [],
         };
@@ -126,23 +127,28 @@ describe("SlidingSync", () => {
                     is_dm: true,
                 },
             };
-            let list = new SlidingList(listReq, [[0,5]]);
-            const slidingSync = new SlidingSync(proxyBaseUrl, [list], {}, client, 1);
+            const slidingSync = new SlidingSync(proxyBaseUrl, [listReq], {}, client, 1);
             const roomA = "!a:localhost";
             const roomB = "!b:localhost";
             const roomC = "!c:localhost";
             const rooms = [
                 {
                     room_id: roomA,
-                    name: "A"
+                    name: "A",
+                    required_state: [],
+                    timeline: [],
                 },
                 {
                     room_id: roomB,
-                    name: "B"
+                    name: "B",
+                    required_state: [],
+                    timeline: [],
                 },
                 {
                     room_id: roomC,
-                    name: "C"
+                    name: "C",
+                    required_state: [],
+                    timeline: [],
                 },
             ]
             httpBackend.when("POST", syncUrl).check(function(req) {

@@ -41,7 +41,7 @@ import { MatrixError } from "./http-api";
 import { RoomStateEvent } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
 import {SyncState } from "./sync";
-import { MSC3575RoomData, MSC3575SlidingSyncResponse, SlidingList, SlidingSync, SlidingSyncState } from "./sliding-sync";
+import { MSC3575RoomData, MSC3575SlidingSyncResponse, SlidingSync, SlidingSyncState } from "./sliding-sync";
 
 const DEBUG = true;
 
@@ -105,7 +105,7 @@ export class SlidingSyncApi {
 
         // TODO: dependency inject
         this.slidingSync = new SlidingSync("http://localhost:8008", [
-            new SlidingList({
+            {
                 ranges: [[0,20]],
                 sort: ["by_highlight_count", "by_notification_count", "by_recency"],
                 required_state: [
@@ -116,7 +116,7 @@ export class SlidingSyncApi {
                     ["m.room.member", this.client.getUserId()],
                 ],
                 timeline_limit: 20,
-            }),
+            },
         ], {}, client, 20 * 1000);
         this.slidingSync.addLifecycleListener(this.onLifecycle.bind(this));
         this.slidingSync.addRoomDataListener(this.onRoomData.bind(this));

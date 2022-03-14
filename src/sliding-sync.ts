@@ -105,12 +105,12 @@ export enum SlidingSyncState {
 }
 
 /**
- * SlidingList represents a single list in sliding sync. The list can have filters, multiple sliding
- * windows, and maintains the index->room_id mapping.
+ * Internal Class. SlidingList represents a single list in sliding sync. The list can have filters,
+ * multiple sliding windows, and maintains the index->room_id mapping.
  */
- export class SlidingList {
+class SlidingList {
     list: MSC3575List;
-    defaultListRange: number[][];
+    private defaultListRange: number[][];
 
     roomIndexToRoomId: Record<number,string>;
     joinedCount: number;
@@ -120,12 +120,11 @@ export enum SlidingSyncState {
      * @param {MSC3575List} list The default list values to apply for this list, including default
      * ranges, required_state, timeline_limit, etc.
      */
-    constructor(list: MSC3575List, defaultListRange?: number[][]) {
-        defaultListRange = defaultListRange || [[0,20]];
+    constructor(list: MSC3575List) {
         list.filters = list.filters || {};
-        list.ranges = list.ranges || defaultListRange;
+        list.ranges = list.ranges || [[0,20]];
         this.list = list;
-        this.defaultListRange = defaultListRange;
+        this.defaultListRange = [[0,20]];
         
         // the constantly changing sliding window ranges. Not an array for performance reasons
         // E.g tracking ranges 0-99, 500-599, we don't want to have a 600 element array
@@ -149,7 +148,8 @@ export enum SlidingSyncState {
     }
 
     /**
-     * Modify the filters on this list. The filters provided are copied.
+     * Modify the filters on this list. The filters provided are copied. This will reset list ranges
+     * so callers need to adjust any UI respectively.
      * @param {object} filters The sliding sync filters to apply e.g { is_dm: true }.
      */
     setFilters(filters: object) {
@@ -171,11 +171,11 @@ export enum SlidingSyncState {
  */
 export class SlidingSync {
     private proxyBaseUrl: string;
-    lists: SlidingList[];
-    client: MatrixClient;
-    timeoutMS: number;
+    private lists: SlidingList[];
+    private client: MatrixClient;
+    private timeoutMS: number;
     private terminated: boolean;
-    roomSubscriptions: Set<string>;
+    private roomSubscriptions: Set<string>; // the *desired* room subscriptions
     private roomSubscriptionInfo: MSC3575RoomSubscription;
     private roomDataCallbacks: ((roomId: string, roomData: MSC3575RoomData) => void)[]; // array of functions
     private lifecycleCallbacks: ((state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err: Error) => void)[];
@@ -185,22 +185,41 @@ export class SlidingSync {
     /**
      * Create a new sliding sync instance
      * @param {string} proxyBaseUrl The base URL of the sliding sync proxy
-     * @param {SlidingList[]} lists The lists to use for sliding sync.
+     * @param {MSC3575List[]} lists The lists to use for sliding sync.
      * @param {MSC3575RoomSubscription} subInfo The params to use for room subscriptions.
      * @param {MatrixClient} client The client to use for /sync calls.
      * @param {number} timeoutMS The number of milliseconds to wait for a response.
      */
-    constructor(proxyBaseUrl: string, lists: SlidingList[], subInfo: MSC3575RoomSubscription, client: MatrixClient, timeoutMS: number) {
+    constructor(proxyBaseUrl: string, lists: MSC3575List[], subInfo: MSC3575RoomSubscription, client: MatrixClient, timeoutMS: number) {
         this.proxyBaseUrl = proxyBaseUrl;
         this.timeoutMS = timeoutMS;
-        this.lists = lists;
+        this.lists = lists.map((l) => { return new SlidingList(l) });
         this.client = client;
         this.roomSubscriptionInfo = subInfo;
         this.terminated = false;
-        this.roomSubscriptions = new Set(); // the *desired* room subscriptions
+        this.roomSubscriptions = new Set();
         this.roomDataCallbacks = [];
         this.lifecycleCallbacks = [];
         this.pendingReq = null;
+    }
+
+    /**
+     * Get the room subscriptions for the sync API.
+     * @returns A copy of the desired room subscriptions.
+     */
+    getRoomSubscriptions(): Set<string> {
+        return new Set(Array.from(this.roomSubscriptions));
+    }
+
+    /**
+     * Modify the room subscriptions for the sync API. Calling this function will interrupt the
+     * /sync request to resend new subscriptions. If the /sync stream has not started, this will
+     * prepare the room subscriptions for when start() is called.
+     * @param s The new desired room subscriptions.
+     */
+    modifyRoomSubscriptions(s: Set<string>) {
+        this.roomSubscriptions = s;
+        this.resend();
     }
 
     /**
