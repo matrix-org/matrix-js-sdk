@@ -682,6 +682,7 @@ describe("Room", function() {
                 event.event.unsigned.invite_room_state = [
                     {
                         type: "m.room.name",
+                        sender: userA,
                         state_key: "",
                         content: {
                             name: roomName,
@@ -703,6 +704,7 @@ describe("Room", function() {
                     {
                         type: "m.room.name",
                         state_key: "",
+                        sender: userA,
                         content: {
                             name: roomNameToIgnore,
                         },

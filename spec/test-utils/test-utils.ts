@@ -3,6 +3,7 @@ import '../olm-loader';
 
 import { logger } from '../../src/logger';
 import { MatrixEvent } from "../../src/models/event";
+import { IContent, IEvent, IEventRelation, IUnsigned, Room, RoomMember, User } from '../../src';
 
 /**
  * Return a promise that is resolved when the client next emits a
@@ -11,7 +12,7 @@ import { MatrixEvent } from "../../src/models/event";
  * @param {Number=} count Number of syncs to wait for (default 1)
  * @return {Promise} Resolves once the client has emitted a SYNCING event
  */
-export function syncPromise(client, count) {
+export function syncPromise(client, count): Promise<void> {
     if (count === undefined) {
         count = 1;
     }
@@ -19,7 +20,7 @@ export function syncPromise(client, count) {
         return Promise.resolve();
     }
 
-    const p = new Promise((resolve, reject) => {
+    const p = new Promise<void>((resolve, reject) => {
         const cb = (state) => {
             logger.log(`${Date.now()} syncPromise(${count}): ${state}`);
             if (state === 'SYNCING') {
@@ -47,6 +48,7 @@ export function mock(constr, name) {
     // http://eclipsesource.com/blogs/2014/03/27/mocks-in-jasmine-tests/
     const HelperConstr = new Function(); // jshint ignore:line
     HelperConstr.prototype = constr.prototype;
+    // @ts-ignore
     const result = new HelperConstr();
     result.toString = function() {
         return "mock" + (name ? " of " + name : "");
@@ -65,37 +67,60 @@ export function mock(constr, name) {
     return result;
 }
 
+type MakeEventPassThruProps = {
+    user?: User["userId"];
+    relatesTo?: IEventRelation;
+    event?: boolean;
+    ts?: number;
+    skey?: string;
+};
+type MakeEventProps = MakeEventPassThruProps & {
+    type: string;
+    content: IContent;
+    room: Room["roomId"];
+    // eslint-disable-next-line camelcase
+    prev_content?: IContent;
+    unsigned?: IUnsigned;
+};
+
 /**
  * Create an Event.
  * @param {Object} opts Values for the event.
  * @param {string} opts.type The event.type
  * @param {string} opts.room The event.room_id
- * @param {string} opts.sender The event.sender
- * @param {string} opts.skey Optional. The state key (auto inserts empty string)
+ * @param {string} opts.user The event.user_id
+ * @param {string=} opts.skey Optional. The state key (auto inserts empty string)
+ * @param {number=} opts.ts   Optional. Timestamp for the event
  * @param {Object} opts.content The event.content
  * @param {boolean} opts.event True to make a MatrixEvent.
+ * @param {unsigned=} opts.unsigned
  * @return {Object} a JSON object representing this event.
  */
-export function mkEvent(opts) {
+export function mkEvent(opts: MakeEventProps): MatrixEvent {
     if (!opts.type || !opts.content) {
         throw new Error("Missing .type or .content =>" + JSON.stringify(opts));
     }
-    const event = {
+    const event: Partial<IEvent> = {
         type: opts.type,
         room_id: opts.room,
-        sender: opts.sender || opts.user, // opts.user for backwards-compat
+        sender: opts.user,
         content: opts.content,
-        unsigned: opts.unsigned,
+        prev_content: opts.prev_content,
         event_id: "$" + Math.random() + "-" + Math.random(),
+        origin_server_ts: opts.ts ?? 0,
+        unsigned: opts.unsigned,
     };
     if (opts.skey !== undefined) {
         event.state_key = opts.skey;
-    } else if (["m.room.name", "m.room.topic", "m.room.create", "m.room.join_rules",
-         "m.room.power_levels", "m.room.topic",
-         "com.example.state"].includes(opts.type)) {
+    } else if ([
+        "m.room.name", "m.room.topic", "m.room.create", "m.room.join_rules",
+        "m.room.power_levels", "m.room.topic", "m.room.history_visibility",
+        "m.room.encryption", "m.room.member", "com.example.state",
+        "m.room.guest_access", "m.room.tombstone",
+    ].indexOf(opts.type) !== -1) {
         event.state_key = "";
     }
-    return opts.event ? new MatrixEvent(event) : event;
+    return opts.event ? new MatrixEvent(event) : event as unknown as MatrixEvent;
 }
 
 /**
@@ -126,56 +151,86 @@ export function mkPresence(opts) {
  * @param {Object} opts Values for the membership.
  * @param {string} opts.room The room ID for the event.
  * @param {string} opts.mship The content.membership for the event.
- * @param {string} opts.sender The sender user ID for the event.
- * @param {string} opts.skey The target user ID for the event if applicable
+ * @param {string} opts.prevMship The prev_content.membership for the event.
+ * @param {number=} opts.ts   Optional. Timestamp for the event
+ * @param {string} opts.user The user ID for the event.
+ * @param {RoomMember} opts.target The target of the event.
+ * @param {string=} opts.skey The other user ID for the event if applicable
  * e.g. for invites/bans.
  * @param {string} opts.name The content.displayname for the event.
- * @param {string} opts.url The content.avatar_url for the event.
+ * @param {string=} opts.url The content.avatar_url for the event.
  * @param {boolean} opts.event True to make a MatrixEvent.
  * @return {Object|MatrixEvent} The event
  */
-export function mkMembership(opts) {
-    opts.type = "m.room.member";
+export function mkMembership(opts: MakeEventPassThruProps & {
+    room: Room["roomId"];
+    mship: string;
+    prevMship?: string;
+    name?: string;
+    url?: string;
+    skey?: string;
+    target?: RoomMember;
+}): MatrixEvent {
+    const event: MakeEventProps = {
+        ...opts,
+        type: "m.room.member",
+        content: {
+            membership: opts.mship,
+        },
+    };
     if (!opts.skey) {
-        opts.skey = opts.sender || opts.user;
+        event.skey = opts.user;
     }
     if (!opts.mship) {
         throw new Error("Missing .mship => " + JSON.stringify(opts));
     }
-    opts.content = {
-        membership: opts.mship,
-    };
-    if (opts.name) {
-        opts.content.displayname = opts.name;
+
+    if (opts.prevMship) {
+        event.prev_content = { membership: opts.prevMship };
     }
-    if (opts.url) {
-        opts.content.avatar_url = opts.url;
+    if (opts.name) { event.content.displayname = opts.name; }
+    if (opts.url) { event.content.avatar_url = opts.url; }
+    const e = mkEvent(event);
+    if (opts.target) {
+        e.target = opts.target;
     }
-    return mkEvent(opts);
+    return e;
 }
 
+export type MessageEventProps = MakeEventPassThruProps & {
+    room: Room["roomId"];
+    relatesTo?: IEventRelation;
+    msg?: string;
+};
 /**
  * Create an m.room.message event.
  * @param {Object} opts Values for the message
  * @param {string} opts.room The room ID for the event.
  * @param {string} opts.user The user ID for the event.
- * @param {string} opts.msg Optional. The content.body for the event.
+ * @param {number} opts.ts The timestamp for the event.
  * @param {boolean} opts.event True to make a MatrixEvent.
+ * @param {string=} opts.msg Optional. The content.body for the event.
  * @return {Object|MatrixEvent} The event
  */
-export function mkMessage(opts) {
-    opts.type = "m.room.message";
-    if (!opts.msg) {
-        opts.msg = "Random->" + Math.random();
-    }
+export function mkMessage({ msg, relatesTo, ...opts }: MakeEventPassThruProps & {
+    room: Room["roomId"];
+    msg?: string;
+}): MatrixEvent {
     if (!opts.room || !opts.user) {
-        throw new Error("Missing .room or .user from %s", opts);
+        throw new Error("Missing .room or .user from options");
     }
-    opts.content = {
-        msgtype: "m.text",
-        body: opts.msg,
+    const message = msg ?? "Random->" + Math.random();
+    const event: MakeEventProps = {
+        ...opts,
+        type: "m.room.message",
+        content: {
+            msgtype: "m.text",
+            body: message,
+            ['m.relates_to']: relatesTo,
+        },
     };
-    return mkEvent(opts);
+
+    return mkEvent(event);
 }
 
 /**
@@ -261,8 +316,7 @@ HttpResponse.prototype.request = function(
                 return this.pendingLookup.promise;
             }
             // >1 pending thing, and they are different, whine.
-            expect(false).toBe(
-                true, ">1 pending request. You should probably handle them. " +
+            expect(false).toBe(">1 pending request. You should probably handle them. " +
                     "PENDING: " + JSON.stringify(this.pendingLookup) + " JUST GOT: " +
                     method + " " + path,
             );
@@ -293,6 +347,7 @@ HttpResponse.prototype.request = function(
         }
 
         if (next.error) {
+            // eslint-disable-next-line prefer-promise-reject-errors
             return Promise.reject({
                 errcode: next.error.errcode,
                 httpStatus: next.error.httpStatus,
@@ -307,7 +362,7 @@ HttpResponse.prototype.request = function(
         this.httpLookups.unshift(next);
         return new Promise(() => {});
     }
-    expect(true).toBe(false, "Expected different request. " + logLine);
+    expect(false).toBe("Expected different request. " + logLine);
     return new Promise(() => {});
 };
 
