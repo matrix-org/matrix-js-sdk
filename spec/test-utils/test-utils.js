@@ -1,8 +1,8 @@
 // load olm before the sdk if possible
-import './olm-loader';
+import '../olm-loader';
 
-import { logger } from '../src/logger';
-import { MatrixEvent } from "../src/models/event";
+import { logger } from '../../src/logger';
+import { MatrixEvent } from "../../src/models/event";
 
 /**
  * Return a promise that is resolved when the client next emits a
