@@ -1,4 +1,4 @@
-import * as utils from "../test-utils";
+import * as utils from "../test-utils/test-utils";
 import { CRYPTO_ENABLED } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
 import { Filter, MemoryStore, Room } from "../../src/matrix";

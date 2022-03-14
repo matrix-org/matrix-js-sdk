@@ -13,7 +13,7 @@ import {
 import { MEGOLM_ALGORITHM } from "../../src/crypto/olmlib";
 import { EventStatus, MatrixEvent } from "../../src/models/event";
 import { Preset } from "../../src/@types/partials";
-import * as testUtils from "../test-utils";
+import * as testUtils from "../test-utils/test-utils";
 
 jest.useFakeTimers();
 

@@ -24,7 +24,7 @@ import * as algorithms from "../../../src/crypto/algorithms";
 import { WebStorageSessionStore } from "../../../src/store/session/webstorage";
 import { MemoryCryptoStore } from "../../../src/crypto/store/memory-crypto-store";
 import { MockStorageApi } from "../../MockStorageApi";
-import * as testUtils from "../../test-utils";
+import * as testUtils from "../../test-utils/test-utils";
 import { OlmDevice } from "../../../src/crypto/OlmDevice";
 import { Crypto } from "../../../src/crypto";
 import { resetCrossSigningKeys } from "./crypto-utils";

@@ -2,7 +2,7 @@ import {
     RelationType,
 } from "../../src";
 import { FilterComponent } from "../../src/filter-component";
-import { mkEvent } from '../test-utils';
+import { mkEvent } from '../test-utils/test-utils';
 
 describe("Filter Component", function() {
     describe("types", function() {
