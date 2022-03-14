@@ -40,6 +40,7 @@ const DEFAULT_INFO_CONTENT_PROPS: InfoContentProps = {
 export const makeBeaconInfoEvent = (
     sender: string,
     contentProps: Partial<InfoContentProps> = {},
+    eventId?: string,
 ): MatrixEvent => {
     const {
         timeout, isLive, description, assetType,
@@ -52,6 +53,10 @@ export const makeBeaconInfoEvent = (
         state_key: sender,
         content: makeBeaconInfoContent(timeout, isLive, description, assetType),
     });
+
+    // live beacons use the beacon_info event id
+    // set or default this
+    event.replaceLocalEventId(eventId || `$${Math.random()}-${Math.random()}`);
 
     return event;
 };

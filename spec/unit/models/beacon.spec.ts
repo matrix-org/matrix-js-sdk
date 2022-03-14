@@ -77,7 +77,20 @@ describe('Beacon', () => {
         const userId = '@user:server.org';
         // 14.03.2022 16:15
         const now = 1647270879403;
+        const HOUR_MS = 3600000;
+
+        // beacon_info events
+        // created 'an hour ago'
+        // without timeout of 3 hours
+        let liveBeaconEvent;
+        let notLiveBeaconEvent;
         beforeEach(() => {
+            // go back in time to create the beacon
+            jest.spyOn(global.Date, 'now').mockReturnValue(now - HOUR_MS);
+            liveBeaconEvent = makeBeaconInfoEvent(userId, { timeout: HOUR_MS * 3, isLive: true });
+            notLiveBeaconEvent = makeBeaconInfoEvent(userId, { timeout: HOUR_MS * 3, isLive: false });
+
+            // back to now
             jest.spyOn(global.Date, 'now').mockReturnValue(now);
         });
 
@@ -86,7 +99,38 @@ describe('Beacon', () => {
         });
 
         it('creates beacon from event', () => {
-            const liveBeacon = makeBeaconInfoEvent(userId, 1000, true);
+            const beacon = new Beacon(liveBeaconEvent);
+
+            expect(beacon.beaconInfoId).toEqual(liveBeaconEvent.getId());
+            expect(beacon.isLive).toEqual(true);
+        });
+
+        describe('isLive()', () => {
+            it('returns false when beacon is explicitly set to not live', () => {
+                const beacon = new Beacon(notLiveBeaconEvent);
+                expect(beacon.isLive).toEqual(false);
+            });
+
+            it('returns false when beacon is expired', () => {
+                // time travel to beacon creation + 3 hours
+                jest.spyOn(global.Date, 'now').mockReturnValue(now - 3 * HOUR_MS);
+                const beacon = new Beacon(liveBeaconEvent);
+                expect(beacon.isLive).toEqual(false);
+            });
+
+            it('returns false when beacon timestamp is in future', () => {
+                // time travel to before beacon events timestamp
+                // event was created now - 1 hour
+                jest.spyOn(global.Date, 'now').mockReturnValue(now - HOUR_MS - HOUR_MS);
+                const beacon = new Beacon(liveBeaconEvent);
+                expect(beacon.isLive).toEqual(false);
+            });
+
+            it('returns true when beacon was created in past and not yet expired', () => {
+                // liveBeaconEvent was created 1 hour ago
+                const beacon = new Beacon(liveBeaconEvent);
+                expect(beacon.isLive).toEqual(true);
+            });
         });
     });
 });

@@ -135,6 +135,9 @@ export type MBeaconInfoEventContent = &
 }
 */
 
+/**
+ * Content of an m.beacon event
+ */
 export type MBeaconEventContent = &
     MLocationEvent &
     // timestamp when location was taken
