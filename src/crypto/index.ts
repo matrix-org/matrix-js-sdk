@@ -3115,7 +3115,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 this.secretStorage.onRequestReceived(event);
             } else if (event.getType() === "m.secret.send") {
                 this.secretStorage.onSecretReceived(event);
-            } else if (event.getType() === "org.matrix.room_key.withheld") {
+            } else if (event.getType() === "m.room_key.withheld"
+                || event.getType() === "org.matrix.room_key.withheld") {
                 this.onRoomKeyWithheldEvent(event);
             } else if (event.getContent().transaction_id) {
                 this.onKeyVerificationMessage(event);

@@ -618,6 +618,9 @@ describe("megolm", function() {
             aliceTestClient.httpBackend.when(
                 'PUT', '/sendToDevice/org.matrix.room_key.withheld/',
             ).respond(200, {});
+            aliceTestClient.httpBackend.when(
+                'PUT', '/sendToDevice/m.room_key.withheld/',
+            ).respond(200, {});
 
             return Promise.all([
                 aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
@@ -717,6 +720,9 @@ describe("megolm", function() {
             });
             aliceTestClient.httpBackend.when(
                 'PUT', '/sendToDevice/org.matrix.room_key.withheld/',
+            ).respond(200, {});
+            aliceTestClient.httpBackend.when(
+                'PUT', '/sendToDevice/m.room_key.withheld/',
             ).respond(200, {});
 
             return Promise.all([
