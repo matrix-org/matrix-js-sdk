@@ -2416,7 +2416,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
 
         if (inviteJoinCount) {
-            return _td(memberNamesToRoomName(otherNames, inviteJoinCount));
+            return memberNamesToRoomName(otherNames, inviteJoinCount);
         }
 
         const myMembership = this.getMyMembership();
@@ -2431,7 +2431,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                     return i.getContent().display_name;
                 });
 
-                return _td(`Inviting ${memberNamesToRoomName(thirdPartyNames)}`);
+                return `Inviting ${memberNamesToRoomName(thirdPartyNames)}`;
             }
         }
         // let's try to figure out who was here before
@@ -2445,9 +2445,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             }).map((m) => m.name);
         }
         if (leftNames.length) {
-            return _td(`Empty room (was ${memberNamesToRoomName(leftNames)})`);
+            return `Empty room (was ${memberNamesToRoomName(leftNames)})`;
         } else {
-            return _td("Empty room");
+            return "Empty room";
         }
     }
 
