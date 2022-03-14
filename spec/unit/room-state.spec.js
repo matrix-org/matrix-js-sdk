@@ -1,4 +1,5 @@
 import * as utils from "../test-utils/test-utils";
+import { makeBeaconInfoEvent } from "../test-utils/beacon";
 import { RoomState } from "../../src/models/room-state";
 
 describe("RoomState", function() {
@@ -249,6 +250,31 @@ describe("RoomState", function() {
             );
         });
 
+        it('adds new beacon info events to state', () => {
+            const beaconEvent = makeBeaconInfoEvent(userA, roomId);
+
+            state.setStateEvents([beaconEvent]);
+
+            expect(state.beacons.size).toEqual(1);
+            expect(state.beacons.get(beaconEvent.getId())).toBeTruthy();
+        });
+
+        it('updates existing beacon info events in state', () => {
+            const beaconId = '$beacon1';
+            const beaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId);
+            const updatedBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: false }, beaconId);
+
+            state.setStateEvents([beaconEvent]);
+            const beaconInstance = state.beacons.get(beaconId);
+            expect(beaconInstance.isLive).toEqual(true);
+
+            state.setStateEvents([updatedBeaconEvent]);
+
+            // same Beacon
+            expect(state.beacons.get(beaconId)).toBe(beaconInstance);
+            // updated liveness
+            expect(state.beacons.get(beaconId).isLive).toEqual(false);
+        });
     });
 
     describe("setOutOfBandMembers", function() {

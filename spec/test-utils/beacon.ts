@@ -39,6 +39,7 @@ const DEFAULT_INFO_CONTENT_PROPS: InfoContentProps = {
  */
 export const makeBeaconInfoEvent = (
     sender: string,
+    roomId: string,
     contentProps: Partial<InfoContentProps> = {},
     eventId?: string,
 ): MatrixEvent => {
@@ -50,6 +51,7 @@ export const makeBeaconInfoEvent = (
     };
     const event = new MatrixEvent({
         type: `${M_BEACON_INFO.name}.${sender}`,
+        room_id: roomId,
         state_key: sender,
         content: makeBeaconInfoContent(timeout, isLive, description, assetType),
     });

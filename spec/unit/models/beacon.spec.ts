@@ -76,6 +76,7 @@ describe('Beacon', () => {
 
     describe('Beacon', () => {
         const userId = '@user:server.org';
+        const roomId = '$room:server.org';
         // 14.03.2022 16:15
         const now = 1647270879403;
         const HOUR_MS = 3600000;
@@ -88,8 +89,13 @@ describe('Beacon', () => {
         beforeEach(() => {
             // go back in time to create the beacon
             jest.spyOn(global.Date, 'now').mockReturnValue(now - HOUR_MS);
-            liveBeaconEvent = makeBeaconInfoEvent(userId, { timeout: HOUR_MS * 3, isLive: true }, '$live123');
-            notLiveBeaconEvent = makeBeaconInfoEvent(userId, { timeout: HOUR_MS * 3, isLive: false }, '$dead123');
+            liveBeaconEvent = makeBeaconInfoEvent(userId, roomId, { timeout: HOUR_MS * 3, isLive: true }, '$live123');
+            notLiveBeaconEvent = makeBeaconInfoEvent(
+                userId,
+                roomId,
+                { timeout: HOUR_MS * 3, isLive: false },
+                '$dead123',
+            );
 
             // back to now
             jest.spyOn(global.Date, 'now').mockReturnValue(now);
@@ -151,7 +157,7 @@ describe('Beacon', () => {
                 expect(beacon.isLive).toEqual(true);
 
                 const updatedBeaconEvent = makeBeaconInfoEvent(
-                    userId, { timeout: HOUR_MS * 3, isLive: false }, '$live123');
+                    userId, roomId, { timeout: HOUR_MS * 3, isLive: false }, '$live123');
 
                 beacon.update(updatedBeaconEvent);
                 expect(beacon.isLive).toEqual(false);
