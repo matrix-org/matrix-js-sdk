@@ -18,6 +18,7 @@ import { logger } from './logger';
 import { IAbortablePromise } from "./@types/partials";
 import { MatrixClient } from "./client";
 import { IRoomEvent, IStateEvent } from "./sync-accumulator";
+import { TypedEventEmitter } from "./models//typed-event-emitter";
 
 const DEBUG = true;
 
@@ -109,23 +110,43 @@ export enum SlidingSyncState {
  * multiple sliding windows, and maintains the index->room_id mapping.
  */
 class SlidingList {
-    list: MSC3575List;
-    private defaultListRange: number[][];
+    private list: MSC3575List;
+    private isModified: boolean;
 
+    // returned data
     roomIndexToRoomId: Record<number,string>;
     joinedCount: number;
 
     /**
      * Construct a new sliding list.
-     * @param {MSC3575List} list The default list values to apply for this list, including default
-     * ranges, required_state, timeline_limit, etc.
+     * @param {MSC3575List} list The range, sort and filter values to use for this list.
      */
     constructor(list: MSC3575List) {
+        this.updateList(list);
+    }
+
+    /**
+     * Mark this list as modified or not. Modified lists will return sticky params with calls to getList.
+     * This is useful for the first time the list is sent, or if the list has changed in some way.
+     * @param modified True to mark this list as modified so all sticky parameters will be re-sent.
+     */
+    setModified(modified: boolean) {
+        this.isModified =  modified;
+    }
+
+    /**
+     * Update list parameters. All fields will be replaced with the new list parameters.
+     * @param list The new list parameters
+     */
+    updateList(list: MSC3575List) {
         list.filters = list.filters || {};
-        list.ranges = list.ranges || [[0,20]];
-        this.list = list;
-        this.defaultListRange = [[0,20]];
-        
+        list.ranges = list.ranges || [];
+        this.list = JSON.parse(JSON.stringify(list));
+        this.isModified = true;
+
+        // reset values as the join count may be very different (if filters changed) including the rooms
+        // (e.g sort orders or sliding window ranges changed)
+
         // the constantly changing sliding window ranges. Not an array for performance reasons
         // E.g tracking ranges 0-99, 500-599, we don't want to have a 600 element array
         this.roomIndexToRoomId = {};
@@ -135,50 +156,70 @@ class SlidingList {
 
     /**
      * Return a copy of the list suitable for a request body.
-     * @param {boolean} includeSticky If true, includes sticky params. Else skips them.
+     * @param {boolean} forceIncludeAllParams True to forcibly include all params even if the list
+     * hasn't been modified. Callers may want to do this if they are modifying the list prior to calling
+     * updateList.
      */
-    getList(includeSticky: boolean): MSC3575List {
-        if (!includeSticky) {
-            // only the ranges are non-sticky
-            return {
-                ranges: JSON.parse(JSON.stringify(this.list.ranges)),
-            };
+    getList(forceIncludeAllParams: boolean): MSC3575List {
+        let list = {
+            ranges: JSON.parse(JSON.stringify(this.list.ranges)),
+        };
+        if (this.isModified || forceIncludeAllParams) {
+            list =  JSON.parse(JSON.stringify(this.list));
         }
-        return JSON.parse(JSON.stringify(this.list));
+        return list;
     }
 
     /**
-     * Modify the filters on this list. The filters provided are copied. This will reset list ranges
-     * so callers need to adjust any UI respectively.
-     * @param {object} filters The sliding sync filters to apply e.g { is_dm: true }.
+     * Check if a given index is within the list range. This is required even though the /sync API
+     * provides explicit updates with index positions because of the following situation:
+     *   0 1 2 3 4 5 6 7 8   indexes
+     *   a b c       d e f   COMMANDS: SYNC 0 2 a b c; SYNC 6 8 d e f;
+     *   a b c       d _ f   COMMAND: DELETE 7;
+     *   e a b c       d f   COMMAND: INSERT 0 e; 
+     *   c=3 is wrong as we are not tracking it, ergo we need to see if `i` is in range else drop it
+     * @param i The index to check
+     * @returns True if the index is within a sliding window
      */
-    setFilters(filters: object) {
-        this.list.filters = Object.assign({}, filters);
-        // if we are viewing a window at 100-120 and then we filter down to 5 total rooms,
-        // we'll end up showing nothing. Therefore, if the filters change (e.g room name filter)
-        // reset the range back to 0-20.
-        this.list.ranges = JSON.parse(JSON.stringify(this.defaultListRange));
-        // Wipe the index to room ID map as the filters have changed which will invalidate these.
-        this.roomIndexToRoomId = {};
+    isIndexInRange(i: number): boolean {
+        for (let r of this.list.ranges) {
+            if (r[0] <= i && i <= r[1]) {
+                return true;
+            }
+        }
+        return false;
     }
 }
+
+export enum SlidingSyncEvent {
+    RoomData = "SlidingSync.RoomData",
+    Lifecycle = "SlidingSync.Lifecycle",
+    List = "SlidingSync.List",
+}
+
+export type SlidingSyncEventHandlerMap = {
+    [SlidingSyncEvent.RoomData]: (roomId: string, roomData: MSC3575RoomData) => void;
+    [SlidingSyncEvent.Lifecycle]: (state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err: Error) => void;
+    [SlidingSyncEvent.List]: (listIndex: number, joinedCount: number, roomIndexToRoomId: Record<number,string>) => void;
+};
 
 /**
  * SlidingSync is a high-level data structure which controls the majority of sliding sync.
  * It has no hooks into JS SDK with the exception of needing a MatrixClient to perform the HTTP request.
  * This means this class (and everything it uses) can be used in isolation from JS SDK if needed.
- * To hook this up with the JS SDK, you need to use SlidingSyncApi.
+ * To hook this up with the JS SDK, you need to use SlidingSyncSdk.
  */
-export class SlidingSync {
+export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSyncEventHandlerMap> {
     private proxyBaseUrl: string;
     private lists: SlidingList[];
+    private listModifiedCount: number;
     private client: MatrixClient;
     private timeoutMS: number;
     private terminated: boolean;
-    private roomSubscriptions: Set<string>; // the *desired* room subscriptions
+
     private roomSubscriptionInfo: MSC3575RoomSubscription;
-    private roomDataCallbacks: ((roomId: string, roomData: MSC3575RoomData) => void)[]; // array of functions
-    private lifecycleCallbacks: ((state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err: Error) => void)[];
+    private desiredRoomSubscriptions: Set<string>; // the *desired* room subscriptions
+    private confirmedRoomSubscriptions: Set<string>;
 
     private pendingReq?: IAbortablePromise<MSC3575SlidingSyncResponse>;
 
@@ -191,16 +232,51 @@ export class SlidingSync {
      * @param {number} timeoutMS The number of milliseconds to wait for a response.
      */
     constructor(proxyBaseUrl: string, lists: MSC3575List[], subInfo: MSC3575RoomSubscription, client: MatrixClient, timeoutMS: number) {
+        super();
         this.proxyBaseUrl = proxyBaseUrl;
         this.timeoutMS = timeoutMS;
         this.lists = lists.map((l) => { return new SlidingList(l) });
         this.client = client;
         this.roomSubscriptionInfo = subInfo;
         this.terminated = false;
-        this.roomSubscriptions = new Set();
-        this.roomDataCallbacks = [];
-        this.lifecycleCallbacks = [];
+        this.desiredRoomSubscriptions = new Set();
+        this.confirmedRoomSubscriptions = new Set();
         this.pendingReq = null;
+        this.listModifiedCount = 0;
+    }
+
+    /**
+     * Get the length of the sliding lists.
+     * @returns The number of lists in the sync request
+     */
+    listLength(): number {
+        return this.lists.length;
+    }
+
+    /**
+     * Get the full list parameters for a list index. This function is provided for callers to use
+     * in conjunction with setList to update fields on an existing list.
+     * @param index The list index to get the list for.
+     * @returns A copy of the list or undefined.
+     */
+    getList(index: number): MSC3575List {
+        return this.lists[index].getList(true);
+    }
+
+    /**
+     * Add or replace a list. Calling this function will interrupt the /sync request to resend new
+     * lists.
+     * @param index The index to modify
+     * @param list The new list parameters.
+     */
+    setList(index: number, list: MSC3575List) {
+        if (this.lists[index]) {
+            this.lists[index].updateList(list);
+        } else {
+            this.lists[index] = new SlidingList(list);
+        }
+        this.listModifiedCount += 1;
+        this.resend();
     }
 
     /**
@@ -208,7 +284,7 @@ export class SlidingSync {
      * @returns A copy of the desired room subscriptions.
      */
     getRoomSubscriptions(): Set<string> {
-        return new Set(Array.from(this.roomSubscriptions));
+        return new Set(Array.from(this.desiredRoomSubscriptions));
     }
 
     /**
@@ -218,24 +294,19 @@ export class SlidingSync {
      * @param s The new desired room subscriptions.
      */
     modifyRoomSubscriptions(s: Set<string>) {
-        this.roomSubscriptions = s;
+        this.desiredRoomSubscriptions = s;
         this.resend();
     }
 
     /**
-     * Listen for high-level room events on the sync connection
-     * @param {function} callback The callback to invoke.
+     * Modify which events to retrieve for room subscriptions. Invalidates all room subscriptions
+     * such that they will be sent up afresh.
+     * @param rs The new room subscription fields to fetch.
      */
-    addRoomDataListener(callback: (roomId: string, roomData: MSC3575RoomData) => void) {
-        this.roomDataCallbacks.push(callback);
-    }
-
-    /**
-     * Listen for high-level lifecycle events on the sync connection
-     * @param {function} callback The callback to invoke.
-     */
-    addLifecycleListener(callback: (state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err: Error) => void) {
-        this.lifecycleCallbacks.push(callback);
+    modifyRoomSubscriptionInfo(rs: MSC3575RoomSubscription) {
+        this.roomSubscriptionInfo = rs;
+        this.confirmedRoomSubscriptions = new Set<string>();
+        this.resend();
     }
 
     /**
@@ -247,9 +318,7 @@ export class SlidingSync {
         if (!roomData.required_state) { roomData.required_state = []; }
         if (!roomData.timeline) { roomData.timeline = []; }
         if (!roomData.room_id) { roomData.room_id = roomId; }
-        this.roomDataCallbacks.forEach((callback) => {
-            callback(roomId, roomData);
-        });
+        this.emit(SlidingSyncEvent.RoomData, roomId, roomData);
     }
 
     /**
@@ -259,9 +328,7 @@ export class SlidingSync {
      * @param {Error?} err Any error that occurred when making the request e.g network errors.
      */
     private _invokeLifecycleListeners(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err?: Error) {
-        this.lifecycleCallbacks.forEach((callback) => {
-            callback(state, resp, err);
-        });
+        this.emit(SlidingSyncEvent.Lifecycle, state, resp, err);
     }
 
     /**
@@ -288,23 +355,21 @@ export class SlidingSync {
      */
     async start() {
         let currentPos;
-        let confirmedSubscriptions: Set<string> = new Set(); // subs we've confirmed we're tracking from the server
         while (!this.terminated) {
             let resp;
             try {
-                // these fields are always required
+                const listModifiedCount = this.listModifiedCount;
                 let reqBody: MSC3575SlidingSyncRequest = {
                     lists: this.lists.map((l) => {
-                        // include sticky params if there is no current pos (first request)
-                        return l.getList(!currentPos);
+                        return l.getList(false);
                     }),
                     pos: currentPos,
                     timeout: this.timeoutMS,
                     clientTimeout: this.timeoutMS + BUFFER_PERIOD_MS,
                 };
                 // check if we are (un)subscribing to a room and modify request this one time for it
-                const newSubscriptions = difference(this.roomSubscriptions, confirmedSubscriptions);
-                const unsubscriptions = difference(confirmedSubscriptions, this.roomSubscriptions);
+                const newSubscriptions = difference(this.desiredRoomSubscriptions, this.confirmedRoomSubscriptions);
+                const unsubscriptions = difference(this.confirmedRoomSubscriptions, this.desiredRoomSubscriptions);
                 if (unsubscriptions.size > 0) {
                     reqBody.unsubscribe_rooms = Array.from(unsubscriptions);
                 }
@@ -320,11 +385,20 @@ export class SlidingSync {
                 currentPos = resp.pos;
                 // update what we think we're subscribed to.
                 for (let roomId of newSubscriptions) {
-                    confirmedSubscriptions.add(roomId);
+                    this.confirmedRoomSubscriptions.add(roomId);
                 }
                 for (let roomId of unsubscriptions) {
-                    confirmedSubscriptions.delete(roomId);
+                    this.confirmedRoomSubscriptions.delete(roomId);
                 }
+                if (listModifiedCount !== this.listModifiedCount) {
+                    // the lists have been modified whilst we were waiting for 'await' to return, but the abort()
+                    // call did nothing. It is NOT SAFE to modify the list array now, so bail.
+                    // TODO: we should keep room subscriptions?
+                    console.warn("list modified during await call, dropping response", resp);
+                    continue;
+                }
+                // mark all these lists as having been sent as sticky so we don't keep sending sticky params
+                this.lists.forEach((l) => { l.setModified(false) })
                 if (!resp.ops) {
                     resp.ops = [];
                 }
@@ -367,12 +441,16 @@ export class SlidingSync {
                 );
             });
 
+            const listIndexesWithUpdates: Set<number> = new Set();
             // TODO: clear gapIndex immediately after next op to avoid a genuine DELETE shifting incorrectly e.g leaving a room
             let gapIndexes = {};
             resp.counts.forEach((count, index) => {
                 gapIndexes[index] = -1;
             });
             resp.ops.forEach((op) => {
+                if (op.list != null) {
+                    listIndexesWithUpdates.add(op.list);
+                }
                 if (op.op === "DELETE") {
                     debuglog("DELETE", op.list, op.index, ";");
                     delete this.lists[op.list].roomIndexToRoomId[op.index];
@@ -411,7 +489,7 @@ export class SlidingSync {
                             // [A,A,B,C] i=1
                             // Terminate. We'll assign into op.index next.
                             for (let i = gapIndex; i > op.index; i--) {
-                                if (indexInRange(this.lists[op.list].list.ranges, i)) {
+                                if (this.lists[op.list].isIndexInRange(i)) {
                                     this.lists[op.list].roomIndexToRoomId[i] =
                                         this.lists[op.list].roomIndexToRoomId[
                                             i - 1
@@ -422,7 +500,7 @@ export class SlidingSync {
                             // the gap is further up the list, shift every element to the left
                             // starting at the gap so we can just shift each element in turn
                             for (let i = gapIndex; i < op.index; i++) {
-                                if (indexInRange(this.lists[op.list].list.ranges, i)) {
+                                if (this.lists[op.list].isIndexInRange(i)) {
                                     this.lists[op.list].roomIndexToRoomId[i] =
                                         this.lists[op.list].roomIndexToRoomId[
                                             i + 1
@@ -481,6 +559,9 @@ export class SlidingSync {
                     );
                 }
             });
+            listIndexesWithUpdates.forEach((i) => {
+                this.emit(SlidingSyncEvent.List, i, this.lists[i].joinedCount, Object.assign({}, this.lists[i].roomIndexToRoomId));
+            })
 
             this._invokeLifecycleListeners(SlidingSyncState.Complete, resp);
         }
@@ -497,19 +578,4 @@ const difference = (setA: Set<string>, setB: Set<string>): Set<string> => {
 
 const sleep = (ms: number) => {
     return new Promise((resolve) => setTimeout(resolve, ms));
-};
-
-// SYNC 0 2 a b c; SYNC 6 8 d e f; DELETE 7; INSERT 0 e;
-// 0 1 2 3 4 5 6 7 8
-// a b c       d e f
-// a b c       d _ f
-// e a b c       d f  <--- c=3 is wrong as we are not tracking it, ergo we need to see if `i` is in range else drop it
-const indexInRange = (ranges: number[][], i: number) => {
-    let isInRange = false;
-    ranges.forEach((r) => {
-        if (r[0] <= i && i <= r[1]) {
-            isInRange = true;
-        }
-    });
-    return isInRange;
 };

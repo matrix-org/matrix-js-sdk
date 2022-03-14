@@ -179,7 +179,7 @@ import { MediaHandler } from "./webrtc/mediaHandler";
 import { IRefreshTokenResponse } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse } from "./sliding-sync";
-import { SlidingSyncApi } from "./sliding-sync-sdk";
+import { SlidingSyncSdk } from "./sliding-sync-sdk";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -910,7 +910,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected verificationMethods: VerificationMethod[];
     protected fallbackICEServerAllowed = false;
     protected roomList: RoomList;
-    protected syncApi: SlidingSyncApi;
+    protected syncApi: SlidingSyncSdk;
     public pushRules: IPushRules;
     protected syncLeftRoomsPromise: Promise<Room[]>;
     protected syncedLeftRooms = false;
@@ -1174,7 +1174,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
             return this.canResetTimelineCallback(roomId);
         };
-        this.syncApi = new SlidingSyncApi(this, this.clientOpts);
+        this.syncApi = new SlidingSyncSdk(this, this.clientOpts);
         this.syncApi.sync();
 
         if (this.clientOpts.clientWellKnownPollPeriod !== undefined) {

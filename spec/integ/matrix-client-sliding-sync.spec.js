@@ -32,7 +32,7 @@ describe("SlidingSync", () => {
             };
             httpBackend.when("POST", syncUrl).respond(200, fakeResp);
             let deliver = callbackPromise(500, "lifecycle callback was not called");
-            slidingSync.addLifecycleListener(deliver.callback);
+            slidingSync.on("SlidingSync.Lifecycle", deliver.callback);
             slidingSync.start();
             await httpBackend.flush(syncUrl, 1);
             let lifecycleData = await deliver.promise;
@@ -62,7 +62,7 @@ describe("SlidingSync", () => {
         it("should be able to subscribe/unsubscribe to a room", async (done) => {    
             // add the subscription
             const slidingSync = new SlidingSync(proxyBaseUrl, [], roomSubInfo, client, 1);
-            slidingSync.roomSubscriptions.add(roomId);
+            slidingSync.modifyRoomSubscriptions(new Set([roomId]));
             const fakeResp = {
                 pos: "a",
                 ops: [],
@@ -81,7 +81,7 @@ describe("SlidingSync", () => {
                 expect(body.room_subscriptions[roomId]).toEqual(roomSubInfo);
             }).respond(200, fakeResp);
             let deliver = callbackPromise(500, "room callback was not called");
-            slidingSync.addRoomDataListener(deliver.callback);
+            slidingSync.on("SlidingSync.RoomData", deliver.callback);
             slidingSync.start();
             await httpBackend.flush(syncUrl, 1);
             let roomData = await deliver.promise;
@@ -99,10 +99,10 @@ describe("SlidingSync", () => {
             }).respond(200, fakeResp);
         
             deliver = callbackPromise(500, "lifecycle callback was not called");
-            slidingSync.addLifecycleListener(deliver.callback);
+            slidingSync.on("SlidingSync.Lifecycle", deliver.callback);
         
             // remove the subscription
-            slidingSync.roomSubscriptions.delete(roomId);
+            slidingSync.modifyRoomSubscriptions(new Set());
         
             // kick the connection to resend the unsub
             slidingSync.resend();
@@ -170,12 +170,12 @@ describe("SlidingSync", () => {
                 counts: [500],
             });
             let listenerData = {};
-            slidingSync.addRoomDataListener((roomId, roomData) => {
+            slidingSync.on("SlidingSync.RoomData", (roomId, roomData) => {
                 expect(listenerData[roomId]).toBeFalsy();
                 listenerData[roomId] = roomData;
             });
             let responseProcessed = new Promise((resolve) => {
-                slidingSync.addLifecycleListener((state)=> {
+                slidingSync.on("SlidingSync.Lifecycle", (state)=> {
                     if (state === SlidingSyncState.Complete) {
                         resolve();
                     }

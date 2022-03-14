@@ -41,7 +41,7 @@ import { MatrixError } from "./http-api";
 import { RoomStateEvent } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
 import {SyncState } from "./sync";
-import { MSC3575RoomData, MSC3575SlidingSyncResponse, SlidingSync, SlidingSyncState } from "./sliding-sync";
+import { MSC3575RoomData, MSC3575SlidingSyncResponse, SlidingSync, SlidingSyncEvent, SlidingSyncState } from "./sliding-sync";
 
 const DEBUG = true;
 
@@ -58,19 +58,10 @@ function debuglog(...params) {
 }
 
 /**
- * <b>Internal class - unstable.</b>
- * Construct an entity which is able to sync with a homeserver.
- * @constructor
- * @param {MatrixClient} client The matrix client instance to use.
- * @param {Object} opts Config options
- * @param {module:crypto=} opts.crypto Crypto manager
- * @param {Function=} opts.canResetEntireTimeline A function which is called
- * with a room ID and returns a boolean. It should return 'true' if the SDK can
- * SAFELY remove events from this room. It may not be safe to remove events if
- * there are other references to the timelines for this room.
- * Default: returns false.
+ * A copy of SyncApi such that it can be used as a drop-in replacement for sync v2. For the actual
+ * sliding sync API, see sliding-sync.ts or the class SlidingSync.
  */
-export class SlidingSyncApi {
+export class SlidingSyncSdk {
     private syncState: SyncState = null;
     private syncStateData: ISyncStateData;
     private slidingSync: SlidingSync;
@@ -118,8 +109,8 @@ export class SlidingSyncApi {
                 timeline_limit: 20,
             },
         ], {}, client, 20 * 1000);
-        this.slidingSync.addLifecycleListener(this.onLifecycle.bind(this));
-        this.slidingSync.addRoomDataListener(this.onRoomData.bind(this));
+        this.slidingSync.on(SlidingSyncEvent.Lifecycle, this.onLifecycle.bind(this));
+        this.slidingSync.on(SlidingSyncEvent.RoomData, this.onRoomData.bind(this));
     }
 
     private onRoomData(roomId: string, roomData: MSC3575RoomData) {
