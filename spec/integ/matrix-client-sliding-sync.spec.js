@@ -114,11 +114,137 @@ describe("SlidingSync", () => {
             done();
         });
 
-        it("should be possible to adjust room subscription info whislt syncing", () => {
+        it("should be possible to adjust room subscription info whilst syncing", async (done) => {
             // add 1 sync, modify info, sync, check it is resent
+            const slidingSync = new SlidingSync(proxyBaseUrl, [], roomSubInfo, client, 1);
+            slidingSync.modifyRoomSubscriptions(new Set([roomId]));
+            const fakeResp = {
+                pos: "a",
+                ops: [],
+                counts: [],
+                room_subscriptions: {
+                    [roomId]: wantRoomData
+                },
+            };
+            httpBackend.when("POST", syncUrl).check(function(req) {
+                let body = req.data;
+                if (!body) {
+                    body = JSON.parse(req.opts.body);
+                }
+                console.log(body);
+                expect(body.room_subscriptions).toBeTruthy();
+                expect(body.room_subscriptions[roomId]).toEqual(roomSubInfo);
+            }).respond(200, fakeResp);
+
+            let p = listenUntil(slidingSync, "SlidingSync.RoomData", (gotRoomId, gotRoomData) => {
+                expect(gotRoomId).toEqual(roomId);
+                expect(gotRoomData).toEqual(wantRoomData);
+                return true;
+            });
+            slidingSync.start();
+            await httpBackend.flush(syncUrl, 1);
+            await p;
+
+            // listen for updated request
+            const newSubInfo = {
+                timeline_limit: 100,
+                required_state: [
+                    ["m.room.member", "*"],
+                ]
+            }
+            httpBackend.when("POST", syncUrl).check(function(req) {
+                let body = req.data;
+                if (!body) {
+                    body = JSON.parse(req.opts.body);
+                }
+                console.log(body);
+                expect(body.room_subscriptions).toBeTruthy();
+                expect(body.room_subscriptions[roomId]).toEqual(newSubInfo);
+            }).respond(200, fakeResp);
+
+            p = listenUntil(slidingSync, "SlidingSync.RoomData", (gotRoomId, gotRoomData) => {
+                expect(gotRoomId).toEqual(roomId);
+                expect(gotRoomData).toEqual(wantRoomData);
+                return true;
+            });
+            
+            slidingSync.modifyRoomSubscriptionInfo(newSubInfo);
+            await httpBackend.flush(syncUrl, 1);
+            await p;
+            slidingSync.stop();
+            done();
         });
-        it("should be possible to add room subscriptions whilst syncing", () => {
+        it("should be possible to add room subscriptions whilst syncing", async (done) => {
             // add 1, sync, add 1, sync, check only 1 is sent
+            const slidingSync = new SlidingSync(proxyBaseUrl, [], roomSubInfo, client, 1);
+            slidingSync.modifyRoomSubscriptions(new Set([roomId]));
+            const fakeResp = {
+                pos: "a",
+                ops: [],
+                counts: [],
+                room_subscriptions: {
+                    [roomId]: wantRoomData
+                },
+            };
+            httpBackend.when("POST", syncUrl).check(function(req) {
+                let body = req.data;
+                if (!body) {
+                    body = JSON.parse(req.opts.body);
+                }
+                console.log(body);
+                expect(body.room_subscriptions).toBeTruthy();
+                expect(body.room_subscriptions[roomId]).toEqual(roomSubInfo);
+            }).respond(200, fakeResp);
+
+            let p = listenUntil(slidingSync, "SlidingSync.RoomData", (gotRoomId, gotRoomData) => {
+                expect(gotRoomId).toEqual(roomId);
+                expect(gotRoomData).toEqual(wantRoomData);
+                return true;
+            });
+            slidingSync.start();
+            await httpBackend.flush(syncUrl, 1);
+            await p;
+
+            // listen for updated request
+            const anotherRoomID = "!another:room";
+            const anotherRoomData = {
+                name: "foo bar 2",
+                room_id: anotherRoomID,
+                required_state: [],
+                timeline: [],
+            }
+            httpBackend.when("POST", syncUrl).check(function(req) {
+                let body = req.data;
+                if (!body) {
+                    body = JSON.parse(req.opts.body);
+                }
+                console.log(body);
+                expect(body.room_subscriptions).toBeTruthy();
+                // only the new room is sent, the other is sticky
+                expect(body.room_subscriptions[anotherRoomID]).toEqual(roomSubInfo);
+                expect(body.room_subscriptions[roomId]).toBeUndefined();
+            }).respond(200, {
+                pos: "b",
+                ops: [],
+                counts: [],
+                room_subscriptions: {
+                    [anotherRoomID]: anotherRoomData
+                },
+            });
+
+            p = listenUntil(slidingSync, "SlidingSync.RoomData", (gotRoomId, gotRoomData) => {
+                expect(gotRoomId).toEqual(anotherRoomID);
+                expect(gotRoomData).toEqual(anotherRoomData);
+                return true;
+            });
+            
+            const subs = slidingSync.getRoomSubscriptions();
+            subs.add(anotherRoomID);
+            slidingSync.modifyRoomSubscriptions(subs);
+            await httpBackend.flush(syncUrl, 1);
+            await p;
+            slidingSync.stop();
+            done();
         });
     });
 
@@ -197,8 +323,103 @@ describe("SlidingSync", () => {
             done();
         });
 
-        it("should be possible to adjust list ranges", () => {
+        it("should be possible to adjust list ranges", async (done) => {
             // make 1 list, modify range, check it gets submitted
+            let listReq = {
+                ranges:  [[0,2]],
+                sort: ["by_name"],
+                timeline_limit: 1,
+                required_state: [
+                    ["m.room.topic", ""],
+                ],
+                filters: {
+                    is_dm: true,
+                },
+            };
+            const slidingSync = new SlidingSync(proxyBaseUrl, [listReq], {}, client, 1);
+            const roomA = "!a:localhost";
+            const roomB = "!b:localhost";
+            const roomC = "!c:localhost";
+            const rooms = [
+                {
+                    room_id: roomA,
+                    name: "A",
+                    required_state: [],
+                    timeline: [],
+                },
+                {
+                    room_id: roomB,
+                    name: "B",
+                    required_state: [],
+                    timeline: [],
+                },
+                {
+                    room_id: roomC,
+                    name: "C",
+                    required_state: [],
+                    timeline: [],
+                },
+            ]
+            httpBackend.when("POST", syncUrl).check(function(req) {
+                let body = req.data;
+                if (!body) {
+                    body = JSON.parse(req.opts.body);
+                }
+                console.log(body);
+                expect(body.lists).toBeTruthy();
+                expect(body.lists[0]).toEqual(listReq);
+            }).respond(200, {
+                pos: "a",
+                ops: [{
+                    op: "SYNC",
+                    list: 0,
+                    range: [0,2],
+                    rooms: rooms,
+                }],
+                counts: [500],
+            });
+            let responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+                return state === SlidingSyncState.Complete;
+            })
+            slidingSync.start();
+            await httpBackend.flush(syncUrl, 1);
+            await responseProcessed;
+            // TODO: the above is duped from test 'should be possible to subscribe to a list'
+
+            // modify the list and list for the new request
+            let newRanges =  [[0,2],[3,5]];
+            httpBackend.when("POST", syncUrl).check(function(req) {
+                let body = req.data;
+                if (!body) {
+                    body = JSON.parse(req.opts.body);
+                }
+                console.log("next ranges", body.lists[0].ranges);
+                expect(body.lists).toBeTruthy();
+                expect(body.lists[0]).toEqual({
+                    // only the ranges should be sent as the rest are unchanged and sticky
+                    ranges: newRanges,
+                });
+            }).respond(200, {
+                pos: "b",
+                ops: [{
+                    op: "SYNC",
+                    list: 0,
+                    range: [0,2],
+                    rooms: rooms,
+                }],
+                counts: [500],
+            });
+            
+            slidingSync.setListRanges(0, newRanges);
+            responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+                return state === SlidingSyncState.RequestFinished;
+            });
+            await httpBackend.flush(syncUrl, 1);
+            await responseProcessed;
+
+
+            slidingSync.stop();
+            done();
         });
 
         it("should be possible to get list updates", () => {
@@ -229,6 +450,7 @@ function listenUntil(emitter, eventName, callback, timeoutMs) {
     if (!timeoutMs) {
         timeoutMs = 500;
     }
+    const trace = new Error().stack.split(`\n`)[2];
     return Promise.race([new Promise((resolve, reject) => {
         const wrapper = (...args) => {
             try {
@@ -242,5 +464,5 @@ function listenUntil(emitter, eventName, callback, timeoutMs) {
             }
         }
         emitter.on(eventName, wrapper);
-    }), timeout(timeoutMs, "timed out waiting for event " + eventName)]);
+    }), timeout(timeoutMs, "timed out waiting for event " + eventName + " " + trace)]);
 }

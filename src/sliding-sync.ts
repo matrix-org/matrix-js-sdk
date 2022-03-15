@@ -122,7 +122,7 @@ class SlidingList {
      * @param {MSC3575List} list The range, sort and filter values to use for this list.
      */
     constructor(list: MSC3575List) {
-        this.updateList(list);
+        this.replaceList(list);
     }
 
     /**
@@ -135,10 +135,18 @@ class SlidingList {
     }
 
     /**
-     * Update list parameters. All fields will be replaced with the new list parameters.
+     * Update the list range for this list. Does not affect modified status as list ranges are non-sticky.
+     * @param newRanges The new ranges for the list
+     */
+    updateListRange(newRanges: number[][]) {
+        this.list.ranges = JSON.parse(JSON.stringify(newRanges));
+    }
+
+    /**
+     * Replace list parameters. All fields will be replaced with the new list parameters.
      * @param list The new list parameters
      */
-    updateList(list: MSC3575List) {
+    replaceList(list: MSC3575List) {
         list.filters = list.filters || {};
         list.ranges = list.ranges || [];
         this.list = JSON.parse(JSON.stringify(list));
@@ -264,6 +272,18 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     }
 
     /**
+     * Set new ranges for an existing list. Calling this function when _only_ the ranges have changed
+     * is more efficient than calling setList(index,list) as this function won't resend sticky params,
+     * whereas setList always will.
+     * @param index The list index to modify
+     * @param ranges The new ranges to apply.
+     */
+    setListRanges(index: number, ranges: number[][]) {
+        this.lists[index].updateListRange(ranges);
+        this.resend();
+    }
+
+    /**
      * Add or replace a list. Calling this function will interrupt the /sync request to resend new
      * lists.
      * @param index The index to modify
@@ -271,7 +291,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      */
     setList(index: number, list: MSC3575List) {
         if (this.lists[index]) {
-            this.lists[index].updateList(list);
+            this.lists[index].replaceList(list);
         } else {
             this.lists[index] = new SlidingList(list);
         }
@@ -393,7 +413,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 if (listModifiedCount !== this.listModifiedCount) {
                     // the lists have been modified whilst we were waiting for 'await' to return, but the abort()
                     // call did nothing. It is NOT SAFE to modify the list array now, so bail.
-                    // TODO: we should keep room subscriptions?
+                    // TODO: we should process room subscriptions?
                     console.warn("list modified during await call, dropping response", resp);
                     continue;
                 }
