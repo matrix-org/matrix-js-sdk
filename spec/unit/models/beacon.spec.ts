@@ -119,7 +119,9 @@ describe('Beacon', () => {
             const beacon = new Beacon(liveBeaconEvent);
 
             expect(beacon.beaconInfoId).toEqual(liveBeaconEvent.getId());
+            expect(beacon.roomId).toEqual(roomId);
             expect(beacon.isLive).toEqual(true);
+            expect(beacon.beaconInfoOwner).toEqual(userId);
         });
 
         describe('isLive()', () => {

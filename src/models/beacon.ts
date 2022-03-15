@@ -44,6 +44,7 @@ export const isBeaconInfoEventType = (type: string) =>
 
 // https://github.com/matrix-org/matrix-spec-proposals/pull/3489
 export class Beacon extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
+    public readonly roomId: string;
     private beaconInfo: BeaconInfoState;
     private _isLive: boolean;
     private livenessWatchInterval: number;
@@ -53,6 +54,7 @@ export class Beacon extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     ) {
         super();
         this.setBeaconInfo(this.rootEvent);
+        this.roomId = this.rootEvent.getRoomId();
         this.emit(BeaconEvent.New, this.rootEvent, this);
     }
 
@@ -62,6 +64,10 @@ export class Beacon extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
 
     public get beaconInfoId(): string {
         return this.rootEvent.getId();
+    }
+
+    public get beaconInfoOwner(): string {
+        return this.rootEvent.getStateKey();
     }
 
     public update(beaconInfoEvent: MatrixEvent): void {
