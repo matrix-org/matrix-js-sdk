@@ -17,7 +17,7 @@ limitations under the License.
 
 import anotherjson from "another-json";
 
-import * as testUtils from "../test-utils";
+import * as testUtils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 import { logger } from "../../src/logger";
 

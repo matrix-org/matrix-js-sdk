@@ -29,7 +29,7 @@ limitations under the License.
 import '../olm-loader';
 
 import { logger } from '../../src/logger';
-import * as testUtils from "../test-utils";
+import * as testUtils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 import { CRYPTO_ENABLED } from "../../src/client";
 
