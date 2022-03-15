@@ -16,7 +16,7 @@ limitations under the License.
 
 import { User, UserEvent } from "./models/user";
 import { NotificationCountType, Room, RoomEvent } from "./models/room";
-import {ConnectionManagement } from "./conn-management";
+import { ConnectionManagement } from "./conn-management";
 import { logger } from './logger';
 import * as utils from "./utils";
 import { EventTimeline } from "./models/event-timeline";
@@ -24,24 +24,19 @@ import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } fr
 import { ISyncStateData } from "./sync";
 import { MatrixEvent } from "./models/event";
 import {
-    Category,
-    IEphemeral,
-    IInvitedRoom,
-    IInviteState,
-    IJoinedRoom,
-    ILeftRoom,
     IMinimalEvent,
     IRoomEvent,
     IStateEvent,
     IStrippedState,
-    ISyncResponse,
-    ITimeline,
 } from "./sync-accumulator";
 import { MatrixError } from "./http-api";
 import { RoomStateEvent } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
-import {SyncState } from "./sync";
-import { MSC3575RoomData, MSC3575SlidingSyncResponse, SlidingSync, SlidingSyncEvent, SlidingSyncState } from "./sliding-sync";
+import { SyncState } from "./sync";
+import {
+    MSC3575RoomData, MSC3575SlidingSyncResponse, SlidingSync,
+    SlidingSyncEvent, SlidingSyncState,
+} from "./sliding-sync";
 
 const DEBUG = true;
 
@@ -70,7 +65,10 @@ export class SlidingSyncSdk {
     private failCount: number;
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
 
-    constructor(slidingSync: SlidingSync, private readonly client: MatrixClient, private readonly opts: Partial<IStoredClientOpts> = {}) {
+    constructor(
+        slidingSync: SlidingSync, private readonly client: MatrixClient,
+        private readonly opts: Partial<IStoredClientOpts> = {},
+    ) {
         this.opts.initialSyncLimit = this.opts.initialSyncLimit ?? 8;
         this.opts.resolveInvitesToProfiles = this.opts.resolveInvitesToProfiles || false;
         this.opts.pollTimeout = this.opts.pollTimeout || (30 * 1000);
@@ -106,7 +104,7 @@ export class SlidingSyncSdk {
         } else {
             room = this.client.store.getRoom(roomData.room_id);
             if (!room) {
-                console.error("initial flag not set but no stored room exists for room ", roomData.room_id, roomData);
+                debuglog("initial flag not set but no stored room exists for room ", roomData.room_id, roomData);
                 return;
             }
         }
@@ -114,7 +112,7 @@ export class SlidingSyncSdk {
     }
 
     private onLifecycle(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err?: Error) {
-        console.log("onLifecycle", state, err);
+        debuglog("onLifecycle", state, err);
         switch (state) {
             case SlidingSyncState.Complete:
                 this.purgeNotifications();
@@ -140,9 +138,12 @@ export class SlidingSyncSdk {
             case SlidingSyncState.RequestFinished:
                 if (err) {
                     this.failCount += 1;
-                    this.updateSyncState(this.failCount > FAILED_SYNC_ERROR_THRESHOLD ? SyncState.Error : SyncState.Reconnecting, {
-                        error: new MatrixError(err),
-                    });
+                    this.updateSyncState(
+                        this.failCount > FAILED_SYNC_ERROR_THRESHOLD ? SyncState.Error : SyncState.Reconnecting,
+                        {
+                            error: new MatrixError(err),
+                        },
+                    );
                 } else {
                     this.failCount = 0;
                 }
@@ -532,7 +533,7 @@ export class SlidingSyncSdk {
      * @param {MatrixEvent[]} [timelineEventList] A list of timeline events. Lower index
      * is earlier in time. Higher index is later.
      */
-     private addNotifications(timelineEventList: MatrixEvent[]): void {
+    private addNotifications(timelineEventList: MatrixEvent[]): void {
         // gather our notifications into this.notifEvents
         if (!this.client.getNotifTimelineSet()) {
             return;
@@ -557,7 +558,7 @@ export class SlidingSyncSdk {
         this.notifEvents.sort(function(a, b) {
             return a.getTs() - b.getTs();
         });
-        this.notifEvents.forEach(function(event) {
+        this.notifEvents.forEach((event) => {
             this.client.getNotifTimelineSet().addLiveEvent(event);
         });
         this.notifEvents = [];
@@ -588,10 +589,9 @@ function ensureNameEvent(client: MatrixClient, roomData: MSC3575RoomData): MSC35
         },
         sender: client.getUserId(),
         origin_server_ts: new Date().getTime(),
-    })
+    });
     return roomData;
 }
-
 
 // Helper functions which set up JS SDK structs are below and are identical to the sync v2 counterparts,
 // just outside the class.
@@ -607,7 +607,6 @@ function createNewUser(client: MatrixClient, userId: string): User {
     ]);
     return user;
 }
-
 
 function createRoom(client: MatrixClient, roomId: string, opts: Partial<IStoredClientOpts>): Room { // XXX cargoculted from sync.ts
     const {

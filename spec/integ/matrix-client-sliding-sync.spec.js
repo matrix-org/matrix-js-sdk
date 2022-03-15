@@ -1,5 +1,6 @@
 import { SlidingSync, SlidingSyncState } from "../../src/sliding-sync";
 import { TestClient } from "../TestClient";
+import { logger } from '../../src/logger';
 
 /**
  * Tests for sliding sync. These tests are broken down into sub-tests which are reliant upon one another.
@@ -12,7 +13,7 @@ describe("SlidingSync", () => {
     const selfUserId = "@alice:localhost";
     const selfAccessToken = "aseukfgwef";
     const proxyBaseUrl = "http://localhost:8008";
-    const syncUrl = proxyBaseUrl + "/_matrix/client/unstable/org.matrix.msc3575/sync"
+    const syncUrl = proxyBaseUrl + "/_matrix/client/unstable/org.matrix.msc3575/sync";
 
     // assign client/httpBackend globals
     const setupClient = () => {
@@ -42,7 +43,7 @@ describe("SlidingSync", () => {
                 room_subscriptions: {},
             };
             httpBackend.when("POST", syncUrl).respond(200, fakeResp);
-            let p = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state, resp, err) => {
+            const p = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state, resp, err) => {
                 expect(state).toEqual(SlidingSyncState.RequestFinished);
                 expect(resp).toEqual(fakeResp);
                 expect(err).toBeFalsy();
@@ -70,7 +71,7 @@ describe("SlidingSync", () => {
             timeline_limit: 1,
             required_state: [
                 ["m.room.name", ""],
-            ]
+            ],
         };
         const wantRoomData = {
             name: "foo bar",
@@ -81,7 +82,7 @@ describe("SlidingSync", () => {
 
         let slidingSync;
 
-        it("should be able to subscribe to a room", async (done) => {    
+        it("should be able to subscribe to a room", async (done) => {
             // add the subscription
             slidingSync = new SlidingSync(proxyBaseUrl, [], roomSubInfo, client, 1);
             slidingSync.modifyRoomSubscriptions(new Set([roomId]));
@@ -90,7 +91,7 @@ describe("SlidingSync", () => {
                 if (!body) {
                     body = JSON.parse(req.opts.body);
                 }
-                console.log("room sub", body);
+                logger.log("room sub", body);
                 expect(body.room_subscriptions).toBeTruthy();
                 expect(body.room_subscriptions[roomId]).toEqual(roomSubInfo);
             }).respond(200, {
@@ -98,11 +99,11 @@ describe("SlidingSync", () => {
                 ops: [],
                 counts: [],
                 room_subscriptions: {
-                    [roomId]: wantRoomData
+                    [roomId]: wantRoomData,
                 },
             });
 
-            let p = listenUntil(slidingSync, "SlidingSync.RoomData", (gotRoomId, gotRoomData) => {
+            const p = listenUntil(slidingSync, "SlidingSync.RoomData", (gotRoomId, gotRoomData) => {
                 expect(gotRoomId).toEqual(roomId);
                 expect(gotRoomData).toEqual(wantRoomData);
                 return true;
@@ -119,14 +120,14 @@ describe("SlidingSync", () => {
                 timeline_limit: 100,
                 required_state: [
                     ["m.room.member", "*"],
-                ]
-            }
+                ],
+            };
             httpBackend.when("POST", syncUrl).check(function(req) {
                 let body = req.data;
                 if (!body) {
                     body = JSON.parse(req.opts.body);
                 }
-                console.log("adjusted sub", body);
+                logger.log("adjusted sub", body);
                 expect(body.room_subscriptions).toBeTruthy();
                 expect(body.room_subscriptions[roomId]).toEqual(newSubInfo);
             }).respond(200, {
@@ -134,16 +135,16 @@ describe("SlidingSync", () => {
                 ops: [],
                 counts: [],
                 room_subscriptions: {
-                    [roomId]: wantRoomData
+                    [roomId]: wantRoomData,
                 },
             });
 
-            let p = listenUntil(slidingSync, "SlidingSync.RoomData", (gotRoomId, gotRoomData) => {
+            const p = listenUntil(slidingSync, "SlidingSync.RoomData", (gotRoomId, gotRoomData) => {
                 expect(gotRoomId).toEqual(roomId);
                 expect(gotRoomData).toEqual(wantRoomData);
                 return true;
             });
-            
+
             slidingSync.modifyRoomSubscriptionInfo(newSubInfo);
             await httpBackend.flushAllExpected();
             await p;
@@ -159,13 +160,13 @@ describe("SlidingSync", () => {
                 room_id: anotherRoomID,
                 required_state: [],
                 timeline: [],
-            }
+            };
             httpBackend.when("POST", syncUrl).check(function(req) {
                 let body = req.data;
                 if (!body) {
                     body = JSON.parse(req.opts.body);
                 }
-                console.log("new subs", body);
+                logger.log("new subs", body);
                 expect(body.room_subscriptions).toBeTruthy();
                 // only the new room is sent, the other is sticky
                 expect(body.room_subscriptions[anotherRoomID]).toEqual(roomSubInfo);
@@ -175,16 +176,16 @@ describe("SlidingSync", () => {
                 ops: [],
                 counts: [],
                 room_subscriptions: {
-                    [anotherRoomID]: anotherRoomData
+                    [anotherRoomID]: anotherRoomData,
                 },
             });
 
-            let p = listenUntil(slidingSync, "SlidingSync.RoomData", (gotRoomId, gotRoomData) => {
+            const p = listenUntil(slidingSync, "SlidingSync.RoomData", (gotRoomId, gotRoomData) => {
                 expect(gotRoomId).toEqual(anotherRoomID);
                 expect(gotRoomData).toEqual(anotherRoomData);
                 return true;
             });
-            
+
             const subs = slidingSync.getRoomSubscriptions();
             subs.add(anotherRoomID);
             slidingSync.modifyRoomSubscriptions(subs);
@@ -199,22 +200,22 @@ describe("SlidingSync", () => {
                 if (!body) {
                     body = JSON.parse(req.opts.body);
                 }
-                console.log("unsub request", body);
+                logger.log("unsub request", body);
                 expect(body.room_subscriptions).toBeFalsy();
                 expect(body.unsubscribe_rooms).toEqual([roomId]);
             }).respond(200, {
                 pos: "b",
                 ops: [],
-                counts: []
+                counts: [],
             });
-        
-            let p = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+
+            const p = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
                 return state === SlidingSyncState.Complete;
             });
-        
+
             // remove the subscription for the first room
             slidingSync.modifyRoomSubscriptions(new Set([anotherRoomID]));
-        
+
             await httpBackend.flushAllExpected();
             await p;
 
@@ -250,13 +251,13 @@ describe("SlidingSync", () => {
                 timeline: [],
             },
         ];
-        const newRanges =  [[0,2],[3,5]];
+        const newRanges = [[0, 2], [3, 5]];
 
         let slidingSync;
         it("should be possible to subscribe to a list", async (done) => {
             // request first 3 rooms
-            let listReq = {
-                ranges:  [[0,2]],
+            const listReq = {
+                ranges: [[0, 2]],
                 sort: ["by_name"],
                 timeline_limit: 1,
                 required_state: [
@@ -272,7 +273,7 @@ describe("SlidingSync", () => {
                 if (!body) {
                     body = JSON.parse(req.opts.body);
                 }
-                console.log("list", body);
+                logger.log("list", body);
                 expect(body.lists).toBeTruthy();
                 expect(body.lists[0]).toEqual(listReq);
             }).respond(200, {
@@ -280,20 +281,20 @@ describe("SlidingSync", () => {
                 ops: [{
                     op: "SYNC",
                     list: 0,
-                    range: [0,2],
+                    range: [0, 2],
                     rooms: rooms,
                 }],
                 counts: [500],
             });
-            let listenerData = {};
+            const listenerData = {};
             const dataListener = (roomId, roomData) => {
                 expect(listenerData[roomId]).toBeFalsy();
                 listenerData[roomId] = roomData;
             };
             slidingSync.on("SlidingSync.RoomData", dataListener);
-            let responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+            const responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
                 return state === SlidingSyncState.Complete;
-            })
+            });
             slidingSync.start();
             await httpBackend.flushAllExpected();
             await responseProcessed;
@@ -312,7 +313,7 @@ describe("SlidingSync", () => {
                 if (!body) {
                     body = JSON.parse(req.opts.body);
                 }
-                console.log("next ranges", body.lists[0].ranges);
+                logger.log("next ranges", body.lists[0].ranges);
                 expect(body.lists).toBeTruthy();
                 expect(body.lists[0]).toEqual({
                     // only the ranges should be sent as the rest are unchanged and sticky
@@ -323,13 +324,13 @@ describe("SlidingSync", () => {
                 ops: [{
                     op: "SYNC",
                     list: 0,
-                    range: [0,2],
+                    range: [0, 2],
                     rooms: rooms,
                 }],
                 counts: [500],
             });
-            
-            let responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+
+            const responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
                 return state === SlidingSyncState.RequestFinished;
             });
             slidingSync.setListRanges(0, newRanges);
@@ -341,7 +342,7 @@ describe("SlidingSync", () => {
         it("should be possible to add an extra list", async (done) => {
             // add extra list
             const extraListReq = {
-                ranges: [[0,100]],
+                ranges: [[0, 100]],
                 sort: ["by_name"],
                 filters: {
                     "is_dm": true,
@@ -352,7 +353,7 @@ describe("SlidingSync", () => {
                 if (!body) {
                     body = JSON.parse(req.opts.body);
                 }
-                console.log("extra list", body);
+                ("extra list", body);
                 expect(body.lists).toBeTruthy();
                 expect(body.lists[0]).toEqual({
                     // only the ranges should be sent as the rest are unchanged and sticky
@@ -364,7 +365,7 @@ describe("SlidingSync", () => {
                 ops: [{
                     op: "SYNC",
                     list: 1,
-                    range: [0,2],
+                    range: [0, 2],
                     rooms: rooms,
                 }],
                 counts: [500, 50],
@@ -378,8 +379,8 @@ describe("SlidingSync", () => {
                     2: roomC,
                 });
                 return true;
-            })
-            let responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+            });
+            const responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
                 return state === SlidingSyncState.Complete;
             });
             slidingSync.setList(1, extraListReq);
@@ -400,7 +401,8 @@ describe("SlidingSync", () => {
                 }],
                 counts: [500, 50],
             });
-            let listPromise = listenUntil(slidingSync, "SlidingSync.List", (listIndex, joinedCount, roomIndexToRoomId) => {
+            const listPromise = listenUntil(slidingSync, "SlidingSync.List",
+            (listIndex, joinedCount, roomIndexToRoomId) => {
                 expect(listIndex).toEqual(0);
                 expect(joinedCount).toEqual(500);
                 expect(roomIndexToRoomId).toEqual({
@@ -409,8 +411,8 @@ describe("SlidingSync", () => {
                     2: roomC,
                 });
                 return true;
-            })
-            let responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+            });
+            const responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
                 return state === SlidingSyncState.Complete;
             });
             await httpBackend.flushAllExpected();
@@ -435,7 +437,8 @@ describe("SlidingSync", () => {
                 }],
                 counts: [500, 50],
             });
-            let listPromise = listenUntil(slidingSync, "SlidingSync.List", (listIndex, joinedCount, roomIndexToRoomId) => {
+            const listPromise = listenUntil(slidingSync, "SlidingSync.List",
+            (listIndex, joinedCount, roomIndexToRoomId) => {
                 expect(listIndex).toEqual(0);
                 expect(joinedCount).toEqual(500);
                 expect(roomIndexToRoomId).toEqual({
@@ -445,7 +448,7 @@ describe("SlidingSync", () => {
                 });
                 return true;
             });
-            let responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+            const responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
                 return state === SlidingSyncState.Complete;
             });
             await httpBackend.flushAllExpected();
@@ -454,7 +457,6 @@ describe("SlidingSync", () => {
             slidingSync.stop();
             done();
         });
-
     });
 });
 
@@ -472,7 +474,7 @@ function timeout(delayMs, reason) {
  * @param {string} eventName The event to listen for
  * @param {function} callback The callback which will be invoked when events fire. Return something truthy from this to resolve the promise.
  * @param {number} timeoutMs The number of milliseconds to wait for the callback to return data. Default: 500ms.
- * @returns A promise which will be resolved when the callback returns data. If the callback throws or the timeout is reached,
+ * @returns {Promise} A promise which will be resolved when the callback returns data. If the callback throws or the timeout is reached,
  * the promise is rejected.
  */
 function listenUntil(emitter, eventName, callback, timeoutMs) {
@@ -483,7 +485,7 @@ function listenUntil(emitter, eventName, callback, timeoutMs) {
     return Promise.race([new Promise((resolve, reject) => {
         const wrapper = (...args) => {
             try {
-                const data = callback(...args)
+                const data = callback(...args);
                 if (data) {
                     emitter.off(eventName, wrapper);
                     resolve(data);
@@ -491,7 +493,7 @@ function listenUntil(emitter, eventName, callback, timeoutMs) {
             } catch (err) {
                 reject(err);
             }
-        }
+        };
         emitter.on(eventName, wrapper);
     }), timeout(timeoutMs, "timed out waiting for event " + eventName + " " + trace)]);
 }

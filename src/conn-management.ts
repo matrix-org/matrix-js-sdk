@@ -19,7 +19,7 @@ import { IDeferred } from "./utils";
 import { MatrixClient } from "./client";
 import { ISyncStateData } from "./sync";
 import { Method } from "./http-api";
-import {SyncState } from "./sync";
+import { SyncState } from "./sync";
 
 /**
  * ConnectionManagement is a class which handles keep-alives and invokes a callback when the connection
@@ -63,7 +63,7 @@ export class ConnectionManagement {
         if (global.window && global.window.removeEventListener) {
             global.window.removeEventListener("online", this.onOnline, false);
         }
-        
+
         if (this.keepAliveTimer) {
             clearTimeout(this.keepAliveTimer);
             this.keepAliveTimer = null;
@@ -98,7 +98,7 @@ export class ConnectionManagement {
                     prefix: '',
                     localTimeoutMs: 15 * 1000,
                 },
-            )
+            );
             success();
         } catch (err) {
             if (err.httpStatus == 400 || err.httpStatus == 404) {
@@ -132,7 +132,7 @@ export class ConnectionManagement {
      *        tightlooping if /versions succeeds but /sync etc. fail).
      * @return {promise} which resolves once the connection returns
      */
-     private startKeepAlives(delay?: number): Promise<boolean> {
+    private startKeepAlives(delay?: number): Promise<boolean> {
         if (delay === undefined) {
             delay = 2000 + Math.floor(Math.random() * 5000);
         }

@@ -8822,7 +8822,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns {MSC3575SlidingSyncResponse} The sliding sync response, or a standard error.
      * @throws on non 2xx status codes with an object {"httpStatus":number}
      */
-    public slidingSync(req: MSC3575SlidingSyncRequest, proxyBaseUrl?: string): IAbortablePromise<MSC3575SlidingSyncResponse> {
+    public slidingSync(
+        req: MSC3575SlidingSyncRequest, proxyBaseUrl?: string,
+    ): IAbortablePromise<MSC3575SlidingSyncResponse> {
         const qps: Record<string, any> = {};
         if (req.pos) {
             qps.pos = req.pos;

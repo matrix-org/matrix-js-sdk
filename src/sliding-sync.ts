@@ -41,7 +41,7 @@ function debuglog(...params) {
 export interface MSC3575RoomSubscription {
     required_state?: string[][];
     timeline_limit?: number;
-};
+}
 
 /**
  * Controls which rooms are returned in a given list.
@@ -51,7 +51,7 @@ export interface MSC3575Filter {
     is_encrypted?: boolean;
     is_invite?: boolean;
     room_name_like?: string;
-};
+}
 
 /**
  * Represents a list subscription.
@@ -60,7 +60,7 @@ export interface MSC3575List extends MSC3575RoomSubscription {
     ranges: number[][];
     sort?: string[];
     filters?: MSC3575Filter;
-};
+}
 
 /**
  * A complete Sliding Sync request.
@@ -76,7 +76,7 @@ export interface MSC3575SlidingSyncRequest {
     pos?: string;
     timeout?: number;
     clientTimeout?: number;
-};
+}
 
 export interface MSC3575RoomData {
     name: string;
@@ -87,7 +87,7 @@ export interface MSC3575RoomData {
     initial?: boolean;
     limited?: boolean;
     room_id: string;
-};
+}
 
 /**
  * A complete Sliding Sync response
@@ -98,7 +98,7 @@ export interface MSC3575SlidingSyncResponse {
     counts: number[];
     room_subscriptions: Record<string, MSC3575RoomData>;
     extensions: object;
-};
+}
 
 export enum SlidingSyncState {
     RequestFinished = "FINISHED",
@@ -114,7 +114,7 @@ class SlidingList {
     private isModified: boolean;
 
     // returned data
-    roomIndexToRoomId: Record<number,string>;
+    roomIndexToRoomId: Record<number, string>;
     joinedCount: number;
 
     /**
@@ -131,7 +131,7 @@ class SlidingList {
      * @param modified True to mark this list as modified so all sticky parameters will be re-sent.
      */
     setModified(modified: boolean) {
-        this.isModified =  modified;
+        this.isModified = modified;
     }
 
     /**
@@ -173,7 +173,7 @@ class SlidingList {
             ranges: JSON.parse(JSON.stringify(this.list.ranges)),
         };
         if (this.isModified || forceIncludeAllParams) {
-            list =  JSON.parse(JSON.stringify(this.list));
+            list = JSON.parse(JSON.stringify(this.list));
         }
         return list;
     }
@@ -184,13 +184,13 @@ class SlidingList {
      *   0 1 2 3 4 5 6 7 8   indexes
      *   a b c       d e f   COMMANDS: SYNC 0 2 a b c; SYNC 6 8 d e f;
      *   a b c       d _ f   COMMAND: DELETE 7;
-     *   e a b c       d f   COMMAND: INSERT 0 e; 
+     *   e a b c       d f   COMMAND: INSERT 0 e;
      *   c=3 is wrong as we are not tracking it, ergo we need to see if `i` is in range else drop it
      * @param i The index to check
      * @returns True if the index is within a sliding window
      */
     isIndexInRange(i: number): boolean {
-        for (let r of this.list.ranges) {
+        for (const r of this.list.ranges) {
             if (r[0] <= i && i <= r[1]) {
                 return true;
             }
@@ -208,7 +208,9 @@ export enum SlidingSyncEvent {
 export type SlidingSyncEventHandlerMap = {
     [SlidingSyncEvent.RoomData]: (roomId: string, roomData: MSC3575RoomData) => void;
     [SlidingSyncEvent.Lifecycle]: (state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err: Error) => void;
-    [SlidingSyncEvent.List]: (listIndex: number, joinedCount: number, roomIndexToRoomId: Record<number,string>) => void;
+    [SlidingSyncEvent.List]: (
+        listIndex: number, joinedCount: number, roomIndexToRoomId: Record<number, string>,
+    ) => void;
 };
 
 /**
@@ -239,11 +241,14 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param {MatrixClient} client The client to use for /sync calls.
      * @param {number} timeoutMS The number of milliseconds to wait for a response.
      */
-    constructor(proxyBaseUrl: string, lists: MSC3575List[], subInfo: MSC3575RoomSubscription, client: MatrixClient, timeoutMS: number) {
+    constructor(
+        proxyBaseUrl: string, lists: MSC3575List[], subInfo: MSC3575RoomSubscription,
+        client: MatrixClient, timeoutMS: number,
+    ) {
         super();
         this.proxyBaseUrl = proxyBaseUrl;
         this.timeoutMS = timeoutMS;
-        this.lists = lists.map((l) => { return new SlidingList(l) });
+        this.lists = lists.map((l) => { return new SlidingList(l); });
         this.client = client;
         this.roomSubscriptionInfo = subInfo;
         this.terminated = false;
@@ -334,7 +339,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param {string} roomId The room which received some data.
      * @param {object} roomData The raw sliding sync response JSON.
      */
-    private _invokeRoomDataListeners(roomId: string, roomData: MSC3575RoomData) {
+    private invokeRoomDataListeners(roomId: string, roomData: MSC3575RoomData) {
         if (!roomData.required_state) { roomData.required_state = []; }
         if (!roomData.timeline) { roomData.timeline = []; }
         if (!roomData.room_id) { roomData.room_id = roomId; }
@@ -347,7 +352,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param {object} resp The raw sync response JSON
      * @param {Error?} err Any error that occurred when making the request e.g network errors.
      */
-    private _invokeLifecycleListeners(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err?: Error) {
+    private invokeLifecycleListeners(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err?: Error) {
         this.emit(SlidingSyncEvent.Lifecycle, state, resp, err);
     }
 
@@ -379,7 +384,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             let resp;
             try {
                 const listModifiedCount = this.listModifiedCount;
-                let reqBody: MSC3575SlidingSyncRequest = {
+                const reqBody: MSC3575SlidingSyncRequest = {
                     lists: this.lists.map((l) => {
                         return l.getList(false);
                     }),
@@ -395,7 +400,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 }
                 if (newSubscriptions.size > 0) {
                     reqBody.room_subscriptions = {};
-                    for (let roomId of newSubscriptions) {
+                    for (const roomId of newSubscriptions) {
                         reqBody.room_subscriptions[roomId] = this.roomSubscriptionInfo;
                     }
                 }
@@ -404,21 +409,23 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 debuglog(resp);
                 currentPos = resp.pos;
                 // update what we think we're subscribed to.
-                for (let roomId of newSubscriptions) {
+                for (const roomId of newSubscriptions) {
                     this.confirmedRoomSubscriptions.add(roomId);
                 }
-                for (let roomId of unsubscriptions) {
+                for (const roomId of unsubscriptions) {
                     this.confirmedRoomSubscriptions.delete(roomId);
                 }
                 if (listModifiedCount !== this.listModifiedCount) {
                     // the lists have been modified whilst we were waiting for 'await' to return, but the abort()
                     // call did nothing. It is NOT SAFE to modify the list array now, so bail.
                     // TODO: we should process room subscriptions?
-                    console.warn("list modified during await call, dropping response", resp);
+                    debuglog("list modified during await call, dropping response", resp);
                     continue;
                 }
                 // mark all these lists as having been sent as sticky so we don't keep sending sticky params
-                this.lists.forEach((l) => { l.setModified(false) })
+                this.lists.forEach((l) => {
+                    l.setModified(false);
+                });
                 if (!resp.ops) {
                     resp.ops = [];
                 }
@@ -430,23 +437,23 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                         this.lists[index].joinedCount = count;
                     });
                 }
-                this._invokeLifecycleListeners(
+                this.invokeLifecycleListeners(
                     SlidingSyncState.RequestFinished,
-                    resp
+                    resp,
                 );
             } catch (err) {
                 if (err.httpStatus) {
-                    this._invokeLifecycleListeners(
+                    this.invokeLifecycleListeners(
                         SlidingSyncState.RequestFinished,
                         null,
-                        err
+                        err,
                     );
                     await sleep(3000);
                 } else if (err != "aborted") {
-                    // check for Jest style abortions and AbortController abortions before logging 
-                    const isAbort = err == "aborted" ||  (err.name && err.name == "AbortError");
+                    // check for Jest style abortions and AbortController abortions before logging
+                    const isAbort = err == "aborted" || (err.name && err.name == "AbortError");
                     if (!isAbort) {
-                        console.error(err);
+                        debuglog(err);
                     }
                 }
             }
@@ -455,15 +462,15 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             }
 
             Object.keys(resp.room_subscriptions).forEach((roomId) => {
-                this._invokeRoomDataListeners(
+                this.invokeRoomDataListeners(
                     roomId,
-                    resp.room_subscriptions[roomId]
+                    resp.room_subscriptions[roomId],
                 );
             });
 
             const listIndexesWithUpdates: Set<number> = new Set();
             // TODO: clear gapIndex immediately after next op to avoid a genuine DELETE shifting incorrectly e.g leaving a room
-            let gapIndexes = {};
+            const gapIndexes = {};
             resp.counts.forEach((count, index) => {
                 gapIndexes[index] = -1;
             });
@@ -481,7 +488,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                         op.list,
                         op.index,
                         op.room.room_id,
-                        ";"
+                        ";",
                     );
                     if (this.lists[op.list].roomIndexToRoomId[op.index]) {
                         const gapIndex = gapIndexes[op.list];
@@ -489,7 +496,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                         if (gapIndex < 0) {
                             debuglog(
                                 "cannot work out where gap is, INSERT without previous DELETE! List: ",
-                                op.list
+                                op.list,
                             );
                             return;
                         }
@@ -531,18 +538,18 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     }
                     this.lists[op.list].roomIndexToRoomId[op.index] =
                         op.room.room_id;
-                    this._invokeRoomDataListeners(op.room.room_id, op.room);
+                    this.invokeRoomDataListeners(op.room.room_id, op.room);
                 } else if (op.op === "UPDATE") {
                     debuglog(
                         "UPDATE",
                         op.list,
                         op.index,
                         op.room.room_id,
-                        ";"
+                        ";",
                     );
-                    this._invokeRoomDataListeners(op.room.room_id, op.room);
+                    this.invokeRoomDataListeners(op.room.room_id, op.room);
                 } else if (op.op === "SYNC") {
-                    let syncRooms = [];
+                    const syncRooms = [];
                     const startIndex = op.range[0];
                     for (let i = startIndex; i <= op.range[1]; i++) {
                         const r = op.rooms[i - startIndex];
@@ -551,7 +558,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                         }
                         this.lists[op.list].roomIndexToRoomId[i] = r.room_id;
                         syncRooms.push(r.room_id);
-                        this._invokeRoomDataListeners(r.room_id, r);
+                        this.invokeRoomDataListeners(r.room_id, r);
                     }
                     debuglog(
                         "SYNC",
@@ -559,14 +566,14 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                         op.range[0],
                         op.range[1],
                         syncRooms.join(" "),
-                        ";"
+                        ";",
                     );
                 } else if (op.op === "INVALIDATE") {
-                    let invalidRooms = [];
+                    const invalidRooms = [];
                     const startIndex = op.range[0];
                     for (let i = startIndex; i <= op.range[1]; i++) {
                         invalidRooms.push(
-                            this.lists[op.list].roomIndexToRoomId[i]
+                            this.lists[op.list].roomIndexToRoomId[i],
                         );
                         delete this.lists[op.list].roomIndexToRoomId[i];
                     }
@@ -575,26 +582,29 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                         op.list,
                         op.range[0],
                         op.range[1],
-                        ";"
+                        ";",
                     );
                 }
             });
             listIndexesWithUpdates.forEach((i) => {
-                this.emit(SlidingSyncEvent.List, i, this.lists[i].joinedCount, Object.assign({}, this.lists[i].roomIndexToRoomId));
-            })
+                this.emit(
+                    SlidingSyncEvent.List,
+                    i, this.lists[i].joinedCount, Object.assign({}, this.lists[i].roomIndexToRoomId),
+                );
+            });
 
-            this._invokeLifecycleListeners(SlidingSyncState.Complete, resp);
+            this.invokeLifecycleListeners(SlidingSyncState.Complete, resp);
         }
     }
 }
 
 const difference = (setA: Set<string>, setB: Set<string>): Set<string> => {
-    let _difference = new Set(setA)
-    for (let elem of setB) {
-        _difference.delete(elem)
+    const _difference = new Set(setA);
+    for (const elem of setB) {
+        _difference.delete(elem);
     }
-    return _difference
-}
+    return _difference;
+};
 
 const sleep = (ms: number) => {
     return new Promise((resolve) => setTimeout(resolve, ms));
