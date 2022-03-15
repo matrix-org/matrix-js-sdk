@@ -102,8 +102,8 @@ export interface IAggregatedRelation {
 }
 
 export interface IEventRelation {
-    rel_type: RelationType | string;
-    event_id: string;
+    rel_type?: RelationType | string;
+    event_id?: string;
     is_falling_back?: boolean;
     "m.in_reply_to"?: {
         event_id: string;
