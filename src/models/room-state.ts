@@ -26,6 +26,7 @@ import { MatrixEvent } from "./event";
 import { MatrixClient } from "../client";
 import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
 import { TypedEventEmitter } from "./typed-event-emitter";
+import { Beacon, isBeaconInfoEventType } from "./beacon";
 
 // possible statuses for out-of-band member loading
 enum OobStatus {
@@ -70,6 +71,8 @@ export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventH
     public members: Record<string, RoomMember> = {}; // userId: RoomMember
     public events = new Map<string, Map<string, MatrixEvent>>(); // Map<eventType, Map<stateKey, MatrixEvent>>
     public paginationToken: string = null;
+
+    public readonly beacons = new Map<string, Beacon>();
 
     /**
      * Construct room state.
@@ -314,6 +317,10 @@ export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventH
                 return;
             }
 
+            if (isBeaconInfoEventType(event.getType())) {
+                this.setBeacon(event);
+            }
+
             const lastStateEvent = this.getStateEventMatching(event);
             this.setStateEvent(event);
             if (event.getType() === EventType.RoomMember) {
@@ -409,6 +416,15 @@ export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventH
             this.events.set(event.getType(), new Map());
         }
         this.events.get(event.getType()).set(event.getStateKey(), event);
+    }
+
+    private setBeacon(event: MatrixEvent): void {
+        if (this.beacons.has(event.getId())) {
+            return this.beacons.get(event.getId()).update(event);
+        }
+
+        const beacon = new Beacon(event);
+        this.beacons.set(beacon.beaconInfoId, beacon);
     }
 
     private getStateEventMatching(event: MatrixEvent): MatrixEvent | null {

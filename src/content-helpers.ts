@@ -18,7 +18,7 @@ limitations under the License.
 
 import { REFERENCE_RELATION } from "matrix-events-sdk";
 
-import { MBeaconEventContent, MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
+import { MBeaconEventContent, MBeaconInfoContent, MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
 import { MsgType } from "./@types/event";
 import { TEXT_NODE_TYPE } from "./@types/extensible_events";
 import {
@@ -193,13 +193,19 @@ export const parseLocationEvent = (wireEventContent: LocationEventWireContent): 
 /**
  * Beacon event helpers
  */
-
-export const makeBeaconInfoContent = (
+export type MakeBeaconInfoContent = (
     timeout: number,
     isLive?: boolean,
     description?: string,
     assetType?: LocationAssetType,
-): MBeaconInfoEventContent => ({
+) => MBeaconInfoEventContent;
+
+export const makeBeaconInfoContent: MakeBeaconInfoContent = (
+    timeout,
+    isLive,
+    description,
+    assetType,
+) => ({
     [M_BEACON_INFO.name]: {
         description,
         timeout,
@@ -211,12 +217,40 @@ export const makeBeaconInfoContent = (
     },
 });
 
-export const makeBeaconContent = (
+export type BeaconInfoState = MBeaconInfoContent & {
+    assetType: LocationAssetType;
+    timestamp: number;
+};
+/**
+ * Flatten beacon info event content
+ */
+export const parseBeaconInfoContent = (content: MBeaconInfoEventContent): BeaconInfoState => {
+    const { description, timeout, live } = M_BEACON_INFO.findIn<MBeaconInfoContent>(content);
+    const { type: assetType } = M_ASSET.findIn<MAssetContent>(content);
+    const timestamp = M_TIMESTAMP.findIn<number>(content);
+
+    return {
+        description,
+        timeout,
+        live,
+        assetType,
+        timestamp,
+    };
+};
+
+export type MakeBeaconContent = (
     uri: string,
     timestamp: number,
     beaconInfoId: string,
     description?: string,
-): MBeaconEventContent => ({
+) => MBeaconEventContent;
+
+export const makeBeaconContent: MakeBeaconContent = (
+    uri,
+    timestamp,
+    beaconInfoId,
+    description,
+) => ({
     [M_LOCATION.name]: {
         description,
         uri,
