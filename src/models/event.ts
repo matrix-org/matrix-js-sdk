@@ -104,10 +104,9 @@ export interface IAggregatedRelation {
 export interface IEventRelation {
     rel_type: RelationType | string;
     event_id: string;
+    is_falling_back?: boolean;
     "m.in_reply_to"?: {
         event_id: string;
-        is_falling_back?: boolean;
-        "io.element.show_reply"?: boolean; // unstable variant of `is_falling_back` - MSC3440
     };
     key?: string;
 }
