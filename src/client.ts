@@ -178,7 +178,7 @@ import { CryptoStore } from "./crypto/store/base";
 import { MediaHandler } from "./webrtc/mediaHandler";
 import { IRefreshTokenResponse } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
-import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse } from "./sliding-sync";
+import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync";
 import { SlidingSyncSdk } from "./sliding-sync-sdk";
 
 export type Store = IStore;
@@ -415,6 +415,11 @@ export interface IStartClientOpts {
      * @experimental
      */
     experimentalThreadSupport?: boolean;
+
+    /**
+     * @experimental
+     */
+     slidingSync?: SlidingSync;
 }
 
 export interface IStoredClientOpts extends IStartClientOpts {
@@ -910,7 +915,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected verificationMethods: VerificationMethod[];
     protected fallbackICEServerAllowed = false;
     protected roomList: RoomList;
-    protected syncApi: SlidingSyncSdk;
+    protected syncApi: SlidingSyncSdk | SyncApi;
     public pushRules: IPushRules;
     protected syncLeftRoomsPromise: Promise<Room[]>;
     protected syncedLeftRooms = false;
@@ -1174,7 +1179,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
             return this.canResetTimelineCallback(roomId);
         };
-        this.syncApi = new SlidingSyncSdk(this, this.clientOpts);
+        if (opts.slidingSync) {
+            this.syncApi = new SlidingSyncSdk(opts.slidingSync, this, this.clientOpts);
+        } else {
+            this.syncApi = new SyncApi(this, this.clientOpts);
+        }
         this.syncApi.sync();
 
         if (this.clientOpts.clientWellKnownPollPeriod !== undefined) {

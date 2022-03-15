@@ -70,7 +70,7 @@ export class SlidingSyncSdk {
     private failCount: number;
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
 
-    constructor(private readonly client: MatrixClient, private readonly opts: Partial<IStoredClientOpts> = {}) {
+    constructor(slidingSync: SlidingSync, private readonly client: MatrixClient, private readonly opts: Partial<IStoredClientOpts> = {}) {
         this.opts.initialSyncLimit = this.opts.initialSyncLimit ?? 8;
         this.opts.resolveInvitesToProfiles = this.opts.resolveInvitesToProfiles || false;
         this.opts.pollTimeout = this.opts.pollTimeout || (30 * 1000);
@@ -94,27 +94,12 @@ export class SlidingSyncSdk {
         this.lastPos = null;
         this.failCount = 0;
 
-        // TODO: dependency inject
-        this.slidingSync = new SlidingSync("http://localhost:8008", [
-            {
-                ranges: [[0,20]],
-                sort: ["by_highlight_count", "by_notification_count", "by_recency"],
-                required_state: [
-                    ["m.room.join_rules", ""],
-                    ["m.room.avatar", ""],
-                    ["m.room.tombstone", ""],
-                    ["m.room.encryption", ""],
-                    ["m.room.member", this.client.getUserId()],
-                ],
-                timeline_limit: 20,
-            },
-        ], {}, client, 20 * 1000);
+        this.slidingSync = slidingSync;
         this.slidingSync.on(SlidingSyncEvent.Lifecycle, this.onLifecycle.bind(this));
         this.slidingSync.on(SlidingSyncEvent.RoomData, this.onRoomData.bind(this));
     }
 
     private onRoomData(roomId: string, roomData: MSC3575RoomData) {
-        console.log("onRoomData", roomId, JSON.stringify(roomData));
         let room: Room;
         if (roomData.initial) {
             room = createRoom(this.client, roomData.room_id, this.opts);
