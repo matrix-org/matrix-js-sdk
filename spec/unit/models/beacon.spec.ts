@@ -24,6 +24,8 @@ import {
 } from "../../../src/models/beacon";
 import { makeBeaconInfoEvent } from "../../test-utils/beacon";
 
+jest.useFakeTimers();
+
 describe('Beacon', () => {
     describe('isTimestampInDuration()', () => {
         const startTs = new Date('2022-03-11T12:07:47.592Z').getTime();
@@ -86,6 +88,14 @@ describe('Beacon', () => {
         // without timeout of 3 hours
         let liveBeaconEvent;
         let notLiveBeaconEvent;
+
+        const advanceDateAndTime = (ms: number) => {
+            // bc liveness check uses Date.now we have to advance this mock
+            jest.spyOn(global.Date, 'now').mockReturnValue(now + ms);
+            // then advance time for the interval by the same amount
+            jest.advanceTimersByTime(ms);
+        };
+
         beforeEach(() => {
             // go back in time to create the beacon
             jest.spyOn(global.Date, 'now').mockReturnValue(now - HOUR_MS);
@@ -162,6 +172,69 @@ describe('Beacon', () => {
                 beacon.update(updatedBeaconEvent);
                 expect(beacon.isLive).toEqual(false);
                 expect(emitSpy).toHaveBeenCalledWith(BeaconEvent.Update, updatedBeaconEvent, beacon);
+            });
+
+            it('emits livenesschange event when beacon liveness changes', () => {
+                const beacon = new Beacon(liveBeaconEvent);
+                const emitSpy = jest.spyOn(beacon, 'emit');
+
+                expect(beacon.isLive).toEqual(true);
+
+                const updatedBeaconEvent = makeBeaconInfoEvent(
+                    userId, roomId, { timeout: HOUR_MS * 3, isLive: false }, beacon.beaconInfoId);
+
+                beacon.update(updatedBeaconEvent);
+                expect(beacon.isLive).toEqual(false);
+                expect(emitSpy).toHaveBeenCalledWith(BeaconEvent.LivenessChange, false, beacon);
+            });
+        });
+
+        describe('monitorLiveness()', () => {
+            it('does not set a monitor interval when beacon is not live', () => {
+                // beacon was created an hour ago
+                // and has a 3hr duration
+                const beacon = new Beacon(notLiveBeaconEvent);
+                const emitSpy = jest.spyOn(beacon, 'emit');
+
+                beacon.monitorLiveness();
+
+                // @ts-ignore
+                expect(beacon.livenessWatchInterval).toBeFalsy();
+                advanceDateAndTime(HOUR_MS * 2 + 1);
+
+                // no emit
+                expect(emitSpy).not.toHaveBeenCalled();
+            });
+
+            it('checks liveness of beacon at expected expiry time', () => {
+                // live beacon was created an hour ago
+                // and has a 3hr duration
+                const beacon = new Beacon(liveBeaconEvent);
+                expect(beacon.isLive).toBeTruthy();
+                const emitSpy = jest.spyOn(beacon, 'emit');
+
+                beacon.monitorLiveness();
+                advanceDateAndTime(HOUR_MS * 2 + 1);
+
+                expect(emitSpy).toHaveBeenCalledTimes(1);
+                expect(emitSpy).toHaveBeenCalledWith(BeaconEvent.LivenessChange, false, beacon);
+            });
+
+            it('destroy kills liveness monitor', () => {
+                // live beacon was created an hour ago
+                // and has a 3hr duration
+                const beacon = new Beacon(liveBeaconEvent);
+                expect(beacon.isLive).toBeTruthy();
+                const emitSpy = jest.spyOn(beacon, 'emit');
+
+                beacon.monitorLiveness();
+
+                // destroy the beacon
+                beacon.destroy();
+
+                advanceDateAndTime(HOUR_MS * 2 + 1);
+
+                expect(emitSpy).not.toHaveBeenCalled();
             });
         });
     });
