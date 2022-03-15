@@ -532,7 +532,12 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
     }
 
     public get replyEventId(): string {
-        const mRelatesTo = this.getWireContent()['m.relates_to'];
+        // We're prefer ev.getContent() over ev.getWireContent() to make sure
+        // we grab the latest edit with potentially new relations. But we also
+        // can't just rely on ev.getContent() by itself because historically we
+        // still show the reply from the original message even though the edit
+        // event does not include the relation reply.
+        const mRelatesTo = this.getContent()['m.relates_to'] || this.getWireContent()['m.relates_to'];
         return mRelatesTo?.['m.in_reply_to']?.event_id;
     }
 
