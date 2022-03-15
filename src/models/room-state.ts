@@ -431,7 +431,6 @@ export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventH
      * @experimental
      */
     private setBeacon(event: MatrixEvent): void {
-        // if (event.getStateKey() === this.client)
         if (this.beacons.has(event.getId())) {
             return this.beacons.get(event.getId()).update(event);
         }

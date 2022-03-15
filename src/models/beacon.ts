@@ -80,6 +80,23 @@ export class Beacon extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         }
     }
 
+    /**
+     * Monitor liveness of a beacon
+     * Emits BeaconEvent.LivenessChange when beacon expires
+     */
+    public monitorLiveness(): void {
+        if (this.livenessWatchInterval) {
+            clearInterval(this.livenessWatchInterval);
+        }
+
+        if (this.isLive) {
+            const expiryInMs = (this.beaconInfo?.timestamp + this.beaconInfo?.timeout + 1) - Date.now();
+            if (expiryInMs > 1) {
+                this.livenessWatchInterval = setInterval(this.checkLiveness.bind(this), expiryInMs);
+            }
+        }
+    }
+
     private setBeaconInfo(event: MatrixEvent): void {
         this.beaconInfo = parseBeaconInfoContent(event.getContent());
         this.checkLiveness();
@@ -92,22 +109,6 @@ export class Beacon extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
 
         if (prevLiveness !== this.isLive) {
             this.emit(BeaconEvent.LivenessChange, this.isLive, this);
-        }
-    }
-
-    /**
-     * Monitor liveness of a beacon
-     */
-    public monitorLiveness(): void {
-        if (this.livenessWatchInterval) {
-            clearInterval(this.livenessWatchInterval);
-        }
-
-        if (this.isLive) {
-            const expiryInMs = (this.beaconInfo?.timestamp + this.beaconInfo?.timeout + 1) - Date.now();
-            if (expiryInMs > 1) {
-                this.livenessWatchInterval = setInterval(this.checkLiveness.bind(this), expiryInMs);
-            }
         }
     }
 }
