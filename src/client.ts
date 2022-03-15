@@ -1179,8 +1179,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
             return this.canResetTimelineCallback(roomId);
         };
-        if (opts.slidingSync) {
-            this.syncApi = new SlidingSyncSdk(opts.slidingSync, this, this.clientOpts);
+        if (this.clientOpts.slidingSync) {
+            this.syncApi = new SlidingSyncSdk(this.clientOpts.slidingSync, this, this.clientOpts);
         } else {
             this.syncApi = new SyncApi(this, this.clientOpts);
         }
