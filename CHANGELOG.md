@@ -1,3 +1,43 @@
+Changes in [16.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v16.0.0) (2022-03-15)
+==================================================================================================
+
+## 🚨 BREAKING CHANGES
+ * Improve typing around event emitter handlers ([\#2180](https://github.com/matrix-org/matrix-js-sdk/pull/2180)).
+
+## ✨ Features
+ * Fix defer not supporting resolving with a Promise<T> ([\#2216](https://github.com/matrix-org/matrix-js-sdk/pull/2216)).
+ * add LocationAssetType enum ([\#2214](https://github.com/matrix-org/matrix-js-sdk/pull/2214)).
+ * Support for mid-call devices changes ([\#2154](https://github.com/matrix-org/matrix-js-sdk/pull/2154)). Contributed by @SimonBrandner.
+ * Add new room state emit RoomStateEvent.Update for lower-frequency hits ([\#2192](https://github.com/matrix-org/matrix-js-sdk/pull/2192)).
+
+## 🐛 Bug Fixes
+ * Fix wrong event_id being sent for m.in_reply_to of threads ([\#2213](https://github.com/matrix-org/matrix-js-sdk/pull/2213)).
+ * Fix wrongly asserting that PushRule::conditions is non-null ([\#2217](https://github.com/matrix-org/matrix-js-sdk/pull/2217)).
+ * Make createThread more resilient when missing rootEvent ([\#2207](https://github.com/matrix-org/matrix-js-sdk/pull/2207)). Fixes vector-im/element-web#21130.
+ * Fix bug with the /hierarchy API sending invalid requests ([\#2201](https://github.com/matrix-org/matrix-js-sdk/pull/2201)). Fixes vector-im/element-web#21170.
+ * fix relation sender filter ([\#2196](https://github.com/matrix-org/matrix-js-sdk/pull/2196)). Fixes vector-im/element-web#20877.
+ * Fix bug with one-way audio after a transfer ([\#2193](https://github.com/matrix-org/matrix-js-sdk/pull/2193)).
+
+Changes in [16.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v16.0.0-rc.1) (2022-03-08)
+============================================================================================================
+
+## 🚨 BREAKING CHANGES
+ * Improve typing around event emitter handlers ([\#2180](https://github.com/matrix-org/matrix-js-sdk/pull/2180)).
+
+## ✨ Features
+ * Fix defer not supporting resolving with a Promise<T> ([\#2216](https://github.com/matrix-org/matrix-js-sdk/pull/2216)).
+ * add LocationAssetType enum ([\#2214](https://github.com/matrix-org/matrix-js-sdk/pull/2214)).
+ * Support for mid-call devices changes ([\#2154](https://github.com/matrix-org/matrix-js-sdk/pull/2154)). Contributed by @SimonBrandner.
+ * Add new room state emit RoomStateEvent.Update for lower-frequency hits ([\#2192](https://github.com/matrix-org/matrix-js-sdk/pull/2192)).
+
+## 🐛 Bug Fixes
+ * Fix wrong event_id being sent for m.in_reply_to of threads ([\#2213](https://github.com/matrix-org/matrix-js-sdk/pull/2213)).
+ * Fix wrongly asserting that PushRule::conditions is non-null ([\#2217](https://github.com/matrix-org/matrix-js-sdk/pull/2217)).
+ * Make createThread more resilient when missing rootEvent ([\#2207](https://github.com/matrix-org/matrix-js-sdk/pull/2207)). Fixes vector-im/element-web#21130.
+ * Fix bug with the /hierarchy API sending invalid requests ([\#2201](https://github.com/matrix-org/matrix-js-sdk/pull/2201)). Fixes vector-im/element-web#21170.
+ * fix relation sender filter ([\#2196](https://github.com/matrix-org/matrix-js-sdk/pull/2196)). Fixes vector-im/element-web#20877.
+ * Fix bug with one-way audio after a transfer ([\#2193](https://github.com/matrix-org/matrix-js-sdk/pull/2193)).
+
 Changes in [15.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.6.0) (2022-02-28)
 ==================================================================================================
 
