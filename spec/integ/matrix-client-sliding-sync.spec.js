@@ -223,9 +223,36 @@ describe("SlidingSync", () => {
         });
     });
 
-    xdescribe("lists", () => {
+    describe("lists", () => {
         beforeAll(setupClient);
         afterAll(teardownClient);
+
+        const roomA = "!a:localhost";
+        const roomB = "!b:localhost";
+        const roomC = "!c:localhost";
+        const rooms = [
+            {
+                room_id: roomA,
+                name: "A",
+                required_state: [],
+                timeline: [],
+            },
+            {
+                room_id: roomB,
+                name: "B",
+                required_state: [],
+                timeline: [],
+            },
+            {
+                room_id: roomC,
+                name: "C",
+                required_state: [],
+                timeline: [],
+            },
+        ];
+        const newRanges =  [[0,2],[3,5]];
+
+        let slidingSync;
         it("should be possible to subscribe to a list", async (done) => {
             // request first 3 rooms
             let listReq = {
@@ -239,36 +266,13 @@ describe("SlidingSync", () => {
                     is_dm: true,
                 },
             };
-            const slidingSync = new SlidingSync(proxyBaseUrl, [listReq], {}, client, 1);
-            const roomA = "!a:localhost";
-            const roomB = "!b:localhost";
-            const roomC = "!c:localhost";
-            const rooms = [
-                {
-                    room_id: roomA,
-                    name: "A",
-                    required_state: [],
-                    timeline: [],
-                },
-                {
-                    room_id: roomB,
-                    name: "B",
-                    required_state: [],
-                    timeline: [],
-                },
-                {
-                    room_id: roomC,
-                    name: "C",
-                    required_state: [],
-                    timeline: [],
-                },
-            ]
+            slidingSync = new SlidingSync(proxyBaseUrl, [listReq], {}, client, 1);
             httpBackend.when("POST", syncUrl).check(function(req) {
                 let body = req.data;
                 if (!body) {
                     body = JSON.parse(req.opts.body);
                 }
-                console.log(body);
+                console.log("list", body);
                 expect(body.lists).toBeTruthy();
                 expect(body.lists[0]).toEqual(listReq);
             }).respond(200, {
@@ -282,10 +286,11 @@ describe("SlidingSync", () => {
                 counts: [500],
             });
             let listenerData = {};
-            slidingSync.on("SlidingSync.RoomData", (roomId, roomData) => {
+            const dataListener = (roomId, roomData) => {
                 expect(listenerData[roomId]).toBeFalsy();
                 listenerData[roomId] = roomData;
-            });
+            };
+            slidingSync.on("SlidingSync.RoomData", dataListener);
             let responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
                 return state === SlidingSyncState.Complete;
             })
@@ -296,75 +301,12 @@ describe("SlidingSync", () => {
             expect(listenerData[roomA]).toEqual(rooms[0]);
             expect(listenerData[roomB]).toEqual(rooms[1]);
             expect(listenerData[roomC]).toEqual(rooms[2]);
-            slidingSync.stop();
+            slidingSync.off("SlidingSync.RoomData", dataListener);
             done();
         });
 
         it("should be possible to adjust list ranges", async (done) => {
-            // make 1 list, modify range, check it gets submitted
-            let listReq = {
-                ranges:  [[0,2]],
-                sort: ["by_name"],
-                timeline_limit: 1,
-                required_state: [
-                    ["m.room.topic", ""],
-                ],
-                filters: {
-                    is_dm: true,
-                },
-            };
-            const slidingSync = new SlidingSync(proxyBaseUrl, [listReq], {}, client, 1);
-            const roomA = "!a:localhost";
-            const roomB = "!b:localhost";
-            const roomC = "!c:localhost";
-            const rooms = [
-                {
-                    room_id: roomA,
-                    name: "A",
-                    required_state: [],
-                    timeline: [],
-                },
-                {
-                    room_id: roomB,
-                    name: "B",
-                    required_state: [],
-                    timeline: [],
-                },
-                {
-                    room_id: roomC,
-                    name: "C",
-                    required_state: [],
-                    timeline: [],
-                },
-            ]
-            httpBackend.when("POST", syncUrl).check(function(req) {
-                let body = req.data;
-                if (!body) {
-                    body = JSON.parse(req.opts.body);
-                }
-                console.log(body);
-                expect(body.lists).toBeTruthy();
-                expect(body.lists[0]).toEqual(listReq);
-            }).respond(200, {
-                pos: "a",
-                ops: [{
-                    op: "SYNC",
-                    list: 0,
-                    range: [0,2],
-                    rooms: rooms,
-                }],
-                counts: [500],
-            });
-            let responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
-                return state === SlidingSyncState.Complete;
-            })
-            slidingSync.start();
-            await httpBackend.flushAllExpected();
-            await responseProcessed;
-            // TODO: the above is duped from test 'should be possible to subscribe to a list'
-
-            // modify the list and list for the new request
-            let newRanges =  [[0,2],[3,5]];
+            // modify the list ranges
             httpBackend.when("POST", syncUrl).check(function(req) {
                 let body = req.data;
                 if (!body) {
@@ -387,20 +329,130 @@ describe("SlidingSync", () => {
                 counts: [500],
             });
             
-            slidingSync.setListRanges(0, newRanges);
-            responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+            let responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
                 return state === SlidingSyncState.RequestFinished;
             });
+            slidingSync.setListRanges(0, newRanges);
             await httpBackend.flushAllExpected();
             await responseProcessed;
-
-
-            slidingSync.stop();
             done();
         });
 
-        it("should be possible to get list updates", () => {
-            // make 2 lists, issue INSERT, check right one gets updated with right values
+        it("should be possible to add an extra list", async (done) => {
+            // add extra list
+            const extraListReq = {
+                ranges: [[0,100]],
+                sort: ["by_name"],
+                filters: {
+                    "is_dm": true,
+                },
+            };
+            httpBackend.when("POST", syncUrl).check(function(req) {
+                let body = req.data;
+                if (!body) {
+                    body = JSON.parse(req.opts.body);
+                }
+                console.log("extra list", body);
+                expect(body.lists).toBeTruthy();
+                expect(body.lists[0]).toEqual({
+                    // only the ranges should be sent as the rest are unchanged and sticky
+                    ranges: newRanges,
+                });
+                expect(body.lists[1]).toEqual(extraListReq);
+            }).respond(200, {
+                pos: "c",
+                ops: [{
+                    op: "SYNC",
+                    list: 1,
+                    range: [0,2],
+                    rooms: rooms,
+                }],
+                counts: [500, 50],
+            });
+            listenUntil(slidingSync, "SlidingSync.List", (listIndex, joinedCount, roomIndexToRoomId) => {
+                expect(listIndex).toEqual(1);
+                expect(joinedCount).toEqual(50);
+                expect(roomIndexToRoomId).toEqual({
+                    0: roomA,
+                    1: roomB,
+                    2: roomC,
+                });
+                return true;
+            })
+            let responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+                return state === SlidingSyncState.Complete;
+            });
+            slidingSync.setList(1, extraListReq);
+            await httpBackend.flushAllExpected();
+            await responseProcessed;
+            done();
+        });
+
+        it("should be possible to get list UPDATEs", async (done) => {
+            rooms[0].name = "New Room Name!";
+            httpBackend.when("POST", syncUrl).respond(200, {
+                pos: "d",
+                ops: [{
+                    op: "UPDATE",
+                    list: 0,
+                    index: 0,
+                    room: rooms[0],
+                }],
+                counts: [500, 50],
+            });
+            let listPromise = listenUntil(slidingSync, "SlidingSync.List", (listIndex, joinedCount, roomIndexToRoomId) => {
+                expect(listIndex).toEqual(0);
+                expect(joinedCount).toEqual(500);
+                expect(roomIndexToRoomId).toEqual({
+                    0: roomA,
+                    1: roomB,
+                    2: roomC,
+                });
+                return true;
+            })
+            let responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+                return state === SlidingSyncState.Complete;
+            });
+            await httpBackend.flushAllExpected();
+            await responseProcessed;
+            await listPromise;
+            done();
+        });
+
+        it("should be possible to get list DELETE/INSERTs", async (done) => {
+            // move C (2) to A (0)
+            httpBackend.when("POST", syncUrl).respond(200, {
+                pos: "e",
+                ops: [{
+                    op: "DELETE",
+                    list: 0,
+                    index: 2,
+                }, {
+                    op: "INSERT",
+                    list: 0,
+                    index: 0,
+                    room: rooms[2],
+                }],
+                counts: [500, 50],
+            });
+            let listPromise = listenUntil(slidingSync, "SlidingSync.List", (listIndex, joinedCount, roomIndexToRoomId) => {
+                expect(listIndex).toEqual(0);
+                expect(joinedCount).toEqual(500);
+                expect(roomIndexToRoomId).toEqual({
+                    0: roomC,
+                    1: roomA,
+                    2: roomB,
+                });
+                return true;
+            });
+            let responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+                return state === SlidingSyncState.Complete;
+            });
+            await httpBackend.flushAllExpected();
+            await responseProcessed;
+            await listPromise;
+            slidingSync.stop();
+            done();
         });
 
     });
