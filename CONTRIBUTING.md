@@ -107,15 +107,16 @@ must include:
 
 1. Comprehensive unit tests written in Jest. These are located in `/test`.
 2. "happy path" end-to-end tests.
-   These are located in `/test/end-to-end-tests`. Ideally, you would also
-   include tests for edge and error cases.
+   These are located in `/test/end-to-end-tests` in `matrix-react-sdk`, and
+   are run using `element-web`. Ideally, you would also include tests for edge
+   and error cases.
 
 Unit tests are expected even when the feature is in labs. It's good practice
 to write tests alongside the code as it ensures the code is testable from
 the start, and gives you a fast feedback loop while you're developing the
 functionality. End-to-end tests should be added prior to the feature
 leaving labs, but don't have to be present from the start (although it might
-be beneficial to have some running early so you can test things faster).
+be beneficial to have some running early, so you can test things faster).
 
 For bugs in those repos, your change must include at least one unit test or
 end-to-end test; which is best depends on what sort of test most concisely
@@ -132,6 +133,12 @@ Tests validate that your change works as intended and also document
 concisely what is being changed. Ideally, your new tests fail
 prior to your change, and succeed once it has been applied. You may
 find this simpler to achieve if you write the tests first.
+
+If you're spiking some code that's experimental and not being used to support
+production features, exceptions can be made to requirements for tests.
+Note that tests will still be required in order to ship the feature, and it's
+strongly encouraged to think about tests early in the process, as adding
+tests later will become progressively more difficult.
 
 If you're not sure how to approach writing tests for your change, ask for help
 in [#element-dev](https://matrix.to/#/#element-dev:matrix.org).
