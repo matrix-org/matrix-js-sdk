@@ -180,6 +180,8 @@ import { IRefreshTokenResponse } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync";
 import { SlidingSyncSdk } from "./sliding-sync-sdk";
+import { Thread, THREAD_RELATION_TYPE } from "./models/thread";
+import { MBeaconInfoEventContent, M_BEACON_INFO_VARIABLE } from "./@types/beacon";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -1168,7 +1170,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.syncApi.stop();
         }
 
-        await this.getCapabilities(true);
+        try {
+            const { serverSupport, stable } = await this.doesServerSupportThread();
+            Thread.setServerSideSupport(serverSupport, stable);
+        } catch (e) {
+            Thread.setServerSideSupport(false, true);
+        }
 
         // shallow-copy the opts dict before modifying and storing it
         this.clientOpts = Object.assign({}, opts) as IStoredClientOpts;
@@ -3676,6 +3683,27 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Create an m.beacon_info event
+     * @param {string} roomId
+     * @param {MBeaconInfoEventContent} beaconInfoContent
+     * @param {string} eventTypeSuffix - string to suffix event type
+     *  to make event type unique.
+     *  See MSC3489 for more context
+     *  https://github.com/matrix-org/matrix-spec-proposals/pull/3489
+     * @returns {ISendEventResponse}
+     */
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    unstable_createLiveBeacon(
+        roomId: Room["roomId"],
+        beaconInfoContent: MBeaconInfoEventContent,
+        eventTypeSuffix: string,
+    ) {
+        const userId = this.getUserId();
+        const eventType = M_BEACON_INFO_VARIABLE.name.replace('*', `${userId}.${eventTypeSuffix}`);
+        return this.sendStateEvent(roomId, eventType, beaconInfoContent, userId);
+    }
+
+    /**
      * @param {string} roomId
      * @param {string} threadId
      * @param {string} eventType
@@ -3721,14 +3749,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (threadId && !content["m.relates_to"]?.rel_type) {
             content["m.relates_to"] = {
                 ...content["m.relates_to"],
-                "rel_type": RelationType.Thread,
+                "rel_type": THREAD_RELATION_TYPE.name,
                 "event_id": threadId,
             };
             const thread = this.getRoom(roomId)?.threads.get(threadId);
             if (thread) {
                 content["m.relates_to"]["m.in_reply_to"] = {
                     "event_id": thread.lastReply((ev: MatrixEvent) => {
-                        return ev.isThreadRelation && !ev.status;
+                        return ev.isRelation(THREAD_RELATION_TYPE.name) && !ev.status;
                     })?.getId(),
                 };
             }
@@ -4935,40 +4963,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         );
     }
 
-    /**
-     * This is an internal method.
-     * @param {MatrixClient} client
-     * @param {string} roomId
-     * @param {string} userId
-     * @param {string} membershipValue
-     * @param {string} reason
-     * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     */
-    private setMembershipState(
-        roomId: string,
-        userId: string,
-        membershipValue: string,
-        reason?: string,
-        callback?: Callback,
-    ) {
-        if (utils.isFunction(reason)) {
-            callback = reason as any as Callback; // legacy
-            reason = undefined;
-        }
-
-        const path = utils.encodeUri(
-            "/rooms/$roomId/state/m.room.member/$userId",
-            { $roomId: roomId, $userId: userId },
-        );
-
-        return this.http.authedRequest(callback, Method.Put, path, undefined, {
-            membership: membershipValue,
-            reason: reason,
-        });
-    }
-
     private membershipChange(
         roomId: string,
         userId: string,
@@ -5428,7 +5422,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 only: 'highlight',
             };
 
-            if (token && token !== "end") {
+            if (token !== "end") {
                 params.from = token;
             }
 
@@ -6566,6 +6560,24 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             : presetName;
 
         return unstableFeatures && !!unstableFeatures[`io.element.e2ee_forced.${versionsPresetName}`];
+    }
+
+    public async doesServerSupportThread(): Promise<{
+        serverSupport: boolean;
+        stable: boolean;
+    } | null> {
+        try {
+            const hasUnstableSupport = await this.doesServerSupportUnstableFeature("org.matrix.msc3440");
+            const hasStableSupport = await this.doesServerSupportUnstableFeature("org.matrix.msc3440.stable")
+                || await this.isVersionSupported("v1.3");
+
+            return {
+                serverSupport: hasUnstableSupport || hasStableSupport,
+                stable: hasStableSupport,
+            };
+        } catch (e) {
+            return null;
+        }
     }
 
     /**

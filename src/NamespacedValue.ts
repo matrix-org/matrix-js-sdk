@@ -70,6 +70,22 @@ export class NamespacedValue<S extends string, U extends string> {
     }
 }
 
+export class ServerControlledNamespacedValue<S extends string, U extends string>
+    extends NamespacedValue<S, U> {
+    private preferUnstable = false;
+
+    public setPreferUnstable(preferUnstable: boolean): void {
+        this.preferUnstable = preferUnstable;
+    }
+
+    public get name(): U | S {
+        if (this.stable && !this.preferUnstable) {
+            return this.stable;
+        }
+        return this.unstable;
+    }
+}
+
 /**
  * Represents a namespaced value which prioritizes the unstable value over the stable
  * value.

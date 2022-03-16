@@ -1,4 +1,4 @@
-import * as utils from "../test-utils";
+import * as utils from "../test-utils/test-utils";
 import { CRYPTO_ENABLED } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
 import { Filter, MemoryStore, Room } from "../../src/matrix";
@@ -587,7 +587,7 @@ const buildEventMessageInThread = () => new MatrixEvent({
             "m.in_reply_to": {
                 "event_id": "$VLS2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
             },
-            "rel_type": "io.element.thread",
+            "rel_type": "m.thread",
         },
         "sender_key": "i3N3CtG/CD2bGB8rA9fW6adLYSDvlUhf2iuU73L65Vg",
         "session_id": "Ja11R/KG6ua0wdk8zAzognrxjio1Gm/RK2Gn6lFL804",

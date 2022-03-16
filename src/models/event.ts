@@ -28,7 +28,7 @@ import { EVENT_VISIBILITY_CHANGE_TYPE, EventType, MsgType, RelationType } from "
 import { Crypto, IEventDecryptionResult } from "../crypto";
 import { deepSortedObjectEntries } from "../utils";
 import { RoomMember } from "./room-member";
-import { Thread, ThreadEvent, EventHandlerMap as ThreadEventHandlerMap } from "./thread";
+import { Thread, ThreadEvent, EventHandlerMap as ThreadEventHandlerMap, THREAD_RELATION_TYPE } from "./thread";
 import { IActionsObject } from '../pushprocessor';
 import { TypedReEmitter } from '../ReEmitter';
 import { MatrixError } from "../http-api";
@@ -102,11 +102,11 @@ export interface IAggregatedRelation {
 }
 
 export interface IEventRelation {
-    rel_type: RelationType | string;
-    event_id: string;
+    rel_type?: RelationType | string;
+    event_id?: string;
+    is_falling_back?: boolean;
     "m.in_reply_to"?: {
         event_id: string;
-        "m.render_in"?: string[];
     };
     key?: string;
 }
@@ -504,7 +504,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
      */
     public get threadRootId(): string | undefined {
         const relatesTo = this.getWireContent()?.["m.relates_to"];
-        if (relatesTo?.rel_type === RelationType.Thread) {
+        if (relatesTo?.rel_type === THREAD_RELATION_TYPE.name) {
             return relatesTo.event_id;
         } else {
             return this.getThread()?.id || this.threadId;
@@ -523,7 +523,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
      */
     public get isThreadRoot(): boolean {
         const threadDetails = this
-            .getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
+            .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
 
         // Bundled relationships only returned when the sync response is limited
         // hence us having to check both bundled relation and inspect the thread
@@ -1356,7 +1356,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
         return this.status;
     }
 
-    public getServerAggregatedRelation<T>(relType: RelationType): T | undefined {
+    public getServerAggregatedRelation<T>(relType: RelationType | string): T | undefined {
         return this.getUnsigned()["m.relations"]?.[relType];
     }
 

@@ -1,4 +1,4 @@
-import * as utils from "../test-utils";
+import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 
 describe("MatrixClient events", function() {
@@ -11,9 +11,9 @@ describe("MatrixClient events", function() {
         const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
         client = testClient.client;
         httpBackend = testClient.httpBackend;
+        httpBackend.when("GET", "/versions").respond(200, {});
         httpBackend.when("GET", "/pushrules").respond(200, {});
         httpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
-        httpBackend.when("GET", "/capabilities").respond(200, { capabilities: {} });
     });
 
     afterEach(function() {

@@ -15,22 +15,43 @@ limitations under the License.
 */
 
 // Types for MSC3488 - m.location: Extending events with location data
+import { EitherAnd } from "matrix-events-sdk";
 
 import { UnstableValue } from "../NamespacedValue";
-import { IContent } from "../models/event";
 import { TEXT_NODE_TYPE } from "./extensible_events";
-
-export const LOCATION_EVENT_TYPE = new UnstableValue(
-    "m.location", "org.matrix.msc3488.location");
-
-export const ASSET_NODE_TYPE = new UnstableValue("m.asset", "org.matrix.msc3488.asset");
-
-export const TIMESTAMP_NODE_TYPE = new UnstableValue("m.ts", "org.matrix.msc3488.ts");
 
 export enum LocationAssetType {
     Self = "m.self",
     Pin = "m.pin",
 }
+
+export const M_ASSET = new UnstableValue("m.asset", "org.matrix.msc3488.asset");
+export type MAssetContent = { type: LocationAssetType };
+/**
+ * The event definition for an m.asset event (in content)
+ */
+export type MAssetEvent = EitherAnd<{ [M_ASSET.name]: MAssetContent }, { [M_ASSET.altName]: MAssetContent }>;
+
+export const M_TIMESTAMP = new UnstableValue("m.ts", "org.matrix.msc3488.ts");
+/**
+ * The event definition for an m.ts event (in content)
+ */
+export type MTimestampEvent = EitherAnd<{ [M_TIMESTAMP.name]: number }, { [M_TIMESTAMP.altName]: number }>;
+
+export const M_LOCATION = new UnstableValue(
+    "m.location", "org.matrix.msc3488.location");
+
+export type MLocationContent = {
+    uri: string;
+    description?: string | null;
+};
+
+export type MLocationEvent = EitherAnd<
+    { [M_LOCATION.name]: MLocationContent },
+    { [M_LOCATION.altName]: MLocationContent }
+>;
+
+export type MTextEvent = EitherAnd<{ [TEXT_NODE_TYPE.name]: string }, { [TEXT_NODE_TYPE.altName]: string }>;
 
 /* From the spec at:
  * https://github.com/matrix-org/matrix-doc/blob/matthew/location/proposals/3488-location.md
@@ -52,20 +73,25 @@ export enum LocationAssetType {
     }
 }
 */
+type OptionalTimestampEvent = MTimestampEvent | undefined;
+/**
+ * The content for an m.location event
+*/
+export type MLocationEventContent = &
+    MLocationEvent &
+    MAssetEvent &
+    MTextEvent &
+    OptionalTimestampEvent;
 
-/* eslint-disable camelcase */
-export interface ILocationContent extends IContent {
+export type LegacyLocationEventContent = {
     body: string;
     msgtype: string;
     geo_uri: string;
-    [LOCATION_EVENT_TYPE.name]: {
-        uri: string;
-        description?: string;
-    };
-    [ASSET_NODE_TYPE.name]: {
-        type: LocationAssetType;
-    };
-    [TEXT_NODE_TYPE.name]: string;
-    [TIMESTAMP_NODE_TYPE.name]: number;
-}
-/* eslint-enable camelcase */
+};
+
+/**
+ * Possible content for location events as sent over the wire
+ */
+export type LocationEventWireContent = Partial<LegacyLocationEventContent & MLocationEventContent>;
+
+export type ILocationContent = MLocationEventContent & LegacyLocationEventContent;

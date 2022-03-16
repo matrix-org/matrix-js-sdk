@@ -1,4 +1,4 @@
-import * as utils from "../test-utils";
+import * as utils from "../test-utils/test-utils";
 import { RoomMember } from "../../src/models/room-member";
 
 describe("RoomMember", function() {

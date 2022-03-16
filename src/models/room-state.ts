@@ -26,6 +26,7 @@ import { MatrixEvent } from "./event";
 import { MatrixClient } from "../client";
 import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
 import { TypedEventEmitter } from "./typed-event-emitter";
+import { Beacon, BeaconEvent, isBeaconInfoEventType } from "./beacon";
 
 // possible statuses for out-of-band member loading
 enum OobStatus {
@@ -39,6 +40,7 @@ export enum RoomStateEvent {
     Members = "RoomState.members",
     NewMember = "RoomState.newMember",
     Update = "RoomState.update", // signals batches of updates without specificity
+    BeaconLiveness = "RoomState.BeaconLiveness",
 }
 
 export type RoomStateEventHandlerMap = {
@@ -46,6 +48,7 @@ export type RoomStateEventHandlerMap = {
     [RoomStateEvent.Members]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
     [RoomStateEvent.NewMember]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
     [RoomStateEvent.Update]: (state: RoomState) => void;
+    [RoomStateEvent.BeaconLiveness]: (state: RoomState, hasLiveBeacons: boolean) => void;
 };
 
 export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventHandlerMap> {
@@ -70,6 +73,9 @@ export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventH
     public members: Record<string, RoomMember> = {}; // userId: RoomMember
     public events = new Map<string, Map<string, MatrixEvent>>(); // Map<eventType, Map<stateKey, MatrixEvent>>
     public paginationToken: string = null;
+
+    public readonly beacons = new Map<string, Beacon>();
+    private liveBeaconIds: string[] = [];
 
     /**
      * Construct room state.
@@ -232,6 +238,10 @@ export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventH
         return event ? event : null;
     }
 
+    public get hasLiveBeacons(): boolean {
+        return !!this.liveBeaconIds?.length;
+    }
+
     /**
      * Creates a copy of this room state so that mutations to either won't affect the other.
      * @return {RoomState} the copy of the room state
@@ -314,6 +324,10 @@ export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventH
                 return;
             }
 
+            if (isBeaconInfoEventType(event.getType())) {
+                this.setBeacon(event);
+            }
+
             const lastStateEvent = this.getStateEventMatching(event);
             this.setStateEvent(event);
             if (event.getType() === EventType.RoomMember) {
@@ -322,6 +336,8 @@ export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventH
             }
             this.emit(RoomStateEvent.Events, event, this, lastStateEvent);
         });
+
+        this.onBeaconLivenessChange();
 
         // update higher level data structures. This needs to be done AFTER the
         // core event dict as these structures may depend on other state events in
@@ -409,6 +425,37 @@ export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventH
             this.events.set(event.getType(), new Map());
         }
         this.events.get(event.getType()).set(event.getStateKey(), event);
+    }
+
+    /**
+     * @experimental
+     */
+    private setBeacon(event: MatrixEvent): void {
+        if (this.beacons.has(event.getId())) {
+            return this.beacons.get(event.getId()).update(event);
+        }
+
+        const beacon = new Beacon(event);
+        beacon.on(BeaconEvent.LivenessChange, this.onBeaconLivenessChange.bind(this));
+        this.beacons.set(beacon.beaconInfoId, beacon);
+    }
+
+    /**
+     * @experimental
+     * Check liveness of room beacons
+     * emit RoomStateEvent.BeaconLiveness when
+     * roomstate.hasLiveBeacons has changed
+     */
+    private onBeaconLivenessChange(): void {
+        const prevHasLiveBeacons = !!this.liveBeaconIds?.length;
+        this.liveBeaconIds = Array.from(this.beacons.values())
+            .filter(beacon => beacon.isLive)
+            .map(beacon => beacon.beaconInfoId);
+
+        const hasLiveBeacons = !!this.liveBeaconIds.length;
+        if (prevHasLiveBeacons !== hasLiveBeacons) {
+            this.emit(RoomStateEvent.BeaconLiveness, this, hasLiveBeacons);
+        }
     }
 
     private getStateEventMatching(event: MatrixEvent): MatrixEvent | null {

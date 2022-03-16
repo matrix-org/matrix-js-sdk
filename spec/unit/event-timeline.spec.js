@@ -1,4 +1,4 @@
-import * as utils from "../test-utils";
+import * as utils from "../test-utils/test-utils";
 import { EventTimeline } from "../../src/models/event-timeline";
 import { RoomState } from "../../src/models/room-state";
 
