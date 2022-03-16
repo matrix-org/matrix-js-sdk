@@ -1,6 +1,7 @@
 import * as utils from "../test-utils/test-utils";
 import { makeBeaconInfoEvent } from "../test-utils/beacon";
-import { RoomState } from "../../src/models/room-state";
+import { filterEmitCallsByEventType } from "../test-utils/emitter";
+import { RoomState, RoomStateEvent } from "../../src/models/room-state";
 
 describe("RoomState", function() {
     const roomId = "!foo:bar";
@@ -274,6 +275,29 @@ describe("RoomState", function() {
             expect(state.beacons.get(beaconId)).toBe(beaconInstance);
             // updated liveness
             expect(state.beacons.get(beaconId).isLive).toEqual(false);
+        });
+
+        it('updates live beacon ids once after setting state events', () => {
+            const liveBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, '$beacon1');
+            const deadBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: false }, '$beacon2');
+
+            const emitSpy = jest.spyOn(state, 'emit');
+
+            state.setStateEvents([liveBeaconEvent, deadBeaconEvent]);
+
+            // called once
+            expect(filterEmitCallsByEventType(RoomStateEvent.BeaconLiveness, emitSpy).length).toBe(1);
+
+            // live beacon is now not live
+            const updatedLiveBeaconEvent = makeBeaconInfoEvent(
+                userA, roomId, { isLive: false }, liveBeaconEvent.getId(),
+            );
+
+            state.setStateEvents([updatedLiveBeaconEvent]);
+
+            expect(state.hasLiveBeacons).toBe(false);
+            expect(filterEmitCallsByEventType(RoomStateEvent.BeaconLiveness, emitSpy).length).toBe(2);
+            expect(emitSpy).toHaveBeenCalledWith(RoomStateEvent.BeaconLiveness, state, false);
         });
     });
 

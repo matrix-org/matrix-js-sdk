@@ -27,6 +27,7 @@ export * from "./http-api";
 export * from "./autodiscovery";
 export * from "./sync-accumulator";
 export * from "./errors";
+export * from "./models/beacon";
 export * from "./models/event";
 export * from "./models/room";
 export * from "./models/group";
