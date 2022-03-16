@@ -103,6 +103,8 @@ import {
     IRoomEvent,
     IStateEvent,
     NotificationCountType,
+    BeaconEvent,
+    BeaconEventHandlerMap,
     RoomEvent,
     RoomEventHandlerMap,
     RoomMemberEvent,
@@ -178,6 +180,7 @@ import { MediaHandler } from "./webrtc/mediaHandler";
 import { IRefreshTokenResponse } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { Thread, THREAD_RELATION_TYPE } from "./models/thread";
+import { MBeaconInfoEventContent, M_BEACON_INFO_VARIABLE } from "./@types/beacon";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -835,7 +838,8 @@ type EmittedEvents = ClientEvent
     | CallEvent // re-emitted by call.ts using Object.values
     | CallEventHandlerEvent.Incoming
     | HttpApiEvent.SessionLoggedOut
-    | HttpApiEvent.NoConsent;
+    | HttpApiEvent.NoConsent
+    | BeaconEvent;
 
 export type ClientEventHandlerMap = {
     [ClientEvent.Sync]: (state: SyncState, lastState?: SyncState, data?: ISyncStateData) => void;
@@ -854,7 +858,8 @@ export type ClientEventHandlerMap = {
     & UserEventHandlerMap
     & CallEventHandlerEventHandlerMap
     & CallEventHandlerMap
-    & HttpApiEventHandlerMap;
+    & HttpApiEventHandlerMap
+    & BeaconEventHandlerMap;
 
 /**
  * Represents a Matrix Client. Only directly construct this if you want to use
@@ -3638,6 +3643,27 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $roomId: roomId,
         });
         return this.http.authedRequest(callback, Method.Put, path, undefined, content);
+    }
+
+    /**
+     * Create an m.beacon_info event
+     * @param {string} roomId
+     * @param {MBeaconInfoEventContent} beaconInfoContent
+     * @param {string} eventTypeSuffix - string to suffix event type
+     *  to make event type unique.
+     *  See MSC3489 for more context
+     *  https://github.com/matrix-org/matrix-spec-proposals/pull/3489
+     * @returns {ISendEventResponse}
+     */
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    unstable_createLiveBeacon(
+        roomId: Room["roomId"],
+        beaconInfoContent: MBeaconInfoEventContent,
+        eventTypeSuffix: string,
+    ) {
+        const userId = this.getUserId();
+        const eventType = M_BEACON_INFO_VARIABLE.name.replace('*', `${userId}.${eventTypeSuffix}`);
+        return this.sendStateEvent(roomId, eventType, beaconInfoContent, userId);
     }
 
     /**
