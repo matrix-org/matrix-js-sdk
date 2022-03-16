@@ -104,6 +104,8 @@ import {
     IRoomEvent,
     IStateEvent,
     NotificationCountType,
+    BeaconEvent,
+    BeaconEventHandlerMap,
     RoomEvent,
     RoomEventHandlerMap,
     RoomMemberEvent,
@@ -842,7 +844,8 @@ type EmittedEvents = ClientEvent
     | CallEvent // re-emitted by call.ts using Object.values
     | CallEventHandlerEvent.Incoming
     | HttpApiEvent.SessionLoggedOut
-    | HttpApiEvent.NoConsent;
+    | HttpApiEvent.NoConsent
+    | BeaconEvent;
 
 export type ClientEventHandlerMap = {
     [ClientEvent.Sync]: (state: SyncState, lastState?: SyncState, data?: ISyncStateData) => void;
@@ -864,7 +867,8 @@ export type ClientEventHandlerMap = {
     & UserEventHandlerMap
     & CallEventHandlerEventHandlerMap
     & CallEventHandlerMap
-    & HttpApiEventHandlerMap;
+    & HttpApiEventHandlerMap
+    & BeaconEventHandlerMap;
 
 /**
  * Represents a Matrix Client. Only directly construct this if you want to use
