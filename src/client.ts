@@ -8820,7 +8820,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {MSC3575SlidingSyncRequest} req The request to make.
      * @param {string} proxyBaseUrl The base URL for the sliding sync proxy.
      * @returns {MSC3575SlidingSyncResponse} The sliding sync response, or a standard error.
-     * @throws on non 2xx status codes with an object {"httpStatus":number}
+     * @throws on non 2xx status codes with an object with a field "httpStatus":number.
      */
     public slidingSync(
         req: MSC3575SlidingSyncRequest, proxyBaseUrl?: string,
