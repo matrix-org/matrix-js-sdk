@@ -123,6 +123,7 @@ class ExtensionToDevice {
     }
     async onResponse(data: object) {
         const cancelledKeyVerificationTxns = [];
+        data["events"] = data["events"] || [];
         data["events"]
             .map(this.client.getEventMapper())
             .map((toDeviceEvent) => { // map is a cheap inline forEach
