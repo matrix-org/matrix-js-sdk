@@ -373,6 +373,10 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         if (this.pendingReq) {
             this.pendingReq.abort();
         }
+        // remove all listeners so things can be GC'd
+        this.removeAllListeners(SlidingSyncEvent.Lifecycle);
+        this.removeAllListeners(SlidingSyncEvent.List);
+        this.removeAllListeners(SlidingSyncEvent.RoomData);
     }
 
     /**
