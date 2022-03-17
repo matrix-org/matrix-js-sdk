@@ -346,7 +346,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             RoomEvent.TimelineReset,
         ]);
 
-        if (this.client.supportsExperimentalThreads) {
+        if (this.client?.supportsExperimentalThreads) {
             Promise.all([
                 this.createThreadTimelineSet(),
                 this.createThreadTimelineSet(ThreadFilterType.My),
@@ -1549,10 +1549,16 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             this.emit(ThreadEvent.New, thread, toStartOfTimeline);
 
             this.threadsTimelineSets.forEach(timelineSet => {
-                if (Thread.hasServerSideSupport) {
-                    timelineSet.addLiveEvent(thread.rootEvent);
-                } else {
-                    timelineSet.addEventToTimeline(thread.rootEvent, timelineSet.getLiveTimeline(), toStartOfTimeline);
+                if (thread.rootEvent) {
+                    if (Thread.hasServerSideSupport) {
+                        timelineSet.addLiveEvent(thread.rootEvent);
+                    } else {
+                        timelineSet.addEventToTimeline(
+                            thread.rootEvent,
+                            timelineSet.getLiveTimeline(),
+                            toStartOfTimeline,
+                        );
+                    }
                 }
             });
 
