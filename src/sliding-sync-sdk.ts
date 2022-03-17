@@ -122,10 +122,8 @@ class ExtensionToDevice {
         return extReq;
     }
     async onResponse(data: object) {
-        this.nextBatch = data["next_batch"];
-
         const cancelledKeyVerificationTxns = [];
-        data["to_device"].events
+        data["events"]
             .map(this.client.getEventMapper())
             .map((toDeviceEvent) => { // map is a cheap inline forEach
                 // We want to flag m.key.verification.start events as cancelled
@@ -145,7 +143,7 @@ class ExtensionToDevice {
                 return toDeviceEvent;
             })
             .forEach(
-                function(toDeviceEvent) {
+                (toDeviceEvent) => {
                     const content = toDeviceEvent.getContent();
                     if (
                         toDeviceEvent.getType() == "m.room.message" &&
@@ -170,6 +168,8 @@ class ExtensionToDevice {
                     this.client.emit(ClientEvent.ToDeviceEvent, toDeviceEvent);
                 },
             );
+
+        this.nextBatch = data["next_batch"];
     }
 }
 
