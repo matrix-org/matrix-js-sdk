@@ -69,6 +69,10 @@ export class Beacon extends TypedEventEmitter<BeaconEvent, BeaconEventHandlerMap
         return this.rootEvent.getStateKey();
     }
 
+    public get beaconInfoEventType(): string {
+        return this.rootEvent.getType();
+    }
+
     public update(beaconInfoEvent: MatrixEvent): void {
         if (beaconInfoEvent.getId() !== this.beaconInfoId) {
             throw new Error('Invalid updating event');

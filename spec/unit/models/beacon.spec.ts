@@ -122,6 +122,7 @@ describe('Beacon', () => {
             expect(beacon.roomId).toEqual(roomId);
             expect(beacon.isLive).toEqual(true);
             expect(beacon.beaconInfoOwner).toEqual(userId);
+            expect(beacon.beaconInfoEventType).toEqual(liveBeaconEvent.getType());
         });
 
         describe('isLive()', () => {
