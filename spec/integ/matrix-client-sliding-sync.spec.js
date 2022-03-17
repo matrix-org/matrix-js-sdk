@@ -41,6 +41,7 @@ describe("SlidingSync", () => {
                 ops: [],
                 counts: [],
                 room_subscriptions: {},
+                extensions: {},
             };
             httpBackend.when("POST", syncUrl).respond(200, fakeResp);
             const p = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state, resp, err) => {
@@ -98,6 +99,7 @@ describe("SlidingSync", () => {
                 pos: "a",
                 ops: [],
                 counts: [],
+                extensions: {},
                 room_subscriptions: {
                     [roomId]: wantRoomData,
                 },
@@ -134,6 +136,7 @@ describe("SlidingSync", () => {
                 pos: "a",
                 ops: [],
                 counts: [],
+                extensions: {},
                 room_subscriptions: {
                     [roomId]: wantRoomData,
                 },
@@ -175,6 +178,7 @@ describe("SlidingSync", () => {
                 pos: "b",
                 ops: [],
                 counts: [],
+                extensions: {},
                 room_subscriptions: {
                     [anotherRoomID]: anotherRoomData,
                 },
@@ -353,7 +357,7 @@ describe("SlidingSync", () => {
                 if (!body) {
                     body = JSON.parse(req.opts.body);
                 }
-                ("extra list", body);
+                logger.log("extra list", body);
                 expect(body.lists).toBeTruthy();
                 expect(body.lists[0]).toEqual({
                     // only the ranges should be sent as the rest are unchanged and sticky
@@ -454,6 +458,103 @@ describe("SlidingSync", () => {
             await httpBackend.flushAllExpected();
             await responseProcessed;
             await listPromise;
+            slidingSync.stop();
+            done();
+        });
+    });
+
+    describe("extensions", () => {
+        beforeAll(setupClient);
+        afterAll(teardownClient);
+        let slidingSync;
+
+        const extName = "foobar";
+        const extReq = {
+            foo: "bar",
+        };
+        const extResp = {
+            baz: "quuz",
+        };
+        let onExtensionRequest;
+        let onExtensionResponse;
+
+        it("should be able to register an extension", async (done) => {
+            slidingSync = new SlidingSync(proxyBaseUrl, [], {}, client, 1);
+            slidingSync.registerExtension(extName, () => {
+                return onExtensionRequest();
+            }, (resp) => {
+                return onExtensionResponse(resp);
+            });
+
+            let extensionOnResponseCalled = false;
+            onExtensionRequest = () => {
+                return extReq;
+            };
+            onExtensionResponse = (resp) => {
+                extensionOnResponseCalled = true;
+                expect(resp).toEqual(extResp);
+            };
+
+            httpBackend.when("POST", syncUrl).check(function(req) {
+                let body = req.data;
+                if (!body) {
+                    body = JSON.parse(req.opts.body);
+                }
+                logger.log("ext req", body);
+                expect(body.extensions).toBeTruthy();
+                expect(body.extensions[extName]).toEqual(extReq);
+            }).respond(200, {
+                pos: "a",
+                ops: [],
+                counts: [],
+                extensions: {
+                    [extName]: extResp,
+                },
+            });
+
+            const p = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state, resp, err) => {
+                return state === SlidingSyncState.Complete;
+            });
+            slidingSync.start();
+            await httpBackend.flushAllExpected();
+            await p;
+            expect(extensionOnResponseCalled).toBe(true);
+            done();
+        });
+
+        it("should be able to send nothing in an extension request/response", async (done) => {
+            onExtensionRequest = () => {
+                return undefined;
+            };
+            let responseCalled = false;
+            onExtensionResponse = (resp) => {
+                responseCalled = true;
+            };
+            httpBackend.when("POST", syncUrl).check(function(req) {
+                let body = req.data;
+                if (!body) {
+                    body = JSON.parse(req.opts.body);
+                }
+                logger.log("ext req nothing", body);
+                expect(body.extensions).toBeTruthy();
+                expect(body.extensions[extName]).toBeUndefined();
+            }).respond(200, {
+                pos: "a",
+                ops: [],
+                counts: [],
+                extensions: {},
+            });
+            // we need to resend as sliding sync will already have a buffered request with the old
+            // extension values from the previous test.
+            slidingSync.resend();
+
+            const p = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state, resp, err) => {
+                return state === SlidingSyncState.Complete;
+            });
+            await httpBackend.flushAllExpected();
+            await p;
+            expect(responseCalled).toBe(false);
+
             slidingSync.stop();
             done();
         });

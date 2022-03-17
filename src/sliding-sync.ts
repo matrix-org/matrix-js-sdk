@@ -226,6 +226,8 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     private client: MatrixClient;
     private timeoutMS: number;
     private terminated: boolean;
+    // map of extension name to req/resp handler
+    private extensions: Record<string, { onRequest: () => any, onResponse: (any) => void }>;
 
     private roomSubscriptionInfo: MSC3575RoomSubscription;
     private desiredRoomSubscriptions: Set<string>; // the *desired* room subscriptions
@@ -256,6 +258,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         this.confirmedRoomSubscriptions = new Set();
         this.pendingReq = null;
         this.listModifiedCount = 0;
+        this.extensions = {};
     }
 
     /**
@@ -335,6 +338,37 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     }
 
     /**
+     * Register an extension to send with the /sync request.
+     * @param name The extension name to go under 'extensions' in the request body.
+     * @param onRequest A function which is called when the request JSON is being formed.
+     * Returns the data to insert under this key.
+     * @param onResponse A function which is called when there is response JSON under this extension.
+     */
+    registerExtension(name: string, onRequest: () => any, onResponse: (resp: any) => void) {
+        if (this.extensions[name]) {
+            throw new Error(`registerExtension: ${name} already exists as an extension`);
+        }
+        this.extensions[name] = {
+            onRequest: onRequest,
+            onResponse: onResponse,
+        };
+    }
+
+    private getExtensionRequest(): object {
+        const ext = {};
+        Object.keys(this.extensions).forEach((extName) => {
+            ext[extName] = this.extensions[extName].onRequest();
+        });
+        return ext;
+    }
+
+    private onExtensionsResponse(ext: object) {
+        Object.keys(ext).forEach((extName) => {
+            this.extensions[extName].onResponse(ext[extName]);
+        });
+    }
+
+    /**
      * Invoke all attached room data listeners.
      * @param {string} roomId The room which received some data.
      * @param {object} roomData The raw sliding sync response JSON.
@@ -395,6 +429,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     pos: currentPos,
                     timeout: this.timeoutMS,
                     clientTimeout: this.timeoutMS + BUFFER_PERIOD_MS,
+                    extensions: this.getExtensionRequest(),
                 };
                 // check if we are (un)subscribing to a room and modify request this one time for it
                 const newSubscriptions = difference(this.desiredRoomSubscriptions, this.confirmedRoomSubscriptions);
@@ -436,6 +471,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 if (!resp.room_subscriptions) {
                     resp.room_subscriptions = {};
                 }
+                if (!resp.extensions) {
+                    resp.extensions = {};
+                }
                 if (resp.counts) {
                     resp.counts.forEach((count, index) => {
                         this.lists[index].joinedCount = count;
@@ -464,6 +502,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             if (!resp) {
                 continue;
             }
+            this.onExtensionsResponse(resp.extensions);
 
             Object.keys(resp.room_subscriptions).forEach((roomId) => {
                 this.invokeRoomDataListeners(
