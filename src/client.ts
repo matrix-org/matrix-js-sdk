@@ -3686,14 +3686,32 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns {ISendEventResponse}
      */
     // eslint-disable-next-line @typescript-eslint/naming-convention
-    unstable_createLiveBeacon(
+    public async unstable_createLiveBeacon(
         roomId: Room["roomId"],
         beaconInfoContent: MBeaconInfoEventContent,
         eventTypeSuffix: string,
     ) {
         const userId = this.getUserId();
         const eventType = M_BEACON_INFO_VARIABLE.name.replace('*', `${userId}.${eventTypeSuffix}`);
-        return this.sendStateEvent(roomId, eventType, beaconInfoContent, userId);
+        return this.unstable_setLiveBeacon(roomId, eventType, beaconInfoContent);
+    }
+
+    /**
+     * Upsert a live beacon event
+     * using a specific m.beacon_info.* event variable type
+     * @param {string} roomId string
+     * @param {string} beaconInfoEventType event type including variable suffix
+     * @param {MBeaconInfoEventContent} beaconInfoContent
+     * @returns {ISendEventResponse}
+     */
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    public async unstable_setLiveBeacon(
+        roomId: string,
+        beaconInfoEventType: string,
+        beaconInfoContent: MBeaconInfoEventContent,
+    ) {
+        const userId = this.getUserId();
+        return this.sendStateEvent(roomId, beaconInfoEventType, beaconInfoContent, userId);
     }
 
     /**
