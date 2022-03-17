@@ -99,6 +99,80 @@ class ExtensionE2EE {
     }
 }
 
+class ExtensionToDevice {
+    client: MatrixClient;
+    nextBatch?: string;
+
+    constructor(client: MatrixClient) {
+        this.client = client;
+        this.nextBatch = null;
+    }
+
+    name(): string {
+        return "to_device";
+    }
+    onRequest(isInitial: boolean): object {
+        let extReq = {
+            since: this.nextBatch !== null ? this.nextBatch : undefined,
+        }
+        if (isInitial) {
+            extReq["limit"] = 100;
+            extReq["enabled"] = true;
+        }
+        return extReq;
+    }
+    async onResponse(data: object) {
+        this.nextBatch = data["next_batch"];
+
+        const cancelledKeyVerificationTxns = [];
+        data["to_device"].events
+            .map(this.client.getEventMapper())
+            .map((toDeviceEvent) => { // map is a cheap inline forEach
+                // We want to flag m.key.verification.start events as cancelled
+                // if there's an accompanying m.key.verification.cancel event, so
+                // we pull out the transaction IDs from the cancellation events
+                // so we can flag the verification events as cancelled in the loop
+                // below.
+                if (toDeviceEvent.getType() === "m.key.verification.cancel") {
+                    const txnId = toDeviceEvent.getContent()['transaction_id'];
+                    if (txnId) {
+                        cancelledKeyVerificationTxns.push(txnId);
+                    }
+                }
+
+                // as mentioned above, .map is a cheap inline forEach, so return
+                // the unmodified event.
+                return toDeviceEvent;
+            })
+            .forEach(
+                function(toDeviceEvent) {
+                    const content = toDeviceEvent.getContent();
+                    if (
+                        toDeviceEvent.getType() == "m.room.message" &&
+                        content.msgtype == "m.bad.encrypted"
+                    ) {
+                        // the mapper already logged a warning.
+                        logger.log(
+                            'Ignoring undecryptable to-device event from ' +
+                            toDeviceEvent.getSender(),
+                        );
+                        return;
+                    }
+
+                    if (toDeviceEvent.getType() === "m.key.verification.start"
+                        || toDeviceEvent.getType() === "m.key.verification.request") {
+                        const txnId = content['transaction_id'];
+                        if (cancelledKeyVerificationTxns.includes(txnId)) {
+                            toDeviceEvent.flagCancelled();
+                        }
+                    }
+
+                    this.client.emit(ClientEvent.ToDeviceEvent, toDeviceEvent);
+                },
+            );
+    }
+}
+
 /**
  * A copy of SyncApi such that it can be used as a drop-in replacement for sync v2. For the actual
  * sliding sync API, see sliding-sync.ts or the class SlidingSync.
@@ -142,6 +216,10 @@ export class SlidingSyncSdk {
         this.slidingSync = slidingSync;
         this.slidingSync.on(SlidingSyncEvent.Lifecycle, this.onLifecycle.bind(this));
         this.slidingSync.on(SlidingSyncEvent.RoomData, this.onRoomData.bind(this));
+        const extToDevice = new ExtensionToDevice(this.client);
+        this.slidingSync.registerExtension(
+            extToDevice.name(), extToDevice.onRequest.bind(extToDevice), extToDevice.onResponse.bind(extToDevice),
+        );
         if (this.opts.crypto) {
             const extE2EE = new ExtensionE2EE(this.opts.crypto);
             this.slidingSync.registerExtension(
