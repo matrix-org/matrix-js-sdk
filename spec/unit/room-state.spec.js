@@ -2,6 +2,7 @@ import * as utils from "../test-utils/test-utils";
 import { makeBeaconInfoEvent } from "../test-utils/beacon";
 import { filterEmitCallsByEventType } from "../test-utils/emitter";
 import { RoomState, RoomStateEvent } from "../../src/models/room-state";
+import { BeaconEvent } from "../../src";
 
 describe("RoomState", function() {
     const roomId = "!foo:bar";
@@ -251,13 +252,16 @@ describe("RoomState", function() {
             );
         });
 
-        it('adds new beacon info events to state', () => {
+        it('adds new beacon info events to state and emits', () => {
             const beaconEvent = makeBeaconInfoEvent(userA, roomId);
+            const emitSpy = jest.spyOn(state, 'emit');
 
             state.setStateEvents([beaconEvent]);
 
             expect(state.beacons.size).toEqual(1);
-            expect(state.beacons.get(beaconEvent.getId())).toBeTruthy();
+            const beaconInstance = state.beacons.get(beaconEvent.getId());
+            expect(beaconInstance).toBeTruthy();
+            expect(emitSpy).toHaveBeenCalledWith(BeaconEvent.New, beaconEvent, beaconInstance);
         });
 
         it('updates existing beacon info events in state', () => {

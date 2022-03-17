@@ -26,7 +26,6 @@ export enum BeaconEvent {
 }
 
 export type BeaconEventHandlerMap = {
-    [BeaconEvent.New]: (event: MatrixEvent, beacon: Beacon) => void;
     [BeaconEvent.Update]: (event: MatrixEvent, beacon: Beacon) => void;
     [BeaconEvent.LivenessChange]: (isLive: boolean, beacon: Beacon) => void;
 };
@@ -42,7 +41,7 @@ export const isBeaconInfoEventType = (type: string) =>
     type.startsWith(M_BEACON_INFO.altName);
 
 // https://github.com/matrix-org/matrix-spec-proposals/pull/3489
-export class Beacon extends TypedEventEmitter<BeaconEvent, BeaconEventHandlerMap> {
+export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.New>, BeaconEventHandlerMap> {
     public readonly roomId: string;
     private beaconInfo: BeaconInfoState;
     private _isLive: boolean;
@@ -54,7 +53,6 @@ export class Beacon extends TypedEventEmitter<BeaconEvent, BeaconEventHandlerMap
         super();
         this.setBeaconInfo(this.rootEvent);
         this.roomId = this.rootEvent.getRoomId();
-        this.emit(BeaconEvent.New, this.rootEvent, this);
     }
 
     public get isLive(): boolean {

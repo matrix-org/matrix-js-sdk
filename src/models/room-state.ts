@@ -26,7 +26,8 @@ import { MatrixEvent } from "./event";
 import { MatrixClient } from "../client";
 import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
 import { TypedEventEmitter } from "./typed-event-emitter";
-import { Beacon, BeaconEvent, isBeaconInfoEventType } from "./beacon";
+import { Beacon, BeaconEvent, isBeaconInfoEventType, BeaconEventHandlerMap } from "./beacon";
+import { TypedReEmitter } from "../ReEmitter";
 
 // possible statuses for out-of-band member loading
 enum OobStatus {
@@ -49,9 +50,13 @@ export type RoomStateEventHandlerMap = {
     [RoomStateEvent.NewMember]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
     [RoomStateEvent.Update]: (state: RoomState) => void;
     [RoomStateEvent.BeaconLiveness]: (state: RoomState, hasLiveBeacons: boolean) => void;
+    [BeaconEvent.New]: (event: MatrixEvent, beacon: Beacon) => void;
 };
 
-export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventHandlerMap> {
+type EmittedEvents = RoomStateEvent | BeaconEvent;
+type EventHandlerMap = RoomStateEventHandlerMap & BeaconEventHandlerMap;
+export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
+    public reEmitter = new TypedReEmitter<EmittedEvents, EventHandlerMap>(this);
     private sentinels: Record<string, RoomMember> = {}; // userId: RoomMember
     // stores fuzzy matches to a list of userIDs (applies utils.removeHiddenChars to keys)
     private displayNameToUserIds: Record<string, string[]> = {};
@@ -436,6 +441,14 @@ export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventH
         }
 
         const beacon = new Beacon(event);
+
+        this.reEmitter.reEmit<BeaconEvent, BeaconEvent>(beacon, [
+            BeaconEvent.New,
+            BeaconEvent.Update,
+            BeaconEvent.LivenessChange,
+        ]);
+
+        this.emit(BeaconEvent.New, event, beacon);
         beacon.on(BeaconEvent.LivenessChange, this.onBeaconLivenessChange.bind(this));
         this.beacons.set(beacon.beaconInfoId, beacon);
     }
