@@ -59,6 +59,18 @@ describe('Beacon content helpers', () => {
             }));
         });
 
+        it('uses timestamp when provided', () => {
+            expect(makeBeaconInfoContent(
+                1234,
+                true,
+                'nice beacon_info',
+                LocationAssetType.Pin,
+                99999,
+            )).toEqual(expect.objectContaining({
+                [M_TIMESTAMP.name]: 99999,
+            }));
+        });
+
         it('defaults asset type to self when not set', () => {
             expect(makeBeaconInfoContent(
                 1234,
