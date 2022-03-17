@@ -227,7 +227,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     private timeoutMS: number;
     private terminated: boolean;
     // map of extension name to req/resp handler
-    private extensions: Record<string, { onRequest: () => any, onResponse: (any) => void }>;
+    private extensions: Record<string, { onRequest: (isInitial: boolean) => any, onResponse: (any) => void }>;
 
     private roomSubscriptionInfo: MSC3575RoomSubscription;
     private desiredRoomSubscriptions: Set<string>; // the *desired* room subscriptions
@@ -344,20 +344,21 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * Returns the data to insert under this key.
      * @param onResponse A function which is called when there is response JSON under this extension.
      */
-    registerExtension(name: string, onRequest: () => any, onResponse: (resp: any) => void) {
+    registerExtension(name: string, onRequest: (isInitial: boolean) => any, onResponse: (resp: any) => void) {
         if (this.extensions[name]) {
             throw new Error(`registerExtension: ${name} already exists as an extension`);
         }
+        // TODO: do we need to have a pre-process and post-process response hook?
         this.extensions[name] = {
             onRequest: onRequest,
             onResponse: onResponse,
         };
     }
 
-    private getExtensionRequest(): object {
+    private getExtensionRequest(isInitial: boolean): object {
         const ext = {};
         Object.keys(this.extensions).forEach((extName) => {
-            ext[extName] = this.extensions[extName].onRequest();
+            ext[extName] = this.extensions[extName].onRequest(isInitial);
         });
         return ext;
     }
@@ -429,7 +430,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     pos: currentPos,
                     timeout: this.timeoutMS,
                     clientTimeout: this.timeoutMS + BUFFER_PERIOD_MS,
-                    extensions: this.getExtensionRequest(),
+                    extensions: this.getExtensionRequest(currentPos === undefined),
                 };
                 // check if we are (un)subscribing to a room and modify request this one time for it
                 const newSubscriptions = difference(this.desiredRoomSubscriptions, this.confirmedRoomSubscriptions);

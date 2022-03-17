@@ -23,6 +23,7 @@ import { EventTimeline } from "./models/event-timeline";
 import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
 import { ISyncStateData } from "./sync";
 import { MatrixEvent } from "./models/event";
+import { Crypto } from "./crypto";
 import {
     IMinimalEvent,
     IRoomEvent,
@@ -50,6 +51,52 @@ function debuglog(...params) {
         return;
     }
     logger.log(...params);
+}
+
+class ExtensionE2EE {
+    crypto: Crypto;
+
+    constructor(crypto: Crypto) {
+        this.crypto = crypto;
+    }
+
+    name(): string {
+        return "e2ee";
+    }
+    onRequest(isInitial: boolean): object {
+        if (!isInitial) {
+            return undefined;
+        }
+        return {
+            enabled: true, // this is sticky so only send it on the initial request
+        };
+    }
+    async onResponse(data: object) {
+        // Handle device list updates
+        if (data["device_lists"]) {
+            await this.crypto.handleDeviceListChanges({
+                oldSyncToken: "yep", // XXX need to do this so the device list changes get processed :(
+            }, data["device_lists"]);
+        }
+
+        // Handle one_time_keys_count
+        if (data["device_one_time_keys_count"]) {
+            const currentCount = data["device_one_time_keys_count"].signed_curve25519 || 0;
+            this.crypto.updateOneTimeKeyCount(currentCount);
+        }
+        if (data["device_unused_fallback_key_types"] ||
+                data["org.matrix.msc2732.device_unused_fallback_key_types"]) {
+            // The presence of device_unused_fallback_key_types indicates that the
+            // server supports fallback keys. If there's no unused
+            // signed_curve25519 fallback key we need a new one.
+            const unusedFallbackKeys = data["device_unused_fallback_key_types"] ||
+                data["org.matrix.msc2732.device_unused_fallback_key_types"];
+            this.crypto.setNeedsNewFallback(
+                unusedFallbackKeys instanceof Array &&
+                !unusedFallbackKeys.includes("signed_curve25519"),
+            );
+        }
+    }
 }
 
 /**
@@ -95,6 +142,12 @@ export class SlidingSyncSdk {
         this.slidingSync = slidingSync;
         this.slidingSync.on(SlidingSyncEvent.Lifecycle, this.onLifecycle.bind(this));
         this.slidingSync.on(SlidingSyncEvent.RoomData, this.onRoomData.bind(this));
+        if (this.opts.crypto) {
+            const extE2EE = new ExtensionE2EE(this.opts.crypto);
+            this.slidingSync.registerExtension(
+                extE2EE.name(), extE2EE.onRequest.bind(extE2EE), extE2EE.onResponse.bind(extE2EE),
+            );
+        }
     }
 
     private onRoomData(roomId: string, roomData: MSC3575RoomData) {
