@@ -2,7 +2,7 @@ import * as utils from "../test-utils/test-utils";
 import { makeBeaconInfoEvent } from "../test-utils/beacon";
 import { filterEmitCallsByEventType } from "../test-utils/emitter";
 import { RoomState, RoomStateEvent } from "../../src/models/room-state";
-import { BeaconEvent } from "../../src";
+import { BeaconEvent } from "../../src/models/beacon";
 
 describe("RoomState", function() {
     const roomId = "!foo:bar";

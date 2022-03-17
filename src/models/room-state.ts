@@ -55,6 +55,7 @@ export type RoomStateEventHandlerMap = {
 
 type EmittedEvents = RoomStateEvent | BeaconEvent;
 type EventHandlerMap = RoomStateEventHandlerMap & BeaconEventHandlerMap;
+
 export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     public reEmitter = new TypedReEmitter<EmittedEvents, EventHandlerMap>(this);
     private sentinels: Record<string, RoomMember> = {}; // userId: RoomMember
