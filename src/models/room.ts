@@ -35,9 +35,16 @@ import {
 } from "../@types/event";
 import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
 import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
-import { Filter } from "../filter";
+import { Filter, IFilterDefinition } from "../filter";
 import { RoomState } from "./room-state";
-import { Thread, ThreadEvent, EventHandlerMap as ThreadHandlerMap } from "./thread";
+import {
+    Thread,
+    ThreadEvent,
+    EventHandlerMap as ThreadHandlerMap,
+    FILTER_RELATED_BY_REL_TYPES, THREAD_RELATION_TYPE,
+    FILTER_RELATED_BY_SENDERS,
+    ThreadFilterType,
+} from "./thread";
 import { Method } from "../http-api";
 import { TypedEventEmitter } from "./typed-event-emitter";
 
@@ -191,6 +198,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     private receiptCacheByEventId: ReceiptCache = {}; // { event_id: ICachedReceipt[] }
     private notificationCounts: Partial<Record<NotificationCountType, number>> = {};
     private readonly timelineSets: EventTimelineSet[];
+    public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
     private readonly filteredTimelineSets: Record<string, EventTimelineSet> = {}; // filter_id: timelineSet
     private readonly pendingEventList?: MatrixEvent[];
@@ -337,6 +345,15 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             RoomEvent.Timeline,
             RoomEvent.TimelineReset,
         ]);
+
+        if (this.client?.supportsExperimentalThreads) {
+            Promise.all([
+                this.createThreadTimelineSet(),
+                this.createThreadTimelineSet(ThreadFilterType.My),
+            ]).then((timelineSets) => {
+                this.threadsTimelineSets.push(...timelineSets);
+            });
+        }
 
         this.fixUpLegacyTimelineFields();
 
@@ -1377,6 +1394,61 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         return timelineSet;
     }
 
+    private async createThreadTimelineSet(filterType?: ThreadFilterType): Promise<EventTimelineSet> {
+        let timelineSet: EventTimelineSet;
+        if (Thread.hasServerSideSupport) {
+            const myUserId = this.client.getUserId();
+            const filter = new Filter(myUserId);
+
+            const definition: IFilterDefinition = {
+                "room": {
+                    "timeline": {
+                        [FILTER_RELATED_BY_REL_TYPES.name]: [THREAD_RELATION_TYPE.name],
+                    },
+                },
+            };
+
+            if (filterType === ThreadFilterType.My) {
+                definition.room.timeline[FILTER_RELATED_BY_SENDERS.name] = [myUserId];
+            }
+
+            filter.setDefinition(definition);
+            const filterId = await this.client.getOrCreateFilter(
+                `THREAD_PANEL_${this.roomId}_${filterType}`,
+                filter,
+            );
+            filter.filterId = filterId;
+            timelineSet = this.getOrCreateFilteredTimelineSet(
+                filter,
+                {
+                    prepopulateTimeline: false,
+                    pendingEvents: false,
+                },
+            );
+
+            // An empty pagination token allows to paginate from the very bottom of
+            // the timeline set.
+            timelineSet.getLiveTimeline().setPaginationToken("", EventTimeline.BACKWARDS);
+        } else {
+            timelineSet = new EventTimelineSet(this, {
+                pendingEvents: false,
+            });
+
+            Array.from(this.threads)
+                .forEach(([, thread]) => {
+                    if (thread.length === 0) return;
+                    const currentUserParticipated = thread.events.some(event => {
+                        return event.getSender() === this.client.getUserId();
+                    });
+                    if (filterType !== ThreadFilterType.My || currentUserParticipated) {
+                        timelineSet.getLiveTimeline().addEvent(thread.rootEvent, false);
+                    }
+                });
+        }
+
+        return timelineSet;
+    }
+
     /**
      * Forget the timelineSet for this room with the given filter
      *
@@ -1476,6 +1548,21 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             }
 
             this.emit(ThreadEvent.New, thread, toStartOfTimeline);
+
+            this.threadsTimelineSets.forEach(timelineSet => {
+                if (thread.rootEvent) {
+                    if (Thread.hasServerSideSupport) {
+                        timelineSet.addLiveEvent(thread.rootEvent);
+                    } else {
+                        timelineSet.addEventToTimeline(
+                            thread.rootEvent,
+                            timelineSet.getLiveTimeline(),
+                            toStartOfTimeline,
+                        );
+                    }
+                }
+            });
+
             return thread;
         }
     }
