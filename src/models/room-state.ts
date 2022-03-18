@@ -57,7 +57,7 @@ type EmittedEvents = RoomStateEvent | BeaconEvent;
 type EventHandlerMap = RoomStateEventHandlerMap & BeaconEventHandlerMap;
 
 export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
-    public reEmitter = new TypedReEmitter<EmittedEvents, EventHandlerMap>(this);
+    public readonly reEmitter = new TypedReEmitter<EmittedEvents, EventHandlerMap>(this);
     private sentinels: Record<string, RoomMember> = {}; // userId: RoomMember
     // stores fuzzy matches to a list of userIDs (applies utils.removeHiddenChars to keys)
     private displayNameToUserIds: Record<string, string[]> = {};
