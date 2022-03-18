@@ -198,6 +198,7 @@ export type MakeBeaconInfoContent = (
     isLive?: boolean,
     description?: string,
     assetType?: LocationAssetType,
+    timestamp?: number
 ) => MBeaconInfoEventContent;
 
 export const makeBeaconInfoContent: MakeBeaconInfoContent = (
@@ -205,13 +206,14 @@ export const makeBeaconInfoContent: MakeBeaconInfoContent = (
     isLive,
     description,
     assetType,
+    timestamp,
 ) => ({
     [M_BEACON_INFO.name]: {
         description,
         timeout,
         live: isLive,
     },
-    [M_TIMESTAMP.name]: Date.now(),
+    [M_TIMESTAMP.name]: timestamp || Date.now(),
     [M_ASSET.name]: {
         type: assetType ?? LocationAssetType.Self,
     },
