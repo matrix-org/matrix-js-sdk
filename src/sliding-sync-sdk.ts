@@ -112,9 +112,9 @@ class ExtensionToDevice {
         return "to_device";
     }
     onRequest(isInitial: boolean): object {
-        let extReq = {
+        const extReq = {
             since: this.nextBatch !== null ? this.nextBatch : undefined,
-        }
+        };
         if (isInitial) {
             extReq["limit"] = 100;
             extReq["enabled"] = true;
@@ -244,7 +244,9 @@ export class SlidingSyncSdk {
     }
 
     private onLifecycle(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err?: Error) {
-        debuglog("onLifecycle", state, err);
+        if (err) {
+            debuglog("onLifecycle", state, err);
+        }
         switch (state) {
             case SlidingSyncState.Complete:
                 this.purgeNotifications();

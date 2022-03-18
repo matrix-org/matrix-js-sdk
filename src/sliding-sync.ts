@@ -226,6 +226,8 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     private client: MatrixClient;
     private timeoutMS: number;
     private terminated: boolean;
+    // flag set when resend() is called because we cannot rely on detecting AbortError in JS SDK :(
+    private needsResend: boolean;
     // map of extension name to req/resp handler
     private extensions: Record<string, { onRequest: (isInitial: boolean) => any, onResponse: (any) => void }>;
 
@@ -258,6 +260,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         this.confirmedRoomSubscriptions = new Set();
         this.pendingReq = null;
         this.listModifiedCount = 0;
+        this.needsResend = false;
         this.extensions = {};
     }
 
@@ -395,6 +398,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * Resend a Sliding Sync request. Used when something has changed in the request.
      */
     resend(): void {
+        this.needsResend = true;
         if (this.pendingReq) {
             this.pendingReq.abort();
         }
@@ -420,6 +424,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     async start() {
         let currentPos;
         while (!this.terminated) {
+            this.needsResend = false;
             let resp;
             try {
                 const listModifiedCount = this.listModifiedCount;
@@ -492,12 +497,14 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                         err,
                     );
                     await sleep(3000);
-                } else if (err != "aborted") {
-                    // check for Jest style abortions and AbortController abortions before logging
-                    const isAbort = err == "aborted" || (err.name && err.name == "AbortError");
-                    if (!isAbort) {
-                        debuglog(err);
-                    }
+                } else if (this.needsResend || err === "aborted") {
+                    // don't sleep as we caused this error by abort()ing the request.
+                    // we check for 'aborted' because that's the error Jest returns and without it
+                    // we get warnings about not exiting fast enough.
+                    continue;
+                } else {
+                    debuglog(err);
+                    await sleep(3000);
                 }
             }
             if (!resp) {
