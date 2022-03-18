@@ -279,6 +279,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @returns A copy of the list or undefined.
      */
     getList(index: number): MSC3575List {
+        if (!this.lists[index]) {
+            return null;
+        }
         return this.lists[index].getList(true);
     }
 
