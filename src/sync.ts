@@ -55,6 +55,7 @@ import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
 import { RoomStateEvent } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
+import { BeaconEvent } from "./models/beacon";
 
 const DEBUG = true;
 
@@ -241,7 +242,11 @@ export class SyncApi {
             RoomStateEvent.Members,
             RoomStateEvent.NewMember,
             RoomStateEvent.Update,
+            BeaconEvent.New,
+            BeaconEvent.Update,
+            BeaconEvent.LivenessChange,
         ]);
+
         room.currentState.on(RoomStateEvent.NewMember, function(event, state, member) {
             member.user = client.getUser(member.userId);
             client.reEmitter.reEmit(member, [
