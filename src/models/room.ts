@@ -1411,6 +1411,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @experimental
      */
     public async addThreadedEvent(event: MatrixEvent, toStartOfTimeline: boolean): Promise<void> {
+        this.applyRedaction(event);
         let thread = this.findThreadForEvent(event);
         if (thread) {
             thread.addEvent(event, toStartOfTimeline);
@@ -1479,17 +1480,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
     }
 
-    /**
-     * Add an event to the end of this room's live timelines. Will fire
-     * "Room.timeline".
-     *
-     * @param {MatrixEvent} event Event to be added
-     * @param {string?} duplicateStrategy 'ignore' or 'replace'
-     * @param {boolean} fromCache whether the sync response came from cache
-     * @fires module:client~MatrixClient#event:"Room.timeline"
-     * @private
-     */
-    private addLiveEvent(event: MatrixEvent, duplicateStrategy?: DuplicateStrategy, fromCache = false): void {
+    applyRedaction(event: MatrixEvent): void {
         if (event.isRedaction()) {
             const redactId = event.event.redacts;
 
@@ -1533,6 +1524,20 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             // clients can say "so and so redacted an event" if they wish to. Also
             // this may be needed to trigger an update.
         }
+    }
+
+    /**
+     * Add an event to the end of this room's live timelines. Will fire
+     * "Room.timeline".
+     *
+     * @param {MatrixEvent} event Event to be added
+     * @param {string?} duplicateStrategy 'ignore' or 'replace'
+     * @param {boolean} fromCache whether the sync response came from cache
+     * @fires module:client~MatrixClient#event:"Room.timeline"
+     * @private
+     */
+    private addLiveEvent(event: MatrixEvent, duplicateStrategy?: DuplicateStrategy, fromCache = false): void {
+        this.applyRedaction(event);
 
         // Implement MSC3531: hiding messages.
         if (event.isVisibilityEvent()) {
