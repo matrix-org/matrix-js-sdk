@@ -273,6 +273,21 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     }
 
     /**
+     * Get the room data for a list.
+     * @param index The list index
+     * @returns The list data which contains the rooms in this list
+     */
+    getListData(index: number): {joinedCount: number, roomIndexToRoomId: Record<number, string>} {
+        if (!this.lists[index]) {
+            return null;
+        }
+        return {
+            joinedCount: this.lists[index].joinedCount,
+            roomIndexToRoomId: Object.assign({}, this.lists[index].roomIndexToRoomId),
+        }
+    }
+
+    /**
      * Get the full list parameters for a list index. This function is provided for callers to use
      * in conjunction with setList to update fields on an existing list.
      * @param index The list index to get the list for.
