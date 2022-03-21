@@ -133,6 +133,8 @@ describe('Beacon', () => {
             expect(beacon.isLive).toEqual(true);
             expect(beacon.beaconInfoOwner).toEqual(userId);
             expect(beacon.beaconInfoEventType).toEqual(liveBeaconEvent.getType());
+            expect(beacon.identifier).toEqual(liveBeaconEvent.getType());
+            expect(beacon.beaconInfo).toBeTruthy();
         });
 
         describe('isLive()', () => {
@@ -236,6 +238,22 @@ describe('Beacon', () => {
 
                 expect(emitSpy).toHaveBeenCalledTimes(1);
                 expect(emitSpy).toHaveBeenCalledWith(BeaconEvent.LivenessChange, false, beacon);
+            });
+
+            it('clears monitor interval when re-monitoring liveness', () => {
+                // live beacon was created an hour ago
+                // and has a 3hr duration
+                const beacon = new Beacon(liveBeaconEvent);
+                expect(beacon.isLive).toBeTruthy();
+
+                beacon.monitorLiveness();
+                // @ts-ignore
+                const oldMonitor = beacon.livenessWatchInterval;
+
+                beacon.monitorLiveness();
+
+                // @ts-ignore
+                expect(beacon.livenessWatchInterval).not.toEqual(oldMonitor);
             });
 
             it('destroy kills liveness monitor', () => {
