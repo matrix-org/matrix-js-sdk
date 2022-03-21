@@ -14,6 +14,8 @@ import { MEGOLM_ALGORITHM } from "../../src/crypto/olmlib";
 import { EventStatus, MatrixEvent } from "../../src/models/event";
 import { Preset } from "../../src/@types/partials";
 import * as testUtils from "../test-utils/test-utils";
+import { makeBeaconInfoContent } from "../../src/content-helpers";
+import { M_BEACON_INFO } from "../../src/@types/beacon";
 
 jest.useFakeTimers();
 
@@ -967,6 +969,45 @@ describe("MatrixClient", function() {
 
             // Restore method
             client.supportsExperimentalThreads = supportsExperimentalThreads;
+        });
+    });
+
+    describe("beacons", () => {
+        const roomId = '!room:server.org';
+        const content = makeBeaconInfoContent(100, true);
+
+        beforeEach(() => {
+            client.http.authedRequest.mockClear().mockResolvedValue({});
+        });
+
+        it("creates new beacon info", async () => {
+            await client.unstable_createLiveBeacon(roomId, content, '123');
+
+            // event type combined
+            const expectedEventType = `${M_BEACON_INFO.name}.${userId}.123`;
+            const [callback, method, path, queryParams, requestContent] = client.http.authedRequest.mock.calls[0];
+            expect(callback).toBeFalsy();
+            expect(method).toBe('PUT');
+            expect(path).toEqual(
+                `/rooms/${encodeURIComponent(roomId)}/state/` +
+                `${encodeURIComponent(expectedEventType)}/${encodeURIComponent(userId)}`,
+            );
+            expect(queryParams).toBeFalsy();
+            expect(requestContent).toEqual(content);
+        });
+
+        it("updates beacon info with specific event type", async () => {
+            const eventType = `${M_BEACON_INFO.name}.${userId}.456`;
+
+            await client.unstable_setLiveBeacon(roomId, eventType, content);
+
+            // event type combined
+            const [, , path, , requestContent] = client.http.authedRequest.mock.calls[0];
+            expect(path).toEqual(
+                `/rooms/${encodeURIComponent(roomId)}/state/` +
+                `${encodeURIComponent(eventType)}/${encodeURIComponent(userId)}`,
+            );
+            expect(requestContent).toEqual(content);
         });
     });
 });

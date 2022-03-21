@@ -26,7 +26,6 @@ export enum BeaconEvent {
 }
 
 export type BeaconEventHandlerMap = {
-    [BeaconEvent.New]: (event: MatrixEvent, beacon: Beacon) => void;
     [BeaconEvent.Update]: (event: MatrixEvent, beacon: Beacon) => void;
     [BeaconEvent.LivenessChange]: (isLive: boolean, beacon: Beacon) => void;
 };
@@ -42,9 +41,9 @@ export const isBeaconInfoEventType = (type: string) =>
     type.startsWith(M_BEACON_INFO.altName);
 
 // https://github.com/matrix-org/matrix-spec-proposals/pull/3489
-export class Beacon extends TypedEventEmitter<BeaconEvent, BeaconEventHandlerMap> {
+export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.New>, BeaconEventHandlerMap> {
     public readonly roomId: string;
-    private beaconInfo: BeaconInfoState;
+    private _beaconInfo: BeaconInfoState;
     private _isLive: boolean;
     private livenessWatchInterval: number;
 
@@ -54,7 +53,6 @@ export class Beacon extends TypedEventEmitter<BeaconEvent, BeaconEventHandlerMap
         super();
         this.setBeaconInfo(this.rootEvent);
         this.roomId = this.rootEvent.getRoomId();
-        this.emit(BeaconEvent.New, this.rootEvent, this);
     }
 
     public get isLive(): boolean {
@@ -67,6 +65,14 @@ export class Beacon extends TypedEventEmitter<BeaconEvent, BeaconEventHandlerMap
 
     public get beaconInfoOwner(): string {
         return this.rootEvent.getStateKey();
+    }
+
+    public get beaconInfoEventType(): string {
+        return this.rootEvent.getType();
+    }
+
+    public get beaconInfo(): BeaconInfoState {
+        return this._beaconInfo;
     }
 
     public update(beaconInfoEvent: MatrixEvent): void {
@@ -95,7 +101,7 @@ export class Beacon extends TypedEventEmitter<BeaconEvent, BeaconEventHandlerMap
         }
 
         if (this.isLive) {
-            const expiryInMs = (this.beaconInfo?.timestamp + this.beaconInfo?.timeout + 1) - Date.now();
+            const expiryInMs = (this._beaconInfo?.timestamp + this._beaconInfo?.timeout + 1) - Date.now();
             if (expiryInMs > 1) {
                 this.livenessWatchInterval = setInterval(this.checkLiveness.bind(this), expiryInMs);
             }
@@ -103,14 +109,14 @@ export class Beacon extends TypedEventEmitter<BeaconEvent, BeaconEventHandlerMap
     }
 
     private setBeaconInfo(event: MatrixEvent): void {
-        this.beaconInfo = parseBeaconInfoContent(event.getContent());
+        this._beaconInfo = parseBeaconInfoContent(event.getContent());
         this.checkLiveness();
     }
 
     private checkLiveness(): void {
         const prevLiveness = this.isLive;
-        this._isLive = this.beaconInfo?.live &&
-            isTimestampInDuration(this.beaconInfo?.timestamp, this.beaconInfo?.timeout, Date.now());
+        this._isLive = this._beaconInfo?.live &&
+            isTimestampInDuration(this._beaconInfo?.timestamp, this._beaconInfo?.timeout, Date.now());
 
         if (prevLiveness !== this.isLive) {
             this.emit(BeaconEvent.LivenessChange, this.isLive, this);

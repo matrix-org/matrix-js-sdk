@@ -478,7 +478,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
      *
      * @return {Object} The event content JSON, or an empty object.
      */
-    public getContent<T = IContent>(): T {
+    public getContent<T extends IContent = IContent>(): T {
         if (this._localRedactionEvent) {
             return {} as T;
         } else if (this._replacingEvent) {

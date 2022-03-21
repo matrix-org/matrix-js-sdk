@@ -364,3 +364,8 @@ export const THREAD_RELATION_TYPE = new ServerControlledNamespacedValue(
     "m.thread",
     "io.element.thread",
 );
+
+export enum ThreadFilterType {
+    "My",
+    "All"
+}
