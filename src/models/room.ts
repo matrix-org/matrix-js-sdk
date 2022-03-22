@@ -1500,11 +1500,22 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             return threadRelationship.current_user_participated;
         });
 
+        const roomState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
         for (const event of orderedByLastReplyEvents) {
-            this.threadsTimelineSets[0].addLiveEvent(event);
+            this.threadsTimelineSets[0].addLiveEvent(
+                event,
+                DuplicateStrategy.Ignore,
+                false,
+                roomState,
+            );
         }
         for (const event of myThreads) {
-            this.threadsTimelineSets[1].addLiveEvent(event);
+            this.threadsTimelineSets[1].addLiveEvent(
+                event,
+                DuplicateStrategy.Ignore,
+                false,
+                roomState,
+            );
         }
 
         this.client.decryptEventIfNeeded(orderedByLastReplyEvents[orderedByLastReplyEvents.length -1]);
