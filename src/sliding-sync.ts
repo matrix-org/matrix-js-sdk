@@ -102,7 +102,14 @@ export interface MSC3575SlidingSyncResponse {
 }
 
 export enum SlidingSyncState {
+    /**
+     * Fired by SlidingSyncEvent.Lifecycle event immediately before processing the response.
+     */
     RequestFinished = "FINISHED",
+    /**
+     * Fired by SlidingSyncEvent.Lifecycle event immediately after all room data listeners have been
+     * invoked, but before list listeners.
+     */
     Complete = "COMPLETE",
 }
 
@@ -200,9 +207,38 @@ class SlidingList {
     }
 }
 
+/**
+ * Events which can be fired by the SlidingSync class. These are designed to provide different levels
+ * of information when processing sync responses.
+ *  - RoomData: concerns rooms, useful for SlidingSyncSdk to update its knowledge of rooms.
+ *  - Lifecycle: concerns callbacks at various well-defined points in the sync process.
+ *  - List: concerns lists, useful for UI layers to re-render room lists.
+ * Specifically, the order of event invocation is:
+ *  - Lifecycle (state=RequestFinished)
+ *  - RoomData (N times)
+ *  - Lifecycle (state=Complete)
+ *  - List (at most once per list)
+ */
 export enum SlidingSyncEvent {
+    /**
+     * This event fires when there are updates for a room. Fired as and when rooms are encountered
+     * in the response.
+     */
     RoomData = "SlidingSync.RoomData",
+    /**
+     * This event fires at various points in the /sync loop lifecycle.
+     *  - SlidingSyncState.RequestFinished: Fires after we receive a valid response but before the
+     * response has been processed. Perform any pre-process steps here. If there was a problem syncing,
+     * `err` will be set (e.g network errors).
+     *  - SlidingSyncState.Complete: Fires after all SlidingSyncEvent.RoomData have been fired but before
+     * SlidingSyncEvent.List.
+     */
     Lifecycle = "SlidingSync.Lifecycle",
+    /**
+     * This event fires whenever there has been a change to this list index. It fires exactly once
+     * per list, even if there were multiple operations for the list.
+     * It fires AFTER Lifecycle and RoomData events.
+     */
     List = "SlidingSync.List",
 }
 
@@ -656,14 +692,13 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     );
                 }
             });
+            this.invokeLifecycleListeners(SlidingSyncState.Complete, resp);
             listIndexesWithUpdates.forEach((i) => {
                 this.emit(
                     SlidingSyncEvent.List,
                     i, this.lists[i].joinedCount, Object.assign({}, this.lists[i].roomIndexToRoomId),
                 );
             });
-
-            this.invokeLifecycleListeners(SlidingSyncState.Complete, resp);
         }
     }
 }
