@@ -99,11 +99,21 @@ describe('Beacon', () => {
         beforeEach(() => {
             // go back in time to create the beacon
             jest.spyOn(global.Date, 'now').mockReturnValue(now - HOUR_MS);
-            liveBeaconEvent = makeBeaconInfoEvent(userId, roomId, { timeout: HOUR_MS * 3, isLive: true }, '$live123');
+            liveBeaconEvent = makeBeaconInfoEvent(
+                userId,
+                roomId,
+                {
+                    timeout: HOUR_MS * 3,
+                    isLive: true,
+                },
+                '$live123',
+                '$live123',
+            );
             notLiveBeaconEvent = makeBeaconInfoEvent(
                 userId,
                 roomId,
                 { timeout: HOUR_MS * 3, isLive: false },
+                '$dead123',
                 '$dead123',
             );
 
@@ -123,6 +133,8 @@ describe('Beacon', () => {
             expect(beacon.isLive).toEqual(true);
             expect(beacon.beaconInfoOwner).toEqual(userId);
             expect(beacon.beaconInfoEventType).toEqual(liveBeaconEvent.getType());
+            expect(beacon.identifier).toEqual(liveBeaconEvent.getType());
+            expect(beacon.beaconInfo).toBeTruthy();
         });
 
         describe('isLive()', () => {
@@ -170,7 +182,7 @@ describe('Beacon', () => {
                 expect(beacon.isLive).toEqual(true);
 
                 const updatedBeaconEvent = makeBeaconInfoEvent(
-                    userId, roomId, { timeout: HOUR_MS * 3, isLive: false }, '$live123');
+                    userId, roomId, { timeout: HOUR_MS * 3, isLive: false }, '$live123', '$live123');
 
                 beacon.update(updatedBeaconEvent);
                 expect(beacon.isLive).toEqual(false);
@@ -184,7 +196,12 @@ describe('Beacon', () => {
                 expect(beacon.isLive).toEqual(true);
 
                 const updatedBeaconEvent = makeBeaconInfoEvent(
-                    userId, roomId, { timeout: HOUR_MS * 3, isLive: false }, beacon.beaconInfoId);
+                    userId,
+                    roomId,
+                    { timeout: HOUR_MS * 3, isLive: false },
+                    beacon.beaconInfoId,
+                    '$live123',
+                );
 
                 beacon.update(updatedBeaconEvent);
                 expect(beacon.isLive).toEqual(false);
@@ -221,6 +238,22 @@ describe('Beacon', () => {
 
                 expect(emitSpy).toHaveBeenCalledTimes(1);
                 expect(emitSpy).toHaveBeenCalledWith(BeaconEvent.LivenessChange, false, beacon);
+            });
+
+            it('clears monitor interval when re-monitoring liveness', () => {
+                // live beacon was created an hour ago
+                // and has a 3hr duration
+                const beacon = new Beacon(liveBeaconEvent);
+                expect(beacon.isLive).toBeTruthy();
+
+                beacon.monitorLiveness();
+                // @ts-ignore
+                const oldMonitor = beacon.livenessWatchInterval;
+
+                beacon.monitorLiveness();
+
+                // @ts-ignore
+                expect(beacon.livenessWatchInterval).not.toEqual(oldMonitor);
             });
 
             it('destroy kills liveness monitor', () => {
