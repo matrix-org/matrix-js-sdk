@@ -2425,7 +2425,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
 
     /**
      * Returns the type of the room from the `m.room.create` event content or undefined if none is set
-     * @returns {?string} the type of the room. Currently only RoomType.Space is known.
+     * @returns {?string} the type of the room.
      */
     public getType(): RoomType | string | undefined {
         const createEvent = this.currentState.getStateEvents(EventType.RoomCreate, "");
@@ -2445,6 +2445,14 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     public isSpaceRoom(): boolean {
         return this.getType() === RoomType.Space;
+    }
+
+    /**
+     * Returns whether the room is a call-room as defined by MSC3417.
+     * @returns {boolean} true if the room's type is RoomType.UnstableCall
+     */
+    public isCallRoom(): boolean {
+        return this.getType() === RoomType.UnstableCall;
     }
 
     /**
