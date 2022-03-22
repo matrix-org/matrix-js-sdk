@@ -9258,12 +9258,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         const parentEventId = event.getAssociatedId();
-        const parentEvent = room?.findEventById(parentEventId) || events.find((mxEv: MatrixEvent) => (
+        const parentEvent = room?.findEventById(parentEventId) ?? events.find((mxEv: MatrixEvent) => (
             mxEv.getId() === parentEventId
         ));
 
-        // A reaction targetting the thread root needs to be routed to both the
-        // the main timeline and the associated thread
+        // A reaction targeting the thread root needs to be routed to both the main timeline and the associated thread
         const targetingThreadRoot = parentEvent?.isThreadRoot || roots.has(event.relationEventId);
         if (targetingThreadRoot) {
             return {

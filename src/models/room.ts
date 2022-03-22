@@ -47,6 +47,7 @@ import {
 } from "./thread";
 import { Method } from "../http-api";
 import { TypedEventEmitter } from "./typed-event-emitter";
+import { IMinimalEvent } from "../sync-accumulator";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -1490,10 +1491,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         } else {
             const events = [event];
             let rootEvent = this.findEventById(event.threadRootId);
-            // If the rootEvent does not exist in the current sync, then look for
-            // it over the network
+            // If the rootEvent does not exist in the current sync, then look for it over the network.
             try {
-                let eventData;
+                let eventData: IMinimalEvent;
                 if (event.threadRootId) {
                     eventData = await this.client.fetchRoomEvent(this.roomId, event.threadRootId);
                 }
@@ -1504,10 +1504,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                     rootEvent.setUnsigned(eventData.unsigned);
                 }
             } finally {
-                // The root event might be not be visible to the person requesting
-                // it. If it wasn't fetched successfully the thread will work
-                // in "limited" mode and won't benefit from all the APIs a homeserver
-                // can provide to enhance the thread experience
+                // The root event might be not be visible to the person requesting it.
+                // If it wasn't fetched successfully the thread will work in "limited" mode and won't
+                // benefit from all the APIs a homeserver can provide to enhance the thread experience
                 thread = this.createThread(rootEvent, events, toStartOfTimeline);
             }
         }
@@ -1567,7 +1566,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
     }
 
-    applyRedaction(event: MatrixEvent): void {
+    private applyRedaction(event: MatrixEvent): void {
         if (event.isRedaction()) {
             const redactId = event.event.redacts;
 
