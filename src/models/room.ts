@@ -1191,10 +1191,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         timeline: EventTimeline,
         paginationToken?: string,
     ): void {
-        timeline.getTimelineSet().addEventsToTimeline(
-            events, toStartOfTimeline,
-            timeline, paginationToken,
-        );
+        timeline.getTimelineSet().addEventsToTimeline(events, toStartOfTimeline, timeline, paginationToken);
     }
 
     /**
@@ -1783,6 +1780,14 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
     }
 
+    private shouldAddEventToMainTimeline(thread: Thread, event: MatrixEvent): boolean {
+        if (!thread) {
+            return true;
+        }
+
+        return !event.isThreadRelation && thread.id === event.getAssociatedId();
+    }
+
     /**
      * Used to aggregate the local echo for a relation, and also
      * for re-applying a relation after it's redaction has been cancelled,
@@ -1795,11 +1800,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     private aggregateNonLiveRelation(event: MatrixEvent): void {
         const thread = this.findThreadForEvent(event);
-        if (thread) {
-            thread.timelineSet.aggregateRelations(event);
-        }
+        thread?.timelineSet.aggregateRelations(event);
 
-        if (thread?.id === event.getAssociatedId() || !thread) {
+        if (this.shouldAddEventToMainTimeline(thread, event)) {
             // TODO: We should consider whether this means it would be a better
             // design to lift the relations handling up to the room instead.
             for (let i = 0; i < this.timelineSets.length; i++) {
@@ -1856,11 +1859,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         localEvent.handleRemoteEcho(remoteEvent.event);
 
         const thread = this.findThreadForEvent(remoteEvent);
-        if (thread) {
-            thread.timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
-        }
+        thread?.timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
 
-        if (thread?.id === remoteEvent.getAssociatedId() || !thread) {
+        if (this.shouldAddEventToMainTimeline(thread, remoteEvent)) {
             for (let i = 0; i < this.timelineSets.length; i++) {
                 const timelineSet = this.timelineSets[i];
 
@@ -1927,10 +1928,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             event.replaceLocalEventId(newEventId);
 
             const thread = this.findThreadForEvent(event);
-            if (thread) {
-                thread.timelineSet.replaceEventId(oldEventId, newEventId);
-            }
-            if (thread?.id === event.getAssociatedId() || !thread) {
+            thread?.timelineSet.replaceEventId(oldEventId, newEventId);
+
+            if (this.shouldAddEventToMainTimeline(thread, event)) {
                 // if the event was already in the timeline (which will be the case if
                 // opts.pendingEventOrdering==chronological), we need to update the
                 // timeline map.
