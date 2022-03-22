@@ -221,6 +221,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
 
             const event = new MatrixEvent(bundledRelationship.latest_event);
             this.setEventMetadata(event);
+            event.setThread(this);
             this.lastEvent = event;
         }
     }

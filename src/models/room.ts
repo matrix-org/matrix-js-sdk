@@ -1508,6 +1508,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 // If it wasn't fetched successfully the thread will work in "limited" mode and won't
                 // benefit from all the APIs a homeserver can provide to enhance the thread experience
                 thread = this.createThread(rootEvent, events, toStartOfTimeline);
+                rootEvent.setThread(thread);
             }
         }
 
