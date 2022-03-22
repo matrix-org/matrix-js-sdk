@@ -170,6 +170,7 @@ export enum RoomEvent {
 type EmittedEvents = RoomEvent
     | ThreadEvent.New
     | ThreadEvent.Update
+    | ThreadEvent.NewReply
     | RoomEvent.Timeline
     | RoomEvent.TimelineReset;
 
@@ -1469,6 +1470,10 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     public threadsReady = false;
 
     public async fetchRoomThreads(): Promise<void> {
+        if (this.threadsReady) {
+            return;
+        }
+
         const allThreadsFilter = await this.getThreadListFilter();
 
         const { chunk: events } = await this.client.createMessagesRequest(
@@ -1506,6 +1511,15 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         this.client.decryptEventIfNeeded(myThreads[myThreads.length -1]);
 
         this.threadsReady = true;
+
+        this.on(ThreadEvent.NewReply, this.onThreadNewReply);
+    }
+
+    private onThreadNewReply(thread: Thread): void {
+        for (const timelineSet of this.threadsTimelineSets) {
+            timelineSet.removeEvent(thread.id);
+            timelineSet.addLiveEvent(thread.rootEvent);
+        }
     }
 
     /**
@@ -1598,6 +1612,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             this.threads.set(thread.id, thread);
             this.reEmitter.reEmit(thread, [
                 ThreadEvent.Update,
+                ThreadEvent.NewReply,
                 RoomEvent.Timeline,
                 RoomEvent.TimelineReset,
             ]);
