@@ -346,15 +346,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             RoomEvent.TimelineReset,
         ]);
 
-        if (this.client?.supportsExperimentalThreads) {
-            Promise.all([
-                this.createThreadTimelineSet(),
-                this.createThreadTimelineSet(ThreadFilterType.My),
-            ]).then((timelineSets) => {
-                this.threadsTimelineSets.push(...timelineSets);
-            });
-        }
-
         this.fixUpLegacyTimelineFields();
 
         if (this.opts.pendingEventOrdering === PendingEventOrdering.Detached) {
@@ -378,6 +369,26 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             this.membersPromise = Promise.resolve(false);
         } else {
             this.membersPromise = null;
+        }
+    }
+
+    private threadTimelineSetsPromise: Promise<[EventTimelineSet, EventTimelineSet]> | null = null;
+    public async createThreadsTimelineSets(): Promise<[EventTimelineSet, EventTimelineSet]> {
+        if (this.threadTimelineSetsPromise) {
+            return this.threadTimelineSetsPromise;
+        }
+
+        if (this.client?.supportsExperimentalThreads) {
+            try {
+                this.threadTimelineSetsPromise = Promise.all([
+                    this.createThreadTimelineSet(),
+                    this.createThreadTimelineSet(ThreadFilterType.My),
+                ]);
+                const timelineSets = await this.threadTimelineSetsPromise;
+                this.threadsTimelineSets.push(...timelineSets);
+            } catch (e) {
+                this.threadTimelineSetsPromise = null;
+            }
         }
     }
 
