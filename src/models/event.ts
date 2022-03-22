@@ -279,7 +279,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
     public target: RoomMember = null;
     public status: EventStatus = null;
     public error: MatrixError = null;
-    public forwardLooking = true;
+    public forwardLooking = true; // only state events may be backwards looking
 
     /* If the event is a `m.key.verification.request` (or to_device `m.key.verification.start`) event,
      * `Crypto` will set this the `VerificationRequest` for the event
