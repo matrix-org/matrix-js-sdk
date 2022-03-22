@@ -9278,14 +9278,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // we want that redaction to be pushed to both timeline
         if (parentEvent?.getAssociatedId()) {
             return this.eventShouldLiveIn(parentEvent, room, events, roots);
-        } else {
-            // We've exhausted all scenarios, can safely assume that this event
-            // should live in the room timeline
-            return {
-                shouldLiveInRoom: true,
-                shouldLiveInThread: false,
-            };
         }
+
+        // We've exhausted all scenarios, can safely assume that this event
+        // should live in the room timeline
+        return {
+            shouldLiveInRoom: true,
+            shouldLiveInThread: false,
+        };
     }
 
     public partitionThreadedEvents(events: MatrixEvent[]): [MatrixEvent[], MatrixEvent[]] {
