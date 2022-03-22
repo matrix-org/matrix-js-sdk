@@ -86,9 +86,17 @@ export interface IEvent {
     unsigned: IUnsigned;
     redacts?: string;
 
-    // v1 legacy fields
+    /**
+     * @deprecated
+     */
     user_id?: string;
+    /**
+     * @deprecated
+     */
     prev_content?: IContent;
+    /**
+     * @deprecated
+     */
     age?: number;
 }
 
