@@ -50,6 +50,7 @@ export interface MSC3575Filter {
     is_dm?: boolean;
     is_encrypted?: boolean;
     is_invite?: boolean;
+    is_tombstoned?: boolean;
     room_name_like?: string;
 }
 
