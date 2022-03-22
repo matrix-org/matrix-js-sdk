@@ -3981,7 +3981,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Returns the eventType that should be used taking encryption into account
      * for a given eventType.
-     * @param {MatrixClient} client the client
      * @param {string} roomId the room for the events `eventType` relates to
      * @param {string} eventType the event type
      * @return {string} the event type taking encryption into account
@@ -6656,6 +6655,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             originalEvent = mapper(result.original_event);
         }
         let events = result.chunk.map(mapper);
+
         if (fetchedEventType === EventType.RoomMessageEncrypted) {
             const allEvents = originalEvent ? events.concat(originalEvent) : events;
             await Promise.all(allEvents.map(e => this.decryptEventIfNeeded(e)));
@@ -6663,6 +6663,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 events = events.filter(e => e.getType() === eventType);
             }
         }
+
         if (originalEvent && relationType === RelationType.Replace) {
             events = events.filter(e => e.getSender() === originalEvent.getSender());
         }
@@ -9288,8 +9289,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         };
     }
 
-    public partitionThreadedEvents(events: MatrixEvent[]): [MatrixEvent[], MatrixEvent[]] {
-        // Indices to the events array, for readibility
+    public partitionThreadedEvents(events: MatrixEvent[]): [
+        timelineEvents: MatrixEvent[],
+        threadedEvents: MatrixEvent[],
+    ] {
+        // Indices to the events array, for readability
         const ROOM = 0;
         const THREAD = 1;
         if (this.supportsExperimentalThreads()) {
