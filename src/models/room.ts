@@ -346,15 +346,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             RoomEvent.TimelineReset,
         ]);
 
-        if (this.client?.supportsExperimentalThreads) {
-            Promise.all([
-                this.createThreadTimelineSet(),
-                this.createThreadTimelineSet(ThreadFilterType.My),
-            ]).then((timelineSets) => {
-                this.threadsTimelineSets.push(...timelineSets);
-            });
-        }
-
         this.fixUpLegacyTimelineFields();
 
         if (this.opts.pendingEventOrdering === PendingEventOrdering.Detached) {
@@ -378,6 +369,26 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             this.membersPromise = Promise.resolve(false);
         } else {
             this.membersPromise = null;
+        }
+    }
+
+    private threadTimelineSetsPromise: Promise<[EventTimelineSet, EventTimelineSet]> | null = null;
+    public async createThreadsTimelineSets(): Promise<[EventTimelineSet, EventTimelineSet]> {
+        if (this.threadTimelineSetsPromise) {
+            return this.threadTimelineSetsPromise;
+        }
+
+        if (this.client?.supportsExperimentalThreads) {
+            try {
+                this.threadTimelineSetsPromise = Promise.all([
+                    this.createThreadTimelineSet(),
+                    this.createThreadTimelineSet(ThreadFilterType.My),
+                ]);
+                const timelineSets = await this.threadTimelineSetsPromise;
+                this.threadsTimelineSets.push(...timelineSets);
+            } catch (e) {
+                this.threadTimelineSetsPromise = null;
+            }
         }
     }
 
@@ -2414,7 +2425,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
 
     /**
      * Returns the type of the room from the `m.room.create` event content or undefined if none is set
-     * @returns {?string} the type of the room. Currently only RoomType.Space is known.
+     * @returns {?string} the type of the room.
      */
     public getType(): RoomType | string | undefined {
         const createEvent = this.currentState.getStateEvents(EventType.RoomCreate, "");
@@ -2434,6 +2445,14 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     public isSpaceRoom(): boolean {
         return this.getType() === RoomType.Space;
+    }
+
+    /**
+     * Returns whether the room is a call-room as defined by MSC3417.
+     * @returns {boolean} true if the room's type is RoomType.UnstableCall
+     */
+    public isCallRoom(): boolean {
+        return this.getType() === RoomType.UnstableCall;
     }
 
     /**
