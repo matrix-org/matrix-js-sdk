@@ -20,7 +20,6 @@ limitations under the License.
  */
 
 import { EventType } from "../@types/event";
-import { Group } from "../models/group";
 import { Room } from "../models/room";
 import { User } from "../models/user";
 import { IEvent, MatrixEvent } from "../models/event";
@@ -53,7 +52,6 @@ export interface IOpts {
  */
 export class MemoryStore implements IStore {
     private rooms: Record<string, Room> = {}; // roomId: Room
-    private groups: Record<string, Group> = {}; // groupId: Group
     private users: Record<string, User> = {}; // userId: User
     private syncToken: string = null;
     // userId: {
@@ -88,34 +86,6 @@ export class MemoryStore implements IStore {
      */
     public setSyncToken(token: string) {
         this.syncToken = token;
-    }
-
-    /**
-     * Store the given room.
-     * @param {Group} group The group to be stored
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public storeGroup(group: Group) {
-        this.groups[group.groupId] = group;
-    }
-
-    /**
-     * Retrieve a group by its group ID.
-     * @param {string} groupId The group ID.
-     * @return {Group} The group or null.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public getGroup(groupId: string): Group | null {
-        return this.groups[groupId] || null;
-    }
-
-    /**
-     * Retrieve all known groups.
-     * @return {Group[]} A list of groups, which may be empty.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public getGroups(): Group[] {
-        return Object.values(this.groups);
     }
 
     /**
