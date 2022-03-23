@@ -6620,10 +6620,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             fetchedEventType,
             opts);
         const mapper = this.getEventMapper();
-        let originalEvent: MatrixEvent;
-        if (result.original_event) {
-            originalEvent = mapper(result.original_event);
-        }
+
+        const originalEvent = result.original_event ? mapper(result.original_event) : undefined;
         let events = result.chunk.map(mapper);
 
         if (fetchedEventType === EventType.RoomMessageEncrypted) {
