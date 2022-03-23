@@ -249,6 +249,11 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
      * Finds an event by ID in the current thread
      */
     public findEventById(eventId: string) {
+        // Check the lastEvent as it may have been created based on a bundled relationship and not in a timeline
+        if (this.lastEvent?.getId() === eventId) {
+            return this.lastEvent;
+        }
+
         return this.timelineSet.findEventById(eventId);
     }
 
