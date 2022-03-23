@@ -218,10 +218,6 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             this.setEventMetadata(event);
             event.setThread(this);
             this.lastEvent = event;
-
-            // XXX: Workaround for Synapse incorrectly sending 2nd-order bundled relationships
-            const eventData = await this.client.fetchRoomEvent(this.roomId, event.getId());
-            event.setUnsigned(eventData.unsigned);
         }
     }
 

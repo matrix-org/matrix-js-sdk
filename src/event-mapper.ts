@@ -40,6 +40,9 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
 
         if (!event || event.status) {
             event = new MatrixEvent(plainOldJsObject);
+        } else {
+            // merge the latest unsigned data from the server
+            event.setUnsigned({ ...event.getUnsigned(), ...plainOldJsObject.unsigned });
         }
 
         if (room?.threads.has(event.getId())) {
