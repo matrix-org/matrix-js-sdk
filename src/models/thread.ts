@@ -206,7 +206,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         this.emit(ThreadEvent.Update, this);
     }
 
-    private async initialiseThread(rootEvent: MatrixEvent | undefined): Promise<void> {
+    private initialiseThread(rootEvent: MatrixEvent | undefined): void {
         const bundledRelationship = rootEvent
             ?.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
 
