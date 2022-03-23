@@ -23,7 +23,7 @@ import { Direction, EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
 import { normalize } from "../utils";
-import { IEvent, MatrixEvent } from "./event";
+import { IEvent, IThreadBundledRelationship, MatrixEvent } from "./event";
 import { EventStatus } from "./event-status";
 import { RoomMember } from "./room-member";
 import { IRoomSummary, RoomSummary } from "./room-summary";
@@ -48,7 +48,6 @@ import {
 } from "./thread";
 import { Method } from "../http-api";
 import { TypedEventEmitter } from "./typed-event-emitter";
-import { IThreadBundledRelationship } from "..";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -1394,13 +1393,11 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 timeline.getPaginationToken(EventTimeline.BACKWARDS),
                 EventTimeline.BACKWARDS,
             );
-        } else {
-            // TODO: Might need to add that back
-
-            // const livePaginationToken = unfilteredLiveTimeline.getPaginationToken(Direction.Forward);
-            // timelineSet
-            //     .getLiveTimeline()
-            //     .setPaginationToken(livePaginationToken, Direction.Backward);
+        } else if (useSyncEvents) {
+            const livePaginationToken = unfilteredLiveTimeline.getPaginationToken(Direction.Forward);
+            timelineSet
+                .getLiveTimeline()
+                .setPaginationToken(livePaginationToken, Direction.Backward);
         }
 
         // alternatively, we could try to do something like this to try and re-paginate
@@ -1457,6 +1454,10 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
 
             // An empty pagination token allows to paginate from the very bottom of
             // the timeline set.
+            // Right now we completely by-pass the pagination to be able to order
+            // the events by last reply to a thread
+            // Once the server can help us with that, we should uncomment the line
+            // below
             // timelineSet.getLiveTimeline().setPaginationToken("", EventTimeline.BACKWARDS);
         } else {
             timelineSet = new EventTimelineSet(this, {
@@ -1498,6 +1499,12 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         const orderedByLastReplyEvents = events
             .map(this.client.getEventMapper())
             .sort((eventA, eventB) => {
+                /**
+                 * `origin_server_ts` in a decentralised world is far from ideal
+                 * but for lack of any better, we will have to use this
+                 * Long term the sorting should be handled by homeservers and this
+                 * is only meant as a short term patch
+                 */
                 const threadAMetadata = eventA
                     .getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
                 const threadBMetadata = eventB
