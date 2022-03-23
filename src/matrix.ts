@@ -30,7 +30,6 @@ export * from "./errors";
 export * from "./models/beacon";
 export * from "./models/event";
 export * from "./models/room";
-export * from "./models/group";
 export * from "./models/event-timeline";
 export * from "./models/event-timeline-set";
 export * from "./models/room-member";
