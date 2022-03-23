@@ -992,17 +992,15 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     }
 
     /**
-     * Get an event which is stored in our unfiltered timeline set or in a thread
+     * Get an event which is stored in our unfiltered timeline set, or in a thread
      *
-     * @param {string} eventId  event ID to look for
+     * @param {string} eventId event ID to look for
      * @return {?module:models/event.MatrixEvent} the given event, or undefined if unknown
      */
     public findEventById(eventId: string): MatrixEvent | undefined {
         let event = this.getUnfilteredTimelineSet().findEventById(eventId);
 
-        if (event) {
-            return event;
-        } else {
+        if (!event) {
             const threads = this.getThreads();
             for (let i = 0; i < threads.length; i++) {
                 const thread = threads[i];
@@ -1012,6 +1010,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 }
             }
         }
+
+        return event;
     }
 
     /**
@@ -1505,7 +1505,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 // If it wasn't fetched successfully the thread will work in "limited" mode and won't
                 // benefit from all the APIs a homeserver can provide to enhance the thread experience
                 thread = this.createThread(rootEvent, events, toStartOfTimeline);
-                rootEvent.setThread(thread);
+                if (thread) {
+                    rootEvent.setThread(thread);
+                }
             }
         }
 
@@ -1941,12 +1943,10 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         } else if (newStatus == EventStatus.CANCELLED) {
             // remove it from the pending event list, or the timeline.
             if (this.pendingEventList) {
-                const idx = this.pendingEventList.findIndex(ev => ev.getId() === oldEventId);
-                if (idx !== -1) {
-                    const [removedEvent] = this.pendingEventList.splice(idx, 1);
-                    if (removedEvent.isRedaction()) {
-                        this.revertRedactionLocalEcho(removedEvent);
-                    }
+                const removedEvent = this.getPendingEvent(oldEventId);
+                this.removePendingEvent(oldEventId);
+                if (removedEvent.isRedaction()) {
+                    this.revertRedactionLocalEcho(removedEvent);
                 }
             }
             this.removeEvent(oldEventId);

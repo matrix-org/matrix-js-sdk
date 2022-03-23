@@ -93,14 +93,9 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             RoomEvent.TimelineReset,
         ]);
 
-        // If we weren't able to find the root event, it's probably missing
+        // If we weren't able to find the root event, it's probably missing,
         // and we define the thread ID from one of the thread relation
-        if (!rootEvent) {
-            this.id = opts?.initialEvents
-                ?.find(event => event.isThreadRelation)?.relationEventId;
-        } else {
-            this.id = rootEvent.getId();
-        }
+        this.id = rootEvent?.getId() ?? opts?.initialEvents?.find(event => event.isThreadRelation)?.relationEventId;
         this.initialiseThread(this.rootEvent);
 
         opts?.initialEvents?.forEach(event => this.addEvent(event, false));
