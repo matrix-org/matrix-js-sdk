@@ -59,6 +59,7 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
                 client.decryptEventIfNeeded(event);
             }
         }
+
         if (!preventReEmit) {
             client.reEmitter.reEmit(event, [
                 MatrixEventEvent.Replaced,
