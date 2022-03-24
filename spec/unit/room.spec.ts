@@ -26,7 +26,6 @@ import { Room } from "../../src/models/room";
 import { RoomState } from "../../src/models/room-state";
 import { UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../../src/@types/event";
 import { TestClient } from "../TestClient";
-import { Thread } from "../../src/models/thread";
 
 describe("Room", function() {
     const roomId = "!foo:bar";
