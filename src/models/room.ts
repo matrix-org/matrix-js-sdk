@@ -48,6 +48,7 @@ import {
 } from "./thread";
 import { Method } from "../http-api";
 import { TypedEventEmitter } from "./typed-event-emitter";
+import { IMinimalEvent } from "../sync-accumulator";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -1005,17 +1006,15 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     }
 
     /**
-     * Get an event which is stored in our unfiltered timeline set or in a thread
+     * Get an event which is stored in our unfiltered timeline set, or in a thread
      *
-     * @param {string} eventId  event ID to look for
+     * @param {string} eventId event ID to look for
      * @return {?module:models/event.MatrixEvent} the given event, or undefined if unknown
      */
     public findEventById(eventId: string): MatrixEvent | undefined {
         let event = this.getUnfilteredTimelineSet().findEventById(eventId);
 
-        if (event) {
-            return event;
-        } else {
+        if (!event) {
             const threads = this.getThreads();
             for (let i = 0; i < threads.length; i++) {
                 const thread = threads[i];
@@ -1025,6 +1024,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 }
             }
         }
+
+        return event;
     }
 
     /**
@@ -1204,10 +1205,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         timeline: EventTimeline,
         paginationToken?: string,
     ): void {
-        timeline.getTimelineSet().addEventsToTimeline(
-            events, toStartOfTimeline,
-            timeline, paginationToken,
-        );
+        timeline.getTimelineSet().addEventsToTimeline(events, toStartOfTimeline, timeline, paginationToken);
     }
 
     /**
@@ -1592,10 +1590,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         } else {
             const events = [event];
             let rootEvent = this.findEventById(event.threadRootId);
-            // If the rootEvent does not exist in the current sync, then look for
-            // it over the network
+            // If the rootEvent does not exist in the current sync, then look for it over the network.
             try {
-                let eventData;
+                let eventData: IMinimalEvent;
                 if (event.threadRootId) {
                     eventData = await this.client.fetchRoomEvent(this.roomId, event.threadRootId);
                 }
@@ -1606,11 +1603,13 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                     rootEvent.setUnsigned(eventData.unsigned);
                 }
             } finally {
-                // The root event might be not be visible to the person requesting
-                // it. If it wasn't fetched successfully the thread will work
-                // in "limited" mode and won't benefit from all the APIs a homeserver
-                // can provide to enhance the thread experience
+                // The root event might be not be visible to the person requesting it.
+                // If it wasn't fetched successfully the thread will work in "limited" mode and won't
+                // benefit from all the APIs a homeserver can provide to enhance the thread experience
                 thread = this.createThread(rootEvent, events, toStartOfTimeline);
+                if (thread) {
+                    rootEvent.setThread(thread);
+                }
             }
         }
 
@@ -1672,7 +1671,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
     }
 
-    applyRedaction(event: MatrixEvent): void {
+    private applyRedaction(event: MatrixEvent): void {
         if (event.isRedaction()) {
             const redactId = event.event.redacts;
 
@@ -1888,6 +1887,14 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
     }
 
+    private shouldAddEventToMainTimeline(thread: Thread, event: MatrixEvent): boolean {
+        if (!thread) {
+            return true;
+        }
+
+        return !event.isThreadRelation && thread.id === event.getAssociatedId();
+    }
+
     /**
      * Used to aggregate the local echo for a relation, and also
      * for re-applying a relation after it's redaction has been cancelled,
@@ -1900,11 +1907,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     private aggregateNonLiveRelation(event: MatrixEvent): void {
         const thread = this.findThreadForEvent(event);
-        if (thread) {
-            thread.timelineSet.aggregateRelations(event);
-        }
+        thread?.timelineSet.aggregateRelations(event);
 
-        if (thread?.id === event.getAssociatedId() || !thread) {
+        if (this.shouldAddEventToMainTimeline(thread, event)) {
             // TODO: We should consider whether this means it would be a better
             // design to lift the relations handling up to the room instead.
             for (let i = 0; i < this.timelineSets.length; i++) {
@@ -1961,11 +1966,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         localEvent.handleRemoteEcho(remoteEvent.event);
 
         const thread = this.findThreadForEvent(remoteEvent);
-        if (thread) {
-            thread.timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
-        }
+        thread?.timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
 
-        if (thread?.id === remoteEvent.getAssociatedId() || !thread) {
+        if (this.shouldAddEventToMainTimeline(thread, remoteEvent)) {
             for (let i = 0; i < this.timelineSets.length; i++) {
                 const timelineSet = this.timelineSets[i];
 
@@ -2032,10 +2035,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             event.replaceLocalEventId(newEventId);
 
             const thread = this.findThreadForEvent(event);
-            if (thread) {
-                thread.timelineSet.replaceEventId(oldEventId, newEventId);
-            }
-            if (thread?.id === event.getAssociatedId() || !thread) {
+            thread?.timelineSet.replaceEventId(oldEventId, newEventId);
+
+            if (this.shouldAddEventToMainTimeline(thread, event)) {
                 // if the event was already in the timeline (which will be the case if
                 // opts.pendingEventOrdering==chronological), we need to update the
                 // timeline map.
@@ -2046,12 +2048,10 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         } else if (newStatus == EventStatus.CANCELLED) {
             // remove it from the pending event list, or the timeline.
             if (this.pendingEventList) {
-                const idx = this.pendingEventList.findIndex(ev => ev.getId() === oldEventId);
-                if (idx !== -1) {
-                    const [removedEvent] = this.pendingEventList.splice(idx, 1);
-                    if (removedEvent.isRedaction()) {
-                        this.revertRedactionLocalEcho(removedEvent);
-                    }
+                const removedEvent = this.getPendingEvent(oldEventId);
+                this.removePendingEvent(oldEventId);
+                if (removedEvent.isRedaction()) {
+                    this.revertRedactionLocalEcho(removedEvent);
                 }
             }
             this.removeEvent(oldEventId);

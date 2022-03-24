@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixClient, RoomEvent } from "../matrix";
+import { MatrixClient, RelationType, RoomEvent } from "../matrix";
 import { TypedReEmitter } from "../ReEmitter";
 import { IRelationsRequestOpts } from "../@types/requests";
 import { IThreadBundledRelationship, MatrixEvent } from "./event";
@@ -24,6 +24,7 @@ import { Room } from './room';
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { RoomState } from "./room-state";
 import { ServerControlledNamespacedValue } from "../NamespacedValue";
+import { logger } from "../logger";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -93,14 +94,9 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             RoomEvent.TimelineReset,
         ]);
 
-        // If we weren't able to find the root event, it's probably missing
+        // If we weren't able to find the root event, it's probably missing,
         // and we define the thread ID from one of the thread relation
-        if (!rootEvent) {
-            this.id = opts?.initialEvents
-                ?.find(event => event.isThreadRelation)?.relationEventId;
-        } else {
-            this.id = rootEvent.getId();
-        }
+        this.id = rootEvent?.getId() ?? opts?.initialEvents?.find(event => event.isThreadRelation)?.relationEventId;
         this.initialiseThread(this.rootEvent);
 
         opts?.initialEvents?.forEach(event => this.addEvent(event, false));
@@ -169,10 +165,10 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             this.addEventToTimeline(event, toStartOfTimeline);
 
             await this.client.decryptEventIfNeeded(event, {});
-        }
+        } else {
+            await this.fetchEditsWhereNeeded(event);
 
-        if (Thread.hasServerSideSupport && this.initialEventsFetched) {
-            if (event.localTimestamp > this.lastReply().localTimestamp) {
+            if (this.initialEventsFetched && event.localTimestamp > this.lastReply().localTimestamp) {
                 this.addEventToTimeline(event, false);
             }
         }
@@ -221,8 +217,26 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
 
             const event = new MatrixEvent(bundledRelationship.latest_event);
             this.setEventMetadata(event);
+            event.setThread(this);
             this.lastEvent = event;
+
+            this.fetchEditsWhereNeeded(event);
         }
+    }
+
+    // XXX: Workaround for https://github.com/matrix-org/matrix-spec-proposals/pull/2676/files#r827240084
+    private async fetchEditsWhereNeeded(...events: MatrixEvent[]): Promise<unknown> {
+        return Promise.all(events.filter(e => e.isEncrypted()).map((event: MatrixEvent) => {
+            return this.client.relations(this.roomId, event.getId(), RelationType.Replace, event.getType(), {
+                limit: 1,
+            }).then(relations => {
+                if (relations.events.length) {
+                    event.makeReplaced(relations.events[0]);
+                }
+            }).catch(e => {
+                logger.error("Failed to load edits for encrypted thread event", e);
+            });
+        }));
     }
 
     public async fetchInitialEvents(): Promise<{
@@ -235,6 +249,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             this.initialEventsFetched = true;
             return null;
         }
+
         try {
             const response = await this.fetchEvents();
             this.initialEventsFetched = true;
@@ -253,6 +268,11 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
      * Finds an event by ID in the current thread
      */
     public findEventById(eventId: string) {
+        // Check the lastEvent as it may have been created based on a bundled relationship and not in a timeline
+        if (this.lastEvent?.getId() === eventId) {
+            return this.lastEvent;
+        }
+
         return this.timelineSet.findEventById(eventId);
     }
 
@@ -328,6 +348,8 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         if (!opts.to && !nextBatch) {
             events = [...events, originalEvent];
         }
+
+        await this.fetchEditsWhereNeeded(...events);
 
         await Promise.all(events.map(event => {
             this.setEventMetadata(event);

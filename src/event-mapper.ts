@@ -29,9 +29,22 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
     const decrypt = options.decrypt !== false;
 
     function mapper(plainOldJsObject: Partial<IEvent>) {
-        const event = new MatrixEvent(plainOldJsObject);
+        const room = client.getRoom(plainOldJsObject.room_id);
 
-        const room = client.getRoom(event.getRoomId());
+        let event: MatrixEvent;
+        // If the event is already known to the room, let's re-use the model rather than duplicating.
+        // We avoid doing this to state events as they may be forward or backwards looking which tweaks behaviour.
+        if (room && plainOldJsObject.state_key === undefined) {
+            event = room.findEventById(plainOldJsObject.event_id);
+        }
+
+        if (!event || event.status) {
+            event = new MatrixEvent(plainOldJsObject);
+        } else {
+            // merge the latest unsigned data from the server
+            event.setUnsigned({ ...event.getUnsigned(), ...plainOldJsObject.unsigned });
+        }
+
         if (room?.threads.has(event.getId())) {
             event.setThread(room.threads.get(event.getId()));
         }
@@ -46,6 +59,7 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
                 client.decryptEventIfNeeded(event);
             }
         }
+
         if (!preventReEmit) {
             client.reEmitter.reEmit(event, [
                 MatrixEventEvent.Replaced,

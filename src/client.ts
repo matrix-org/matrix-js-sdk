@@ -3951,7 +3951,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Returns the eventType that should be used taking encryption into account
      * for a given eventType.
-     * @param {MatrixClient} client the client
      * @param {string} roomId the room for the events `eventType` relates to
      * @param {string} eventType the event type
      * @return {string} the event type taking encryption into account
@@ -6621,11 +6620,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             fetchedEventType,
             opts);
         const mapper = this.getEventMapper();
-        let originalEvent: MatrixEvent;
-        if (result.original_event) {
-            originalEvent = mapper(result.original_event);
-        }
+
+        const originalEvent = result.original_event ? mapper(result.original_event) : undefined;
         let events = result.chunk.map(mapper);
+
         if (fetchedEventType === EventType.RoomMessageEncrypted) {
             const allEvents = originalEvent ? events.concat(originalEvent) : events;
             await Promise.all(allEvents.map(e => this.decryptEventIfNeeded(e)));
@@ -6633,6 +6631,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 events = events.filter(e => e.getType() === eventType);
             }
         }
+
         if (originalEvent && relationType === RelationType.Replace) {
             events = events.filter(e => e.getSender() === originalEvent.getSender());
         }
@@ -8866,12 +8865,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         const parentEventId = event.getAssociatedId();
-        const parentEvent = room?.findEventById(parentEventId) || events.find((mxEv: MatrixEvent) => (
+        const parentEvent = room?.findEventById(parentEventId) ?? events.find((mxEv: MatrixEvent) => (
             mxEv.getId() === parentEventId
         ));
 
-        // A reaction targetting the thread root needs to be routed to both the
-        // the main timeline and the associated thread
+        // A reaction targeting the thread root needs to be routed to both the main timeline and the associated thread
         const targetingThreadRoot = parentEvent?.isThreadRoot || roots.has(event.relationEventId);
         if (targetingThreadRoot) {
             return {
@@ -8887,18 +8885,21 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // we want that redaction to be pushed to both timeline
         if (parentEvent?.getAssociatedId()) {
             return this.eventShouldLiveIn(parentEvent, room, events, roots);
-        } else {
-            // We've exhausted all scenarios, can safely assume that this event
-            // should live in the room timeline
-            return {
-                shouldLiveInRoom: true,
-                shouldLiveInThread: false,
-            };
         }
+
+        // We've exhausted all scenarios, can safely assume that this event
+        // should live in the room timeline
+        return {
+            shouldLiveInRoom: true,
+            shouldLiveInThread: false,
+        };
     }
 
-    public partitionThreadedEvents(events: MatrixEvent[]): [MatrixEvent[], MatrixEvent[]] {
-        // Indices to the events array, for readibility
+    public partitionThreadedEvents(events: MatrixEvent[]): [
+        timelineEvents: MatrixEvent[],
+        threadedEvents: MatrixEvent[],
+    ] {
+        // Indices to the events array, for readability
         const ROOM = 0;
         const THREAD = 1;
         if (this.supportsExperimentalThreads()) {
