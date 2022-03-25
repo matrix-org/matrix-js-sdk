@@ -17,7 +17,7 @@ limitations under the License.
 import { IUploadKeySignaturesResponse } from "./client";
 
 export class InvalidStoreError extends Error {
-    public static TOGGLED_LAZY_LOADING = "TOGGLED_LAZY_LOADING";
+    public static readonly TOGGLED_LAZY_LOADING = "TOGGLED_LAZY_LOADING";
 
     constructor(public reason: string, public value: boolean) {
         super(`Store is invalid because ${reason}, `
