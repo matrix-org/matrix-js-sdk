@@ -26,7 +26,7 @@ export class InvalidStoreError extends Error {
 }
 
 export class InvalidCryptoStoreError extends Error {
-    public static TOO_NEW = "TOO_NEW";
+    public static readonly TOO_NEW = "TOO_NEW";
 
     constructor(public reason: string) {
         super(`Crypto store is invalid because ${reason}, ` +
