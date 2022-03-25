@@ -1,3 +1,9 @@
+codecov:
+  allow_coverage_offsets: True
+coverage:
+  status:
+    project: off
+    patch: off
 comment:
   layout: "diff, files"
   behavior: default
