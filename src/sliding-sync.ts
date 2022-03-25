@@ -207,6 +207,49 @@ class SlidingList {
     }
 }
 
+
+/**
+ * When onResponse extensions should be invoked: before or after processing the main response.
+ */
+ export enum ExtensionState {
+    // Call onResponse before processing the response body. This is useful when your extension is
+    // preparing the ground for the response body e.g processing to-device messages before the
+    // encrypted event arrives.
+    PreProcess = "ExtState.PreProcess",
+    // Call onResponse after processing the response body. This is useful when your extension is
+    // decorating data from the client and you rely on MatrixClient.getRoom returning the Room object
+    // e.g room account data.
+    PostProcess = "ExtState.PostProcess",
+}
+
+/**
+ * An interface that must be satisfied to register extensions
+ */
+export interface Extension {
+    /**
+     * The extension name to go under 'extensions' in the request body.
+     * @returns The JSON key.
+     */
+    name(): string
+    /**
+     * A function which is called when the request JSON is being formed.
+     * Returns the data to insert under this key.
+     * @param isInitial True when this is part of the initial request (send sticky params)
+     * @returns The request JSON to send.
+     */
+    onRequest(isInitial: boolean): object
+    /**
+     * A function which is called when there is response JSON under this extension.
+     * @param data The response JSON under the extension name.
+     */
+    onResponse(data: object)
+    /**
+     * Controls when onResponse should be called.
+     * @returns The state when it should be called.
+     */
+    when(): ExtensionState
+}
+
 /**
  * Events which can be fired by the SlidingSync class. These are designed to provide different levels
  * of information when processing sync responses.
@@ -266,7 +309,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     // flag set when resend() is called because we cannot rely on detecting AbortError in JS SDK :(
     private needsResend: boolean;
     // map of extension name to req/resp handler
-    private extensions: Record<string, { onRequest: (isInitial: boolean) => any, onResponse: (any) => void }>;
+    private extensions: Record<string, Extension>;
 
     private roomSubscriptionInfo: MSC3575RoomSubscription;
     private desiredRoomSubscriptions: Set<string>; // the *desired* room subscriptions
@@ -397,20 +440,13 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
 
     /**
      * Register an extension to send with the /sync request.
-     * @param name The extension name to go under 'extensions' in the request body.
-     * @param onRequest A function which is called when the request JSON is being formed.
-     * Returns the data to insert under this key.
-     * @param onResponse A function which is called when there is response JSON under this extension.
+     * @param ext The extension to register.
      */
-    registerExtension(name: string, onRequest: (isInitial: boolean) => any, onResponse: (resp: any) => void) {
-        if (this.extensions[name]) {
-            throw new Error(`registerExtension: ${name} already exists as an extension`);
+    registerExtension(ext: Extension) {
+        if (this.extensions[ext.name()]) {
+            throw new Error(`registerExtension: ${ext.name()} already exists as an extension`);
         }
-        // TODO: do we need to have a pre-process and post-process response hook?
-        this.extensions[name] = {
-            onRequest: onRequest,
-            onResponse: onResponse,
-        };
+        this.extensions[ext.name()] = ext;
     }
 
     private getExtensionRequest(isInitial: boolean): object {
@@ -421,9 +457,19 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         return ext;
     }
 
-    private onExtensionsResponse(ext: object) {
+    private onPreExtensionsResponse(ext: object) {
         Object.keys(ext).forEach((extName) => {
-            this.extensions[extName].onResponse(ext[extName]);
+            if (this.extensions[extName].when() == ExtensionState.PreProcess) {
+                this.extensions[extName].onResponse(ext[extName]);
+            }
+        });
+    }
+
+    private onPostExtensionsResponse(ext: object) {
+        Object.keys(ext).forEach((extName) => {
+            if (this.extensions[extName].when() == ExtensionState.PostProcess) {
+                this.extensions[extName].onResponse(ext[extName]);
+            }
         });
     }
 
@@ -480,6 +526,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         let currentPos;
         while (!this.terminated) {
             this.needsResend = false;
+            let doNotUpdateList = false;
             let resp;
             try {
                 const listModifiedCount = this.listModifiedCount;
@@ -517,10 +564,10 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 }
                 if (listModifiedCount !== this.listModifiedCount) {
                     // the lists have been modified whilst we were waiting for 'await' to return, but the abort()
-                    // call did nothing. It is NOT SAFE to modify the list array now, so bail.
-                    // TODO: we should process room subscriptions?
-                    debuglog("list modified during await call, dropping response", resp);
-                    continue;
+                    // call did nothing. It is NOT SAFE to modify the list array now. We'll process the response but
+                    // not update list pointers.
+                    debuglog("list modified during await call, not updating list");
+                    doNotUpdateList = true;
                 }
                 // mark all these lists as having been sent as sticky so we don't keep sending sticky params
                 this.lists.forEach((l) => {
@@ -565,7 +612,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             if (!resp) {
                 continue;
             }
-            this.onExtensionsResponse(resp.extensions);
+            this.onPreExtensionsResponse(resp.extensions);
 
             Object.keys(resp.room_subscriptions).forEach((roomId) => {
                 this.invokeRoomDataListeners(
@@ -580,119 +627,122 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             resp.counts.forEach((count, index) => {
                 gapIndexes[index] = -1;
             });
-            resp.ops.forEach((op) => {
-                if (op.list != null) {
-                    listIndexesWithUpdates.add(op.list);
-                }
-                if (op.op === "DELETE") {
-                    debuglog("DELETE", op.list, op.index, ";");
-                    delete this.lists[op.list].roomIndexToRoomId[op.index];
-                    gapIndexes[op.list] = op.index;
-                } else if (op.op === "INSERT") {
-                    debuglog(
-                        "INSERT",
-                        op.list,
-                        op.index,
-                        op.room.room_id,
-                        ";",
-                    );
-                    if (this.lists[op.list].roomIndexToRoomId[op.index]) {
-                        const gapIndex = gapIndexes[op.list];
-                        // something is in this space, shift items out of the way
-                        if (gapIndex < 0) {
-                            debuglog(
-                                "cannot work out where gap is, INSERT without previous DELETE! List: ",
-                                op.list,
-                            );
-                            return;
-                        }
-                        //  0,1,2,3  index
-                        // [A,B,C,D]
-                        //   DEL 3
-                        // [A,B,C,_]
-                        //   INSERT E 0
-                        // [E,A,B,C]
-                        // gapIndex=3, op.index=0
-                        if (gapIndex > op.index) {
-                            // the gap is further down the list, shift every element to the right
-                            // starting at the gap so we can just shift each element in turn:
-                            // [A,B,C,_] gapIndex=3, op.index=0
-                            // [A,B,C,C] i=3
-                            // [A,B,B,C] i=2
-                            // [A,A,B,C] i=1
-                            // Terminate. We'll assign into op.index next.
-                            for (let i = gapIndex; i > op.index; i--) {
-                                if (this.lists[op.list].isIndexInRange(i)) {
-                                    this.lists[op.list].roomIndexToRoomId[i] =
-                                        this.lists[op.list].roomIndexToRoomId[
-                                            i - 1
-                                        ];
-                                }
-                            }
-                        } else if (gapIndex < op.index) {
-                            // the gap is further up the list, shift every element to the left
-                            // starting at the gap so we can just shift each element in turn
-                            for (let i = gapIndex; i < op.index; i++) {
-                                if (this.lists[op.list].isIndexInRange(i)) {
-                                    this.lists[op.list].roomIndexToRoomId[i] =
-                                        this.lists[op.list].roomIndexToRoomId[
-                                            i + 1
-                                        ];
-                                }
-                            }
-                        }
+            if (!doNotUpdateList) {
+                resp.ops.forEach((op) => {
+                    if (op.list != null) {
+                        listIndexesWithUpdates.add(op.list);
                     }
-                    this.lists[op.list].roomIndexToRoomId[op.index] =
-                        op.room.room_id;
-                    this.invokeRoomDataListeners(op.room.room_id, op.room);
-                } else if (op.op === "UPDATE") {
-                    debuglog(
-                        "UPDATE",
-                        op.list,
-                        op.index,
-                        op.room.room_id,
-                        ";",
-                    );
-                    this.invokeRoomDataListeners(op.room.room_id, op.room);
-                } else if (op.op === "SYNC") {
-                    const syncRooms = [];
-                    const startIndex = op.range[0];
-                    for (let i = startIndex; i <= op.range[1]; i++) {
-                        const r = op.rooms[i - startIndex];
-                        if (!r) {
-                            break; // we are at the end of list
-                        }
-                        this.lists[op.list].roomIndexToRoomId[i] = r.room_id;
-                        syncRooms.push(r.room_id);
-                        this.invokeRoomDataListeners(r.room_id, r);
-                    }
-                    debuglog(
-                        "SYNC",
-                        op.list,
-                        op.range[0],
-                        op.range[1],
-                        syncRooms.join(" "),
-                        ";",
-                    );
-                } else if (op.op === "INVALIDATE") {
-                    const invalidRooms = [];
-                    const startIndex = op.range[0];
-                    for (let i = startIndex; i <= op.range[1]; i++) {
-                        invalidRooms.push(
-                            this.lists[op.list].roomIndexToRoomId[i],
+                    if (op.op === "DELETE") {
+                        debuglog("DELETE", op.list, op.index, ";");
+                        delete this.lists[op.list].roomIndexToRoomId[op.index];
+                        gapIndexes[op.list] = op.index;
+                    } else if (op.op === "INSERT") {
+                        debuglog(
+                            "INSERT",
+                            op.list,
+                            op.index,
+                            op.room.room_id,
+                            ";",
                         );
-                        delete this.lists[op.list].roomIndexToRoomId[i];
+                        if (this.lists[op.list].roomIndexToRoomId[op.index]) {
+                            const gapIndex = gapIndexes[op.list];
+                            // something is in this space, shift items out of the way
+                            if (gapIndex < 0) {
+                                debuglog(
+                                    "cannot work out where gap is, INSERT without previous DELETE! List: ",
+                                    op.list,
+                                );
+                                return;
+                            }
+                            //  0,1,2,3  index
+                            // [A,B,C,D]
+                            //   DEL 3
+                            // [A,B,C,_]
+                            //   INSERT E 0
+                            // [E,A,B,C]
+                            // gapIndex=3, op.index=0
+                            if (gapIndex > op.index) {
+                                // the gap is further down the list, shift every element to the right
+                                // starting at the gap so we can just shift each element in turn:
+                                // [A,B,C,_] gapIndex=3, op.index=0
+                                // [A,B,C,C] i=3
+                                // [A,B,B,C] i=2
+                                // [A,A,B,C] i=1
+                                // Terminate. We'll assign into op.index next.
+                                for (let i = gapIndex; i > op.index; i--) {
+                                    if (this.lists[op.list].isIndexInRange(i)) {
+                                        this.lists[op.list].roomIndexToRoomId[i] =
+                                            this.lists[op.list].roomIndexToRoomId[
+                                                i - 1
+                                            ];
+                                    }
+                                }
+                            } else if (gapIndex < op.index) {
+                                // the gap is further up the list, shift every element to the left
+                                // starting at the gap so we can just shift each element in turn
+                                for (let i = gapIndex; i < op.index; i++) {
+                                    if (this.lists[op.list].isIndexInRange(i)) {
+                                        this.lists[op.list].roomIndexToRoomId[i] =
+                                            this.lists[op.list].roomIndexToRoomId[
+                                                i + 1
+                                            ];
+                                    }
+                                }
+                            }
+                        }
+                        this.lists[op.list].roomIndexToRoomId[op.index] =
+                            op.room.room_id;
+                        this.invokeRoomDataListeners(op.room.room_id, op.room);
+                    } else if (op.op === "UPDATE") {
+                        debuglog(
+                            "UPDATE",
+                            op.list,
+                            op.index,
+                            op.room.room_id,
+                            ";",
+                        );
+                        this.invokeRoomDataListeners(op.room.room_id, op.room);
+                    } else if (op.op === "SYNC") {
+                        const syncRooms = [];
+                        const startIndex = op.range[0];
+                        for (let i = startIndex; i <= op.range[1]; i++) {
+                            const r = op.rooms[i - startIndex];
+                            if (!r) {
+                                break; // we are at the end of list
+                            }
+                            this.lists[op.list].roomIndexToRoomId[i] = r.room_id;
+                            syncRooms.push(r.room_id);
+                            this.invokeRoomDataListeners(r.room_id, r);
+                        }
+                        debuglog(
+                            "SYNC",
+                            op.list,
+                            op.range[0],
+                            op.range[1],
+                            syncRooms.join(" "),
+                            ";",
+                        );
+                    } else if (op.op === "INVALIDATE") {
+                        const invalidRooms = [];
+                        const startIndex = op.range[0];
+                        for (let i = startIndex; i <= op.range[1]; i++) {
+                            invalidRooms.push(
+                                this.lists[op.list].roomIndexToRoomId[i],
+                            );
+                            delete this.lists[op.list].roomIndexToRoomId[i];
+                        }
+                        debuglog(
+                            "INVALIDATE",
+                            op.list,
+                            op.range[0],
+                            op.range[1],
+                            ";",
+                        );
                     }
-                    debuglog(
-                        "INVALIDATE",
-                        op.list,
-                        op.range[0],
-                        op.range[1],
-                        ";",
-                    );
-                }
-            });
+                });
+            }
             this.invokeLifecycleListeners(SlidingSyncState.Complete, resp);
+            this.onPostExtensionsResponse(resp.extensions);
             listIndexesWithUpdates.forEach((i) => {
                 this.emit(
                     SlidingSyncEvent.List,

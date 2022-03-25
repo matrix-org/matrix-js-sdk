@@ -35,9 +35,12 @@ import { RoomStateEvent } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
 import { SyncState } from "./sync";
 import {
+    Extension, ExtensionState,
     MSC3575RoomData, MSC3575SlidingSyncResponse, SlidingSync,
     SlidingSyncEvent, SlidingSyncState,
 } from "./sliding-sync";
+import { EventType, IPushRules } from "./matrix";
+import { PushProcessor } from "./pushprocessor";
 
 const DEBUG = true;
 
@@ -53,7 +56,7 @@ function debuglog(...params) {
     logger.log(...params);
 }
 
-class ExtensionE2EE {
+class ExtensionE2EE implements Extension {
     crypto: Crypto;
 
     constructor(crypto: Crypto) {
@@ -62,6 +65,9 @@ class ExtensionE2EE {
 
     name(): string {
         return "e2ee";
+    }
+    when(): ExtensionState {
+        return ExtensionState.PreProcess;
     }
     onRequest(isInitial: boolean): object {
         if (!isInitial) {
@@ -99,7 +105,7 @@ class ExtensionE2EE {
     }
 }
 
-class ExtensionToDevice {
+class ExtensionToDevice implements Extension {
     client: MatrixClient;
     nextBatch?: string;
 
@@ -110,6 +116,9 @@ class ExtensionToDevice {
 
     name(): string {
         return "to_device";
+    }
+    when(): ExtensionState {
+        return ExtensionState.PreProcess;
     }
     onRequest(isInitial: boolean): object {
         const extReq = {
@@ -174,6 +183,71 @@ class ExtensionToDevice {
     }
 }
 
+class ExtensionAccountData implements Extension {
+    client: MatrixClient;
+
+    constructor(client: MatrixClient) {
+        this.client = client;
+    }
+
+    name(): string {
+        return "account_data";
+    }
+    when(): ExtensionState {
+        return ExtensionState.PostProcess;
+    }
+    onRequest(isInitial: boolean): object {
+        if (!isInitial) {
+            return undefined;
+        }
+        return {
+            enabled: true,
+        }
+    }
+    onResponse(data: {global: object[], rooms: Record<string, object[]>}) {
+        if (data.global && data.global.length > 0) {
+            this.processGlobalAccountData(data.global);
+        }
+
+        for (let roomId in data.rooms) {
+            const accountDataEvents = mapEvents(this.client, roomId, data.rooms[roomId]);
+            const room = this.client.getRoom(roomId);
+            if (!room) {
+                console.error("got account data for room but room doesn't exist on client:", roomId);
+                continue;
+            }
+            room.addAccountData(accountDataEvents);
+            accountDataEvents.forEach((e) => {
+                this.client.emit(ClientEvent.Event, e);
+            });
+        }
+    }
+
+    processGlobalAccountData(globalAccountData: object[]) {
+        const events = mapEvents(this.client, undefined, globalAccountData);
+        const prevEventsMap = events.reduce((m, c) => {
+            m[c.getId()] = this.client.store.getAccountData(c.getType());
+            return m;
+        }, {});
+        this.client.store.storeAccountDataEvents(events);
+        events.forEach(
+            (accountDataEvent) => {
+                // Honour push rules that come down the sync stream but also
+                // honour push rules that were previously cached. Base rules
+                // will be updated when we receive push rules via getPushRules
+                // (see sync) before syncing over the network.
+                if (accountDataEvent.getType() === EventType.PushRules) {
+                    const rules = accountDataEvent.getContent<IPushRules>();
+                    this.client.pushRules = PushProcessor.rewriteDefaultRules(rules);
+                }
+                const prevEvent = prevEventsMap[accountDataEvent.getId()];
+                this.client.emit(ClientEvent.AccountData, accountDataEvent, prevEvent);
+                return accountDataEvent;
+            },
+        );
+    }
+}
+
 /**
  * A copy of SyncApi such that it can be used as a drop-in replacement for sync v2. For the actual
  * sliding sync API, see sliding-sync.ts or the class SlidingSync.
@@ -217,16 +291,18 @@ export class SlidingSyncSdk {
         this.slidingSync = slidingSync;
         this.slidingSync.on(SlidingSyncEvent.Lifecycle, this.onLifecycle.bind(this));
         this.slidingSync.on(SlidingSyncEvent.RoomData, this.onRoomData.bind(this));
-        const extToDevice = new ExtensionToDevice(this.client);
-        this.slidingSync.registerExtension(
-            extToDevice.name(), extToDevice.onRequest.bind(extToDevice), extToDevice.onResponse.bind(extToDevice),
-        );
+        const extensions: Extension[] = [
+            new ExtensionToDevice(this.client),
+            new ExtensionAccountData(this.client),
+        ];
         if (this.opts.crypto) {
-            const extE2EE = new ExtensionE2EE(this.opts.crypto);
-            this.slidingSync.registerExtension(
-                extE2EE.name(), extE2EE.onRequest.bind(extE2EE), extE2EE.onResponse.bind(extE2EE),
-            );
+            extensions.push(
+                new ExtensionE2EE(this.opts.crypto),
+            )
         }
+        extensions.forEach((ext) => {
+            this.slidingSync.registerExtension(ext);
+        });
     }
 
     private onRoomData(roomId: string, roomData: MSC3575RoomData) {
@@ -350,12 +426,12 @@ export class SlidingSyncSdk {
 
     private async processRoomData(client: MatrixClient, room: Room, roomData: MSC3575RoomData) {
         roomData = ensureNameEvent(client, roomData);
-        const stateEvents = this.mapEvents(room.roomId, roomData.required_state);
+        const stateEvents = mapEvents(this.client, room.roomId, roomData.required_state);
         // Prevent events from being decrypted ahead of time
         // this helps large account to speed up faster
         // room::decryptCriticalEvent is in charge of decrypting all the events
         // required for a client to function properly
-        const timelineEvents = this.mapEvents(room.roomId, roomData.timeline, false); // this.mapSyncEventsFormat(joinObj.timeline, room, false);
+        const timelineEvents = mapEvents(this.client, room.roomId, roomData.timeline, false); // this.mapSyncEventsFormat(joinObj.timeline, room, false);
         const ephemeralEvents = []; // TODO this.mapSyncEventsFormat(joinObj.ephemeral);
         const accountDataEvents = []; // TODO this.mapSyncEventsFormat(joinObj.account_data);
 
@@ -490,14 +566,6 @@ export class SlidingSyncSdk {
         // And decrypt all events after the recorded read receipt to ensure an accurate
         // notification count
         room.decryptCriticalEvents();
-    }
-
-    private mapEvents(roomId: string, events: object[], decrypt = true): MatrixEvent[] {
-        const mapper = this.client.getEventMapper({ decrypt });
-        return (events as Array<IStrippedState | IRoomEvent | IStateEvent | IMinimalEvent>).map(function(e) {
-            e["room_id"] = roomId;
-            return mapper(e);
-        });
     }
 
     /**
@@ -795,4 +863,12 @@ function deregisterStateListeners(room: Room): void { // XXX cargoculted from sy
     room.currentState.removeAllListeners(RoomStateEvent.Events);
     room.currentState.removeAllListeners(RoomStateEvent.Members);
     room.currentState.removeAllListeners(RoomStateEvent.NewMember);
+}
+
+function mapEvents(client: MatrixClient, roomId: string, events: object[], decrypt = true): MatrixEvent[] {
+    const mapper = client.getEventMapper({ decrypt });
+    return (events as Array<IStrippedState | IRoomEvent | IStateEvent | IMinimalEvent>).map(function(e) {
+        e["room_id"] = roomId;
+        return mapper(e);
+    });
 }
