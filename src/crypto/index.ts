@@ -920,7 +920,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             // secrets using it, in theory. We could move them to the new key but a)
             // that would mean we'd need to prompt for the old passphrase, and b)
             // it's not clear that would be the right thing to do anyway.
-            const { keyInfo, privateKey } = await createSecretStorageKey();
+            const { keyInfo = {} as IAddSecretStorageKeyOpts, privateKey } = await createSecretStorageKey();
             newKeyId = await createSSSS(keyInfo, privateKey);
         } else if (!storageExists && keyBackupInfo) {
             // we have an existing backup, but no SSSS
