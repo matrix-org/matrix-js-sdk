@@ -23,7 +23,7 @@ import { Direction, EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
 import { normalize } from "../utils";
-import { IEvent, MatrixEvent } from "./event";
+import { IEvent, IThreadBundledRelationship, MatrixEvent } from "./event";
 import { EventStatus } from "./event-status";
 import { RoomMember } from "./room-member";
 import { IRoomSummary, RoomSummary } from "./room-summary";
@@ -32,15 +32,24 @@ import { TypedReEmitter } from '../ReEmitter';
 import {
     EventType, RoomCreateTypeField, RoomType, UNSTABLE_ELEMENT_FUNCTIONAL_USERS,
     EVENT_VISIBILITY_CHANGE_TYPE,
+    RelationType,
 } from "../@types/event";
 import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
 import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
-import { Filter } from "../filter";
+import { Filter, IFilterDefinition } from "../filter";
 import { RoomState } from "./room-state";
-import { Thread, ThreadEvent, EventHandlerMap as ThreadHandlerMap } from "./thread";
+import {
+    Thread,
+    ThreadEvent,
+    EventHandlerMap as ThreadHandlerMap,
+    FILTER_RELATED_BY_REL_TYPES, THREAD_RELATION_TYPE,
+    FILTER_RELATED_BY_SENDERS,
+    ThreadFilterType,
+} from "./thread";
 import { Method } from "../http-api";
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { ReceiptType } from "../@types/read_receipts";
+import { IMinimalEvent } from "../sync-accumulator";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -142,6 +151,7 @@ export interface ICreateFilterOpts {
     // timeline. Useful to disable for some filters that can't be achieved by the
     // client in an efficient manner
     prepopulateTimeline?: boolean;
+    useSyncEvents?: boolean;
     pendingEvents?: boolean;
 }
 
@@ -161,6 +171,7 @@ export enum RoomEvent {
 type EmittedEvents = RoomEvent
     | ThreadEvent.New
     | ThreadEvent.Update
+    | ThreadEvent.NewReply
     | RoomEvent.Timeline
     | RoomEvent.TimelineReset;
 
@@ -178,7 +189,7 @@ export type RoomEventHandlerMap = {
         oldEventId?: string,
         oldStatus?: EventStatus,
     ) => void;
-    [ThreadEvent.New]: (thread: Thread) => void;
+    [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
 } & ThreadHandlerMap;
 
 export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> {
@@ -192,6 +203,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     private receiptCacheByEventId: ReceiptCache = {}; // { event_id: ICachedReceipt[] }
     private notificationCounts: Partial<Record<NotificationCountType, number>> = {};
     private readonly timelineSets: EventTimelineSet[];
+    public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
     private readonly filteredTimelineSets: Record<string, EventTimelineSet> = {}; // filter_id: timelineSet
     private readonly pendingEventList?: MatrixEvent[];
@@ -362,6 +374,26 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             this.membersPromise = Promise.resolve(false);
         } else {
             this.membersPromise = null;
+        }
+    }
+
+    private threadTimelineSetsPromise: Promise<[EventTimelineSet, EventTimelineSet]> | null = null;
+    public async createThreadsTimelineSets(): Promise<[EventTimelineSet, EventTimelineSet]> {
+        if (this.threadTimelineSetsPromise) {
+            return this.threadTimelineSetsPromise;
+        }
+
+        if (this.client?.supportsExperimentalThreads) {
+            try {
+                this.threadTimelineSetsPromise = Promise.all([
+                    this.createThreadTimelineSet(),
+                    this.createThreadTimelineSet(ThreadFilterType.My),
+                ]);
+                const timelineSets = await this.threadTimelineSetsPromise;
+                this.threadsTimelineSets.push(...timelineSets);
+            } catch (e) {
+                this.threadTimelineSetsPromise = null;
+            }
         }
     }
 
@@ -975,17 +1007,15 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     }
 
     /**
-     * Get an event which is stored in our unfiltered timeline set or in a thread
+     * Get an event which is stored in our unfiltered timeline set, or in a thread
      *
-     * @param {string} eventId  event ID to look for
+     * @param {string} eventId event ID to look for
      * @return {?module:models/event.MatrixEvent} the given event, or undefined if unknown
      */
     public findEventById(eventId: string): MatrixEvent | undefined {
         let event = this.getUnfilteredTimelineSet().findEventById(eventId);
 
-        if (event) {
-            return event;
-        } else {
+        if (!event) {
             const threads = this.getThreads();
             for (let i = 0; i < threads.length; i++) {
                 const thread = threads[i];
@@ -995,6 +1025,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 }
             }
         }
+
+        return event;
     }
 
     /**
@@ -1174,10 +1206,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         timeline: EventTimeline,
         paginationToken?: string,
     ): void {
-        timeline.getTimelineSet().addEventsToTimeline(
-            events, toStartOfTimeline,
-            timeline, paginationToken,
-        );
+        timeline.getTimelineSet().addEventsToTimeline(events, toStartOfTimeline, timeline, paginationToken);
     }
 
     /**
@@ -1319,6 +1348,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         filter: Filter,
         {
             prepopulateTimeline = true,
+            useSyncEvents = true,
             pendingEvents = true,
         }: ICreateFilterOpts = {},
     ): EventTimelineSet {
@@ -1331,8 +1361,10 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             RoomEvent.Timeline,
             RoomEvent.TimelineReset,
         ]);
-        this.filteredTimelineSets[filter.filterId] = timelineSet;
-        this.timelineSets.push(timelineSet);
+        if (useSyncEvents) {
+            this.filteredTimelineSets[filter.filterId] = timelineSet;
+            this.timelineSets.push(timelineSet);
+        }
 
         const unfilteredLiveTimeline = this.getLiveTimeline();
         // Not all filter are possible to replicate client-side only
@@ -1360,7 +1392,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 timeline.getPaginationToken(EventTimeline.BACKWARDS),
                 EventTimeline.BACKWARDS,
             );
-        } else {
+        } else if (useSyncEvents) {
             const livePaginationToken = unfilteredLiveTimeline.getPaginationToken(Direction.Forward);
             timelineSet
                 .getLiveTimeline()
@@ -1376,6 +1408,146 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         // );
 
         return timelineSet;
+    }
+
+    private async getThreadListFilter(filterType = ThreadFilterType.All): Promise<Filter> {
+        const myUserId = this.client.getUserId();
+        const filter = new Filter(myUserId);
+
+        const definition: IFilterDefinition = {
+            "room": {
+                "timeline": {
+                    [FILTER_RELATED_BY_REL_TYPES.name]: [THREAD_RELATION_TYPE.name],
+                },
+            },
+        };
+
+        if (filterType === ThreadFilterType.My) {
+            definition.room.timeline[FILTER_RELATED_BY_SENDERS.name] = [myUserId];
+        }
+
+        filter.setDefinition(definition);
+        const filterId = await this.client.getOrCreateFilter(
+            `THREAD_PANEL_${this.roomId}_${filterType}`,
+            filter,
+        );
+
+        filter.filterId = filterId;
+
+        return filter;
+    }
+
+    private async createThreadTimelineSet(filterType?: ThreadFilterType): Promise<EventTimelineSet> {
+        let timelineSet: EventTimelineSet;
+        if (Thread.hasServerSideSupport) {
+            const filter = await this.getThreadListFilter(filterType);
+
+            timelineSet = this.getOrCreateFilteredTimelineSet(
+                filter,
+                {
+                    prepopulateTimeline: false,
+                    useSyncEvents: false,
+                    pendingEvents: false,
+                },
+            );
+
+            // An empty pagination token allows to paginate from the very bottom of
+            // the timeline set.
+            // Right now we completely by-pass the pagination to be able to order
+            // the events by last reply to a thread
+            // Once the server can help us with that, we should uncomment the line
+            // below
+            // timelineSet.getLiveTimeline().setPaginationToken("", EventTimeline.BACKWARDS);
+        } else {
+            timelineSet = new EventTimelineSet(this, {
+                pendingEvents: false,
+            });
+
+            Array.from(this.threads)
+                .forEach(([, thread]) => {
+                    if (thread.length === 0) return;
+                    const currentUserParticipated = thread.events.some(event => {
+                        return event.getSender() === this.client.getUserId();
+                    });
+                    if (filterType !== ThreadFilterType.My || currentUserParticipated) {
+                        timelineSet.getLiveTimeline().addEvent(thread.rootEvent, false);
+                    }
+                });
+        }
+
+        return timelineSet;
+    }
+
+    public threadsReady = false;
+
+    public async fetchRoomThreads(): Promise<void> {
+        if (this.threadsReady) {
+            return;
+        }
+
+        const allThreadsFilter = await this.getThreadListFilter();
+
+        const { chunk: events } = await this.client.createMessagesRequest(
+            this.roomId,
+            "",
+            Number.MAX_SAFE_INTEGER,
+            Direction.Backward,
+            allThreadsFilter,
+        );
+
+        const orderedByLastReplyEvents = events
+            .map(this.client.getEventMapper())
+            .sort((eventA, eventB) => {
+                /**
+                 * `origin_server_ts` in a decentralised world is far from ideal
+                 * but for lack of any better, we will have to use this
+                 * Long term the sorting should be handled by homeservers and this
+                 * is only meant as a short term patch
+                 */
+                const threadAMetadata = eventA
+                    .getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
+                const threadBMetadata = eventB
+                    .getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
+                return threadAMetadata.latest_event.origin_server_ts - threadBMetadata.latest_event.origin_server_ts;
+            });
+
+        const myThreads = orderedByLastReplyEvents.filter(event => {
+            const threadRelationship = event
+                .getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
+            return threadRelationship.current_user_participated;
+        });
+
+        const roomState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
+        for (const event of orderedByLastReplyEvents) {
+            this.threadsTimelineSets[0].addLiveEvent(
+                event,
+                DuplicateStrategy.Ignore,
+                false,
+                roomState,
+            );
+        }
+        for (const event of myThreads) {
+            this.threadsTimelineSets[1].addLiveEvent(
+                event,
+                DuplicateStrategy.Ignore,
+                false,
+                roomState,
+            );
+        }
+
+        this.client.decryptEventIfNeeded(orderedByLastReplyEvents[orderedByLastReplyEvents.length -1]);
+        this.client.decryptEventIfNeeded(myThreads[myThreads.length -1]);
+
+        this.threadsReady = true;
+
+        this.on(ThreadEvent.NewReply, this.onThreadNewReply);
+    }
+
+    private onThreadNewReply(thread: Thread): void {
+        for (const timelineSet of this.threadsTimelineSets) {
+            timelineSet.removeEvent(thread.id);
+            timelineSet.addLiveEvent(thread.rootEvent);
+        }
     }
 
     /**
@@ -1412,16 +1584,16 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @experimental
      */
     public async addThreadedEvent(event: MatrixEvent, toStartOfTimeline: boolean): Promise<void> {
+        this.applyRedaction(event);
         let thread = this.findThreadForEvent(event);
         if (thread) {
             thread.addEvent(event, toStartOfTimeline);
         } else {
             const events = [event];
             let rootEvent = this.findEventById(event.threadRootId);
-            // If the rootEvent does not exist in the current sync, then look for
-            // it over the network
+            // If the rootEvent does not exist in the current sync, then look for it over the network.
             try {
-                let eventData;
+                let eventData: IMinimalEvent;
                 if (event.threadRootId) {
                     eventData = await this.client.fetchRoomEvent(this.roomId, event.threadRootId);
                 }
@@ -1432,18 +1604,24 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                     rootEvent.setUnsigned(eventData.unsigned);
                 }
             } finally {
-                // The root event might be not be visible to the person requesting
-                // it. If it wasn't fetched successfully the thread will work
-                // in "limited" mode and won't benefit from all the APIs a homeserver
-                // can provide to enhance the thread experience
-                thread = this.createThread(rootEvent, events);
+                // The root event might be not be visible to the person requesting it.
+                // If it wasn't fetched successfully the thread will work in "limited" mode and won't
+                // benefit from all the APIs a homeserver can provide to enhance the thread experience
+                thread = this.createThread(rootEvent, events, toStartOfTimeline);
+                if (thread) {
+                    rootEvent.setThread(thread);
+                }
             }
         }
 
         this.emit(ThreadEvent.Update, thread);
     }
 
-    public createThread(rootEvent: MatrixEvent | undefined, events: MatrixEvent[] = []): Thread | undefined {
+    public createThread(
+        rootEvent: MatrixEvent | undefined,
+        events: MatrixEvent[] = [],
+        toStartOfTimeline: boolean,
+    ): Thread | undefined {
         if (rootEvent) {
             const tl = this.getTimelineForEvent(rootEvent.getId());
             const relatedEvents = tl?.getTimelineSet().getAllRelationsEventForEvent(rootEvent.getId());
@@ -1463,6 +1641,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             this.threads.set(thread.id, thread);
             this.reEmitter.reEmit(thread, [
                 ThreadEvent.Update,
+                ThreadEvent.NewReply,
                 RoomEvent.Timeline,
                 RoomEvent.TimelineReset,
             ]);
@@ -1471,22 +1650,29 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 this.lastThread = thread;
             }
 
-            this.emit(ThreadEvent.New, thread);
+            this.emit(ThreadEvent.New, thread, toStartOfTimeline);
+
+            if (this.threadsReady) {
+                this.threadsTimelineSets.forEach(timelineSet => {
+                    if (thread.rootEvent) {
+                        if (Thread.hasServerSideSupport) {
+                            timelineSet.addLiveEvent(thread.rootEvent);
+                        } else {
+                            timelineSet.addEventToTimeline(
+                                thread.rootEvent,
+                                timelineSet.getLiveTimeline(),
+                                toStartOfTimeline,
+                            );
+                        }
+                    }
+                });
+            }
+
             return thread;
         }
     }
 
-    /**
-     * Add an event to the end of this room's live timelines. Will fire
-     * "Room.timeline".
-     *
-     * @param {MatrixEvent} event Event to be added
-     * @param {string?} duplicateStrategy 'ignore' or 'replace'
-     * @param {boolean} fromCache whether the sync response came from cache
-     * @fires module:client~MatrixClient#event:"Room.timeline"
-     * @private
-     */
-    private addLiveEvent(event: MatrixEvent, duplicateStrategy?: DuplicateStrategy, fromCache = false): void {
+    private applyRedaction(event: MatrixEvent): void {
         if (event.isRedaction()) {
             const redactId = event.event.redacts;
 
@@ -1530,6 +1716,20 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             // clients can say "so and so redacted an event" if they wish to. Also
             // this may be needed to trigger an update.
         }
+    }
+
+    /**
+     * Add an event to the end of this room's live timelines. Will fire
+     * "Room.timeline".
+     *
+     * @param {MatrixEvent} event Event to be added
+     * @param {string?} duplicateStrategy 'ignore' or 'replace'
+     * @param {boolean} fromCache whether the sync response came from cache
+     * @fires module:client~MatrixClient#event:"Room.timeline"
+     * @private
+     */
+    private addLiveEvent(event: MatrixEvent, duplicateStrategy?: DuplicateStrategy, fromCache = false): void {
+        this.applyRedaction(event);
 
         // Implement MSC3531: hiding messages.
         if (event.isVisibilityEvent()) {
@@ -1688,6 +1888,14 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
     }
 
+    private shouldAddEventToMainTimeline(thread: Thread, event: MatrixEvent): boolean {
+        if (!thread) {
+            return true;
+        }
+
+        return !event.isThreadRelation && thread.id === event.getAssociatedId();
+    }
+
     /**
      * Used to aggregate the local echo for a relation, and also
      * for re-applying a relation after it's redaction has been cancelled,
@@ -1700,11 +1908,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     private aggregateNonLiveRelation(event: MatrixEvent): void {
         const thread = this.findThreadForEvent(event);
-        if (thread) {
-            thread.timelineSet.aggregateRelations(event);
-        }
+        thread?.timelineSet.aggregateRelations(event);
 
-        if (thread?.id === event.getAssociatedId() || !thread) {
+        if (this.shouldAddEventToMainTimeline(thread, event)) {
             // TODO: We should consider whether this means it would be a better
             // design to lift the relations handling up to the room instead.
             for (let i = 0; i < this.timelineSets.length; i++) {
@@ -1761,11 +1967,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         localEvent.handleRemoteEcho(remoteEvent.event);
 
         const thread = this.findThreadForEvent(remoteEvent);
-        if (thread) {
-            thread.timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
-        }
+        thread?.timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
 
-        if (thread?.id === remoteEvent.getAssociatedId() || !thread) {
+        if (this.shouldAddEventToMainTimeline(thread, remoteEvent)) {
             for (let i = 0; i < this.timelineSets.length; i++) {
                 const timelineSet = this.timelineSets[i];
 
@@ -1832,10 +2036,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             event.replaceLocalEventId(newEventId);
 
             const thread = this.findThreadForEvent(event);
-            if (thread) {
-                thread.timelineSet.replaceEventId(oldEventId, newEventId);
-            }
-            if (thread?.id === event.getAssociatedId() || !thread) {
+            thread?.timelineSet.replaceEventId(oldEventId, newEventId);
+
+            if (this.shouldAddEventToMainTimeline(thread, event)) {
                 // if the event was already in the timeline (which will be the case if
                 // opts.pendingEventOrdering==chronological), we need to update the
                 // timeline map.
@@ -1846,12 +2049,10 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         } else if (newStatus == EventStatus.CANCELLED) {
             // remove it from the pending event list, or the timeline.
             if (this.pendingEventList) {
-                const idx = this.pendingEventList.findIndex(ev => ev.getId() === oldEventId);
-                if (idx !== -1) {
-                    const [removedEvent] = this.pendingEventList.splice(idx, 1);
-                    if (removedEvent.isRedaction()) {
-                        this.revertRedactionLocalEcho(removedEvent);
-                    }
+                const removedEvent = this.getPendingEvent(oldEventId);
+                this.removePendingEvent(oldEventId);
+                if (removedEvent.isRedaction()) {
+                    this.revertRedactionLocalEcho(removedEvent);
                 }
             }
             this.removeEvent(oldEventId);
@@ -2319,7 +2520,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
 
     /**
      * Returns the type of the room from the `m.room.create` event content or undefined if none is set
-     * @returns {?string} the type of the room. Currently only RoomType.Space is known.
+     * @returns {?string} the type of the room.
      */
     public getType(): RoomType | string | undefined {
         const createEvent = this.currentState.getStateEvents(EventType.RoomCreate, "");
@@ -2339,6 +2540,14 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     public isSpaceRoom(): boolean {
         return this.getType() === RoomType.Space;
+    }
+
+    /**
+     * Returns whether the room is a call-room as defined by MSC3417.
+     * @returns {boolean} true if the room's type is RoomType.UnstableCall
+     */
+    public isCallRoom(): boolean {
+        return this.getType() === RoomType.UnstableCall;
     }
 
     /**

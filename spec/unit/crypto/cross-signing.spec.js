@@ -20,7 +20,7 @@ import anotherjson from 'another-json';
 
 import * as olmlib from "../../../src/crypto/olmlib";
 import { TestClient } from '../../TestClient';
-import { HttpResponse, setHttpResponses } from '../../test-utils';
+import { HttpResponse, setHttpResponses } from '../../test-utils/test-utils';
 import { resetCrossSigningKeys } from "./crypto-utils";
 import { MatrixError } from '../../../src/http-api';
 import { logger } from '../../../src/logger';
@@ -237,7 +237,6 @@ describe("Cross Signing", function() {
 
         // feed sync result that includes master key, ssk, device key
         const responses = [
-            HttpResponse.CAPABILITIES_RESPONSE,
             HttpResponse.PUSH_RULES_RESPONSE,
             {
                 method: "POST",
@@ -494,7 +493,6 @@ describe("Cross Signing", function() {
         // - master key signed by her usk (pretend that it was signed by another
         //   of Alice's devices)
         const responses = [
-            HttpResponse.CAPABILITIES_RESPONSE,
             HttpResponse.PUSH_RULES_RESPONSE,
             {
                 method: "POST",

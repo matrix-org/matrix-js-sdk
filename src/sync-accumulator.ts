@@ -129,12 +129,6 @@ interface IDeviceLists {
     left: string[];
 }
 
-export interface IGroups {
-    [Category.Join]: object;
-    [Category.Invite]: object;
-    [Category.Leave]: object;
-}
-
 export interface ISyncResponse {
     next_batch: string;
     rooms: IRooms;
@@ -143,8 +137,6 @@ export interface ISyncResponse {
     to_device?: IToDevice;
     device_lists?: IDeviceLists;
     device_one_time_keys_count?: Record<string, number>;
-
-    groups: IGroups; // unspecced
 }
 /* eslint-enable camelcase */
 
@@ -176,7 +168,6 @@ export interface ISyncData {
     nextBatch: string;
     accountData: IMinimalEvent[];
     roomsData: IRooms;
-    groupsData: IGroups;
 }
 
 /**
@@ -199,13 +190,6 @@ export class SyncAccumulator {
     // streaming from without losing events.
     private nextBatch: string = null;
 
-    // { ('invite'|'join'|'leave'): $groupId: { ... sync 'group' data } }
-    private groups: Record<Category, object> = {
-        invite: {},
-        join: {},
-        leave: {},
-    };
-
     /**
      * @param {Object} opts
      * @param {Number=} opts.maxTimelineEntries The ideal maximum number of
@@ -221,7 +205,6 @@ export class SyncAccumulator {
 
     public accumulate(syncResponse: ISyncResponse, fromDatabase = false): void {
         this.accumulateRooms(syncResponse, fromDatabase);
-        this.accumulateGroups(syncResponse);
         this.accumulateAccountData(syncResponse);
         this.nextBatch = syncResponse.next_batch;
     }
@@ -523,38 +506,6 @@ export class SyncAccumulator {
     }
 
     /**
-     * Accumulate incremental /sync group data.
-     * @param {Object} syncResponse the complete /sync JSON
-     */
-    private accumulateGroups(syncResponse: ISyncResponse): void {
-        if (!syncResponse.groups) {
-            return;
-        }
-        if (syncResponse.groups.invite) {
-            Object.keys(syncResponse.groups.invite).forEach((groupId) => {
-                this.accumulateGroup(groupId, Category.Invite, syncResponse.groups.invite[groupId]);
-            });
-        }
-        if (syncResponse.groups.join) {
-            Object.keys(syncResponse.groups.join).forEach((groupId) => {
-                this.accumulateGroup(groupId, Category.Join, syncResponse.groups.join[groupId]);
-            });
-        }
-        if (syncResponse.groups.leave) {
-            Object.keys(syncResponse.groups.leave).forEach((groupId) => {
-                this.accumulateGroup(groupId, Category.Leave, syncResponse.groups.leave[groupId]);
-            });
-        }
-    }
-
-    private accumulateGroup(groupId: string, category: Category, data: object): void {
-        for (const cat of [Category.Invite, Category.Leave, Category.Join]) {
-            delete this.groups[cat][groupId];
-        }
-        this.groups[category][groupId] = data;
-    }
-
-    /**
      * Return everything under the 'rooms' key from a /sync response which
      * represents all room data that should be stored. This should be paired
      * with the sync token which represents the most recent /sync response
@@ -712,7 +663,6 @@ export class SyncAccumulator {
         return {
             nextBatch: this.nextBatch,
             roomsData: data,
-            groupsData: this.groups,
             accountData: accData,
         };
     }

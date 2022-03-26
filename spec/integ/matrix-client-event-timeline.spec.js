@@ -1,4 +1,4 @@
-import * as utils from "../test-utils";
+import * as utils from "../test-utils/test-utils";
 import { EventTimeline } from "../../src/matrix";
 import { logger } from "../../src/logger";
 import { TestClient } from "../TestClient";
@@ -71,7 +71,7 @@ const EVENTS = [
 
 // start the client, and wait for it to initialise
 function startClient(httpBackend, client) {
-    httpBackend.when("GET", "/capabilities").respond(200, { capabilities: {} });
+    httpBackend.when("GET", "/versions").respond(200, {});
     httpBackend.when("GET", "/pushrules").respond(200, {});
     httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
     httpBackend.when("GET", "/sync").respond(200, INITIAL_SYNC_DATA);

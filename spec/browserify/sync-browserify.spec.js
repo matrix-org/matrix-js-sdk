@@ -17,7 +17,7 @@ limitations under the License.
 // load XmlHttpRequest mock
 import "./setupTests";
 import "../../dist/browser-matrix"; // uses browser-matrix instead of the src
-import * as utils from "../test-utils";
+import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 
 const USER_ID = "@user:test.server";
@@ -35,7 +35,7 @@ describe("Browserify Test", function() {
         client = testClient.client;
         httpBackend = testClient.httpBackend;
 
-        httpBackend.when("GET", "/capabilities").respond(200, { capabilities: {} });
+        httpBackend.when("GET", "/versions").respond(200, {});
         httpBackend.when("GET", "/pushrules").respond(200, {});
         httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
 

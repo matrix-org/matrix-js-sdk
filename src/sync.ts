@@ -25,7 +25,6 @@ limitations under the License.
 
 import { User, UserEvent } from "./models/user";
 import { NotificationCountType, Room, RoomEvent } from "./models/room";
-import { Group } from "./models/group";
 import * as utils from "./utils";
 import { IDeferred } from "./utils";
 import { Filter } from "./filter";
@@ -35,7 +34,6 @@ import { logger } from './logger';
 import { InvalidStoreError } from './errors';
 import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
 import {
-    Category,
     IEphemeral,
     IInvitedRoom,
     IInviteState,
@@ -55,6 +53,7 @@ import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
 import { RoomStateEvent } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
+import { BeaconEvent } from "./models/beacon";
 
 const DEBUG = true;
 
@@ -213,21 +212,6 @@ export class SyncApi {
     }
 
     /**
-     * @param {string} groupId
-     * @return {Group}
-     */
-    public createGroup(groupId: string): Group {
-        const client = this.client;
-        const group = new Group(groupId);
-        client.reEmitter.reEmit(group, [
-            ClientEvent.GroupProfile,
-            ClientEvent.GroupMyMembership,
-        ]);
-        client.store.storeGroup(group);
-        return group;
-    }
-
-    /**
      * @param {Room} room
      * @private
      */
@@ -241,7 +225,11 @@ export class SyncApi {
             RoomStateEvent.Members,
             RoomStateEvent.NewMember,
             RoomStateEvent.Update,
+            BeaconEvent.New,
+            BeaconEvent.Update,
+            BeaconEvent.LivenessChange,
         ]);
+
         room.currentState.on(RoomStateEvent.NewMember, function(event, state, member) {
             member.user = client.getUser(member.userId);
             client.reEmitter.reEmit(member, [
@@ -763,7 +751,6 @@ export class SyncApi {
         const data: ISyncResponse = {
             next_batch: nextSyncToken,
             rooms: savedSync.roomsData,
-            groups: savedSync.groupsData,
             account_data: {
                 events: savedSync.accountData,
             },
@@ -1050,20 +1037,7 @@ export class SyncApi {
         //          timeline: { events: [], prev_batch: $token }
         //        }
         //      }
-        //    },
-        //    groups: {
-        //        invite: {
-        //            $groupId: {
-        //                inviter: $inviter,
-        //                profile: {
-        //                    avatar_url: $avatarUrl,
-        //                    name: $groupName,
-        //                },
-        //            },
-        //        },
-        //        join: {},
-        //        leave: {},
-        //    },
+        //    }
         // }
 
         // TODO-arch:
@@ -1165,20 +1139,6 @@ export class SyncApi {
         } else {
             // no more to-device events: we can stop polling with a short timeout.
             this.catchingUp = false;
-        }
-
-        if (data.groups) {
-            if (data.groups.invite) {
-                this.processGroupSyncEntry(data.groups.invite, Category.Invite);
-            }
-
-            if (data.groups.join) {
-                this.processGroupSyncEntry(data.groups.join, Category.Join);
-            }
-
-            if (data.groups.leave) {
-                this.processGroupSyncEntry(data.groups.leave, Category.Leave);
-            }
         }
 
         // the returned json structure is a bit crap, so make it into a
@@ -1535,35 +1495,6 @@ export class SyncApi {
                 this.updateSyncState(SyncState.Error, { error: err });
             }
         });
-    }
-
-    /**
-     * @param {Object} groupsSection Groups section object, eg. response.groups.invite
-     * @param {string} sectionName Which section this is ('invite', 'join' or 'leave')
-     */
-    private processGroupSyncEntry(groupsSection: object, sectionName: Category) {
-        // Processes entries from 'groups' section of the sync stream
-        for (const groupId of Object.keys(groupsSection)) {
-            const groupInfo = groupsSection[groupId];
-            let group = this.client.store.getGroup(groupId);
-            const isBrandNew = group === null;
-            if (group === null) {
-                group = this.createGroup(groupId);
-            }
-            if (groupInfo.profile) {
-                group.setProfile(
-                    groupInfo.profile.name, groupInfo.profile.avatar_url,
-                );
-            }
-            if (groupInfo.inviter) {
-                group.setInviter({ userId: groupInfo.inviter });
-            }
-            group.setMyMembership(sectionName);
-            if (isBrandNew) {
-                // Now we've filled in all the fields, emit the Group event
-                this.client.emit(ClientEvent.Group, group);
-            }
-        }
     }
 
     /**

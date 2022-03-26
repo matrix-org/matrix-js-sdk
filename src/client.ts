@@ -37,7 +37,6 @@ import { Filter, IFilterDefinition } from "./filter";
 import { CallEventHandlerEvent, CallEventHandler, CallEventHandlerEventHandlerMap } from './webrtc/callEventHandler';
 import * as utils from './utils';
 import { sleep } from './utils';
-import { Group } from "./models/group";
 import { Direction, EventTimeline } from "./models/event-timeline";
 import { IActionsObject, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery";
@@ -104,6 +103,8 @@ import {
     IRoomEvent,
     IStateEvent,
     NotificationCountType,
+    BeaconEvent,
+    BeaconEventHandlerMap,
     RoomEvent,
     RoomEventHandlerMap,
     RoomMemberEvent,
@@ -179,6 +180,8 @@ import { MediaHandler } from "./webrtc/mediaHandler";
 import { IRefreshTokenResponse } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { ReceiptType } from "./@types/read_receipts";
+import { Thread, THREAD_RELATION_TYPE } from "./models/thread";
+import { MBeaconInfoEventContent, M_BEACON_INFO_VARIABLE } from "./@types/beacon";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -780,11 +783,6 @@ export enum ClientEvent {
     DeleteRoom = "deleteRoom",
     SyncUnexpectedError = "sync.unexpectedError",
     ClientWellKnown = "WellKnown.client",
-    /* @deprecated */
-    Group = "Group",
-    // The following enum members are both deprecated and in the wrong place, Groups haven't been TSified
-    GroupProfile = "Group.profile",
-    GroupMyMembership = "Group.myMembership",
 }
 
 type RoomEvents = RoomEvent.Name
@@ -841,7 +839,8 @@ type EmittedEvents = ClientEvent
     | CallEvent // re-emitted by call.ts using Object.values
     | CallEventHandlerEvent.Incoming
     | HttpApiEvent.SessionLoggedOut
-    | HttpApiEvent.NoConsent;
+    | HttpApiEvent.NoConsent
+    | BeaconEvent;
 
 export type ClientEventHandlerMap = {
     [ClientEvent.Sync]: (state: SyncState, lastState?: SyncState, data?: ISyncStateData) => void;
@@ -852,9 +851,6 @@ export type ClientEventHandlerMap = {
     [ClientEvent.DeleteRoom]: (roomId: string) => void;
     [ClientEvent.SyncUnexpectedError]: (error: Error) => void;
     [ClientEvent.ClientWellKnown]: (data: IClientWellKnown) => void;
-    [ClientEvent.Group]: (group: Group) => void;
-    [ClientEvent.GroupProfile]: (group: Group) => void;
-    [ClientEvent.GroupMyMembership]: (group: Group) => void;
 } & RoomEventHandlerMap
     & RoomStateEventHandlerMap
     & CryptoEventHandlerMap
@@ -863,7 +859,8 @@ export type ClientEventHandlerMap = {
     & UserEventHandlerMap
     & CallEventHandlerEventHandlerMap
     & CallEventHandlerMap
-    & HttpApiEventHandlerMap;
+    & HttpApiEventHandlerMap
+    & BeaconEventHandlerMap;
 
 /**
  * Represents a Matrix Client. Only directly construct this if you want to use
@@ -1168,7 +1165,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.syncApi.stop();
         }
 
-        await this.getCapabilities(true);
+        try {
+            const { serverSupport, stable } = await this.doesServerSupportThread();
+            Thread.setServerSideSupport(serverSupport, stable);
+        } catch (e) {
+            Thread.setServerSideSupport(false, true);
+        }
 
         // shallow-copy the opts dict before modifying and storing it
         this.clientOpts = Object.assign({}, opts) as IStoredClientOpts;
@@ -3238,27 +3240,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Get the group for the given group ID.
-     * This function will return a valid group for any group for which a Group event
-     * has been emitted.
-     * @param {string} groupId The group ID
-     * @return {Group} The Group or null if the group is not known or there is no data store.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public getGroup(groupId: string): Group {
-        return this.store.getGroup(groupId);
-    }
-
-    /**
-     * Retrieve all known groups.
-     * @return {Group[]} A list of groups, or an empty list if there is no data store.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public getGroups(): Group[] {
-        return this.store.getGroups();
-    }
-
-    /**
      * Get the config for the media repository.
      * @param {module:client.callback} callback Optional.
      * @return {Promise} Resolves with an object containing the config.
@@ -3672,6 +3653,45 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Create an m.beacon_info event
+     * @param {string} roomId
+     * @param {MBeaconInfoEventContent} beaconInfoContent
+     * @param {string} eventTypeSuffix - string to suffix event type
+     *  to make event type unique.
+     *  See MSC3489 for more context
+     *  https://github.com/matrix-org/matrix-spec-proposals/pull/3489
+     * @returns {ISendEventResponse}
+     */
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    public async unstable_createLiveBeacon(
+        roomId: Room["roomId"],
+        beaconInfoContent: MBeaconInfoEventContent,
+        eventTypeSuffix: string,
+    ) {
+        const userId = this.getUserId();
+        const eventType = M_BEACON_INFO_VARIABLE.name.replace('*', `${userId}.${eventTypeSuffix}`);
+        return this.unstable_setLiveBeacon(roomId, eventType, beaconInfoContent);
+    }
+
+    /**
+     * Upsert a live beacon event
+     * using a specific m.beacon_info.* event variable type
+     * @param {string} roomId string
+     * @param {string} beaconInfoEventType event type including variable suffix
+     * @param {MBeaconInfoEventContent} beaconInfoContent
+     * @returns {ISendEventResponse}
+     */
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    public async unstable_setLiveBeacon(
+        roomId: string,
+        beaconInfoEventType: string,
+        beaconInfoContent: MBeaconInfoEventContent,
+    ) {
+        const userId = this.getUserId();
+        return this.sendStateEvent(roomId, beaconInfoEventType, beaconInfoContent, userId);
+    }
+
+    /**
      * @param {string} roomId
      * @param {string} threadId
      * @param {string} eventType
@@ -3717,14 +3737,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (threadId && !content["m.relates_to"]?.rel_type) {
             content["m.relates_to"] = {
                 ...content["m.relates_to"],
-                "rel_type": RelationType.Thread,
+                "rel_type": THREAD_RELATION_TYPE.name,
                 "event_id": threadId,
             };
             const thread = this.getRoom(roomId)?.threads.get(threadId);
             if (thread) {
                 content["m.relates_to"]["m.in_reply_to"] = {
                     "event_id": thread.lastReply((ev: MatrixEvent) => {
-                        return ev.isRelation(RelationType.Thread) && !ev.status;
+                        return ev.isRelation(THREAD_RELATION_TYPE.name) && !ev.status;
                     })?.getId(),
                 };
             }
@@ -3938,7 +3958,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Returns the eventType that should be used taking encryption into account
      * for a given eventType.
-     * @param {MatrixClient} client the client
      * @param {string} roomId the room for the events `eventType` relates to
      * @param {string} eventType the event type
      * @return {string} the event type taking encryption into account
@@ -5385,7 +5404,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 only: 'highlight',
             };
 
-            if (token && token !== "end") {
+            if (token !== "end") {
                 params.from = token;
             }
 
@@ -5923,7 +5942,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public searchRoomEvents(opts: IEventSearchOpts): Promise<ISearchResults> {
-        // TODO: support groups
+        // TODO: support search groups
 
         const body = {
             search_categories: {
@@ -6525,6 +6544,24 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return unstableFeatures && !!unstableFeatures[`io.element.e2ee_forced.${versionsPresetName}`];
     }
 
+    public async doesServerSupportThread(): Promise<{
+        serverSupport: boolean;
+        stable: boolean;
+    } | null> {
+        try {
+            const hasUnstableSupport = await this.doesServerSupportUnstableFeature("org.matrix.msc3440");
+            const hasStableSupport = await this.doesServerSupportUnstableFeature("org.matrix.msc3440.stable")
+                || await this.isVersionSupported("v1.3");
+
+            return {
+                serverSupport: hasUnstableSupport || hasStableSupport,
+                stable: hasStableSupport,
+            };
+        } catch (e) {
+            return null;
+        }
+    }
+
     /**
      * Get if lazy loading members is being used.
      * @return {boolean} Whether or not members are lazy loaded by this client
@@ -6585,11 +6622,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             fetchedEventType,
             opts);
         const mapper = this.getEventMapper();
-        let originalEvent: MatrixEvent;
-        if (result.original_event) {
-            originalEvent = mapper(result.original_event);
-        }
+
+        const originalEvent = result.original_event ? mapper(result.original_event) : undefined;
         let events = result.chunk.map(mapper);
+
         if (fetchedEventType === EventType.RoomMessageEncrypted) {
             const allEvents = originalEvent ? events.concat(originalEvent) : events;
             await Promise.all(allEvents.map(e => this.decryptEventIfNeeded(e)));
@@ -6597,6 +6633,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 events = events.filter(e => e.getType() === eventType);
             }
         }
+
         if (originalEvent && relationType === RelationType.Replace) {
             events = events.filter(e => e.getSender() === originalEvent.getSender());
         }
@@ -8771,368 +8808,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return new MSC3089TreeSpace(this, roomId);
     }
 
-    // TODO: Remove this warning, alongside the functions
-    // See https://github.com/vector-im/element-web/issues/17532
-    // ======================================================
-    // **                ANCIENT APIS BELOW                **
-    // ======================================================
-
-    /**
-     * @param {string} groupId
-     * @return {Promise} Resolves: Group summary object
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public getGroupSummary(groupId: string): Promise<any> {
-        const path = utils.encodeUri("/groups/$groupId/summary", { $groupId: groupId });
-        return this.http.authedRequest(undefined, Method.Get, path);
-    }
-
-    /**
-     * @param {string} groupId
-     * @return {Promise} Resolves: Group profile object
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public getGroupProfile(groupId: string): Promise<any> {
-        const path = utils.encodeUri("/groups/$groupId/profile", { $groupId: groupId });
-        return this.http.authedRequest(undefined, Method.Get, path);
-    }
-
-    /**
-     * @param {string} groupId
-     * @param {Object} profile The group profile object
-     * @param {string=} profile.name Name of the group
-     * @param {string=} profile.avatar_url MXC avatar URL
-     * @param {string=} profile.short_description A short description of the room
-     * @param {string=} profile.long_description A longer HTML description of the room
-     * @return {Promise} Resolves: Empty object
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public setGroupProfile(groupId: string, profile: any): Promise<any> {
-        const path = utils.encodeUri("/groups/$groupId/profile", { $groupId: groupId });
-        return this.http.authedRequest(
-            undefined, Method.Post, path, undefined, profile,
-        );
-    }
-
-    /**
-     * @param {string} groupId
-     * @param {object} policy The join policy for the group. Must include at
-     *     least a 'type' field which is 'open' if anyone can join the group
-     *     the group without prior approval, or 'invite' if an invite is
-     *     required to join.
-     * @return {Promise} Resolves: Empty object
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public setGroupJoinPolicy(groupId: string, policy: any): Promise<any> {
-        const path = utils.encodeUri(
-            "/groups/$groupId/settings/m.join_policy",
-            { $groupId: groupId },
-        );
-        return this.http.authedRequest(
-            undefined, Method.Put, path, undefined, {
-                'm.join_policy': policy,
-            },
-        );
-    }
-
-    /**
-     * @param {string} groupId
-     * @return {Promise} Resolves: Group users list object
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public getGroupUsers(groupId: string): Promise<any> {
-        const path = utils.encodeUri("/groups/$groupId/users", { $groupId: groupId });
-        return this.http.authedRequest(undefined, Method.Get, path);
-    }
-
-    /**
-     * @param {string} groupId
-     * @return {Promise} Resolves: Group users list object
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public getGroupInvitedUsers(groupId: string): Promise<any> {
-        const path = utils.encodeUri("/groups/$groupId/invited_users", { $groupId: groupId });
-        return this.http.authedRequest(undefined, Method.Get, path);
-    }
-
-    /**
-     * @param {string} groupId
-     * @return {Promise} Resolves: Group rooms list object
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public getGroupRooms(groupId: string): Promise<any> {
-        const path = utils.encodeUri("/groups/$groupId/rooms", { $groupId: groupId });
-        return this.http.authedRequest(undefined, Method.Get, path);
-    }
-
-    /**
-     * @param {string} groupId
-     * @param {string} userId
-     * @return {Promise} Resolves: Empty object
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public inviteUserToGroup(groupId: string, userId: string): Promise<any> {
-        const path = utils.encodeUri(
-            "/groups/$groupId/admin/users/invite/$userId",
-            { $groupId: groupId, $userId: userId },
-        );
-        return this.http.authedRequest(undefined, Method.Put, path, undefined, {});
-    }
-
-    /**
-     * @param {string} groupId
-     * @param {string} userId
-     * @return {Promise} Resolves: Empty object
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public removeUserFromGroup(groupId: string, userId: string): Promise<any> {
-        const path = utils.encodeUri(
-            "/groups/$groupId/admin/users/remove/$userId",
-            { $groupId: groupId, $userId: userId },
-        );
-        return this.http.authedRequest(undefined, Method.Put, path, undefined, {});
-    }
-
-    /**
-     * @param {string} groupId
-     * @param {string} userId
-     * @param {string} roleId Optional.
-     * @return {Promise} Resolves: Empty object
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public addUserToGroupSummary(groupId: string, userId: string, roleId: string): Promise<any> {
-        const path = utils.encodeUri(
-            roleId ?
-                "/groups/$groupId/summary/$roleId/users/$userId" :
-                "/groups/$groupId/summary/users/$userId",
-            { $groupId: groupId, $roleId: roleId, $userId: userId },
-        );
-        return this.http.authedRequest(undefined, Method.Put, path, undefined, {});
-    }
-
-    /**
-     * @param {string} groupId
-     * @param {string} userId
-     * @return {Promise} Resolves: Empty object
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public removeUserFromGroupSummary(groupId: string, userId: string): Promise<any> {
-        const path = utils.encodeUri(
-            "/groups/$groupId/summary/users/$userId",
-            { $groupId: groupId, $userId: userId },
-        );
-        return this.http.authedRequest(undefined, Method.Delete, path, undefined, {});
-    }
-
-    /**
-     * @param {string} groupId
-     * @param {string} roomId
-     * @param {string} categoryId Optional.
-     * @return {Promise} Resolves: Empty object
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public addRoomToGroupSummary(groupId: string, roomId: string, categoryId: string): Promise<any> {
-        const path = utils.encodeUri(
-            categoryId ?
-                "/groups/$groupId/summary/$categoryId/rooms/$roomId" :
-                "/groups/$groupId/summary/rooms/$roomId",
-            { $groupId: groupId, $categoryId: categoryId, $roomId: roomId },
-        );
-        return this.http.authedRequest(undefined, Method.Put, path, undefined, {});
-    }
-
-    /**
-     * @param {string} groupId
-     * @param {string} roomId
-     * @return {Promise} Resolves: Empty object
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public removeRoomFromGroupSummary(groupId: string, roomId: string): Promise<any> {
-        const path = utils.encodeUri(
-            "/groups/$groupId/summary/rooms/$roomId",
-            { $groupId: groupId, $roomId: roomId },
-        );
-        return this.http.authedRequest(undefined, Method.Delete, path, undefined, {});
-    }
-
-    /**
-     * @param {string} groupId
-     * @param {string} roomId
-     * @param {boolean} isPublic Whether the room-group association is visible to non-members
-     * @return {Promise} Resolves: Empty object
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public addRoomToGroup(groupId: string, roomId: string, isPublic: boolean): Promise<any> {
-        if (isPublic === undefined) {
-            isPublic = true;
-        }
-        const path = utils.encodeUri(
-            "/groups/$groupId/admin/rooms/$roomId",
-            { $groupId: groupId, $roomId: roomId },
-        );
-        return this.http.authedRequest(undefined, Method.Put, path, undefined,
-            { "m.visibility": { type: isPublic ? "public" : "private" } },
-        );
-    }
-
-    /**
-     * Configure the visibility of a room-group association.
-     * @param {string} groupId
-     * @param {string} roomId
-     * @param {boolean} isPublic Whether the room-group association is visible to non-members
-     * @return {Promise} Resolves: Empty object
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public updateGroupRoomVisibility(groupId: string, roomId: string, isPublic: boolean): Promise<any> {
-        // NB: The /config API is generic but there's not much point in exposing this yet as synapse
-        //     is the only server to implement this. In future we should consider an API that allows
-        //     arbitrary configuration, i.e. "config/$configKey".
-
-        const path = utils.encodeUri(
-            "/groups/$groupId/admin/rooms/$roomId/config/m.visibility",
-            { $groupId: groupId, $roomId: roomId },
-        );
-        return this.http.authedRequest(undefined, Method.Put, path, undefined,
-            { type: isPublic ? "public" : "private" },
-        );
-    }
-
-    /**
-     * @param {string} groupId
-     * @param {string} roomId
-     * @return {Promise} Resolves: Empty object
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public removeRoomFromGroup(groupId: string, roomId: string): Promise<any> {
-        const path = utils.encodeUri(
-            "/groups/$groupId/admin/rooms/$roomId",
-            { $groupId: groupId, $roomId: roomId },
-        );
-        return this.http.authedRequest(undefined, Method.Delete, path, undefined, {});
-    }
-
-    /**
-     * @param {string} groupId
-     * @param {Object} opts Additional options to send alongside the acceptance.
-     * @return {Promise} Resolves: Empty object
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public acceptGroupInvite(groupId: string, opts = null): Promise<any> {
-        const path = utils.encodeUri(
-            "/groups/$groupId/self/accept_invite",
-            { $groupId: groupId },
-        );
-        return this.http.authedRequest(undefined, Method.Put, path, undefined, opts || {});
-    }
-
-    /**
-     * @param {string} groupId
-     * @return {Promise} Resolves: Empty object
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public joinGroup(groupId: string): Promise<any> {
-        const path = utils.encodeUri(
-            "/groups/$groupId/self/join",
-            { $groupId: groupId },
-        );
-        return this.http.authedRequest(undefined, Method.Put, path, undefined, {});
-    }
-
-    /**
-     * @param {string} groupId
-     * @return {Promise} Resolves: Empty object
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public leaveGroup(groupId: string): Promise<any> {
-        const path = utils.encodeUri(
-            "/groups/$groupId/self/leave",
-            { $groupId: groupId },
-        );
-        return this.http.authedRequest(undefined, Method.Put, path, undefined, {});
-    }
-
-    /**
-     * @return {Promise} Resolves: The groups to which the user is joined
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public getJoinedGroups(): Promise<any> {
-        const path = utils.encodeUri("/joined_groups", {});
-        return this.http.authedRequest(undefined, Method.Get, path);
-    }
-
-    /**
-     * @param {Object} content Request content
-     * @param {string} content.localpart The local part of the desired group ID
-     * @param {Object} content.profile Group profile object
-     * @return {Promise} Resolves: Object with key group_id: id of the created group
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public createGroup(content: any): Promise<any> {
-        const path = utils.encodeUri("/create_group", {});
-        return this.http.authedRequest(
-            undefined, Method.Post, path, undefined, content,
-        );
-    }
-
-    /**
-     * @param {string[]} userIds List of user IDs
-     * @return {Promise} Resolves: Object as exmaple below
-     *
-     *     {
-     *         "users": {
-     *             "@bob:example.com": {
-     *                 "+example:example.com"
-     *             }
-     *         }
-     *     }
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public getPublicisedGroups(userIds: string[]): Promise<any> {
-        const path = utils.encodeUri("/publicised_groups", {});
-        return this.http.authedRequest(
-            undefined, Method.Post, path, undefined, { user_ids: userIds },
-        );
-    }
-
-    /**
-     * @param {string} groupId
-     * @param {boolean} isPublic Whether the user's membership of this group is made public
-     * @return {Promise} Resolves: Empty object
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public setGroupPublicity(groupId: string, isPublic: boolean): Promise<any> {
-        const path = utils.encodeUri(
-            "/groups/$groupId/self/update_publicity",
-            { $groupId: groupId },
-        );
-        return this.http.authedRequest(undefined, Method.Put, path, undefined, {
-            publicise: isPublic,
-        });
-    }
-
     /**
      * @experimental
      */
@@ -9191,12 +8866,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         const parentEventId = event.getAssociatedId();
-        const parentEvent = room?.findEventById(parentEventId) || events.find((mxEv: MatrixEvent) => (
+        const parentEvent = room?.findEventById(parentEventId) ?? events.find((mxEv: MatrixEvent) => (
             mxEv.getId() === parentEventId
         ));
 
-        // A reaction targetting the thread root needs to be routed to both the
-        // the main timeline and the associated thread
+        // A reaction targeting the thread root needs to be routed to both the main timeline and the associated thread
         const targetingThreadRoot = parentEvent?.isThreadRoot || roots.has(event.relationEventId);
         if (targetingThreadRoot) {
             return {
@@ -9212,18 +8886,21 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // we want that redaction to be pushed to both timeline
         if (parentEvent?.getAssociatedId()) {
             return this.eventShouldLiveIn(parentEvent, room, events, roots);
-        } else {
-            // We've exhausted all scenarios, can safely assume that this event
-            // should live in the room timeline
-            return {
-                shouldLiveInRoom: true,
-                shouldLiveInThread: false,
-            };
         }
+
+        // We've exhausted all scenarios, can safely assume that this event
+        // should live in the room timeline
+        return {
+            shouldLiveInRoom: true,
+            shouldLiveInThread: false,
+        };
     }
 
-    public partitionThreadedEvents(events: MatrixEvent[]): [MatrixEvent[], MatrixEvent[]] {
-        // Indices to the events array, for readibility
+    public partitionThreadedEvents(events: MatrixEvent[]): [
+        timelineEvents: MatrixEvent[],
+        threadedEvents: MatrixEvent[],
+    ] {
+        // Indices to the events array, for readability
         const ROOM = 0;
         const THREAD = 1;
         if (this.supportsExperimentalThreads()) {
@@ -9453,18 +9130,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
  *       var rooms = matrixClient.getRooms();
  *       break;
  *   }
- * });
- */
-
-/**
- * Fires whenever the sdk learns about a new group. <strong>This event
- * is experimental and may change.</strong>
- * @event module:client~MatrixClient#"Group"
- * @param {Group} group The newly created, fully populated group.
- * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
- * @example
- * matrixClient.on("Group", function(group){
- *   var groupId = group.groupId;
  * });
  */
 
