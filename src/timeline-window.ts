@@ -111,20 +111,14 @@ export class TimelineWindow {
                 // we were looking for the live timeline: initialise to the end
                 eventIndex = events.length;
             } else {
-                for (let i = 0; i < events.length; i++) {
-                    if (events[i].getId() == initialEventId) {
-                        eventIndex = i;
-                        break;
-                    }
-                }
+                eventIndex = events.findIndex(e => e.getId() === initialEventId);
 
-                if (eventIndex === undefined) {
+                if (eventIndex < 0) {
                     throw new Error("getEventTimeline result didn't include requested event");
                 }
             }
 
-            const endIndex = Math.min(events.length,
-                eventIndex + Math.ceil(initialWindowSize / 2));
+            const endIndex = Math.min(events.length, eventIndex + Math.ceil(initialWindowSize / 2));
             const startIndex = Math.max(0, endIndex - initialWindowSize);
             this.start = new TimelineIndex(timeline, startIndex - timeline.getBaseIndex());
             this.end = new TimelineIndex(timeline, endIndex - timeline.getBaseIndex());
