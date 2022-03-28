@@ -5241,7 +5241,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         if (timelineSet.getTimelineForEvent(eventId)) {
-            return Promise.resolve(timelineSet.getTimelineForEvent(eventId));
+            return timelineSet.getTimelineForEvent(eventId);
         }
 
         const path = utils.encodeUri(
