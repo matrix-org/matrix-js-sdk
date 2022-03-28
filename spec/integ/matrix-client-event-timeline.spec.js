@@ -116,8 +116,8 @@ describe("getEventTimeline support", function() {
         return startClient(httpBackend, client).then(function() {
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];
-            expect(function() {
-                client.getEventTimeline(timelineSet, "event");
+            expect(async function() {
+                await client.getEventTimeline(timelineSet, "event");
             }).toThrow();
         });
     });
@@ -136,8 +136,8 @@ describe("getEventTimeline support", function() {
         return startClient(httpBackend, client).then(() => {
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];
-            expect(function() {
-                client.getEventTimeline(timelineSet, "event");
+            expect(async function() {
+                await client.getEventTimeline(timelineSet, "event");
             }).not.toThrow();
         });
     });
