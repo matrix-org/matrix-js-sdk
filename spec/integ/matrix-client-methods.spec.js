@@ -284,6 +284,10 @@ describe("MatrixClient", function() {
                 done();
             });
         });
+
+        it("should filter out context from different timelines (threads)", () => {
+
+        });
     });
 
     describe("downloadKeys", function() {
