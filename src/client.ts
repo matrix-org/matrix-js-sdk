@@ -5231,10 +5231,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} eventId  The ID of the event to look for
      *
      * @return {Promise} Resolves:
-     *    {@link module:models/event-timeline~EventTimeline} including the given
-     *    event
+     *    {@link module:models/event-timeline~EventTimeline} including the given event
      */
-    public getEventTimeline(timelineSet: EventTimelineSet, eventId: string): Promise<EventTimeline> {
+    public async getEventTimeline(timelineSet: EventTimelineSet, eventId: string): Promise<EventTimeline> {
         // don't allow any timeline support unless it's been enabled.
         if (!this.timelineSupport) {
             throw new Error("timeline support is disabled. Set the 'timelineSupport'" +
@@ -5258,51 +5257,45 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             params = { filter: JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER) };
         }
 
-        // TODO: we should implement a backoff (as per scrollback()) to deal more
-        // nicely with HTTP errors.
-        const promise = this.http.authedRequest<any>(undefined, Method.Get, path, params).then(async (res) => { // TODO types
-            if (!res.event) {
-                throw new Error("'event' not in '/context' result - homeserver too old?");
-            }
+        // TODO: we should implement a backoff (as per scrollback()) to deal more nicely with HTTP errors.
+        const res = await this.http.authedRequest<any>(undefined, Method.Get, path, params); // TODO types
+        if (!res.event) {
+            throw new Error("'event' not in '/context' result - homeserver too old?");
+        }
 
-            // by the time the request completes, the event might have ended up in
-            // the timeline.
-            if (timelineSet.getTimelineForEvent(eventId)) {
-                return timelineSet.getTimelineForEvent(eventId);
-            }
+        // by the time the request completes, the event might have ended up in the timeline.
+        if (timelineSet.getTimelineForEvent(eventId)) {
+            return timelineSet.getTimelineForEvent(eventId);
+        }
 
-            // we start with the last event, since that's the point at which we
-            // have known state.
-            // events_after is already backwards; events_before is forwards.
-            res.events_after.reverse();
-            const events = res.events_after
-                .concat([res.event])
-                .concat(res.events_before);
-            const matrixEvents = events.map(this.getEventMapper());
+        // we start with the last event, since that's the point at which we have known state.
+        // events_after is already backwards; events_before is forwards.
+        res.events_after.reverse();
+        const events = res.events_after
+            .concat([res.event])
+            .concat(res.events_before);
+        const matrixEvents = events.map(this.getEventMapper());
 
-            let timeline = timelineSet.getTimelineForEvent(matrixEvents[0].getId());
-            if (!timeline) {
-                timeline = timelineSet.addTimeline();
-                timeline.initialiseState(res.state.map(this.getEventMapper()));
-                timeline.getState(EventTimeline.FORWARDS).paginationToken = res.end;
-            } else {
-                const stateEvents = res.state.map(this.getEventMapper());
-                timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(stateEvents);
-            }
+        let timeline = timelineSet.getTimelineForEvent(matrixEvents[0].getId());
+        if (!timeline) {
+            timeline = timelineSet.addTimeline();
+            timeline.initialiseState(res.state.map(this.getEventMapper()));
+            timeline.getState(EventTimeline.FORWARDS).paginationToken = res.end;
+        } else {
+            const stateEvents = res.state.map(this.getEventMapper());
+            timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(stateEvents);
+        }
 
-            const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(matrixEvents);
+        const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(matrixEvents);
 
-            timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
-            await this.processThreadEvents(timelineSet.room, threadedEvents, true);
+        timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
+        await this.processThreadEvents(timelineSet.room, threadedEvents, true);
 
-            // there is no guarantee that the event ended up in "timeline" (we
-            // might have switched to a neighbouring timeline) - so check the
-            // room's index again. On the other hand, there's no guarantee the
-            // event ended up anywhere, if it was later redacted, so we just
-            // return the timeline we first thought of.
-            return timelineSet.getTimelineForEvent(eventId) || timeline;
-        });
-        return promise;
+        // There is no guarantee that the event ended up in "timeline" (we might have switched to a neighbouring
+        // timeline) - so check the room's index again. On the other hand, there's no guarantee the event ended up
+        // anywhere, if it was later redacted, so we just return the timeline we first thought of.
+        return timelineSet.getTimelineForEvent(eventId)
+            ?? timeline;
     }
 
     /**

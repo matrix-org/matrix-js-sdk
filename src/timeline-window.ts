@@ -99,11 +99,11 @@ export class TimelineWindow {
      *
      * @return {Promise}
      */
-    public load(initialEventId?: string, initialWindowSize = 20): Promise<any> {
+    public load(initialEventId?: string, initialWindowSize = 20): Promise<void> {
         // given an EventTimeline, find the event we were looking for, and initialise our
         // fields so that the event in question is in the middle of the window.
         const initFields = (timeline: EventTimeline) => {
-            let eventIndex;
+            let eventIndex: number;
 
             const events = timeline.getEvents();
 
@@ -131,20 +131,17 @@ export class TimelineWindow {
             this.eventCount = endIndex - startIndex;
         };
 
-        // We avoid delaying the resolution of the promise by a reactor tick if
-        // we already have the data we need, which is important to keep room-switching
-        // feeling snappy.
-        //
+        // We avoid delaying the resolution of the promise by a reactor tick if we already have the data we need,
+        // which is important to keep room-switching feeling snappy.
         if (initialEventId) {
             const timeline = this.timelineSet.getTimelineForEvent(initialEventId);
             if (timeline) {
                 // hot-path optimization to save a reactor tick by replicating the sync check getTimelineForEvent does.
                 initFields(timeline);
-                return Promise.resolve(timeline);
+                return Promise.resolve();
             }
 
-            const prom = this.client.getEventTimeline(this.timelineSet, initialEventId);
-            return prom.then(initFields);
+            return this.client.getEventTimeline(this.timelineSet, initialEventId).then(initFields);
         } else {
             const tl = this.timelineSet.getLiveTimeline();
             initFields(tl);
