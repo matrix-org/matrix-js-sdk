@@ -458,6 +458,21 @@ export class SlidingSyncSdk {
             }
         }
 
+        if (roomData.invite_state) {
+            const inviteStateEvents = mapEvents(this.client, room.roomId, roomData.invite_state);
+            this.processRoomEvents(room, inviteStateEvents);
+            if (roomData.initial) {
+                room.recalculate();
+                this.client.store.storeRoom(room);
+                this.client.emit(ClientEvent.Room, room);
+            }
+            inviteStateEvents.forEach((e) => {
+                this.client.emit(ClientEvent.Event, e);
+            });
+            room.updateMyMembership("invite");
+            return;
+        }
+
         const prevBatch = null; //"prev_batch_token_TODO";
         if (roomData.initial) {
             // set the back-pagination token. Do this *before* adding any
