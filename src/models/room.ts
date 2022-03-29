@@ -1448,14 +1448,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                     pendingEvents: false,
                 },
             );
-
-            // An empty pagination token allows to paginate from the very bottom of
-            // the timeline set.
-            // Right now we completely by-pass the pagination to be able to order
-            // the events by last reply to a thread
-            // Once the server can help us with that, we should uncomment the line
-            // below
-            // timelineSet.getLiveTimeline().setPaginationToken("", EventTimeline.BACKWARDS);
         } else {
             timelineSet = new EventTimelineSet(this, {
                 pendingEvents: false,
@@ -1493,7 +1485,10 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             allThreadsFilter,
         );
 
-        const orderedByLastReplyEvents = events
+        if (!events.length) return;
+
+        // Sorted by last_reply origin_server_ts
+        const threadRoots = events
             .map(this.client.getEventMapper())
             .sort((eventA, eventB) => {
                 /**
@@ -1509,32 +1504,37 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 return threadAMetadata.latest_event.origin_server_ts - threadBMetadata.latest_event.origin_server_ts;
             });
 
-        const myThreads = orderedByLastReplyEvents.filter(event => {
-            const threadRelationship = event
-                .getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
-            return threadRelationship.current_user_participated;
-        });
-
+        let latestMyThreadsRootEvent: MatrixEvent;
         const roomState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
-        for (const event of orderedByLastReplyEvents) {
+        for (const rootEvent of threadRoots) {
             this.threadsTimelineSets[0].addLiveEvent(
-                event,
+                rootEvent,
                 DuplicateStrategy.Ignore,
                 false,
                 roomState,
             );
-        }
-        for (const event of myThreads) {
-            this.threadsTimelineSets[1].addLiveEvent(
-                event,
-                DuplicateStrategy.Ignore,
-                false,
-                roomState,
-            );
+
+            const threadRelationship = rootEvent
+                .getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
+            if (threadRelationship.current_user_participated) {
+                this.threadsTimelineSets[1].addLiveEvent(
+                    rootEvent,
+                    DuplicateStrategy.Ignore,
+                    false,
+                    roomState,
+                );
+                latestMyThreadsRootEvent = rootEvent;
+            }
+
+            if (!this.getThread(rootEvent.getId())) {
+                this.createThread(rootEvent, [], true);
+            }
         }
 
-        this.client.decryptEventIfNeeded(orderedByLastReplyEvents[orderedByLastReplyEvents.length -1]);
-        this.client.decryptEventIfNeeded(myThreads[myThreads.length -1]);
+        this.client.decryptEventIfNeeded(threadRoots[threadRoots.length -1]);
+        if (latestMyThreadsRootEvent) {
+            this.client.decryptEventIfNeeded(latestMyThreadsRootEvent);
+        }
 
         this.threadsReady = true;
 
