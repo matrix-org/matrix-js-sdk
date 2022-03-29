@@ -2,6 +2,7 @@ import * as utils from "../test-utils/test-utils";
 import { EventTimeline } from "../../src/matrix";
 import { logger } from "../../src/logger";
 import { TestClient } from "../TestClient";
+import { Thread, THREAD_RELATION_TYPE } from "../../src/models/thread";
 
 const userId = "@alice:localhost";
 const userName = "Alice";
@@ -69,6 +70,27 @@ const EVENTS = [
     }),
 ];
 
+const THREAD_ROOT = utils.mkMessage({
+    room: roomId,
+    user: userId,
+    msg: "thread root",
+});
+
+const THREAD_REPLY = utils.mkEvent({
+    room: roomId,
+    user: userId,
+    type: "m.room.message",
+    content: {
+        "body": "thread reply",
+        "msgtype": "m.text",
+        "m.relates_to": {
+            // We can't use the const here because we change server support mode for test
+            rel_type: "io.element.thread",
+            event_id: THREAD_ROOT.event_id,
+        },
+    },
+});
+
 // start the client, and wait for it to initialise
 function startClient(httpBackend, client) {
     httpBackend.when("GET", "/versions").respond(200, {});
@@ -116,9 +138,7 @@ describe("getEventTimeline support", function() {
         return startClient(httpBackend, client).then(function() {
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];
-            expect(function() {
-                client.getEventTimeline(timelineSet, "event");
-            }).toThrow();
+            expect(client.getEventTimeline(timelineSet, "event")).rejects.toBeTruthy();
         });
     });
 
@@ -136,16 +156,12 @@ describe("getEventTimeline support", function() {
         return startClient(httpBackend, client).then(() => {
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];
-            expect(function() {
-                client.getEventTimeline(timelineSet, "event");
-            }).not.toThrow();
+            expect(client.getEventTimeline(timelineSet, "event")).rejects.toBeFalsy();
         });
     });
 
-    it("scrollback should be able to scroll back to before a gappy /sync",
-      function() {
+    it("scrollback should be able to scroll back to before a gappy /sync", function() {
         // need a client with timelineSupport disabled to make this work
-
         let room;
 
         return startClient(httpBackend, client).then(function() {
@@ -229,6 +245,7 @@ describe("MatrixClient event timelines", function() {
     afterEach(function() {
         httpBackend.verifyNoOutstandingExpectation();
         client.stopClient();
+        Thread.setServerSideSupport(false);
     });
 
     describe("getEventTimeline", function() {
@@ -355,8 +372,7 @@ describe("MatrixClient event timelines", function() {
             ]);
         });
 
-        it("should join timelines where they overlap a previous /context",
-          function() {
+        it("should join timelines where they overlap a previous /context", function() {
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];
 
@@ -477,6 +493,50 @@ describe("MatrixClient event timelines", function() {
                 }),
                 httpBackend.flushAllExpected(),
             ]);
+        });
+
+        it("should handle thread replies with server support by fetching a contiguous thread timeline", async () => {
+            Thread.setServerSideSupport(true);
+            client.stopClient(); // we don't need the client to be syncing at this time
+            const room = client.getRoom(roomId);
+            const timelineSet = room.getTimelineSets()[0];
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_REPLY.event_id))
+                .respond(200, function() {
+                    return {
+                        start: "start_token0",
+                        events_before: [],
+                        event: THREAD_REPLY,
+                        events_after: [],
+                        end: "end_token0",
+                        state: [],
+                    };
+                });
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id))
+                .respond(200, function() {
+                    return THREAD_ROOT;
+                });
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
+                encodeURIComponent(THREAD_ROOT.event_id) + "/" +
+                encodeURIComponent(THREAD_RELATION_TYPE.name) + "?limit=20")
+                .respond(200, function() {
+                    return {
+                        original_event: THREAD_ROOT,
+                        chunk: [THREAD_REPLY],
+                        next_batch: "next_batch_token0",
+                        prev_batch: "prev_batch_token0",
+                    };
+                });
+
+            const timelinePromise = client.getEventTimeline(timelineSet, THREAD_REPLY.event_id);
+            await httpBackend.flushAllExpected();
+
+            const timeline = await timelinePromise;
+
+            expect(timeline.getEvents().find(e => e.getId() === THREAD_ROOT.event_id));
+            expect(timeline.getEvents().find(e => e.getId() === THREAD_REPLY.event_id));
         });
     });
 

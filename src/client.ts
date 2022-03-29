@@ -5231,19 +5231,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} eventId  The ID of the event to look for
      *
      * @return {Promise} Resolves:
-     *    {@link module:models/event-timeline~EventTimeline} including the given
-     *    event
+     *    {@link module:models/event-timeline~EventTimeline} including the given event
      */
-    public getEventTimeline(timelineSet: EventTimelineSet, eventId: string): Promise<EventTimeline> {
+    public async getEventTimeline(timelineSet: EventTimelineSet, eventId: string): Promise<EventTimeline> {
         // don't allow any timeline support unless it's been enabled.
         if (!this.timelineSupport) {
             throw new Error("timeline support is disabled. Set the 'timelineSupport'" +
-                " parameter to true when creating MatrixClient to enable" +
-                " it.");
+                " parameter to true when creating MatrixClient to enable it.");
         }
 
         if (timelineSet.getTimelineForEvent(eventId)) {
-            return Promise.resolve(timelineSet.getTimelineForEvent(eventId));
+            return timelineSet.getTimelineForEvent(eventId);
         }
 
         const path = utils.encodeUri(
@@ -5253,56 +5251,82 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             },
         );
 
-        let params = undefined;
+        let params: Record<string, string | string[]> = undefined;
         if (this.clientOpts.lazyLoadMembers) {
             params = { filter: JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER) };
         }
 
-        // TODO: we should implement a backoff (as per scrollback()) to deal more
-        // nicely with HTTP errors.
-        const promise = this.http.authedRequest<any>(undefined, Method.Get, path, params).then(async (res) => { // TODO types
-            if (!res.event) {
-                throw new Error("'event' not in '/context' result - homeserver too old?");
-            }
+        // TODO: we should implement a backoff (as per scrollback()) to deal more nicely with HTTP errors.
+        const res = await this.http.authedRequest<any>(undefined, Method.Get, path, params); // TODO types
+        if (!res.event) {
+            throw new Error("'event' not in '/context' result - homeserver too old?");
+        }
 
-            // by the time the request completes, the event might have ended up in
-            // the timeline.
-            if (timelineSet.getTimelineForEvent(eventId)) {
-                return timelineSet.getTimelineForEvent(eventId);
-            }
+        // by the time the request completes, the event might have ended up in the timeline.
+        if (timelineSet.getTimelineForEvent(eventId)) {
+            return timelineSet.getTimelineForEvent(eventId);
+        }
 
-            // we start with the last event, since that's the point at which we
-            // have known state.
+        const mapper = this.getEventMapper();
+        const event = mapper(res.event);
+        const events = [
+            // we start with the last event, since that's the point at which we have known state.
             // events_after is already backwards; events_before is forwards.
-            res.events_after.reverse();
-            const events = res.events_after
-                .concat([res.event])
-                .concat(res.events_before);
-            const matrixEvents = events.map(this.getEventMapper());
+            ...res.events_after.reverse().map(mapper),
+            event,
+            ...res.events_before.map(mapper),
+        ];
 
-            let timeline = timelineSet.getTimelineForEvent(matrixEvents[0].getId());
-            if (!timeline) {
-                timeline = timelineSet.addTimeline();
-                timeline.initialiseState(res.state.map(this.getEventMapper()));
-                timeline.getState(EventTimeline.FORWARDS).paginationToken = res.end;
-            } else {
-                const stateEvents = res.state.map(this.getEventMapper());
-                timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(stateEvents);
+        // Where the event is a thread reply (not a root) and running in MSC-enabled mode the Thread timeline only
+        // functions contiguously, so we have to jump through some hoops to get our target event in it.
+        // XXX: workaround for https://github.com/vector-im/element-meta/issues/150
+        if (Thread.hasServerSideSupport && event.isRelation(THREAD_RELATION_TYPE.name)) {
+            const [, threadedEvents] = this.partitionThreadedEvents(events);
+            const thread = await timelineSet.room.createThreadFetchRoot(event.threadRootId, threadedEvents, true);
+
+            let nextBatch: string;
+            const response = await thread.fetchInitialEvents();
+            if (response?.nextBatch) {
+                nextBatch = response.nextBatch;
             }
 
-            const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(matrixEvents);
+            const opts: IRelationsRequestOpts = {
+                limit: 50,
+            };
 
-            timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
-            await this.processThreadEvents(timelineSet.room, threadedEvents, true);
+            // Fetch events until we find the one we were asked for
+            while (!thread.findEventById(eventId)) {
+                if (nextBatch) {
+                    opts.from = nextBatch;
+                }
 
-            // there is no guarantee that the event ended up in "timeline" (we
-            // might have switched to a neighbouring timeline) - so check the
-            // room's index again. On the other hand, there's no guarantee the
-            // event ended up anywhere, if it was later redacted, so we just
-            // return the timeline we first thought of.
-            return timelineSet.getTimelineForEvent(eventId) || timeline;
-        });
-        return promise;
+                ({ nextBatch } = await thread.fetchEvents(opts));
+            }
+
+            return thread.liveTimeline;
+        }
+
+        // Here we handle non-thread timelines only, but still process any thread events to populate thread summaries.
+        let timeline = timelineSet.getTimelineForEvent(events[0].getId());
+        if (timeline) {
+            timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(res.state.map(mapper));
+        } else {
+            timeline = timelineSet.addTimeline();
+            timeline.initialiseState(res.state.map(mapper));
+            timeline.getState(EventTimeline.FORWARDS).paginationToken = res.end;
+        }
+
+        const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(events);
+        timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
+        // The target event is not in a thread but process the contextual events, so we can show any threads around it.
+        await this.processThreadEvents(timelineSet.room, threadedEvents, true);
+
+        // There is no guarantee that the event ended up in "timeline" (we might have switched to a neighbouring
+        // timeline) - so check the room's index again. On the other hand, there's no guarantee the event ended up
+        // anywhere, if it was later redacted, so we just return the timeline we first thought of.
+        return timelineSet.getTimelineForEvent(eventId)
+            ?? timelineSet.room.findThreadForEvent(event)?.liveTimeline // for Threads degraded support
+            ?? timeline;
     }
 
     /**
@@ -6026,10 +6050,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // turn it back into a list.
         searchResults.highlights = Array.from(highlights);
 
+        const mapper = this.getEventMapper();
+
         // append the new results to our existing results
-        const resultsLength = roomEvents.results ? roomEvents.results.length : 0;
+        const resultsLength = roomEvents.results?.length ?? 0;
         for (let i = 0; i < resultsLength; i++) {
-            const sr = SearchResult.fromJson(roomEvents.results[i], this.getEventMapper());
+            const sr = SearchResult.fromJson(roomEvents.results[i], mapper);
             const room = this.getRoom(sr.context.getEvent().getRoomId());
             if (room) {
                 // Copy over a known event sender if we can

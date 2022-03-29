@@ -165,12 +165,12 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             this.addEventToTimeline(event, toStartOfTimeline);
 
             await this.client.decryptEventIfNeeded(event, {});
-        } else {
+        } else if (!toStartOfTimeline &&
+            this.initialEventsFetched &&
+            event.localTimestamp > this.lastReply().localTimestamp
+        ) {
             await this.fetchEditsWhereNeeded(event);
-
-            if (this.initialEventsFetched && event.localTimestamp > this.lastReply().localTimestamp) {
-                this.addEventToTimeline(event, false);
-            }
+            this.addEventToTimeline(event, false);
         }
 
         if (!this._currentUserParticipated && event.getSender() === this.client.getUserId()) {

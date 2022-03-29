@@ -3,6 +3,7 @@ import { CRYPTO_ENABLED } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
 import { Filter, MemoryStore, Room } from "../../src/matrix";
 import { TestClient } from "../TestClient";
+import { THREAD_RELATION_TYPE } from "../../src/models/thread";
 
 describe("MatrixClient", function() {
     let client = null;
@@ -14,9 +15,7 @@ describe("MatrixClient", function() {
     beforeEach(function() {
         store = new MemoryStore();
 
-        const testClient = new TestClient(userId, "aliceDevice", accessToken, undefined, {
-            store: store,
-        });
+        const testClient = new TestClient(userId, "aliceDevice", accessToken, undefined, { store });
         httpBackend = testClient.httpBackend;
         client = testClient.client;
     });
@@ -244,14 +243,15 @@ describe("MatrixClient", function() {
     });
 
     describe("searching", function() {
-        const response = {
-            search_categories: {
-                room_events: {
-                    count: 24,
-                    results: {
-                        "$flibble:localhost": {
+        it("searchMessageText should perform a /search for room_events", function() {
+            const response = {
+                search_categories: {
+                    room_events: {
+                        count: 24,
+                        results: [{
                             rank: 0.1,
                             result: {
+                                event_id: "$flibble:localhost",
                                 type: "m.room.message",
                                 user_id: "@alice:localhost",
                                 room_id: "!feuiwhf:localhost",
@@ -260,13 +260,11 @@ describe("MatrixClient", function() {
                                     msgtype: "m.text",
                                 },
                             },
-                        },
+                        }],
                     },
                 },
-            },
-        };
+            };
 
-        it("searchMessageText should perform a /search for room_events", function(done) {
             client.searchMessageText({
                 query: "monkeys",
             });
@@ -280,8 +278,171 @@ describe("MatrixClient", function() {
                 });
             }).respond(200, response);
 
-            httpBackend.flush().then(function() {
-                done();
+            return httpBackend.flush();
+        });
+
+        describe("should filter out context from different timelines (threads)", () => {
+            it("filters out thread replies when result is in the main timeline", async () => {
+                const response = {
+                    search_categories: {
+                        room_events: {
+                            count: 24,
+                            results: [{
+                                rank: 0.1,
+                                result: {
+                                    event_id: "$flibble:localhost",
+                                    type: "m.room.message",
+                                    user_id: "@alice:localhost",
+                                    room_id: "!feuiwhf:localhost",
+                                    content: {
+                                        body: "main timeline",
+                                        msgtype: "m.text",
+                                    },
+                                },
+                                context: {
+                                    events_after: [{
+                                        event_id: "$ev-after:server",
+                                        type: "m.room.message",
+                                        user_id: "@alice:localhost",
+                                        room_id: "!feuiwhf:localhost",
+                                        content: {
+                                            "body": "thread reply",
+                                            "msgtype": "m.text",
+                                            "m.relates_to": {
+                                                "event_id": "$some-thread:server",
+                                                "rel_type": THREAD_RELATION_TYPE.name,
+                                            },
+                                        },
+                                    }],
+                                    events_before: [{
+                                        event_id: "$ev-before:server",
+                                        type: "m.room.message",
+                                        user_id: "@alice:localhost",
+                                        room_id: "!feuiwhf:localhost",
+                                        content: {
+                                            body: "main timeline again",
+                                            msgtype: "m.text",
+                                        },
+                                    }],
+                                },
+                            }],
+                        },
+                    },
+                };
+
+                const data = {
+                    results: [],
+                    highlights: [],
+                };
+                client.processRoomEventsSearch(data, response);
+
+                expect(data.results).toHaveLength(1);
+                expect(data.results[0].context.timeline).toHaveLength(2);
+                expect(data.results[0].context.timeline.find(e => e.getId() === "$ev-after:server")).toBeFalsy();
+            });
+
+            it("filters out thread replies from threads other than the thread the result replied to", () => {
+                const response = {
+                    search_categories: {
+                        room_events: {
+                            count: 24,
+                            results: [{
+                                rank: 0.1,
+                                result: {
+                                    event_id: "$flibble:localhost",
+                                    type: "m.room.message",
+                                    user_id: "@alice:localhost",
+                                    room_id: "!feuiwhf:localhost",
+                                    content: {
+                                        "body": "thread 1 reply 1",
+                                        "msgtype": "m.text",
+                                        "m.relates_to": {
+                                            "event_id": "$thread1:server",
+                                            "rel_type": THREAD_RELATION_TYPE.name,
+                                        },
+                                    },
+                                },
+                                context: {
+                                    events_after: [{
+                                        event_id: "$ev-after:server",
+                                        type: "m.room.message",
+                                        user_id: "@alice:localhost",
+                                        room_id: "!feuiwhf:localhost",
+                                        content: {
+                                            "body": "thread 2 reply 2",
+                                            "msgtype": "m.text",
+                                            "m.relates_to": {
+                                                "event_id": "$thread2:server",
+                                                "rel_type": THREAD_RELATION_TYPE.name,
+                                            },
+                                        },
+                                    }],
+                                    events_before: [],
+                                },
+                            }],
+                        },
+                    },
+                };
+
+                const data = {
+                    results: [],
+                    highlights: [],
+                };
+                client.processRoomEventsSearch(data, response);
+
+                expect(data.results).toHaveLength(1);
+                expect(data.results[0].context.timeline).toHaveLength(1);
+                expect(data.results[0].context.timeline.find(e => e.getId() === "$flibble:localhost")).toBeTruthy();
+            });
+
+            it("filters out main timeline events when result is a thread reply", () => {
+                const response = {
+                    search_categories: {
+                        room_events: {
+                            count: 24,
+                            results: [{
+                                rank: 0.1,
+                                result: {
+                                    event_id: "$flibble:localhost",
+                                    type: "m.room.message",
+                                    user_id: "@alice:localhost",
+                                    room_id: "!feuiwhf:localhost",
+                                    content: {
+                                        "body": "thread 1 reply 1",
+                                        "msgtype": "m.text",
+                                        "m.relates_to": {
+                                            "event_id": "$thread1:server",
+                                            "rel_type": THREAD_RELATION_TYPE.name,
+                                        },
+                                    },
+                                },
+                                context: {
+                                    events_after: [{
+                                        event_id: "$ev-after:server",
+                                        type: "m.room.message",
+                                        user_id: "@alice:localhost",
+                                        room_id: "!feuiwhf:localhost",
+                                        content: {
+                                            "body": "main timeline",
+                                            "msgtype": "m.text",
+                                        },
+                                    }],
+                                    events_before: [],
+                                },
+                            }],
+                        },
+                    },
+                };
+
+                const data = {
+                    results: [],
+                    highlights: [],
+                };
+                client.processRoomEventsSearch(data, response);
+
+                expect(data.results).toHaveLength(1);
+                expect(data.results[0].context.timeline).toHaveLength(1);
+                expect(data.results[0].context.timeline.find(e => e.getId() === "$flibble:localhost")).toBeTruthy();
             });
         });
     });

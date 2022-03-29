@@ -48,7 +48,6 @@ import {
 } from "./thread";
 import { Method } from "../http-api";
 import { TypedEventEmitter } from "./typed-event-emitter";
-import { IMinimalEvent } from "../sync-accumulator";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -1578,24 +1577,18 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
     }
 
-    /**
-     * Add an event to a thread's timeline. Will fire "Thread.update"
-     * @experimental
-     */
-    public async addThreadedEvent(event: MatrixEvent, toStartOfTimeline: boolean): Promise<void> {
-        this.applyRedaction(event);
-        let thread = this.findThreadForEvent(event);
-        if (thread) {
-            thread.addEvent(event, toStartOfTimeline);
-        } else {
-            const events = [event];
-            let rootEvent = this.findEventById(event.threadRootId);
-            // If the rootEvent does not exist in the current sync, then look for it over the network.
+    public async createThreadFetchRoot(
+        threadId: string,
+        events?: MatrixEvent[],
+        toStartOfTimeline?: boolean,
+    ): Promise<Thread> {
+        let thread = this.getThread(threadId);
+
+        if (!thread) {
+            let rootEvent = this.findEventById(threadId);
+            // If the rootEvent does not exist in the local stores, then fetch it from the server.
             try {
-                let eventData: IMinimalEvent;
-                if (event.threadRootId) {
-                    eventData = await this.client.fetchRoomEvent(this.roomId, event.threadRootId);
-                }
+                const eventData = await this.client.fetchRoomEvent(this.roomId, threadId);
 
                 if (!rootEvent) {
                     rootEvent = new MatrixEvent(eventData);
@@ -1611,6 +1604,22 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                     rootEvent.setThread(thread);
                 }
             }
+        }
+
+        return thread;
+    }
+
+    /**
+     * Add an event to a thread's timeline. Will fire "Thread.update"
+     * @experimental
+     */
+    public async addThreadedEvent(event: MatrixEvent, toStartOfTimeline: boolean): Promise<void> {
+        this.applyRedaction(event);
+        let thread = this.findThreadForEvent(event);
+        if (thread) {
+            await thread.addEvent(event, toStartOfTimeline);
+        } else {
+            thread = await this.createThreadFetchRoot(event.threadRootId, [event], toStartOfTimeline);
         }
 
         this.emit(ThreadEvent.Update, thread);
@@ -1634,8 +1643,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             room: this,
             client: this.client,
         });
-        // If we managed to create a thread and figure out its `id`
-        // then we can use it
+        // If we managed to create a thread and figure out its `id` then we can use it
         if (thread.id) {
             this.threads.set(thread.id, thread);
             this.reEmitter.reEmit(thread, [
