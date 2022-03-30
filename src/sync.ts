@@ -310,6 +310,7 @@ export class SyncApi {
                 client.emit(ClientEvent.Room, room);
 
                 this.processEventsForNotifs(room, events);
+                return room;
             }));
         });
     }
