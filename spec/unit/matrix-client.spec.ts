@@ -32,6 +32,7 @@ import { Preset } from "../../src/@types/partials";
 import * as testUtils from "../test-utils/test-utils";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
+import { Room } from "../../src";
 
 jest.useFakeTimers();
 
@@ -957,6 +958,7 @@ describe("MatrixClient", function() {
         it("partitions root events to room timeline and thread timeline", () => {
             const supportsExperimentalThreads = client.supportsExperimentalThreads;
             client.supportsExperimentalThreads = () => true;
+            client.getRoom = (roomId: string) => new Room(roomId, client, userId);
 
             const rootEvent = new MatrixEvent({
                 "content": {},
