@@ -276,15 +276,13 @@ export class SyncApi {
             return client.http.authedRequest<any>( // TODO types
                 undefined, Method.Get, "/sync", qps as any, undefined, localTimeoutMs,
             );
-        }).then((data) => {
+        }).then(async (data) => {
             let leaveRooms = [];
             if (data.rooms?.leave) {
                 leaveRooms = this.mapSyncResponseToRoomArray(data.rooms.leave);
             }
-            const rooms = [];
-            leaveRooms.forEach(async (leaveObj) => {
+            return Promise.all(leaveRooms.map(async (leaveObj) => {
                 const room = leaveObj.room;
-                rooms.push(room);
                 if (!leaveObj.isBrandNewRoom) {
                     // the intention behind syncLeftRooms is to add in rooms which were
                     // *omitted* from the initial /sync. Rooms the user were joined to
@@ -303,8 +301,7 @@ export class SyncApi {
 
                 // set the back-pagination token. Do this *before* adding any
                 // events so that clients can start back-paginating.
-                room.getLiveTimeline().setPaginationToken(leaveObj.timeline.prev_batch,
-                    EventTimeline.BACKWARDS);
+                room.getLiveTimeline().setPaginationToken(leaveObj.timeline.prev_batch, EventTimeline.BACKWARDS);
 
                 await this.processRoomEvents(room, stateEvents, events);
 
@@ -313,8 +310,7 @@ export class SyncApi {
                 client.emit(ClientEvent.Room, room);
 
                 this.processEventsForNotifs(room, events);
-            });
-            return rooms;
+            }));
         });
     }
 

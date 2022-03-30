@@ -735,8 +735,7 @@ describe("MatrixClient syncing", function() {
                     expect(tok).toEqual("pagTok");
                 }),
 
-                // first flush the filter request; this will make syncLeftRooms
-                // make its /sync call
+                // first flush the filter request; this will make syncLeftRooms make its /sync call
                 httpBackend.flush("/filter").then(function() {
                     return httpBackend.flushAllExpected();
                 }),
