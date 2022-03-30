@@ -8868,59 +8868,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return threadRoots;
     }
 
-    private eventShouldLiveIn(event: MatrixEvent, room: Room, events: MatrixEvent[], roots: Set<string>): {
-        shouldLiveInRoom: boolean;
-        shouldLiveInThread: boolean;
-        threadId?: string;
-    } {
-        if (event.isThreadRoot || roots.has(event.getId())) {
-            return {
-                shouldLiveInRoom: true,
-                shouldLiveInThread: true,
-                threadId: event.getId(),
-            };
-        }
-
-        // A thread relation is always only shown in a thread
-        if (event.isThreadRelation) {
-            return {
-                shouldLiveInRoom: false,
-                shouldLiveInThread: true,
-                threadId: event.relationEventId,
-            };
-        }
-
-        const parentEventId = event.getAssociatedId();
-        const parentEvent = room?.findEventById(parentEventId) ?? events.find((mxEv: MatrixEvent) => (
-            mxEv.getId() === parentEventId
-        ));
-
-        // A reaction targeting the thread root needs to be routed to both the main timeline and the associated thread
-        const targetingThreadRoot = parentEvent?.isThreadRoot || roots.has(event.relationEventId);
-        if (targetingThreadRoot) {
-            return {
-                shouldLiveInRoom: true,
-                shouldLiveInThread: true,
-                threadId: event.relationEventId,
-            };
-        }
-
-        // If the parent event also has an associated ID we want to re-run the
-        // computation for that parent event.
-        // In the case of the redaction of a reaction that targets a root event
-        // we want that redaction to be pushed to both timeline
-        if (parentEvent?.getAssociatedId()) {
-            return this.eventShouldLiveIn(parentEvent, room, events, roots);
-        }
-
-        // We've exhausted all scenarios, can safely assume that this event
-        // should live in the room timeline
-        return {
-            shouldLiveInRoom: true,
-            shouldLiveInThread: false,
-        };
-    }
-
     public partitionThreadedEvents(events: MatrixEvent[]): [
         timelineEvents: MatrixEvent[],
         threadedEvents: MatrixEvent[],
@@ -8931,13 +8878,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (this.supportsExperimentalThreads()) {
             const threadRoots = this.findThreadRoots(events);
             return events.reduce((memo, event: MatrixEvent) => {
-                const room = this.getRoom(event.getRoomId());
-
                 const {
                     shouldLiveInRoom,
                     shouldLiveInThread,
                     threadId,
-                } = this.eventShouldLiveIn(event, room, events, threadRoots);
+                } = this.getRoom(event.getRoomId()).eventShouldLiveIn(event, events, threadRoots);
 
                 if (shouldLiveInRoom) {
                     memo[ROOM].push(event);

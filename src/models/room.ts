@@ -1562,19 +1562,68 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
     }
 
-    public findThreadForEvent(event: MatrixEvent): Thread | null {
-        if (!event) {
-            return null;
+    public eventShouldLiveIn(event: MatrixEvent, events?: MatrixEvent[], roots?: Set<string>): {
+        shouldLiveInRoom: boolean;
+        shouldLiveInThread: boolean;
+        threadId?: string;
+    } {
+        // A thread root is always shown in both timelines
+        if (event.isThreadRoot || roots?.has(event.getId())) {
+            return {
+                shouldLiveInRoom: true,
+                shouldLiveInThread: true,
+                threadId: event.getId(),
+            };
         }
 
+        // A thread relation is always only shown in a thread
         if (event.isThreadRelation) {
-            return this.threads.get(event.threadRootId);
-        } else if (event.isThreadRoot) {
-            return this.threads.get(event.getId());
-        } else {
-            const parentEvent = this.findEventById(event.getAssociatedId());
-            return this.findThreadForEvent(parentEvent);
+            return {
+                shouldLiveInRoom: false,
+                shouldLiveInThread: true,
+                threadId: event.relationEventId,
+            };
         }
+
+        const parentEventId = event.getAssociatedId();
+        const parentEvent = this.findEventById(parentEventId) ?? events?.find(e => e.getId() === parentEventId);
+
+        // Treat relations and redactions as extensions of their parents so evaluate parentEvent instead
+        if (parentEvent && (event.isRelation() || event.isRedaction())) {
+            return this.eventShouldLiveIn(parentEvent, events, roots);
+        }
+
+        // Edge case where we know the event is a relation but don't have the parentEvent
+        if (roots?.has(event.relationEventId)) {
+            return {
+                shouldLiveInRoom: true,
+                shouldLiveInThread: true,
+                threadId: event.relationEventId,
+            };
+        }
+
+        // A reply directly to a thread response is shown as part of the thread only, this is to provide a better
+        // experience when communicating with users using clients without full threads support
+        if (parentEvent?.isThreadRelation) {
+            return {
+                shouldLiveInRoom: false,
+                shouldLiveInThread: true,
+                threadId: parentEventId,
+            };
+        }
+
+        // We've exhausted all scenarios, can safely assume that this event should live in the room timeline only
+        return {
+            shouldLiveInRoom: true,
+            shouldLiveInThread: false,
+        };
+    }
+
+    public findThreadForEvent(event?: MatrixEvent): Thread | null {
+        if (!event) return null;
+
+        const { threadId } = this.eventShouldLiveIn(event);
+        return threadId ? this.getThread(threadId) : null;
     }
 
     public async createThreadFetchRoot(
@@ -1895,14 +1944,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
     }
 
-    private shouldAddEventToMainTimeline(thread: Thread, event: MatrixEvent): boolean {
-        if (!thread) {
-            return true;
-        }
-
-        return !event.isThreadRelation && thread.id === event.getAssociatedId();
-    }
-
     /**
      * Used to aggregate the local echo for a relation, and also
      * for re-applying a relation after it's redaction has been cancelled,
@@ -1914,10 +1955,11 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @param {module:models/event.MatrixEvent} event the relation event that needs to be aggregated.
      */
     private aggregateNonLiveRelation(event: MatrixEvent): void {
-        const thread = this.findThreadForEvent(event);
+        const { shouldLiveInRoom, threadId } = this.eventShouldLiveIn(event);
+        const thread = this.getThread(threadId);
         thread?.timelineSet.aggregateRelations(event);
 
-        if (this.shouldAddEventToMainTimeline(thread, event)) {
+        if (shouldLiveInRoom) {
             // TODO: We should consider whether this means it would be a better
             // design to lift the relations handling up to the room instead.
             for (let i = 0; i < this.timelineSets.length; i++) {
@@ -1973,10 +2015,11 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         // any, which is good, because we don't want to try decoding it again).
         localEvent.handleRemoteEcho(remoteEvent.event);
 
-        const thread = this.findThreadForEvent(remoteEvent);
+        const { shouldLiveInRoom, threadId } = this.eventShouldLiveIn(remoteEvent);
+        const thread = this.getThread(threadId);
         thread?.timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
 
-        if (this.shouldAddEventToMainTimeline(thread, remoteEvent)) {
+        if (shouldLiveInRoom) {
             for (let i = 0; i < this.timelineSets.length; i++) {
                 const timelineSet = this.timelineSets[i];
 
@@ -2042,10 +2085,11 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             // update the event id
             event.replaceLocalEventId(newEventId);
 
-            const thread = this.findThreadForEvent(event);
+            const { shouldLiveInRoom, threadId } = this.eventShouldLiveIn(event);
+            const thread = this.getThread(threadId);
             thread?.timelineSet.replaceEventId(oldEventId, newEventId);
 
-            if (this.shouldAddEventToMainTimeline(thread, event)) {
+            if (shouldLiveInRoom) {
                 // if the event was already in the timeline (which will be the case if
                 // opts.pendingEventOrdering==chronological), we need to update the
                 // timeline map.
