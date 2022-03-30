@@ -2105,13 +2105,12 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @throws If <code>duplicateStrategy</code> is not falsey, 'replace' or 'ignore'.
      */
     public addLiveEvents(events: MatrixEvent[], duplicateStrategy?: DuplicateStrategy, fromCache = false): void {
-        let i;
         if (duplicateStrategy && ["replace", "ignore"].indexOf(duplicateStrategy) === -1) {
             throw new Error("duplicateStrategy MUST be either 'replace' or 'ignore'");
         }
 
         // sanity check that the live timeline is still live
-        for (i = 0; i < this.timelineSets.length; i++) {
+        for (let i = 0; i < this.timelineSets.length; i++) {
             const liveTimeline = this.timelineSets[i].getLiveTimeline();
             if (liveTimeline.getPaginationToken(EventTimeline.FORWARDS)) {
                 throw new Error(
@@ -2120,21 +2119,13 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 );
             }
             if (liveTimeline.getNeighbouringTimeline(EventTimeline.FORWARDS)) {
-                throw new Error(
-                    "live timeline " + i + " is no longer live - " +
-                    "it has a neighbouring timeline",
-                );
+                throw new Error(`live timeline ${i} is no longer live - it has a neighbouring timeline`);
             }
         }
 
-        for (i = 0; i < events.length; i++) {
-            // TODO: We should have a filter to say "only add state event
-            // types X Y Z to the timeline".
+        for (let i = 0; i < events.length; i++) {
+            // TODO: We should have a filter to say "only add state event types X Y Z to the timeline".
             this.addLiveEvent(events[i], duplicateStrategy, fromCache);
-            const thread = this.findThreadForEvent(events[i]);
-            if (thread) {
-                thread.addEvent(events[i], true);
-            }
         }
     }
 
