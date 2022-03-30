@@ -8873,7 +8873,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         shouldLiveInThread: boolean;
         threadId?: string;
     } {
-        if (event.isThreadRoot) {
+        if (event.isThreadRoot || roots.has(event.getId())) {
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: true,
