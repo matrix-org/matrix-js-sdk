@@ -1,4 +1,5 @@
 import {
+    MatrixEvent,
     RelationType,
 } from "../../src";
 import { FilterComponent } from "../../src/filter-component";
@@ -13,7 +14,7 @@ describe("Filter Component", function() {
                 content: { },
                 room: 'roomId',
                 event: true,
-            });
+            }) as MatrixEvent;
 
             const checkResult = filter.check(event);
 
@@ -27,7 +28,7 @@ describe("Filter Component", function() {
                 content: { },
                 room: 'roomId',
                 event: true,
-            });
+            }) as MatrixEvent;
 
             const checkResult = filter.check(event);
 
@@ -54,7 +55,7 @@ describe("Filter Component", function() {
                         },
                     },
                 },
-            });
+            }) as MatrixEvent;
 
             expect(filter.check(threadRootNotParticipated)).toBe(false);
         });
@@ -79,7 +80,7 @@ describe("Filter Component", function() {
                 user: '@someone-else:server.org',
                 room: 'roomId',
                 event: true,
-            });
+            }) as MatrixEvent;
 
             expect(filter.check(threadRootParticipated)).toBe(true);
         });
@@ -99,7 +100,7 @@ describe("Filter Component", function() {
                         [RelationType.Reference]: {},
                     },
                 },
-            });
+            }) as MatrixEvent;
 
             expect(filter.check(referenceRelationEvent)).toBe(false);
         });
@@ -122,7 +123,7 @@ describe("Filter Component", function() {
                 },
                 room: 'roomId',
                 event: true,
-            });
+            }) as MatrixEvent;
 
             const eventWithMultipleRelations = mkEvent({
                 "type": "m.room.message",
@@ -147,7 +148,7 @@ describe("Filter Component", function() {
                 },
                 "room": 'roomId',
                 "event": true,
-            });
+            }) as MatrixEvent;
 
             const noMatchEvent = mkEvent({
                 "type": "m.room.message",
@@ -159,7 +160,7 @@ describe("Filter Component", function() {
                 },
                 "room": 'roomId',
                 "event": true,
-            });
+            }) as MatrixEvent;
 
             expect(filter.check(threadRootEvent)).toBe(true);
             expect(filter.check(eventWithMultipleRelations)).toBe(true);
