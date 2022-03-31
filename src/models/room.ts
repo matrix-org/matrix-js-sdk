@@ -1608,7 +1608,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             return {
                 shouldLiveInRoom: false,
                 shouldLiveInThread: true,
-                threadId: parentEventId,
+                threadId: parentEvent.threadRootId,
             };
         }
 

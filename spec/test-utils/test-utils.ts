@@ -76,6 +76,7 @@ interface IEventOpts {
     event?: boolean;
     user?: string;
     unsigned?: IUnsigned;
+    redacts?: string;
 }
 
 /**
@@ -100,6 +101,7 @@ export function mkEvent(opts: IEventOpts): object | MatrixEvent {
         content: opts.content,
         unsigned: opts.unsigned || {},
         event_id: "$" + Math.random() + "-" + Math.random(),
+        redacts: opts.redacts,
     };
     if (opts.skey !== undefined) {
         event.state_key = opts.skey;

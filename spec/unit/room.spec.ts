@@ -26,7 +26,7 @@ import {
     EventType,
     JoinRule,
     MatrixEvent,
-    PendingEventOrdering,
+    PendingEventOrdering, RelationType,
     RoomEvent
 } from "../../src";
 import { EventTimeline } from "../../src/models/event-timeline";
@@ -1858,6 +1858,183 @@ describe("Room", function() {
             });
 
             expect(() => room.createThread(rootEvent, [])).not.toThrow();
+        });
+    });
+
+    describe("eventShouldLiveIn", () => {
+        const room = new Room(roomId, null, userA);
+
+        const mkMessage = () => utils.mkMessage({
+            event: true,
+            user: userA,
+            room: roomId,
+        }) as MatrixEvent;
+
+        const mkReply = (target: MatrixEvent) => utils.mkEvent({
+            event: true,
+            type: EventType.RoomMessage,
+            user: userA,
+            room: roomId,
+            content: {
+                "body": "Reply :: " + Math.random(),
+                "m.relates_to": {
+                    "m.in_reply_to": {
+                        "event_id": target.getId(),
+                    },
+                },
+            },
+        }) as MatrixEvent;
+
+        const mkThreadResponse = (root: MatrixEvent) => utils.mkEvent({
+            event: true,
+            type: EventType.RoomMessage,
+            user: userA,
+            room: roomId,
+            content: {
+                "body": "Thread response :: " + Math.random(),
+                "m.relates_to": {
+                    "event_id": root.getId(),
+                    "m.in_reply_to": {
+                        "event_id": root.getId(),
+                    },
+                    "rel_type": "m.thread",
+                },
+            },
+        }) as MatrixEvent;
+
+        const mkReaction = (target: MatrixEvent) => utils.mkEvent({
+            event: true,
+            type: EventType.Reaction,
+            user: userA,
+            room: roomId,
+            content: {
+                "m.relates_to": {
+                    "rel_type": RelationType.Annotation,
+                    "event_id": target.getId(),
+                    "key": Math.random().toString(),
+                },
+            },
+        }) as MatrixEvent;
+
+        const mkRedaction = (target: MatrixEvent) => utils.mkEvent({
+            event: true,
+            type: EventType.RoomRedaction,
+            user: userA,
+            room: roomId,
+            redacts: target.getId(),
+            content: {},
+        }) as MatrixEvent;
+
+        it("thread root and its relations&redactions should be in both", () => {
+            const randomMessage = mkMessage();
+            const threadRoot = mkMessage();
+            const threadResponse1 = mkThreadResponse(threadRoot);
+            const threadReaction1 = mkReaction(threadRoot);
+            const threadReaction2 = mkReaction(threadRoot);
+            const threadReaction2Redaction = mkRedaction(threadReaction2);
+
+            const roots = new Set([threadRoot.getId()]);
+            const events = [
+                randomMessage,
+                threadRoot,
+                threadResponse1,
+                threadReaction1,
+                threadReaction2,
+                threadReaction2Redaction,
+            ];
+
+            expect(room.eventShouldLiveIn(randomMessage, events, roots).shouldLiveInRoom).toBeTruthy();
+            expect(room.eventShouldLiveIn(randomMessage, events, roots).shouldLiveInThread).toBeFalsy();
+
+            expect(room.eventShouldLiveIn(threadRoot, events, roots).shouldLiveInRoom).toBeTruthy();
+            expect(room.eventShouldLiveIn(threadRoot, events, roots).shouldLiveInThread).toBeTruthy();
+            expect(room.eventShouldLiveIn(threadRoot, events, roots).threadId).toBe(threadRoot.getId());
+            expect(room.eventShouldLiveIn(threadResponse1, events, roots).shouldLiveInRoom).toBeFalsy();
+            expect(room.eventShouldLiveIn(threadResponse1, events, roots).shouldLiveInThread).toBeTruthy();
+            expect(room.eventShouldLiveIn(threadResponse1, events, roots).threadId).toBe(threadRoot.getId());
+
+            expect(room.eventShouldLiveIn(threadReaction1, events, roots).shouldLiveInRoom).toBeTruthy();
+            expect(room.eventShouldLiveIn(threadReaction1, events, roots).shouldLiveInThread).toBeTruthy();
+            expect(room.eventShouldLiveIn(threadReaction1, events, roots).threadId).toBe(threadRoot.getId());
+            expect(room.eventShouldLiveIn(threadReaction2, events, roots).shouldLiveInRoom).toBeTruthy();
+            expect(room.eventShouldLiveIn(threadReaction2, events, roots).shouldLiveInThread).toBeTruthy();
+            expect(room.eventShouldLiveIn(threadReaction2, events, roots).threadId).toBe(threadRoot.getId());
+            expect(room.eventShouldLiveIn(threadReaction2Redaction, events, roots).shouldLiveInRoom).toBeTruthy();
+            expect(room.eventShouldLiveIn(threadReaction2Redaction, events, roots).shouldLiveInThread).toBeTruthy();
+            expect(room.eventShouldLiveIn(threadReaction2Redaction, events, roots).threadId).toBe(threadRoot.getId());
+        });
+
+        it("thread response and its relations&redactions should be only in thread timeline", () => {
+            const threadRoot = mkMessage();
+            const threadResponse1 = mkThreadResponse(threadRoot);
+            const threadReaction1 = mkReaction(threadResponse1);
+            const threadReaction2 = mkReaction(threadResponse1);
+            const threadReaction2Redaction = mkRedaction(threadReaction2);
+
+            const roots = new Set([threadRoot.getId()]);
+            const events = [threadRoot, threadResponse1, threadReaction1, threadReaction2, threadReaction2Redaction];
+
+            expect(room.eventShouldLiveIn(threadReaction1, events, roots).shouldLiveInRoom).toBeFalsy();
+            expect(room.eventShouldLiveIn(threadReaction1, events, roots).shouldLiveInThread).toBeTruthy();
+            expect(room.eventShouldLiveIn(threadReaction1, events, roots).threadId).toBe(threadRoot.getId());
+            expect(room.eventShouldLiveIn(threadReaction2, events, roots).shouldLiveInRoom).toBeFalsy();
+            expect(room.eventShouldLiveIn(threadReaction2, events, roots).shouldLiveInThread).toBeTruthy();
+            expect(room.eventShouldLiveIn(threadReaction2, events, roots).threadId).toBe(threadRoot.getId());
+            expect(room.eventShouldLiveIn(threadReaction2Redaction, events, roots).shouldLiveInRoom).toBeFalsy();
+            expect(room.eventShouldLiveIn(threadReaction2Redaction, events, roots).shouldLiveInThread).toBeTruthy();
+            expect(room.eventShouldLiveIn(threadReaction2Redaction, events, roots).threadId).toBe(threadRoot.getId());
+        });
+
+        it("reply to thread response and its relations&redactions should be only in thread timeline", () => {
+            const threadRoot = mkMessage();
+            const threadResponse1 = mkThreadResponse(threadRoot);
+            const reply1 = mkReply(threadResponse1);
+            const threadReaction1 = mkReaction(reply1);
+            const threadReaction2 = mkReaction(reply1);
+            const threadReaction2Redaction = mkRedaction(reply1);
+
+            const roots = new Set([threadRoot.getId()]);
+            const events = [
+                threadRoot,
+                threadResponse1,
+                reply1,
+                threadReaction1,
+                threadReaction2,
+                threadReaction2Redaction,
+            ];
+
+            expect(room.eventShouldLiveIn(reply1, events, roots).shouldLiveInRoom).toBeFalsy();
+            expect(room.eventShouldLiveIn(reply1, events, roots).shouldLiveInThread).toBeTruthy();
+            expect(room.eventShouldLiveIn(reply1, events, roots).threadId).toBe(threadRoot.getId());
+            expect(room.eventShouldLiveIn(threadReaction1, events, roots).shouldLiveInRoom).toBeFalsy();
+            expect(room.eventShouldLiveIn(threadReaction1, events, roots).shouldLiveInThread).toBeTruthy();
+            expect(room.eventShouldLiveIn(threadReaction1, events, roots).threadId).toBe(threadRoot.getId());
+            expect(room.eventShouldLiveIn(threadReaction2, events, roots).shouldLiveInRoom).toBeFalsy();
+            expect(room.eventShouldLiveIn(threadReaction2, events, roots).shouldLiveInThread).toBeTruthy();
+            expect(room.eventShouldLiveIn(threadReaction2, events, roots).threadId).toBe(threadRoot.getId());
+            expect(room.eventShouldLiveIn(threadReaction2Redaction, events, roots).shouldLiveInRoom).toBeFalsy();
+            expect(room.eventShouldLiveIn(threadReaction2Redaction, events, roots).shouldLiveInThread).toBeTruthy();
+            expect(room.eventShouldLiveIn(threadReaction2Redaction, events, roots).threadId).toBe(threadRoot.getId());
+        });
+
+        it("reply to reply to thread root should only be in the main timeline", () => {
+            const threadRoot = mkMessage();
+            const threadResponse1 = mkThreadResponse(threadRoot);
+            const reply1 = mkReply(threadRoot);
+            const reply2 = mkReply(reply1);
+
+            const roots = new Set([threadRoot.getId()]);
+            const events = [
+                threadRoot,
+                threadResponse1,
+                reply1,
+                reply2,
+            ];
+
+            expect(room.eventShouldLiveIn(reply1, events, roots).shouldLiveInRoom).toBeTruthy();
+            expect(room.eventShouldLiveIn(reply1, events, roots).shouldLiveInThread).toBeFalsy();
+            expect(room.eventShouldLiveIn(reply2, events, roots).shouldLiveInRoom).toBeTruthy();
+            expect(room.eventShouldLiveIn(reply2, events, roots).shouldLiveInThread).toBeFalsy();
         });
     });
 });
