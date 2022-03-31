@@ -18,7 +18,13 @@ import { REFERENCE_RELATION } from "matrix-events-sdk";
 
 import { M_BEACON_INFO } from "../../src/@types/beacon";
 import { LocationAssetType, M_ASSET, M_LOCATION, M_TIMESTAMP } from "../../src/@types/location";
-import { makeBeaconContent, makeBeaconInfoContent } from "../../src/content-helpers";
+import { M_TOPIC } from "../../src/@types/topic";
+import {
+    makeBeaconContent,
+    makeBeaconInfoContent,
+    makeTopicContent,
+    parseTopicContent,
+} from "../../src/content-helpers";
 
 describe('Beacon content helpers', () => {
     describe('makeBeaconInfoContent()', () => {
@@ -121,6 +127,63 @@ describe('Beacon content helpers', () => {
                     rel_type: REFERENCE_RELATION.name,
                     event_id: '$1234',
                 },
+            });
+        });
+    });
+});
+
+describe('Topic content helpers', () => {
+    describe('makeTopicContent()', () => {
+        it('creates fully defined event content without html', () => {
+            expect(makeTopicContent("pizza")).toEqual({
+                topic: "pizza",
+                [M_TOPIC.name]: [{
+                    body: "pizza",
+                    mimetype: "text/plain",
+                }],
+            });
+        });
+
+        it('creates fully defined event content with html', () => {
+            expect(makeTopicContent("pizza", "<b>pizza</b>")).toEqual({
+                topic: "pizza",
+                [M_TOPIC.name]: [{
+                    body: "pizza",
+                    mimetype: "text/plain",
+                }, {
+                    body: "<b>pizza</b>",
+                    mimetype: "text/html",
+                }],
+            });
+        });
+    });
+
+    describe('parseTopicContent()', () => {
+        it('parses event content without html', () => {
+            expect(parseTopicContent({
+                topic: "pizza",
+                [M_TOPIC.name]: [{
+                    body: "pizza",
+                    mimetype: "text/plain",
+                }],
+            })).toEqual({
+                text: "pizza",
+            });
+        });
+
+        it('parses event content with html', () => {
+            expect(parseTopicContent({
+                topic: "pizza",
+                [M_TOPIC.name]: [{
+                    body: "pizza",
+                    mimetype: "text/plain",
+                }, {
+                    body: "<b>pizza</b>",
+                    mimetype: "text/html",
+                }],
+            })).toEqual({
+                text: "pizza",
+                html: "<b>pizza</b>",
             });
         });
     });

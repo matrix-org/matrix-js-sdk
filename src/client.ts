@@ -3534,12 +3534,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * @param {string} roomId
      * @param {string} topic
+     * @param {string} htmlTopic Optional.
      * @param {module:client.callback} callback Optional.
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setRoomTopic(roomId: string, topic: string, callback?: Callback): Promise<ISendEventResponse> {
-        return this.sendStateEvent(roomId, EventType.RoomTopic, { topic: topic }, undefined, callback);
+    public setRoomTopic(
+        roomId: string,
+        topic: string,
+        htmlTopic?: string,
+        callback?: Callback,
+    ): Promise<ISendEventResponse> {
+        const content = ContentHelpers.makeTopicContent(topic, htmlTopic);
+        return this.sendStateEvent(roomId, EventType.RoomTopic, content, undefined, callback);
     }
 
     /**
