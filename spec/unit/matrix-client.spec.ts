@@ -958,7 +958,7 @@ describe("MatrixClient", function() {
         it("partitions root events to room timeline and thread timeline", () => {
             const supportsExperimentalThreads = client.supportsExperimentalThreads;
             client.supportsExperimentalThreads = () => true;
-            client.getRoom = (roomId: string) => new Room(roomId, client, userId);
+            const room = new Room("!room1:matrix.org", client, userId);
 
             const rootEvent = new MatrixEvent({
                 "content": {},
@@ -981,9 +981,9 @@ describe("MatrixClient", function() {
 
             expect(rootEvent.isThreadRoot).toBe(true);
 
-            const [room, threads] = client.partitionThreadedEvents([rootEvent]);
-            expect(room).toHaveLength(1);
-            expect(threads).toHaveLength(1);
+            const [roomEvents, threadEvents] = client.partitionThreadedEvents(room, [rootEvent]);
+            expect(roomEvents).toHaveLength(1);
+            expect(threadEvents).toHaveLength(1);
 
             // Restore method
             client.supportsExperimentalThreads = supportsExperimentalThreads;

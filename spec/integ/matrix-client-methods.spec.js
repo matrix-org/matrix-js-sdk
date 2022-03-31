@@ -556,13 +556,11 @@ describe("MatrixClient", function() {
     });
 
     describe("partitionThreadedEvents", function() {
-        beforeEach(() => {
-            client.getRoom = (roomId) => new Room(roomId, client, userId);
-        });
+        const room = new Room("!STrMRsukXHtqQdSeHa:matrix.org", client, userId);
 
         it("returns empty arrays when given an empty arrays", function() {
             const events = [];
-            const [timeline, threaded] = client.partitionThreadedEvents(events);
+            const [timeline, threaded] = client.partitionThreadedEvents(room, events);
             expect(timeline).toEqual([]);
             expect(threaded).toEqual([]);
         });
@@ -582,7 +580,7 @@ describe("MatrixClient", function() {
             // Vote has no threadId yet
             expect(eventPollResponseReference.threadId).toBeFalsy();
 
-            const [timeline, threaded] = client.partitionThreadedEvents(events);
+            const [timeline, threaded] = client.partitionThreadedEvents(room, events);
 
             expect(timeline).toEqual([
                 // The message that was sent in a thread is missing
@@ -615,7 +613,7 @@ describe("MatrixClient", function() {
                 eventReaction,
             ];
 
-            const [timeline, threaded] = client.partitionThreadedEvents(events);
+            const [timeline, threaded] = client.partitionThreadedEvents(room, events);
 
             expect(timeline).toEqual([
                 eventPollStartThreadRoot,
@@ -642,7 +640,7 @@ describe("MatrixClient", function() {
                 eventMessageInThread,
             ];
 
-            const [timeline, threaded] = client.partitionThreadedEvents(events);
+            const [timeline, threaded] = client.partitionThreadedEvents(room, events);
 
             expect(timeline).toEqual([
                 eventPollStartThreadRoot,
@@ -669,7 +667,7 @@ describe("MatrixClient", function() {
                 eventReaction,
             ];
 
-            const [timeline, threaded] = client.partitionThreadedEvents(events);
+            const [timeline, threaded] = client.partitionThreadedEvents(room, events);
 
             expect(timeline).toEqual([
                 eventPollStartThreadRoot,
@@ -712,7 +710,7 @@ describe("MatrixClient", function() {
                 eventMember,
                 eventCreate,
             ];
-            const [timeline, threaded] = client.partitionThreadedEvents(events);
+            const [timeline, threaded] = client.partitionThreadedEvents(room, events);
 
             expect(timeline).toEqual([
                 // The message that was sent in a thread is missing
@@ -751,7 +749,7 @@ describe("MatrixClient", function() {
                 threadedReactionRedaction,
             ];
 
-            const [timeline, threaded] = client.partitionThreadedEvents(events);
+            const [timeline, threaded] = client.partitionThreadedEvents(room, events);
 
             expect(timeline).toEqual([
                 threadRootEvent,
@@ -780,7 +778,7 @@ describe("MatrixClient", function() {
                 replyToReply,
             ];
 
-            const [timeline, threaded] = client.partitionThreadedEvents(events);
+            const [timeline, threaded] = client.partitionThreadedEvents(room, events);
 
             expect(timeline).toEqual([
                 threadRootEvent,
@@ -807,7 +805,7 @@ describe("MatrixClient", function() {
                 replyToThreadResponse,
             ];
 
-            const [timeline, threaded] = client.partitionThreadedEvents(events);
+            const [timeline, threaded] = client.partitionThreadedEvents(room, events);
 
             expect(timeline).toEqual([
                 threadRootEvent,

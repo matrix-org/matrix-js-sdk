@@ -5179,7 +5179,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     room.currentState.setUnknownStateEvents(stateEvents);
                 }
 
-                const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(matrixEvents);
+                const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(room, matrixEvents);
 
                 room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
                 await this.processThreadEvents(room, threadedEvents, true);
@@ -5281,7 +5281,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // functions contiguously, so we have to jump through some hoops to get our target event in it.
         // XXX: workaround for https://github.com/vector-im/element-meta/issues/150
         if (Thread.hasServerSideSupport && event.isRelation(THREAD_RELATION_TYPE.name)) {
-            const [, threadedEvents] = this.partitionThreadedEvents(events);
+            const [, threadedEvents] = this.partitionThreadedEvents(timelineSet.room, events);
             const thread = await timelineSet.room.createThreadFetchRoot(event.threadRootId, threadedEvents, true);
 
             let nextBatch: string;
@@ -5316,7 +5316,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             timeline.getState(EventTimeline.FORWARDS).paginationToken = res.end;
         }
 
-        const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(events);
+        const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(timelineSet.room, events);
         timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
         // The target event is not in a thread but process the contextual events, so we can show any threads around it.
         await this.processThreadEvents(timelineSet.room, threadedEvents, true);
@@ -5446,9 +5446,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     matrixEvents[i] = event;
                 }
 
-                const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(matrixEvents);
-
                 const timelineSet = eventTimeline.getTimelineSet();
+                const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(timelineSet.room, matrixEvents);
                 timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
                 await this.processThreadEvents(timelineSet.room, threadedEvents, backwards);
 
@@ -5484,10 +5483,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 const token = res.end;
                 const matrixEvents = res.chunk.map(this.getEventMapper());
 
-                const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(matrixEvents);
-
-                eventTimeline.getTimelineSet()
-                    .addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
+                const timelineSet = eventTimeline.getTimelineSet();
+                const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(timelineSet.room, matrixEvents);
+                timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
                 await this.processThreadEvents(room, threadedEvents, backwards);
 
                 // if we've hit the end of the timeline, we need to stop trying to
@@ -8868,7 +8866,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return threadRoots;
     }
 
-    public partitionThreadedEvents(events: MatrixEvent[]): [
+    public partitionThreadedEvents(room: Room, events: MatrixEvent[]): [
         timelineEvents: MatrixEvent[],
         threadedEvents: MatrixEvent[],
     ] {
@@ -8882,7 +8880,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     shouldLiveInRoom,
                     shouldLiveInThread,
                     threadId,
-                } = this.getRoom(event.getRoomId()).eventShouldLiveIn(event, events, threadRoots);
+                } = room.eventShouldLiveIn(event, events, threadRoots);
 
                 if (shouldLiveInRoom) {
                     memo[ROOM].push(event);

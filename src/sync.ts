@@ -754,7 +754,7 @@ export class SyncApi {
         try {
             await this.processSyncResponse(syncEventData, data);
         } catch (e) {
-            logger.error("Error processing cached sync", e.stack || e);
+            logger.error("Error processing cached sync", e);
         }
 
         // Don't emit a prepared if we've bailed because the store is invalid:
@@ -829,7 +829,7 @@ export class SyncApi {
         } catch (e) {
             // log the exception with stack if we have it, else fall back
             // to the plain description
-            logger.error("Caught /sync error", e.stack || e);
+            logger.error("Caught /sync error", e);
 
             // Emit the exception for client handling
             this.client.emit(ClientEvent.SyncUnexpectedError, e);
@@ -1639,7 +1639,7 @@ export class SyncApi {
         // if the timeline has any state events in it.
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
-        const [mainTimelineEvents, threadedEvents] = this.client.partitionThreadedEvents(timelineEventList || []);
+        const [mainTimelineEvents, threadedEvents] = this.client.partitionThreadedEvents(room, timelineEventList || []);
         room.addLiveEvents(mainTimelineEvents, null, fromCache);
         await this.processThreadEvents(room, threadedEvents, false);
     }
