@@ -88,6 +88,8 @@ export interface MSC3575RoomData {
     invite_state?: IStateEvent[];
     initial?: boolean;
     limited?: boolean;
+    is_dm?: boolean;
+    prev_batch?: string;
     room_id: string;
 }
 

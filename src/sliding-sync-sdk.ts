@@ -473,12 +473,11 @@ export class SlidingSyncSdk {
             return;
         }
 
-        const prevBatch = null; //"prev_batch_token_TODO";
         if (roomData.initial) {
             // set the back-pagination token. Do this *before* adding any
             // events so that clients can start back-paginating.
             room.getLiveTimeline().setPaginationToken(
-                prevBatch, EventTimeline.BACKWARDS);
+                roomData.prev_batch, EventTimeline.BACKWARDS);
         } else if (roomData.limited) {
             let limited = true;
 
@@ -519,7 +518,7 @@ export class SlidingSyncSdk {
             if (limited) {
                 deregisterStateListeners(room);
                 room.resetLiveTimeline(
-                    prevBatch,
+                    roomData.prev_batch,
                     null, // TODO this.opts.canResetEntireTimeline(room.roomId) ? null : syncEventData.oldSyncToken,
                 );
 
