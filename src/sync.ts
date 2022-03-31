@@ -276,15 +276,13 @@ export class SyncApi {
             return client.http.authedRequest<any>( // TODO types
                 undefined, Method.Get, "/sync", qps as any, undefined, localTimeoutMs,
             );
-        }).then((data) => {
+        }).then(async (data) => {
             let leaveRooms = [];
             if (data.rooms?.leave) {
                 leaveRooms = this.mapSyncResponseToRoomArray(data.rooms.leave);
             }
-            const rooms = [];
-            leaveRooms.forEach(async (leaveObj) => {
+            return Promise.all(leaveRooms.map(async (leaveObj) => {
                 const room = leaveObj.room;
-                rooms.push(room);
                 if (!leaveObj.isBrandNewRoom) {
                     // the intention behind syncLeftRooms is to add in rooms which were
                     // *omitted* from the initial /sync. Rooms the user were joined to
@@ -298,25 +296,22 @@ export class SyncApi {
                 }
                 leaveObj.timeline = leaveObj.timeline || {};
                 const events = this.mapSyncEventsFormat(leaveObj.timeline, room);
-                const [timelineEvents, threadedEvents] = this.client.partitionThreadedEvents(events);
 
                 const stateEvents = this.mapSyncEventsFormat(leaveObj.state, room);
 
                 // set the back-pagination token. Do this *before* adding any
                 // events so that clients can start back-paginating.
-                room.getLiveTimeline().setPaginationToken(leaveObj.timeline.prev_batch,
-                    EventTimeline.BACKWARDS);
+                room.getLiveTimeline().setPaginationToken(leaveObj.timeline.prev_batch, EventTimeline.BACKWARDS);
 
-                this.processRoomEvents(room, stateEvents, timelineEvents);
-                await this.processThreadEvents(room, threadedEvents, false);
+                await this.processRoomEvents(room, stateEvents, events);
 
                 room.recalculate();
                 client.store.storeRoom(room);
                 client.emit(ClientEvent.Room, room);
 
                 this.processEventsForNotifs(room, events);
-            });
-            return rooms;
+                return room;
+            }));
         });
     }
 
@@ -759,7 +754,7 @@ export class SyncApi {
         try {
             await this.processSyncResponse(syncEventData, data);
         } catch (e) {
-            logger.error("Error processing cached sync", e.stack || e);
+            logger.error("Error processing cached sync", e);
         }
 
         // Don't emit a prepared if we've bailed because the store is invalid:
@@ -834,7 +829,7 @@ export class SyncApi {
         } catch (e) {
             // log the exception with stack if we have it, else fall back
             // to the plain description
-            logger.error("Caught /sync error", e.stack || e);
+            logger.error("Caught /sync error", e);
 
             // Emit the exception for client handling
             this.client.emit(ClientEvent.SyncUnexpectedError, e);
@@ -1087,9 +1082,7 @@ export class SyncApi {
         }
 
         // handle to-device events
-        if (data.to_device && Array.isArray(data.to_device.events) &&
-            data.to_device.events.length > 0
-        ) {
+        if (Array.isArray(data.to_device?.events) && data.to_device.events.length > 0) {
             const cancelledKeyVerificationTxns = [];
             data.to_device.events
                 .map(client.getEventMapper())
@@ -1163,11 +1156,11 @@ export class SyncApi {
         this.notifEvents = [];
 
         // Handle invites
-        inviteRooms.forEach((inviteObj) => {
+        await utils.promiseMapSeries(inviteRooms, async (inviteObj) => {
             const room = inviteObj.room;
             const stateEvents = this.mapSyncEventsFormat(inviteObj.invite_state, room);
 
-            this.processRoomEvents(room, stateEvents);
+            await this.processRoomEvents(room, stateEvents);
             if (inviteObj.isBrandNewRoom) {
                 room.recalculate();
                 client.store.storeRoom(room);
@@ -1274,10 +1267,7 @@ export class SyncApi {
                 }
             }
 
-            const [timelineEvents, threadedEvents] = this.client.partitionThreadedEvents(events);
-
-            this.processRoomEvents(room, stateEvents, timelineEvents, syncEventData.fromCache);
-            await this.processThreadEvents(room, threadedEvents, false);
+            await this.processRoomEvents(room, stateEvents, events, syncEventData.fromCache);
 
             // set summary after processing events,
             // because it will trigger a name calculation
@@ -1318,8 +1308,7 @@ export class SyncApi {
             };
 
             await utils.promiseMapSeries(stateEvents, processRoomEvent);
-            await utils.promiseMapSeries(timelineEvents, processRoomEvent);
-            await utils.promiseMapSeries(threadedEvents, processRoomEvent);
+            await utils.promiseMapSeries(events, processRoomEvent);
             ephemeralEvents.forEach(function(e) {
                 client.emit(ClientEvent.Event, e);
             });
@@ -1336,16 +1325,13 @@ export class SyncApi {
         });
 
         // Handle leaves (e.g. kicked rooms)
-        leaveRooms.forEach(async (leaveObj) => {
+        await utils.promiseMapSeries(leaveRooms, async (leaveObj) => {
             const room = leaveObj.room;
             const stateEvents = this.mapSyncEventsFormat(leaveObj.state, room);
             const events = this.mapSyncEventsFormat(leaveObj.timeline, room);
             const accountDataEvents = this.mapSyncEventsFormat(leaveObj.account_data);
 
-            const [timelineEvents, threadedEvents] = this.client.partitionThreadedEvents(events);
-
-            this.processRoomEvents(room, stateEvents, timelineEvents);
-            await this.processThreadEvents(room, threadedEvents, false);
+            await this.processRoomEvents(room, stateEvents, events);
             room.addAccountData(accountDataEvents);
 
             room.recalculate();
@@ -1359,10 +1345,7 @@ export class SyncApi {
             stateEvents.forEach(function(e) {
                 client.emit(ClientEvent.Event, e);
             });
-            timelineEvents.forEach(function(e) {
-                client.emit(ClientEvent.Event, e);
-            });
-            threadedEvents.forEach(function(e) {
+            events.forEach(function(e) {
                 client.emit(ClientEvent.Event, e);
             });
             accountDataEvents.forEach(function(e) {
@@ -1592,16 +1575,16 @@ export class SyncApi {
      * @param {Room} room
      * @param {MatrixEvent[]} stateEventList A list of state events. This is the state
      * at the *START* of the timeline list if it is supplied.
-     * @param {MatrixEvent[]} [timelineEventList] A list of timeline events. Lower index
+     * @param {MatrixEvent[]} [timelineEventList] A list of timeline events, including threaded. Lower index
      * @param {boolean} fromCache whether the sync response came from cache
      * is earlier in time. Higher index is later.
      */
-    private processRoomEvents(
+    private async processRoomEvents(
         room: Room,
         stateEventList: MatrixEvent[],
         timelineEventList?: MatrixEvent[],
         fromCache = false,
-    ): void {
+    ): Promise<void> {
         // If there are no events in the timeline yet, initialise it with
         // the given state events
         const liveTimeline = room.getLiveTimeline();
@@ -1651,11 +1634,14 @@ export class SyncApi {
             room.oldState.setStateEvents(stateEventList || []);
             room.currentState.setStateEvents(stateEventList || []);
         }
-        // execute the timeline events. This will continue to diverge the current state
+
+        // Execute the timeline events. This will continue to diverge the current state
         // if the timeline has any state events in it.
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
-        room.addLiveEvents(timelineEventList || [], null, fromCache);
+        const [mainTimelineEvents, threadedEvents] = this.client.partitionThreadedEvents(room, timelineEventList || []);
+        room.addLiveEvents(mainTimelineEvents, null, fromCache);
+        await this.processThreadEvents(room, threadedEvents, false);
     }
 
     /**
