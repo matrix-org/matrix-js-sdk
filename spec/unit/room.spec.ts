@@ -26,8 +26,9 @@ import {
     EventType,
     JoinRule,
     MatrixEvent,
-    PendingEventOrdering, RelationType,
-    RoomEvent
+    PendingEventOrdering,
+    RelationType,
+    RoomEvent,
 } from "../../src";
 import { EventTimeline } from "../../src/models/event-timeline";
 import { Room } from "../../src/models/room";
