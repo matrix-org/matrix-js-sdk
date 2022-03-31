@@ -44,7 +44,7 @@ export function syncPromise(client: MatrixClient, count = 1): Promise<void> {
  * @param {string} name The name of the class
  * @return {Object} An instantiated object with spied methods/properties.
  */
-export function mock(constr, name: string) {
+export function mock<T>(constr: { new(...args: any[]): T }, name: string): T {
     // Based on http://eclipsesource.com/blogs/2014/03/27/mocks-in-jasmine-tests/
     const HelperConstr = new Function(); // jshint ignore:line
     HelperConstr.prototype = constr.prototype;

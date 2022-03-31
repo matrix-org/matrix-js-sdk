@@ -47,10 +47,8 @@ describe("Room", function() {
     beforeEach(function() {
         room = new Room(roomId, null, userA);
         // mock RoomStates
-        room.oldState = room.getLiveTimeline().startState =
-            utils.mock(RoomState, "oldState");
-        room.currentState = room.getLiveTimeline().endState =
-            utils.mock(RoomState, "currentState");
+        room.oldState = room.getLiveTimeline().startState = utils.mock(RoomState, "oldState");
+        room.currentState = room.getLiveTimeline().endState = utils.mock(RoomState, "currentState");
     });
 
     describe("getAvatarUrl", function() {
