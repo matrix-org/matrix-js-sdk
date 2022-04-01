@@ -404,6 +404,38 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         this.emit(RoomStateEvent.Update, this);
     }
 
+    public processBeaconEvents(events: MatrixEvent[]): void {
+        // discard locations if we have no beacons
+        if (!events?.length || !this.beacons.size) {
+            return;
+        }
+
+        // console.log('hhh', 'RS.processBeaconEvents', this.beacons.keys(), events);
+
+
+        // names are confusing here
+        // a Beacon is the 'parent' event, but event type is 'm.beacon_info'
+        // a location is the 'child' related to the Beacon, but the event type is 'm.beacon'
+        // group locations by beaconInfoId
+        const locationEventsByBeaconId = events.reduce<Record<string, MatrixEvent[]>>((acc, event) => {
+            const beaconInfoEventId = event.getRelation()?.event_id;
+            if (!acc[beaconInfoEventId]) {
+                acc[beaconInfoEventId] = [];
+            }
+            acc[beaconInfoEventId].push(event);
+            return acc;
+        }, {});
+
+        Object.entries(locationEventsByBeaconId).forEach(([beaconInfoEventId, events]) => {
+            // TODO better way to find beacon by event_id
+            const beacon = [...this.beacons.values()].find(beacon => beacon.beaconInfoId === beaconInfoEventId);
+
+            if (beacon) {
+                beacon.addLocations(events);
+            }
+        });
+    }
+
     /**
      * Looks up a member by the given userId, and if it doesn't exist,
      * create it and emit the `RoomState.newMember` event.

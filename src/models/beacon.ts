@@ -14,9 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { M_BEACON_INFO } from "../@types/beacon";
-import { BeaconInfoState, parseBeaconInfoContent } from "../content-helpers";
+import { MBeaconEventContent, M_BEACON_INFO } from "../@types/beacon";
+import { M_TIMESTAMP } from "../@types/location";
+import { BeaconInfoState, BeaconLocationState, parseBeaconContent, parseBeaconInfoContent } from "../content-helpers";
 import { MatrixEvent } from "../matrix";
+import { sortEventsByLatestContentTimestamp } from "../utils";
 import { TypedEventEmitter } from "./typed-event-emitter";
 
 export enum BeaconEvent {
@@ -24,12 +26,14 @@ export enum BeaconEvent {
     Update = "Beacon.update",
     LivenessChange = "Beacon.LivenessChange",
     Destroy = "Destroy",
+    LocationUpdate = "LocationUpdate",
 }
 
 export type BeaconEventHandlerMap = {
     [BeaconEvent.Update]: (event: MatrixEvent, beacon: Beacon) => void;
     [BeaconEvent.LivenessChange]: (isLive: boolean, beacon: Beacon) => void;
     [BeaconEvent.Destroy]: (beaconIdentifier: string) => void;
+    [BeaconEvent.LocationUpdate]: (locationState: BeaconLocationState) => void;
 };
 
 export const isTimestampInDuration = (
@@ -48,6 +52,8 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
     private _beaconInfo: BeaconInfoState;
     private _isLive: boolean;
     private livenessWatchInterval: number;
+    // TODO is there any reason to store the whole event
+    private _latestLocationState: BeaconLocationState | undefined;
 
     constructor(
         private rootEvent: MatrixEvent,
@@ -79,6 +85,10 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
 
     public get beaconInfo(): BeaconInfoState {
         return this._beaconInfo;
+    }
+
+    public get latestLocationState(): BeaconLocationState | undefined {
+        return this._latestLocationState;
     }
 
     public update(beaconInfoEvent: MatrixEvent): void {
@@ -115,6 +125,32 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
                 this.livenessWatchInterval = setInterval(this.checkLiveness.bind(this), expiryInMs);
             }
         }
+    }
+
+    // TODO can this event be cast to m.beacon event type somewhere in the path ?
+    // TODO is name confusing while these are m.beacon events ?
+    public addLocations(locationEvents: MatrixEvent[]): void {
+        // discard locations for beacons that are not live
+        if (!this.isLive) {
+            return;
+        }
+
+        const validLocationEvents = locationEvents.filter(event => {
+            const content = event.getContent<MBeaconEventContent>();
+            const timestamp = M_TIMESTAMP.findIn<number>(content);
+            return (
+                // only include positions that were taken inside the beacon's live period
+                isTimestampInDuration(this._beaconInfo.timestamp, this._beaconInfo.timeout, timestamp) &&
+                // ignore positions older than our current latest location
+                (!this.latestLocationState || timestamp > this.latestLocationState.timestamp)
+            );
+        });
+        const latestLocationEvent = validLocationEvents.sort(sortEventsByLatestContentTimestamp)?.[0];
+
+        this._latestLocationState = parseBeaconContent(latestLocationEvent.getContent());
+
+        console.log('hhh', 'emitting new latest location', this.identifier);
+        this.emit(BeaconEvent.LocationUpdate, this.latestLocationState);
     }
 
     private setBeaconInfo(event: MatrixEvent): void {

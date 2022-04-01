@@ -180,7 +180,7 @@ import { MediaHandler } from "./webrtc/mediaHandler";
 import { IRefreshTokenResponse } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { Thread, THREAD_RELATION_TYPE } from "./models/thread";
-import { MBeaconInfoEventContent, M_BEACON_INFO_VARIABLE } from "./@types/beacon";
+import { MBeaconInfoEventContent, M_BEACON, M_BEACON_INFO_VARIABLE } from "./@types/beacon";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -5181,6 +5181,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
                 const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(room, matrixEvents);
 
+                this.processBeaconEvents(room, matrixEvents);
                 room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
                 await this.processThreadEvents(room, threadedEvents, true);
 
@@ -5317,6 +5318,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(timelineSet.room, events);
+        this.processBeaconEvents(timelineSet.room, events);
         timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
         // The target event is not in a thread but process the contextual events, so we can show any threads around it.
         await this.processThreadEvents(timelineSet.room, threadedEvents, true);
@@ -5449,6 +5451,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 const timelineSet = eventTimeline.getTimelineSet();
                 const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(timelineSet.room, matrixEvents);
                 timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
+                this.processBeaconEvents(timelineSet.room, matrixEvents);
                 await this.processThreadEvents(timelineSet.room, threadedEvents, backwards);
 
                 // if we've hit the end of the timeline, we need to stop trying to
@@ -5486,6 +5489,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 const timelineSet = eventTimeline.getTimelineSet();
                 const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(timelineSet.room, matrixEvents);
                 timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
+                this.processBeaconEvents(timelineSet.room, matrixEvents);
                 await this.processThreadEvents(room, threadedEvents, backwards);
 
                 // if we've hit the end of the timeline, we need to stop trying to
@@ -8914,6 +8918,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         for (const event of threadedEvents) {
             await room.addThreadedEvent(event, toStartOfTimeline);
         }
+    }
+
+    public processBeaconEvents(
+        room: Room,
+        events?: MatrixEvent[],
+    ): void {
+        if (!events?.length) {
+            return;
+        }
+        const beaconEvents = events.filter(event => M_BEACON.matches(event.getType()));
+        // console.log('hhh processBeaocnEvents', room, beaconEvents);
+        room.currentState.processBeaconEvents(beaconEvents);
     }
 
     /**
