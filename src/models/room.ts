@@ -2209,15 +2209,19 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         for (let i = 0; i < events.length; i++) {
             // TODO: We should have a filter to say "only add state event types X Y Z to the timeline".
             this.processLiveEvent(events[i]);
-            const { shouldLiveInRoom, threadId } = threadInfos[i];
 
-            if (threadId) {
+            const {
+                shouldLiveInRoom,
+                shouldLiveInThread,
+                threadId,
+            } = threadInfos[i];
 
+            if (shouldLiveInThread) {
+                if (!eventsByThread[threadId]) {
+                    eventsByThread[threadId] = [];
+                }
+                eventsByThread[threadId].push(events[i]);
             }
-            if (!eventsByThread[threadId]) {
-                eventsByThread[threadId] = [];
-            }
-            eventsByThread[threadId].push(events[i]);
 
             if (shouldLiveInRoom) {
                 this.addLiveEvent(events[i], duplicateStrategy, fromCache);
