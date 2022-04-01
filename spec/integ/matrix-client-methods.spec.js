@@ -146,11 +146,13 @@ describe("MatrixClient", function() {
         it("should no-op if you've already joined a room", function() {
             const roomId = "!foo:bar";
             const room = new Room(roomId, client, userId);
+            client.fetchRoomEvent = () => Promise.resolve({});
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userId, room: roomId, mship: "join", event: true,
                 }),
             ]);
+            httpBackend.verifyNoOutstandingRequests();
             store.storeRoom(room);
             client.joinRoom(roomId);
             httpBackend.verifyNoOutstandingRequests();
