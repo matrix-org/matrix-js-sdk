@@ -45,8 +45,9 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
             event.setUnsigned({ ...event.getUnsigned(), ...plainOldJsObject.unsigned });
         }
 
-        if (room?.threads.has(event.getId())) {
-            event.setThread(room.threads.get(event.getId()));
+        const thread = room?.findThreadForEvent(event);
+        if (thread) {
+            event.setThread(thread);
         }
 
         if (event.isEncrypted()) {

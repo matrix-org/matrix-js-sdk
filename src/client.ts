@@ -8851,7 +8851,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Given some events, find the IDs of all the thread roots that are
      * referred to by them.
      */
-    private findThreadRoots(events: MatrixEvent[]): Set<string> {
+    public findThreadRoots(events: MatrixEvent[]): Set<string> {
         const threadRoots = new Set<string>();
         for (const event of events) {
             if (event.isThreadRelation) {
@@ -8906,7 +8906,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         toStartOfTimeline: boolean,
     ): Promise<void> {
         for (const event of threadedEvents) {
-            await room.addThreadedEvent(event, toStartOfTimeline);
+            await room.processThreadedEvent(event, toStartOfTimeline);
         }
     }
 

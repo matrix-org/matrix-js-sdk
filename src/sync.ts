@@ -1640,20 +1640,7 @@ export class SyncApi {
         // if the timeline has any state events in it.
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
-        const [mainTimelineEvents, threadedEvents] = this.client.partitionThreadedEvents(room, timelineEventList || []);
-        room.addLiveEvents(mainTimelineEvents, null, fromCache);
-        await this.processThreadEvents(room, threadedEvents, false);
-    }
-
-    /**
-     * @experimental
-     */
-    private processThreadEvents(
-        room: Room,
-        threadedEvents: MatrixEvent[],
-        toStartOfTimeline: boolean,
-    ): Promise<void> {
-        return this.client.processThreadEvents(room, threadedEvents, toStartOfTimeline);
+        room.addLiveEvents(timelineEventList || [], null, fromCache);
     }
 
     /**
