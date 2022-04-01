@@ -115,6 +115,26 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     }
 
     private onEcho = (event: MatrixEvent) => {
+        // There is a risk that the `localTimestamp` approximation will not be accurate
+        // when threads are used over federation. That could result in the reply
+        // count value drifting away from the value returned by the server
+        const isThreadReply = event.isRelation(THREAD_RELATION_TYPE.name);
+        if (!this.lastEvent || (isThreadReply
+            && (event.getId() !== this.lastEvent.getId())
+            && (event.localTimestamp > this.lastEvent.localTimestamp))
+        ) {
+            this.lastEvent = event;
+            if (this.lastEvent.getId() !== this.id) {
+                // This counting only works when server side support is enabled as we started the counting
+                // from the value returned within the bundled relationship
+                if (Thread.hasServerSideSupport) {
+                    this.replyCount++;
+                }
+
+                this.emit(ThreadEvent.NewReply, this, event);
+            }
+        }
+
         if (this.timelineSet.eventIdToTimeline(event.getId())) {
             this.emit(ThreadEvent.Update, this);
         }
@@ -177,31 +197,11 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             this._currentUserParticipated = true;
         }
 
-        const isThreadReply = event.getRelation()?.rel_type === THREAD_RELATION_TYPE.name;
+        const isThreadReply = event.isRelation(THREAD_RELATION_TYPE.name);
         // If no thread support exists we want to count all thread relation
         // added as a reply. We can't rely on the bundled relationships count
         if (!Thread.hasServerSideSupport && isThreadReply) {
             this.replyCount++;
-        }
-
-        // There is a risk that the `localTimestamp` approximation will not be accurate
-        // when threads are used over federation. That could results in the reply
-        // count value drifting away from the value returned by the server
-        if (!this.lastEvent || (isThreadReply
-            && (event.getId() !== this.lastEvent.getId())
-            && (event.localTimestamp > this.lastEvent.localTimestamp))
-        ) {
-            this.lastEvent = event;
-            if (this.lastEvent.getId() !== this.id) {
-                // This counting only works when server side support is enabled
-                // as we started the counting from the value returned in the
-                // bundled relationship
-                if (Thread.hasServerSideSupport) {
-                    this.replyCount++;
-                }
-
-                this.emit(ThreadEvent.NewReply, this, event);
-            }
         }
 
         this.emit(ThreadEvent.Update, this);
