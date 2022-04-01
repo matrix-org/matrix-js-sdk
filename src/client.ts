@@ -3771,9 +3771,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             txnId = this.makeTxnId();
         }
 
-        // we always construct a MatrixEvent when sending because the store and
-        // scheduler use them. We'll extract the params back out if it turns out
-        // the client has no scheduler or store.
+        // We always construct a MatrixEvent when sending because the store and scheduler use them.
+        // We'll extract the params back out if it turns out the client has no scheduler or store.
         const localEvent = new MatrixEvent(Object.assign(eventObject, {
             event_id: "~" + roomId + ":" + txnId,
             user_id: this.credentials.userId,
@@ -3808,9 +3807,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         localEvent.setStatus(EventStatus.SENDING);
 
         // add this event immediately to the local store as 'sending'.
-        if (room) {
-            room.addPendingEvent(localEvent, txnId);
-        }
+        room?.addPendingEvent(localEvent, txnId);
 
         // addPendingEvent can change the state to NOT_SENT if it believes
         // that there's other events that have failed. We won't bother to
@@ -8894,8 +8891,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 return memo;
             }, [[], []]);
         } else {
-            // When `experimentalThreadSupport` is disabled
-            // treat all events as timelineEvents
+            // When `experimentalThreadSupport` is disabled treat all events as timelineEvents
             return [
                 events,
                 [],

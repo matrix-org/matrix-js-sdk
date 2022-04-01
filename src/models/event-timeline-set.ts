@@ -852,7 +852,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         }
         let relationsWithEventType = relationsWithRelType[eventType];
 
-        let relatesToEvent;
+        let relatesToEvent: MatrixEvent;
         if (!relationsWithEventType) {
             relationsWithEventType = relationsWithRelType[eventType] = new Relations(
                 relationType,

@@ -1655,20 +1655,6 @@ export class SyncApi {
         return this.client.processThreadEvents(room, threadedEvents, toStartOfTimeline);
     }
 
-    // extractRelatedEvents(event: MatrixEvent, events: MatrixEvent[], relatedEvents: MatrixEvent[] = []): MatrixEvent[] {
-    //     relatedEvents.push(event);
-
-    //     const parentEventId = event.getAssociatedId();
-    //     const parentEventIndex = events.findIndex(event => event.getId() === parentEventId);
-
-    //     if (parentEventIndex > -1) {
-    //         const [relatedEvent] = events.splice(parentEventIndex, 1);
-    //         return this.extractRelatedEvents(relatedEvent, events, relatedEvents);
-    //     } else {
-    //         return relatedEvents;
-    //     }
-    // }
-
     /**
      * Takes a list of timelineEvents and adds and adds to notifEvents
      * as appropriate.
