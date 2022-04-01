@@ -1,4 +1,3 @@
-
 import * as utils from "../test-utils/test-utils";
 import { makeBeaconInfoEvent } from "../test-utils/beacon";
 import { filterEmitCallsByEventType } from "../test-utils/emitter";
