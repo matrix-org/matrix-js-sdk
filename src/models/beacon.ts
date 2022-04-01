@@ -23,11 +23,13 @@ export enum BeaconEvent {
     New = "Beacon.new",
     Update = "Beacon.update",
     LivenessChange = "Beacon.LivenessChange",
+    Destroy = "Destroy",
 }
 
 export type BeaconEventHandlerMap = {
     [BeaconEvent.Update]: (event: MatrixEvent, beacon: Beacon) => void;
     [BeaconEvent.LivenessChange]: (isLive: boolean, beacon: Beacon) => void;
+    [BeaconEvent.Destroy]: (beaconIdentifier: string) => void;
 };
 
 export const isTimestampInDuration = (
@@ -93,6 +95,9 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
         if (this.livenessWatchInterval) {
             clearInterval(this.livenessWatchInterval);
         }
+
+        this._isLive = false;
+        this.emit(BeaconEvent.Destroy, this.identifier);
     }
 
     /**
