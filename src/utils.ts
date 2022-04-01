@@ -24,6 +24,8 @@ import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
 
 import type NodeCrypto from "crypto";
+import { MatrixEvent } from ".";
+import { M_TIMESTAMP } from "./@types/location";
 
 /**
  * Encode a dictionary of query parameters.
@@ -707,4 +709,11 @@ export function recursivelyAssign(target: Object, source: Object, ignoreNullish 
         }
     }
     return target;
+}
+
+function getContentTimestampWithFallback(event: MatrixEvent) {
+    return M_TIMESTAMP.findIn<number>(event.getContent()) ?? -1;
+}
+export function sortEventsByLatestContentTimestamp(left: MatrixEvent, right: MatrixEvent): number {
+    return getContentTimestampWithFallback(right) - getContentTimestampWithFallback(left);
 }
