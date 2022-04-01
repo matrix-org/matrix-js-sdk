@@ -8857,9 +8857,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         threadedEvents: MatrixEvent[],
         toStartOfTimeline: boolean,
     ): Promise<void> {
-        for (const event of threadedEvents) {
-            await room.processThreadedEvent(event, toStartOfTimeline);
-        }
+        await room.processThreadedEvents(threadedEvents, toStartOfTimeline);
     }
 
     /**
