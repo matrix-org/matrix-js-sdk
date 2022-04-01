@@ -510,7 +510,7 @@ describe("utils", function() {
         });
     });
 
-    fdescribe('sortEventsByLatestContentTimestamp', () => {
+    describe('sortEventsByLatestContentTimestamp', () => {
         const roomId = '!room:server';
         const userId = '@user:server';
         const eventWithoutContentTimestamp = mkMessage({ room: roomId, user: userId, event: true });
