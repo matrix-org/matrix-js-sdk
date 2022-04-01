@@ -1567,6 +1567,13 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         shouldLiveInThread: boolean;
         threadId?: string;
     } {
+        if (!this.client.supportsExperimentalThreads()) {
+            return {
+                shouldLiveInRoom: true,
+                shouldLiveInThread: false,
+            };
+        }
+
         // A thread root is always shown in both timelines
         if (event.isThreadRoot || roots?.has(event.getId())) {
             return {
@@ -1581,7 +1588,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             return {
                 shouldLiveInRoom: false,
                 shouldLiveInThread: true,
-                threadId: event.relationEventId,
+                threadId: event.threadRootId,
             };
         }
 
@@ -1638,12 +1645,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             // If the rootEvent does not exist in the local stores, then fetch it from the server.
             try {
                 const eventData = await this.client.fetchRoomEvent(this.roomId, threadId);
-
-                if (!rootEvent) {
-                    rootEvent = new MatrixEvent(eventData);
-                } else {
-                    rootEvent.setUnsigned(eventData.unsigned);
-                }
+                const mapper = this.client.getEventMapper();
+                rootEvent = mapper(eventData); // will merge with existing event object if such is known
             } finally {
                 // The root event might be not be visible to the person requesting it.
                 // If it wasn't fetched successfully the thread will work in "limited" mode and won't
@@ -1658,20 +1661,27 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         return thread;
     }
 
+    private async addThreadedEvent(event: MatrixEvent, threadId: string, toStartOfTimeline = false): Promise<void> {
+        let thread = this.getThread(threadId);
+        if (thread) {
+            await thread.addEvent(event, toStartOfTimeline);
+        } else {
+            thread = await this.createThreadFetchRoot(threadId, [event], toStartOfTimeline);
+        }
+
+        if (thread) {
+            this.emit(ThreadEvent.Update, thread);
+        }
+    }
+
     /**
      * Add an event to a thread's timeline. Will fire "Thread.update"
      * @experimental
      */
-    public async addThreadedEvent(event: MatrixEvent, toStartOfTimeline: boolean): Promise<void> {
+    public async processThreadedEvent(event: MatrixEvent, toStartOfTimeline: boolean): Promise<void> {
         this.applyRedaction(event);
-        let thread = this.findThreadForEvent(event);
-        if (thread) {
-            await thread.addEvent(event, toStartOfTimeline);
-        } else {
-            thread = await this.createThreadFetchRoot(event.threadRootId, [event], toStartOfTimeline);
-        }
-
-        this.emit(ThreadEvent.Update, thread);
+        const { threadId } = this.eventShouldLiveIn(event);
+        await this.addThreadedEvent(event, threadId, toStartOfTimeline);
     }
 
     public createThread(
@@ -1738,7 +1748,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 redactedEvent.makeRedacted(event);
 
                 // If this is in the current state, replace it with the redacted version
-                if (redactedEvent.getStateKey()) {
+                if (redactedEvent.isState()) {
                     const currentStateEvent = this.currentState.getStateEvents(
                         redactedEvent.getType(),
                         redactedEvent.getStateKey(),
@@ -1784,7 +1794,19 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @fires module:client~MatrixClient#event:"Room.timeline"
      * @private
      */
-    private addLiveEvent(event: MatrixEvent, duplicateStrategy?: DuplicateStrategy, fromCache = false): void {
+    private addLiveEvent(
+        event: MatrixEvent,
+        duplicateStrategy: DuplicateStrategy = DuplicateStrategy.Ignore,
+        fromCache = false,
+        events: MatrixEvent[],
+        threadRoots: Set<string>,
+    ): void {
+        const {
+            shouldLiveInRoom,
+            shouldLiveInThread,
+            threadId,
+        } = this.eventShouldLiveIn(event, events, threadRoots);
+
         this.applyRedaction(event);
 
         // Implement MSC3531: hiding messages.
@@ -1804,6 +1826,12 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 return;
             }
         }
+
+        if (shouldLiveInThread) {
+            this.addThreadedEvent(event, threadId, false);
+        }
+
+        if (!shouldLiveInRoom) return; // skip the rest of the handling as it deals with the main timeline
 
         // add to our timeline sets
         for (let i = 0; i < this.timelineSets.length; i++) {
@@ -2164,9 +2192,10 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             }
         }
 
+        const threadRoots = this.client.findThreadRoots(events);
         for (let i = 0; i < events.length; i++) {
             // TODO: We should have a filter to say "only add state event types X Y Z to the timeline".
-            this.addLiveEvent(events[i], duplicateStrategy, fromCache);
+            this.addLiveEvent(events[i], duplicateStrategy, fromCache, events, threadRoots);
         }
     }
 
