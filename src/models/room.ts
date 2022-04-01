@@ -1998,10 +1998,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         const newEventId = remoteEvent.getId();
         const oldStatus = localEvent.status;
 
-        logger.debug(
-            `Got remote echo for event ${oldEventId} -> ${newEventId} ` +
-            `old status ${oldStatus}`,
-        );
+        logger.debug(`Got remote echo for event ${oldEventId} -> ${newEventId} old status ${oldStatus}`);
 
         // no longer pending
         delete this.txnToEvent[remoteEvent.getUnsigned().transaction_id];
