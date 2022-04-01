@@ -1647,6 +1647,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 const eventData = await this.client.fetchRoomEvent(this.roomId, threadId);
                 const mapper = this.client.getEventMapper();
                 rootEvent = mapper(eventData); // will merge with existing event object if such is known
+            } catch (e) {
+                logger.error("Failed to fetch thread root to construct thread with", e);
             } finally {
                 // The root event might be not be visible to the person requesting it.
                 // If it wasn't fetched successfully the thread will work in "limited" mode and won't
