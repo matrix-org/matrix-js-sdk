@@ -2192,11 +2192,60 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             }
         }
 
-        const threadRoots = this.client.findThreadRoots(events);
+        const threadRoots = this.findThreadRoots(events);
         for (let i = 0; i < events.length; i++) {
             // TODO: We should have a filter to say "only add state event types X Y Z to the timeline".
             this.addLiveEvent(events[i], duplicateStrategy, fromCache, events, threadRoots);
         }
+    }
+
+    public partitionThreadedEvents(events: MatrixEvent[]): [
+        timelineEvents: MatrixEvent[],
+        threadedEvents: MatrixEvent[],
+    ] {
+        // Indices to the events array, for readability
+        const ROOM = 0;
+        const THREAD = 1;
+        if (this.client.supportsExperimentalThreads()) {
+            const threadRoots = this.findThreadRoots(events);
+            return events.reduce((memo, event: MatrixEvent) => {
+                const {
+                    shouldLiveInRoom,
+                    shouldLiveInThread,
+                    threadId,
+                } = this.eventShouldLiveIn(event, events, threadRoots);
+
+                if (shouldLiveInRoom) {
+                    memo[ROOM].push(event);
+                }
+
+                if (shouldLiveInThread) {
+                    event.setThreadId(threadId);
+                    memo[THREAD].push(event);
+                }
+
+                return memo;
+            }, [[], []]);
+        } else {
+            // When `experimentalThreadSupport` is disabled treat all events as timelineEvents
+            return [
+                events,
+                [],
+            ];
+        }
+    }
+
+    /**
+     * Given some events, find the IDs of all the thread roots that are referred to by them.
+     */
+    private findThreadRoots(events: MatrixEvent[]): Set<string> {
+        const threadRoots = new Set<string>();
+        for (const event of events) {
+            if (event.isThreadRelation) {
+                threadRoots.add(event.relationEventId);
+            }
+        }
+        return threadRoots;
     }
 
     /**

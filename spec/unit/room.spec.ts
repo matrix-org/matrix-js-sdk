@@ -45,7 +45,7 @@ describe("Room", function() {
     let room;
 
     beforeEach(function() {
-        room = new Room(roomId, null, userA);
+        room = new Room(roomId, new TestClient(userA, "device").client, userA);
         // mock RoomStates
         room.oldState = room.getLiveTimeline().startState = utils.mock(RoomState, "oldState");
         room.currentState = room.getLiveTimeline().endState = utils.mock(RoomState, "currentState");
@@ -406,7 +406,7 @@ describe("Room", function() {
         let events = null;
 
         beforeEach(function() {
-            room = new Room(roomId, null, null, { timelineSupport: timelineSupport });
+            room = new Room(roomId, new TestClient(userA).client, userA, { timelineSupport: timelineSupport });
             // set events each time to avoid resusing Event objects (which
             // doesn't work because they get frozen)
             events = [
@@ -486,7 +486,7 @@ describe("Room", function() {
 
     describe("compareEventOrdering", function() {
         beforeEach(function() {
-            room = new Room(roomId, null, null, { timelineSupport: true });
+            room = new Room(roomId, new TestClient(userA).client, userA, { timelineSupport: true });
         });
 
         const events: MatrixEvent[] = [
@@ -673,7 +673,7 @@ describe("Room", function() {
 
         beforeEach(function() {
             // no mocking
-            room = new Room(roomId, null, userA);
+            room = new Room(roomId, new TestClient(userA).client, userA);
         });
 
         describe("Room.recalculate => Stripped State Events", function() {
@@ -1259,6 +1259,7 @@ describe("Room", function() {
             const client = (new TestClient(
                 "@alice:example.com", "alicedevice",
             )).client;
+            client.supportsExperimentalThreads = () => true;
             const room = new Room(roomId, client, userA, {
                 pendingEventOrdering: PendingEventOrdering.Detached,
             });
@@ -1285,7 +1286,7 @@ describe("Room", function() {
 
         it("should add pending events to the timeline if " +
                       "pendingEventOrdering == 'chronological'", function() {
-            room = new Room(roomId, null, userA, {
+            const room = new Room(roomId, new TestClient(userA).client, userA, {
                 pendingEventOrdering: PendingEventOrdering.Chronological,
             });
             const eventA = utils.mkMessage({
@@ -1504,7 +1505,7 @@ describe("Room", function() {
 
     describe("guessDMUserId", function() {
         it("should return first hero id", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.setSummary({
                 'm.heroes': [userB],
                 'm.joined_member_count': 1,
@@ -1513,7 +1514,7 @@ describe("Room", function() {
             expect(room.guessDMUserId()).toEqual(userB);
         });
         it("should return first member that isn't self", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([utils.mkMembership({
                 user: userB,
                 mship: "join",
@@ -1523,7 +1524,7 @@ describe("Room", function() {
             expect(room.guessDMUserId()).toEqual(userB);
         });
         it("should return self if only member present", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             expect(room.guessDMUserId()).toEqual(userA);
         });
     });
@@ -1542,12 +1543,12 @@ describe("Room", function() {
 
     describe("getDefaultRoomName", function() {
         it("should return 'Empty room' if a user is the only member", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             expect(room.getDefaultRoomName(userA)).toEqual("Empty room");
         });
 
         it("should return a display name if one other member is in the room", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1562,7 +1563,7 @@ describe("Room", function() {
         });
 
         it("should return a display name if one other member is banned", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1577,7 +1578,7 @@ describe("Room", function() {
         });
 
         it("should return a display name if one other member is invited", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1592,7 +1593,7 @@ describe("Room", function() {
         });
 
         it("should return 'Empty room (was User B)' if User B left the room", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1607,7 +1608,7 @@ describe("Room", function() {
         });
 
         it("should return 'User B and User C' if in a room with two other users", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1626,7 +1627,7 @@ describe("Room", function() {
         });
 
         it("should return 'User B and 2 others' if in a room with three other users", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1651,7 +1652,7 @@ describe("Room", function() {
 
     describe("io.element.functional_users", function() {
         it("should return a display name (default behaviour) if no one is marked as a functional member", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1673,7 +1674,7 @@ describe("Room", function() {
         });
 
         it("should return a display name (default behaviour) if service members is a number (invalid)", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1697,7 +1698,7 @@ describe("Room", function() {
         });
 
         it("should return a display name (default behaviour) if service members is a string (invalid)", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1719,7 +1720,7 @@ describe("Room", function() {
         });
 
         it("should return 'Empty room' if the only other member is a functional member", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1741,7 +1742,7 @@ describe("Room", function() {
         });
 
         it("should return 'User B' if User B is the only other member who isn't a functional member", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1767,7 +1768,7 @@ describe("Room", function() {
         });
 
         it("should return 'Empty room' if all other members are functional members", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1793,7 +1794,7 @@ describe("Room", function() {
         });
 
         it("should not break if an unjoined user is marked as a service user", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1861,7 +1862,9 @@ describe("Room", function() {
     });
 
     describe("eventShouldLiveIn", () => {
-        const room = new Room(roomId, null, userA);
+        const client = new TestClient(userA).client;
+        client.supportsExperimentalThreads = () => true;
+        const room = new Room(roomId, client, userA);
 
         const mkMessage = () => utils.mkMessage({
             event: true,
