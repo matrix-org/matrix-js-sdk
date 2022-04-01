@@ -1967,13 +1967,12 @@ describe("Room", function() {
 
             room.addLiveEvents([randomMessage, threadRoot, threadResponse]);
             const thread = await emitPromise(room, ThreadEvent.New);
-            // await emitPromise(thread, ThreadEvent.NewReply);
 
             expect(thread.replyToEvent).toBe(threadResponse);
             expect(thread.replyToEvent.getContent().body).toBe(threadResponse.getContent().body);
 
             room.addLiveEvents([threadResponseEdit]);
-            // await emitPromise(thread, ThreadEvent.Update);
+            await emitPromise(thread, ThreadEvent.Update);
             expect(thread.replyToEvent.getContent().body).toBe(threadResponseEdit.getContent()["m.new_content"].body);
         });
     });
