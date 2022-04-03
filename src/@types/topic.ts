@@ -19,8 +19,8 @@ import { EitherAnd, IMessageRendering } from "matrix-events-sdk";
 import { UnstableValue } from "../NamespacedValue";
 
 /**
- * Extensible topic event type based on MSC1767
- * https://github.com/matrix-org/matrix-spec-proposals/pull/1767
+ * Extensible topic event type based on MSC3765
+ * https://github.com/matrix-org/matrix-spec-proposals/pull/3765
  */
 
 /**
@@ -44,7 +44,7 @@ import { UnstableValue } from "../NamespacedValue";
 /**
  * The event type for an m.topic event (in content)
  */
-export const M_TOPIC = new UnstableValue("m.topic", "org.matrix.msc1767.topic");
+export const M_TOPIC = new UnstableValue("m.topic", "org.matrix.msc3765.topic");
 
 /**
  * The event content for an m.topic event (in content)
