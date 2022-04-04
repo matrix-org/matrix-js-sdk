@@ -10,7 +10,7 @@ import {
     prevString,
     simpleRetryOperation,
     stringToBase,
-    sortEventsByLatestContentTimestamp
+    sortEventsByLatestContentTimestamp,
 } from "../../src/utils";
 import { logger } from "../../src/logger";
 import { mkMessage } from "../test-utils/test-utils";

@@ -405,8 +405,11 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     }
 
     public processBeaconEvents(events: MatrixEvent[]): void {
-        // discard locations if we have no beacons
-        if (!events?.length || !this.beacons.size) {
+        if (
+            !events.length ||
+            // discard locations if we have no beacons
+            !this.beacons.size
+        ) {
             return;
         }
 
@@ -424,7 +427,6 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         }, {});
 
         Object.entries(locationEventsByBeaconId).forEach(([beaconInfoEventId, events]) => {
-            // TODO better way to find beacon by event_id
             const beacon = [...this.beacons.values()].find(beacon => beacon.beaconInfoId === beaconInfoEventId);
 
             if (beacon) {
@@ -466,7 +468,6 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * @experimental
      */
     private setBeacon(event: MatrixEvent): void {
-        console.log('hhh', event.getType(), event.isRedacted(), event.isRedaction(), event);
         if (this.beacons.has(event.getType())) {
             const beacon = this.beacons.get(event.getType());
 

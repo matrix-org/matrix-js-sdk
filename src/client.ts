@@ -8928,7 +8928,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return;
         }
         const beaconEvents = events.filter(event => M_BEACON.matches(event.getType()));
-        // console.log('hhh processBeaocnEvents', room, beaconEvents);
         room.currentState.processBeaconEvents(beaconEvents);
     }
 

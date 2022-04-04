@@ -25,9 +25,8 @@ export enum BeaconEvent {
     New = "Beacon.new",
     Update = "Beacon.update",
     LivenessChange = "Beacon.LivenessChange",
-    Destroy = "Destroy",
-    LocationUpdate = "LocationUpdate",
-    Destroy = "Destroy"
+    Destroy = "Beacon.Destroy",
+    LocationUpdate = "Beacon.LocationUpdate",
 }
 
 export type BeaconEventHandlerMap = {
@@ -134,7 +133,6 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
     public addLocations(locationEvents: MatrixEvent[]): void {
         // discard locations for beacons that are not live
 
-        console.log('hhh addLocation', JSON.stringify(locationEvents));
         if (!this.isLive) {
             return;
         }
@@ -151,10 +149,10 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
         });
         const latestLocationEvent = validLocationEvents.sort(sortEventsByLatestContentTimestamp)?.[0];
 
-        this._latestLocationState = parseBeaconContent(latestLocationEvent.getContent());
-
-        console.log('hhh', 'emitting new latest location', this.identifier);
-        this.emit(BeaconEvent.LocationUpdate, this.latestLocationState);
+        if (latestLocationEvent) {
+            this._latestLocationState = parseBeaconContent(latestLocationEvent.getContent());
+            this.emit(BeaconEvent.LocationUpdate, this.latestLocationState);
+        }
     }
 
     private setBeaconInfo(event: MatrixEvent): void {

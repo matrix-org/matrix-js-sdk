@@ -1,5 +1,5 @@
 import * as utils from "../test-utils/test-utils";
-import { makeBeaconInfoEvent } from "../test-utils/beacon";
+import { makeBeaconEvent, makeBeaconInfoEvent } from "../test-utils/beacon";
 import { filterEmitCallsByEventType } from "../test-utils/emitter";
 import { RoomState, RoomStateEvent } from "../../src/models/room-state";
 import { BeaconEvent } from "../../src/models/beacon";
@@ -710,6 +710,58 @@ describe("RoomState", function() {
 
             expect(state.maySendEvent('m.room.other_thing', userA)).toEqual(true);
             expect(state.maySendEvent('m.room.other_thing', userB)).toEqual(false);
+        });
+    });
+
+    describe('processBeaconEvents', () => {
+        const beacon1 = makeBeaconInfoEvent(userA, roomId, {}, '$beacon1', '$beacon1');
+        const beacon2 = makeBeaconInfoEvent(userA, roomId, {}, '$beacon2', '$beacon2');
+
+        it('does nothing when state has no beacons', () => {
+            const emitSpy = jest.spyOn(state, 'emit');
+            state.processBeaconEvents([makeBeaconEvent(userA, { beaconInfoId: '$beacon1' })]);
+            expect(emitSpy).not.toHaveBeenCalled();
+        });
+
+        it('does nothing when there are no events', () => {
+            state.setStateEvents([beacon1, beacon2]);
+            const emitSpy = jest.spyOn(state, 'emit').mockClear();
+            state.processBeaconEvents([]);
+            expect(emitSpy).not.toHaveBeenCalled();
+        });
+
+        it('discards events for beacons that are not in state', () => {
+            const location = makeBeaconEvent(userA, {
+                beaconInfoId: 'some-other-beacon',
+            });
+            state.setStateEvents([beacon1, beacon2]);
+            const emitSpy = jest.spyOn(state, 'emit').mockClear();
+            state.processBeaconEvents([location]);
+            expect(emitSpy).not.toHaveBeenCalled();
+        });
+
+        it('adds locations to beacons', () => {
+            const location1 = makeBeaconEvent(userA, {
+                beaconInfoId: '$beacon1', timestamp: Date.now() + 1,
+            });
+            const location2 = makeBeaconEvent(userA, {
+                beaconInfoId: '$beacon1', timestamp: Date.now() + 2,
+            });
+            const location3 = makeBeaconEvent(userA, {
+                beaconInfoId: 'some-other-beacon',
+            });
+            state.setStateEvents([beacon1, beacon2]);
+
+            expect(state.beacons.size).toEqual(2);
+
+            const beaconInstance = state.beacons.get(beacon1.getType());
+            const addLocationsSpy = jest.spyOn(beaconInstance, 'addLocations');
+
+            state.processBeaconEvents([location1, location2, location3]);
+
+            expect(addLocationsSpy).toHaveBeenCalledTimes(1);
+            // only called with locations for beacon1
+            expect(addLocationsSpy).toHaveBeenCalledWith([location1, location2]);
         });
     });
 });
