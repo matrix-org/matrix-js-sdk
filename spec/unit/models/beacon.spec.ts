@@ -256,7 +256,7 @@ describe('Beacon', () => {
                 expect(beacon.livenessWatchInterval).not.toEqual(oldMonitor);
             });
 
-            it('destroy kills liveness monitor', () => {
+            it('destroy kills liveness monitor and emits', () => {
                 // live beacon was created an hour ago
                 // and has a 3hr duration
                 const beacon = new Beacon(liveBeaconEvent);
@@ -267,10 +267,14 @@ describe('Beacon', () => {
 
                 // destroy the beacon
                 beacon.destroy();
+                expect(emitSpy).toHaveBeenCalledWith(BeaconEvent.Destroy, beacon.identifier);
+                // live forced to false
+                expect(beacon.isLive).toBe(false);
 
                 advanceDateAndTime(HOUR_MS * 2 + 1);
 
-                expect(emitSpy).not.toHaveBeenCalled();
+                // no additional calls
+                expect(emitSpy).toHaveBeenCalledTimes(1);
             });
         });
     });

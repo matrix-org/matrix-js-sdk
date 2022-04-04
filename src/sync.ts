@@ -227,6 +227,7 @@ export class SyncApi {
             RoomStateEvent.Update,
             BeaconEvent.New,
             BeaconEvent.Update,
+            BeaconEvent.Destroy,
             BeaconEvent.LivenessChange,
         ]);
 
