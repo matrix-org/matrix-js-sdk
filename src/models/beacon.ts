@@ -53,7 +53,6 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
     private _beaconInfo: BeaconInfoState;
     private _isLive: boolean;
     private livenessWatchInterval: number;
-    // TODO is there any reason to store the whole event
     private _latestLocationState: BeaconLocationState | undefined;
 
     constructor(
@@ -128,16 +127,17 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
         }
     }
 
-    // TODO can this event be cast to m.beacon event type somewhere in the path ?
-    // TODO is name confusing while these are m.beacon events ?
-    public addLocations(locationEvents: MatrixEvent[]): void {
+    /**
+     * Process Beacon locations
+     * Emits BeaconEvent.LocationUpdate
+     */
+    public addLocations(beaconLocationEvents: MatrixEvent[]): void {
         // discard locations for beacons that are not live
-
         if (!this.isLive) {
             return;
         }
 
-        const validLocationEvents = locationEvents.filter(event => {
+        const validLocationEvents = beaconLocationEvents.filter(event => {
             const content = event.getContent<MBeaconEventContent>();
             const timestamp = M_TIMESTAMP.findIn<number>(content);
             return (
