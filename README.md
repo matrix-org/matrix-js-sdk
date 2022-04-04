@@ -305,7 +305,7 @@ End-to-end encryption support
 
 The SDK supports end-to-end encryption via the Olm and Megolm protocols, using
 [libolm](https://gitlab.matrix.org/matrix-org/olm). It is left up to the
-application to make libolm available, via the ``Olm`` global.
+application to make libolm available, via the global variable ``Olm`` .
 
 It is also necessary to call ``matrixClient.initCrypto()`` after creating a new
 ``MatrixClient`` (but **before** calling ``matrixClient.startClient()``) to
@@ -324,20 +324,51 @@ specification.
 
 To provide the Olm library in a browser application:
 
- * download the transpiled libolm (from https://packages.matrix.org/npm/olm/).
+ * download the transpiled libolm (from https://gitlab.matrix.org/matrix-org/olm/-/releases).
  * load ``olm.js`` as a ``<script>`` *before* ``browser-matrix.js``.
 
 To provide the Olm library in a node.js application:
 
- * ``yarn add https://packages.matrix.org/npm/olm/olm-3.1.4.tgz``
-   (replace the URL with the latest version you want to use from
-    https://packages.matrix.org/npm/olm/)
- * ``global.Olm = require('olm');`` *before* loading ``matrix-js-sdk``.
+ * ``yarn add @matrix-org/olm --registry=https://gitlab.matrix.org/api/v4/packages/npm/packages/npm/``
+ * ``global.Olm = require('@matrix-org/olm');`` *before* loading ``matrix-js-sdk``.
 
-If you want to package Olm as dependency for your node.js application, you can
-use ``yarn add https://packages.matrix.org/npm/olm/olm-3.1.4.tgz``. If your
-application also works without e2e crypto enabled, add ``--optional`` to mark it
+If your application also works without e2e crypto enabled, add ``--optional`` to mark it
 as an optional dependency.
+
+Besides Olm, you need to configure some options when `createClient()` . These three options are required for enabling e2e crypto: `sessionStore` , `cryptoStore` and `deviceId` .
+
+For `sessionStore`, you need to provide a `WebStorageSessionStore` instance.
+
+To instantiate `WebStorageSessionStore` in a browser application:
+
+Choose from `window.sessionStorage` and `window.localStorage` to instantiate `WebStorageSessionStore`:
+
+- `sessionStore: new sdk.WebStorageSessionStore(localStorage)`
+
+To instantiate `WebStorageSessionStore` in a node.js application:
+
+The SDK does not provide an alternative solution for node.js application to store encrypted information with `WebStorageSessionStore`, but you can import a third-party npm package to mimic Web Storage API that runs on node.js like `node-localstorage` or implement your own`Storage` Object. The SDK specification requires a `Storage` implementation with `key`，`getItem`，`setItem`，`removeItem` and `length` method. The `Storage` Object can store data as a file or a local database.
+
+If you are still confused about mimicking Web Storage API, check out the `node-localstorage` solution provided by [this issue](https://github.com/matrix-org/matrix-js-sdk/issues/731#issuecomment-745344192).
+
+- `sessionStore: new sdk.WebStorageSessionStore(yourStorage)`
+
+For `cryptoStore`, you need to instantiate it with `IndexedDBCryptoStore`, `LocalStorageCryptoStore ` or `MemoryCryptoStore`. (choose according to your environment).
+
+- `cryptoStore: new sdk.MemoryCryptoStore()`
+
+Example:
+
+```javascript
+   const matrixClient = sdk.createClient({
+       baseUrl: "http://localhost:8008",
+       accessToken: myAccessToken,
+       userId: myUserId,
+       sessionStore: new sdk.WebStorageSessionStore(localStorage),
+  	   cryptoStore: new sdk.MemoryCryptoStore(),
+       deviceId: myDeviceId,
+   });
+```
 
 
 Contributing
