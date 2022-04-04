@@ -2593,6 +2593,14 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     }
 
     /**
+     * Returns whether the room is a video room.
+     * @returns {boolean} true if the room's type is RoomType.ElementVideo
+     */
+    public isElementVideoRoom(): boolean {
+        return this.getType() === RoomType.ElementVideo;
+    }
+
+    /**
      * This is an internal method. Calculates the name of the room from the current
      * room state.
      * @param {string} userId The client's user ID. Used to filter room members
