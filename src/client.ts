@@ -3649,38 +3649,30 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Create an m.beacon_info event
      * @param {string} roomId
      * @param {MBeaconInfoEventContent} beaconInfoContent
-     * @param {string} eventTypeSuffix - string to suffix event type
-     *  to make event type unique.
-     *  See MSC3672 for more context
-     *  https://github.com/matrix-org/matrix-spec-proposals/pull/3672
      * @returns {ISendEventResponse}
      */
     // eslint-disable-next-line @typescript-eslint/naming-convention
     public async unstable_createLiveBeacon(
         roomId: Room["roomId"],
         beaconInfoContent: MBeaconInfoEventContent,
-        eventTypeSuffix: string,
     ) {
-        const eventType = M_BEACON_INFO.name;
-        return this.unstable_setLiveBeacon(roomId, eventType, beaconInfoContent);
+        return this.unstable_setLiveBeacon(roomId, beaconInfoContent);
     }
 
     /**
      * Upsert a live beacon event
      * using a specific m.beacon_info.* event variable type
      * @param {string} roomId string
-     * @param {string} beaconInfoEventType event type including variable suffix
      * @param {MBeaconInfoEventContent} beaconInfoContent
      * @returns {ISendEventResponse}
      */
     // eslint-disable-next-line @typescript-eslint/naming-convention
     public async unstable_setLiveBeacon(
         roomId: string,
-        beaconInfoEventType: string,
         beaconInfoContent: MBeaconInfoEventContent,
     ) {
         const userId = this.getUserId();
-        return this.sendStateEvent(roomId, beaconInfoEventType, beaconInfoContent, userId);
+        return this.sendStateEvent(roomId, M_BEACON_INFO.name, beaconInfoContent, userId);
     }
 
     /**

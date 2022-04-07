@@ -999,7 +999,7 @@ describe("MatrixClient", function() {
         });
 
         it("creates new beacon info", async () => {
-            await client.unstable_createLiveBeacon(roomId, content, '123');
+            await client.unstable_createLiveBeacon(roomId, content);
 
             // event type combined
             const expectedEventType = M_BEACON_INFO.name;
@@ -1015,15 +1015,13 @@ describe("MatrixClient", function() {
         });
 
         it("updates beacon info with specific event type", async () => {
-            const eventType = M_BEACON_INFO.name;
-
-            await client.unstable_setLiveBeacon(roomId, eventType, content);
+            await client.unstable_setLiveBeacon(roomId, content);
 
             // event type combined
             const [, , path, , requestContent] = client.http.authedRequest.mock.calls[0];
             expect(path).toEqual(
                 `/rooms/${encodeURIComponent(roomId)}/state/` +
-                `${encodeURIComponent(eventType)}/${encodeURIComponent(userId)}`,
+                `${encodeURIComponent(M_BEACON_INFO.name)}/${encodeURIComponent(userId)}`,
             );
             expect(requestContent).toEqual(content);
         });

@@ -87,13 +87,11 @@ describe('Beacon', () => {
                     isLive: true,
                 },
                 '$live123',
-                '$live123',
             );
             notLiveBeaconEvent = makeBeaconInfoEvent(
                 userId,
                 roomId,
                 { timeout: HOUR_MS * 3, isLive: false },
-                '$dead123',
                 '$dead123',
             );
 
@@ -162,7 +160,7 @@ describe('Beacon', () => {
                 expect(beacon.isLive).toEqual(true);
 
                 const updatedBeaconEvent = makeBeaconInfoEvent(
-                    userId, roomId, { timeout: HOUR_MS * 3, isLive: false }, '$live123', '$live123');
+                    userId, roomId, { timeout: HOUR_MS * 3, isLive: false }, '$live123');
 
                 beacon.update(updatedBeaconEvent);
                 expect(beacon.isLive).toEqual(false);
@@ -180,7 +178,6 @@ describe('Beacon', () => {
                     roomId,
                     { timeout: HOUR_MS * 3, isLive: false },
                     beacon.beaconInfoId,
-                    '$live123',
                 );
 
                 beacon.update(updatedBeaconEvent);

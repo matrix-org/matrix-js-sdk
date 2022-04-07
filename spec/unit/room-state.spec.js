@@ -282,8 +282,8 @@ describe("RoomState", function() {
 
             it('updates existing beacon info events in state', () => {
                 const beaconId = '$beacon1';
-                const beaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId, beaconId);
-                const updatedBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: false }, beaconId, beaconId);
+                const beaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId);
+                const updatedBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: false }, beaconId);
 
                 state.setStateEvents([beaconEvent]);
                 const beaconInstance = state.beacons.get(beaconEvent.getType());
@@ -299,8 +299,8 @@ describe("RoomState", function() {
 
             it('destroys and removes redacted beacon events', () => {
                 const beaconId = '$beacon1';
-                const beaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId, beaconId);
-                const redactedBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId, beaconId);
+                const beaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId);
+                const redactedBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId);
                 const redactionEvent = { event: { type: 'm.room.redaction' } };
                 redactedBeaconEvent.makeRedacted(redactionEvent);
 
@@ -316,8 +316,8 @@ describe("RoomState", function() {
             });
 
             it('updates live beacon ids once after setting state events', () => {
-                const liveBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, '$beacon1', '$beacon1');
-                const deadBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: false }, '$beacon2', '$beacon2');
+                const liveBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, '$beacon1');
+                const deadBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: false }, '$beacon2');
 
                 const emitSpy = jest.spyOn(state, 'emit');
 
