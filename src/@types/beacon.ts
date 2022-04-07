@@ -20,8 +20,8 @@ import { UnstableValue } from "../NamespacedValue";
 import { MAssetEvent, MLocationEvent, MTimestampEvent } from "./location";
 
 /**
- * Beacon info and beacon event types as described in MSC3489
- * https://github.com/matrix-org/matrix-spec-proposals/pull/3489
+ * Beacon info and beacon event types as described in MSC3672
+ * https://github.com/matrix-org/matrix-spec-proposals/pull/3672
  */
 
 /**
@@ -63,8 +63,8 @@ import { MAssetEvent, MLocationEvent, MTimestampEvent } from "./location";
 /**
  * Non-variable type for m.beacon_info event content
  */
-export const M_BEACON_INFO = new UnstableValue("m.beacon_info", "org.matrix.msc3489.beacon_info");
-export const M_BEACON = new UnstableValue("m.beacon", "org.matrix.msc3489.beacon");
+export const M_BEACON_INFO = new UnstableValue("m.beacon_info", "org.matrix.msc3672.beacon_info");
+export const M_BEACON = new UnstableValue("m.beacon", "org.matrix.msc3672.beacon");
 
 export type MBeaconInfoContent = {
     description?: string;
@@ -82,9 +82,9 @@ export type MBeaconInfoEvent = EitherAnd<
 
 /**
  * m.beacon_info Event example from the spec
- * https://github.com/matrix-org/matrix-spec-proposals/pull/3489
+ * https://github.com/matrix-org/matrix-spec-proposals/pull/3672
  * {
-    "type": "m.beacon_info.@matthew:matrix.org.1",
+    "type": "m.beacon_info",
     "state_key": "@matthew:matrix.org",
     "content": {
         "m.beacon_info": {
@@ -111,7 +111,7 @@ export type MBeaconInfoEventContent = &
 
 /**
  * m.beacon event example
- * https://github.com/matrix-org/matrix-spec-proposals/pull/3489
+ * https://github.com/matrix-org/matrix-spec-proposals/pull/3672
  *
  * {
     "type": "m.beacon",

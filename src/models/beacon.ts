@@ -38,7 +38,7 @@ export const isTimestampInDuration = (
     timestamp: number,
 ): boolean => timestamp >= startTimestamp && startTimestamp + durationMs >= timestamp;
 
-// https://github.com/matrix-org/matrix-spec-proposals/pull/3489
+// https://github.com/matrix-org/matrix-spec-proposals/pull/3672
 export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.New>, BeaconEventHandlerMap> {
     public readonly roomId: string;
     private _beaconInfo: BeaconInfoState;

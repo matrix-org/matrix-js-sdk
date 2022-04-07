@@ -3651,8 +3651,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {MBeaconInfoEventContent} beaconInfoContent
      * @param {string} eventTypeSuffix - string to suffix event type
      *  to make event type unique.
-     *  See MSC3489 for more context
-     *  https://github.com/matrix-org/matrix-spec-proposals/pull/3489
+     *  See MSC3672 for more context
+     *  https://github.com/matrix-org/matrix-spec-proposals/pull/3672
      * @returns {ISendEventResponse}
      */
     // eslint-disable-next-line @typescript-eslint/naming-convention
