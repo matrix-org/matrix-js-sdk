@@ -16,7 +16,6 @@ limitations under the License.
 
 import { REFERENCE_RELATION } from "matrix-events-sdk";
 
-import { M_BEACON_INFO } from "../../src/@types/beacon";
 import { LocationAssetType, M_ASSET, M_LOCATION, M_TIMESTAMP } from "../../src/@types/location";
 import { makeBeaconContent, makeBeaconInfoContent } from "../../src/content-helpers";
 
