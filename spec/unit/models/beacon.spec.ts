@@ -163,6 +163,24 @@ describe('Beacon', () => {
                 expect(beacon.identifier).toEqual(`${roomId}_${userId}`);
             });
 
+            it('does not update with an older event', () => {
+                const beacon = new Beacon(liveBeaconEvent);
+                const emitSpy = jest.spyOn(beacon, 'emit').mockClear();
+                expect(beacon.beaconInfoId).toEqual(liveBeaconEvent.getId());
+
+                const oldUpdateEvent = makeBeaconInfoEvent(
+                    userId,
+                    roomId,
+                );
+                // less than the original event
+                oldUpdateEvent.event.origin_server_ts = liveBeaconEvent.event.origin_server_ts - 1000;
+
+                beacon.update(oldUpdateEvent);
+                // didnt update
+                expect(emitSpy).not.toHaveBeenCalled();
+                expect(beacon.beaconInfoId).toEqual(liveBeaconEvent.getId());
+            });
+
             it('updates event', () => {
                 const beacon = new Beacon(liveBeaconEvent);
                 const emitSpy = jest.spyOn(beacon, 'emit');

@@ -62,7 +62,7 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
         return this._isLive;
     }
 
-    public get identifier(): string {
+    public get identifier(): BeaconIdentifier {
         return getBeaconInfoIdentifier(this.rootEvent);
     }
 
@@ -85,6 +85,10 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
     public update(beaconInfoEvent: MatrixEvent): void {
         if (getBeaconInfoIdentifier(beaconInfoEvent) !== this.identifier) {
             throw new Error('Invalid updating event');
+        }
+        // don't update beacon with an older event
+        if (beaconInfoEvent.event.origin_server_ts < this.rootEvent.event.origin_server_ts) {
+            return;
         }
         this.rootEvent = beaconInfoEvent;
         this.setBeaconInfo(this.rootEvent);

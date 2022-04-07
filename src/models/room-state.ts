@@ -30,6 +30,7 @@ import { Beacon, BeaconEvent, BeaconEventHandlerMap } from "./beacon";
 import { TypedReEmitter } from "../ReEmitter";
 import { M_BEACON_INFO } from "../@types/beacon";
 import { getBeaconInfoIdentifier } from "./beacon";
+import { BeaconIdentifier } from "..";
 
 // possible statuses for out-of-band member loading
 enum OobStatus {
@@ -82,8 +83,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     public events = new Map<string, Map<string, MatrixEvent>>(); // Map<eventType, Map<stateKey, MatrixEvent>>
     public paginationToken: string = null;
 
-    public readonly beacons = new Map<string, Beacon>();
-    private liveBeaconIds: string[] = [];
+    public readonly beacons = new Map<BeaconIdentifier, Beacon>();
+    private liveBeaconIds: BeaconIdentifier[] = [];
 
     /**
      * Construct room state.
@@ -443,6 +444,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         if (this.beacons.has(beaconIdentifier)) {
             const beacon = this.beacons.get(beaconIdentifier);
 
+
+            // TODO is it redacting exactly the beacon we have, or a previous version?
             if (event.isRedacted()) {
                 beacon.destroy();
                 this.beacons.delete(beaconIdentifier);

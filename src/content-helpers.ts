@@ -243,14 +243,14 @@ export const parseBeaconInfoContent = (content: MBeaconInfoEventContent): Beacon
 export type MakeBeaconContent = (
     uri: string,
     timestamp: number,
-    beaconInfoId: string,
+    beaconInfoEventId: string,
     description?: string,
 ) => MBeaconEventContent;
 
 export const makeBeaconContent: MakeBeaconContent = (
     uri,
     timestamp,
-    beaconInfoId,
+    beaconInfoEventId,
     description,
 ) => ({
     [M_LOCATION.name]: {
@@ -260,6 +260,6 @@ export const makeBeaconContent: MakeBeaconContent = (
     [M_TIMESTAMP.name]: timestamp,
     "m.relates_to": {
         rel_type: REFERENCE_RELATION.name,
-        event_id: beaconInfoId,
+        event_id: beaconInfoEventId,
     },
 });

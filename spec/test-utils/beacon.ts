@@ -42,7 +42,6 @@ export const makeBeaconInfoEvent = (
     roomId: string,
     contentProps: Partial<InfoContentProps> = {},
     eventId?: string,
-    eventTypeSuffix?: string,
 ): MatrixEvent => {
     const {
         timeout, isLive, description, assetType,
@@ -56,6 +55,8 @@ export const makeBeaconInfoEvent = (
         state_key: sender,
         content: makeBeaconInfoContent(timeout, isLive, description, assetType),
     });
+
+    event.event.origin_server_ts = Date.now();
 
     // live beacons use the beacon_info event id
     // set or default this
