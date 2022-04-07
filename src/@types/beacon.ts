@@ -61,11 +61,6 @@ import { MAssetEvent, MLocationEvent, MTimestampEvent } from "./location";
  */
 
 /**
- * Variable event type for m.beacon_info
- */
-export const M_BEACON_INFO_VARIABLE = new UnstableValue("m.beacon_info.*", "org.matrix.msc3489.beacon_info.*");
-
-/**
  * Non-variable type for m.beacon_info event content
  */
 export const M_BEACON_INFO = new UnstableValue("m.beacon_info", "org.matrix.msc3489.beacon_info");

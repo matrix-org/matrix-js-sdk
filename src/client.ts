@@ -180,7 +180,7 @@ import { MediaHandler } from "./webrtc/mediaHandler";
 import { IRefreshTokenResponse } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { Thread, THREAD_RELATION_TYPE } from "./models/thread";
-import { MBeaconInfoEventContent, M_BEACON_INFO_VARIABLE } from "./@types/beacon";
+import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -3661,8 +3661,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         beaconInfoContent: MBeaconInfoEventContent,
         eventTypeSuffix: string,
     ) {
-        const userId = this.getUserId();
-        const eventType = M_BEACON_INFO_VARIABLE.name.replace('*', `${userId}.${eventTypeSuffix}`);
+        const eventType = M_BEACON_INFO.name;
         return this.unstable_setLiveBeacon(roomId, eventType, beaconInfoContent);
     }
 
