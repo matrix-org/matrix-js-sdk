@@ -58,6 +58,7 @@ describe('Beacon', () => {
 
     describe('Beacon', () => {
         const userId = '@user:server.org';
+        const userId2 = '@user2:server.org';
         const roomId = '$room:server.org';
         // 14.03.2022 16:15
         const now = 1647270879403;
@@ -68,6 +69,7 @@ describe('Beacon', () => {
         // without timeout of 3 hours
         let liveBeaconEvent;
         let notLiveBeaconEvent;
+        let user2BeaconEvent;
 
         const advanceDateAndTime = (ms: number) => {
             // bc liveness check uses Date.now we have to advance this mock
@@ -94,6 +96,15 @@ describe('Beacon', () => {
                 { timeout: HOUR_MS * 3, isLive: false },
                 '$dead123',
             );
+            user2BeaconEvent = makeBeaconInfoEvent(
+                userId2,
+                roomId,
+                {
+                    timeout: HOUR_MS * 3,
+                    isLive: true,
+                },
+                '$user2live123',
+            );
 
             // back to now
             jest.spyOn(global.Date, 'now').mockReturnValue(now);
@@ -111,7 +122,7 @@ describe('Beacon', () => {
             expect(beacon.isLive).toEqual(true);
             expect(beacon.beaconInfoOwner).toEqual(userId);
             expect(beacon.beaconInfoEventType).toEqual(liveBeaconEvent.getType());
-            expect(beacon.identifier).toEqual(liveBeaconEvent.getType());
+            expect(beacon.identifier).toEqual(liveBeaconEvent.getStateKey());
             expect(beacon.beaconInfo).toBeTruthy();
         });
 
@@ -149,8 +160,9 @@ describe('Beacon', () => {
 
                 expect(beacon.beaconInfoId).toEqual(liveBeaconEvent.getId());
 
-                expect(() => beacon.update(notLiveBeaconEvent)).toThrow();
-                expect(beacon.isLive).toEqual(true);
+                expect(() => beacon.update(user2BeaconEvent)).toThrow();
+                // didnt update
+                expect(beacon.identifier).toEqual(liveBeaconEvent.getStateKey());
             });
 
             it('updates event', () => {
