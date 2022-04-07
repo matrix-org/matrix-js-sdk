@@ -301,7 +301,7 @@ describe("RoomState", function() {
                 const beaconId = '$beacon1';
                 const beaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId);
                 const redactedBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId);
-                const redactionEvent = { event: { type: 'm.room.redaction' } };
+                const redactionEvent = { event: { type: 'm.room.redaction', redacts: beaconEvent.getId() } };
                 redactedBeaconEvent.makeRedacted(redactionEvent);
 
                 state.setStateEvents([beaconEvent]);
