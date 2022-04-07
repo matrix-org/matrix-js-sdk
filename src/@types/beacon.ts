@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EitherAnd, RELATES_TO_RELATIONSHIP, REFERENCE_RELATION } from "matrix-events-sdk";
+import { RELATES_TO_RELATIONSHIP, REFERENCE_RELATION } from "matrix-events-sdk";
 
 import { UnstableValue } from "../NamespacedValue";
 import { MAssetEvent, MLocationEvent, MTimestampEvent } from "./location";
@@ -75,11 +75,6 @@ export type MBeaconInfoContent = {
     live?: boolean;
 };
 
-export type MBeaconInfoEvent = EitherAnd<
-    { [M_BEACON_INFO.name]: MBeaconInfoContent },
-    { [M_BEACON_INFO.altName]: MBeaconInfoContent }
->;
-
 /**
  * m.beacon_info Event example from the spec
  * https://github.com/matrix-org/matrix-spec-proposals/pull/3672
@@ -103,7 +98,7 @@ export type MBeaconInfoEvent = EitherAnd<
  * m.beacon_info.* event content
  */
 export type MBeaconInfoEventContent = &
-    MBeaconInfoEvent &
+    MBeaconInfoContent &
     // creation timestamp of the beacon on the client
     MTimestampEvent &
     // the type of asset being tracked as per MSC3488

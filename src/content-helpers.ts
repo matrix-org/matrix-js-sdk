@@ -18,7 +18,7 @@ limitations under the License.
 
 import { REFERENCE_RELATION } from "matrix-events-sdk";
 
-import { MBeaconEventContent, MBeaconInfoContent, MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
+import { MBeaconEventContent, MBeaconInfoContent, MBeaconInfoEventContent } from "./@types/beacon";
 import { MsgType } from "./@types/event";
 import { TEXT_NODE_TYPE } from "./@types/extensible_events";
 import {
@@ -208,11 +208,9 @@ export const makeBeaconInfoContent: MakeBeaconInfoContent = (
     assetType,
     timestamp,
 ) => ({
-    [M_BEACON_INFO.name]: {
-        description,
-        timeout,
-        live: isLive,
-    },
+    description,
+    timeout,
+    live: isLive,
     [M_TIMESTAMP.name]: timestamp || Date.now(),
     [M_ASSET.name]: {
         type: assetType ?? LocationAssetType.Self,
@@ -227,7 +225,7 @@ export type BeaconInfoState = MBeaconInfoContent & {
  * Flatten beacon info event content
  */
 export const parseBeaconInfoContent = (content: MBeaconInfoEventContent): BeaconInfoState => {
-    const { description, timeout, live } = M_BEACON_INFO.findIn<MBeaconInfoContent>(content);
+    const { description, timeout, live } = content;
     const { type: assetType } = M_ASSET.findIn<MAssetContent>(content);
     const timestamp = M_TIMESTAMP.findIn<number>(content);
 

@@ -36,11 +36,9 @@ describe('Beacon content helpers', () => {
                 'nice beacon_info',
                 LocationAssetType.Pin,
             )).toEqual({
-                [M_BEACON_INFO.name]: {
-                    description: 'nice beacon_info',
-                    timeout: 1234,
-                    live: true,
-                },
+                description: 'nice beacon_info',
+                timeout: 1234,
+                live: true,
                 [M_TIMESTAMP.name]: mockDateNow,
                 [M_ASSET.name]: {
                     type: LocationAssetType.Pin,
