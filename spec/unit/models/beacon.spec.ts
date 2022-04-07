@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventType } from "../../../src";
-import { M_BEACON_INFO } from "../../../src/@types/beacon";
 import {
     isTimestampInDuration,
     Beacon,
@@ -122,7 +120,7 @@ describe('Beacon', () => {
             expect(beacon.isLive).toEqual(true);
             expect(beacon.beaconInfoOwner).toEqual(userId);
             expect(beacon.beaconInfoEventType).toEqual(liveBeaconEvent.getType());
-            expect(beacon.identifier).toEqual(liveBeaconEvent.getStateKey());
+            expect(beacon.identifier).toEqual(`${roomId}_${userId}`);
             expect(beacon.beaconInfo).toBeTruthy();
         });
 
@@ -162,7 +160,7 @@ describe('Beacon', () => {
 
                 expect(() => beacon.update(user2BeaconEvent)).toThrow();
                 // didnt update
-                expect(beacon.identifier).toEqual(liveBeaconEvent.getStateKey());
+                expect(beacon.identifier).toEqual(`${roomId}_${userId}`);
             });
 
             it('updates event', () => {

@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { M_BEACON_INFO } from "../@types/beacon";
 import { BeaconInfoState, parseBeaconInfoContent } from "../content-helpers";
 import { MatrixEvent } from "../matrix";
 import { TypedEventEmitter } from "./typed-event-emitter";
@@ -38,6 +37,12 @@ export const isTimestampInDuration = (
     timestamp: number,
 ): boolean => timestamp >= startTimestamp && startTimestamp + durationMs >= timestamp;
 
+// beacon info events are uniquely identified by
+// `<roomId>_<state_key>`
+export type BeaconIdentifier = string;
+export const getBeaconInfoIdentifier = (event: MatrixEvent): BeaconIdentifier =>
+    `${event.getRoomId()}_${event.getStateKey()}`;
+
 // https://github.com/matrix-org/matrix-spec-proposals/pull/3672
 export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.New>, BeaconEventHandlerMap> {
     public readonly roomId: string;
@@ -58,7 +63,7 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
     }
 
     public get identifier(): string {
-        return this.rootEvent.getStateKey();
+        return getBeaconInfoIdentifier(this.rootEvent);
     }
 
     public get beaconInfoId(): string {
@@ -78,7 +83,7 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
     }
 
     public update(beaconInfoEvent: MatrixEvent): void {
-        if (beaconInfoEvent.getStateKey() !== this.identifier) {
+        if (getBeaconInfoIdentifier(beaconInfoEvent) !== this.identifier) {
             throw new Error('Invalid updating event');
         }
         this.rootEvent = beaconInfoEvent;

@@ -29,6 +29,7 @@ import { TypedEventEmitter } from "./typed-event-emitter";
 import { Beacon, BeaconEvent, BeaconEventHandlerMap } from "./beacon";
 import { TypedReEmitter } from "../ReEmitter";
 import { M_BEACON_INFO } from "../@types/beacon";
+import { getBeaconInfoIdentifier } from "./beacon";
 
 // possible statuses for out-of-band member loading
 enum OobStatus {
@@ -438,7 +439,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * @experimental
      */
     private setBeacon(event: MatrixEvent): void {
-        const beaconIdentifier = event.getStateKey();
+        const beaconIdentifier = getBeaconInfoIdentifier(event);
         if (this.beacons.has(beaconIdentifier)) {
             const beacon = this.beacons.get(beaconIdentifier);
 
