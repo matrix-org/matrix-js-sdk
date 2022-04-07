@@ -26,8 +26,9 @@ import { MatrixEvent } from "./event";
 import { MatrixClient } from "../client";
 import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
 import { TypedEventEmitter } from "./typed-event-emitter";
-import { Beacon, BeaconEvent, isBeaconInfoEventType, BeaconEventHandlerMap } from "./beacon";
+import { Beacon, BeaconEvent, BeaconEventHandlerMap } from "./beacon";
 import { TypedReEmitter } from "../ReEmitter";
+import { M_BEACON_INFO } from "../@types/beacon";
 
 // possible statuses for out-of-band member loading
 enum OobStatus {
@@ -330,7 +331,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                 return;
             }
 
-            if (isBeaconInfoEventType(event.getType())) {
+            if (M_BEACON_INFO.matches(event.getType())) {
                 this.setBeacon(event);
             }
 

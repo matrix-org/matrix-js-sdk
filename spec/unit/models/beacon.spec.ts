@@ -18,7 +18,6 @@ import { EventType } from "../../../src";
 import { M_BEACON_INFO } from "../../../src/@types/beacon";
 import {
     isTimestampInDuration,
-    isBeaconInfoEventType,
     Beacon,
     BeaconEvent,
 } from "../../../src/models/beacon";
@@ -54,25 +53,6 @@ describe('Beacon', () => {
             const twoHourDuration = HOUR_MS * 2;
             const now = startTs + HOUR_MS;
             expect(isTimestampInDuration(startTs, twoHourDuration, now)).toBe(true);
-        });
-    });
-
-    describe('isBeaconInfoEventType', () => {
-        it.each([
-            EventType.CallAnswer,
-            `prefix.${M_BEACON_INFO.name}`,
-            `prefix.${M_BEACON_INFO.altName}`,
-        ])('returns false for %s', (type) => {
-            expect(isBeaconInfoEventType(type)).toBe(false);
-        });
-
-        it.each([
-            M_BEACON_INFO.name,
-            M_BEACON_INFO.altName,
-            `${M_BEACON_INFO.name}.@test:server.org.12345`,
-            `${M_BEACON_INFO.altName}.@test:server.org.12345`,
-        ])('returns true for %s', (type) => {
-            expect(isBeaconInfoEventType(type)).toBe(true);
         });
     });
 
