@@ -438,12 +438,13 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * @experimental
      */
     private setBeacon(event: MatrixEvent): void {
-        if (this.beacons.has(event.getType())) {
-            const beacon = this.beacons.get(event.getType());
+        const beaconIdentifier = event.getStateKey();
+        if (this.beacons.has(beaconIdentifier)) {
+            const beacon = this.beacons.get(beaconIdentifier);
 
             if (event.isRedacted()) {
                 beacon.destroy();
-                this.beacons.delete(event.getType());
+                this.beacons.delete(beaconIdentifier);
                 return;
             }
 
@@ -465,7 +466,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
         this.emit(BeaconEvent.New, event, beacon);
         beacon.on(BeaconEvent.LivenessChange, this.onBeaconLivenessChange.bind(this));
-        this.beacons.set(beacon.beaconInfoEventType, beacon);
+        this.beacons.set(beacon.identifier, beacon);
     }
 
     /**
@@ -478,7 +479,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         const prevHasLiveBeacons = !!this.liveBeaconIds?.length;
         this.liveBeaconIds = Array.from(this.beacons.values())
             .filter(beacon => beacon.isLive)
-            .map(beacon => beacon.beaconInfoId);
+            .map(beacon => beacon.identifier);
 
         const hasLiveBeacons = !!this.liveBeaconIds.length;
         if (prevHasLiveBeacons !== hasLiveBeacons) {
