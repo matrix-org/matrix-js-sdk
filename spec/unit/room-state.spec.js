@@ -260,7 +260,7 @@ describe("RoomState", function() {
                 state.setStateEvents([beaconEvent]);
 
                 expect(state.beacons.size).toEqual(1);
-                const beaconInstance = state.beacons.get(beaconEvent.getType());
+                const beaconInstance = state.beacons.get(beaconEvent.getStateKey());
                 expect(beaconInstance).toBeTruthy();
                 expect(emitSpy).toHaveBeenCalledWith(BeaconEvent.New, beaconEvent, beaconInstance);
             });
@@ -286,15 +286,15 @@ describe("RoomState", function() {
                 const updatedBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: false }, beaconId);
 
                 state.setStateEvents([beaconEvent]);
-                const beaconInstance = state.beacons.get(beaconEvent.getType());
+                const beaconInstance = state.beacons.get(beaconEvent.getStateKey());
                 expect(beaconInstance.isLive).toEqual(true);
 
                 state.setStateEvents([updatedBeaconEvent]);
 
                 // same Beacon
-                expect(state.beacons.get(beaconEvent.getType())).toBe(beaconInstance);
+                expect(state.beacons.get(beaconEvent.getStateKey())).toBe(beaconInstance);
                 // updated liveness
-                expect(state.beacons.get(beaconEvent.getType()).isLive).toEqual(false);
+                expect(state.beacons.get(beaconEvent.getStateKey()).isLive).toEqual(false);
             });
 
             it('destroys and removes redacted beacon events', () => {
@@ -305,19 +305,19 @@ describe("RoomState", function() {
                 redactedBeaconEvent.makeRedacted(redactionEvent);
 
                 state.setStateEvents([beaconEvent]);
-                const beaconInstance = state.beacons.get(beaconEvent.getType());
+                const beaconInstance = state.beacons.get(beaconEvent.getStateKey());
                 const destroySpy = jest.spyOn(beaconInstance, 'destroy');
                 expect(beaconInstance.isLive).toEqual(true);
 
                 state.setStateEvents([redactedBeaconEvent]);
 
                 expect(destroySpy).toHaveBeenCalled();
-                expect(state.beacons.get(beaconEvent.getType())).toBe(undefined);
+                expect(state.beacons.get(beaconEvent.getStateKey())).toBe(undefined);
             });
 
             it('updates live beacon ids once after setting state events', () => {
                 const liveBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, '$beacon1');
-                const deadBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: false }, '$beacon2');
+                const deadBeaconEvent = makeBeaconInfoEvent(userB, roomId, { isLive: false }, '$beacon2');
 
                 const emitSpy = jest.spyOn(state, 'emit');
 
