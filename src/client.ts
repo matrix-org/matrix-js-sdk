@@ -3771,9 +3771,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             txnId = this.makeTxnId();
         }
 
-        // we always construct a MatrixEvent when sending because the store and
-        // scheduler use them. We'll extract the params back out if it turns out
-        // the client has no scheduler or store.
+        // We always construct a MatrixEvent when sending because the store and scheduler use them.
+        // We'll extract the params back out if it turns out the client has no scheduler or store.
         const localEvent = new MatrixEvent(Object.assign(eventObject, {
             event_id: "~" + roomId + ":" + txnId,
             user_id: this.credentials.userId,
@@ -3808,9 +3807,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         localEvent.setStatus(EventStatus.SENDING);
 
         // add this event immediately to the local store as 'sending'.
-        if (room) {
-            room.addPendingEvent(localEvent, txnId);
-        }
+        room?.addPendingEvent(localEvent, txnId);
 
         // addPendingEvent can change the state to NOT_SENT if it believes
         // that there's other events that have failed. We won't bother to
@@ -5179,7 +5176,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     room.currentState.setUnknownStateEvents(stateEvents);
                 }
 
-                const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(room, matrixEvents);
+                const [timelineEvents, threadedEvents] = room.partitionThreadedEvents(matrixEvents);
 
                 room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
                 await this.processThreadEvents(room, threadedEvents, true);
@@ -5281,7 +5278,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // functions contiguously, so we have to jump through some hoops to get our target event in it.
         // XXX: workaround for https://github.com/vector-im/element-meta/issues/150
         if (Thread.hasServerSideSupport && event.isRelation(THREAD_RELATION_TYPE.name)) {
-            const [, threadedEvents] = this.partitionThreadedEvents(timelineSet.room, events);
+            const [, threadedEvents] = timelineSet.room.partitionThreadedEvents(events);
             const thread = await timelineSet.room.createThreadFetchRoot(event.threadRootId, threadedEvents, true);
 
             let nextBatch: string;
@@ -5316,7 +5313,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             timeline.getState(EventTimeline.FORWARDS).paginationToken = res.end;
         }
 
-        const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(timelineSet.room, events);
+        const [timelineEvents, threadedEvents] = timelineSet.room.partitionThreadedEvents(events);
         timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
         // The target event is not in a thread but process the contextual events, so we can show any threads around it.
         await this.processThreadEvents(timelineSet.room, threadedEvents, true);
@@ -5447,7 +5444,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 }
 
                 const timelineSet = eventTimeline.getTimelineSet();
-                const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(timelineSet.room, matrixEvents);
+                const [timelineEvents, threadedEvents] = timelineSet.room.partitionThreadedEvents(matrixEvents);
                 timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
                 await this.processThreadEvents(timelineSet.room, threadedEvents, backwards);
 
@@ -5484,7 +5481,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 const matrixEvents = res.chunk.map(this.getEventMapper());
 
                 const timelineSet = eventTimeline.getTimelineSet();
-                const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(timelineSet.room, matrixEvents);
+                const [timelineEvents, threadedEvents] = timelineSet.room.partitionThreadedEvents(matrixEvents);
                 timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
                 await this.processThreadEvents(room, threadedEvents, backwards);
 
@@ -8853,57 +8850,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Given some events, find the IDs of all the thread roots that are
-     * referred to by them.
-     */
-    private findThreadRoots(events: MatrixEvent[]): Set<string> {
-        const threadRoots = new Set<string>();
-        for (const event of events) {
-            if (event.isThreadRelation) {
-                threadRoots.add(event.relationEventId);
-            }
-        }
-        return threadRoots;
-    }
-
-    public partitionThreadedEvents(room: Room, events: MatrixEvent[]): [
-        timelineEvents: MatrixEvent[],
-        threadedEvents: MatrixEvent[],
-    ] {
-        // Indices to the events array, for readability
-        const ROOM = 0;
-        const THREAD = 1;
-        if (this.supportsExperimentalThreads()) {
-            const threadRoots = this.findThreadRoots(events);
-            return events.reduce((memo, event: MatrixEvent) => {
-                const {
-                    shouldLiveInRoom,
-                    shouldLiveInThread,
-                    threadId,
-                } = room.eventShouldLiveIn(event, events, threadRoots);
-
-                if (shouldLiveInRoom) {
-                    memo[ROOM].push(event);
-                }
-
-                if (shouldLiveInThread) {
-                    event.setThreadId(threadId);
-                    memo[THREAD].push(event);
-                }
-
-                return memo;
-            }, [[], []]);
-        } else {
-            // When `experimentalThreadSupport` is disabled
-            // treat all events as timelineEvents
-            return [
-                events,
-                [],
-            ];
-        }
-    }
-
-    /**
      * @experimental
      */
     public async processThreadEvents(
@@ -8911,9 +8857,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         threadedEvents: MatrixEvent[],
         toStartOfTimeline: boolean,
     ): Promise<void> {
-        for (const event of threadedEvents) {
-            await room.addThreadedEvent(event, toStartOfTimeline);
-        }
+        await room.processThreadedEvents(threadedEvents, toStartOfTimeline);
     }
 
     /**

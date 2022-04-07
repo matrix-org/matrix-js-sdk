@@ -35,6 +35,8 @@ import { Room } from "../../src/models/room";
 import { RoomState } from "../../src/models/room-state";
 import { UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../../src/@types/event";
 import { TestClient } from "../TestClient";
+import { emitPromise } from "../test-utils/test-utils";
+import { ThreadEvent } from "../../src/models/thread";
 
 describe("Room", function() {
     const roomId = "!foo:bar";
@@ -44,8 +46,86 @@ describe("Room", function() {
     const userD = "@dorothy:bar";
     let room;
 
+    const mkMessage = () => utils.mkMessage({
+        event: true,
+        user: userA,
+        room: roomId,
+    }) as MatrixEvent;
+
+    const mkReply = (target: MatrixEvent) => utils.mkEvent({
+        event: true,
+        type: EventType.RoomMessage,
+        user: userA,
+        room: roomId,
+        content: {
+            "body": "Reply :: " + Math.random(),
+            "m.relates_to": {
+                "m.in_reply_to": {
+                    "event_id": target.getId(),
+                },
+            },
+        },
+    }) as MatrixEvent;
+
+    const mkEdit = (target: MatrixEvent, salt = Math.random()) => utils.mkEvent({
+        event: true,
+        type: EventType.RoomMessage,
+        user: userA,
+        room: roomId,
+        content: {
+            "body": "* Edit of :: " + target.getId() + " :: " + salt,
+            "m.new_content": {
+                body: "Edit of :: " + target.getId() + " :: " + salt,
+            },
+            "m.relates_to": {
+                rel_type: RelationType.Replace,
+                event_id: target.getId(),
+            },
+        },
+    }) as MatrixEvent;
+
+    const mkThreadResponse = (root: MatrixEvent) => utils.mkEvent({
+        event: true,
+        type: EventType.RoomMessage,
+        user: userA,
+        room: roomId,
+        content: {
+            "body": "Thread response :: " + Math.random(),
+            "m.relates_to": {
+                "event_id": root.getId(),
+                "m.in_reply_to": {
+                    "event_id": root.getId(),
+                },
+                "rel_type": "m.thread",
+            },
+        },
+    }) as MatrixEvent;
+
+    const mkReaction = (target: MatrixEvent) => utils.mkEvent({
+        event: true,
+        type: EventType.Reaction,
+        user: userA,
+        room: roomId,
+        content: {
+            "m.relates_to": {
+                "rel_type": RelationType.Annotation,
+                "event_id": target.getId(),
+                "key": Math.random().toString(),
+            },
+        },
+    }) as MatrixEvent;
+
+    const mkRedaction = (target: MatrixEvent) => utils.mkEvent({
+        event: true,
+        type: EventType.RoomRedaction,
+        user: userA,
+        room: roomId,
+        redacts: target.getId(),
+        content: {},
+    }) as MatrixEvent;
+
     beforeEach(function() {
-        room = new Room(roomId, null, userA);
+        room = new Room(roomId, new TestClient(userA, "device").client, userA);
         // mock RoomStates
         room.oldState = room.getLiveTimeline().startState = utils.mock(RoomState, "oldState");
         room.currentState = room.getLiveTimeline().endState = utils.mock(RoomState, "currentState");
@@ -157,19 +237,18 @@ describe("Room", function() {
             expect(room.timeline[0]).toEqual(events[0]);
         });
 
-        it("should emit 'Room.timeline' events",
-            function() {
-                let callCount = 0;
-                room.on("Room.timeline", function(event, emitRoom, toStart) {
-                    callCount += 1;
-                    expect(room.timeline.length).toEqual(callCount);
-                    expect(event).toEqual(events[callCount - 1]);
-                    expect(emitRoom).toEqual(room);
-                    expect(toStart).toBeFalsy();
-                });
-                room.addLiveEvents(events);
-                expect(callCount).toEqual(2);
+        it("should emit 'Room.timeline' events", function() {
+            let callCount = 0;
+            room.on("Room.timeline", function(event, emitRoom, toStart) {
+                callCount += 1;
+                expect(room.timeline.length).toEqual(callCount);
+                expect(event).toEqual(events[callCount - 1]);
+                expect(emitRoom).toEqual(room);
+                expect(toStart).toBeFalsy();
             });
+            room.addLiveEvents(events);
+            expect(callCount).toEqual(2);
+        });
 
         it("should call setStateEvents on the right RoomState with the right forwardLooking value for new events",
             function() {
@@ -338,42 +417,41 @@ describe("Room", function() {
             expect(oldEv.sender).toEqual(oldSentinel);
         });
 
-        it("should set event.target for new and old m.room.member events",
-            function() {
-                const sentinel = {
-                    userId: userA,
-                    membership: "join",
-                    name: "Alice",
-                };
-                const oldSentinel = {
-                    userId: userA,
-                    membership: "join",
-                    name: "Old Alice",
-                };
-                room.currentState.getSentinelMember.mockImplementation(function(uid) {
-                    if (uid === userA) {
-                        return sentinel;
-                    }
-                    return null;
-                });
-                room.oldState.getSentinelMember.mockImplementation(function(uid) {
-                    if (uid === userA) {
-                        return oldSentinel;
-                    }
-                    return null;
-                });
-
-                const newEv = utils.mkMembership({
-                    room: roomId, mship: "invite", user: userB, skey: userA, event: true,
-                }) as MatrixEvent;
-                const oldEv = utils.mkMembership({
-                    room: roomId, mship: "ban", user: userB, skey: userA, event: true,
-                }) as MatrixEvent;
-                room.addLiveEvents([newEv]);
-                expect(newEv.target).toEqual(sentinel);
-                room.addEventsToTimeline([oldEv], true, room.getLiveTimeline());
-                expect(oldEv.target).toEqual(oldSentinel);
+        it("should set event.target for new and old m.room.member events", function() {
+            const sentinel = {
+                userId: userA,
+                membership: "join",
+                name: "Alice",
+            };
+            const oldSentinel = {
+                userId: userA,
+                membership: "join",
+                name: "Old Alice",
+            };
+            room.currentState.getSentinelMember.mockImplementation(function(uid) {
+                if (uid === userA) {
+                    return sentinel;
+                }
+                return null;
             });
+            room.oldState.getSentinelMember.mockImplementation(function(uid) {
+                if (uid === userA) {
+                    return oldSentinel;
+                }
+                return null;
+            });
+
+            const newEv = utils.mkMembership({
+                room: roomId, mship: "invite", user: userB, skey: userA, event: true,
+            }) as MatrixEvent;
+            const oldEv = utils.mkMembership({
+                room: roomId, mship: "ban", user: userB, skey: userA, event: true,
+            }) as MatrixEvent;
+            room.addLiveEvents([newEv]);
+            expect(newEv.target).toEqual(sentinel);
+            room.addEventsToTimeline([oldEv], true, room.getLiveTimeline());
+            expect(oldEv.target).toEqual(oldSentinel);
+        });
 
         it("should call setStateEvents on the right RoomState with the right " +
         "forwardLooking value for old events", function() {
@@ -406,7 +484,7 @@ describe("Room", function() {
         let events = null;
 
         beforeEach(function() {
-            room = new Room(roomId, null, null, { timelineSupport: timelineSupport });
+            room = new Room(roomId, new TestClient(userA).client, userA, { timelineSupport: timelineSupport });
             // set events each time to avoid resusing Event objects (which
             // doesn't work because they get frozen)
             events = [
@@ -469,8 +547,7 @@ describe("Room", function() {
             expect(callCount).toEqual(1);
         });
 
-        it("should " + (timelineSupport ? "remember" : "forget") +
-                " old timelines", function() {
+        it("should " + (timelineSupport ? "remember" : "forget") + " old timelines", function() {
             room.addLiveEvents([events[0]]);
             expect(room.timeline.length).toEqual(1);
             const firstLiveTimeline = room.getLiveTimeline();
@@ -486,7 +563,7 @@ describe("Room", function() {
 
     describe("compareEventOrdering", function() {
         beforeEach(function() {
-            room = new Room(roomId, null, null, { timelineSupport: true });
+            room = new Room(roomId, new TestClient(userA).client, userA, { timelineSupport: true });
         });
 
         const events: MatrixEvent[] = [
@@ -673,7 +750,7 @@ describe("Room", function() {
 
         beforeEach(function() {
             // no mocking
-            room = new Room(roomId, null, userA);
+            room = new Room(roomId, new TestClient(userA).client, userA);
         });
 
         describe("Room.recalculate => Stripped State Events", function() {
@@ -1259,6 +1336,7 @@ describe("Room", function() {
             const client = (new TestClient(
                 "@alice:example.com", "alicedevice",
             )).client;
+            client.supportsExperimentalThreads = () => true;
             const room = new Room(roomId, client, userA, {
                 pendingEventOrdering: PendingEventOrdering.Detached,
             });
@@ -1285,7 +1363,7 @@ describe("Room", function() {
 
         it("should add pending events to the timeline if " +
                       "pendingEventOrdering == 'chronological'", function() {
-            room = new Room(roomId, null, userA, {
+            const room = new Room(roomId, new TestClient(userA).client, userA, {
                 pendingEventOrdering: PendingEventOrdering.Chronological,
             });
             const eventA = utils.mkMessage({
@@ -1504,7 +1582,7 @@ describe("Room", function() {
 
     describe("guessDMUserId", function() {
         it("should return first hero id", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.setSummary({
                 'm.heroes': [userB],
                 'm.joined_member_count': 1,
@@ -1513,7 +1591,7 @@ describe("Room", function() {
             expect(room.guessDMUserId()).toEqual(userB);
         });
         it("should return first member that isn't self", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([utils.mkMembership({
                 user: userB,
                 mship: "join",
@@ -1523,7 +1601,7 @@ describe("Room", function() {
             expect(room.guessDMUserId()).toEqual(userB);
         });
         it("should return self if only member present", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             expect(room.guessDMUserId()).toEqual(userA);
         });
     });
@@ -1542,12 +1620,12 @@ describe("Room", function() {
 
     describe("getDefaultRoomName", function() {
         it("should return 'Empty room' if a user is the only member", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             expect(room.getDefaultRoomName(userA)).toEqual("Empty room");
         });
 
         it("should return a display name if one other member is in the room", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1562,7 +1640,7 @@ describe("Room", function() {
         });
 
         it("should return a display name if one other member is banned", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1577,7 +1655,7 @@ describe("Room", function() {
         });
 
         it("should return a display name if one other member is invited", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1592,7 +1670,7 @@ describe("Room", function() {
         });
 
         it("should return 'Empty room (was User B)' if User B left the room", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1607,7 +1685,7 @@ describe("Room", function() {
         });
 
         it("should return 'User B and User C' if in a room with two other users", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1626,7 +1704,7 @@ describe("Room", function() {
         });
 
         it("should return 'User B and 2 others' if in a room with three other users", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1651,7 +1729,7 @@ describe("Room", function() {
 
     describe("io.element.functional_users", function() {
         it("should return a display name (default behaviour) if no one is marked as a functional member", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1673,7 +1751,7 @@ describe("Room", function() {
         });
 
         it("should return a display name (default behaviour) if service members is a number (invalid)", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1697,7 +1775,7 @@ describe("Room", function() {
         });
 
         it("should return a display name (default behaviour) if service members is a string (invalid)", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1719,7 +1797,7 @@ describe("Room", function() {
         });
 
         it("should return 'Empty room' if the only other member is a functional member", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1741,7 +1819,7 @@ describe("Room", function() {
         });
 
         it("should return 'User B' if User B is the only other member who isn't a functional member", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1767,7 +1845,7 @@ describe("Room", function() {
         });
 
         it("should return 'Empty room' if all other members are functional members", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1793,7 +1871,7 @@ describe("Room", function() {
         });
 
         it("should not break if an unjoined user is marked as a service user", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, new TestClient(userA).client, userA);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userA, mship: "join",
@@ -1858,71 +1936,51 @@ describe("Room", function() {
 
             expect(() => room.createThread(rootEvent, [])).not.toThrow();
         });
+
+        it("Edits update the lastReply event", async () => {
+            const client = (new TestClient(
+                "@alice:example.com", "alicedevice",
+            )).client;
+            client.supportsExperimentalThreads = () => true;
+            room = new Room(roomId, client, userA);
+
+            const randomMessage = mkMessage();
+            const threadRoot = mkMessage();
+            const threadResponse = mkThreadResponse(threadRoot);
+            threadResponse.localTimestamp += 1000;
+            const threadResponseEdit = mkEdit(threadResponse);
+            threadResponseEdit.localTimestamp += 2000;
+
+            client.fetchRoomEvent = (eventId: string) => Promise.resolve({
+                ...threadRoot.event,
+                unsigned: {
+                    "age": 123,
+                    "m.relations": {
+                        "m.thread": {
+                            latest_event: threadResponse.event,
+                            count: 2,
+                            current_user_participated: true,
+                        },
+                    },
+                },
+            });
+
+            room.addLiveEvents([randomMessage, threadRoot, threadResponse]);
+            const thread = await emitPromise(room, ThreadEvent.New);
+
+            expect(thread.replyToEvent).toBe(threadResponse);
+            expect(thread.replyToEvent.getContent().body).toBe(threadResponse.getContent().body);
+
+            room.addLiveEvents([threadResponseEdit]);
+            await emitPromise(thread, ThreadEvent.Update);
+            expect(thread.replyToEvent.getContent().body).toBe(threadResponseEdit.getContent()["m.new_content"].body);
+        });
     });
 
     describe("eventShouldLiveIn", () => {
-        const room = new Room(roomId, null, userA);
-
-        const mkMessage = () => utils.mkMessage({
-            event: true,
-            user: userA,
-            room: roomId,
-        }) as MatrixEvent;
-
-        const mkReply = (target: MatrixEvent) => utils.mkEvent({
-            event: true,
-            type: EventType.RoomMessage,
-            user: userA,
-            room: roomId,
-            content: {
-                "body": "Reply :: " + Math.random(),
-                "m.relates_to": {
-                    "m.in_reply_to": {
-                        "event_id": target.getId(),
-                    },
-                },
-            },
-        }) as MatrixEvent;
-
-        const mkThreadResponse = (root: MatrixEvent) => utils.mkEvent({
-            event: true,
-            type: EventType.RoomMessage,
-            user: userA,
-            room: roomId,
-            content: {
-                "body": "Thread response :: " + Math.random(),
-                "m.relates_to": {
-                    "event_id": root.getId(),
-                    "m.in_reply_to": {
-                        "event_id": root.getId(),
-                    },
-                    "rel_type": "m.thread",
-                },
-            },
-        }) as MatrixEvent;
-
-        const mkReaction = (target: MatrixEvent) => utils.mkEvent({
-            event: true,
-            type: EventType.Reaction,
-            user: userA,
-            room: roomId,
-            content: {
-                "m.relates_to": {
-                    "rel_type": RelationType.Annotation,
-                    "event_id": target.getId(),
-                    "key": Math.random().toString(),
-                },
-            },
-        }) as MatrixEvent;
-
-        const mkRedaction = (target: MatrixEvent) => utils.mkEvent({
-            event: true,
-            type: EventType.RoomRedaction,
-            user: userA,
-            room: roomId,
-            redacts: target.getId(),
-            content: {},
-        }) as MatrixEvent;
+        const client = new TestClient(userA).client;
+        client.supportsExperimentalThreads = () => true;
+        const room = new Room(roomId, client, userA);
 
         it("thread root and its relations&redactions should be in both", () => {
             const randomMessage = mkMessage();

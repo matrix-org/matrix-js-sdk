@@ -331,7 +331,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         // the all-knowning server tells us that the event at some point had
         // this timestamp for its replacement, so any following replacement should definitely not be less
         const replaceRelation = this.targetEvent.getServerAggregatedRelation<IAggregatedRelation>(RelationType.Replace);
-        const minTs = replaceRelation && replaceRelation.origin_server_ts;
+        const minTs = replaceRelation?.origin_server_ts;
 
         const lastReplacement = this.getRelations().reduce((last, event) => {
             if (event.getSender() !== this.targetEvent.getSender()) {

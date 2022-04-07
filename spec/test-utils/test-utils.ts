@@ -101,6 +101,7 @@ export function mkEvent(opts: IEventOpts): object | MatrixEvent {
         content: opts.content,
         unsigned: opts.unsigned || {},
         event_id: "$" + Math.random() + "-" + Math.random(),
+        txn_id: "~" + Math.random(),
         redacts: opts.redacts,
     };
     if (opts.skey !== undefined) {

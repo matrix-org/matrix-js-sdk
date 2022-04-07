@@ -775,7 +775,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     }
 
     public getAllRelationsEventForEvent(eventId: string): MatrixEvent[] {
-        const relationsForEvent = this.relations[eventId] || {};
+        const relationsForEvent = this.relations?.[eventId] || {};
         const events = [];
         for (const relationsRecord of Object.values(relationsForEvent)) {
             for (const relations of Object.values(relationsRecord)) {
@@ -852,7 +852,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         }
         let relationsWithEventType = relationsWithRelType[eventType];
 
-        let relatesToEvent;
+        let relatesToEvent: MatrixEvent;
         if (!relationsWithEventType) {
             relationsWithEventType = relationsWithRelType[eventType] = new Relations(
                 relationType,

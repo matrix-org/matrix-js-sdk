@@ -119,11 +119,6 @@ export interface IEventRelation {
     key?: string;
 }
 
-export interface IVisibilityEventRelation extends IEventRelation {
-    visibility: "visible" | "hidden";
-    reason?: string;
-}
-
 /**
  * When an event is a visibility change event, as per MSC3531,
  * the visibility change implied by the event.
