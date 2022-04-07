@@ -1002,7 +1002,7 @@ describe("MatrixClient", function() {
             await client.unstable_createLiveBeacon(roomId, content, '123');
 
             // event type combined
-            const expectedEventType = `${M_BEACON_INFO.name}.${userId}.123`;
+            const expectedEventType = M_BEACON_INFO.name;
             const [callback, method, path, queryParams, requestContent] = client.http.authedRequest.mock.calls[0];
             expect(callback).toBeFalsy();
             expect(method).toBe('PUT');
@@ -1015,7 +1015,7 @@ describe("MatrixClient", function() {
         });
 
         it("updates beacon info with specific event type", async () => {
-            const eventType = `${M_BEACON_INFO.name}.${userId}.456`;
+            const eventType = M_BEACON_INFO.name;
 
             await client.unstable_setLiveBeacon(roomId, eventType, content);
 
