@@ -444,7 +444,6 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         if (this.beacons.has(beaconIdentifier)) {
             const beacon = this.beacons.get(beaconIdentifier);
 
-
             // TODO is it redacting exactly the beacon we have, or a previous version?
             if (event.isRedacted()) {
                 beacon.destroy();
