@@ -227,6 +227,7 @@ export class SyncApi {
             RoomStateEvent.Update,
             BeaconEvent.New,
             BeaconEvent.Update,
+            BeaconEvent.Destroy,
             BeaconEvent.LivenessChange,
         ]);
 
@@ -1169,7 +1170,6 @@ export class SyncApi {
             stateEvents.forEach(function(e) {
                 client.emit(ClientEvent.Event, e);
             });
-            room.updateMyMembership("invite");
         });
 
         // Handle joins
@@ -1316,8 +1316,6 @@ export class SyncApi {
                 client.emit(ClientEvent.Event, e);
             });
 
-            room.updateMyMembership("join");
-
             // Decrypt only the last message in all rooms to make sure we can generate a preview
             // And decrypt all events after the recorded read receipt to ensure an accurate
             // notification count
@@ -1351,8 +1349,6 @@ export class SyncApi {
             accountDataEvents.forEach(function(e) {
                 client.emit(ClientEvent.Event, e);
             });
-
-            room.updateMyMembership("leave");
         });
 
         // update the notification timeline, if appropriate.
@@ -1639,35 +1635,8 @@ export class SyncApi {
         // if the timeline has any state events in it.
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
-        const [mainTimelineEvents, threadedEvents] = this.client.partitionThreadedEvents(room, timelineEventList || []);
-        room.addLiveEvents(mainTimelineEvents, null, fromCache);
-        await this.processThreadEvents(room, threadedEvents, false);
+        room.addLiveEvents(timelineEventList || [], null, fromCache);
     }
-
-    /**
-     * @experimental
-     */
-    private processThreadEvents(
-        room: Room,
-        threadedEvents: MatrixEvent[],
-        toStartOfTimeline: boolean,
-    ): Promise<void> {
-        return this.client.processThreadEvents(room, threadedEvents, toStartOfTimeline);
-    }
-
-    // extractRelatedEvents(event: MatrixEvent, events: MatrixEvent[], relatedEvents: MatrixEvent[] = []): MatrixEvent[] {
-    //     relatedEvents.push(event);
-
-    //     const parentEventId = event.getAssociatedId();
-    //     const parentEventIndex = events.findIndex(event => event.getId() === parentEventId);
-
-    //     if (parentEventIndex > -1) {
-    //         const [relatedEvent] = events.splice(parentEventIndex, 1);
-    //         return this.extractRelatedEvents(relatedEvent, events, relatedEvents);
-    //     } else {
-    //         return relatedEvents;
-    //     }
-    // }
 
     /**
      * Takes a list of timelineEvents and adds and adds to notifEvents

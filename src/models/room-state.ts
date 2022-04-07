@@ -438,7 +438,19 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      */
     private setBeacon(event: MatrixEvent): void {
         if (this.beacons.has(event.getType())) {
-            return this.beacons.get(event.getType()).update(event);
+            const beacon = this.beacons.get(event.getType());
+
+            if (event.isRedacted()) {
+                beacon.destroy();
+                this.beacons.delete(event.getType());
+                return;
+            }
+
+            return beacon.update(event);
+        }
+
+        if (event.isRedacted()) {
+            return;
         }
 
         const beacon = new Beacon(event);
@@ -446,6 +458,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         this.reEmitter.reEmit<BeaconEvent, BeaconEvent>(beacon, [
             BeaconEvent.New,
             BeaconEvent.Update,
+            BeaconEvent.Destroy,
             BeaconEvent.LivenessChange,
         ]);
 

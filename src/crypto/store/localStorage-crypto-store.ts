@@ -325,7 +325,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
                         });
                     },
                 );
-                if (limit && session.length >= limit) {
+                if (limit && sessions.length >= limit) {
                     break;
                 }
             }
