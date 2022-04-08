@@ -1,3 +1,17 @@
+Changes in [16.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v16.0.1) (2022-03-28)
+==================================================================================================
+
+## ✨ Features
+ * emit aggregate room beacon liveness ([\#2241](https://github.com/matrix-org/matrix-js-sdk/pull/2241)).
+ * Live location sharing - create m.beacon_info events ([\#2238](https://github.com/matrix-org/matrix-js-sdk/pull/2238)).
+ * Beacon event types from MSC3489 ([\#2230](https://github.com/matrix-org/matrix-js-sdk/pull/2230)).
+
+## 🐛 Bug Fixes
+ * Fix incorrect usage of unstable variant of `is_falling_back` ([\#2227](https://github.com/matrix-org/matrix-js-sdk/pull/2227)).
+
+Changes in [16.0.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v16.0.1-rc.1) (2022-03-22)
+============================================================================================================
+
 Changes in [16.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v16.0.0) (2022-03-15)
 ==================================================================================================
 

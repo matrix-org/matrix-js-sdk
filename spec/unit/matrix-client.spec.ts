@@ -33,6 +33,8 @@ import { ReceiptType } from "../../src/@types/read_receipts";
 import * as testUtils from "../test-utils/test-utils";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
+import { Room } from "../../src";
+import { makeBeaconEvent } from "../test-utils/beacon";
 
 jest.useFakeTimers();
 
@@ -958,6 +960,7 @@ describe("MatrixClient", function() {
         it("partitions root events to room timeline and thread timeline", () => {
             const supportsExperimentalThreads = client.supportsExperimentalThreads;
             client.supportsExperimentalThreads = () => true;
+            const room = new Room("!room1:matrix.org", client, userId);
 
             const rootEvent = new MatrixEvent({
                 "content": {},
@@ -980,9 +983,9 @@ describe("MatrixClient", function() {
 
             expect(rootEvent.isThreadRoot).toBe(true);
 
-            const [room, threads] = client.partitionThreadedEvents([rootEvent]);
-            expect(room).toHaveLength(1);
-            expect(threads).toHaveLength(1);
+            const [roomEvents, threadEvents] = room.partitionThreadedEvents([rootEvent]);
+            expect(roomEvents).toHaveLength(1);
+            expect(threadEvents).toHaveLength(1);
 
             // Restore method
             client.supportsExperimentalThreads = supportsExperimentalThreads;
@@ -1038,10 +1041,10 @@ describe("MatrixClient", function() {
         });
 
         it("creates new beacon info", async () => {
-            await client.unstable_createLiveBeacon(roomId, content, '123');
+            await client.unstable_createLiveBeacon(roomId, content);
 
             // event type combined
-            const expectedEventType = `${M_BEACON_INFO.name}.${userId}.123`;
+            const expectedEventType = M_BEACON_INFO.name;
             const [callback, method, path, queryParams, requestContent] = client.http.authedRequest.mock.calls[0];
             expect(callback).toBeFalsy();
             expect(method).toBe('PUT');
@@ -1054,17 +1057,44 @@ describe("MatrixClient", function() {
         });
 
         it("updates beacon info with specific event type", async () => {
-            const eventType = `${M_BEACON_INFO.name}.${userId}.456`;
-
-            await client.unstable_setLiveBeacon(roomId, eventType, content);
+            await client.unstable_setLiveBeacon(roomId, content);
 
             // event type combined
             const [, , path, , requestContent] = client.http.authedRequest.mock.calls[0];
             expect(path).toEqual(
                 `/rooms/${encodeURIComponent(roomId)}/state/` +
-                `${encodeURIComponent(eventType)}/${encodeURIComponent(userId)}`,
+                `${encodeURIComponent(M_BEACON_INFO.name)}/${encodeURIComponent(userId)}`,
             );
             expect(requestContent).toEqual(content);
+        });
+
+        describe('processBeaconEvents()', () => {
+            it('does nothing when events is falsy', () => {
+                const room = new Room(roomId, client, userId);
+                const roomStateProcessSpy = jest.spyOn(room.currentState, 'processBeaconEvents');
+
+                client.processBeaconEvents(room, undefined);
+                expect(roomStateProcessSpy).not.toHaveBeenCalled();
+            });
+
+            it('does nothing when events is of length 0', () => {
+                const room = new Room(roomId, client, userId);
+                const roomStateProcessSpy = jest.spyOn(room.currentState, 'processBeaconEvents');
+
+                client.processBeaconEvents(room, []);
+                expect(roomStateProcessSpy).not.toHaveBeenCalled();
+            });
+
+            it('calls room states processBeaconEvents with m.beacon events', () => {
+                const room = new Room(roomId, client, userId);
+                const roomStateProcessSpy = jest.spyOn(room.currentState, 'processBeaconEvents');
+
+                const messageEvent = testUtils.mkMessage({ room: roomId, user: userId, event: true });
+                const beaconEvent = makeBeaconEvent(userId);
+
+                client.processBeaconEvents(room, [messageEvent, beaconEvent]);
+                expect(roomStateProcessSpy).toHaveBeenCalledWith([beaconEvent]);
+            });
         });
     });
 });
