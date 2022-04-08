@@ -5447,9 +5447,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 }
 
                 const timelineSet = eventTimeline.getTimelineSet();
-                const [timelineEvents, threadedEvents] = this.partitionThreadedEvents(timelineSet.room, matrixEvents);
-                timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
-                await this.processThreadEvents(timelineSet.room, threadedEvents, backwards);
+                timelineSet.addEventsToTimeline(matrixEvents, backwards, eventTimeline, token);
 
                 // if we've hit the end of the timeline, we need to stop trying to
                 // paginate. We need to keep the 'forwards' token though, to make sure
