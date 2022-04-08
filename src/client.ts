@@ -7823,6 +7823,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public setPassword(
         authDict: any,
         newPassword: string,
+        callback?: Callback
+    ): Promise<any>;
+    public setPassword(
+        authDict: any,
+        newPassword: string,
         logoutDevices: boolean,
         callback?: Callback
         ): Promise<any>;
