@@ -77,6 +77,13 @@ export enum SyncState {
     Reconnecting = "RECONNECTING",
 }
 
+// Room versions where "insertion", "batch", and "marker" events are controlled
+// by power-levels. MSC2716 is supported in existing room versions but they
+// should only have special meaning when the room creator sends them.
+const MSC2716_ROOM_VERSIONS = [
+    'org.matrix.msc2716v3'
+];
+
 function getFilterName(userId: string, suffix?: string): string {
     // scope this on the user ID because people may login on many accounts
     // and they all need to be stored!
@@ -239,6 +246,27 @@ export class SyncApi {
                 RoomMemberEvent.Membership,
             ]);
         });
+
+        room.currentState.on(RoomStateEvent.Marker, function(event, state) {
+            const isValidMsc2716Event =  MSC2716_ROOM_VERSIONS.includes(room.getVersion()) ||
+                // MSC2716 is supported in all existing room versions but special
+                // meaning should only be given to "insertion", "batch", and
+                // "marker" events when they come from the room creator
+                event.getSender() === room.getRoomCreator();
+            console.log(`On marker state isValidMsc2716Event=${isValidMsc2716Event}, event_id=${event.getId()} room.getLastMarkerEventIdProcessed()=${room.getLastMarkerEventIdProcessed()}`);
+            if(
+                isValidMsc2716Event &&
+                // We only need to throw the timeline away once when we see a
+                // marker. All of the historical content will be in the
+                // `/messsages` responses from here on out.
+                event.getId() !== room.getLastMarkerEventIdProcessed()
+            ) {
+                // Saw new marker event, refreshing the timeline
+                console.log('Saw new marker event, refreshing the timeline');
+                room.resetLiveTimeline(null, null);
+                room.setLastMarkerEventIdProcessed(event.getId())
+            }
+        });
     }
 
     /**
@@ -250,6 +278,7 @@ export class SyncApi {
         room.currentState.removeAllListeners(RoomStateEvent.Events);
         room.currentState.removeAllListeners(RoomStateEvent.Members);
         room.currentState.removeAllListeners(RoomStateEvent.NewMember);
+        room.currentState.removeAllListeners(RoomStateEvent.Marker);
     }
 
     /**

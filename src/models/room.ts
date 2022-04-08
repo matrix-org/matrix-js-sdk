@@ -204,6 +204,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
     private readonly filteredTimelineSets: Record<string, EventTimelineSet> = {}; // filter_id: timelineSet
+    private lastMarkerEventIdProcessed: string = null;
     private readonly pendingEventList?: MatrixEvent[];
     // read by megolm via getter; boolean value - null indicates "use global value"
     private blacklistUnverifiedDevices: boolean = null;
@@ -437,6 +438,19 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             .map(event => event.attemptDecryption(this.client.crypto, { isRetry: true }));
 
         return Promise.allSettled(decryptionPromises) as unknown as Promise<void>;
+    }
+
+    /**
+     * Gets the creator of the room
+     * @returns {string} The creator of the room, or null if it could not be determined
+     */
+    public getRoomCreator(): string | null {
+        const createEvent = this.currentState.getStateEvents(EventType.RoomCreate, "");
+        if (!createEvent) {
+            return null;
+        }
+        const roomCreator = createEvent.getContent()['sender'];
+        return roomCreator;
     }
 
     /**
@@ -1002,6 +1016,25 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     public addTimeline(): EventTimeline {
         return this.getUnfilteredTimelineSet().addTimeline();
+    }
+
+    /**
+     * Get the last marker event ID proccessed
+     *
+     * @return {String} the last marker event ID proccessed or null if none have
+     * been processed
+     */
+    public getLastMarkerEventIdProcessed(): string | null {
+        return this.lastMarkerEventIdProcessed;
+    }
+
+    /**
+     * Set the last marker event ID proccessed
+     *
+     * @param {String} eventId The marker event ID to set
+     */
+    public setLastMarkerEventIdProcessed(eventId: string): void {
+        this.lastMarkerEventIdProcessed = eventId;
     }
 
     /**

@@ -42,6 +42,7 @@ export enum RoomStateEvent {
     NewMember = "RoomState.newMember",
     Update = "RoomState.update", // signals batches of updates without specificity
     BeaconLiveness = "RoomState.BeaconLiveness",
+    Marker = "RoomState.org.matrix.msc2716.marker",
 }
 
 export type RoomStateEventHandlerMap = {
@@ -51,6 +52,7 @@ export type RoomStateEventHandlerMap = {
     [RoomStateEvent.Update]: (state: RoomState) => void;
     [RoomStateEvent.BeaconLiveness]: (state: RoomState, hasLiveBeacons: boolean) => void;
     [BeaconEvent.New]: (event: MatrixEvent, beacon: Beacon) => void;
+    [RoomStateEvent.Marker]: (event: MatrixEvent, state: RoomState) => void;
 };
 
 type EmittedEvents = RoomStateEvent | BeaconEvent;
@@ -398,6 +400,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
                 // assume all our sentinels are now out-of-date
                 this.sentinels = {};
+            } else if (event.getType() === EventType.Marker) {
+                this.emit(RoomStateEvent.Marker, event, this);
             }
         });
 

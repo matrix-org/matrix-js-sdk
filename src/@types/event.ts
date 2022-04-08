@@ -87,6 +87,8 @@ export enum EventType {
     RoomKeyRequest = "m.room_key_request",
     ForwardedRoomKey = "m.forwarded_room_key",
     Dummy = "m.dummy",
+
+    Marker = "org.matrix.msc2716.marker", // MSC2716
 }
 
 export enum RelationType {
