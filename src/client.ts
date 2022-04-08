@@ -5436,11 +5436,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     matrixEvents[i] = event;
                 }
 
+                // No need to partition events for threads here, everything lives
+                // in the notification timeline set
                 const timelineSet = eventTimeline.getTimelineSet();
-                const [timelineEvents, threadedEvents] = timelineSet.room.partitionThreadedEvents(matrixEvents);
-                timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
+                timelineSet.addEventsToTimeline(matrixEvents, backwards, eventTimeline, token);
                 this.processBeaconEvents(timelineSet.room, matrixEvents);
-                await this.processThreadEvents(timelineSet.room, threadedEvents, backwards);
 
                 // if we've hit the end of the timeline, we need to stop trying to
                 // paginate. We need to keep the 'forwards' token though, to make sure
