@@ -2386,8 +2386,10 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         });
     }
 
-    public getReadReceiptForUserId(userId: string, ignoreSynthesized = false): IWrappedReceipt | null {
-        const [realReceipt, syntheticReceipt] = this.receipts["m.read"]?.[userId] ?? [];
+    public getReadReceiptForUserId(
+        userId: string, ignoreSynthesized = false, receiptType = ReceiptType.Read,
+    ): IWrappedReceipt | null {
+        const [realReceipt, syntheticReceipt] = this.receipts[receiptType]?.[userId] ?? [];
         if (ignoreSynthesized) {
             return realReceipt;
         }
@@ -2405,8 +2407,22 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @return {String} ID of the latest event that the given user has read, or null.
      */
     public getEventReadUpTo(userId: string, ignoreSynthesized = false): string | null {
-        const readReceipt = this.getReadReceiptForUserId(userId, ignoreSynthesized);
-        return readReceipt?.eventId ?? null;
+        const timelineSet = this.getUnfilteredTimelineSet();
+        const publicReadReceipt = this.getReadReceiptForUserId(userId, ignoreSynthesized, ReceiptType.Read);
+        const privateReadReceipt = this.getReadReceiptForUserId(userId, ignoreSynthesized, ReceiptType.ReadPrivate);
+
+        // If we have both, compare them
+        let comparison;
+        if (publicReadReceipt?.eventId && privateReadReceipt?.eventId) {
+            comparison = timelineSet.compareEventOrdering(publicReadReceipt?.eventId, privateReadReceipt?.eventId);
+        }
+
+        // The public receipt is more likely to drift out of date so the private
+        // one has precedence
+        if (!comparison) return privateReadReceipt?.eventId ?? publicReadReceipt?.eventId ?? null;
+
+        // If public read receipt is older, return the private one
+        return (comparison < 0) ? privateReadReceipt?.eventId : publicReadReceipt?.eventId;
     }
 
     /**
