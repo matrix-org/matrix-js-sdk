@@ -7824,19 +7824,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         authDict: any,
         newPassword: string,
         callback?: Callback,
-    ): Promise<any>;
+    ): Promise<{}>;
     public setPassword(
         authDict: any,
         newPassword: string,
         logoutDevices: boolean,
         callback?: Callback,
-    ): Promise<any>;
+    ): Promise<{}>;
     public setPassword(
         authDict: any,
         newPassword: string,
         logoutDevices?: Callback | boolean,
         callback?: Callback,
-    ): Promise<any> { // TODO: Types
+    ): Promise<{}> {
         if (typeof logoutDevices === 'function') {
             callback = logoutDevices;
         }
@@ -7851,7 +7851,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             'logout_devices': logoutDevices,
         };
 
-        return this.http.authedRequest(
+        return this.http.authedRequest<{}>(
             callback, Method.Post, path, null, data,
         );
     }
