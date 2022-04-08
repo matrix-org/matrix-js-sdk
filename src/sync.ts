@@ -54,6 +54,7 @@ import { IPushRules } from "./@types/PushRules";
 import { RoomStateEvent } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
 import { BeaconEvent } from "./models/beacon";
+import { ISetStateOptions } from "./models/room-state";
 
 const DEBUG = true;
 
@@ -247,7 +248,17 @@ export class SyncApi {
             ]);
         });
 
-        room.currentState.on(RoomStateEvent.Marker, function(event, state) {
+        room.currentState.on(RoomStateEvent.Marker, function(event, {fromInitialState}: ISetStateOptions = {}) {
+            // We don't want to refresh the timeline:
+            //  1. If it's persons first time syncing the room, they won't have
+            //     any old events cached to refresh.
+            //  1. If we're re-hydrating from `syncFromCache` because we already
+            //     processed any marker event state that was in the cache
+            if(fromInitialState) {
+                console.log('fromInitialState ignoring');
+                return;
+            }
+
             const isValidMsc2716Event =  MSC2716_ROOM_VERSIONS.includes(room.getVersion()) ||
                 // MSC2716 is supported in all existing room versions but special
                 // meaning should only be given to "insertion", "batch", and
@@ -256,13 +267,13 @@ export class SyncApi {
             console.log(`On marker state isValidMsc2716Event=${isValidMsc2716Event}, event_id=${event.getId()} room.getLastMarkerEventIdProcessed()=${room.getLastMarkerEventIdProcessed()}`);
             if(
                 isValidMsc2716Event &&
-                // We only need to throw the timeline away once when we see a
+                // We only need to throw the timeline away once, when we see a
                 // marker. All of the historical content will be in the
                 // `/messsages` responses from here on out.
                 event.getId() !== room.getLastMarkerEventIdProcessed()
             ) {
                 // Saw new marker event, refreshing the timeline
-                console.log('Saw new marker event, refreshing the timeline');
+                console.log('Saw new marker event, refreshing the timeline', new Error().stack);
                 room.resetLiveTimeline(null, null);
                 room.setLastMarkerEventIdProcessed(event.getId())
             }
@@ -1618,6 +1629,7 @@ export class SyncApi {
         // the given state events
         const liveTimeline = room.getLiveTimeline();
         const timelineWasEmpty = liveTimeline.getEvents().length == 0;
+        console.log('timelineWasEmpty', timelineWasEmpty)
         if (timelineWasEmpty) {
             // Passing these events into initialiseState will freeze them, so we need
             // to compute and cache the push actions for them now, otherwise sync dies
@@ -1669,7 +1681,11 @@ export class SyncApi {
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
         const [mainTimelineEvents, threadedEvents] = this.client.partitionThreadedEvents(room, timelineEventList || []);
-        room.addLiveEvents(mainTimelineEvents, null, fromCache);
+        room.addLiveEvents(mainTimelineEvents, {
+            duplicateStrategy: null,
+            fromCache,
+            fromInitialState: timelineWasEmpty
+        });
         await this.processThreadEvents(room, threadedEvents, false);
     }
 

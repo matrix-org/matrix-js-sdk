@@ -36,6 +36,10 @@ enum OobStatus {
     Finished,
 }
 
+export interface ISetStateOptions {
+    fromInitialState?: boolean;
+}
+
 export enum RoomStateEvent {
     Events = "RoomState.events",
     Members = "RoomState.members",
@@ -52,7 +56,7 @@ export type RoomStateEventHandlerMap = {
     [RoomStateEvent.Update]: (state: RoomState) => void;
     [RoomStateEvent.BeaconLiveness]: (state: RoomState, hasLiveBeacons: boolean) => void;
     [BeaconEvent.New]: (event: MatrixEvent, beacon: Beacon) => void;
-    [RoomStateEvent.Marker]: (event: MatrixEvent, state: RoomState) => void;
+    [RoomStateEvent.Marker]: (event: MatrixEvent, setStateOptions: ISetStateOptions) => void;
 };
 
 type EmittedEvents = RoomStateEvent | BeaconEvent;
@@ -311,16 +315,18 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     }
 
     /**
-     * Add an array of one or more state MatrixEvents, overwriting
-     * any existing state with the same {type, stateKey} tuple. Will fire
-     * "RoomState.events" for every event added. May fire "RoomState.members"
-     * if there are <code>m.room.member</code> events.
+     * Add an array of one or more state MatrixEvents, overwriting any existing
+     * state with the same {type, stateKey} tuple. Will fire "RoomState.events"
+     * for every event added. May fire "RoomState.members" if there are
+     * <code>m.room.member</code> events.
      * @param {MatrixEvent[]} stateEvents a list of state events for this room.
+     * @param {Bool} fromInitialState whether the stateEvents are from the first
+     * sync in the room or a sync we already know about (syncFromCache)
      * @fires module:client~MatrixClient#event:"RoomState.members"
      * @fires module:client~MatrixClient#event:"RoomState.newMember"
      * @fires module:client~MatrixClient#event:"RoomState.events"
      */
-    public setStateEvents(stateEvents: MatrixEvent[]) {
+    public setStateEvents(stateEvents: MatrixEvent[], setStateOptions?: ISetStateOptions) {
         this.updateModifiedTime();
 
         // update the core event dict
@@ -401,7 +407,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                 // assume all our sentinels are now out-of-date
                 this.sentinels = {};
             } else if (event.getType() === EventType.Marker) {
-                this.emit(RoomStateEvent.Marker, event, this);
+                this.emit(RoomStateEvent.Marker, event, setStateOptions);
             }
         });
 

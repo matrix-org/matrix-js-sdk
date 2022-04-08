@@ -56,6 +56,20 @@ export interface IRoomTimelineData {
     liveEvent?: boolean;
 }
 
+export interface IAddLiveEventOptions {
+    duplicateStrategy?: DuplicateStrategy;
+    fromCache?: boolean;
+    roomState?: RoomState;
+    fromInitialState?: boolean;
+}
+
+export interface IAddEventToTimelineOptions {
+    toStartOfTimeline: boolean;
+    fromCache?: boolean;
+    roomState?: RoomState;
+    fromInitialState?: boolean;
+}
+
 type EmittedEvents = RoomEvent.Timeline | RoomEvent.TimelineReset;
 
 export type EventTimelineSetHandlerMap = {
@@ -431,7 +445,9 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
             if (!existingTimeline) {
                 // we don't know about this event yet. Just add it to the timeline.
-                this.addEventToTimeline(event, timeline, toStartOfTimeline);
+                this.addEventToTimeline(event, timeline, {
+                    toStartOfTimeline
+                });
                 lastEventWasNew = true;
                 didUpdate = true;
                 continue;
@@ -529,9 +545,12 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      */
     public addLiveEvent(
         event: MatrixEvent,
-        duplicateStrategy: DuplicateStrategy = DuplicateStrategy.Ignore,
-        fromCache = false,
-        roomState?: RoomState,
+        {
+            duplicateStrategy = DuplicateStrategy.Ignore,
+            fromCache = false,
+            roomState,
+            fromInitialState
+        }: IAddLiveEventOptions = {}
     ): void {
         if (this.filter) {
             const events = this.filter.filterRoomTimeline([event]);
@@ -570,7 +589,12 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             return;
         }
 
-        this.addEventToTimeline(event, this.liveTimeline, false, fromCache, roomState);
+        this.addEventToTimeline(event, this.liveTimeline, {
+            toStartOfTimeline: false,
+            fromCache,
+            roomState,
+            fromInitialState,
+        });
     }
 
     /**
@@ -589,12 +613,19 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     public addEventToTimeline(
         event: MatrixEvent,
         timeline: EventTimeline,
-        toStartOfTimeline: boolean,
-        fromCache = false,
-        roomState?: RoomState,
+        {
+            toStartOfTimeline,
+            fromCache = false,
+            roomState,
+            fromInitialState = false
+        }: IAddEventToTimelineOptions,
     ) {
         const eventId = event.getId();
-        timeline.addEvent(event, toStartOfTimeline, roomState);
+        timeline.addEvent(event, {
+            atStart: toStartOfTimeline, 
+            stateContext: roomState,
+            fromInitialState,
+        });
         this._eventIdToTimeline[eventId] = timeline;
 
         this.setRelationsTarget(event);
@@ -630,10 +661,14 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         } else {
             if (this.filter) {
                 if (this.filter.filterRoomTimeline([localEvent]).length) {
-                    this.addEventToTimeline(localEvent, this.liveTimeline, false);
+                    this.addEventToTimeline(localEvent, this.liveTimeline, {
+                        toStartOfTimeline: false
+                    });
                 }
             } else {
-                this.addEventToTimeline(localEvent, this.liveTimeline, false);
+                this.addEventToTimeline(localEvent, this.liveTimeline, {
+                    toStartOfTimeline: false
+                });
             }
         }
     }

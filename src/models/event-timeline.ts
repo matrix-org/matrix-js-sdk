@@ -23,10 +23,17 @@ import { EventTimelineSet } from "./event-timeline-set";
 import { MatrixEvent } from "./event";
 import { Filter } from "../filter";
 import { EventType } from "../@types/event";
+import { ISetStateOptions } from "./room-state";
 
 export enum Direction {
     Backward = "b",
     Forward = "f",
+}
+
+export interface IAddEventOptions {
+    atStart: boolean;
+    stateContext?: RoomState;
+    fromInitialState?: boolean;
 }
 
 export class EventTimeline {
@@ -152,8 +159,11 @@ export class EventTimeline {
             Object.freeze(e);
         }
 
-        this.startState.setStateEvents(stateEvents);
-        this.endState.setStateEvents(stateEvents);
+        const setStateOptions: ISetStateOptions = {
+            fromInitialState: true
+        };
+        this.startState.setStateEvents(stateEvents, setStateOptions);
+        this.endState.setStateEvents(stateEvents, setStateOptions);
     }
 
     /**
@@ -347,7 +357,14 @@ export class EventTimeline {
      * @param {MatrixEvent} event   new event
      * @param {boolean}  atStart     true to insert new event at the start
      */
-    public addEvent(event: MatrixEvent, atStart: boolean, stateContext?: RoomState): void {
+    public addEvent(
+        event: MatrixEvent,
+        {
+            atStart,
+            stateContext,
+            fromInitialState,
+        }: IAddEventOptions
+    ): void {
         if (!stateContext) {
             stateContext = atStart ? this.startState : this.endState;
         }
@@ -362,7 +379,9 @@ export class EventTimeline {
                 event.isState() &&
                 timelineSet.room.getUnfilteredTimelineSet() === timelineSet
             ) {
-                stateContext.setStateEvents([event]);
+                stateContext.setStateEvents([event], {
+                    fromInitialState
+                });
                 // it is possible that the act of setting the state event means we
                 // can set more metadata (specifically sender/target props), so try
                 // it again if the prop wasn't previously set. It may also mean that

@@ -48,6 +48,7 @@ import {
 } from "./thread";
 import { Method } from "../http-api";
 import { TypedEventEmitter } from "./typed-event-emitter";
+import { IAddLiveEventOptions } from "./event-timeline-set";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -1493,7 +1494,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                         return event.getSender() === this.client.getUserId();
                     });
                     if (filterType !== ThreadFilterType.My || currentUserParticipated) {
-                        timelineSet.getLiveTimeline().addEvent(thread.rootEvent, false);
+                        timelineSet.getLiveTimeline().addEvent(thread.rootEvent, {
+                            atStart: false
+                        });
                     }
                 });
         }
@@ -1540,22 +1543,20 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         let latestMyThreadsRootEvent: MatrixEvent;
         const roomState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
         for (const rootEvent of threadRoots) {
-            this.threadsTimelineSets[0].addLiveEvent(
-                rootEvent,
-                DuplicateStrategy.Ignore,
-                false,
+            this.threadsTimelineSets[0].addLiveEvent(rootEvent, {
+                duplicateStrategy: DuplicateStrategy.Ignore,
+                fromCache: false,
                 roomState,
-            );
+            });
 
             const threadRelationship = rootEvent
                 .getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
             if (threadRelationship.current_user_participated) {
-                this.threadsTimelineSets[1].addLiveEvent(
-                    rootEvent,
-                    DuplicateStrategy.Ignore,
-                    false,
+                this.threadsTimelineSets[1].addLiveEvent(rootEvent, {
+                    duplicateStrategy: DuplicateStrategy.Ignore,
+                    fromCache: false,
                     roomState,
-                );
+                });
                 latestMyThreadsRootEvent = rootEvent;
             }
 
@@ -1750,7 +1751,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                             timelineSet.addEventToTimeline(
                                 thread.rootEvent,
                                 timelineSet.getLiveTimeline(),
-                                toStartOfTimeline,
+                                {toStartOfTimeline}
                             );
                         }
                     }
@@ -1817,7 +1818,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @fires module:client~MatrixClient#event:"Room.timeline"
      * @private
      */
-    private addLiveEvent(event: MatrixEvent, duplicateStrategy?: DuplicateStrategy, fromCache = false): void {
+    private addLiveEvent(event: MatrixEvent, addLiveEventOptions: IAddLiveEventOptions = {}): void {
         this.applyRedaction(event);
 
         // Implement MSC3531: hiding messages.
@@ -1840,7 +1841,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
 
         // add to our timeline sets
         for (let i = 0; i < this.timelineSets.length; i++) {
-            this.timelineSets[i].addLiveEvent(event, duplicateStrategy, fromCache);
+            this.timelineSets[i].addLiveEvent(event, addLiveEventOptions);
         }
 
         // synthesize and inject implicit read receipts
@@ -1926,11 +1927,15 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 if (timelineSet.getFilter()) {
                     if (timelineSet.getFilter().filterRoomTimeline([event]).length) {
                         timelineSet.addEventToTimeline(event,
-                            timelineSet.getLiveTimeline(), false);
+                            timelineSet.getLiveTimeline(), {
+                                toStartOfTimeline: false
+                            });
                     }
                 } else {
                     timelineSet.addEventToTimeline(event,
-                        timelineSet.getLiveTimeline(), false);
+                        timelineSet.getLiveTimeline(), {
+                            toStartOfTimeline: false
+                        });
                 }
             }
         }
@@ -2181,7 +2186,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @param {boolean} fromCache whether the sync response came from cache
      * @throws If <code>duplicateStrategy</code> is not falsey, 'replace' or 'ignore'.
      */
-    public addLiveEvents(events: MatrixEvent[], duplicateStrategy?: DuplicateStrategy, fromCache = false): void {
+    public addLiveEvents(events: MatrixEvent[], addLiveEventOptions: IAddLiveEventOptions = {}): void {
+        const { duplicateStrategy } = addLiveEventOptions;
         if (duplicateStrategy && ["replace", "ignore"].indexOf(duplicateStrategy) === -1) {
             throw new Error("duplicateStrategy MUST be either 'replace' or 'ignore'");
         }
@@ -2202,7 +2208,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
 
         for (let i = 0; i < events.length; i++) {
             // TODO: We should have a filter to say "only add state event types X Y Z to the timeline".
-            this.addLiveEvent(events[i], duplicateStrategy, fromCache);
+            this.addLiveEvent(events[i], addLiveEventOptions);
         }
     }
 
