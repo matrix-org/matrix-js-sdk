@@ -7841,7 +7841,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             callback = logoutDevices;
         }
         if (typeof logoutDevices !== 'boolean') {
-            logoutDevices = true;
+            // Use backwards compatible behaviour of not specifying logout_devices
+            // This way it is left up to the server:
+            logoutDevices = undefined;
         }
 
         const path = "/account/password";
