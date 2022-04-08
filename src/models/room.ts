@@ -94,7 +94,7 @@ interface IReceipt {
     ts: number;
 }
 
-interface IWrappedReceipt {
+export interface IWrappedReceipt {
     eventId: string;
     data: IReceipt;
 }

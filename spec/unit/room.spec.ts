@@ -23,6 +23,7 @@ import * as utils from "../test-utils/test-utils";
 import {
     DuplicateStrategy,
     EventStatus,
+    EventTimelineSet,
     EventType,
     JoinRule,
     MatrixEvent,
@@ -31,12 +32,13 @@ import {
     RoomEvent,
 } from "../../src";
 import { EventTimeline } from "../../src/models/event-timeline";
-import { Room } from "../../src/models/room";
+import { IWrappedReceipt, Room } from "../../src/models/room";
 import { RoomState } from "../../src/models/room-state";
 import { UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../../src/@types/event";
 import { TestClient } from "../TestClient";
 import { emitPromise } from "../test-utils/test-utils";
 import { ThreadEvent } from "../../src/models/thread";
+import { ReceiptType } from "../../src/@types/read_receipts";
 
 describe("Room", function() {
     const roomId = "!foo:bar";
@@ -2092,6 +2094,31 @@ describe("Room", function() {
             expect(room.eventShouldLiveIn(reply1, events, roots).shouldLiveInThread).toBeFalsy();
             expect(room.eventShouldLiveIn(reply2, events, roots).shouldLiveInRoom).toBeTruthy();
             expect(room.eventShouldLiveIn(reply2, events, roots).shouldLiveInThread).toBeFalsy();
+        });
+    });
+
+    describe("getEventReadUpTo()", () => {
+        const client = new TestClient(userA).client;
+        const room = new Room(roomId, client, userA);
+
+        it("handles missing receipt type", () => {
+            room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
+                return receiptType === ReceiptType.ReadPrivate ? { eventId: "eventId" } as IWrappedReceipt : null;
+            };
+
+            expect(room.getEventReadUpTo(userA)).toEqual("eventId");
+        });
+
+        it("prefers older receipt", () => {
+            room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
+                return (receiptType === ReceiptType.Read
+                    ? { eventId: "eventId1" }
+                    : { eventId: "eventId2" }
+                    ) as IWrappedReceipt;
+            };
+            room.getUnfilteredTimelineSet = () => ({ compareEventOrdering: (event1, event2) => 1 } as EventTimelineSet);
+
+            expect(room.getEventReadUpTo(userA)).toEqual("eventId1");
         });
     });
 });
