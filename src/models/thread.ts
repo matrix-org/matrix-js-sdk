@@ -94,6 +94,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             RoomEvent.TimelineReset,
         ]);
 
+        this.room.on(RoomEvent.Redaction, this.onRedaction);
         this.room.on(RoomEvent.LocalEchoUpdated, this.onEcho);
         this.timelineSet.on(RoomEvent.Timeline, this.onEcho);
 
@@ -113,6 +114,25 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             THREAD_RELATION_TYPE.setPreferUnstable(true);
         }
     }
+
+    private onRedaction = (event: MatrixEvent) => {
+        if (event.threadRootId !== this.id) return;
+        const targetId = event.event.redacts;
+        const targetEvent = this.room.findEventById(targetId);
+        if (targetEvent && this.room.eventShouldLiveIn(targetEvent).threadId === this.id) {
+            this.replyCount--;
+        }
+
+        if (this.lastEvent?.getId() === targetId) {
+            const events = [...this.timelineSet.getLiveTimeline().getEvents()].reverse();
+            this.lastEvent = events.find(e => {
+                return !e.isRedacted() && (e.isRelation(THREAD_RELATION_TYPE.name) || e.isThreadRoot);
+            });
+            this.emit(ThreadEvent.NewReply, this, this.lastEvent);
+        }
+
+        this.emit(ThreadEvent.Update, this);
+    };
 
     private onEcho = (event: MatrixEvent) => {
         if (event.threadRootId !== this.id) return; // ignore echoes for other timelines
