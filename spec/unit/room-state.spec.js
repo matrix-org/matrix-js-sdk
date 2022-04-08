@@ -715,7 +715,7 @@ describe("RoomState", function() {
 
     describe('processBeaconEvents', () => {
         const beacon1 = makeBeaconInfoEvent(userA, roomId, {}, '$beacon1', '$beacon1');
-        const beacon2 = makeBeaconInfoEvent(userA, roomId, {}, '$beacon2', '$beacon2');
+        const beacon2 = makeBeaconInfoEvent(userB, roomId, {}, '$beacon2', '$beacon2');
 
         it('does nothing when state has no beacons', () => {
             const emitSpy = jest.spyOn(state, 'emit');
@@ -747,14 +747,15 @@ describe("RoomState", function() {
             const location2 = makeBeaconEvent(userA, {
                 beaconInfoId: '$beacon1', timestamp: Date.now() + 2,
             });
-            const location3 = makeBeaconEvent(userA, {
+            const location3 = makeBeaconEvent(userB, {
                 beaconInfoId: 'some-other-beacon',
             });
+
             state.setStateEvents([beacon1, beacon2]);
 
             expect(state.beacons.size).toEqual(2);
 
-            const beaconInstance = state.beacons.get(beacon1.getType());
+            const beaconInstance = state.beacons.get(getBeaconInfoIdentifier(beacon1));
             const addLocationsSpy = jest.spyOn(beaconInstance, 'addLocations');
 
             state.processBeaconEvents([location1, location2, location3]);

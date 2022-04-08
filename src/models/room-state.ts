@@ -419,8 +419,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         // names are confusing here
         // a Beacon is the parent event, but event type is 'm.beacon_info'
         // a location is the 'child' related to the Beacon, but the event type is 'm.beacon'
-        // group locations by beaconInfoId
-        const locationEventsByBeaconId = events.reduce<Record<string, MatrixEvent[]>>((acc, event) => {
+        // group locations by beaconInfo event id
+        const locationEventsByBeaconEventId = events.reduce<Record<string, MatrixEvent[]>>((acc, event) => {
             const beaconInfoEventId = event.getRelation()?.event_id;
             if (!acc[beaconInfoEventId]) {
                 acc[beaconInfoEventId] = [];
@@ -429,7 +429,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             return acc;
         }, {});
 
-        Object.entries(locationEventsByBeaconId).forEach(([beaconInfoEventId, events]) => {
+        Object.entries(locationEventsByBeaconEventId).forEach(([beaconInfoEventId, events]) => {
             const beacon = [...this.beacons.values()].find(beacon => beacon.beaconInfoId === beaconInfoEventId);
 
             if (beacon) {
@@ -472,6 +472,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      */
     private setBeacon(event: MatrixEvent): void {
         const beaconIdentifier = getBeaconInfoIdentifier(event);
+
         if (this.beacons.has(beaconIdentifier)) {
             const beacon = this.beacons.get(beaconIdentifier);
 
@@ -501,6 +502,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
         this.emit(BeaconEvent.New, event, beacon);
         beacon.on(BeaconEvent.LivenessChange, this.onBeaconLivenessChange.bind(this));
+
         this.beacons.set(beacon.identifier, beacon);
     }
 

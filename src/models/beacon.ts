@@ -105,6 +105,7 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
         this.setBeaconInfo(this.rootEvent);
 
         this.emit(BeaconEvent.Update, beaconInfoEvent, this);
+        this.clearLatestLocation();
     }
 
     public destroy(): void {
@@ -125,10 +126,14 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
             clearInterval(this.livenessWatchInterval);
         }
 
+        this.checkLiveness();
         if (this.isLive) {
-            const expiryInMs = (this._beaconInfo?.timestamp + this._beaconInfo?.timeout + 1) - Date.now();
+            const expiryInMs = (this._beaconInfo?.timestamp + this._beaconInfo?.timeout) - Date.now();
             if (expiryInMs > 1) {
-                this.livenessWatchInterval = setInterval(this.checkLiveness.bind(this), expiryInMs);
+                this.livenessWatchInterval = setInterval(
+                    () => { this.monitorLiveness(); },
+                    expiryInMs,
+                );
             }
         }
     }
@@ -160,6 +165,11 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
             this.emit(BeaconEvent.LocationUpdate, this.latestLocationState);
         }
     }
+
+    private clearLatestLocation = () => {
+        this._latestLocationState = undefined;
+        this.emit(BeaconEvent.LocationUpdate, this.latestLocationState);
+    };
 
     private setBeaconInfo(event: MatrixEvent): void {
         this._beaconInfo = parseBeaconInfoContent(event.getContent());
