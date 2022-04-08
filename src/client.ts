@@ -7832,11 +7832,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         logoutDevices?: Callback | boolean,
         callback?: Callback,
     ): Promise<any> { // TODO: Types
-        if (typeof logoutDevices !== 'boolean') {
-            logoutDevices = true;
-        }
         if (typeof logoutDevices === 'function') {
             callback = logoutDevices;
+        }
+        if (typeof logoutDevices !== 'boolean') {
+            logoutDevices = true;
         }
 
         const path = "/account/password";
