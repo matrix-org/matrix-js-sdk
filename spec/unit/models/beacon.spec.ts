@@ -19,7 +19,7 @@ import {
     Beacon,
     BeaconEvent,
 } from "../../../src/models/beacon";
-import { makeBeaconInfoEvent } from "../../test-utils/beacon";
+import { makeBeaconEvent, makeBeaconInfoEvent } from "../../test-utils/beacon";
 
 jest.useFakeTimers();
 
@@ -280,6 +280,94 @@ describe('Beacon', () => {
 
                 // no additional calls
                 expect(emitSpy).toHaveBeenCalledTimes(1);
+            });
+        });
+
+        describe('addLocations', () => {
+            it('ignores locations when beacon is not live', () => {
+                const beacon = new Beacon(makeBeaconInfoEvent(userId, roomId, { isLive: false }));
+                const emitSpy = jest.spyOn(beacon, 'emit');
+
+                beacon.addLocations([
+                    makeBeaconEvent(userId, { beaconInfoId: beacon.beaconInfoId, timestamp: now + 1 }),
+                ]);
+
+                expect(beacon.latestLocationState).toBeFalsy();
+                expect(emitSpy).not.toHaveBeenCalled();
+            });
+
+            it('ignores locations outside the beacon live duration', () => {
+                const beacon = new Beacon(makeBeaconInfoEvent(userId, roomId, { isLive: true, timeout: 60000 }));
+                const emitSpy = jest.spyOn(beacon, 'emit');
+
+                beacon.addLocations([
+                    // beacon has now + 60000 live period
+                    makeBeaconEvent(userId, { beaconInfoId: beacon.beaconInfoId, timestamp: now + 100000 }),
+                ]);
+
+                expect(beacon.latestLocationState).toBeFalsy();
+                expect(emitSpy).not.toHaveBeenCalled();
+            });
+
+            it('sets latest location state to most recent location', () => {
+                const beacon = new Beacon(makeBeaconInfoEvent(userId, roomId, { isLive: true, timeout: 60000 }));
+                const emitSpy = jest.spyOn(beacon, 'emit');
+
+                const locations = [
+                    // older
+                    makeBeaconEvent(
+                        userId, { beaconInfoId: beacon.beaconInfoId, uri: 'geo:foo', timestamp: now + 1 },
+                    ),
+                    // newer
+                    makeBeaconEvent(
+                        userId, { beaconInfoId: beacon.beaconInfoId, uri: 'geo:bar', timestamp: now + 10000 },
+                    ),
+                    // not valid
+                    makeBeaconEvent(
+                        userId, { beaconInfoId: beacon.beaconInfoId, uri: 'geo:baz', timestamp: now - 5 },
+                    ),
+                ];
+
+                beacon.addLocations(locations);
+
+                const expectedLatestLocation = {
+                    description: undefined,
+                    timestamp: now + 10000,
+                    uri: 'geo:bar',
+                };
+
+                // the newest valid location
+                expect(beacon.latestLocationState).toEqual(expectedLatestLocation);
+                expect(emitSpy).toHaveBeenCalledWith(BeaconEvent.LocationUpdate, expectedLatestLocation);
+            });
+
+            it('ignores locations that are less recent that the current latest location', () => {
+                const beacon = new Beacon(makeBeaconInfoEvent(userId, roomId, { isLive: true, timeout: 60000 }));
+
+                const olderLocation = makeBeaconEvent(
+                    userId, { beaconInfoId: beacon.beaconInfoId, uri: 'geo:foo', timestamp: now + 1 },
+                );
+                const newerLocation = makeBeaconEvent(
+                    userId, { beaconInfoId: beacon.beaconInfoId, uri: 'geo:bar', timestamp: now + 10000 },
+                );
+
+                beacon.addLocations([newerLocation]);
+                // latest location set to newerLocation
+                expect(beacon.latestLocationState).toEqual(expect.objectContaining({
+                    uri: 'geo:bar',
+                }));
+
+                const emitSpy = jest.spyOn(beacon, 'emit').mockClear();
+
+                // add older location
+                beacon.addLocations([olderLocation]);
+
+                // no change
+                expect(beacon.latestLocationState).toEqual(expect.objectContaining({
+                    uri: 'geo:bar',
+                }));
+                // no emit
+                expect(emitSpy).not.toHaveBeenCalled();
             });
         });
     });

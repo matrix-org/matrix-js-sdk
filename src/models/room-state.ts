@@ -407,6 +407,37 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         this.emit(RoomStateEvent.Update, this);
     }
 
+    public processBeaconEvents(events: MatrixEvent[]): void {
+        if (
+            !events.length ||
+            // discard locations if we have no beacons
+            !this.beacons.size
+        ) {
+            return;
+        }
+
+        // names are confusing here
+        // a Beacon is the parent event, but event type is 'm.beacon_info'
+        // a location is the 'child' related to the Beacon, but the event type is 'm.beacon'
+        // group locations by beaconInfo event id
+        const locationEventsByBeaconEventId = events.reduce<Record<string, MatrixEvent[]>>((acc, event) => {
+            const beaconInfoEventId = event.getRelation()?.event_id;
+            if (!acc[beaconInfoEventId]) {
+                acc[beaconInfoEventId] = [];
+            }
+            acc[beaconInfoEventId].push(event);
+            return acc;
+        }, {});
+
+        Object.entries(locationEventsByBeaconEventId).forEach(([beaconInfoEventId, events]) => {
+            const beacon = [...this.beacons.values()].find(beacon => beacon.beaconInfoId === beaconInfoEventId);
+
+            if (beacon) {
+                beacon.addLocations(events);
+            }
+        });
+    }
+
     /**
      * Looks up a member by the given userId, and if it doesn't exist,
      * create it and emit the `RoomState.newMember` event.
@@ -441,6 +472,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      */
     private setBeacon(event: MatrixEvent): void {
         const beaconIdentifier = getBeaconInfoIdentifier(event);
+
         if (this.beacons.has(beaconIdentifier)) {
             const beacon = this.beacons.get(beaconIdentifier);
 
@@ -470,6 +502,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
         this.emit(BeaconEvent.New, event, beacon);
         beacon.on(BeaconEvent.LivenessChange, this.onBeaconLivenessChange.bind(this));
+
         this.beacons.set(beacon.identifier, beacon);
     }
 

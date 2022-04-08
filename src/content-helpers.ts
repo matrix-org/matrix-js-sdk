@@ -261,3 +261,18 @@ export const makeBeaconContent: MakeBeaconContent = (
         event_id: beaconInfoEventId,
     },
 });
+
+export type BeaconLocationState = MLocationContent & {
+    timestamp: number;
+};
+
+export const parseBeaconContent = (content: MBeaconEventContent): BeaconLocationState => {
+    const { description, uri } = M_LOCATION.findIn<MLocationContent>(content);
+    const timestamp = M_TIMESTAMP.findIn<number>(content);
+
+    return {
+        description,
+        uri,
+        timestamp,
+    };
+};

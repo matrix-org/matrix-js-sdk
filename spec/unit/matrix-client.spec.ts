@@ -33,6 +33,7 @@ import * as testUtils from "../test-utils/test-utils";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
 import { Room } from "../../src";
+import { makeBeaconEvent } from "../test-utils/beacon";
 
 jest.useFakeTimers();
 
@@ -1024,6 +1025,35 @@ describe("MatrixClient", function() {
                 `${encodeURIComponent(M_BEACON_INFO.name)}/${encodeURIComponent(userId)}`,
             );
             expect(requestContent).toEqual(content);
+        });
+
+        describe('processBeaconEvents()', () => {
+            it('does nothing when events is falsy', () => {
+                const room = new Room(roomId, client, userId);
+                const roomStateProcessSpy = jest.spyOn(room.currentState, 'processBeaconEvents');
+
+                client.processBeaconEvents(room, undefined);
+                expect(roomStateProcessSpy).not.toHaveBeenCalled();
+            });
+
+            it('does nothing when events is of length 0', () => {
+                const room = new Room(roomId, client, userId);
+                const roomStateProcessSpy = jest.spyOn(room.currentState, 'processBeaconEvents');
+
+                client.processBeaconEvents(room, []);
+                expect(roomStateProcessSpy).not.toHaveBeenCalled();
+            });
+
+            it('calls room states processBeaconEvents with m.beacon events', () => {
+                const room = new Room(roomId, client, userId);
+                const roomStateProcessSpy = jest.spyOn(room.currentState, 'processBeaconEvents');
+
+                const messageEvent = testUtils.mkMessage({ room: roomId, user: userId, event: true });
+                const beaconEvent = makeBeaconEvent(userId);
+
+                client.processBeaconEvents(room, [messageEvent, beaconEvent]);
+                expect(roomStateProcessSpy).toHaveBeenCalledWith([beaconEvent]);
+            });
         });
     });
 });
