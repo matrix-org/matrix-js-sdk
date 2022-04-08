@@ -1636,6 +1636,7 @@ export class SyncApi {
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
         room.addLiveEvents(timelineEventList || [], null, fromCache);
+        this.client.processBeaconEvents(room, timelineEventList);
     }
 
     /**

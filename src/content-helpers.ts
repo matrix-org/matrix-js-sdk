@@ -18,7 +18,7 @@ limitations under the License.
 
 import { isProvided, REFERENCE_RELATION } from "matrix-events-sdk";
 
-import { MBeaconEventContent, MBeaconInfoContent, MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
+import { MBeaconEventContent, MBeaconInfoContent, MBeaconInfoEventContent } from "./@types/beacon";
 import { MsgType } from "./@types/event";
 import { TEXT_NODE_TYPE } from "./@types/extensible_events";
 import {
@@ -192,83 +192,9 @@ export const parseLocationEvent = (wireEventContent: LocationEventWireContent): 
 };
 
 /**
- * Beacon event helpers
- */
-export type MakeBeaconInfoContent = (
-    timeout: number,
-    isLive?: boolean,
-    description?: string,
-    assetType?: LocationAssetType,
-    timestamp?: number
-) => MBeaconInfoEventContent;
-
-export const makeBeaconInfoContent: MakeBeaconInfoContent = (
-    timeout,
-    isLive,
-    description,
-    assetType,
-    timestamp,
-) => ({
-    [M_BEACON_INFO.name]: {
-        description,
-        timeout,
-        live: isLive,
-    },
-    [M_TIMESTAMP.name]: timestamp || Date.now(),
-    [M_ASSET.name]: {
-        type: assetType ?? LocationAssetType.Self,
-    },
-});
-
-export type BeaconInfoState = MBeaconInfoContent & {
-    assetType: LocationAssetType;
-    timestamp: number;
-};
-/**
- * Flatten beacon info event content
- */
-export const parseBeaconInfoContent = (content: MBeaconInfoEventContent): BeaconInfoState => {
-    const { description, timeout, live } = M_BEACON_INFO.findIn<MBeaconInfoContent>(content);
-    const { type: assetType } = M_ASSET.findIn<MAssetContent>(content);
-    const timestamp = M_TIMESTAMP.findIn<number>(content);
-
-    return {
-        description,
-        timeout,
-        live,
-        assetType,
-        timestamp,
-    };
-};
-
-export type MakeBeaconContent = (
-    uri: string,
-    timestamp: number,
-    beaconInfoId: string,
-    description?: string,
-) => MBeaconEventContent;
-
-export const makeBeaconContent: MakeBeaconContent = (
-    uri,
-    timestamp,
-    beaconInfoId,
-    description,
-) => ({
-    [M_LOCATION.name]: {
-        description,
-        uri,
-    },
-    [M_TIMESTAMP.name]: timestamp,
-    "m.relates_to": {
-        rel_type: REFERENCE_RELATION.name,
-        event_id: beaconInfoId,
-    },
-});
-
-/**
  * Topic event helpers
  */
-export type MakeTopicContent = (
+ export type MakeTopicContent = (
     topic: string,
     htmlTopic?: string,
 ) => MRoomTopicEventContent;
@@ -291,4 +217,91 @@ export const parseTopicContent = (content: MRoomTopicEventContent): TopicState =
     const text = mtopic?.find(r => !isProvided(r.mimetype) || r.mimetype === "text/plain")?.body ?? content.topic;
     const html = mtopic?.find(r => r.mimetype === "text/html")?.body;
     return { text, html };
+};
+
+/**
+ * Beacon event helpers
+ */
+export type MakeBeaconInfoContent = (
+    timeout: number,
+    isLive?: boolean,
+    description?: string,
+    assetType?: LocationAssetType,
+    timestamp?: number
+) => MBeaconInfoEventContent;
+
+export const makeBeaconInfoContent: MakeBeaconInfoContent = (
+    timeout,
+    isLive,
+    description,
+    assetType,
+    timestamp,
+) => ({
+    description,
+    timeout,
+    live: isLive,
+    [M_TIMESTAMP.name]: timestamp || Date.now(),
+    [M_ASSET.name]: {
+        type: assetType ?? LocationAssetType.Self,
+    },
+});
+
+export type BeaconInfoState = MBeaconInfoContent & {
+    assetType: LocationAssetType;
+    timestamp: number;
+};
+/**
+ * Flatten beacon info event content
+ */
+export const parseBeaconInfoContent = (content: MBeaconInfoEventContent): BeaconInfoState => {
+    const { description, timeout, live } = content;
+    const { type: assetType } = M_ASSET.findIn<MAssetContent>(content);
+    const timestamp = M_TIMESTAMP.findIn<number>(content);
+
+    return {
+        description,
+        timeout,
+        live,
+        assetType,
+        timestamp,
+    };
+};
+
+export type MakeBeaconContent = (
+    uri: string,
+    timestamp: number,
+    beaconInfoEventId: string,
+    description?: string,
+) => MBeaconEventContent;
+
+export const makeBeaconContent: MakeBeaconContent = (
+    uri,
+    timestamp,
+    beaconInfoEventId,
+    description,
+) => ({
+    [M_LOCATION.name]: {
+        description,
+        uri,
+    },
+    [M_TIMESTAMP.name]: timestamp,
+    "m.relates_to": {
+        rel_type: REFERENCE_RELATION.name,
+        event_id: beaconInfoEventId,
+    },
+});
+
+export type BeaconLocationState = MLocationContent & {
+    timestamp: number;
+};
+
+export const parseBeaconContent = (content: MBeaconEventContent): BeaconLocationState => {
+    const { description, uri } = M_LOCATION.findIn<MLocationContent>(content);
+    const timestamp = M_TIMESTAMP.findIn<number>(content);
+
+    return {
+        description,
+        uri,
+        timestamp,
+    };
 };
