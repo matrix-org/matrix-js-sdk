@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { M_BEACON_INFO } from "../@types/beacon";
 import { BeaconInfoState, parseBeaconInfoContent } from "../content-helpers";
 import { MatrixEvent } from "../matrix";
 import { TypedEventEmitter } from "./typed-event-emitter";
@@ -38,11 +37,13 @@ export const isTimestampInDuration = (
     timestamp: number,
 ): boolean => timestamp >= startTimestamp && startTimestamp + durationMs >= timestamp;
 
-export const isBeaconInfoEventType = (type: string) =>
-    type.startsWith(M_BEACON_INFO.name) ||
-    type.startsWith(M_BEACON_INFO.altName);
+// beacon info events are uniquely identified by
+// `<roomId>_<state_key>`
+export type BeaconIdentifier = string;
+export const getBeaconInfoIdentifier = (event: MatrixEvent): BeaconIdentifier =>
+    `${event.getRoomId()}_${event.getStateKey()}`;
 
-// https://github.com/matrix-org/matrix-spec-proposals/pull/3489
+// https://github.com/matrix-org/matrix-spec-proposals/pull/3672
 export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.New>, BeaconEventHandlerMap> {
     public readonly roomId: string;
     private _beaconInfo: BeaconInfoState;
@@ -61,8 +62,8 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
         return this._isLive;
     }
 
-    public get identifier(): string {
-        return this.beaconInfoEventType;
+    public get identifier(): BeaconIdentifier {
+        return getBeaconInfoIdentifier(this.rootEvent);
     }
 
     public get beaconInfoId(): string {
@@ -82,8 +83,12 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
     }
 
     public update(beaconInfoEvent: MatrixEvent): void {
-        if (beaconInfoEvent.getType() !== this.beaconInfoEventType) {
+        if (getBeaconInfoIdentifier(beaconInfoEvent) !== this.identifier) {
             throw new Error('Invalid updating event');
+        }
+        // don't update beacon with an older event
+        if (beaconInfoEvent.event.origin_server_ts < this.rootEvent.event.origin_server_ts) {
+            return;
         }
         this.rootEvent = beaconInfoEvent;
         this.setBeaconInfo(this.rootEvent);
