@@ -26,8 +26,11 @@ import { MatrixEvent } from "./event";
 import { MatrixClient } from "../client";
 import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
 import { TypedEventEmitter } from "./typed-event-emitter";
-import { Beacon, BeaconEvent, isBeaconInfoEventType, BeaconEventHandlerMap } from "./beacon";
+import { Beacon, BeaconEvent, BeaconEventHandlerMap } from "./beacon";
 import { TypedReEmitter } from "../ReEmitter";
+import { M_BEACON_INFO } from "../@types/beacon";
+import { getBeaconInfoIdentifier } from "./beacon";
+import { BeaconIdentifier } from "..";
 
 // possible statuses for out-of-band member loading
 enum OobStatus {
@@ -80,8 +83,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     public events = new Map<string, Map<string, MatrixEvent>>(); // Map<eventType, Map<stateKey, MatrixEvent>>
     public paginationToken: string = null;
 
-    public readonly beacons = new Map<string, Beacon>();
-    private liveBeaconIds: string[] = [];
+    public readonly beacons = new Map<BeaconIdentifier, Beacon>();
+    private liveBeaconIds: BeaconIdentifier[] = [];
 
     /**
      * Construct room state.
@@ -330,7 +333,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                 return;
             }
 
-            if (isBeaconInfoEventType(event.getType())) {
+            if (M_BEACON_INFO.matches(event.getType())) {
                 this.setBeacon(event);
             }
 
@@ -468,12 +471,15 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * @experimental
      */
     private setBeacon(event: MatrixEvent): void {
-        if (this.beacons.has(event.getType())) {
-            const beacon = this.beacons.get(event.getType());
+        const beaconIdentifier = getBeaconInfoIdentifier(event);
+        if (this.beacons.has(beaconIdentifier)) {
+            const beacon = this.beacons.get(beaconIdentifier);
 
             if (event.isRedacted()) {
-                beacon.destroy();
-                this.beacons.delete(event.getType());
+                if (beacon.beaconInfoId === event.getRedactionEvent()?.['redacts']) {
+                    beacon.destroy();
+                    this.beacons.delete(beaconIdentifier);
+                }
                 return;
             }
 
@@ -495,7 +501,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
         this.emit(BeaconEvent.New, event, beacon);
         beacon.on(BeaconEvent.LivenessChange, this.onBeaconLivenessChange.bind(this));
-        this.beacons.set(beacon.beaconInfoEventType, beacon);
+        this.beacons.set(beacon.identifier, beacon);
     }
 
     /**
@@ -508,7 +514,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         const prevHasLiveBeacons = !!this.liveBeaconIds?.length;
         this.liveBeaconIds = Array.from(this.beacons.values())
             .filter(beacon => beacon.isLive)
-            .map(beacon => beacon.beaconInfoId);
+            .map(beacon => beacon.identifier);
 
         const hasLiveBeacons = !!this.liveBeaconIds.length;
         if (prevHasLiveBeacons !== hasLiveBeacons) {

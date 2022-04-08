@@ -982,7 +982,7 @@ describe("MatrixClient", function() {
 
             expect(rootEvent.isThreadRoot).toBe(true);
 
-            const [roomEvents, threadEvents] = client.partitionThreadedEvents(room, [rootEvent]);
+            const [roomEvents, threadEvents] = room.partitionThreadedEvents([rootEvent]);
             expect(roomEvents).toHaveLength(1);
             expect(threadEvents).toHaveLength(1);
 
@@ -1000,10 +1000,10 @@ describe("MatrixClient", function() {
         });
 
         it("creates new beacon info", async () => {
-            await client.unstable_createLiveBeacon(roomId, content, '123');
+            await client.unstable_createLiveBeacon(roomId, content);
 
             // event type combined
-            const expectedEventType = `${M_BEACON_INFO.name}.${userId}.123`;
+            const expectedEventType = M_BEACON_INFO.name;
             const [callback, method, path, queryParams, requestContent] = client.http.authedRequest.mock.calls[0];
             expect(callback).toBeFalsy();
             expect(method).toBe('PUT');
@@ -1016,15 +1016,13 @@ describe("MatrixClient", function() {
         });
 
         it("updates beacon info with specific event type", async () => {
-            const eventType = `${M_BEACON_INFO.name}.${userId}.456`;
-
-            await client.unstable_setLiveBeacon(roomId, eventType, content);
+            await client.unstable_setLiveBeacon(roomId, content);
 
             // event type combined
             const [, , path, , requestContent] = client.http.authedRequest.mock.calls[0];
             expect(path).toEqual(
                 `/rooms/${encodeURIComponent(roomId)}/state/` +
-                `${encodeURIComponent(eventType)}/${encodeURIComponent(userId)}`,
+                `${encodeURIComponent(M_BEACON_INFO.name)}/${encodeURIComponent(userId)}`,
             );
             expect(requestContent).toEqual(content);
         });

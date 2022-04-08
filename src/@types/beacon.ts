@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EitherAnd, RELATES_TO_RELATIONSHIP, REFERENCE_RELATION } from "matrix-events-sdk";
+import { RELATES_TO_RELATIONSHIP, REFERENCE_RELATION } from "matrix-events-sdk";
 
 import { UnstableValue } from "../NamespacedValue";
 import { MAssetEvent, MLocationEvent, MTimestampEvent } from "./location";
 
 /**
- * Beacon info and beacon event types as described in MSC3489
- * https://github.com/matrix-org/matrix-spec-proposals/pull/3489
+ * Beacon info and beacon event types as described in MSC3672
+ * https://github.com/matrix-org/matrix-spec-proposals/pull/3672
  */
 
 /**
@@ -61,15 +61,10 @@ import { MAssetEvent, MLocationEvent, MTimestampEvent } from "./location";
  */
 
 /**
- * Variable event type for m.beacon_info
- */
-export const M_BEACON_INFO_VARIABLE = new UnstableValue("m.beacon_info.*", "org.matrix.msc3489.beacon_info.*");
-
-/**
  * Non-variable type for m.beacon_info event content
  */
-export const M_BEACON_INFO = new UnstableValue("m.beacon_info", "org.matrix.msc3489.beacon_info");
-export const M_BEACON = new UnstableValue("m.beacon", "org.matrix.msc3489.beacon");
+export const M_BEACON_INFO = new UnstableValue("m.beacon_info", "org.matrix.msc3672.beacon_info");
+export const M_BEACON = new UnstableValue("m.beacon", "org.matrix.msc3672.beacon");
 
 export type MBeaconInfoContent = {
     description?: string;
@@ -80,16 +75,11 @@ export type MBeaconInfoContent = {
     live?: boolean;
 };
 
-export type MBeaconInfoEvent = EitherAnd<
-    { [M_BEACON_INFO.name]: MBeaconInfoContent },
-    { [M_BEACON_INFO.altName]: MBeaconInfoContent }
->;
-
 /**
  * m.beacon_info Event example from the spec
- * https://github.com/matrix-org/matrix-spec-proposals/pull/3489
+ * https://github.com/matrix-org/matrix-spec-proposals/pull/3672
  * {
-    "type": "m.beacon_info.@matthew:matrix.org.1",
+    "type": "m.beacon_info",
     "state_key": "@matthew:matrix.org",
     "content": {
         "m.beacon_info": {
@@ -108,7 +98,7 @@ export type MBeaconInfoEvent = EitherAnd<
  * m.beacon_info.* event content
  */
 export type MBeaconInfoEventContent = &
-    MBeaconInfoEvent &
+    MBeaconInfoContent &
     // creation timestamp of the beacon on the client
     MTimestampEvent &
     // the type of asset being tracked as per MSC3488
@@ -116,7 +106,7 @@ export type MBeaconInfoEventContent = &
 
 /**
  * m.beacon event example
- * https://github.com/matrix-org/matrix-spec-proposals/pull/3489
+ * https://github.com/matrix-org/matrix-spec-proposals/pull/3672
  *
  * {
     "type": "m.beacon",
