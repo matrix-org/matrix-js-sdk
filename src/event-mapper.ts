@@ -66,6 +66,9 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
                 MatrixEventEvent.Replaced,
                 MatrixEventEvent.VisibilityChange,
             ]);
+            room?.reEmitter.reEmit(event, [
+                MatrixEventEvent.BeforeRedaction,
+            ]);
         }
         return event;
     }

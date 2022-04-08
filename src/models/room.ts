@@ -23,7 +23,7 @@ import { Direction, EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
 import { defer, normalize } from "../utils";
-import { IEvent, IThreadBundledRelationship, MatrixEvent } from "./event";
+import { IEvent, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent, MatrixEventHandlerMap } from "./event";
 import { EventStatus } from "./event-status";
 import { RoomMember } from "./room-member";
 import { IRoomSummary, RoomSummary } from "./room-summary";
@@ -171,7 +171,8 @@ type EmittedEvents = RoomEvent
     | ThreadEvent.Update
     | ThreadEvent.NewReply
     | RoomEvent.Timeline
-    | RoomEvent.TimelineReset;
+    | RoomEvent.TimelineReset
+    | MatrixEventEvent.BeforeRedaction;
 
 export type RoomEventHandlerMap = {
     [RoomEvent.MyMembership]: (room: Room, membership: string, prevMembership?: string) => void;
@@ -188,10 +189,10 @@ export type RoomEventHandlerMap = {
         oldStatus?: EventStatus,
     ) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
-} & ThreadHandlerMap;
+} & ThreadHandlerMap & MatrixEventHandlerMap;
 
 export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> {
-    private readonly reEmitter: TypedReEmitter<EmittedEvents, RoomEventHandlerMap>;
+    public readonly reEmitter: TypedReEmitter<EmittedEvents, RoomEventHandlerMap>;
     private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
     // receipts should clobber based on receipt_type and user_id pairs hence
     // the form of this structure. This is sub-optimal for the exposed APIs
@@ -1676,6 +1677,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             thread = await this.threadPromises.get(threadId);
         }
 
+        events = events.filter(e => e.getId() !== threadId); // filter out any root events
+
         if (thread) {
             for (const event of events) {
                 await thread.addEvent(event, toStartOfTimeline);
@@ -1810,7 +1813,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
     };
 
-    private processLiveEvent(event: MatrixEvent): Promise<void> {
+    private processLiveEvent(event: MatrixEvent): void {
         this.applyRedaction(event);
 
         // Implement MSC3531: hiding messages.
@@ -1827,7 +1830,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             if (existingEvent) {
                 // remote echo of an event we sent earlier
                 this.handleRemoteEcho(event, existingEvent);
-                return;
             }
         }
     }

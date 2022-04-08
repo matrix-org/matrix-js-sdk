@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixClient, RelationType, RoomEvent } from "../matrix";
+import { MatrixClient, MatrixEventEvent, RelationType, RoomEvent } from "../matrix";
 import { TypedReEmitter } from "../ReEmitter";
 import { IRelationsRequestOpts } from "../@types/requests";
 import { IThreadBundledRelationship, MatrixEvent } from "./event";
@@ -94,7 +94,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             RoomEvent.TimelineReset,
         ]);
 
-        this.room.on(RoomEvent.Redaction, this.onRedaction);
+        this.room.on(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
         this.room.on(RoomEvent.LocalEchoUpdated, this.onEcho);
         this.timelineSet.on(RoomEvent.Timeline, this.onEcho);
 
@@ -115,23 +115,23 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         }
     }
 
-    private onRedaction = (event: MatrixEvent) => {
-        if (event.threadRootId !== this.id) return;
-        const targetId = event.event.redacts;
-        const targetEvent = this.room.findEventById(targetId);
-        if (targetEvent && this.room.eventShouldLiveIn(targetEvent).threadId === this.id) {
+    private onBeforeRedaction = (event: MatrixEvent) => {
+        if (event?.isRelation(THREAD_RELATION_TYPE.name) &&
+            this.room.eventShouldLiveIn(event).threadId === this.id
+        ) {
             this.replyCount--;
+            this.emit(ThreadEvent.Update, this);
         }
 
-        if (this.lastEvent?.getId() === targetId) {
+        if (this.lastEvent?.getId() === event.getId()) {
             const events = [...this.timelineSet.getLiveTimeline().getEvents()].reverse();
-            this.lastEvent = events.find(e => {
-                return !e.isRedacted() && (e.isRelation(THREAD_RELATION_TYPE.name) || e.isThreadRoot);
-            });
+            this.lastEvent = events.find(e => (
+                !e.isRedacted() &&
+                e.getId() !== event.getId() &&
+                e.isRelation(THREAD_RELATION_TYPE.name)
+            )) ?? this.rootEvent;
             this.emit(ThreadEvent.NewReply, this, this.lastEvent);
         }
-
-        this.emit(ThreadEvent.Update, this);
     };
 
     private onEcho = (event: MatrixEvent) => {
@@ -142,7 +142,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         // when threads are used over federation. That could result in the reply
         // count value drifting away from the value returned by the server
         const isThreadReply = event.isRelation(THREAD_RELATION_TYPE.name);
-        if (!this.lastEvent || this.lastEvent.isRedacted() || (isThreadReply
+        if (!this.lastEvent || (isThreadReply
             && (event.getId() !== this.lastEvent.getId())
             && (event.localTimestamp > this.lastEvent.localTimestamp))
         ) {
