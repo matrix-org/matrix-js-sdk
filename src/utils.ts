@@ -714,6 +714,7 @@ export function recursivelyAssign(target: Object, source: Object, ignoreNullish 
 function getContentTimestampWithFallback(event: MatrixEvent): number {
     return M_TIMESTAMP.findIn<number>(event.getContent()) ?? -1;
 }
+
 /**
  * Sort events by their content m.ts property
  * Latest timestamp first

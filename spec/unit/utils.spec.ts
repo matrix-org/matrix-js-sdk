@@ -519,6 +519,7 @@ describe("utils", function() {
         const beaconEvent2 = makeBeaconEvent(userId, { timestamp: 1648804528558 });
         const beaconEvent3 = makeBeaconEvent(userId, { timestamp: 1648804528000 });
         const beaconEvent4 = makeBeaconEvent(userId, { timestamp: 0 });
+
         it('sorts events with timestamps as later than events without', () => {
             expect(
                 [beaconEvent4, eventWithoutContentTimestamp, beaconEvent1]
