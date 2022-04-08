@@ -383,7 +383,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             return this.threadTimelineSetsPromise;
         }
 
-        if (this.client?.supportsExperimentalThreads) {
+        if (this.client?.supportsExperimentalThreads()) {
             try {
                 this.threadTimelineSetsPromise = Promise.all([
                     this.createThreadTimelineSet(),
