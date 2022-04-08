@@ -115,11 +115,14 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     }
 
     private onEcho = (event: MatrixEvent) => {
+        if (event.threadRootId !== this.id) return; // ignore echoes for other timelines
+        if (this.lastEvent === event) return;
+
         // There is a risk that the `localTimestamp` approximation will not be accurate
         // when threads are used over federation. That could result in the reply
         // count value drifting away from the value returned by the server
         const isThreadReply = event.isRelation(THREAD_RELATION_TYPE.name);
-        if (!this.lastEvent || (isThreadReply
+        if (!this.lastEvent || this.lastEvent.isRedacted() || (isThreadReply
             && (event.getId() !== this.lastEvent.getId())
             && (event.localTimestamp > this.lastEvent.localTimestamp))
         ) {
@@ -135,9 +138,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             }
         }
 
-        if (this.timelineSet.eventIdToTimeline(event.getId())) {
-            this.emit(ThreadEvent.Update, this);
-        }
+        this.emit(ThreadEvent.Update, this);
     };
 
     public get roomState(): RoomState {
@@ -188,10 +189,9 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             this._currentUserParticipated = true;
         }
 
-        const isThreadReply = event.isRelation(THREAD_RELATION_TYPE.name);
         // If no thread support exists we want to count all thread relation
         // added as a reply. We can't rely on the bundled relationships count
-        if (!Thread.hasServerSideSupport && isThreadReply) {
+        if (!Thread.hasServerSideSupport && event.isRelation(THREAD_RELATION_TYPE.name)) {
             this.replyCount++;
         }
 
