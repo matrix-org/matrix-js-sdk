@@ -194,7 +194,7 @@ export const parseLocationEvent = (wireEventContent: LocationEventWireContent): 
 /**
  * Topic event helpers
  */
- export type MakeTopicContent = (
+export type MakeTopicContent = (
     topic: string,
     htmlTopic?: string,
 ) => MRoomTopicEventContent;
