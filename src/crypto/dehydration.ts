@@ -75,15 +75,16 @@ export class DehydrationManager {
                         if (result) {
                             const { key, keyInfo, deviceDisplayName, time } = result;
                             const pickleKey = Buffer.from(this.crypto.olmDevice.pickleKey);
-                            const decrypted = await decryptAES(key, pickleKey, DEHYDRATION_ALGORITHM);
-                            this.key = decodeBase64(decrypted);
-                            this.keyInfo = keyInfo;
-                            this.deviceDisplayName = deviceDisplayName;
-                            const now = Date.now();
-                            const delay = Math.max(1, time + oneweek - now);
-                            this.timeoutId = global.setTimeout(
-                                this.dehydrateDevice.bind(this), delay,
-                            );
+                            decryptAES(key, pickleKey, DEHYDRATION_ALGORITHM).then((decrypted) => {
+                                this.key = decodeBase64(decrypted);
+                                this.keyInfo = keyInfo;
+                                this.deviceDisplayName = deviceDisplayName;
+                                const now = Date.now();
+                                const delay = Math.max(1, time + oneweek - now);
+                                this.timeoutId = global.setTimeout(
+                                    this.dehydrateDevice.bind(this), delay,
+                                );
+                            });
                         }
                     },
                     "dehydration",
