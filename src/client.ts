@@ -7819,18 +7819,45 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Make a request to change your password.
      * @param {Object} authDict
      * @param {string} newPassword The new desired password.
+     * @param {boolean} logoutDevices Should all sessions be logged out after the password change. Defaults to true.
      * @param {module:client.callback} callback Optional.
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setPassword(authDict: any, newPassword: string, callback?: Callback): Promise<any> { // TODO: Types
+    public setPassword(
+        authDict: any,
+        newPassword: string,
+        callback?: Callback,
+    ): Promise<{}>;
+    public setPassword(
+        authDict: any,
+        newPassword: string,
+        logoutDevices: boolean,
+        callback?: Callback,
+    ): Promise<{}>;
+    public setPassword(
+        authDict: any,
+        newPassword: string,
+        logoutDevices?: Callback | boolean,
+        callback?: Callback,
+    ): Promise<{}> {
+        if (typeof logoutDevices === 'function') {
+            callback = logoutDevices;
+        }
+        if (typeof logoutDevices !== 'boolean') {
+            // Use backwards compatible behaviour of not specifying logout_devices
+            // This way it is left up to the server:
+            logoutDevices = undefined;
+        }
+
         const path = "/account/password";
         const data = {
             'auth': authDict,
             'new_password': newPassword,
+            'logout_devices': logoutDevices,
         };
 
-        return this.http.authedRequest(
+        return this.http.authedRequest<{}>(
             callback, Method.Post, path, null, data,
         );
     }
