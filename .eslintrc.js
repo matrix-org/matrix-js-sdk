@@ -9,6 +9,9 @@ module.exports = {
         browser: true,
         node: true,
     },
+    parserOptions: {
+        project: "./tsconfig.json",
+    },
     rules: {
         "no-var": ["warn"],
         "prefer-rest-params": ["warn"],
@@ -56,6 +59,9 @@ module.exports = {
             "quotes": "off",
             // We use a `logger` intermediary module
             "no-console": "error",
+
+            // Encouraging safe use of promises:
+            "@typescript-eslint/await-thenable": "error",
         },
     }],
 };

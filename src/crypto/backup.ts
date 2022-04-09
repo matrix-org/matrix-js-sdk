@@ -375,7 +375,7 @@ export class BackupManager {
             );
             if (device) {
                 sigInfo.device = device;
-                sigInfo.deviceTrust = await this.baseApis.checkDeviceTrust(
+                sigInfo.deviceTrust = this.baseApis.checkDeviceTrust(
                     this.baseApis.getUserId(), sigInfo.deviceId,
                 );
                 try {
@@ -495,7 +495,7 @@ export class BackupManager {
                 rooms[roomId] = { sessions: {} };
             }
 
-            const sessionData = await this.baseApis.crypto.olmDevice.exportInboundGroupSession(
+            const sessionData = this.baseApis.crypto.olmDevice.exportInboundGroupSession(
                 session.senderKey, session.sessionId, session.sessionData,
             );
             sessionData.algorithm = MEGOLM_ALGORITHM;

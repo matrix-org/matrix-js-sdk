@@ -1026,7 +1026,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             const decodedBackupKey = new Uint8Array(olmlib.decodeBase64(
                 fixedBackupKey || sessionBackupKey,
             ));
-            await builder.addSessionBackupPrivateKeyToCache(decodedBackupKey);
+            builder.addSessionBackupPrivateKeyToCache(decodedBackupKey);
         } else if (this.backupManager.getKeyBackupEnabled()) {
             // key backup is enabled but we don't have a session backup key in SSSS: see if we have one in
             // the cache or the user can provide one, and if so, write it to SSSS
