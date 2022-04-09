@@ -71,7 +71,7 @@ export class DehydrationManager {
             (txn) => {
                 this.crypto.cryptoStore.getSecretStorePrivateKey(
                     txn,
-                    async (result) => {
+                    (result) => {
                         if (result) {
                             const { key, keyInfo, deviceDisplayName, time } = result;
                             const pickleKey = Buffer.from(this.crypto.olmDevice.pickleKey);

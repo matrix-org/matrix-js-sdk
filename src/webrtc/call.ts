@@ -1374,7 +1374,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * Internal
      * @param {Object} event
      */
-    private gotLocalIceCandidate = (event: RTCPeerConnectionIceEvent): Promise<void> => {
+    private gotLocalIceCandidate = (event: RTCPeerConnectionIceEvent): void => {
         if (event.candidate) {
             logger.debug(
                 "Call " + this.callId + " got local ICE " + event.candidate.sdpMid + " candidate: " +
@@ -1829,7 +1829,14 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
     }
 
-    private onNegotiationNeeded = async (): Promise<void> => {
+    private onNegotiationNeeded = (): void => {
+        this.onNegotiationNeededPromise().then().catch(e => {
+            // TODO: should this be handled?
+            throw e;
+        });
+    };
+
+    private onNegotiationNeededPromise = async (): Promise<void> => {
         logger.info("Negotiation is needed!");
 
         if (this.state !== CallState.CreateOffer && this.opponentVersion === 0) {

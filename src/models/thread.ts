@@ -102,7 +102,13 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         this.id = rootEvent?.getId() ?? opts?.initialEvents?.find(event => event.isThreadRelation)?.relationEventId;
         this.initialiseThread(this.rootEvent);
 
-        opts?.initialEvents?.forEach(event => this.addEvent(event, false));
+        // TODO: do we actually want to wait for this to be completed on initialisation?
+        opts?.initialEvents?.forEach(event => {
+            this.addEvent(event, false).then().catch(e => {
+                // TODO: should this be handled?
+                throw e;
+            });
+        });
     }
 
     public static setServerSideSupport(hasServerSideSupport: boolean, useStable: boolean): void {

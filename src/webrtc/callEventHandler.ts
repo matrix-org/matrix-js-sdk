@@ -66,7 +66,14 @@ export class CallEventHandler {
         this.client.removeListener(RoomEvent.Timeline, this.onRoomTimeline);
     }
 
-    private evaluateEventBuffer = async () => {
+    private evaluateEventBuffer = (): void => {
+        this.evaluateEventBufferPromise().then().catch(e => {
+            // TODO: should this be logged or handled in some way?
+            throw e;
+        });
+    };
+
+    private evaluateEventBufferPromise = async () => {
         if (this.client.getSyncState() === SyncState.Syncing) {
             await Promise.all(this.callEventBuffer.map(event => {
                 this.client.decryptEventIfNeeded(event);
@@ -111,7 +118,7 @@ export class CallEventHandler {
 
         if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
             // add an event listener for once the event is decrypted.
-            event.once(MatrixEventEvent.Decrypted, async () => {
+            event.once(MatrixEventEvent.Decrypted, () => {
                 if (!this.eventIsACall(event)) return;
 
                 if (this.callEventBuffer.includes(event)) {
@@ -120,11 +127,8 @@ export class CallEventHandler {
                 } else {
                     // This one wasn't buffered so just run the event handler for it
                     // straight away
-                    try {
-                        await this.handleCallEvent(event);
-                    } catch (e) {
-                        logger.error("Caught exception handling call event", e);
-                    }
+                    this.handleCallEvent(event).then()
+                        .catch(e => logger.error("Caught exception handling call event", e));
                 }
             });
         }

@@ -1426,7 +1426,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /*
      * Event handler for DeviceList's userNewDevices event
      */
-    private onDeviceListUserCrossSigningUpdated = async (userId: string) => {
+    private onDeviceListUserCrossSigningUpdated = (userId: string): void => {
+        this.onDeviceListUserCrossSigningUpdatedPromise(userId).then().catch(e => {
+            // TODO: should this be handled?
+            throw e;
+        });
+    };
+    private onDeviceListUserCrossSigningUpdatedPromise = async (userId: string) => {
         if (userId === this.userId) {
             // An update to our own cross-signing key.
             // Get the new key first:
