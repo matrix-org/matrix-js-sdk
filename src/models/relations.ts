@@ -252,10 +252,8 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      * The original relation event that is about to be redacted.
      */
     private onBeforeRedaction = (redactedEvent: MatrixEvent): void => {
-        this.onBeforeRedactionPromise(redactedEvent).then().catch(e => {
-            // TODO: should this be handled?
-            throw e;
-        });
+        // TODO: why are we not handling errors?
+        void this.onBeforeRedactionPromise(redactedEvent);
     };
 
     private onBeforeRedactionPromise = async (redactedEvent: MatrixEvent): Promise<void> => {

@@ -104,10 +104,8 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
 
         // TODO: do we actually want to wait for this to be completed on initialisation?
         opts?.initialEvents?.forEach(event => {
-            this.addEvent(event, false).then().catch(e => {
-                // TODO: should this be handled?
-                throw e;
-            });
+            // TODO: why are we not awaiting this/handling errors?
+            void this.addEvent(event, false);
         });
     }
 

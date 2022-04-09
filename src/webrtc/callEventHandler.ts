@@ -67,10 +67,8 @@ export class CallEventHandler {
     }
 
     private evaluateEventBuffer = (): void => {
-        this.evaluateEventBufferPromise().then().catch(e => {
-            // TODO: should this be logged or handled in some way?
-            throw e;
-        });
+        // TODO: why are we not handling errors?
+        void this.evaluateEventBufferPromise();
     };
 
     private evaluateEventBufferPromise = async () => {

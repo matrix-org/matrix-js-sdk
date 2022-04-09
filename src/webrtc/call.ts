@@ -1830,10 +1830,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     private onNegotiationNeeded = (): void => {
-        this.onNegotiationNeededPromise().then().catch(e => {
-            // TODO: should this be handled?
-            throw e;
-        });
+        // TODO: why are we not handling errors?
+        void this.onNegotiationNeededPromise();
     };
 
     private onNegotiationNeededPromise = async (): Promise<void> => {
