@@ -555,7 +555,8 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      *    is no need to wait for this (it's mostly for the unit tests).
      */
     public refreshOutdatedDeviceLists(): Promise<void> {
-        this.saveIfDirty();
+        // TODO: why are we not awaiting/handling errors?
+        void this.saveIfDirty();
 
         const usersToDownload = [];
         for (const userId of Object.keys(this.deviceTrackingStatus)) {
@@ -660,7 +661,8 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
                     }
                 }
             });
-            this.saveIfDirty();
+            // TODO: why are we not awaiting/handling errors?
+            void this.saveIfDirty();
             this.emit(CryptoEvent.DevicesUpdated, users, !this.hasFetched);
             this.hasFetched = true;
         };
@@ -804,7 +806,8 @@ class DeviceListUpdateSerialiser {
 
             // if we have queued users, fire off another request.
             if (this.queuedQueryDeferred) {
-                this.doQueuedQueries();
+                // TODO: why are we not chaining promises or handling errors?
+                void this.doQueuedQueries();
             }
         }, (e) => {
             logger.warn('Error downloading keys for ' + downloadUsers + ':', e);

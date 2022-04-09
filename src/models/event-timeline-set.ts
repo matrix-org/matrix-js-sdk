@@ -803,7 +803,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
         for (const relationsWithRelType of Object.values(relationsForEvent)) {
             for (const relationsWithEventType of Object.values(relationsWithRelType)) {
-                relationsWithEventType.setTargetEvent(event);
+                // TODO: why are we not awaiting this/handling errors?
+                void relationsWithEventType.setTargetEvent(event);
             }
         }
     }
@@ -861,11 +862,13 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             );
             relatesToEvent = this.findEventById(relatesToEventId) || this.room.getPendingEvent(relatesToEventId);
             if (relatesToEvent) {
-                relationsWithEventType.setTargetEvent(relatesToEvent);
+                // TODO: why are we not awaiting this/handling errors?
+                void relationsWithEventType.setTargetEvent(relatesToEvent);
             }
         }
 
-        relationsWithEventType.addEvent(event);
+        // TODO: why are we not awaiting this/handling errors?
+        void relationsWithEventType.addEvent(event);
     }
 }
 

@@ -143,7 +143,8 @@ export class MSC3089TreeSpace {
             // sharing a folder in other circles.
             if (shareHistoryKeys && isRoomSharedHistory(this.room)) {
                 // noinspection JSIgnoredPromiseFromCall - we aren't concerned as much if this fails.
-                this.client.sendSharedHistoryKeys(this.roomId, [userId]);
+                // TODO: why are we not handling errors to prevent uncaught rejection error?
+                void this.client.sendSharedHistoryKeys(this.roomId, [userId]);
             }
         });
     }

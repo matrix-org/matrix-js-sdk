@@ -484,7 +484,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
             myDevices[this.deviceId] = deviceInfo;
             this.deviceList.storeDevicesForUser(this.userId, myDevices);
-            this.deviceList.saveIfDirty();
+            // TODO: why are we not awaiting this/handling errors?
+            void this.deviceList.saveIfDirty();
         }
 
         await this.cryptoStore.doTxn(
@@ -504,7 +505,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         this.deviceList.startTrackingDeviceList(this.userId);
 
         logger.log("Crypto: checking for key backup...");
-        this.backupManager.checkAndStart();
+        // TODO: why are we not awaiting this/handling errors?
+        void this.backupManager.checkAndStart();
     }
 
     /**
@@ -680,7 +682,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         // Reset the cross-signing keys
         const resetCrossSigning = async () => {
-            crossSigningInfo.resetKeys();
+            // TODO: why are we not awaiting this/handling errors?
+            void crossSigningInfo.resetKeys();
             // Sign master key with device key
             await this.signObject(crossSigningInfo.keys.master);
 
@@ -1128,8 +1131,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @returns {Promise} the key, if any, or null
      */
     public async getSessionBackupPrivateKey(): Promise<Uint8Array | null> {
-        let key = await new Promise<any>((resolve) => { // TODO types
-            this.cryptoStore.doTxn(
+        let key = await new Promise<any>((resolve, rejected) => { // TODO types
+            // TODO: why are we not handling errors?
+            void this.cryptoStore.doTxn(
                 'readonly',
                 [IndexedDBCryptoStore.STORE_ACCOUNT],
                 (txn) => {
@@ -1236,7 +1240,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 );
             });
         };
-        upload({ shouldEmit: true });
+        // we do the upload in the background:
+        void upload({ shouldEmit: true });
 
         const shouldUpgradeCb = (
             this.baseApis.cryptoCallbacks.shouldUpgradeDeviceVerifications
@@ -1448,7 +1453,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 // on the server for our account. So we clear our own stored cross-signing keys,
                 // effectively disabling cross-signing until the user gets verified by the device
                 // that reset the keys
-                this.storeTrustedSelfKeys(null);
+                // TODO: why are we not awaiting this/handling errors?
+                void this.storeTrustedSelfKeys(null);
                 // emit cross-signing has been disabled
                 this.emit(CryptoEvent.KeysChanged, {});
                 // as the trust for our own user has changed,
@@ -1533,7 +1539,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         const oldUserSigningId = this.crossSigningInfo.getId("user_signing");
 
         // Update the version of our keys in our cross-signing object and the local store
-        this.storeTrustedSelfKeys(newCrossSigning.keys);
+        // TODO: why are we not awaiting this/handling errors?
+        void this.storeTrustedSelfKeys(newCrossSigning.keys);
 
         const selfSigningChanged = oldSelfSigningId !== newCrossSigning.getId("self_signing");
         const userSigningChanged = oldUserSigningId !== newCrossSigning.getId("user_signing");
@@ -1640,7 +1647,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                         );
                     });
             };
-            upload({ shouldEmit: true });
+            // we upload in the background:
+            void upload({ shouldEmit: true });
         }
 
         this.emit(CryptoEvent.UserTrustStatusChanged, userId, this.checkUserTrust(userId));
@@ -2016,7 +2024,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         if (fallbackJson) {
             this.fallbackCleanup = setTimeout(() => {
                 delete this.fallbackCleanup;
-                this.olmDevice.forgetOldFallbackKey();
+                // TODO: why are we not handling errors?
+                void this.olmDevice.forgetOldFallbackKey();
             }, 60*60*1000);
         }
 
@@ -2122,7 +2131,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             }
 
             if (!this.crossSigningInfo.getId() && userId === this.crossSigningInfo.userId) {
-                this.storeTrustedSelfKeys(xsk.keys);
+                // TODO: why are we not awaiting this/handling errors?
+                void this.storeTrustedSelfKeys(xsk.keys);
                 // This will cause our own user trust to change, so emit the event
                 this.emit(CryptoEvent.UserTrustStatusChanged, this.userId, this.checkUserTrust(userId));
             }
@@ -2200,7 +2210,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             dev.verified = verificationStatus;
             dev.known = knownStatus;
             this.deviceList.storeDevicesForUser(userId, devices);
-            this.deviceList.saveIfDirty();
+            // TODO: why are we not awaiting this/handling errors?
+            void this.deviceList.saveIfDirty();
         }
 
         // do cross-signing
@@ -2613,7 +2624,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             // but didn't want to remove it as it technically would
             // be a breaking change.
             if (!inhibitDeviceQuery) {
-                this.deviceList.refreshOutdatedDeviceLists();
+                // TODO: why are we not awaiting this/handling errors?
+                void this.deviceList.refreshOutdatedDeviceLists();
             }
         } else {
             logger.log("Enabling encryption in " + roomId);
@@ -2809,7 +2821,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
 
         if (!this.roomDeviceTrackingState[roomId]) {
-            this.trackRoomDevices(roomId);
+            // we don't await this as we pick up the Promise separately afterwards
+            void this.trackRoomDevices(roomId);
         }
         // wait for all the room devices to be loaded
         await this.roomDeviceTrackingState[roomId];
@@ -3003,12 +3016,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async onSyncCompleted(syncData: ISyncStateData): Promise<void> {
         this.deviceList.setSyncToken(syncData.nextSyncToken);
-        this.deviceList.saveIfDirty();
+        // TODO: why are we not awaiting this/handling errors?
+        void this.deviceList.saveIfDirty();
 
         // we always track our own device list (for key backups etc)
         this.deviceList.startTrackingDeviceList(this.userId);
 
-        this.deviceList.refreshOutdatedDeviceLists();
+        // TODO: why are we not awaiting this/handling errors?
+        void this.deviceList.refreshOutdatedDeviceLists();
 
         // we don't start uploading one-time keys until we've caught up with
         // to-device messages, to help us avoid throwing away one-time-keys that we
@@ -3016,7 +3031,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // (https://github.com/vector-im/element-web/issues/2782).
         if (!syncData.catchingUp) {
             this.maybeUploadOneTimeKeys();
-            this.processReceivedRoomKeyRequests();
+            // TODO: why are we not awaiting this/handling errors?
+            void this.processReceivedRoomKeyRequests();
 
             // likewise don't start requesting keys until we've caught up
             // on to_device messages, otherwise we'll request keys that we're
@@ -3116,7 +3132,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             } else if (event.getType() == "m.room_key_request") {
                 this.onRoomKeyRequestEvent(event);
             } else if (event.getType() === "m.secret.request") {
-                this.secretStorage.onRequestReceived(event);
+                // TODO: why are we not handling errors?
+                void this.secretStorage.onRequestReceived(event);
             } else if (event.getType() === "m.secret.send") {
                 this.secretStorage.onSecretReceived(event);
             } else if (event.getType() === "m.room_key.withheld"
@@ -3125,10 +3142,12 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             } else if (event.getContent().transaction_id) {
                 this.onKeyVerificationMessage(event);
             } else if (event.getContent().msgtype === "m.bad.encrypted") {
-                this.onToDeviceBadEncrypted(event);
+                // TODO: why are we not handling errors?
+                void this.onToDeviceBadEncrypted(event);
             } else if (event.isBeingDecrypted() || event.shouldAttemptDecryption()) {
                 if (!event.isBeingDecrypted()) {
-                    event.attemptDecryption(this);
+                    // TODO: why are we not handling errors?
+                    void event.attemptDecryption(this);
                 }
                 // once the event has been decrypted, try again
                 event.once(MatrixEventEvent.Decrypted, (ev) => {
@@ -3157,7 +3176,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         if (!this.backupManager.checkedForBackup) {
             // don't bother awaiting on this - the important thing is that we retry if we
             // haven't managed to check before
-            this.backupManager.checkAndStart();
+            // TODO: why are we not handling errors?
+            void this.backupManager.checkAndStart();
         }
 
         const alg = this.getRoomDecryptor(content.room_id, content.algorithm);
@@ -3187,7 +3207,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         const alg = this.getRoomDecryptor(content.room_id, content.algorithm);
         if (alg.onRoomKeyWithheldEvent) {
-            alg.onRoomKeyWithheldEvent(event);
+            // TODO: why are we not awaiting this/handling errors?
+            void alg.onRoomKeyWithheldEvent(event);
         }
         if (!content.room_id) {
             // retry decryption for all events sent by the sender_key.  This will
@@ -3195,7 +3216,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             // wedged.
             const roomDecryptors = this.getRoomDecryptors(content.algorithm);
             for (const decryptor of roomDecryptors) {
-                decryptor.retryDecryptionFromSender(content.sender_key);
+                // TODO: why are we not awaiting this/handling errors?
+                void decryptor.retryDecryptionFromSender(content.sender_key);
             }
         }
     }
@@ -3228,7 +3250,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             return new VerificationRequest(
                 channel, this.verificationMethods, this.baseApis);
         };
-        this.handleVerificationEvent(event, this.toDeviceVerificationRequests, createRequest);
+        // TODO: why are we not handling errors?
+        void this.handleVerificationEvent(event, this.toDeviceVerificationRequests, createRequest);
     }
 
     /**
@@ -3259,7 +3282,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             return new VerificationRequest(
                 channel, this.verificationMethods, this.baseApis);
         };
-        this.handleVerificationEvent(event, this.inRoomVerificationRequests, createRequest, liveEvent);
+        // TODO: why are we not handling errors?
+        void this.handleVerificationEvent(event, this.inRoomVerificationRequests, createRequest, liveEvent);
     };
 
     private async handleVerificationEvent(
@@ -3337,7 +3361,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         const retryDecryption = () => {
             const roomDecryptors = this.getRoomDecryptors(olmlib.MEGOLM_ALGORITHM);
             for (const decryptor of roomDecryptors) {
-                decryptor.retryDecryptionFromSender(deviceKey);
+                // TODO: why are we not awaiting this/handling errors?
+                void decryptor.retryDecryptionFromSender(deviceKey);
             }
         };
 
@@ -3422,7 +3447,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         const requestsToResend =
             await this.outgoingRoomKeyRequestManager.getOutgoingSentRoomKeyRequest(sender, device.deviceId);
         for (const keyReq of requestsToResend) {
-            this.requestRoomKey(keyReq.requestBody, keyReq.recipients, true);
+            // TODO: why are we not awaiting this/handling errors?
+            void this.requestRoomKey(keyReq.requestBody, keyReq.recipients, true);
         }
     }
 

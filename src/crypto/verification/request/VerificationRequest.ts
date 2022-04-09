@@ -623,7 +623,8 @@ export class VerificationRequest<
             if (!this._verifier && !this.observeOnly) {
                 this._verifier = this.createVerifier(method, event);
                 if (!this._verifier) {
-                    this.cancel({
+                    // TODO: why are we not awaiting this/handling errors?
+                    void this.cancel({
                         code: "m.unknown_method",
                         reason: `Unknown method: ${method}`,
                     });
@@ -817,12 +818,14 @@ export class VerificationRequest<
     private cancelOnTimeout = () => {
         try {
             if (this.initiatedByMe) {
-                this.cancel({
+                // TODO: why are we not awaiting this/handling errors?
+                void this.cancel({
                     reason: "Other party didn't accept in time",
                     code: "m.timeout",
                 });
             } else {
-                this.cancel({
+                // TODO: why are we not awaiting this/handling errors?
+                void this.cancel({
                     reason: "User didn't accept in time",
                     code: "m.timeout",
                 });
@@ -932,7 +935,8 @@ export class VerificationRequest<
     }
 
     public onVerifierFinished(): void {
-        this.channel.send("m.key.verification.done", {});
+        // TODO: why are we not awaiting this/handling errors?
+        void this.channel.send("m.key.verification.done", {});
         this.verifierHasFinished = true;
         // move to .done phase
         const newTransitions = this.applyPhaseTransitions();

@@ -57,7 +57,8 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
                 ]);
             }
             if (decrypt) {
-                client.decryptEventIfNeeded(event);
+                // TODO: why are we not awaiting this?
+                void client.decryptEventIfNeeded(event);
             }
         }
 

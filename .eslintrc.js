@@ -63,6 +63,7 @@ module.exports = {
             // Encouraging safe use of promises:
             "@typescript-eslint/await-thenable": "error",
             "@typescript-eslint/no-misused-promises": ["error", { "checksConditionals": false }],
+            "@typescript-eslint/no-floating-promises": "error",
         },
     }],
 };

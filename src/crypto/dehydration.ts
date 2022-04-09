@@ -62,7 +62,8 @@ export class DehydrationManager {
     private keyInfo: {[props: string]: any};
     private deviceDisplayName: string;
     constructor(private readonly crypto: Crypto) {
-        this.getDehydrationKeyFromCache();
+        // TODO: why are we not awaiting this/handling errors?
+        void this.getDehydrationKeyFromCache();
     }
     async getDehydrationKeyFromCache(): Promise<void> {
         return await this.crypto.cryptoStore.doTxn(
@@ -75,7 +76,8 @@ export class DehydrationManager {
                         if (result) {
                             const { key, keyInfo, deviceDisplayName, time } = result;
                             const pickleKey = Buffer.from(this.crypto.olmDevice.pickleKey);
-                            decryptAES(key, pickleKey, DEHYDRATION_ALGORITHM).then((decrypted) => {
+                            // TODO: why are we not handling errors?
+                            void decryptAES(key, pickleKey, DEHYDRATION_ALGORITHM).then((decrypted) => {
                                 this.key = decodeBase64(decrypted);
                                 this.keyInfo = keyInfo;
                                 this.deviceDisplayName = deviceDisplayName;
@@ -101,7 +103,8 @@ export class DehydrationManager {
         const matches = await this.setKey(key, keyInfo, deviceDisplayName);
         if (!matches) {
             // start dehydration in the background
-            this.dehydrateDevice();
+            // TODO: why are we not handling errors?
+            void this.dehydrateDevice();
         }
     }
 

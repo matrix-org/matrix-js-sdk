@@ -20,7 +20,7 @@ import { Room } from "../../src/models/room";
 import { Relations } from "../../src/models/relations";
 
 describe("Relations", function() {
-    it("should deduplicate annotations", function() {
+    it("should deduplicate annotations", async function() {
         const room = new Room("room123", null, null);
         const relations = new Relations("m.annotation", "m.reaction", room);
 
@@ -42,7 +42,7 @@ describe("Relations", function() {
 
         // Add the event once and check results
         {
-            relations.addEvent(eventA);
+            await relations.addEvent(eventA);
             const annotationsByKey = relations.getSortedAnnotationsByKey();
             expect(annotationsByKey.length).toEqual(1);
             const [key, events] = annotationsByKey[0];
@@ -52,7 +52,7 @@ describe("Relations", function() {
 
         // Add the event again and expect the same
         {
-            relations.addEvent(eventA);
+            await relations.addEvent(eventA);
             const annotationsByKey = relations.getSortedAnnotationsByKey();
             expect(annotationsByKey.length).toEqual(1);
             const [key, events] = annotationsByKey[0];
@@ -65,7 +65,7 @@ describe("Relations", function() {
 
         // Add the event again and expect the same
         {
-            relations.addEvent(eventB);
+            await relations.addEvent(eventB);
             const annotationsByKey = relations.getSortedAnnotationsByKey();
             expect(annotationsByKey.length).toEqual(1);
             const [key, events] = annotationsByKey[0];

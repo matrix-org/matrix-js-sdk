@@ -1139,17 +1139,20 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         if (this.crypto) {
-            this.crypto.uploadDeviceKeys();
+            // TODO: why are we not awaiting this/handling errors?
+            void this.crypto.uploadDeviceKeys();
             this.crypto.start();
         }
 
         // periodically poll for turn servers if we support voip
         if (this.canSupportVoip) {
             this.checkTurnServersIntervalID = setInterval(() => {
-                this.checkTurnServers();
+                // TODO: why are we not handling errors?
+                void this.checkTurnServers();
             }, TURN_CHECK_INTERVAL);
             // noinspection ES6MissingAwait
-            this.checkTurnServers();
+            // TODO: why are we not handling errors?
+            void this.checkTurnServers();
         }
 
         if (this.syncApi) {
@@ -1179,9 +1182,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         if (this.clientOpts.clientWellKnownPollPeriod !== undefined) {
             this.clientWellKnownIntervalID = setInterval(() => {
-                this.fetchClientWellKnown();
+                // TODO: why are we not handling errors?
+                void this.fetchClientWellKnown();
             }, 1000 * this.clientOpts.clientWellKnownPollPeriod);
-            this.fetchClientWellKnown();
+            // TODO: why are we not handling errors?
+            void this.fetchClientWellKnown();
         }
     }
 
@@ -1813,7 +1818,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // check the key backup status, since whether or not we use this depends on
         // whether it has a signature from a verified device
         if (userId == this.credentials.userId) {
-            this.checkKeyBackup();
+            // TODO: why are we not awaiting this/handling errors?
+            void this.checkKeyBackup();
         }
         return prom;
     }
@@ -3117,9 +3123,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             // Cache the key, if possible.
             // This is async.
             this.crypto.storeSessionBackupPrivateKey(privKey)
+                .then(cacheCompleteCallback)
                 .catch((e) => {
                     logger.warn("Error caching session backup key:", e);
-                }).then(cacheCompleteCallback);
+                });
 
             if (progressCallback) {
                 progressCallback({
@@ -6688,7 +6695,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public decryptEventIfNeeded(event: MatrixEvent, options?: IDecryptOptions): Promise<void> {
         if (event.shouldAttemptDecryption()) {
-            event.attemptDecryption(this.crypto, options);
+            // we don't await this as we pick up the Promise afterwards separately
+            void event.attemptDecryption(this.crypto, options);
         }
 
         if (event.isBeingDecrypted()) {

@@ -215,7 +215,8 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             event.setThread(this);
             this.lastEvent = event;
 
-            this.fetchEditsWhereNeeded(event);
+            // TODO: why are we not awaiting this/handling errors?
+            void this.fetchEditsWhereNeeded(event);
         }
     }
 

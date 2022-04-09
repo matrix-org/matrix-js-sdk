@@ -175,7 +175,8 @@ export class IndexedDBStore extends MemoryStore {
      * @return {Promise} Resolves if the data was deleted from the database.
      */
     public deleteAllData = this.degradable((): Promise<void> => {
-        super.deleteAllData();
+        // TODO: why are we not awaiting this/handling errors?
+        void super.deleteAllData();
         return this.backend.clearDatabase().then(() => {
             logger.log("Deleted indexeddb data.");
         }, (err) => {
@@ -255,12 +256,14 @@ export class IndexedDBStore extends MemoryStore {
      * @returns {Promise} when all members have been stored
      */
     public setOutOfBandMembers = this.degradable((roomId: string, membershipEvents: IEvent[]): Promise<void> => {
-        super.setOutOfBandMembers(roomId, membershipEvents);
+        // TODO: why are we not awaiting this/handling errors?
+        void super.setOutOfBandMembers(roomId, membershipEvents);
         return this.backend.setOutOfBandMembers(roomId, membershipEvents);
     }, "setOutOfBandMembers");
 
     public clearOutOfBandMembers = this.degradable((roomId: string) => {
-        super.clearOutOfBandMembers(roomId);
+        // TODO: why are we not awaiting this/handling errors?
+        void super.clearOutOfBandMembers(roomId);
         return this.backend.clearOutOfBandMembers(roomId);
     }, "clearOutOfBandMembers");
 
@@ -269,7 +272,8 @@ export class IndexedDBStore extends MemoryStore {
     }, "getClientOptions");
 
     public storeClientOptions = this.degradable((options: object): Promise<void> => {
-        super.storeClientOptions(options);
+        // TODO: why are we not awaiting this/handling errors?
+        void super.storeClientOptions(options);
         return this.backend.storeClientOptions(options);
     }, "storeClientOptions");
 

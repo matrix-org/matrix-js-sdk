@@ -747,7 +747,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             await this.addBufferedIceCandidates();
         } catch (e) {
             logger.debug("Failed to set remote description", e);
-            this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
+            // TODO: why are we not awaiting this/handling errors?
+            void this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
             return;
         }
 
@@ -758,7 +759,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // (81 at time of writing), this is no longer a problem, so let's do it the correct way.
         if (!remoteStream || remoteStream.getTracks().length === 0) {
             logger.error("No remote stream or no tracks after setting remote description!");
-            this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
+            // TODO: why are we not awaiting this/handling errors?
+            void this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
             return;
         }
 
@@ -874,7 +876,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         logger.debug(`Answering call ${this.callId}`);
 
-        this.gotCallFeedsForAnswer(callFeeds);
+        // TODO: why are we not awaiting this/handling errors?
+        void this.gotCallFeedsForAnswer(callFeeds);
     }
 
     /**
@@ -888,7 +891,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             newCall.waitForLocalAVStream = true;
         } else if ([CallState.CreateOffer, CallState.InviteSent].includes(this.state)) {
             logger.debug("Handing local stream to new call");
-            newCall.gotCallFeedsForAnswer(this.getLocalFeeds());
+            // TODO: why are we not awaiting this/handling errors?
+            void newCall.gotCallFeedsForAnswer(this.getLocalFeeds());
         }
         this.successor = newCall;
         this.emit(CallEvent.Replaced, newCall);
@@ -904,7 +908,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (this.callHasEnded()) return;
 
         logger.debug("Ending call " + this.callId);
-        this.terminate(CallParty.Local, reason, !suppressEvent);
+        // TODO: why are we not awaiting this/handling errors?
+        void this.terminate(CallParty.Local, reason, !suppressEvent);
         // We don't want to send hangup here if we didn't even get to sending an invite
         if (this.state === CallState.WaitLocalMedia) return;
         const content = {};
@@ -912,7 +917,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if ((this.opponentVersion && this.opponentVersion >= 1) || reason !== CallErrorCode.UserHangup) {
             content["reason"] = reason;
         }
-        this.sendVoipEvent(EventType.CallHangup, content);
+        // TODO: why are we not awaiting this/handling errors?
+        void this.sendVoipEvent(EventType.CallHangup, content);
     }
 
     /**
@@ -934,8 +940,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
 
         logger.debug("Rejecting call: " + this.callId);
-        this.terminate(CallParty.Local, CallErrorCode.UserHangup, true);
-        this.sendVoipEvent(EventType.CallReject, {});
+        // TODO: why are we not awaiting this/handling errors?
+        void this.terminate(CallParty.Local, CallErrorCode.UserHangup, true);
+        // TODO: why are we not awaiting this/handling errors?
+        void this.sendVoipEvent(EventType.CallReject, {});
     }
 
     /**
@@ -1048,7 +1056,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 const sender = this.usermediaSenders.find((sender) => {
                     return sender.track?.kind === "video";
                 });
-                sender.replaceTrack(track);
+                // TODO: why are we not awaiting this/handling errors?
+                void sender.replaceTrack(track);
 
                 this.pushNewLocalFeed(stream, SDPStreamMetadataPurpose.Screenshare, false);
 
@@ -1064,7 +1073,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             const sender = this.usermediaSenders.find((sender) => {
                 return sender.track?.kind === "video";
             });
-            sender.replaceTrack(track);
+            // TODO: why are we not awaiting this/handling errors?
+            void sender.replaceTrack(track);
 
             this.client.getMediaHandler().stopScreensharingStream(this.localScreensharingStream);
             this.deleteFeedByStream(this.localScreensharingStream);
@@ -1254,7 +1264,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     private updateMuteStatus(): void {
-        this.sendVoipEvent(EventType.CallSDPStreamMetadataChangedPrefix, {
+        // TODO: why are we not awaiting this/handling errors?
+        void this.sendVoipEvent(EventType.CallSDPStreamMetadataChangedPrefix, {
             [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(),
         });
 
@@ -1267,7 +1278,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     private gotCallFeedsForInvite(callFeeds: CallFeed[]): void {
         if (this.successor) {
-            this.successor.gotCallFeedsForAnswer(callFeeds);
+            // TODO: why are we not awaiting this/handling errors?
+            void this.successor.gotCallFeedsForAnswer(callFeeds);
             return;
         }
         if (this.callHasEnded()) {
@@ -1329,7 +1341,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         // error handler re-throws so this won't happen on error, but
         // we don't want the same error handling on the candidate queue
-        this.sendCandidateQueue();
+        // TODO: why are we not awaiting this/handling errors?
+        void this.sendCandidateQueue();
     }
 
     private async gotCallFeedsForAnswer(callFeeds: CallFeed[]): Promise<void> {
@@ -1349,7 +1362,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             myAnswer = await this.peerConn.createAnswer();
         } catch (err) {
             logger.debug("Failed to create answer: ", err);
-            this.terminate(CallParty.Local, CallErrorCode.CreateAnswer, true);
+            // TODO: why are we not awaiting this/handling errors?
+            void this.terminate(CallParty.Local, CallErrorCode.CreateAnswer, true);
             return;
         }
 
@@ -1362,10 +1376,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 setTimeout(resolve, 200);
             });
 
-            this.sendAnswer();
+            // TODO: why are we not awaiting this/handling errors?
+            void this.sendAnswer();
         } catch (err) {
             logger.debug("Error setting local description!", err);
-            this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);
+            // TODO: why are we not awaiting this/handling errors?
+            void this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);
             return;
         }
     }
@@ -1484,7 +1500,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             await this.peerConn.setRemoteDescription(content.answer);
         } catch (e) {
             logger.debug("Failed to set remote description", e);
-            this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
+            // TODO: why are we not awaiting this/handling errors?
+            void this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
             return;
         }
 
@@ -1520,7 +1537,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (selectedPartyId !== this.ourPartyId) {
             logger.info(`Got select_answer for party ID ${selectedPartyId}: we are party ID ${this.ourPartyId}.`);
             // The other party has picked somebody else's answer
-            this.terminate(CallParty.Remote, CallErrorCode.AnsweredElsewhere, true);
+            // TODO: why are we not awaiting this/handling errors?
+            void this.terminate(CallParty.Remote, CallErrorCode.AnsweredElsewhere, true);
         }
     }
 
@@ -1566,7 +1584,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 const localDescription = await this.peerConn.createAnswer();
                 await this.peerConn.setLocalDescription(localDescription);
 
-                this.sendVoipEvent(EventType.CallNegotiate, {
+                // TODO: why are we not awaiting this/handling errors?
+
+                void this.sendVoipEvent(EventType.CallNegotiate, {
                     description: this.peerConn.localDescription,
                     [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(),
                 });
@@ -1630,7 +1650,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             await this.peerConn.setLocalDescription(description);
         } catch (err) {
             logger.debug("Error setting local description!", err);
-            this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);
+            // TODO: why are we not awaiting this/handling errors?
+            void this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);
             return;
         }
 
@@ -1686,14 +1707,16 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             }
 
             this.emit(CallEvent.Error, new CallError(code, message, error));
-            this.terminate(CallParty.Local, code, false);
+            // TODO: why are we not awaiting this/handling errors?
+            void this.terminate(CallParty.Local, code, false);
 
             // no need to carry on & send the candidate queue, but we also
             // don't want to rethrow the error
             return;
         }
 
-        this.sendCandidateQueue();
+        // TODO: why are we not awaiting this/handling errors?
+        void this.sendCandidateQueue();
         if (this.state === CallState.CreateOffer) {
             this.inviteOrAnswerSent = true;
             this.setState(CallState.InviteSent);
@@ -1716,7 +1739,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 "Failed to get local offer!", err,
             ),
         );
-        this.terminate(CallParty.Local, CallErrorCode.LocalOfferFailed, false);
+        // TODO: why are we not handling errors?
+        void this.terminate(CallParty.Local, CallErrorCode.LocalOfferFailed, false);
     };
 
     private getUserMediaFailed = (err: Error): void => {
@@ -1735,7 +1759,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 "does this app have permission?", err,
             ),
         );
-        this.terminate(CallParty.Local, CallErrorCode.NoUserMedia, false);
+        // TODO: why are we not handling errors?
+        void this.terminate(CallParty.Local, CallErrorCode.NoUserMedia, false);
     };
 
     private onIceConnectionStateChanged = (): void => {
@@ -1862,7 +1887,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // a partner yet but we're treating the hangup as a reject as per VoIP v0)
         if (this.partyIdMatches(msg) || this.state === CallState.Ringing) {
             // default reason is user_hangup
-            this.terminate(CallParty.Remote, msg.reason || CallErrorCode.UserHangup, true);
+            // TODO: why are we not handling errors?
+            void this.terminate(CallParty.Remote, msg.reason || CallErrorCode.UserHangup, true);
         } else {
             logger.info(`Ignoring message from party ID ${msg.party_id}: our partner is ${this.opponentPartyId}`);
         }
@@ -1884,7 +1910,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         );
 
         if (shouldTerminate) {
-            this.terminate(CallParty.Remote, msg.reason || CallErrorCode.UserHangup, true);
+            // TODO: why are we not handling errors?
+            void this.terminate(CallParty.Remote, msg.reason || CallErrorCode.UserHangup, true);
         } else {
             logger.debug(`Call is in state: ${this.state}: ignoring reject`);
         }
@@ -1892,7 +1919,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     public onAnsweredElsewhere = (msg: MCallAnswer): void => {
         logger.debug("Call ID " + this.callId + " answered elsewhere");
-        this.terminate(CallParty.Remote, CallErrorCode.AnsweredElsewhere, true);
+        // TODO: why are we not handling errors?
+        void this.terminate(CallParty.Remote, CallErrorCode.AnsweredElsewhere, true);
     };
 
     private setState(state: CallState): void {
@@ -1941,7 +1969,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         if (this.candidateSendTries === 0) {
             setTimeout(() => {
-                this.sendCandidateQueue();
+                // TODO: why are we not handling errors?
+                void this.sendCandidateQueue();
             }, delay);
         }
     }
@@ -2110,7 +2139,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             ++this.candidateSendTries;
             logger.debug("Failed to send candidates. Retrying in " + delayMs + "ms", error);
             setTimeout(() => {
-                this.sendCandidateQueue();
+                // TODO: why are we not handling errors?
+                void this.sendCandidateQueue();
             }, delayMs);
         }
     }

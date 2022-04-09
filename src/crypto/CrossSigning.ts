@@ -701,7 +701,8 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
     return {
         getCrossSigningKeyCache: async function(type: string, _expectedPublicKey: string): Promise<Uint8Array> {
             const key = await new Promise<any>((resolve) => {
-                store.doTxn(
+                // TODO: why are we not handling errors?
+                void store.doTxn(
                     'readonly',
                     [IndexedDBCryptoStore.STORE_ACCOUNT],
                     (txn) => {
@@ -811,7 +812,8 @@ export function requestKeysDuringVerification(
                 logger.info("Backup key stored. Starting backup restore...");
                 const backupInfo = await client.getKeyBackupVersion();
                 // no need to await for this - just let it go in the bg
-                client.restoreKeyBackupWithCache(undefined, undefined, backupInfo).then(() => {
+                // TODO: why are we not handling errors?
+                void client.restoreKeyBackupWithCache(undefined, undefined, backupInfo).then(() => {
                     logger.info("Backup restored.");
                 });
             }

@@ -558,10 +558,12 @@ export class SyncApi {
                 // otherwise the sync state will end up being incorrect
                 debuglog("Waiting for saved sync before retrying push rules...");
                 await this.recoverFromSyncStartupError(savedSyncPromise, err);
-                getPushRules();
+                // TODO: why are we not chaining/awaiting the promise?
+                void getPushRules();
                 return;
             }
-            checkLazyLoadStatus(); // advance to the next stage
+            // TODO: why are we not awaiting this/handling errors?
+            void checkLazyLoadStatus(); // advance to the next stage
         };
 
         const buildDefaultFilter = () => {
@@ -617,7 +619,8 @@ export class SyncApi {
                 throw err;
             }
 
-            getFilter(); // Now get the filter and start syncing
+            // TODO: why are we not awaiting this/handling errors?
+            void getFilter(); // Now get the filter and start syncing
         };
 
         const getFilter = async () => {
@@ -639,7 +642,8 @@ export class SyncApi {
                 // otherwise the sync state will end up being incorrect
                 debuglog("Waiting for saved sync before retrying filter...");
                 await this.recoverFromSyncStartupError(savedSyncPromise, err);
-                getFilter();
+                // TODO: why are we not chaining/awaiting the promise?
+                void getFilter();
                 return;
             }
             // reset the notifications timeline to prepare it to paginate from
@@ -658,12 +662,15 @@ export class SyncApi {
             // Now wait for the saved sync to finish...
             debuglog("Waiting for saved sync before starting sync processing...");
             await savedSyncPromise;
-            this.doSync({ filterId });
+            // TODO: why are we not awaiting this/handling errors?
+            void this.doSync({ filterId });
         };
 
         if (client.isGuest()) {
             // no push rules for guests, no access to POST filter for guests.
-            this.doSync({});
+            // do this in the background:
+            // TODO: why are we not handling errors?
+            void this.doSync({});
         } else {
             // Pull the saved sync token out first, before the worker starts sending
             // all the sync data which could take a while. This will let us send our
@@ -685,7 +692,8 @@ export class SyncApi {
             // Now start the first incremental sync request: this can also
             // take a while so if we set it going now, we can wait for it
             // to finish while we process our saved sync data.
-            getPushRules();
+            // TODO: why are we not handling errors?
+            void getPushRules();
         }
     }
 
@@ -720,7 +728,9 @@ export class SyncApi {
         if (!this.connectionReturnedDefer) {
             return false;
         }
-        this.startKeepAlives(0);
+        // start in background:
+        // TODO: why are we not handling errors?
+        void this.startKeepAlives(0);
         return true;
     }
     /**
@@ -869,7 +879,8 @@ export class SyncApi {
         }
 
         // Begin next sync
-        this.doSync(syncOptions);
+        // TODO: why are we not awaiting this/handling errors?
+        void this.doSync(syncOptions);
     }
 
     private doSyncRequest(syncOptions: ISyncOptions, syncToken: string): IRequestPromise<ISyncResponse> {
@@ -974,7 +985,10 @@ export class SyncApi {
                     catchingUp: true,
                 });
             }
-            this.doSync(syncOptions);
+            // TODO: why are we not awaiting this/handling errors?
+            void this.doSync(syncOptions);
+        }).catch(e => {
+            logger.warn("Ignoring error whilst starting keep alive", e);
         });
 
         this.currentSyncRequest = null;
@@ -1319,7 +1333,8 @@ export class SyncApi {
             // Decrypt only the last message in all rooms to make sure we can generate a preview
             // And decrypt all events after the recorded read receipt to ensure an accurate
             // notification count
-            room.decryptCriticalEvents();
+            // TODO: why are we not awaiting this/handling errors?
+            void room.decryptCriticalEvents();
         });
 
         // Handle leaves (e.g. kicked rooms)
@@ -1690,7 +1705,9 @@ export class SyncApi {
      */
     private onOnline = (): void => {
         debuglog("Browser thinks we are back online");
-        this.startKeepAlives(0);
+        // do this in the background:
+        // TODO: why are we not handling errors?
+        void this.startKeepAlives(0);
     };
 }
 

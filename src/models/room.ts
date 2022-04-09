@@ -842,7 +842,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             this.currentState.setOutOfBandMembers(result.memberEvents);
             // now the members are loaded, start to track the e2e devices if needed
             if (this.client.isCryptoEnabled() && this.client.isRoomEncrypted(this.roomId)) {
-                this.client.crypto.trackRoomDevices(this.roomId);
+                // TODO: why are we not awaiting this/handling errors?
+                void this.client.crypto.trackRoomDevices(this.roomId);
             }
             return result.fromServer;
         }).catch((err) => {
@@ -1533,9 +1534,11 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             }
         }
 
-        this.client.decryptEventIfNeeded(threadRoots[threadRoots.length -1]);
+        // TODO: why are we not awaiting this/handling errors?
+        void this.client.decryptEventIfNeeded(threadRoots[threadRoots.length -1]);
         if (latestMyThreadsRootEvent) {
-            this.client.decryptEventIfNeeded(latestMyThreadsRootEvent);
+            // TODO: why are we not awaiting this/handling errors?
+            void this.client.decryptEventIfNeeded(latestMyThreadsRootEvent);
         }
 
         this.threadsReady = true;
@@ -2208,7 +2211,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
 
         for (let i = 0; i < events.length; i++) {
             // TODO: We should have a filter to say "only add state event types X Y Z to the timeline".
-            this.processLiveEvent(events[i]);
+            // TODO: why are we not awaiting this/handling errors?
+            void this.processLiveEvent(events[i]);
 
             const {
                 shouldLiveInRoom,
@@ -2229,7 +2233,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
 
         Object.entries(eventsByThread).forEach(([threadId, threadEvents]) => {
-            this.addThreadedEvents(threadEvents, threadId, false);
+            // TODO: why are we not awaiting this/handling errors?
+            void this.addThreadedEvents(threadEvents, threadId, false);
         });
     }
 

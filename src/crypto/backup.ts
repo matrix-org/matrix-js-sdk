@@ -157,8 +157,9 @@ export class BackupManager {
         this.baseApis.emit(CryptoEvent.KeyBackupStatus, true);
 
         // There may be keys left over from a partially completed backup, so
-        // schedule a send to check.
-        this.scheduleKeyBackupSend();
+        // schedule a send to check in the background.
+        // TODO: why are we not handling errors?
+        void this.scheduleKeyBackupSend();
     }
 
     /**
@@ -539,7 +540,8 @@ export class BackupManager {
         if (this.backupInfo) {
             // don't wait for this to complete: it will delay so
             // happens in the background
-            this.scheduleKeyBackupSend();
+            // TODO: why are we not handling errors?
+            void this.scheduleKeyBackupSend();
         }
         // if this.backupInfo is not set, then the keys will be backed up when
         // this.enableKeyBackup is called
@@ -553,7 +555,8 @@ export class BackupManager {
         await this.flagAllGroupSessionsForBackup();
 
         // Schedule keys to upload in the background as soon as possible.
-        this.scheduleKeyBackupSend(0 /* maxDelay */);
+        // TODO: why are we not handling errors?
+        void this.scheduleKeyBackupSend(0 /* maxDelay */);
     }
 
     /**
@@ -572,7 +575,8 @@ export class BackupManager {
             (txn) => {
                 this.baseApis.crypto.cryptoStore.getAllEndToEndInboundGroupSessions(txn, (session) => {
                     if (session !== null) {
-                        this.baseApis.crypto.cryptoStore.markSessionsNeedingBackup([session], txn);
+                        // TODO: why are we not awaiting this/handling errors?
+                        void this.baseApis.crypto.cryptoStore.markSessionsNeedingBackup([session], txn);
                     }
                 });
             },

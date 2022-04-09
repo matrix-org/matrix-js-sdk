@@ -409,7 +409,8 @@ export class SecretStorage {
             for (const device of devices) {
                 toDevice[device] = cancelData;
             }
-            this.baseApis.sendToDevice("m.secret.request", {
+            // TODO: why are we not awaiting/handling errors?
+            void this.baseApis.sendToDevice("m.secret.request", {
                 [this.baseApis.getUserId()]: toDevice,
             });
 
@@ -430,7 +431,8 @@ export class SecretStorage {
             toDevice[device] = requestData;
         }
         logger.info(`Request secret ${name} from ${devices}, id ${requestId}`);
-        this.baseApis.sendToDevice("m.secret.request", {
+        // TODO: why are we not awaiting/handling errors?
+        void this.baseApis.sendToDevice("m.secret.request", {
             [this.baseApis.getUserId()]: toDevice,
         });
 
@@ -532,7 +534,8 @@ export class SecretStorage {
                 };
 
                 logger.info(`Sending ${content.name} secret for ${deviceId}`);
-                this.baseApis.sendToDevice("m.room.encrypted", contentMap);
+                // TODO: why are we not handling errors?
+                void this.baseApis.sendToDevice("m.room.encrypted", contentMap);
             } else {
                 logger.info(`Request denied for ${content.name} secret for ${deviceId}`);
             }

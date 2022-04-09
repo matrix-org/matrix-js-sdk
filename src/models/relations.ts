@@ -169,7 +169,8 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         }
         // Event was cancelled, remove from the collection
         event.removeListener(MatrixEventEvent.Status, this.onEventStatus);
-        this.removeEvent(event);
+        // TODO: why are we not handling errors?
+        void this.removeEvent(event);
     };
 
     /**

@@ -236,7 +236,8 @@ export class VerificationBase<
                 // cancelled by the other user)
                 if (e === timeoutException) {
                     const timeoutEvent = newTimeoutError();
-                    this.send(timeoutEvent.getType(), timeoutEvent.getContent());
+                    // TODO: why are we not awaiting this/handling errors?
+                    void this.send(timeoutEvent.getType(), timeoutEvent.getContent());
                 } else if (e instanceof MatrixEvent) {
                     const sender = e.getSender();
                     if (sender !== this.userId) {
@@ -245,16 +246,19 @@ export class VerificationBase<
                             content.code = content.code || "m.unknown";
                             content.reason = content.reason || content.body
                                 || "Unknown reason";
-                            this.send("m.key.verification.cancel", content);
+                            // TODO: why are we not awaiting this/handling errors?
+                            void this.send("m.key.verification.cancel", content);
                         } else {
-                            this.send("m.key.verification.cancel", {
+                            // TODO: why are we not awaiting this/handling errors?
+                            void this.send("m.key.verification.cancel", {
                                 code: "m.unknown",
                                 reason: content.body || "Unknown reason",
                             });
                         }
                     }
                 } else {
-                    this.send("m.key.verification.cancel", {
+                    // TODO: why are we not awaiting this/handling errors?
+                    void this.send("m.key.verification.cancel", {
                         code: "m.unknown",
                         reason: e.toString(),
                     });

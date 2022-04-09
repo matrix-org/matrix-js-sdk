@@ -74,7 +74,8 @@ export class CallEventHandler {
     private evaluateEventBufferPromise = async () => {
         if (this.client.getSyncState() === SyncState.Syncing) {
             await Promise.all(this.callEventBuffer.map(event => {
-                this.client.decryptEventIfNeeded(event);
+                // TODO: as this is inside a Promise.all I think we should be awaiting this?
+                void this.client.decryptEventIfNeeded(event);
             }));
 
             const ignoreCallIds = new Set<String>();
@@ -106,7 +107,9 @@ export class CallEventHandler {
     };
 
     private onRoomTimeline = (event: MatrixEvent) => {
-        this.client.decryptEventIfNeeded(event);
+        // we set the event decrypting in the background:
+        // TODO: why are we not handling errors?
+        void this.client.decryptEventIfNeeded(event);
         // any call events or ones that might be once they're decrypted
         if (this.eventIsACall(event) || event.isBeingDecrypted()) {
             // queue up for processing once all events from this sync have been
@@ -188,7 +191,8 @@ export class CallEventHandler {
             // if we stashed candidate events for that call ID, play them back now
             if (this.candidateEventsByCall.get(call.callId)) {
                 for (const ev of this.candidateEventsByCall.get(call.callId)) {
-                    call.onRemoteIceCandidatesReceived(ev);
+                    // TODO: why are we not awaiting this/handling errors?
+                    void call.onRemoteIceCandidatesReceived(ev);
                 }
             }
 
@@ -224,7 +228,8 @@ export class CallEventHandler {
                         " and canceling outgoing call " + existingCall.callId,
                     );
                     existingCall.replacedBy(call);
-                    call.answer();
+                    // TODO: why are we not awaiting this/handling errors?
+                    void call.answer();
                 } else {
                     logger.log(
                         "Glare detected: rejecting incoming call " + call.callId +
@@ -246,7 +251,8 @@ export class CallEventHandler {
                 }
                 this.candidateEventsByCall.get(content.call_id).push(event);
             } else {
-                call.onRemoteIceCandidatesReceived(event);
+                // TODO: why are we not awaiting this/handling errors?
+                void call.onRemoteIceCandidatesReceived(event);
             }
             return;
         } else if ([EventType.CallHangup, EventType.CallReject].includes(type)) {
@@ -294,20 +300,24 @@ export class CallEventHandler {
                         call.onAnsweredElsewhere(content as MCallAnswer);
                     }
                 } else {
-                    call.onAnswerReceived(event);
+                    // TODO: why are we not awaiting this/handling errors?
+                    void call.onAnswerReceived(event);
                 }
                 break;
             case EventType.CallSelectAnswer:
-                call.onSelectAnswerReceived(event);
+                // TODO: why are we not awaiting this/handling errors?
+                void call.onSelectAnswerReceived(event);
                 break;
 
             case EventType.CallNegotiate:
-                call.onNegotiateReceived(event);
+                // TODO: why are we not awaiting this/handling errors?
+                void call.onNegotiateReceived(event);
                 break;
 
             case EventType.CallAssertedIdentity:
             case EventType.CallAssertedIdentityPrefix:
-                call.onAssertedIdentityReceived(event);
+                // TODO: why are we not awaiting this/handling errors?
+                void call.onAssertedIdentityReceived(event);
                 break;
 
             case EventType.CallSDPStreamMetadataChanged:

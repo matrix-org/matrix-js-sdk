@@ -293,7 +293,8 @@ export class InteractiveAuth {
             }
         }
 
-        this.submitAuthDict(authDict, true);
+        // TODO: why are we not awaiting this/handling errors?
+        void this.submitAuthDict(authDict, true);
     }
 
     /**
@@ -512,7 +513,8 @@ export class InteractiveAuth {
         this.currentStage = nextStage;
 
         if (nextStage === AuthType.Dummy) {
-            this.submitAuthDict({
+            // TODO: why are we not awaiting this/handling errors?
+            void this.submitAuthDict({
                 type: 'm.login.dummy',
             });
             return;

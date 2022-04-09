@@ -375,7 +375,8 @@ class MegolmEncryption extends EncryptionAlgorithm {
                     if (!singleOlmCreationPhase && (Date.now() - start < 10000)) {
                         // perform the second phase of olm session creation if requested,
                         // and if the first phase didn't take too long
-                        (async () => {
+                        // TODO: why are we not handling errors?
+                        void (async () => {
                             // Retry sending keys to devices that we were unable to establish
                             // an olm session for.  This time, we use a longer timeout, but we
                             // do this in the background and don't block anything else while we
@@ -477,7 +478,8 @@ class MegolmEncryption extends EncryptionAlgorithm {
         );
 
         // don't wait for it to complete
-        this.crypto.backupManager.backupGroupSession(this.olmDevice.deviceCurve25519Key, sessionId);
+        // TODO: why are we not handling errors?
+        void this.crypto.backupManager.backupGroupSession(this.olmDevice.deviceCurve25519Key, sessionId);
 
         return new OutboundSessionInfo(sessionId, sharedHistory);
     }
@@ -1365,7 +1367,8 @@ class MegolmDecryption extends DecryptionAlgorithm {
 
         const recipients = event.getKeyRequestRecipients(this.userId);
 
-        this.crypto.requestRoomKey({
+        // TODO: why are we not awaiting/handling errors?
+        void this.crypto.requestRoomKey({
             room_id: event.getRoomId(),
             algorithm: wireContent.algorithm,
             sender_key: wireContent.sender_key,
@@ -1488,7 +1491,8 @@ class MegolmDecryption extends DecryptionAlgorithm {
             exportFormat, extraSessionData,
         ).then(() => {
             // have another go at decrypting events sent with this session.
-            this.retryDecryption(senderKey, sessionId)
+            // TODO: why are we not handling errors or chaining promises?
+            void this.retryDecryption(senderKey, sessionId)
                 .then((success) => {
                     // cancel any outstanding room key requests for this session.
                     // Only do this if we managed to decrypt every message in the
@@ -1506,7 +1510,8 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 });
         }).then(() => {
             // don't wait for the keys to be backed up for the server
-            this.crypto.backupManager.backupGroupSession(senderKey, content.session_id);
+            // TODO: why are we not handling errors?
+            void this.crypto.backupManager.backupGroupSession(senderKey, content.session_id);
         }).catch((e) => {
             logger.error(`Error handling m.room_key_event: ${e}`);
         });
@@ -1539,7 +1544,8 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 // create a new one.
                 logger.debug("New session already created.  Not creating a new one.");
                 await this.olmDevice.recordSessionProblem(senderKey, "no_olm", true);
-                this.retryDecryptionFromSender(senderKey);
+                // TODO: why are we not handling errors?
+                void this.retryDecryptionFromSender(senderKey);
                 return;
             }
             let device = this.crypto.deviceList.getDeviceByIdentityKey(
@@ -1558,7 +1564,8 @@ class MegolmDecryption extends DecryptionAlgorithm {
                         ": not establishing session",
                     );
                     await this.olmDevice.recordSessionProblem(senderKey, "no_olm", false);
-                    this.retryDecryptionFromSender(senderKey);
+                    // TODO: why are we not handling errors?
+                    void this.retryDecryptionFromSender(senderKey);
                     return;
                 }
             }
@@ -1581,7 +1588,8 @@ class MegolmDecryption extends DecryptionAlgorithm {
             );
 
             await this.olmDevice.recordSessionProblem(senderKey, "no_olm", true);
-            this.retryDecryptionFromSender(senderKey);
+            // TODO: why are we not awaiting/handling errors?
+            void this.retryDecryptionFromSender(senderKey);
 
             await this.baseApis.sendToDevice("m.room.encrypted", {
                 [sender]: {
@@ -1619,7 +1627,8 @@ class MegolmDecryption extends DecryptionAlgorithm {
         const deviceInfo = this.crypto.getStoredDevice(userId, deviceId);
         const body = keyRequest.requestBody;
 
-        this.olmlib.ensureOlmSessionsForDevices(
+        // TODO: why are we not handling errors?
+        void this.olmlib.ensureOlmSessionsForDevices(
             this.olmDevice, this.baseApis, {
                 [userId]: [deviceInfo],
             },
@@ -1731,7 +1740,8 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 });
             }
             // have another go at decrypting events sent with this session.
-            this.retryDecryption(session.sender_key, session.session_id);
+            // TODO: why are we not chaining promises/handling errors?
+            void this.retryDecryption(session.sender_key, session.session_id);
         });
     }
 
