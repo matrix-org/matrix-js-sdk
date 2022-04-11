@@ -254,27 +254,25 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      */
     private onBeforeRedaction = (redactedEvent: MatrixEvent): void => {
         // TODO: why are we not handling errors?
-        void this.onBeforeRedactionPromise(redactedEvent);
-    };
+        void (async (redactedEvent: MatrixEvent): Promise<void> => {
+            if (!this.relations.has(redactedEvent)) {
+                return;
+            }
 
-    private onBeforeRedactionPromise = async (redactedEvent: MatrixEvent): Promise<void> => {
-        if (!this.relations.has(redactedEvent)) {
-            return;
-        }
+            this.relations.delete(redactedEvent);
 
-        this.relations.delete(redactedEvent);
+            if (this.relationType === RelationType.Annotation) {
+                // Remove the redacted annotation from aggregation by key
+                this.removeAnnotationFromAggregation(redactedEvent);
+            } else if (this.relationType === RelationType.Replace && this.targetEvent) {
+                const lastReplacement = await this.getLastReplacement();
+                this.targetEvent.makeReplaced(lastReplacement);
+            }
 
-        if (this.relationType === RelationType.Annotation) {
-            // Remove the redacted annotation from aggregation by key
-            this.removeAnnotationFromAggregation(redactedEvent);
-        } else if (this.relationType === RelationType.Replace && this.targetEvent) {
-            const lastReplacement = await this.getLastReplacement();
-            this.targetEvent.makeReplaced(lastReplacement);
-        }
+            redactedEvent.removeListener(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
 
-        redactedEvent.removeListener(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
-
-        this.emit(RelationsEvent.Redaction, redactedEvent);
+            this.emit(RelationsEvent.Redaction, redactedEvent);
+        })(redactedEvent);
     };
 
     /**

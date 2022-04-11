@@ -1433,49 +1433,48 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     private onDeviceListUserCrossSigningUpdated = (userId: string): void => {
         // TODO: why are we not handling errors?
-        void this.onDeviceListUserCrossSigningUpdatedPromise(userId);
-    };
-    private onDeviceListUserCrossSigningUpdatedPromise = async (userId: string) => {
-        if (userId === this.userId) {
-            // An update to our own cross-signing key.
-            // Get the new key first:
-            const newCrossSigning = this.deviceList.getStoredCrossSigningForUser(userId);
-            const seenPubkey = newCrossSigning ? newCrossSigning.getId() : null;
-            const currentPubkey = this.crossSigningInfo.getId();
-            const changed = currentPubkey !== seenPubkey;
+        void (async (userId: string) => {
+            if (userId === this.userId) {
+                // An update to our own cross-signing key.
+                // Get the new key first:
+                const newCrossSigning = this.deviceList.getStoredCrossSigningForUser(userId);
+                const seenPubkey = newCrossSigning ? newCrossSigning.getId() : null;
+                const currentPubkey = this.crossSigningInfo.getId();
+                const changed = currentPubkey !== seenPubkey;
 
-            if (currentPubkey && seenPubkey && !changed) {
-                // If it's not changed, just make sure everything is up to date
-                await this.checkOwnCrossSigningTrust();
+                if (currentPubkey && seenPubkey && !changed) {
+                    // If it's not changed, just make sure everything is up to date
+                    await this.checkOwnCrossSigningTrust();
+                } else {
+                    // We'll now be in a state where cross-signing on the account is not trusted
+                    // because our locally stored cross-signing keys will not match the ones
+                    // on the server for our account. So we clear our own stored cross-signing keys,
+                    // effectively disabling cross-signing until the user gets verified by the device
+                    // that reset the keys
+                    // TODO: why are we not awaiting this/handling errors?
+                    void this.storeTrustedSelfKeys(null);
+                    // emit cross-signing has been disabled
+                    this.emit(CryptoEvent.KeysChanged, {});
+                    // as the trust for our own user has changed,
+                    // also emit an event for this
+                    this.emit(CryptoEvent.UserTrustStatusChanged, this.userId, this.checkUserTrust(userId));
+                }
             } else {
-                // We'll now be in a state where cross-signing on the account is not trusted
-                // because our locally stored cross-signing keys will not match the ones
-                // on the server for our account. So we clear our own stored cross-signing keys,
-                // effectively disabling cross-signing until the user gets verified by the device
-                // that reset the keys
-                // TODO: why are we not awaiting this/handling errors?
-                void this.storeTrustedSelfKeys(null);
-                // emit cross-signing has been disabled
-                this.emit(CryptoEvent.KeysChanged, {});
-                // as the trust for our own user has changed,
-                // also emit an event for this
-                this.emit(CryptoEvent.UserTrustStatusChanged, this.userId, this.checkUserTrust(userId));
-            }
-        } else {
-            await this.checkDeviceVerifications(userId);
+                await this.checkDeviceVerifications(userId);
 
-            // Update verified before latch using the current state and save the new
-            // latch value in the device list store.
-            const crossSigning = this.deviceList.getStoredCrossSigningForUser(userId);
-            if (crossSigning) {
-                crossSigning.updateCrossSigningVerifiedBefore(
-                    this.checkUserTrust(userId).isCrossSigningVerified(),
-                );
-                this.deviceList.setRawStoredCrossSigningForUser(userId, crossSigning.toStorage());
-            }
+                // Update verified before latch using the current state and save the new
+                // latch value in the device list store.
+                const crossSigning = this.deviceList.getStoredCrossSigningForUser(userId);
+                if (crossSigning) {
+                    crossSigning.updateCrossSigningVerifiedBefore(
+                        this.checkUserTrust(userId).isCrossSigningVerified(),
+                    );
+                    this.deviceList.setRawStoredCrossSigningForUser(userId, crossSigning.toStorage());
+                }
 
-            this.emit(CryptoEvent.UserTrustStatusChanged, userId, this.checkUserTrust(userId));
-        }
+                this.emit(CryptoEvent.UserTrustStatusChanged, userId, this.checkUserTrust(userId));
+            }
+        })(userId);
     };
 
     /**

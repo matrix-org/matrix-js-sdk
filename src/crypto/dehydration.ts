@@ -77,7 +77,8 @@ export class DehydrationManager {
                             const { key, keyInfo, deviceDisplayName, time } = result;
                             const pickleKey = Buffer.from(this.crypto.olmDevice.pickleKey);
                             // TODO: why are we not handling errors?
-                            void decryptAES(key, pickleKey, DEHYDRATION_ALGORITHM).then((decrypted) => {
+                            void (async () => {
+                                const decrypted = await decryptAES(key, pickleKey, DEHYDRATION_ALGORITHM);
                                 this.key = decodeBase64(decrypted);
                                 this.keyInfo = keyInfo;
                                 this.deviceDisplayName = deviceDisplayName;
@@ -86,7 +87,7 @@ export class DehydrationManager {
                                 this.timeoutId = global.setTimeout(
                                     this.dehydrateDevice.bind(this), delay,
                                 );
-                            });
+                            })();
                         }
                     },
                     "dehydration",
