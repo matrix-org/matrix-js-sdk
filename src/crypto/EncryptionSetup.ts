@@ -215,10 +215,8 @@ export class EncryptionSetupOperation {
 
             // We must only call `uploadDeviceSigningKeys` from inside this auth
             // helper to ensure we properly handle auth errors.
-            await this.crossSigningKeys.authUpload(async (authDict) => {
-                const res = await baseApis.uploadDeviceSigningKeys(authDict, keys as CrossSigningKeys);
-                logger.info("Done uploadDeviceSigningKeys");
-                return res;
+            await this.crossSigningKeys.authUpload(authDict => {
+                return baseApis.uploadDeviceSigningKeys(authDict, keys as CrossSigningKeys);
             });
 
             // pass the new keys to the main instance of our own CrossSigningInfo.
@@ -226,7 +224,6 @@ export class EncryptionSetupOperation {
         }
         // set account data
         if (this.accountData) {
-            logger.info("Setting accountData");
             for (const [type, content] of this.accountData) {
                 await baseApis.setAccountData(type, content);
             }
@@ -234,7 +231,6 @@ export class EncryptionSetupOperation {
         // upload first cross-signing signatures with the new key
         // (e.g. signing our own device)
         if (this.keySignatures) {
-            logger.info("Uploading key signatures");
             await baseApis.uploadKeySignatures(this.keySignatures);
         }
         // need to create/update key backup info
