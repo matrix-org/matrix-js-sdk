@@ -1,11 +1,17 @@
-Changes in [17.0.0-rc.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v17.0.0-rc.3) (2022-04-11)
-============================================================================================================
+Changes in [17.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v17.0.0) (2022-04-11)
+==================================================================================================
 
-Changes in [17.0.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v17.0.0-rc.2) (2022-04-08)
-============================================================================================================
+## 🚨 BREAKING CHANGES
+ * Remove groups and groups-related APIs ([\#2234](https://github.com/matrix-org/matrix-js-sdk/pull/2234)).
 
-Changes in [17.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v17.0.0-rc.1) (2022-04-08)
-============================================================================================================
+## ✨ Features
+ * Add Element video room type ([\#2273](https://github.com/matrix-org/matrix-js-sdk/pull/2273)).
+ * Live location sharing - handle redacted beacons ([\#2269](https://github.com/matrix-org/matrix-js-sdk/pull/2269)).
+
+## 🐛 Bug Fixes
+ * Fix getSessionsNeedingBackup() limit support ([\#2270](https://github.com/matrix-org/matrix-js-sdk/pull/2270)). Contributed by @adamvy.
+ * Fix issues with /search and /context API handling for threads ([\#2261](https://github.com/matrix-org/matrix-js-sdk/pull/2261)). Fixes vector-im/element-web#21543.
+ * Prevent exception 'Unable to set up secret storage' ([\#2260](https://github.com/matrix-org/matrix-js-sdk/pull/2260)).
 
 Changes in [16.0.2-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v16.0.2-rc.1) (2022-04-05)
 ============================================================================================================
