@@ -80,7 +80,7 @@ interface IEventOpts {
     redacts?: string;
 }
 
-let i = 1; // counter for events, easier for comparison of randomly generated events
+let testEventIndex = 1; // counter for events, easier for comparison of randomly generated events
 /**
  * Create an Event.
  * @param {Object} opts Values for the event.
@@ -103,7 +103,7 @@ export function mkEvent(opts: IEventOpts, client?: MatrixClient): object | Matri
         sender: opts.sender || opts.user, // opts.user for backwards-compat
         content: opts.content,
         unsigned: opts.unsigned || {},
-        event_id: "$" + i++ + "-" + Math.random() + "-" + Math.random(),
+        event_id: "$" + testEventIndex++ + "-" + Math.random() + "-" + Math.random(),
         txn_id: "~" + Math.random(),
         redacts: opts.redacts,
     };
