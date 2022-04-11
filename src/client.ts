@@ -3779,6 +3779,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             localEvent.setThreadId(thread.id);
         }
 
+        // set up re-emitter for this new event - this is normally the job of EventMapper but we don't use it here
+        this.reEmitter.reEmit(localEvent, [
+            MatrixEventEvent.Replaced,
+            MatrixEventEvent.VisibilityChange,
+        ]);
+        room?.reEmitter.reEmit(localEvent, [
+            MatrixEventEvent.BeforeRedaction,
+        ]);
+
         // if this is a relation or redaction of an event
         // that hasn't been sent yet (e.g. with a local id starting with a ~)
         // then listen for the remote echo of that event so that by the time
