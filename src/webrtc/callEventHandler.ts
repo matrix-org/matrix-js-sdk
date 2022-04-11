@@ -68,41 +68,39 @@ export class CallEventHandler {
 
     private evaluateEventBuffer = (): void => {
         // TODO: why are we not handling errors?
-        void this.evaluateEventBufferPromise();
-    };
+        void (async () => {
+            if (this.client.getSyncState() === SyncState.Syncing) {
+                await Promise.all(this.callEventBuffer.map(event => {
+                    this.client.decryptEventIfNeeded(event);
+                }));
 
-    private evaluateEventBufferPromise = async () => {
-        if (this.client.getSyncState() === SyncState.Syncing) {
-            await Promise.all(this.callEventBuffer.map(event => {
-                this.client.decryptEventIfNeeded(event);
-            }));
-
-            const ignoreCallIds = new Set<String>();
-            // inspect the buffer and mark all calls which have been answered
-            // or hung up before passing them to the call event handler.
-            for (const ev of this.callEventBuffer) {
-                if (ev.getType() === EventType.CallAnswer ||
-                        ev.getType() === EventType.CallHangup) {
-                    ignoreCallIds.add(ev.getContent().call_id);
+                const ignoreCallIds = new Set<String>();
+                // inspect the buffer and mark all calls which have been answered
+                // or hung up before passing them to the call event handler.
+                for (const ev of this.callEventBuffer) {
+                    if (ev.getType() === EventType.CallAnswer ||
+                            ev.getType() === EventType.CallHangup) {
+                        ignoreCallIds.add(ev.getContent().call_id);
+                    }
                 }
+                // now loop through the buffer chronologically and inject them
+                for (const e of this.callEventBuffer) {
+                    if (
+                        e.getType() === EventType.CallInvite &&
+                        ignoreCallIds.has(e.getContent().call_id)
+                    ) {
+                        // This call has previously been answered or hung up: ignore it
+                        continue;
+                    }
+                    try {
+                        await this.handleCallEvent(e);
+                    } catch (e) {
+                        logger.error("Caught exception handling call event", e);
+                    }
+                }
+                this.callEventBuffer = [];
             }
-            // now loop through the buffer chronologically and inject them
-            for (const e of this.callEventBuffer) {
-                if (
-                    e.getType() === EventType.CallInvite &&
-                    ignoreCallIds.has(e.getContent().call_id)
-                ) {
-                    // This call has previously been answered or hung up: ignore it
-                    continue;
-                }
-                try {
-                    await this.handleCallEvent(e);
-                } catch (e) {
-                    logger.error("Caught exception handling call event", e);
-                }
-            }
-            this.callEventBuffer = [];
-        }
+        })();
     };
 
     private onRoomTimeline = (event: MatrixEvent) => {

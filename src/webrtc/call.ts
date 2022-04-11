@@ -1831,28 +1831,26 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     private onNegotiationNeeded = (): void => {
         // TODO: why are we not handling errors?
-        void this.onNegotiationNeededPromise();
-    };
+        void (async (): Promise<void> => {
+            logger.info("Negotiation is needed!");
 
-    private onNegotiationNeededPromise = async (): Promise<void> => {
-        logger.info("Negotiation is needed!");
+            if (this.state !== CallState.CreateOffer && this.opponentVersion === 0) {
+                logger.info("Opponent does not support renegotiation: ignoring negotiationneeded event");
+                return;
+            }
 
-        if (this.state !== CallState.CreateOffer && this.opponentVersion === 0) {
-            logger.info("Opponent does not support renegotiation: ignoring negotiationneeded event");
-            return;
-        }
-
-        this.makingOffer = true;
-        try {
-            this.getRidOfRTXCodecs();
-            const myOffer = await this.peerConn.createOffer();
-            await this.gotLocalOffer(myOffer);
-        } catch (e) {
-            this.getLocalOfferFailed(e);
-            return;
-        } finally {
-            this.makingOffer = false;
-        }
+            this.makingOffer = true;
+            try {
+                this.getRidOfRTXCodecs();
+                const myOffer = await this.peerConn.createOffer();
+                await this.gotLocalOffer(myOffer);
+            } catch (e) {
+                this.getLocalOfferFailed(e);
+                return;
+            } finally {
+                this.makingOffer = false;
+            }
+        })();
     };
 
     public onHangupReceived = (msg: MCallHangupReject): void => {
