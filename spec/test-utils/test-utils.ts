@@ -8,6 +8,7 @@ import { logger } from '../../src/logger';
 import { IContent, IEvent, IUnsigned, MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { ClientEvent, EventType, MatrixClient } from "../../src";
 import { SyncState } from "../../src/sync";
+import { eventMapperFor } from "../../src/event-mapper";
 
 /**
  * Return a promise that is resolved when the client next emits a
@@ -79,6 +80,7 @@ interface IEventOpts {
     redacts?: string;
 }
 
+let testEventIndex = 1; // counter for events, easier for comparison of randomly generated events
 /**
  * Create an Event.
  * @param {Object} opts Values for the event.
@@ -88,9 +90,10 @@ interface IEventOpts {
  * @param {string} opts.skey Optional. The state key (auto inserts empty string)
  * @param {Object} opts.content The event.content
  * @param {boolean} opts.event True to make a MatrixEvent.
+ * @param {MatrixClient} client If passed along with opts.event=true will be used to set up re-emitters.
  * @return {Object} a JSON object representing this event.
  */
-export function mkEvent(opts: IEventOpts): object | MatrixEvent {
+export function mkEvent(opts: IEventOpts, client?: MatrixClient): object | MatrixEvent {
     if (!opts.type || !opts.content) {
         throw new Error("Missing .type or .content =>" + JSON.stringify(opts));
     }
@@ -100,7 +103,7 @@ export function mkEvent(opts: IEventOpts): object | MatrixEvent {
         sender: opts.sender || opts.user, // opts.user for backwards-compat
         content: opts.content,
         unsigned: opts.unsigned || {},
-        event_id: "$" + Math.random() + "-" + Math.random(),
+        event_id: "$" + testEventIndex++ + "-" + Math.random() + "-" + Math.random(),
         txn_id: "~" + Math.random(),
         redacts: opts.redacts,
     };
@@ -117,6 +120,11 @@ export function mkEvent(opts: IEventOpts): object | MatrixEvent {
     ].includes(opts.type)) {
         event.state_key = "";
     }
+
+    if (opts.event && client) {
+        return eventMapperFor(client, {})(event);
+    }
+
     return opts.event ? new MatrixEvent(event) : event;
 }
 
@@ -209,9 +217,10 @@ interface IMessageOpts {
  * @param {string} opts.user The user ID for the event.
  * @param {string} opts.msg Optional. The content.body for the event.
  * @param {boolean} opts.event True to make a MatrixEvent.
+ * @param {MatrixClient} client If passed along with opts.event=true will be used to set up re-emitters.
  * @return {Object|MatrixEvent} The event
  */
-export function mkMessage(opts: IMessageOpts): object | MatrixEvent {
+export function mkMessage(opts: IMessageOpts, client?: MatrixClient): object | MatrixEvent {
     const eventOpts: IEventOpts = {
         ...opts,
         type: EventType.RoomMessage,
@@ -224,7 +233,7 @@ export function mkMessage(opts: IMessageOpts): object | MatrixEvent {
     if (!eventOpts.content.body) {
         eventOpts.content.body = "Random->" + Math.random();
     }
-    return mkEvent(eventOpts);
+    return mkEvent(eventOpts, client);
 }
 
 /**
