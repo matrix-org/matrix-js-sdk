@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixClient, RelationType, RoomEvent } from "../matrix";
+import { MatrixClient, MatrixEventEvent, RelationType, RoomEvent } from "../matrix";
 import { TypedReEmitter } from "../ReEmitter";
 import { IRelationsRequestOpts } from "../@types/requests";
 import { IThreadBundledRelationship, MatrixEvent } from "./event";
@@ -94,15 +94,16 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             RoomEvent.TimelineReset,
         ]);
 
+        this.room.on(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
+        this.room.on(RoomEvent.LocalEchoUpdated, this.onEcho);
+        this.timelineSet.on(RoomEvent.Timeline, this.onEcho);
+
         // If we weren't able to find the root event, it's probably missing,
         // and we define the thread ID from one of the thread relation
         this.id = rootEvent?.getId() ?? opts?.initialEvents?.find(event => event.isThreadRelation)?.relationEventId;
         this.initialiseThread(this.rootEvent);
 
         opts?.initialEvents?.forEach(event => this.addEvent(event, false));
-
-        this.room.on(RoomEvent.LocalEchoUpdated, this.onEcho);
-        this.room.on(RoomEvent.Timeline, this.onEcho);
     }
 
     public static setServerSideSupport(hasServerSideSupport: boolean, useStable: boolean): void {
@@ -114,10 +115,50 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         }
     }
 
-    private onEcho = (event: MatrixEvent) => {
-        if (this.timelineSet.eventIdToTimeline(event.getId())) {
+    private onBeforeRedaction = (event: MatrixEvent) => {
+        if (event?.isRelation(THREAD_RELATION_TYPE.name) &&
+            this.room.eventShouldLiveIn(event).threadId === this.id
+        ) {
+            this.replyCount--;
             this.emit(ThreadEvent.Update, this);
         }
+
+        if (this.lastEvent?.getId() === event.getId()) {
+            const events = [...this.timelineSet.getLiveTimeline().getEvents()].reverse();
+            this.lastEvent = events.find(e => (
+                !e.isRedacted() &&
+                e.getId() !== event.getId() &&
+                e.isRelation(THREAD_RELATION_TYPE.name)
+            )) ?? this.rootEvent;
+            this.emit(ThreadEvent.NewReply, this, this.lastEvent);
+        }
+    };
+
+    private onEcho = (event: MatrixEvent) => {
+        if (event.threadRootId !== this.id) return; // ignore echoes for other timelines
+        if (this.lastEvent === event) return;
+
+        // There is a risk that the `localTimestamp` approximation will not be accurate
+        // when threads are used over federation. That could result in the reply
+        // count value drifting away from the value returned by the server
+        const isThreadReply = event.isRelation(THREAD_RELATION_TYPE.name);
+        if (!this.lastEvent || (isThreadReply
+            && (event.getId() !== this.lastEvent.getId())
+            && (event.localTimestamp > this.lastEvent.localTimestamp))
+        ) {
+            this.lastEvent = event;
+            if (this.lastEvent.getId() !== this.id) {
+                // This counting only works when server side support is enabled as we started the counting
+                // from the value returned within the bundled relationship
+                if (Thread.hasServerSideSupport) {
+                    this.replyCount++;
+                }
+
+                this.emit(ThreadEvent.NewReply, this, event);
+            }
+        }
+
+        this.emit(ThreadEvent.Update, this);
     };
 
     public get roomState(): RoomState {
@@ -125,15 +166,6 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     }
 
     private addEventToTimeline(event: MatrixEvent, toStartOfTimeline: boolean): void {
-        if (event.getUnsigned().transaction_id) {
-            const existingEvent = this.room.getEventForTxnId(event.getUnsigned().transaction_id);
-            if (existingEvent) {
-                // remote echo of an event we sent earlier
-                this.room.handleRemoteEcho(event, existingEvent);
-                return;
-            }
-        }
-
         if (!this.findEventById(event.getId())) {
             this.timelineSet.addEventToTimeline(
                 event,
@@ -177,31 +209,10 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             this._currentUserParticipated = true;
         }
 
-        const isThreadReply = event.getRelation()?.rel_type === THREAD_RELATION_TYPE.name;
         // If no thread support exists we want to count all thread relation
         // added as a reply. We can't rely on the bundled relationships count
-        if (!Thread.hasServerSideSupport && isThreadReply) {
+        if (!Thread.hasServerSideSupport && event.isRelation(THREAD_RELATION_TYPE.name)) {
             this.replyCount++;
-        }
-
-        // There is a risk that the `localTimestamp` approximation will not be accurate
-        // when threads are used over federation. That could results in the reply
-        // count value drifting away from the value returned by the server
-        if (!this.lastEvent || (isThreadReply
-            && (event.getId() !== this.lastEvent.getId())
-            && (event.localTimestamp > this.lastEvent.localTimestamp))
-        ) {
-            this.lastEvent = event;
-            if (this.lastEvent.getId() !== this.id) {
-                // This counting only works when server side support is enabled
-                // as we started the counting from the value returned in the
-                // bundled relationship
-                if (Thread.hasServerSideSupport) {
-                    this.replyCount++;
-                }
-
-                this.emit(ThreadEvent.NewReply, this, event);
-            }
         }
 
         this.emit(ThreadEvent.Update, this);

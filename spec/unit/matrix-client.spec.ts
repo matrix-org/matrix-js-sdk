@@ -981,7 +981,7 @@ describe("MatrixClient", function() {
 
             expect(rootEvent.isThreadRoot).toBe(true);
 
-            const [roomEvents, threadEvents] = client.partitionThreadedEvents(room, [rootEvent]);
+            const [roomEvents, threadEvents] = room.partitionThreadedEvents([rootEvent]);
             expect(roomEvents).toHaveLength(1);
             expect(threadEvents).toHaveLength(1);
 
