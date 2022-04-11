@@ -123,8 +123,13 @@ export class CallEventHandler {
                 } else {
                     // This one wasn't buffered so just run the event handler for it
                     // straight away
-                    this.handleCallEvent(event).then()
-                        .catch(e => logger.error("Caught exception handling call event", e));
+                    void (async () => {
+                        try {
+                            await this.handleCallEvent(event);
+                        } catch (e) {
+                            logger.error("Caught exception handling call event", e);
+                        }
+                    })();
                 }
             });
         }
