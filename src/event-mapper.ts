@@ -25,7 +25,7 @@ export interface MapperOpts {
 }
 
 export function eventMapperFor(client: MatrixClient, options: MapperOpts): EventMapper {
-    const preventReEmit = Boolean(options.preventReEmit);
+    let preventReEmit = Boolean(options.preventReEmit);
     const decrypt = options.decrypt !== false;
 
     function mapper(plainOldJsObject: Partial<IEvent>) {
@@ -43,6 +43,8 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
         } else {
             // merge the latest unsigned data from the server
             event.setUnsigned({ ...event.getUnsigned(), ...plainOldJsObject.unsigned });
+            // prevent doubling up re-emitters
+            preventReEmit = true;
         }
 
         const thread = room?.findThreadForEvent(event);

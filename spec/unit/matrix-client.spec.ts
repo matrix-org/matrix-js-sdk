@@ -816,6 +816,9 @@ describe("MatrixClient", function() {
             },
             addPendingEvent: jest.fn(),
             updatePendingEvent: jest.fn(),
+            reEmitter: {
+                reEmit: jest.fn(),
+            },
         };
 
         beforeEach(() => {
