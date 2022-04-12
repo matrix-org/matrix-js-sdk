@@ -6410,12 +6410,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public async _unstable_getSharedRooms(userId: string): Promise<string[]> { // eslint-disable-line
-        if (!(await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666"))) {
-            throw Error('Server does not support shared_rooms API');
+        const sharedRoomsSupport = await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666");
+        const mutualRoomsSupport = await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666.mutual_rooms");
+
+        if (!sharedRoomsSupport && !mutualRoomsSupport) {
+            throw Error('Server does not support mutual_rooms API');
         }
-        const path = utils.encodeUri("/uk.half-shot.msc2666/user/shared_rooms/$userId", {
-            $userId: userId,
-        });
+
+        const path = utils.encodeUri(
+            `/uk.half-shot.msc2666/user/${mutualRoomsSupport ? 'mutual_rooms' : 'shared_rooms'}/$userId`,
+            { $userId: userId },
+        );
+
         const res = await this.http.authedRequest<{ joined: string[] }>(
             undefined, Method.Get, path, undefined, undefined,
             { prefix: PREFIX_UNSTABLE },
