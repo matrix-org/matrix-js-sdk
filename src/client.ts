@@ -6408,7 +6408,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {Promise<string[]>} Resolves to a set of rooms
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async _unstable_getMutualRooms(userId: string): Promise<string[]> { // eslint-disable-line
+    public async _unstable_getSharedRooms(userId: string): Promise<string[]> { // eslint-disable-line
         if (!(await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666"))) {
             throw Error('Server does not support mutual_rooms API');
         }
