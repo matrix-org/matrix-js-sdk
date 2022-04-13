@@ -6597,7 +6597,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Query the server to see if it supports the MSC2457 `logout_devices` parameter when setting password
      * @return {Promise<boolean>} true if server supports the `logout_devices` parameter
      */
-    public async doesServerSupportLogoutDevices(): Promise<boolean> {
+    public doesServerSupportLogoutDevices(): Promise<boolean> {
         return this.isVersionSupported("r0.6.1");
     }
 
