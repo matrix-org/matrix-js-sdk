@@ -326,13 +326,15 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * Add an array of one or more state MatrixEvents, overwriting any existing
      * state with the same {type, stateKey} tuple. Will fire "RoomState.events"
      * for every event added. May fire "RoomState.members" if there are
-     * <code>m.room.member</code> events.
+     * <code>m.room.member</code> events. May fire "RoomStateEvent.Marker" if there are
+     * <code>EventType.Marker</code> events.
      * @param {MatrixEvent[]} stateEvents a list of state events for this room.
      * @param {boolean} fromInitialState whether the stateEvents are from the first
      * sync in the room or a sync we already know about (syncFromCache)
      * @fires module:client~MatrixClient#event:"RoomState.members"
      * @fires module:client~MatrixClient#event:"RoomState.newMember"
      * @fires module:client~MatrixClient#event:"RoomState.events"
+     * @fires module:client~MatrixClient#event:"RoomStateEvent.Marker"
      */
     public setStateEvents(stateEvents: MatrixEvent[], setStateOptions?: ISetStateOptions) {
         this.updateModifiedTime();

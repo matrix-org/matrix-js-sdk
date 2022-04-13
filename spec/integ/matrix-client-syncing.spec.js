@@ -1,5 +1,6 @@
 import { MatrixEvent } from "../../src/models/event";
 import { EventTimeline } from "../../src/models/event-timeline";
+import { EventType } from "../../src/@types/event";
 import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 
@@ -460,6 +461,104 @@ describe("MatrixClient syncing", function() {
 
         xit("should update the room topic", function() {
 
+        });
+
+        describe("onMarkerStateEvent", () => {
+            it('no marker means the timeline does not need a refresh (check a sane default)', async () => {
+                const syncData = {
+                    next_batch: "batch_token",
+                    rooms: {
+                        join: {},
+                    },
+                };
+                syncData.rooms.join[roomOne] = {
+                    timeline: {
+                        events: [
+                            utils.mkMessage({
+                                room: roomOne, user: otherUserId, msg: "hello",
+                            }),
+                        ],
+                        prev_batch: "pagTok",
+                    },
+                    state: {
+                        events: [
+                            utils.mkEvent({
+                                type: "m.room.create", room: roomOne, user: otherUserId,
+                                content: {
+                                    creator: otherUserId,
+                                },
+                            }),
+                        ],
+                    },
+                };
+
+                httpBackend.when("GET", "/sync").respond(200, syncData);
+
+                client.startClient();
+                await Promise.all([
+                    httpBackend.flushAllExpected(),
+                    awaitSyncEvent(),
+                ]);
+
+                const room = client.getRoom(roomOne);
+                expect(room.getTimelineNeedsRefresh()).toEqual(false);
+            });
+
+            it('a new marker event should mark the timeline as needing a refresh', async () => {
+                const syncData = {
+                    next_batch: "batch_token",
+                    rooms: {
+                        join: {},
+                    },
+                };
+                syncData.rooms.join[roomOne] = {
+                    timeline: {
+                        events: [
+                            utils.mkEvent({
+                                type: EventType.Marker, room: roomOne, user: otherUserId,
+                                skey: "",
+                                content: {
+                                    "m.insertion_id": "$abc",
+                                },
+                            }),
+                        ],
+                        prev_batch: "pagTok",
+                    },
+                    state: {
+                        events: [
+                            utils.mkEvent({
+                                type: "m.room.create", room: roomOne, user: otherUserId,
+                                content: {
+                                    creator: otherUserId,
+                                },
+                            }),
+                        ],
+                    },
+                };
+
+                const markerEventId = syncData.rooms.join[roomOne].timeline.events[0].event_id;
+
+                let emitCount = 0;
+                client.on("Room.historyImportedWithinTimeline", function(markerEvent, room) {
+                    expect(markerEvent.getId()).toEqual(markerEventId);
+                    expect(room.roomId).toEqual(roomOne);
+                    emitCount += 1;
+                });
+
+                httpBackend.when("GET", "/sync").respond(200, syncData);
+
+                client.startClient();
+                await Promise.all([
+                    httpBackend.flushAllExpected(),
+                    awaitSyncEvent(),
+                ]);
+
+                const room = client.getRoom(roomOne);
+                expect(room.getTimelineNeedsRefresh()).toEqual(true);
+                // Make sure "Room.historyImportedWithinTimeline" was emitted
+                expect(emitCount).toEqual(1);
+                expect(room.getLastMarkerEventIdProcessed()).toEqual(markerEventId);
+            });
         });
     });
 

@@ -460,7 +460,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         if (!createEvent) {
             return null;
         }
-        const roomCreator = createEvent.getContent()['sender'];
+        const roomCreator = createEvent.getContent()['creator'];
         return roomCreator;
     }
 
