@@ -36,7 +36,7 @@ import {
 function matchesWildcard(actualValue: string, filterValue: string): boolean {
     if (filterValue.endsWith("*")) {
         const typePrefix = filterValue.slice(0, -1);
-        return actualValue.substr(0, typePrefix.length) === typePrefix;
+        return actualValue.slice(0, typePrefix.length) === typePrefix;
     } else {
         return actualValue === filterValue;
     }
