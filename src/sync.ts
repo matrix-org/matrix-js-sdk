@@ -210,6 +210,7 @@ export class SyncApi {
             RoomEvent.Receipt,
             RoomEvent.Tags,
             RoomEvent.LocalEchoUpdated,
+            RoomEvent.historyImportedWithinTimeline,
             RoomEvent.AccountData,
             RoomEvent.MyMembership,
             RoomEvent.Timeline,
@@ -248,7 +249,8 @@ export class SyncApi {
             ]);
         });
 
-        room.currentState.on(RoomStateEvent.Marker, function(event, {fromInitialState}: ISetStateOptions = {}) {
+        // TODO: Should we just move this to `room.ts`?
+        room.currentState.on(RoomStateEvent.Marker, async function(markerEvent, {fromInitialState}: ISetStateOptions = {}) {
             // We don't want to refresh the timeline:
             //  1. If it's persons first time syncing the room, they won't have
             //     any old events cached to refresh.
@@ -263,19 +265,27 @@ export class SyncApi {
                 // MSC2716 is supported in all existing room versions but special
                 // meaning should only be given to "insertion", "batch", and
                 // "marker" events when they come from the room creator
-                event.getSender() === room.getRoomCreator();
-            console.log(`On marker state isValidMsc2716Event=${isValidMsc2716Event}, event_id=${event.getId()} room.getLastMarkerEventIdProcessed()=${room.getLastMarkerEventIdProcessed()}`);
+                markerEvent.getSender() === room.getRoomCreator();
+            console.log(`On marker state isValidMsc2716Event=${isValidMsc2716Event}, event_id=${markerEvent.getId()} room.getLastMarkerEventIdProcessed()=${room.getLastMarkerEventIdProcessed()}`);
             if(
                 isValidMsc2716Event &&
                 // We only need to throw the timeline away once, when we see a
                 // marker. All of the historical content will be in the
                 // `/messsages` responses from here on out.
-                event.getId() !== room.getLastMarkerEventIdProcessed()
+                markerEvent.getId() !== room.getLastMarkerEventIdProcessed()
             ) {
-                // Saw new marker event, refreshing the timeline
-                console.log('Saw new marker event, refreshing the timeline', new Error().stack);
-                room.resetLiveTimeline(null, null);
-                room.setLastMarkerEventIdProcessed(event.getId())
+                // Saw new marker event, let's let the clients know they should
+                // refresh the timeline.
+                //
+                // FIXME: Is there a way we could lookup
+                // `markerEvent.getContent()['m.insertion_id']` and get the
+                // prev_events of that event to see exactly where the history
+                // was imported and whether we have it locally? Because we only
+                // need to refresh the timeline if the timeline includes the
+                // prev_events of the base insertion event.
+                console.log('Saw new marker event', new Error().stack);
+                this.emit(RoomEvent.historyImportedWithinTimeline, markerEvent, room);
+                room.setLastMarkerEventIdProcessed(markerEvent.getId())
             }
         });
     }

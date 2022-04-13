@@ -163,6 +163,7 @@ export enum RoomEvent {
     Redaction = "Room.redaction",
     RedactionCancelled = "Room.redactionCancelled",
     LocalEchoUpdated = "Room.localEchoUpdated",
+    historyImportedWithinTimeline = "Room.historyImportedWithinTimeline",
     Timeline = "Room.timeline",
     TimelineReset = "Room.timelineReset",
 }
@@ -188,6 +189,10 @@ export type RoomEventHandlerMap = {
         oldEventId?: string,
         oldStatus?: EventStatus,
     ) => void;
+    [RoomEvent.historyImportedWithinTimeline]: (
+        markerEvent: MatrixEvent,
+        room: Room,
+    ) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
 } & ThreadHandlerMap;
 
@@ -205,6 +210,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
     private readonly filteredTimelineSets: Record<string, EventTimelineSet> = {}; // filter_id: timelineSet
+    private timelineNeedsRefresh: boolean = false;
     private lastMarkerEventIdProcessed: string = null;
     private readonly pendingEventList?: MatrixEvent[];
     // read by megolm via getter; boolean value - null indicates "use global value"
@@ -1017,6 +1023,24 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     public addTimeline(): EventTimeline {
         return this.getUnfilteredTimelineSet().addTimeline();
+    }
+
+    /**
+     * Whether the timeline needs to be refreshed in order to pull in new
+     * historical messages that were imported.
+     * @param {Boolean} value The value to set
+     */
+     public setTimelineNeedsRefresh(value: boolean): void {
+        this.timelineNeedsRefresh = value;
+    }
+
+    /**
+     * Whether the timeline needs to be refreshed in order to pull in new
+     * historical messages that were imported.
+     * @return {Boolean} .
+     */
+    public getTimelineNeedsRefresh(): boolean {
+        return this.timelineNeedsRefresh;
     }
 
     /**
