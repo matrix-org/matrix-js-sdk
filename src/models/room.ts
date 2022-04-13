@@ -1474,7 +1474,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     public threadsReady = false;
 
     public async fetchRoomThreads(): Promise<void> {
-        if (this.threadsReady) {
+        if (this.threadsReady || !this.client.supportsExperimentalThreads()) {
             return;
         }
 
@@ -1662,7 +1662,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 // benefit from all the APIs a homeserver can provide to enhance the thread experience
                 thread = this.createThread(rootEvent, events, toStartOfTimeline);
                 if (thread) {
-                    rootEvent.setThread(thread);
+                    rootEvent?.setThread(thread);
                 }
                 deferred.resolve(thread);
             }
