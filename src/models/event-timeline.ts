@@ -32,7 +32,7 @@ export enum Direction {
 
 export interface IAddEventOptions {
     atStart: boolean;
-    stateContext?: RoomState;
+    roomState?: RoomState;
     fromInitialState?: boolean;
 }
 
@@ -361,25 +361,25 @@ export class EventTimeline {
         event: MatrixEvent,
         {
             atStart,
-            stateContext,
+            roomState,
             fromInitialState,
         }: IAddEventOptions,
     ): void {
-        if (!stateContext) {
-            stateContext = atStart ? this.startState : this.endState;
+        if (!roomState) {
+            roomState = atStart ? this.startState : this.endState;
         }
 
         const timelineSet = this.getTimelineSet();
 
         if (timelineSet.room) {
-            EventTimeline.setEventMetadata(event, stateContext, atStart);
+            EventTimeline.setEventMetadata(event, roomState, atStart);
 
             // modify state but only on unfiltered timelineSets
             if (
                 event.isState() &&
                 timelineSet.room.getUnfilteredTimelineSet() === timelineSet
             ) {
-                stateContext.setStateEvents([event], {
+                roomState.setStateEvents([event], {
                     fromInitialState,
                 });
                 // it is possible that the act of setting the state event means we
@@ -393,7 +393,7 @@ export class EventTimeline {
                 // member event, whereas we want to set the .sender value for the ACTUAL
                 // member event itself.
                 if (!event.sender || (event.getType() === "m.room.member" && !atStart)) {
-                    EventTimeline.setEventMetadata(event, stateContext, atStart);
+                    EventTimeline.setEventMetadata(event, roomState, atStart);
                 }
             }
         }
