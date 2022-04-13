@@ -6594,6 +6594,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Query the server to see if it supports the MSC2457 `logout_devices` parameter when setting password
+     * @return {Promise<boolean>} true if server supports the `logout_devices` parameter
+     */
+    public async doesServerSupportLogoutDevices(): Promise<boolean> {
+        const response = await this.getVersions();
+        return response?.versions?.includes("r0.6.1");
+    }
+
+    /**
      * Get if lazy loading members is being used.
      * @return {boolean} Whether or not members are lazy loaded by this client
      */
