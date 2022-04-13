@@ -502,6 +502,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
         this.emit(BeaconEvent.New, event, beacon);
         beacon.on(BeaconEvent.LivenessChange, this.onBeaconLivenessChange.bind(this));
+        beacon.on(BeaconEvent.Destroy, this.onBeaconLivenessChange.bind(this));
 
         this.beacons.set(beacon.identifier, beacon);
     }
