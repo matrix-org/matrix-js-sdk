@@ -78,7 +78,9 @@ export interface IAddLiveEventOptions {
 
 export interface IAddEventToTimelineOptions {
     toStartOfTimeline: boolean;
+    /** Whether the sync response came from cache */
     fromCache?: boolean;
+    /** The state events to reconcile metadata from */
     roomState?: RoomState;
     /** Whether the state is part of the first state snapshot we're seeing in
      *  the room. This could be happen in a variety of cases:
@@ -464,7 +466,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             if (!existingTimeline) {
                 // we don't know about this event yet. Just add it to the timeline.
                 this.addEventToTimeline(event, timeline, {
-                    toStartOfTimeline
+                    toStartOfTimeline,
                 });
                 lastEventWasNew = true;
                 didUpdate = true;
@@ -565,8 +567,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             duplicateStrategy = DuplicateStrategy.Ignore,
             fromCache = false,
             roomState,
-            fromInitialState
-        }: IAddLiveEventOptions = {}
+            fromInitialState,
+        }: IAddLiveEventOptions = {},
     ): void {
         if (this.filter) {
             const events = this.filter.filterRoomTimeline([event]);
@@ -632,12 +634,12 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             toStartOfTimeline,
             fromCache = false,
             roomState,
-            fromInitialState = false
+            fromInitialState = false,
         }: IAddEventToTimelineOptions,
     ) {
         const eventId = event.getId();
         timeline.addEvent(event, {
-            atStart: toStartOfTimeline, 
+            atStart: toStartOfTimeline,
             stateContext: roomState,
             fromInitialState,
         });
@@ -677,12 +679,12 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             if (this.filter) {
                 if (this.filter.filterRoomTimeline([localEvent]).length) {
                     this.addEventToTimeline(localEvent, this.liveTimeline, {
-                        toStartOfTimeline: false
+                        toStartOfTimeline: false,
                     });
                 }
             } else {
                 this.addEventToTimeline(localEvent, this.liveTimeline, {
-                    toStartOfTimeline: false
+                    toStartOfTimeline: false,
                 });
             }
         }

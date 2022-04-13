@@ -142,7 +142,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
                     toStartOfTimeline,
                     fromCache: false,
                     roomState: this.roomState,
-                }
+                },
             );
         }
     }

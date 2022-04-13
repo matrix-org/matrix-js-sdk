@@ -160,7 +160,7 @@ export class EventTimeline {
         }
 
         const setStateOptions: ISetStateOptions = {
-            fromInitialState: true
+            fromInitialState: true,
         };
         this.startState.setStateEvents(stateEvents, setStateOptions);
         this.endState.setStateEvents(stateEvents, setStateOptions);
@@ -363,7 +363,7 @@ export class EventTimeline {
             atStart,
             stateContext,
             fromInitialState,
-        }: IAddEventOptions
+        }: IAddEventOptions,
     ): void {
         if (!stateContext) {
             stateContext = atStart ? this.startState : this.endState;
@@ -380,7 +380,7 @@ export class EventTimeline {
                 timelineSet.room.getUnfilteredTimelineSet() === timelineSet
             ) {
                 stateContext.setStateEvents([event], {
-                    fromInitialState
+                    fromInitialState,
                 });
                 // it is possible that the act of setting the state event means we
                 // can set more metadata (specifically sender/target props), so try

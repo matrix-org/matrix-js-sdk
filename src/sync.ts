@@ -82,7 +82,7 @@ export enum SyncState {
 // by power-levels. MSC2716 is supported in existing room versions but they
 // should only have special meaning when the room creator sends them.
 const MSC2716_ROOM_VERSIONS = [
-    'org.matrix.msc2716v3'
+    'org.matrix.msc2716v3',
 ];
 
 function getFilterName(userId: string, suffix?: string): string {
@@ -250,24 +250,27 @@ export class SyncApi {
         });
 
         // TODO: Should we just move this to `room.ts`?
-        room.currentState.on(RoomStateEvent.Marker, async function(markerEvent, {fromInitialState}: ISetStateOptions = {}) {
+        room.currentState.on(RoomStateEvent.Marker, async function(
+            markerEvent,
+            {fromInitialState}: ISetStateOptions = {},
+        ) {
             // We don't want to refresh the timeline:
             //  1. If it's persons first time syncing the room, they won't have
             //     any old events cached to refresh.
             //  1. If we're re-hydrating from `syncFromCache` because we already
             //     processed any marker event state that was in the cache
-            if(fromInitialState) {
+            if (fromInitialState) {
                 console.log('fromInitialState ignoring');
                 return;
             }
 
-            const isValidMsc2716Event =  MSC2716_ROOM_VERSIONS.includes(room.getVersion()) ||
+            const isValidMsc2716Event = MSC2716_ROOM_VERSIONS.includes(room.getVersion()) ||
                 // MSC2716 is supported in all existing room versions but special
                 // meaning should only be given to "insertion", "batch", and
                 // "marker" events when they come from the room creator
                 markerEvent.getSender() === room.getRoomCreator();
             console.log(`On marker state isValidMsc2716Event=${isValidMsc2716Event}, event_id=${markerEvent.getId()} room.getLastMarkerEventIdProcessed()=${room.getLastMarkerEventIdProcessed()}`);
-            if(
+            if (
                 isValidMsc2716Event &&
                 // We only need to throw the timeline away once, when we see a
                 // marker. All of the historical content will be in the
@@ -284,8 +287,8 @@ export class SyncApi {
                 // need to refresh the timeline if the timeline includes the
                 // prev_events of the base insertion event.
                 console.log('Saw new marker event', new Error().stack);
-                this.emit(RoomEvent.historyImportedWithinTimeline, markerEvent, room);
-                room.setLastMarkerEventIdProcessed(markerEvent.getId())
+                room.emit(RoomEvent.historyImportedWithinTimeline, markerEvent, room);
+                room.setLastMarkerEventIdProcessed(markerEvent.getId());
             }
         });
     }
