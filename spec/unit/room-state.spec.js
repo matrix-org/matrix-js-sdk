@@ -334,7 +334,7 @@ describe("RoomState", function() {
                 state.setStateEvents([updatedLiveBeaconEvent]);
 
                 expect(state.hasLiveBeacons).toBe(false);
-                expect(filterEmitCallsByEventType(RoomStateEvent.BeaconLiveness, emitSpy).length).toBe(2);
+                expect(filterEmitCallsByEventType(RoomStateEvent.BeaconLiveness, emitSpy).length).toBe(3);
                 expect(emitSpy).toHaveBeenCalledWith(RoomStateEvent.BeaconLiveness, state, false);
             });
         });
