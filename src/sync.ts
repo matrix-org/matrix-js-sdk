@@ -305,20 +305,16 @@ export class SyncApi {
                 // Saw new marker event, let's let the clients know they should
                 // refresh the timeline.
                 //
-                // FIXME: Is there a way we could lookup
-                // `markerEvent.getContent()['m.insertion_id']` and get the
-                // prev_events of that event to see exactly where the history
-                // was imported and whether we have it locally? Because we only
+                // It would be nice if we could lookup the base insertion event
+                // that the marker event was pointing to because we really only
                 // need to refresh the timeline if the timeline includes the
-                // prev_events of the base insertion event.
-                const originalStackTraceLimit = Error.stackTraceLimit;
-                Error.stackTraceLimit = Infinity;
+                // prev_events of the base insertion event and won't re-request
+                // `/messages` over that range in the timeline. But the problem
+                // is we can't see prev_events from the client API.
                 logger.debug(
                     `MarkerState: Timeline needs to be refreshed because ` +
                     `a new markerEventId=${markerEvent.getId()} was sent in roomId=${room.roomId}`,
-                    new Error().stack,
                 );
-                Error.stackTraceLimit = originalStackTraceLimit;
                 room.setTimelineNeedsRefresh(true);
                 room.emit(RoomEvent.historyImportedWithinTimeline, markerEvent, room);
                 room.setLastMarkerEventIdProcessed(markerEvent.getId());
