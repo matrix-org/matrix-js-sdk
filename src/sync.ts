@@ -250,7 +250,6 @@ export class SyncApi {
             ]);
         });
 
-        // TODO: Should we just move this to `room.ts`?
         room.currentState.on(RoomStateEvent.Marker, async function(
             markerEvent,
             { fromInitialState }: ISetStateOptions = {},
