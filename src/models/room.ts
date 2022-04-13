@@ -1523,7 +1523,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                     });
                     if (filterType !== ThreadFilterType.My || currentUserParticipated) {
                         timelineSet.getLiveTimeline().addEvent(thread.rootEvent, {
-                            atStart: false,
+                            toStartOfTimeline: false,
                         });
                     }
                 });

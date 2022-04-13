@@ -3240,7 +3240,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     private onTimelineEvent = (
         event: MatrixEvent,
         room: Room,
-        atStart: boolean,
+        toStartOfTimeline: boolean,
         removed: boolean,
         { liveEvent = true } = {},
     ): void => {

@@ -639,7 +639,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     ) {
         const eventId = event.getId();
         timeline.addEvent(event, {
-            atStart: toStartOfTimeline,
+            toStartOfTimeline,
             roomState,
             fromInitialState,
         });

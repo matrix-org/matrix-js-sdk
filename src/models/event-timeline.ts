@@ -31,8 +31,15 @@ export enum Direction {
 }
 
 export interface IAddEventOptions {
-    atStart: boolean;
+    /** Whether to insert the new event at the start of the timeline */
+    toStartOfTimeline: boolean;
+    /** The state events to reconcile metadata from */
     roomState?: RoomState;
+    /** Whether the state is part of the first state snapshot we're seeing in
+     *  the room. This could be happen in a variety of cases:
+     *  1. From the initial sync
+     *  2. It's the first state we're seeing after joining the room
+     *  3. Or whether it's coming from `syncFromCache` */
     fromInitialState?: boolean;
 }
 
@@ -360,19 +367,19 @@ export class EventTimeline {
     public addEvent(
         event: MatrixEvent,
         {
-            atStart,
+            toStartOfTimeline,
             roomState,
             fromInitialState,
         }: IAddEventOptions,
     ): void {
         if (!roomState) {
-            roomState = atStart ? this.startState : this.endState;
+            roomState = toStartOfTimeline ? this.startState : this.endState;
         }
 
         const timelineSet = this.getTimelineSet();
 
         if (timelineSet.room) {
-            EventTimeline.setEventMetadata(event, roomState, atStart);
+            EventTimeline.setEventMetadata(event, roomState, toStartOfTimeline);
 
             // modify state but only on unfiltered timelineSets
             if (
@@ -392,22 +399,22 @@ export class EventTimeline {
                 // back in time, else we'll set the .sender value for BEFORE the given
                 // member event, whereas we want to set the .sender value for the ACTUAL
                 // member event itself.
-                if (!event.sender || (event.getType() === "m.room.member" && !atStart)) {
-                    EventTimeline.setEventMetadata(event, roomState, atStart);
+                if (!event.sender || (event.getType() === "m.room.member" && !toStartOfTimeline)) {
+                    EventTimeline.setEventMetadata(event, roomState, toStartOfTimeline);
                 }
             }
         }
 
         let insertIndex;
 
-        if (atStart) {
+        if (toStartOfTimeline) {
             insertIndex = 0;
         } else {
             insertIndex = this.events.length;
         }
 
         this.events.splice(insertIndex, 0, event); // insert element
-        if (atStart) {
+        if (toStartOfTimeline) {
             this.baseIndex++;
         }
     }
