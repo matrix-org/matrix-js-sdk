@@ -42,7 +42,7 @@ function addEventsToTimeline(timeline, numEvents, toStartOfTimeline) {
                 room: ROOM_ID, user: USER_ID,
                 event: true,
             }), {
-                toStartOfTimeline
+                toStartOfTimeline,
             },
         );
     }

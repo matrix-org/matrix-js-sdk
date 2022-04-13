@@ -262,22 +262,46 @@ export class SyncApi {
             //  2. If we're re-hydrating from `syncFromCache` because we already
             //     processed any marker event state that was in the cache
             if (fromInitialState) {
-                console.log('fromInitialState ignoring');
+                logger.debug(
+                    `MarkerState: Ignoring markerEventId=${markerEvent.getId()} in roomId=${room.roomId} ` +
+                    `because it's from initial state.`,
+                );
                 return;
             }
 
-            const isValidMsc2716Event = MSC2716_ROOM_VERSIONS.includes(room.getVersion()) ||
-                // MSC2716 is supported in all existing room versions but special
-                // meaning should only be given to "insertion", "batch", and
-                // "marker" events when they come from the room creator
+            const isValidMsc2716Event =
+                // Check whether the room version directly supports MSC2716, in
+                // which case, "marker" events are already auth'ed by
+                // power_levels
+                MSC2716_ROOM_VERSIONS.includes(room.getVersion()) ||
+                // MSC2716 is also supported in all existing room versions but
+                // special meaning should only be given to "insertion", "batch",
+                // and "marker" events when they come from the room creator
                 markerEvent.getSender() === room.getRoomCreator();
-            console.log(`On marker state isValidMsc2716Event=${isValidMsc2716Event}, event_id=${markerEvent.getId()} room.getLastMarkerEventIdProcessed()=${room.getLastMarkerEventIdProcessed()}`);
+
+            if (!isValidMsc2716Event) {
+                logger.debug(
+                    `MarkerState: Ignoring markerEventId=${markerEvent.getId()} in roomId=${room.roomId} because ` +
+                    `MSC2716 is not supported in the room version or for any room version, the marker wasn't sent ` +
+                    `by the room creator.`,
+                );
+            }
+
+            // Don't process a marker event multiple times; we only need to
+            // throw the timeline away once, when we see a marker. All of the
+            // historical content will be in the `/messsages` responses from
+            // here on out.
+            const markerAlreadyProcessed = markerEvent.getId() === room.getLastMarkerEventIdProcessed();
+            if (markerAlreadyProcessed) {
+                logger.debug(
+                    `MarkerState: Ignoring markerEventId=${markerEvent.getId()} in roomId=${room.roomId} because ` +
+                    `it has already been processed.`,
+                );
+            }
+
             if (
                 isValidMsc2716Event &&
-                // We only need to throw the timeline away once, when we see a
-                // marker. All of the historical content will be in the
-                // `/messsages` responses from here on out.
-                markerEvent.getId() !== room.getLastMarkerEventIdProcessed()
+                !markerAlreadyProcessed
             ) {
                 // Saw new marker event, let's let the clients know they should
                 // refresh the timeline.
@@ -288,8 +312,14 @@ export class SyncApi {
                 // was imported and whether we have it locally? Because we only
                 // need to refresh the timeline if the timeline includes the
                 // prev_events of the base insertion event.
+                const originalStackTraceLimit = Error.stackTraceLimit;
                 Error.stackTraceLimit = Infinity;
-                console.log(`Saw new marker event roomId=${room.roomId}`, new Error().stack);
+                logger.debug(
+                    `MarkerState: Timeline needs to be refreshed because ` +
+                    `a new markerEventId=${markerEvent.getId()} was sent in roomId=${room.roomId}`,
+                    new Error().stack,
+                );
+                Error.stackTraceLimit = originalStackTraceLimit;
                 room.setTimelineNeedsRefresh(true);
                 room.emit(RoomEvent.historyImportedWithinTimeline, markerEvent, room);
                 room.setLastMarkerEventIdProcessed(markerEvent.getId());
