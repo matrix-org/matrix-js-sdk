@@ -22,8 +22,8 @@ import { EventTimelineSet, DuplicateStrategy } from "./event-timeline-set";
 import { Direction, EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
-import { normalize } from "../utils";
-import { IEvent, IThreadBundledRelationship, MatrixEvent } from "./event";
+import { defer, normalize } from "../utils";
+import { IEvent, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent, MatrixEventHandlerMap } from "./event";
 import { EventStatus } from "./event-status";
 import { RoomMember } from "./room-member";
 import { IRoomSummary, RoomSummary } from "./room-summary";
@@ -163,9 +163,9 @@ export enum RoomEvent {
     Redaction = "Room.redaction",
     RedactionCancelled = "Room.redactionCancelled",
     LocalEchoUpdated = "Room.localEchoUpdated",
-    historyImportedWithinTimeline = "Room.historyImportedWithinTimeline",
     Timeline = "Room.timeline",
     TimelineReset = "Room.timelineReset",
+    historyImportedWithinTimeline = "Room.historyImportedWithinTimeline",
 }
 
 type EmittedEvents = RoomEvent
@@ -173,7 +173,9 @@ type EmittedEvents = RoomEvent
     | ThreadEvent.Update
     | ThreadEvent.NewReply
     | RoomEvent.Timeline
-    | RoomEvent.TimelineReset;
+    | RoomEvent.TimelineReset
+    | RoomEvent.historyImportedWithinTimeline
+    | MatrixEventEvent.BeforeRedaction;
 
 export type RoomEventHandlerMap = {
     [RoomEvent.MyMembership]: (room: Room, membership: string, prevMembership?: string) => void;
@@ -194,10 +196,10 @@ export type RoomEventHandlerMap = {
         room: Room,
     ) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
-} & ThreadHandlerMap;
+} & ThreadHandlerMap & MatrixEventHandlerMap;
 
 export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> {
-    private readonly reEmitter: TypedReEmitter<EmittedEvents, RoomEventHandlerMap>;
+    public readonly reEmitter: TypedReEmitter<EmittedEvents, RoomEventHandlerMap>;
     private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
     // receipts should clobber based on receipt_type and user_id pairs hence
     // the form of this structure. This is sub-optimal for the exposed APIs
@@ -210,7 +212,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
     private readonly filteredTimelineSets: Record<string, EventTimelineSet> = {}; // filter_id: timelineSet
-    private timelineNeedsRefresh = false;
+    private timelineNeedsRefresh: boolean = false;
     private lastMarkerEventIdProcessed: string = null;
     private readonly pendingEventList?: MatrixEvent[];
     // read by megolm via getter; boolean value - null indicates "use global value"
@@ -221,6 +223,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     private getTypeWarning = false;
     private getVersionWarning = false;
     private membersPromise?: Promise<boolean>;
+    // Map from threadId to pending Thread instance created by createThreadFetchRoot
+    private threadPromises = new Map<string, Promise<Thread>>();
 
     // XXX: These should be read-only
     /**
@@ -389,7 +393,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             return this.threadTimelineSetsPromise;
         }
 
-        if (this.client?.supportsExperimentalThreads) {
+        if (this.client?.supportsExperimentalThreads()) {
             try {
                 this.threadTimelineSetsPromise = Promise.all([
                     this.createThreadTimelineSet(),
@@ -1625,6 +1629,13 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         shouldLiveInThread: boolean;
         threadId?: string;
     } {
+        if (!this.client.supportsExperimentalThreads()) {
+            return {
+                shouldLiveInRoom: true,
+                shouldLiveInThread: false,
+            };
+        }
+
         // A thread root is always shown in both timelines
         if (event.isThreadRoot || roots?.has(event.getId())) {
             return {
@@ -1639,7 +1650,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             return {
                 shouldLiveInRoom: false,
                 shouldLiveInThread: true,
-                threadId: event.relationEventId,
+                threadId: event.threadRootId,
             };
         }
 
@@ -1688,21 +1699,23 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         threadId: string,
         events?: MatrixEvent[],
         toStartOfTimeline?: boolean,
-    ): Promise<Thread> {
+    ): Promise<Thread | null> {
         let thread = this.getThread(threadId);
 
         if (!thread) {
+            const deferred = defer<Thread | null>();
+            this.threadPromises.set(threadId, deferred.promise);
+
             let rootEvent = this.findEventById(threadId);
             // If the rootEvent does not exist in the local stores, then fetch it from the server.
             try {
                 const eventData = await this.client.fetchRoomEvent(this.roomId, threadId);
-
-                if (!rootEvent) {
-                    rootEvent = new MatrixEvent(eventData);
-                } else {
-                    rootEvent.setUnsigned(eventData.unsigned);
-                }
+                const mapper = this.client.getEventMapper();
+                rootEvent = mapper(eventData); // will merge with existing event object if such is known
+            } catch (e) {
+                logger.error("Failed to fetch thread root to construct thread with", e);
             } finally {
+                this.threadPromises.delete(threadId);
                 // The root event might be not be visible to the person requesting it.
                 // If it wasn't fetched successfully the thread will work in "limited" mode and won't
                 // benefit from all the APIs a homeserver can provide to enhance the thread experience
@@ -1710,26 +1723,53 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 if (thread) {
                     rootEvent.setThread(thread);
                 }
+                deferred.resolve(thread);
             }
         }
 
         return thread;
     }
 
-    /**
-     * Add an event to a thread's timeline. Will fire "Thread.update"
-     * @experimental
-     */
-    public async addThreadedEvent(event: MatrixEvent, toStartOfTimeline: boolean): Promise<void> {
-        this.applyRedaction(event);
-        let thread = this.findThreadForEvent(event);
-        if (thread) {
-            await thread.addEvent(event, toStartOfTimeline);
-        } else {
-            thread = await this.createThreadFetchRoot(event.threadRootId, [event], toStartOfTimeline);
+    private async addThreadedEvents(events: MatrixEvent[], threadId: string, toStartOfTimeline = false): Promise<void> {
+        let thread = this.getThread(threadId);
+        if (this.threadPromises.has(threadId)) {
+            thread = await this.threadPromises.get(threadId);
         }
 
-        this.emit(ThreadEvent.Update, thread);
+        events = events.filter(e => e.getId() !== threadId); // filter out any root events
+
+        if (thread) {
+            for (const event of events) {
+                await thread.addEvent(event, toStartOfTimeline);
+            }
+        } else {
+            thread = await this.createThreadFetchRoot(threadId, events, toStartOfTimeline);
+        }
+
+        if (thread) {
+            this.emit(ThreadEvent.Update, thread);
+        }
+    }
+
+    /**
+     * Adds events to a thread's timeline. Will fire "Thread.update"
+     * @experimental
+     */
+    public async processThreadedEvents(events: MatrixEvent[], toStartOfTimeline: boolean): Promise<unknown> {
+        events.forEach(this.applyRedaction);
+
+        const eventsByThread: { [threadId: string]: MatrixEvent[] } = {};
+        for (const event of events) {
+            const { threadId } = this.eventShouldLiveIn(event);
+            if (!eventsByThread[threadId]) {
+                eventsByThread[threadId] = [];
+            }
+            eventsByThread[threadId].push(event);
+        }
+
+        return Promise.all(Object.entries(eventsByThread).map(([threadId, events]) => (
+            this.addThreadedEvents(events, threadId, toStartOfTimeline)
+        )));
     }
 
     public createThread(
@@ -1775,7 +1815,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                             timelineSet.addEventToTimeline(
                                 thread.rootEvent,
                                 timelineSet.getLiveTimeline(),
-                                {toStartOfTimeline}
+                                {toStartOfTimeline},
                             );
                         }
                     }
@@ -1786,7 +1826,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
     }
 
-    private applyRedaction(event: MatrixEvent): void {
+    private applyRedaction = (event: MatrixEvent): void => {
         if (event.isRedaction()) {
             const redactId = event.event.redacts;
 
@@ -1796,7 +1836,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 redactedEvent.makeRedacted(event);
 
                 // If this is in the current state, replace it with the redacted version
-                if (redactedEvent.getStateKey()) {
+                if (redactedEvent.isState()) {
                     const currentStateEvent = this.currentState.getStateEvents(
                         redactedEvent.getType(),
                         redactedEvent.getStateKey(),
@@ -1830,17 +1870,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             // clients can say "so and so redacted an event" if they wish to. Also
             // this may be needed to trigger an update.
         }
-    }
+    };
 
-    /**
-     * Add an event to the end of this room's live timelines. Will fire
-     * "Room.timeline".
-     *
-     * @param {MatrixEvent} event Event to be added
-     * @param {IAddLiveEventOptions} options addLiveEvent options
-     * @private
-     */
-    private addLiveEvent(event: MatrixEvent, addLiveEventOptions: IAddLiveEventOptions = {}): void {
+    private processLiveEvent(event: MatrixEvent): void {
         this.applyRedaction(event);
 
         // Implement MSC3531: hiding messages.
@@ -1857,10 +1889,20 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             if (existingEvent) {
                 // remote echo of an event we sent earlier
                 this.handleRemoteEcho(event, existingEvent);
-                return;
             }
         }
+    }
 
+    /**
+     * Add an event to the end of this room's live timelines. Will fire
+     * "Room.timeline".
+     *
+     * @param {MatrixEvent} event Event to be added
+     * @param {IAddLiveEventOptions} options addLiveEvent options
+     * @fires module:client~MatrixClient#event:"Room.timeline"
+     * @private
+     */
+    private addLiveEvent(event: MatrixEvent, addLiveEventOptions: IAddLiveEventOptions = {}): void {
         // add to our timeline sets
         for (let i = 0; i < this.timelineSets.length; i++) {
             this.timelineSets[i].addLiveEvent(event, addLiveEventOptions);
@@ -1950,13 +1992,13 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                     if (timelineSet.getFilter().filterRoomTimeline([event]).length) {
                         timelineSet.addEventToTimeline(event,
                             timelineSet.getLiveTimeline(), {
-                                toStartOfTimeline: false
+                                toStartOfTimeline: false,
                             });
                     }
                 } else {
                     timelineSet.addEventToTimeline(event,
                         timelineSet.getLiveTimeline(), {
-                            toStartOfTimeline: false
+                            toStartOfTimeline: false,
                         });
                 }
             }
@@ -2058,10 +2100,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         const newEventId = remoteEvent.getId();
         const oldStatus = localEvent.status;
 
-        logger.debug(
-            `Got remote echo for event ${oldEventId} -> ${newEventId} ` +
-            `old status ${oldStatus}`,
-        );
+        logger.debug(`Got remote echo for event ${oldEventId} -> ${newEventId} old status ${oldStatus}`);
 
         // no longer pending
         delete this.txnToEvent[remoteEvent.getUnsigned().transaction_id];
@@ -2198,7 +2237,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      *
      * @param {MatrixEvent[]} events A list of events to add.
      * @param {IAddLiveEventOptions} options addLiveEvent options
-     *
      * @throws If <code>duplicateStrategy</code> is not falsey, 'replace' or 'ignore'.
      */
     public addLiveEvents(events: MatrixEvent[], addLiveEventOptions: IAddLiveEventOptions = {}): void {
@@ -2221,10 +2259,84 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             }
         }
 
+        const threadRoots = this.findThreadRoots(events);
+        const threadInfos = events.map(e => this.eventShouldLiveIn(e, events, threadRoots));
+        const eventsByThread: { [threadId: string]: MatrixEvent[] } = {};
+
         for (let i = 0; i < events.length; i++) {
             // TODO: We should have a filter to say "only add state event types X Y Z to the timeline".
-            this.addLiveEvent(events[i], addLiveEventOptions);
+            this.processLiveEvent(events[i]);
+
+            const {
+                shouldLiveInRoom,
+                shouldLiveInThread,
+                threadId,
+            } = threadInfos[i];
+
+            if (shouldLiveInThread) {
+                if (!eventsByThread[threadId]) {
+                    eventsByThread[threadId] = [];
+                }
+                eventsByThread[threadId].push(events[i]);
+            }
+
+            if (shouldLiveInRoom) {
+                this.addLiveEvent(events[i], addLiveEventOptions);
+            }
         }
+
+        Object.entries(eventsByThread).forEach(([threadId, threadEvents]) => {
+            this.addThreadedEvents(threadEvents, threadId, false);
+        });
+    }
+
+    public partitionThreadedEvents(events: MatrixEvent[]): [
+        timelineEvents: MatrixEvent[],
+        threadedEvents: MatrixEvent[],
+    ] {
+        // Indices to the events array, for readability
+        const ROOM = 0;
+        const THREAD = 1;
+        if (this.client.supportsExperimentalThreads()) {
+            const threadRoots = this.findThreadRoots(events);
+            return events.reduce((memo, event: MatrixEvent) => {
+                const {
+                    shouldLiveInRoom,
+                    shouldLiveInThread,
+                    threadId,
+                } = this.eventShouldLiveIn(event, events, threadRoots);
+
+                if (shouldLiveInRoom) {
+                    memo[ROOM].push(event);
+                }
+
+                if (shouldLiveInThread) {
+                    event.setThreadId(threadId);
+                    memo[THREAD].push(event);
+                }
+
+                return memo;
+            }, [[], []]);
+        } else {
+            // When `experimentalThreadSupport` is disabled treat all events as timelineEvents
+            return [
+                events,
+                [],
+            ];
+        }
+    }
+
+    /**
+     * Given some events, find the IDs of all the thread roots that are referred to by them.
+     */
+    private findThreadRoots(events: MatrixEvent[]): Set<string> {
+        const threadRoots = new Set<string>();
+        for (const event of events) {
+            if (event.isThreadRelation) {
+                threadRoots.add(event.relationEventId);
+            }
+        }
+        return threadRoots;
     }
 
     /**
@@ -2282,22 +2394,27 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         // set fake stripped state events if this is an invite room so logic remains
         // consistent elsewhere.
         const membershipEvent = this.currentState.getStateEvents(EventType.RoomMember, this.myUserId);
-        if (membershipEvent && membershipEvent.getContent().membership === "invite") {
-            const strippedStateEvents = membershipEvent.getUnsigned().invite_room_state || [];
-            strippedStateEvents.forEach((strippedEvent) => {
-                const existingEvent = this.currentState.getStateEvents(strippedEvent.type, strippedEvent.state_key);
-                if (!existingEvent) {
-                    // set the fake stripped event instead
-                    this.currentState.setStateEvents([new MatrixEvent({
-                        type: strippedEvent.type,
-                        state_key: strippedEvent.state_key,
-                        content: strippedEvent.content,
-                        event_id: "$fake" + Date.now(),
-                        room_id: this.roomId,
-                        user_id: this.myUserId, // technically a lie
-                    })]);
-                }
-            });
+        if (membershipEvent) {
+            const membership = membershipEvent.getContent().membership;
+            this.updateMyMembership(membership);
+
+            if (membership === "invite") {
+                const strippedStateEvents = membershipEvent.getUnsigned().invite_room_state || [];
+                strippedStateEvents.forEach((strippedEvent) => {
+                    const existingEvent = this.currentState.getStateEvents(strippedEvent.type, strippedEvent.state_key);
+                    if (!existingEvent) {
+                        // set the fake stripped event instead
+                        this.currentState.setStateEvents([new MatrixEvent({
+                            type: strippedEvent.type,
+                            state_key: strippedEvent.state_key,
+                            content: strippedEvent.content,
+                            event_id: "$fake" + Date.now(),
+                            room_id: this.roomId,
+                            user_id: this.myUserId, // technically a lie
+                        })]);
+                    }
+                });
+            }
         }
 
         const oldName = this.name;
@@ -2644,6 +2761,14 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     public isCallRoom(): boolean {
         return this.getType() === RoomType.UnstableCall;
+    }
+
+    /**
+     * Returns whether the room is a video room.
+     * @returns {boolean} true if the room's type is RoomType.ElementVideo
+     */
+    public isElementVideoRoom(): boolean {
+        return this.getType() === RoomType.ElementVideo;
     }
 
     /**

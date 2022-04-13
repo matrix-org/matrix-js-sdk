@@ -115,6 +115,7 @@ export const RoomCreateTypeField = "type";
 export enum RoomType {
     Space = "m.space",
     UnstableCall = "org.matrix.msc3417.call",
+    ElementVideo = "io.element.video",
 }
 
 /**
