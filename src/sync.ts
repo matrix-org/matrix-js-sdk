@@ -250,6 +250,11 @@ export class SyncApi {
             ]);
         });
 
+        // When we see the marker state change in the room, we know there is
+        // some new historical messages imported by MSC2716 `/batch_send`
+        // somewhere in the room and we need to throw away the timeline to make
+        // sure the historical messages are shown when we paginate `/messages`
+        // again.
         room.currentState.on(RoomStateEvent.Marker, async function(
             markerEvent,
             { fromInitialState }: ISetStateOptions = {},
@@ -298,19 +303,24 @@ export class SyncApi {
                 );
             }
 
+            // It would be nice if we could also specifically tell whether the
+            // historical messages actually affected the locally cached client
+            // timeline or not. The problem is we can't see the prev_events of
+            // the base insertion event that the marker was pointing to because
+            // prev_events aren't available in the client API's. In most cases,
+            // the history won't be in people's locally cached timelines in the
+            // client, so we don't need to bother everyone about refreshing
+            // their timeline. This works for a v1 though and there are use
+            // cases like initially bootstrapping your bridged room where people
+            // are likely to encounter the historical messages affecting their
+            // current timeline (think someone signing up for Beeper and
+            // importing their Whatsapp history).
             if (
                 isValidMsc2716Event &&
                 !markerAlreadyProcessed
             ) {
                 // Saw new marker event, let's let the clients know they should
                 // refresh the timeline.
-                //
-                // It would be nice if we could lookup the base insertion event
-                // that the marker event was pointing to because we really only
-                // need to refresh the timeline if the timeline includes the
-                // prev_events of the base insertion event and won't re-request
-                // `/messages` over that range in the timeline. But the problem
-                // is we can't see prev_events from the client API.
                 logger.debug(
                     `MarkerState: Timeline needs to be refreshed because ` +
                     `a new markerEventId=${markerEvent.getId()} was sent in roomId=${room.roomId}`,
