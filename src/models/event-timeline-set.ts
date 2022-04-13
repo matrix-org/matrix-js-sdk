@@ -57,9 +57,22 @@ export interface IRoomTimelineData {
 }
 
 export interface IAddLiveEventOptions {
+    /** Applies to events in the timeline only. If this is 'replace' then if a
+     * duplicate is encountered, the event passed to this function will replace
+     * the existing event in the timeline. If this is not specified, or is
+     * 'ignore', then the event passed to this function will be ignored
+     * entirely, preserving the existing event in the timeline. Events are
+     * identical based on their event ID <b>only</b>. */
     duplicateStrategy?: DuplicateStrategy;
+    /** Whether the sync response came from cache */
     fromCache?: boolean;
+    /** The state events to reconcile metadata from */
     roomState?: RoomState;
+    /** Whether the state is part of the first state snapshot we're seeing in
+     *  the room. This could be happen in a variety of cases:
+     *  1. From the initial sync
+     *  2. It's the first state we're seeing after joining the room
+     *  3. Or whether it's coming from `syncFromCache` */
     fromInitialState?: boolean;
 }
 
@@ -67,6 +80,11 @@ export interface IAddEventToTimelineOptions {
     toStartOfTimeline: boolean;
     fromCache?: boolean;
     roomState?: RoomState;
+    /** Whether the state is part of the first state snapshot we're seeing in
+     *  the room. This could be happen in a variety of cases:
+     *  1. From the initial sync
+     *  2. It's the first state we're seeing after joining the room
+     *  3. Or whether it's coming from `syncFromCache` */
     fromInitialState?: boolean;
 }
 
@@ -539,9 +557,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * Add an event to the end of this live timeline.
      *
      * @param {MatrixEvent} event Event to be added
-     * @param {string?} duplicateStrategy 'ignore' or 'replace'
-     * @param {boolean} fromCache whether the sync response came from cache
-     * @param roomState the state events to reconcile metadata from
+     * @param {IAddLiveEventOptions} options addLiveEvent options
      */
     public addLiveEvent(
         event: MatrixEvent,
@@ -605,8 +621,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      *
      * @param {MatrixEvent} event
      * @param {EventTimeline} timeline
-     * @param {boolean} toStartOfTimeline
-     * @param {boolean} fromCache whether the sync response came from cache
+     * @param {IAddEventToTimelineOptions} options addEventToTimeline options
      *
      * @fires module:client~MatrixClient#event:"Room.timeline"
      */

@@ -355,7 +355,7 @@ export class EventTimeline {
      * Add a new event to the timeline, and update the state
      *
      * @param {MatrixEvent} event   new event
-     * @param {boolean}  atStart     true to insert new event at the start
+     * @param {IAddEventOptions} options addEvent options
      */
     public addEvent(
         event: MatrixEvent,

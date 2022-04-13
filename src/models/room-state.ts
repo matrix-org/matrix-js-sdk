@@ -37,6 +37,11 @@ enum OobStatus {
 }
 
 export interface ISetStateOptions {
+    /** Whether the state is part of the first state snapshot we're seeing in
+     *  the room. This could be happen in a variety of cases:
+     *  1. From the initial sync
+     *  2. It's the first state we're seeing after joining the room
+     *  3. Or whether it's coming from `syncFromCache` */
     fromInitialState?: boolean;
 }
 

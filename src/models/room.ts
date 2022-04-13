@@ -1519,7 +1519,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                     });
                     if (filterType !== ThreadFilterType.My || currentUserParticipated) {
                         timelineSet.getLiveTimeline().addEvent(thread.rootEvent, {
-                            atStart: false
+                            atStart: false,
                         });
                     }
                 });
@@ -1837,9 +1837,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * "Room.timeline".
      *
      * @param {MatrixEvent} event Event to be added
-     * @param {string?} duplicateStrategy 'ignore' or 'replace'
-     * @param {boolean} fromCache whether the sync response came from cache
-     * @fires module:client~MatrixClient#event:"Room.timeline"
+     * @param {IAddLiveEventOptions} options addLiveEvent options
      * @private
      */
     private addLiveEvent(event: MatrixEvent, addLiveEventOptions: IAddLiveEventOptions = {}): void {
@@ -2199,15 +2197,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * they will go to the end of the timeline.
      *
      * @param {MatrixEvent[]} events A list of events to add.
+     * @param {IAddLiveEventOptions} options addLiveEvent options
      *
-     * @param {string} duplicateStrategy Optional. Applies to events in the
-     * timeline only. If this is 'replace' then if a duplicate is encountered, the
-     * event passed to this function will replace the existing event in the
-     * timeline. If this is not specified, or is 'ignore', then the event passed to
-     * this function will be ignored entirely, preserving the existing event in the
-     * timeline. Events are identical based on their event ID <b>only</b>.
-     *
-     * @param {boolean} fromCache whether the sync response came from cache
      * @throws If <code>duplicateStrategy</code> is not falsey, 'replace' or 'ignore'.
      */
     public addLiveEvents(events: MatrixEvent[], addLiveEventOptions: IAddLiveEventOptions = {}): void {
