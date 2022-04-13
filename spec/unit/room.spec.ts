@@ -52,7 +52,7 @@ describe("Room", function() {
         event: true,
         user: userA,
         room: roomId,
-    }) as MatrixEvent;
+    }, room.client) as MatrixEvent;
 
     const mkReply = (target: MatrixEvent) => utils.mkEvent({
         event: true,
@@ -67,7 +67,7 @@ describe("Room", function() {
                 },
             },
         },
-    }) as MatrixEvent;
+    }, room.client) as MatrixEvent;
 
     const mkEdit = (target: MatrixEvent, salt = Math.random()) => utils.mkEvent({
         event: true,
@@ -84,7 +84,7 @@ describe("Room", function() {
                 event_id: target.getId(),
             },
         },
-    }) as MatrixEvent;
+    }, room.client) as MatrixEvent;
 
     const mkThreadResponse = (root: MatrixEvent) => utils.mkEvent({
         event: true,
@@ -101,7 +101,7 @@ describe("Room", function() {
                 "rel_type": "m.thread",
             },
         },
-    }) as MatrixEvent;
+    }, room.client) as MatrixEvent;
 
     const mkReaction = (target: MatrixEvent) => utils.mkEvent({
         event: true,
@@ -115,7 +115,7 @@ describe("Room", function() {
                 "key": Math.random().toString(),
             },
         },
-    }) as MatrixEvent;
+    }, room.client) as MatrixEvent;
 
     const mkRedaction = (target: MatrixEvent) => utils.mkEvent({
         event: true,
@@ -124,7 +124,7 @@ describe("Room", function() {
         room: roomId,
         redacts: target.getId(),
         content: {},
-    }) as MatrixEvent;
+    }, room.client) as MatrixEvent;
 
     beforeEach(function() {
         room = new Room(roomId, new TestClient(userA, "device").client, userA);
@@ -1901,6 +1901,7 @@ describe("Room", function() {
                 "@alice:example.com", "alicedevice",
             )).client;
             room = new Room(roomId, client, userA);
+            client.getRoom = () => room;
         });
 
         it("allow create threads without a root event", function() {
@@ -1940,11 +1941,7 @@ describe("Room", function() {
         });
 
         it("Edits update the lastReply event", async () => {
-            const client = (new TestClient(
-                "@alice:example.com", "alicedevice",
-            )).client;
-            client.supportsExperimentalThreads = () => true;
-            room = new Room(roomId, client, userA);
+            room.client.supportsExperimentalThreads = () => true;
 
             const randomMessage = mkMessage();
             const threadRoot = mkMessage();
@@ -1953,7 +1950,7 @@ describe("Room", function() {
             const threadResponseEdit = mkEdit(threadResponse);
             threadResponseEdit.localTimestamp += 2000;
 
-            client.fetchRoomEvent = (eventId: string) => Promise.resolve({
+            room.client.fetchRoomEvent = (eventId: string) => Promise.resolve({
                 ...threadRoot.event,
                 unsigned: {
                     "age": 123,
@@ -1976,6 +1973,121 @@ describe("Room", function() {
             room.addLiveEvents([threadResponseEdit]);
             await emitPromise(thread, ThreadEvent.Update);
             expect(thread.replyToEvent.getContent().body).toBe(threadResponseEdit.getContent()["m.new_content"].body);
+        });
+
+        it("Redactions to thread responses decrement the length", async () => {
+            room.client.supportsExperimentalThreads = () => true;
+
+            const threadRoot = mkMessage();
+            const threadResponse1 = mkThreadResponse(threadRoot);
+            threadResponse1.localTimestamp += 1000;
+            const threadResponse2 = mkThreadResponse(threadRoot);
+            threadResponse2.localTimestamp += 2000;
+
+            room.client.fetchRoomEvent = (eventId: string) => Promise.resolve({
+                ...threadRoot.event,
+                unsigned: {
+                    "age": 123,
+                    "m.relations": {
+                        "m.thread": {
+                            latest_event: threadResponse2.event,
+                            count: 2,
+                            current_user_participated: true,
+                        },
+                    },
+                },
+            });
+
+            room.addLiveEvents([threadRoot, threadResponse1, threadResponse2]);
+            const thread = await emitPromise(room, ThreadEvent.New);
+
+            expect(thread).toHaveLength(2);
+            expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
+
+            const threadResponse1Redaction = mkRedaction(threadResponse1);
+            room.addLiveEvents([threadResponse1Redaction]);
+            await emitPromise(thread, ThreadEvent.Update);
+            expect(thread).toHaveLength(1);
+            expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
+        });
+
+        it("Redactions to reactions in threads do not decrement the length", async () => {
+            room.client.supportsExperimentalThreads = () => true;
+
+            const threadRoot = mkMessage();
+            const threadResponse1 = mkThreadResponse(threadRoot);
+            threadResponse1.localTimestamp += 1000;
+            const threadResponse2 = mkThreadResponse(threadRoot);
+            threadResponse2.localTimestamp += 2000;
+            const threadResponse2Reaction = mkReaction(threadResponse2);
+
+            room.client.fetchRoomEvent = (eventId: string) => Promise.resolve({
+                ...threadRoot.event,
+                unsigned: {
+                    "age": 123,
+                    "m.relations": {
+                        "m.thread": {
+                            latest_event: threadResponse2.event,
+                            count: 2,
+                            current_user_participated: true,
+                        },
+                    },
+                },
+            });
+
+            room.addLiveEvents([threadRoot, threadResponse1, threadResponse2, threadResponse2Reaction]);
+            const thread = await emitPromise(room, ThreadEvent.New);
+
+            expect(thread).toHaveLength(2);
+            expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
+
+            const threadResponse2ReactionRedaction = mkRedaction(threadResponse2Reaction);
+            room.addLiveEvents([threadResponse2ReactionRedaction]);
+            await emitPromise(thread, ThreadEvent.Update);
+            expect(thread).toHaveLength(2);
+            expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
+        });
+
+        it("Redacting the lastEvent finds a new lastEvent", async () => {
+            room.client.supportsExperimentalThreads = () => true;
+
+            const threadRoot = mkMessage();
+            const threadResponse1 = mkThreadResponse(threadRoot);
+            threadResponse1.localTimestamp += 1000;
+            const threadResponse2 = mkThreadResponse(threadRoot);
+            threadResponse2.localTimestamp += 2000;
+
+            room.client.fetchRoomEvent = (eventId: string) => Promise.resolve({
+                ...threadRoot.event,
+                unsigned: {
+                    "age": 123,
+                    "m.relations": {
+                        "m.thread": {
+                            latest_event: threadResponse2.event,
+                            count: 2,
+                            current_user_participated: true,
+                        },
+                    },
+                },
+            });
+
+            room.addLiveEvents([threadRoot, threadResponse1, threadResponse2]);
+            const thread = await emitPromise(room, ThreadEvent.New);
+
+            expect(thread).toHaveLength(2);
+            expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
+
+            const threadResponse2Redaction = mkRedaction(threadResponse2);
+            room.addLiveEvents([threadResponse2Redaction]);
+            await emitPromise(thread, ThreadEvent.Update);
+            expect(thread).toHaveLength(1);
+            expect(thread.replyToEvent.getId()).toBe(threadResponse1.getId());
+
+            const threadResponse1Redaction = mkRedaction(threadResponse1);
+            room.addLiveEvents([threadResponse1Redaction]);
+            await emitPromise(thread, ThreadEvent.Update);
+            expect(thread).toHaveLength(0);
+            expect(thread.replyToEvent.getId()).toBe(threadRoot.getId());
         });
     });
 

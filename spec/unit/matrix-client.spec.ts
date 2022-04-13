@@ -817,6 +817,9 @@ describe("MatrixClient", function() {
             },
             addPendingEvent: jest.fn(),
             updatePendingEvent: jest.fn(),
+            reEmitter: {
+                reEmit: jest.fn(),
+            },
         };
 
         beforeEach(() => {
@@ -1095,6 +1098,59 @@ describe("MatrixClient", function() {
                 client.processBeaconEvents(room, [messageEvent, beaconEvent]);
                 expect(roomStateProcessSpy).toHaveBeenCalledWith([beaconEvent]);
             });
+        });
+    });
+
+    describe("setPassword", () => {
+        const auth = { session: 'abcdef', type: 'foo' };
+        const newPassword = 'newpassword';
+        const callback = () => {};
+
+        const passwordTest = (expectedRequestContent: any, expectedCallback?: Function) => {
+            const [callback, method, path, queryParams, requestContent] = client.http.authedRequest.mock.calls[0];
+            if (expectedCallback) {
+                expect(callback).toBe(expectedCallback);
+            } else {
+                expect(callback).toBeFalsy();
+            }
+            expect(method).toBe('POST');
+            expect(path).toEqual('/account/password');
+            expect(queryParams).toBeFalsy();
+            expect(requestContent).toEqual(expectedRequestContent);
+        };
+
+        beforeEach(() => {
+            client.http.authedRequest.mockClear().mockResolvedValue({});
+        });
+
+        it("no logout_devices specified", async () => {
+            await client.setPassword(auth, newPassword);
+            passwordTest({ auth, new_password: newPassword });
+        });
+
+        it("no logout_devices specified + callback", async () => {
+            await client.setPassword(auth, newPassword, callback);
+            passwordTest({ auth, new_password: newPassword }, callback);
+        });
+
+        it("overload logoutDevices=true", async () => {
+            await client.setPassword(auth, newPassword, true);
+            passwordTest({ auth, new_password: newPassword, logout_devices: true });
+        });
+
+        it("overload logoutDevices=true + callback", async () => {
+            await client.setPassword(auth, newPassword, true, callback);
+            passwordTest({ auth, new_password: newPassword, logout_devices: true }, callback);
+        });
+
+        it("overload logoutDevices=false", async () => {
+            await client.setPassword(auth, newPassword, false);
+            passwordTest({ auth, new_password: newPassword, logout_devices: false });
+        });
+
+        it("overload logoutDevices=false + callback", async () => {
+            await client.setPassword(auth, newPassword, false, callback);
+            passwordTest({ auth, new_password: newPassword, logout_devices: false }, callback);
         });
     });
 });
