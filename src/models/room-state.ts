@@ -514,15 +514,14 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     /**
      * @experimental
      * Check liveness of room beacons
-     * emit RoomStateEvent.BeaconLiveness when
-     * roomstate.hasLiveBeacons has changed
+     * emit RoomStateEvent.BeaconLiveness event
      */
     private onBeaconLivenessChange(): void {
         this._liveBeaconIds = Array.from(this.beacons.values())
             .filter(beacon => beacon.isLive)
             .map(beacon => beacon.identifier);
 
-            this.emit(RoomStateEvent.BeaconLiveness, this, this.hasLiveBeacons);
+        this.emit(RoomStateEvent.BeaconLiveness, this, this.hasLiveBeacons);
     }
 
     private getStateEventMatching(event: MatrixEvent): MatrixEvent | null {
