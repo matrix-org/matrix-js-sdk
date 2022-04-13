@@ -6598,8 +6598,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {Promise<boolean>} true if server supports the `logout_devices` parameter
      */
     public async doesServerSupportLogoutDevices(): Promise<boolean> {
-        const response = await this.getVersions();
-        return response?.versions?.includes("r0.6.1");
+        return this.isVersionSupported("r0.6.1");
     }
 
     /**
