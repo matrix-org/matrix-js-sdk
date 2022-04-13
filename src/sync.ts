@@ -1639,7 +1639,6 @@ export class SyncApi {
         // the given state events
         const liveTimeline = room.getLiveTimeline();
         const timelineWasEmpty = liveTimeline.getEvents().length == 0;
-        console.log('timelineWasEmpty', timelineWasEmpty)
         if (timelineWasEmpty) {
             // Passing these events into initialiseState will freeze them, so we need
             // to compute and cache the push actions for them now, otherwise sync dies
