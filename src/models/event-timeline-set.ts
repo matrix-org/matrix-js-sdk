@@ -641,7 +641,13 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         timeline.addEvent(event, {
             toStartOfTimeline,
             roomState,
-            fromInitialState,
+            // We don't want to refresh the timeline:
+            //  1. If it's persons first time syncing the room, they won't have
+            //     any old events cached to refresh. This could be from initial
+            //     sync or just the first time syncing the room since joining.
+            //  2. If we're re-hydrating from `syncFromCache` because we already
+            //     processed any marker event state that was in the cache
+            fromInitialState: fromInitialState || fromCache,
         });
         this._eventIdToTimeline[eventId] = timeline;
 

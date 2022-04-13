@@ -257,8 +257,9 @@ export class SyncApi {
         ) {
             // We don't want to refresh the timeline:
             //  1. If it's persons first time syncing the room, they won't have
-            //     any old events cached to refresh.
-            //  1. If we're re-hydrating from `syncFromCache` because we already
+            //     any old events cached to refresh. This could be from initial
+            //     sync or just the first time syncing the room since joining.
+            //  2. If we're re-hydrating from `syncFromCache` because we already
             //     processed any marker event state that was in the cache
             if (fromInitialState) {
                 console.log('fromInitialState ignoring');
@@ -287,7 +288,9 @@ export class SyncApi {
                 // was imported and whether we have it locally? Because we only
                 // need to refresh the timeline if the timeline includes the
                 // prev_events of the base insertion event.
-                console.log('Saw new marker event', new Error().stack);
+                Error.stackTraceLimit = Infinity;
+                console.log(`Saw new marker event roomId=${room.roomId}`, new Error().stack);
+                room.setTimelineNeedsRefresh(true);
                 room.emit(RoomEvent.historyImportedWithinTimeline, markerEvent, room);
                 room.setLastMarkerEventIdProcessed(markerEvent.getId());
             }
