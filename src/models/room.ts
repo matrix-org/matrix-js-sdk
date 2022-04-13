@@ -212,7 +212,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
     private readonly filteredTimelineSets: Record<string, EventTimelineSet> = {}; // filter_id: timelineSet
-    private timelineNeedsRefresh: boolean = false;
+    private timelineNeedsRefresh = false;
     private lastMarkerEventIdProcessed: string = null;
     private readonly pendingEventList?: MatrixEvent[];
     // read by megolm via getter; boolean value - null indicates "use global value"
@@ -1815,7 +1815,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                             timelineSet.addEventToTimeline(
                                 thread.rootEvent,
                                 timelineSet.getLiveTimeline(),
-                                {toStartOfTimeline},
+                                { toStartOfTimeline },
                             );
                         }
                     }

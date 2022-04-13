@@ -253,7 +253,7 @@ export class SyncApi {
         // TODO: Should we just move this to `room.ts`?
         room.currentState.on(RoomStateEvent.Marker, async function(
             markerEvent,
-            {fromInitialState}: ISetStateOptions = {},
+            { fromInitialState }: ISetStateOptions = {},
         ) {
             // We don't want to refresh the timeline:
             //  1. If it's persons first time syncing the room, they won't have
