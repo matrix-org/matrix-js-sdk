@@ -1,5 +1,6 @@
 import { MatrixEvent } from "../../src/models/event";
 import { EventTimeline } from "../../src/models/event-timeline";
+import { EventType } from "../../src/@types/event";
 import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 
@@ -460,6 +461,304 @@ describe("MatrixClient syncing", function() {
 
         xit("should update the room topic", function() {
 
+        });
+
+        describe("onMarkerStateEvent", () => {
+            const normalMessageEvent = utils.mkMessage({
+                room: roomOne, user: otherUserId, msg: "hello",
+            });
+
+            it('new marker event *NOT* from the room creator in a subsequent syncs ' +
+                'should *NOT* mark the timeline as needing a refresh', async () => {
+                const roomCreateEvent = utils.mkEvent({
+                    type: "m.room.create", room: roomOne, user: otherUserId,
+                    content: {
+                        creator: otherUserId,
+                        room_version: '9',
+                    },
+                });
+                const normalFirstSync = {
+                    next_batch: "batch_token",
+                    rooms: {
+                        join: {},
+                    },
+                };
+                normalFirstSync.rooms.join[roomOne] = {
+                    timeline: {
+                        events: [normalMessageEvent],
+                        prev_batch: "pagTok",
+                    },
+                    state: {
+                        events: [roomCreateEvent],
+                    },
+                };
+
+                const nextSyncData = {
+                    next_batch: "batch_token",
+                    rooms: {
+                        join: {},
+                    },
+                };
+                nextSyncData.rooms.join[roomOne] = {
+                    timeline: {
+                        events: [
+                            // In subsequent syncs, a marker event in timeline
+                            // range should normally trigger
+                            // `timelineNeedsRefresh=true` but this marker isn't
+                            // being sent by the room creator so it has no
+                            // special meaning in existing room versions.
+                            utils.mkEvent({
+                                type: EventType.Marker,
+                                room: roomOne,
+                                // The important part we're testing is here!
+                                // `userC` is not the room creator.
+                                user: userC,
+                                skey: "",
+                                content: {
+                                    "m.insertion_id": "$abc",
+                                },
+                            }),
+                        ],
+                        prev_batch: "pagTok",
+                    },
+                };
+
+                // Ensure the marker is being sent by someone who is not the room creator
+                // because this is the main thing we're testing in this spec.
+                const markerEvent = nextSyncData.rooms.join[roomOne].timeline.events[0];
+                expect(markerEvent.sender).toBeDefined();
+                expect(markerEvent.sender).not.toEqual(roomCreateEvent.sender);
+
+                httpBackend.when("GET", "/sync").respond(200, normalFirstSync);
+                httpBackend.when("GET", "/sync").respond(200, nextSyncData);
+
+                client.startClient();
+                await Promise.all([
+                    httpBackend.flushAllExpected(),
+                    awaitSyncEvent(2),
+                ]);
+
+                const room = client.getRoom(roomOne);
+                expect(room.getTimelineNeedsRefresh()).toEqual(false);
+            });
+
+            [{
+                label: 'In existing room versions (when the room creator sends the MSC2716 events)',
+                roomVersion: '9',
+            }, {
+                label: 'In a MSC2716 supported room version',
+                roomVersion: 'org.matrix.msc2716v3',
+            }].forEach((testMeta) => {
+                describe(testMeta.label, () => {
+                    const roomCreateEvent = utils.mkEvent({
+                        type: "m.room.create", room: roomOne, user: otherUserId,
+                        content: {
+                            creator: otherUserId,
+                            room_version: testMeta.roomVersion,
+                        },
+                    });
+
+                    const markerEventFromRoomCreator = utils.mkEvent({
+                        type: EventType.Marker, room: roomOne, user: otherUserId,
+                        skey: "",
+                        content: {
+                            "m.insertion_id": "$abc",
+                        },
+                    });
+
+                    const normalFirstSync = {
+                        next_batch: "batch_token",
+                        rooms: {
+                            join: {},
+                        },
+                    };
+                    normalFirstSync.rooms.join[roomOne] = {
+                        timeline: {
+                            events: [normalMessageEvent],
+                            prev_batch: "pagTok",
+                        },
+                        state: {
+                            events: [roomCreateEvent],
+                        },
+                    };
+
+                    it('no marker event in sync response '+
+                        'should *NOT* mark the timeline as needing a refresh (check for a sane default)', async () => {
+                        const syncData = {
+                            next_batch: "batch_token",
+                            rooms: {
+                                join: {},
+                            },
+                        };
+                        syncData.rooms.join[roomOne] = {
+                            timeline: {
+                                events: [normalMessageEvent],
+                                prev_batch: "pagTok",
+                            },
+                            state: {
+                                events: [roomCreateEvent],
+                            },
+                        };
+
+                        httpBackend.when("GET", "/sync").respond(200, syncData);
+
+                        client.startClient();
+                        await Promise.all([
+                            httpBackend.flushAllExpected(),
+                            awaitSyncEvent(),
+                        ]);
+
+                        const room = client.getRoom(roomOne);
+                        expect(room.getTimelineNeedsRefresh()).toEqual(false);
+                    });
+
+                    it('marker event already sent within timeline range when you join ' +
+                        'should *NOT* mark the timeline as needing a refresh (timelineWasEmpty)', async () => {
+                        const syncData = {
+                            next_batch: "batch_token",
+                            rooms: {
+                                join: {},
+                            },
+                        };
+                        syncData.rooms.join[roomOne] = {
+                            timeline: {
+                                events: [markerEventFromRoomCreator],
+                                prev_batch: "pagTok",
+                            },
+                            state: {
+                                events: [roomCreateEvent],
+                            },
+                        };
+
+                        httpBackend.when("GET", "/sync").respond(200, syncData);
+
+                        client.startClient();
+                        await Promise.all([
+                            httpBackend.flushAllExpected(),
+                            awaitSyncEvent(),
+                        ]);
+
+                        const room = client.getRoom(roomOne);
+                        expect(room.getTimelineNeedsRefresh()).toEqual(false);
+                    });
+
+                    it('marker event already sent before joining (in state) ' +
+                        'should *NOT* mark the timeline as needing a refresh (timelineWasEmpty)', async () => {
+                        const syncData = {
+                            next_batch: "batch_token",
+                            rooms: {
+                                join: {},
+                            },
+                        };
+                        syncData.rooms.join[roomOne] = {
+                            timeline: {
+                                events: [normalMessageEvent],
+                                prev_batch: "pagTok",
+                            },
+                            state: {
+                                events: [
+                                    roomCreateEvent,
+                                    markerEventFromRoomCreator,
+                                ],
+                            },
+                        };
+
+                        httpBackend.when("GET", "/sync").respond(200, syncData);
+
+                        client.startClient();
+                        await Promise.all([
+                            httpBackend.flushAllExpected(),
+                            awaitSyncEvent(),
+                        ]);
+
+                        const room = client.getRoom(roomOne);
+                        expect(room.getTimelineNeedsRefresh()).toEqual(false);
+                    });
+
+                    it('new marker event in a subsequent syncs timeline range ' +
+                        'should mark the timeline as needing a refresh', async () => {
+                        const nextSyncData = {
+                            next_batch: "batch_token",
+                            rooms: {
+                                join: {},
+                            },
+                        };
+                        nextSyncData.rooms.join[roomOne] = {
+                            timeline: {
+                                events: [
+                                    // In subsequent syncs, a marker event in timeline
+                                    // range should trigger `timelineNeedsRefresh=true`
+                                    markerEventFromRoomCreator,
+                                ],
+                                prev_batch: "pagTok",
+                            },
+                        };
+
+                        const markerEventId = nextSyncData.rooms.join[roomOne].timeline.events[0].event_id;
+
+                        let emitCount = 0;
+                        client.on("Room.historyImportedWithinTimeline", function(markerEvent, room) {
+                            expect(markerEvent.getId()).toEqual(markerEventId);
+                            expect(room.roomId).toEqual(roomOne);
+                            emitCount += 1;
+                        });
+
+                        httpBackend.when("GET", "/sync").respond(200, normalFirstSync);
+                        httpBackend.when("GET", "/sync").respond(200, nextSyncData);
+
+                        client.startClient();
+                        await Promise.all([
+                            httpBackend.flushAllExpected(),
+                            awaitSyncEvent(2),
+                        ]);
+
+                        const room = client.getRoom(roomOne);
+                        expect(room.getTimelineNeedsRefresh()).toEqual(true);
+                        // Make sure "Room.historyImportedWithinTimeline" was emitted
+                        expect(emitCount).toEqual(1);
+                        expect(room.getLastMarkerEventIdProcessed()).toEqual(markerEventId);
+                    });
+
+                    // Mimic a marker event being sent far back in the scroll back but since our last sync
+                    it('new marker event in sync state should mark the timeline as needing a refresh', async () => {
+                        const nextSyncData = {
+                            next_batch: "batch_token",
+                            rooms: {
+                                join: {},
+                            },
+                        };
+                        nextSyncData.rooms.join[roomOne] = {
+                            timeline: {
+                                events: [
+                                    utils.mkMessage({
+                                        room: roomOne, user: otherUserId, msg: "hello again",
+                                    }),
+                                ],
+                                prev_batch: "pagTok",
+                            },
+                            state: {
+                                events: [
+                                    // In subsequent syncs, a marker event in state
+                                    // should trigger `timelineNeedsRefresh=true`
+                                    markerEventFromRoomCreator,
+                                ],
+                            },
+                        };
+
+                        httpBackend.when("GET", "/sync").respond(200, normalFirstSync);
+                        httpBackend.when("GET", "/sync").respond(200, nextSyncData);
+
+                        client.startClient();
+                        await Promise.all([
+                            httpBackend.flushAllExpected(),
+                            awaitSyncEvent(2),
+                        ]);
+
+                        const room = client.getRoom(roomOne);
+                        expect(room.getTimelineNeedsRefresh()).toEqual(true);
+                    });
+                });
+            });
         });
     });
 

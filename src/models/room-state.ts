@@ -32,6 +32,15 @@ import { M_BEACON_INFO } from "../@types/beacon";
 import { getBeaconInfoIdentifier } from "./beacon";
 import { BeaconIdentifier } from "..";
 
+export interface IMarkerFoundOptions {
+    /** Whether the timeline was empty before the marker arrived in
+     *  the room. This could be happen in a variety of cases:
+     *  1. From the initial sync
+     *  2. It's the first state we're seeing after joining the room
+     *  3. Or whether it's coming from `syncFromCache` */
+    timelineWasEmpty?: boolean;
+}
+
 // possible statuses for out-of-band member loading
 enum OobStatus {
     NotStarted,
@@ -45,6 +54,7 @@ export enum RoomStateEvent {
     NewMember = "RoomState.newMember",
     Update = "RoomState.update", // signals batches of updates without specificity
     BeaconLiveness = "RoomState.BeaconLiveness",
+    Marker = "RoomState.Marker",
 }
 
 export type RoomStateEventHandlerMap = {
@@ -53,6 +63,7 @@ export type RoomStateEventHandlerMap = {
     [RoomStateEvent.NewMember]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
     [RoomStateEvent.Update]: (state: RoomState) => void;
     [RoomStateEvent.BeaconLiveness]: (state: RoomState, hasLiveBeacons: boolean) => void;
+    [RoomStateEvent.Marker]: (event: MatrixEvent, setStateOptions: IMarkerFoundOptions) => void;
     [BeaconEvent.New]: (event: MatrixEvent, beacon: Beacon) => void;
 };
 
@@ -312,16 +323,19 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     }
 
     /**
-     * Add an array of one or more state MatrixEvents, overwriting
-     * any existing state with the same {type, stateKey} tuple. Will fire
-     * "RoomState.events" for every event added. May fire "RoomState.members"
-     * if there are <code>m.room.member</code> events.
+     * Add an array of one or more state MatrixEvents, overwriting any existing
+     * state with the same {type, stateKey} tuple. Will fire "RoomState.events"
+     * for every event added. May fire "RoomState.members" if there are
+     * <code>m.room.member</code> events. May fire "RoomStateEvent.Marker" if there are
+     * <code>EventType.Marker</code> events.
      * @param {MatrixEvent[]} stateEvents a list of state events for this room.
+     * @param {IMarkerFoundOptions} markerFoundOptions
      * @fires module:client~MatrixClient#event:"RoomState.members"
      * @fires module:client~MatrixClient#event:"RoomState.newMember"
      * @fires module:client~MatrixClient#event:"RoomState.events"
+     * @fires module:client~MatrixClient#event:"RoomStateEvent.Marker"
      */
-    public setStateEvents(stateEvents: MatrixEvent[]) {
+    public setStateEvents(stateEvents: MatrixEvent[], markerFoundOptions?: IMarkerFoundOptions) {
         this.updateModifiedTime();
 
         // update the core event dict
@@ -401,6 +415,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
                 // assume all our sentinels are now out-of-date
                 this.sentinels = {};
+            } else if (event.getType() === EventType.Marker) {
+                this.emit(RoomStateEvent.Marker, event, markerFoundOptions);
             }
         });
 

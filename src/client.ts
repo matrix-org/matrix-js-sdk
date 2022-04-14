@@ -790,6 +790,7 @@ type RoomEvents = RoomEvent.Name
     | RoomEvent.Receipt
     | RoomEvent.Tags
     | RoomEvent.LocalEchoUpdated
+    | RoomEvent.historyImportedWithinTimeline
     | RoomEvent.AccountData
     | RoomEvent.MyMembership
     | RoomEvent.Timeline
@@ -799,6 +800,7 @@ type RoomStateEvents = RoomStateEvent.Events
     | RoomStateEvent.Members
     | RoomStateEvent.NewMember
     | RoomStateEvent.Update
+    | RoomStateEvent.Marker
     ;
 
 type CryptoEvents = CryptoEvent.KeySignatureUploadFailure

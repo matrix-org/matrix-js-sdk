@@ -54,6 +54,7 @@ import { IPushRules } from "./@types/PushRules";
 import { RoomStateEvent } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
 import { BeaconEvent } from "./models/beacon";
+import { IMarkerFoundOptions } from "./models/room-state";
 
 const DEBUG = true;
 
@@ -76,6 +77,13 @@ export enum SyncState {
     Catchup = "CATCHUP",
     Reconnecting = "RECONNECTING",
 }
+
+// Room versions where "insertion", "batch", and "marker" events are controlled
+// by power-levels. MSC2716 is supported in existing room versions but they
+// should only have special meaning when the room creator sends them.
+const MSC2716_ROOM_VERSIONS = [
+    'org.matrix.msc2716v3',
+];
 
 function getFilterName(userId: string, suffix?: string): string {
     // scope this on the user ID because people may login on many accounts
@@ -202,6 +210,7 @@ export class SyncApi {
             RoomEvent.Receipt,
             RoomEvent.Tags,
             RoomEvent.LocalEchoUpdated,
+            RoomEvent.historyImportedWithinTimeline,
             RoomEvent.AccountData,
             RoomEvent.MyMembership,
             RoomEvent.Timeline,
@@ -240,6 +249,10 @@ export class SyncApi {
                 RoomMemberEvent.Membership,
             ]);
         });
+
+        room.currentState.on(RoomStateEvent.Marker, (markerEvent, markerFoundOptions) => {
+            this.onMarkerStateEvent(room, markerEvent, markerFoundOptions);
+        });
     }
 
     /**
@@ -251,6 +264,92 @@ export class SyncApi {
         room.currentState.removeAllListeners(RoomStateEvent.Events);
         room.currentState.removeAllListeners(RoomStateEvent.Members);
         room.currentState.removeAllListeners(RoomStateEvent.NewMember);
+        room.currentState.removeAllListeners(RoomStateEvent.Marker);
+    }
+
+    /** When we see the marker state change in the room, we know there is some
+     * new historical messages imported by MSC2716 `/batch_send` somewhere in
+     * the room and we need to throw away the timeline to make sure the
+     * historical messages are shown when we paginate `/messages` again.
+     * @param {Room} room The room where the marker event was sent
+     * @param {MatrixEvent} markerEvent The new marker event
+     * @param {ISetStateOptions} setStateOptions When `timelineWasEmpty` is set
+     * as `true`, the given marker event will be ignored
+    */
+    private onMarkerStateEvent(
+        room: Room,
+        markerEvent: MatrixEvent,
+        { timelineWasEmpty }: IMarkerFoundOptions = {},
+    ): void {
+        // We don't need to refresh the timeline if it was empty before the
+        // marker arrived. This could be happen in a variety of cases:
+        //  1. From the initial sync
+        //  2. If it's from the first state we're seeing after joining the room
+        //  3. Or whether it's coming from `syncFromCache`
+        if (timelineWasEmpty) {
+            logger.debug(
+                `MarkerState: Ignoring markerEventId=${markerEvent.getId()} in roomId=${room.roomId} ` +
+                `because the timeline was empty before the marker arrived which means there is nothing to refresh.`,
+            );
+            return;
+        }
+
+        const isValidMsc2716Event =
+            // Check whether the room version directly supports MSC2716, in
+            // which case, "marker" events are already auth'ed by
+            // power_levels
+            MSC2716_ROOM_VERSIONS.includes(room.getVersion()) ||
+            // MSC2716 is also supported in all existing room versions but
+            // special meaning should only be given to "insertion", "batch",
+            // and "marker" events when they come from the room creator
+            markerEvent.getSender() === room.getRoomCreator();
+
+        if (!isValidMsc2716Event) {
+            logger.debug(
+                `MarkerState: Ignoring markerEventId=${markerEvent.getId()} in roomId=${room.roomId} because ` +
+                `MSC2716 is not supported in the room version or for any room version, the marker wasn't sent ` +
+                `by the room creator.`,
+            );
+        }
+
+        // Don't process a marker event multiple times; we only need to
+        // throw the timeline away once, when we see a marker. All of the
+        // historical content will be in the `/messsages` responses from
+        // here on out.
+        const markerAlreadyProcessed = markerEvent.getId() === room.getLastMarkerEventIdProcessed();
+        if (markerAlreadyProcessed) {
+            logger.debug(
+                `MarkerState: Ignoring markerEventId=${markerEvent.getId()} in roomId=${room.roomId} because ` +
+                `it has already been processed.`,
+            );
+        }
+
+        // It would be nice if we could also specifically tell whether the
+        // historical messages actually affected the locally cached client
+        // timeline or not. The problem is we can't see the prev_events of
+        // the base insertion event that the marker was pointing to because
+        // prev_events aren't available in the client API's. In most cases,
+        // the history won't be in people's locally cached timelines in the
+        // client, so we don't need to bother everyone about refreshing
+        // their timeline. This works for a v1 though and there are use
+        // cases like initially bootstrapping your bridged room where people
+        // are likely to encounter the historical messages affecting their
+        // current timeline (think someone signing up for Beeper and
+        // importing their Whatsapp history).
+        if (
+            isValidMsc2716Event &&
+            !markerAlreadyProcessed
+        ) {
+            // Saw new marker event, let's let the clients know they should
+            // refresh the timeline.
+            logger.debug(
+                `MarkerState: Timeline needs to be refreshed because ` +
+                `a new markerEventId=${markerEvent.getId()} was sent in roomId=${room.roomId}`,
+            );
+            room.setTimelineNeedsRefresh(true);
+            room.emit(RoomEvent.historyImportedWithinTimeline, markerEvent, room);
+            room.setLastMarkerEventIdProcessed(markerEvent.getId());
+        }
     }
 
     /**
@@ -1597,7 +1696,9 @@ export class SyncApi {
             for (const ev of stateEventList) {
                 this.client.getPushActionsForEvent(ev);
             }
-            liveTimeline.initialiseState(stateEventList);
+            liveTimeline.initialiseState(stateEventList, {
+                timelineWasEmpty,
+            });
         }
 
         this.resolveInvites(room);
@@ -1635,7 +1736,10 @@ export class SyncApi {
         // if the timeline has any state events in it.
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
-        room.addLiveEvents(timelineEventList || [], null, fromCache);
+        room.addLiveEvents(timelineEventList || [], {
+            fromCache,
+            timelineWasEmpty,
+        });
         this.client.processBeaconEvents(room, timelineEventList);
     }
 

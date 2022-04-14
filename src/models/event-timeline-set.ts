@@ -56,6 +56,40 @@ export interface IRoomTimelineData {
     liveEvent?: boolean;
 }
 
+export interface IAddLiveEventOptions {
+    /** Applies to events in the timeline only. If this is 'replace' then if a
+     * duplicate is encountered, the event passed to this function will replace
+     * the existing event in the timeline. If this is not specified, or is
+     * 'ignore', then the event passed to this function will be ignored
+     * entirely, preserving the existing event in the timeline. Events are
+     * identical based on their event ID <b>only</b>. */
+    duplicateStrategy?: DuplicateStrategy;
+    /** Whether the sync response came from cache */
+    fromCache?: boolean;
+    /** The state events to reconcile metadata from */
+    roomState?: RoomState;
+    /** Whether the timeline was empty before the marker arrived in
+     *  the room. This could be happen in a variety of cases:
+     *  1. From the initial sync
+     *  2. It's the first state we're seeing after joining the room
+     *  3. Or whether it's coming from `syncFromCache` */
+    timelineWasEmpty?: boolean;
+}
+
+export interface IAddEventToTimelineOptions {
+    toStartOfTimeline: boolean;
+    /** Whether the sync response came from cache */
+    fromCache?: boolean;
+    /** The state events to reconcile metadata from */
+    roomState?: RoomState;
+    /** Whether the timeline was empty before the marker arrived in
+     *  the room. This could be happen in a variety of cases:
+     *  1. From the initial sync
+     *  2. It's the first state we're seeing after joining the room
+     *  3. Or whether it's coming from `syncFromCache` */
+    timelineWasEmpty?: boolean;
+}
+
 type EmittedEvents = RoomEvent.Timeline | RoomEvent.TimelineReset;
 
 export type EventTimelineSetHandlerMap = {
@@ -431,7 +465,9 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
             if (!existingTimeline) {
                 // we don't know about this event yet. Just add it to the timeline.
-                this.addEventToTimeline(event, timeline, toStartOfTimeline);
+                this.addEventToTimeline(event, timeline, {
+                    toStartOfTimeline,
+                });
                 lastEventWasNew = true;
                 didUpdate = true;
                 continue;
@@ -523,15 +559,17 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * Add an event to the end of this live timeline.
      *
      * @param {MatrixEvent} event Event to be added
-     * @param {string?} duplicateStrategy 'ignore' or 'replace'
-     * @param {boolean} fromCache whether the sync response came from cache
+     * @param {IAddLiveEventOptions} options addLiveEvent options
      * @param roomState the state events to reconcile metadata from
      */
     public addLiveEvent(
         event: MatrixEvent,
-        duplicateStrategy: DuplicateStrategy = DuplicateStrategy.Ignore,
-        fromCache = false,
-        roomState?: RoomState,
+        {
+            duplicateStrategy = DuplicateStrategy.Ignore,
+            fromCache = false,
+            roomState,
+            timelineWasEmpty,
+        }: IAddLiveEventOptions = {},
     ): void {
         if (this.filter) {
             const events = this.filter.filterRoomTimeline([event]);
@@ -570,7 +608,12 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             return;
         }
 
-        this.addEventToTimeline(event, this.liveTimeline, false, fromCache, roomState);
+        this.addEventToTimeline(event, this.liveTimeline, {
+            toStartOfTimeline: false,
+            fromCache,
+            roomState,
+            timelineWasEmpty,
+        });
     }
 
     /**
@@ -581,20 +624,26 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      *
      * @param {MatrixEvent} event
      * @param {EventTimeline} timeline
-     * @param {boolean} toStartOfTimeline
-     * @param {boolean} fromCache whether the sync response came from cache
+     * @param {IAddEventToTimelineOptions} options addEventToTimeline options
      *
      * @fires module:client~MatrixClient#event:"Room.timeline"
      */
     public addEventToTimeline(
         event: MatrixEvent,
         timeline: EventTimeline,
-        toStartOfTimeline: boolean,
-        fromCache = false,
-        roomState?: RoomState,
+        {
+            toStartOfTimeline,
+            fromCache = false,
+            roomState,
+            timelineWasEmpty,
+        }: IAddEventToTimelineOptions,
     ) {
         const eventId = event.getId();
-        timeline.addEvent(event, toStartOfTimeline, roomState);
+        timeline.addEvent(event, {
+            toStartOfTimeline,
+            roomState,
+            timelineWasEmpty,
+        });
         this._eventIdToTimeline[eventId] = timeline;
 
         this.setRelationsTarget(event);
@@ -630,10 +679,14 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         } else {
             if (this.filter) {
                 if (this.filter.filterRoomTimeline([localEvent]).length) {
-                    this.addEventToTimeline(localEvent, this.liveTimeline, false);
+                    this.addEventToTimeline(localEvent, this.liveTimeline, {
+                        toStartOfTimeline: false,
+                    });
                 }
             } else {
-                this.addEventToTimeline(localEvent, this.liveTimeline, false);
+                this.addEventToTimeline(localEvent, this.liveTimeline, {
+                    toStartOfTimeline: false,
+                });
             }
         }
     }

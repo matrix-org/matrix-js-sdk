@@ -24,6 +24,24 @@ import { MatrixEvent } from "./event";
 import { Filter } from "../filter";
 import { EventType } from "../@types/event";
 
+export interface IInitialiseStateOptions {
+    /** Whether the timeline was empty before the marker arrived in
+     *  the room. This could be happen in a variety of cases:
+     *  1. From the initial sync
+     *  2. It's the first state we're seeing after joining the room
+     *  3. Or whether it's coming from `syncFromCache` */
+    timelineWasEmpty?: boolean;
+}
+
+export interface IAddEventOptions {
+    /** Whether to insert the new event at the start of the timeline */
+    toStartOfTimeline: boolean;
+    /** The state events to reconcile metadata from */
+    roomState?: RoomState;
+    /** TODO */
+    timelineWasEmpty?: boolean;
+}
+
 export enum Direction {
     Backward = "b",
     Forward = "f",
@@ -131,7 +149,7 @@ export class EventTimeline {
      * state with.
      * @throws {Error} if an attempt is made to call this after addEvent is called.
      */
-    public initialiseState(stateEvents: MatrixEvent[]): void {
+    public initialiseState(stateEvents: MatrixEvent[], { timelineWasEmpty }: IInitialiseStateOptions = {}): void {
         if (this.events.length > 0) {
             throw new Error("Cannot initialise state after events are added");
         }
@@ -152,8 +170,12 @@ export class EventTimeline {
             Object.freeze(e);
         }
 
-        this.startState.setStateEvents(stateEvents);
-        this.endState.setStateEvents(stateEvents);
+        this.startState.setStateEvents(stateEvents, {
+            timelineWasEmpty,
+        });
+        this.endState.setStateEvents(stateEvents, {
+            timelineWasEmpty,
+        });
     }
 
     /**
@@ -342,27 +364,36 @@ export class EventTimeline {
     }
 
     /**
-     * Add a new event to the timeline, and update the state
+      * Add a new event to the timeline, and update the state
      *
      * @param {MatrixEvent} event   new event
-     * @param {boolean}  atStart     true to insert new event at the start
+     * @param {IAddEventOptions} options addEvent options
      */
-    public addEvent(event: MatrixEvent, atStart: boolean, stateContext?: RoomState): void {
-        if (!stateContext) {
-            stateContext = atStart ? this.startState : this.endState;
+    public addEvent(
+        event: MatrixEvent,
+        {
+            toStartOfTimeline,
+            roomState,
+            timelineWasEmpty,
+        }: IAddEventOptions,
+    ): void {
+        if (!roomState) {
+            roomState = toStartOfTimeline ? this.startState : this.endState;
         }
 
         const timelineSet = this.getTimelineSet();
 
         if (timelineSet.room) {
-            EventTimeline.setEventMetadata(event, stateContext, atStart);
+            EventTimeline.setEventMetadata(event, roomState, toStartOfTimeline);
 
             // modify state but only on unfiltered timelineSets
             if (
                 event.isState() &&
                 timelineSet.room.getUnfilteredTimelineSet() === timelineSet
             ) {
-                stateContext.setStateEvents([event]);
+                roomState.setStateEvents([event], {
+                    timelineWasEmpty,
+                });
                 // it is possible that the act of setting the state event means we
                 // can set more metadata (specifically sender/target props), so try
                 // it again if the prop wasn't previously set. It may also mean that
@@ -373,22 +404,22 @@ export class EventTimeline {
                 // back in time, else we'll set the .sender value for BEFORE the given
                 // member event, whereas we want to set the .sender value for the ACTUAL
                 // member event itself.
-                if (!event.sender || (event.getType() === "m.room.member" && !atStart)) {
-                    EventTimeline.setEventMetadata(event, stateContext, atStart);
+                if (!event.sender || (event.getType() === "m.room.member" && !toStartOfTimeline)) {
+                    EventTimeline.setEventMetadata(event, roomState, toStartOfTimeline);
                 }
             }
         }
 
         let insertIndex;
 
-        if (atStart) {
+        if (toStartOfTimeline) {
             insertIndex = 0;
         } else {
             insertIndex = this.events.length;
         }
 
         this.events.splice(insertIndex, 0, event); // insert element
-        if (atStart) {
+        if (toStartOfTimeline) {
             this.baseIndex++;
         }
     }

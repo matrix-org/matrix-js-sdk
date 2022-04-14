@@ -48,6 +48,7 @@ import {
 } from "./thread";
 import { Method } from "../http-api";
 import { TypedEventEmitter } from "./typed-event-emitter";
+import { IAddLiveEventOptions } from "./event-timeline-set";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -164,6 +165,7 @@ export enum RoomEvent {
     LocalEchoUpdated = "Room.localEchoUpdated",
     Timeline = "Room.timeline",
     TimelineReset = "Room.timelineReset",
+    historyImportedWithinTimeline = "Room.historyImportedWithinTimeline",
 }
 
 type EmittedEvents = RoomEvent
@@ -172,6 +174,7 @@ type EmittedEvents = RoomEvent
     | ThreadEvent.NewReply
     | RoomEvent.Timeline
     | RoomEvent.TimelineReset
+    | RoomEvent.historyImportedWithinTimeline
     | MatrixEventEvent.BeforeRedaction;
 
 export type RoomEventHandlerMap = {
@@ -187,6 +190,10 @@ export type RoomEventHandlerMap = {
         room: Room,
         oldEventId?: string,
         oldStatus?: EventStatus,
+    ) => void;
+    [RoomEvent.historyImportedWithinTimeline]: (
+        markerEvent: MatrixEvent,
+        room: Room,
     ) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
 } & ThreadHandlerMap & MatrixEventHandlerMap;
@@ -205,6 +212,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
     private readonly filteredTimelineSets: Record<string, EventTimelineSet> = {}; // filter_id: timelineSet
+    private timelineNeedsRefresh = false;
+    private lastMarkerEventIdProcessed: string = null;
     private readonly pendingEventList?: MatrixEvent[];
     // read by megolm via getter; boolean value - null indicates "use global value"
     private blacklistUnverifiedDevices: boolean = null;
@@ -440,6 +449,19 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             .map(event => event.attemptDecryption(this.client.crypto, { isRetry: true }));
 
         return Promise.allSettled(decryptionPromises) as unknown as Promise<void>;
+    }
+
+    /**
+     * Gets the creator of the room
+     * @returns {string} The creator of the room, or null if it could not be determined
+     */
+    public getRoomCreator(): string | null {
+        const createEvent = this.currentState.getStateEvents(EventType.RoomCreate, "");
+        if (!createEvent) {
+            return null;
+        }
+        const roomCreator = createEvent.getContent()['creator'];
+        return roomCreator;
     }
 
     /**
@@ -1008,6 +1030,43 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     }
 
     /**
+     * Whether the timeline needs to be refreshed in order to pull in new
+     * historical messages that were imported.
+     * @param {Boolean} value The value to set
+     */
+    public setTimelineNeedsRefresh(value: boolean): void {
+        this.timelineNeedsRefresh = value;
+    }
+
+    /**
+     * Whether the timeline needs to be refreshed in order to pull in new
+     * historical messages that were imported.
+     * @return {Boolean} .
+     */
+    public getTimelineNeedsRefresh(): boolean {
+        return this.timelineNeedsRefresh;
+    }
+
+    /**
+     * Get the last marker event ID proccessed
+     *
+     * @return {String} the last marker event ID proccessed or null if none have
+     * been processed
+     */
+    public getLastMarkerEventIdProcessed(): string | null {
+        return this.lastMarkerEventIdProcessed;
+    }
+
+    /**
+     * Set the last marker event ID proccessed
+     *
+     * @param {String} eventId The marker event ID to set
+     */
+    public setLastMarkerEventIdProcessed(eventId: string): void {
+        this.lastMarkerEventIdProcessed = eventId;
+    }
+
+    /**
      * Get an event which is stored in our unfiltered timeline set, or in a thread
      *
      * @param {string} eventId event ID to look for
@@ -1463,7 +1522,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                         return event.getSender() === this.client.getUserId();
                     });
                     if (filterType !== ThreadFilterType.My || currentUserParticipated) {
-                        timelineSet.getLiveTimeline().addEvent(thread.rootEvent, false);
+                        timelineSet.getLiveTimeline().addEvent(thread.rootEvent, {
+                            toStartOfTimeline: false,
+                        });
                     }
                 });
         }
@@ -1510,22 +1571,20 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         let latestMyThreadsRootEvent: MatrixEvent;
         const roomState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
         for (const rootEvent of threadRoots) {
-            this.threadsTimelineSets[0].addLiveEvent(
-                rootEvent,
-                DuplicateStrategy.Ignore,
-                false,
+            this.threadsTimelineSets[0].addLiveEvent(rootEvent, {
+                duplicateStrategy: DuplicateStrategy.Ignore,
+                fromCache: false,
                 roomState,
-            );
+            });
 
             const threadRelationship = rootEvent
                 .getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
             if (threadRelationship.current_user_participated) {
-                this.threadsTimelineSets[1].addLiveEvent(
-                    rootEvent,
-                    DuplicateStrategy.Ignore,
-                    false,
+                this.threadsTimelineSets[1].addLiveEvent(rootEvent, {
+                    duplicateStrategy: DuplicateStrategy.Ignore,
+                    fromCache: false,
                     roomState,
-                );
+                });
                 latestMyThreadsRootEvent = rootEvent;
             }
 
@@ -1756,7 +1815,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                             timelineSet.addEventToTimeline(
                                 thread.rootEvent,
                                 timelineSet.getLiveTimeline(),
-                                toStartOfTimeline,
+                                { toStartOfTimeline },
                             );
                         }
                     }
@@ -1839,15 +1898,14 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * "Room.timeline".
      *
      * @param {MatrixEvent} event Event to be added
-     * @param {string?} duplicateStrategy 'ignore' or 'replace'
-     * @param {boolean} fromCache whether the sync response came from cache
+     * @param {IAddLiveEventOptions} options addLiveEvent options
      * @fires module:client~MatrixClient#event:"Room.timeline"
      * @private
      */
-    private addLiveEvent(event: MatrixEvent, duplicateStrategy: DuplicateStrategy, fromCache = false): void {
+    private addLiveEvent(event: MatrixEvent, addLiveEventOptions: IAddLiveEventOptions = {}): void {
         // add to our timeline sets
         for (let i = 0; i < this.timelineSets.length; i++) {
-            this.timelineSets[i].addLiveEvent(event, duplicateStrategy, fromCache);
+            this.timelineSets[i].addLiveEvent(event, addLiveEventOptions);
         }
 
         // synthesize and inject implicit read receipts
@@ -1933,11 +1991,15 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 if (timelineSet.getFilter()) {
                     if (timelineSet.getFilter().filterRoomTimeline([event]).length) {
                         timelineSet.addEventToTimeline(event,
-                            timelineSet.getLiveTimeline(), false);
+                            timelineSet.getLiveTimeline(), {
+                                toStartOfTimeline: false,
+                            });
                     }
                 } else {
                     timelineSet.addEventToTimeline(event,
-                        timelineSet.getLiveTimeline(), false);
+                        timelineSet.getLiveTimeline(), {
+                            toStartOfTimeline: false,
+                        });
                 }
             }
         }
@@ -2174,18 +2236,11 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * they will go to the end of the timeline.
      *
      * @param {MatrixEvent[]} events A list of events to add.
-     *
-     * @param {string} duplicateStrategy Optional. Applies to events in the
-     * timeline only. If this is 'replace' then if a duplicate is encountered, the
-     * event passed to this function will replace the existing event in the
-     * timeline. If this is not specified, or is 'ignore', then the event passed to
-     * this function will be ignored entirely, preserving the existing event in the
-     * timeline. Events are identical based on their event ID <b>only</b>.
-     *
-     * @param {boolean} fromCache whether the sync response came from cache
+     * @param {IAddLiveEventOptions} options addLiveEvent options
      * @throws If <code>duplicateStrategy</code> is not falsey, 'replace' or 'ignore'.
      */
-    public addLiveEvents(events: MatrixEvent[], duplicateStrategy?: DuplicateStrategy, fromCache = false): void {
+    public addLiveEvents(events: MatrixEvent[], addLiveEventOptions: IAddLiveEventOptions = {}): void {
+        const { duplicateStrategy } = addLiveEventOptions;
         if (duplicateStrategy && ["replace", "ignore"].indexOf(duplicateStrategy) === -1) {
             throw new Error("duplicateStrategy MUST be either 'replace' or 'ignore'");
         }
@@ -2226,7 +2281,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             }
 
             if (shouldLiveInRoom) {
-                this.addLiveEvent(events[i], duplicateStrategy, fromCache);
+                this.addLiveEvent(events[i], addLiveEventOptions);
             }
         }
 

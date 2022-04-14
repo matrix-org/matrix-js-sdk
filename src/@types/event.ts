@@ -33,6 +33,7 @@ export enum EventType {
     RoomGuestAccess = "m.room.guest_access",
     RoomServerAcl = "m.room.server_acl",
     RoomTombstone = "m.room.tombstone",
+    Marker = "org.matrix.msc2716.marker", // MSC2716
     /**
      * @deprecated Should not be used.
      */
