@@ -3795,8 +3795,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const thread = room?.threads.get(threadId);
         if (thread) {
             localEvent.setThread(thread);
-            localEvent.setThreadId(thread.id);
         }
+
+        // set up re-emitter for this new event - this is normally the job of EventMapper but we don't use it here
+        this.reEmitter.reEmit(localEvent, [
+            MatrixEventEvent.Replaced,
+            MatrixEventEvent.VisibilityChange,
+        ]);
+        room?.reEmitter.reEmit(localEvent, [
+            MatrixEventEvent.BeforeRedaction,
+        ]);
 
         // if this is a relation or redaction of an event
         // that hasn't been sent yet (e.g. with a local id starting with a ~)
@@ -5288,7 +5296,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // Where the event is a thread reply (not a root) and running in MSC-enabled mode the Thread timeline only
         // functions contiguously, so we have to jump through some hoops to get our target event in it.
         // XXX: workaround for https://github.com/vector-im/element-meta/issues/150
-        if (Thread.hasServerSideSupport && event.isRelation(THREAD_RELATION_TYPE.name)) {
+        if (Thread.hasServerSideSupport &&
+            this.supportsExperimentalThreads() &&
+            event.isRelation(THREAD_RELATION_TYPE.name)
+        ) {
             const [, threadedEvents] = timelineSet.room.partitionThreadedEvents(events);
             const thread = await timelineSet.room.createThreadFetchRoot(event.threadRootId, threadedEvents, true);
 
@@ -6420,12 +6431,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public async _unstable_getSharedRooms(userId: string): Promise<string[]> { // eslint-disable-line
-        if (!(await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666"))) {
-            throw Error('Server does not support shared_rooms API');
+        const sharedRoomsSupport = await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666");
+        const mutualRoomsSupport = await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666.mutual_rooms");
+
+        if (!sharedRoomsSupport && !mutualRoomsSupport) {
+            throw Error('Server does not support mutual_rooms API');
         }
-        const path = utils.encodeUri("/uk.half-shot.msc2666/user/shared_rooms/$userId", {
-            $userId: userId,
-        });
+
+        const path = utils.encodeUri(
+            `/uk.half-shot.msc2666/user/${mutualRoomsSupport ? 'mutual_rooms' : 'shared_rooms'}/$userId`,
+            { $userId: userId },
+        );
+
         const res = await this.http.authedRequest<{ joined: string[] }>(
             undefined, Method.Get, path, undefined, undefined,
             { prefix: PREFIX_UNSTABLE },

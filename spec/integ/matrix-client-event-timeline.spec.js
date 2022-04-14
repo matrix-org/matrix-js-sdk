@@ -496,6 +496,7 @@ describe("MatrixClient event timelines", function() {
         });
 
         it("should handle thread replies with server support by fetching a contiguous thread timeline", async () => {
+            client.clientOpts.experimentalThreadSupport = true;
             Thread.setServerSideSupport(true);
             client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId);
