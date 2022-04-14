@@ -172,9 +172,11 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             this.timelineSet.addEventToTimeline(
                 event,
                 this.liveTimeline,
-                toStartOfTimeline,
-                false,
-                this.roomState,
+                {
+                    toStartOfTimeline,
+                    fromCache: false,
+                    roomState: this.roomState,
+                },
             );
         }
     }
