@@ -202,18 +202,18 @@ class ExtensionAccountData implements Extension {
         }
         return {
             enabled: true,
-        }
+        };
     }
     onResponse(data: {global: object[], rooms: Record<string, object[]>}) {
         if (data.global && data.global.length > 0) {
             this.processGlobalAccountData(data.global);
         }
 
-        for (let roomId in data.rooms) {
+        for (const roomId in data.rooms) {
             const accountDataEvents = mapEvents(this.client, roomId, data.rooms[roomId]);
             const room = this.client.getRoom(roomId);
             if (!room) {
-                console.error("got account data for room but room doesn't exist on client:", roomId);
+                logger.warn("got account data for room but room doesn't exist on client:", roomId);
                 continue;
             }
             room.addAccountData(accountDataEvents);
@@ -298,7 +298,7 @@ export class SlidingSyncSdk {
         if (this.opts.crypto) {
             extensions.push(
                 new ExtensionE2EE(this.opts.crypto),
-            )
+            );
         }
         extensions.forEach((ext) => {
             this.slidingSync.registerExtension(ext);

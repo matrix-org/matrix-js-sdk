@@ -210,11 +210,10 @@ class SlidingList {
     }
 }
 
-
 /**
  * When onResponse extensions should be invoked: before or after processing the main response.
  */
- export enum ExtensionState {
+export enum ExtensionState {
     // Call onResponse before processing the response body. This is useful when your extension is
     // preparing the ground for the response body e.g processing to-device messages before the
     // encrypted event arrives.
@@ -233,24 +232,24 @@ export interface Extension {
      * The extension name to go under 'extensions' in the request body.
      * @returns The JSON key.
      */
-    name(): string
+    name(): string;
     /**
      * A function which is called when the request JSON is being formed.
      * Returns the data to insert under this key.
      * @param isInitial True when this is part of the initial request (send sticky params)
      * @returns The request JSON to send.
      */
-    onRequest(isInitial: boolean): object
+    onRequest(isInitial: boolean): object;
     /**
      * A function which is called when there is response JSON under this extension.
      * @param data The response JSON under the extension name.
      */
-    onResponse(data: object)
+    onResponse(data: object);
     /**
      * Controls when onResponse should be called.
      * @returns The state when it should be called.
      */
-    when(): ExtensionState
+    when(): ExtensionState;
 }
 
 /**
@@ -367,7 +366,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         return {
             joinedCount: this.lists[index].joinedCount,
             roomIndexToRoomId: Object.assign({}, this.lists[index].roomIndexToRoomId),
-        }
+        };
     }
 
     /**
