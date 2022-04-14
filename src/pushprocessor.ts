@@ -158,8 +158,7 @@ export class PushProcessor {
                 .find((r) => r.rule_id === override.rule_id);
 
             if (existingRule) {
-                // Copy over the actions, default, and conditions. Don't touch the user's
-                // preference.
+                // Copy over the actions, default, and conditions. Don't touch the user's preference.
                 existingRule.default = override.default;
                 existingRule.conditions = override.conditions;
                 existingRule.actions = override.actions;
@@ -447,6 +446,8 @@ export class PushProcessor {
     }
 
     public ruleMatchesEvent(rule: IPushRule, ev: MatrixEvent): boolean {
+        if (!rule.conditions?.length) return true;
+
         let ret = true;
         for (let i = 0; i < rule.conditions.length; ++i) {
             const cond = rule.conditions[i];

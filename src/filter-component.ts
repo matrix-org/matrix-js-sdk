@@ -14,7 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { RelationType } from "./@types/event";
 import { MatrixEvent } from "./models/event";
+import {
+    FILTER_RELATED_BY_REL_TYPES,
+    FILTER_RELATED_BY_SENDERS,
+    THREAD_RELATION_TYPE,
+} from "./models/thread";
 
 /**
  * @module filter-component
@@ -46,6 +52,12 @@ export interface IFilterComponent {
     not_senders?: string[];
     contains_url?: boolean;
     limit?: number;
+    related_by_senders?: Array<RelationType | string>;
+    related_by_rel_types?: string[];
+
+    // Unstable values
+    "io.element.relation_senders"?: Array<RelationType | string>;
+    "io.element.relation_types"?: string[];
 }
 /* eslint-enable camelcase */
 
@@ -61,7 +73,7 @@ export interface IFilterComponent {
  * @param {Object} filterJson the definition of this filter JSON, e.g. { 'contains_url': true }
  */
 export class FilterComponent {
-    constructor(private filterJson: IFilterComponent) {}
+    constructor(private filterJson: IFilterComponent, public readonly userId?: string) {}
 
     /**
      * Checks with the filter component matches the given event
@@ -69,11 +81,25 @@ export class FilterComponent {
      * @return {boolean} true if the event matches the filter
      */
     public check(event: MatrixEvent): boolean {
+        const bundledRelationships = event.getUnsigned()?.["m.relations"] || {};
+        const relations: Array<string | RelationType> = Object.keys(bundledRelationships);
+        // Relation senders allows in theory a look-up of any senders
+        // however clients can only know about the current user participation status
+        // as sending a whole list of participants could be proven problematic in terms
+        // of performance
+        // This should be improved when bundled relationships solve that problem
+        const relationSenders = [];
+        if (this.userId && bundledRelationships?.[THREAD_RELATION_TYPE.name]?.current_user_participated) {
+            relationSenders.push(this.userId);
+        }
+
         return this.checkFields(
             event.getRoomId(),
             event.getSender(),
             event.getType(),
             event.getContent() ? event.getContent().url !== undefined : false,
+            relations,
+            relationSenders,
         );
     }
 
@@ -82,13 +108,15 @@ export class FilterComponent {
      */
     public toJSON(): object {
         return {
-            types: this.filterJson.types || null,
-            not_types: this.filterJson.not_types || [],
-            rooms: this.filterJson.rooms || null,
-            not_rooms: this.filterJson.not_rooms || [],
-            senders: this.filterJson.senders || null,
-            not_senders: this.filterJson.not_senders || [],
-            contains_url: this.filterJson.contains_url || null,
+            "types": this.filterJson.types || null,
+            "not_types": this.filterJson.not_types || [],
+            "rooms": this.filterJson.rooms || null,
+            "not_rooms": this.filterJson.not_rooms || [],
+            "senders": this.filterJson.senders || null,
+            "not_senders": this.filterJson.not_senders || [],
+            "contains_url": this.filterJson.contains_url || null,
+            [FILTER_RELATED_BY_SENDERS.name]: this.filterJson[FILTER_RELATED_BY_SENDERS.name] || [],
+            [FILTER_RELATED_BY_REL_TYPES.name]: this.filterJson[FILTER_RELATED_BY_REL_TYPES.name] || [],
         };
     }
 
@@ -98,9 +126,18 @@ export class FilterComponent {
      * @param {String} sender        the sender of the event being checked
      * @param {String} eventType     the type of the event being checked
      * @param {boolean} containsUrl  whether the event contains a content.url field
+     * @param {boolean} relationTypes  whether has aggregated relation of the given type
+     * @param {boolean} relationSenders whether one of the relation is sent by the user listed
      * @return {boolean} true if the event fields match the filter
      */
-    private checkFields(roomId: string, sender: string, eventType: string, containsUrl: boolean): boolean {
+    private checkFields(
+        roomId: string,
+        sender: string,
+        eventType: string,
+        containsUrl: boolean,
+        relationTypes: Array<RelationType | string>,
+        relationSenders: string[],
+    ): boolean {
         const literalKeys = {
             "rooms": function(v: string): boolean {
                 return roomId === v;
@@ -133,7 +170,27 @@ export class FilterComponent {
             return false;
         }
 
+        const relationTypesFilter = this.filterJson[FILTER_RELATED_BY_REL_TYPES.name];
+        if (relationTypesFilter !== undefined) {
+            if (!this.arrayMatchesFilter(relationTypesFilter, relationTypes)) {
+                return false;
+            }
+        }
+
+        const relationSendersFilter = this.filterJson[FILTER_RELATED_BY_SENDERS.name];
+        if (relationSendersFilter !== undefined) {
+            if (!this.arrayMatchesFilter(relationSendersFilter, relationSenders)) {
+                return false;
+            }
+        }
+
         return true;
+    }
+
+    private arrayMatchesFilter(filter: any[], values: any[]): boolean {
+        return values.length > 0 && filter.every(value => {
+            return values.includes(value);
+        });
     }
 
     /**
@@ -141,7 +198,7 @@ export class FilterComponent {
      * @param {MatrixEvent[]} events  Events to be checked against the filter component
      * @return {MatrixEvent[]} events which matched the filter component
      */
-    filter(events: MatrixEvent[]): MatrixEvent[] {
+    public filter(events: MatrixEvent[]): MatrixEvent[] {
         return events.filter(this.check, this);
     }
 
@@ -150,7 +207,7 @@ export class FilterComponent {
      * 10 if none is otherwise specified. Cargo-culted from Synapse.
      * @return {Number} the limit for this filter component.
      */
-    limit(): number {
+    public limit(): number {
         return this.filterJson.limit !== undefined ? this.filterJson.limit : 10;
     }
 }

@@ -16,8 +16,6 @@ limitations under the License.
 
 /* eslint-disable @babel/no-invalid-this */
 
-import { EventEmitter } from 'events';
-
 import { MemoryStore, IOpts as IBaseOpts } from "./memory";
 import { LocalIndexedDBStoreBackend } from "./indexeddb-local-backend";
 import { RemoteIndexedDBStoreBackend } from "./indexeddb-remote-backend";
@@ -27,6 +25,7 @@ import { logger } from '../logger';
 import { ISavedSync } from "./index";
 import { IIndexedDBBackend } from "./indexeddb-backend";
 import { ISyncResponse } from "../sync-accumulator";
+import { TypedEventEmitter } from "../models/typed-event-emitter";
 
 /**
  * This is an internal module. See {@link IndexedDBStore} for the public class.
@@ -46,6 +45,10 @@ interface IOpts extends IBaseOpts {
     workerFactory?: () => Worker;
 }
 
+type EventHandlerMap = {
+    "degraded": (e: Error) => void;
+};
+
 export class IndexedDBStore extends MemoryStore {
     static exists(indexedDB: IDBFactory, dbName: string): Promise<boolean> {
         return LocalIndexedDBStoreBackend.exists(indexedDB, dbName);
@@ -59,7 +62,7 @@ export class IndexedDBStore extends MemoryStore {
     // the database, such that we can derive the set if users that have been
     // modified since we last saved.
     private userModifiedMap: Record<string, number> = {}; // user_id : timestamp
-    private emitter = new EventEmitter();
+    private emitter = new TypedEventEmitter<keyof EventHandlerMap, EventHandlerMap>();
 
     /**
      * Construct a new Indexed Database store, which extends MemoryStore.

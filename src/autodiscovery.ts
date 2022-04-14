@@ -17,9 +17,10 @@ limitations under the License.
 
 /** @module auto-discovery */
 
+import { URL as NodeURL } from "url";
+
 import { IClientWellKnown, IWellKnownConfig } from "./client";
 import { logger } from './logger';
-import { URL as NodeURL } from "url";
 
 // Dev note: Auto discovery is part of the spec.
 // See: https://matrix.org/docs/spec/client_server/r0.4.0.html#server-discovery

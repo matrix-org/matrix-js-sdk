@@ -18,7 +18,9 @@ import { MatrixClient } from "../client";
 import { IEncryptedFile, RelationType, UNSTABLE_MSC3089_BRANCH } from "../@types/event";
 import { IContent, MatrixEvent } from "./event";
 import { MSC3089TreeSpace } from "./MSC3089TreeSpace";
-import type { ReadStream } from "fs";
+import { EventTimeline } from "./event-timeline";
+import { FileType } from "../http-api";
+import type { ISendEventResponse } from "..";
 
 /**
  * Represents a [MSC3089](https://github.com/matrix-org/matrix-doc/pull/3089) branch - a reference
@@ -38,7 +40,11 @@ export class MSC3089Branch {
      * The file ID.
      */
     public get id(): string {
-        return this.indexEvent.getStateKey();
+        const stateKey = this.indexEvent.getStateKey();
+        if (!stateKey) {
+            throw new Error("State key not found for branch");
+        }
+        return stateKey;
     }
 
     /**
@@ -121,6 +127,10 @@ export class MSC3089Branch {
         const file = event.getOriginalContent()['file'];
         const httpUrl = this.client.mxcUrlToHttp(file['url']);
 
+        if (!httpUrl) {
+            throw new Error(`No HTTP URL available for ${file['url']}`);
+        }
+
         return { info: file, httpUrl: httpUrl };
     }
 
@@ -132,7 +142,14 @@ export class MSC3089Branch {
         const room = this.client.getRoom(this.roomId);
         if (!room) throw new Error("Unknown room");
 
-        const event = room.getUnfilteredTimelineSet().findEventById(this.id);
+        let event: MatrixEvent | undefined = room.getUnfilteredTimelineSet().findEventById(this.id);
+
+        // keep scrolling back if needed until we find the event or reach the start of the room:
+        while (!event && room.getLiveTimeline().getState(EventTimeline.BACKWARDS).paginationToken) {
+            await this.client.scrollback(room, 100);
+            event = room.getUnfilteredTimelineSet().findEventById(this.id);
+        }
+
         if (!event) throw new Error("Failed to find event");
 
         // Sometimes the event isn't decrypted for us, so do that. We specifically set `emit: true`
@@ -148,14 +165,14 @@ export class MSC3089Branch {
      * @param {File | String | Buffer | ReadStream | Blob} encryptedContents The encrypted contents.
      * @param {Partial<IEncryptedFile>} info The encrypted file information.
      * @param {IContent} additionalContent Optional event content fields to include in the message.
-     * @returns {Promise<void>} Resolves when uploaded.
+     * @returns {Promise<ISendEventResponse>} Resolves to the file event's sent response.
      */
     public async createNewVersion(
         name: string,
-        encryptedContents: File | String | Buffer | ReadStream | Blob,
+        encryptedContents: FileType,
         info: Partial<IEncryptedFile>,
         additionalContent?: IContent,
-    ): Promise<void> {
+    ): Promise<ISendEventResponse> {
         const fileEventResponse = await this.directory.createFile(name, encryptedContents, info, {
             ...(additionalContent ?? {}),
             "m.new_content": true,
@@ -177,6 +194,8 @@ export class MSC3089Branch {
             ...(this.indexEvent.getContent()),
             active: false,
         }, this.id);
+
+        return fileEventResponse;
     }
 
     /**
@@ -199,7 +218,7 @@ export class MSC3089Branch {
         // XXX: This is a very inefficient search, but it's the best we can do with the
         // relations structure we have in the SDK. As of writing, it is not worth the
         // investment in improving the structure.
-        let childEvent: MatrixEvent;
+        let childEvent: MatrixEvent | undefined;
         let parentEvent = await this.getFileEvent();
         do {
             childEvent = timelineEvents.find(e => e.replacingEventId() === parentEvent.getId());

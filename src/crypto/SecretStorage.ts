@@ -16,12 +16,13 @@ limitations under the License.
 
 import { logger } from '../logger';
 import * as olmlib from './olmlib';
+import { encodeBase64 } from './olmlib';
 import { randomString } from '../randomstring';
-import { encryptAES, decryptAES, IEncryptedPayload, calculateKeyCheck } from './aes';
-import { encodeBase64 } from "./olmlib";
-import { ICryptoCallbacks, MatrixClient, MatrixEvent } from '../matrix';
+import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from './aes';
+import { ClientEvent, ICryptoCallbacks, MatrixEvent } from '../matrix';
+import { ClientEventHandlerMap, MatrixClient } from "../client";
 import { IAddSecretStorageKeyOpts, ISecretStorageKeyInfo } from './api';
-import { EventEmitter } from 'stream';
+import { TypedEventEmitter } from '../models/typed-event-emitter';
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
 
@@ -35,9 +36,9 @@ export interface ISecretRequest {
     cancel: (reason: string) => void;
 }
 
-export interface IAccountDataClient extends EventEmitter {
+export interface IAccountDataClient extends TypedEventEmitter<ClientEvent.AccountData, ClientEventHandlerMap> {
     // Subset of MatrixClient (which also uses any for the event content)
-    getAccountDataFromServer: (eventType: string) => Promise<Record<string, any>>;
+    getAccountDataFromServer: <T extends {[k: string]: any}>(eventType: string) => Promise<T>;
     getAccountData: (eventType: string) => MatrixEvent;
     setAccountData: (eventType: string, content: any) => Promise<{}>;
 }
@@ -52,6 +53,13 @@ interface ISecretRequestInternal {
 interface IDecryptors {
     encrypt: (plaintext: string) => Promise<IEncryptedPayload>;
     decrypt: (ciphertext: IEncryptedPayload) => Promise<string>;
+}
+
+interface ISecretInfo {
+    encrypted: {
+        // eslint-disable-next-line camelcase
+        key_id: IEncryptedPayload;
+    };
 }
 
 /**
@@ -75,8 +83,8 @@ export class SecretStorage {
         private readonly baseApis?: MatrixClient,
     ) {}
 
-    public async getDefaultKeyId(): Promise<string> {
-        const defaultKey = await this.accountDataAdapter.getAccountDataFromServer(
+    public async getDefaultKeyId(): Promise<string | null> {
+        const defaultKey = await this.accountDataAdapter.getAccountDataFromServer<{ key: string }>(
             'm.secret_storage.default_key',
         );
         if (!defaultKey) return null;
@@ -90,17 +98,17 @@ export class SecretStorage {
                     ev.getType() === 'm.secret_storage.default_key' &&
                     ev.getContent().key === keyId
                 ) {
-                    this.accountDataAdapter.removeListener('accountData', listener);
+                    this.accountDataAdapter.removeListener(ClientEvent.AccountData, listener);
                     resolve();
                 }
             };
-            this.accountDataAdapter.on('accountData', listener);
+            this.accountDataAdapter.on(ClientEvent.AccountData, listener);
 
             this.accountDataAdapter.setAccountData(
                 'm.secret_storage.default_key',
                 { key: keyId },
             ).catch(e => {
-                this.accountDataAdapter.removeListener('accountData', listener);
+                this.accountDataAdapter.removeListener(ClientEvent.AccountData, listener);
                 reject(e);
             });
         });
@@ -149,7 +157,7 @@ export class SecretStorage {
             do {
                 keyId = randomString(32);
             } while (
-                await this.accountDataAdapter.getAccountDataFromServer(
+                await this.accountDataAdapter.getAccountDataFromServer<ISecretStorageKeyInfo>(
                     `m.secret_storage.key.${keyId}`,
                 )
             );
@@ -182,9 +190,9 @@ export class SecretStorage {
             return null;
         }
 
-        const keyInfo = await this.accountDataAdapter.getAccountDataFromServer(
+        const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretStorageKeyInfo>(
             "m.secret_storage.key." + keyId,
-        ) as ISecretStorageKeyInfo;
+        );
         return keyInfo ? [keyId, keyInfo] : null;
     }
 
@@ -230,7 +238,7 @@ export class SecretStorage {
      *     or null/undefined to use the default key.
      */
     public async store(name: string, secret: string, keys?: string[]): Promise<void> {
-        const encrypted = {};
+        const encrypted: Record<string, IEncryptedPayload> = {};
 
         if (!keys) {
             const defaultKeyId = await this.getDefaultKeyId();
@@ -246,9 +254,9 @@ export class SecretStorage {
 
         for (const keyId of keys) {
             // get key information from key storage
-            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer(
+            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretStorageKeyInfo>(
                 "m.secret_storage.key." + keyId,
-            ) as ISecretStorageKeyInfo;
+            );
             if (!keyInfo) {
                 throw new Error("Unknown key: " + keyId);
             }
@@ -277,7 +285,7 @@ export class SecretStorage {
      * @return {string} the contents of the secret
      */
     public async get(name: string): Promise<string> {
-        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer(name);
+        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretInfo>(name);
         if (!secretInfo) {
             return;
         }
@@ -286,11 +294,13 @@ export class SecretStorage {
         }
 
         // get possible keys to decrypt
-        const keys = {};
+        const keys: Record<string, ISecretStorageKeyInfo> = {};
         for (const keyId of Object.keys(secretInfo.encrypted)) {
             // get key information from key storage
-            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer(
-                "m.secret_storage.key." + keyId,
+            const keyInfo = (
+                await this.accountDataAdapter.getAccountDataFromServer<ISecretStorageKeyInfo>(
+                    "m.secret_storage.key." + keyId,
+                )
             );
             const encInfo = secretInfo.encrypted[keyId];
             // only use keys we understand the encryption algorithm of
@@ -306,7 +316,7 @@ export class SecretStorage {
                 `the keys it is encrypted with are for a supported algorithm`);
         }
 
-        let keyId;
+        let keyId: string;
         let decryption;
         try {
             // fetch private key from app
@@ -335,9 +345,9 @@ export class SecretStorage {
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    public async isStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo>> {
+    public async isStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo> | null> {
         // check if secret exists
-        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer(name);
+        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretInfo>(name);
         if (!secretInfo) return null;
         if (!secretInfo.encrypted) {
             return null;
@@ -350,7 +360,7 @@ export class SecretStorage {
         // filter secret encryption keys with supported algorithm
         for (const keyId of Object.keys(secretInfo.encrypted)) {
             // get key information from key storage
-            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer(
+            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretStorageKeyInfo>(
                 "m.secret_storage.key." + keyId,
             );
             if (!keyInfo) continue;
@@ -375,8 +385,8 @@ export class SecretStorage {
     public request(name: string, devices: string[]): ISecretRequest {
         const requestId = this.baseApis.makeTxnId();
 
-        let resolve: (string) => void;
-        let reject: (Error) => void;
+        let resolve: (s: string) => void;
+        let reject: (e: Error) => void;
         const promise = new Promise<string>((res, rej) => {
             resolve = res;
             reject = rej;

@@ -1,7 +1,9 @@
-import * as utils from "../test-utils";
+import * as utils from "../test-utils/test-utils";
 import { CRYPTO_ENABLED } from "../../src/client";
+import { MatrixEvent } from "../../src/models/event";
 import { Filter, MemoryStore, Room } from "../../src/matrix";
 import { TestClient } from "../TestClient";
+import { THREAD_RELATION_TYPE } from "../../src/models/thread";
 
 describe("MatrixClient", function() {
     let client = null;
@@ -13,9 +15,7 @@ describe("MatrixClient", function() {
     beforeEach(function() {
         store = new MemoryStore();
 
-        const testClient = new TestClient(userId, "aliceDevice", accessToken, undefined, {
-            store: store,
-        });
+        const testClient = new TestClient(userId, "aliceDevice", accessToken, undefined, { store });
         httpBackend = testClient.httpBackend;
         client = testClient.client;
     });
@@ -145,12 +145,14 @@ describe("MatrixClient", function() {
     describe("joinRoom", function() {
         it("should no-op if you've already joined a room", function() {
             const roomId = "!foo:bar";
-            const room = new Room(roomId, userId);
+            const room = new Room(roomId, client, userId);
+            client.fetchRoomEvent = () => Promise.resolve({});
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userId, room: roomId, mship: "join", event: true,
                 }),
             ]);
+            httpBackend.verifyNoOutstandingRequests();
             store.storeRoom(room);
             client.joinRoom(roomId);
             httpBackend.verifyNoOutstandingRequests();
@@ -243,14 +245,15 @@ describe("MatrixClient", function() {
     });
 
     describe("searching", function() {
-        const response = {
-            search_categories: {
-                room_events: {
-                    count: 24,
-                    results: {
-                        "$flibble:localhost": {
+        it("searchMessageText should perform a /search for room_events", function() {
+            const response = {
+                search_categories: {
+                    room_events: {
+                        count: 24,
+                        results: [{
                             rank: 0.1,
                             result: {
+                                event_id: "$flibble:localhost",
                                 type: "m.room.message",
                                 user_id: "@alice:localhost",
                                 room_id: "!feuiwhf:localhost",
@@ -259,13 +262,11 @@ describe("MatrixClient", function() {
                                     msgtype: "m.text",
                                 },
                             },
-                        },
+                        }],
                     },
                 },
-            },
-        };
+            };
 
-        it("searchMessageText should perform a /search for room_events", function(done) {
             client.searchMessageText({
                 query: "monkeys",
             });
@@ -279,8 +280,171 @@ describe("MatrixClient", function() {
                 });
             }).respond(200, response);
 
-            httpBackend.flush().then(function() {
-                done();
+            return httpBackend.flush();
+        });
+
+        describe("should filter out context from different timelines (threads)", () => {
+            it("filters out thread replies when result is in the main timeline", async () => {
+                const response = {
+                    search_categories: {
+                        room_events: {
+                            count: 24,
+                            results: [{
+                                rank: 0.1,
+                                result: {
+                                    event_id: "$flibble:localhost",
+                                    type: "m.room.message",
+                                    user_id: "@alice:localhost",
+                                    room_id: "!feuiwhf:localhost",
+                                    content: {
+                                        body: "main timeline",
+                                        msgtype: "m.text",
+                                    },
+                                },
+                                context: {
+                                    events_after: [{
+                                        event_id: "$ev-after:server",
+                                        type: "m.room.message",
+                                        user_id: "@alice:localhost",
+                                        room_id: "!feuiwhf:localhost",
+                                        content: {
+                                            "body": "thread reply",
+                                            "msgtype": "m.text",
+                                            "m.relates_to": {
+                                                "event_id": "$some-thread:server",
+                                                "rel_type": THREAD_RELATION_TYPE.name,
+                                            },
+                                        },
+                                    }],
+                                    events_before: [{
+                                        event_id: "$ev-before:server",
+                                        type: "m.room.message",
+                                        user_id: "@alice:localhost",
+                                        room_id: "!feuiwhf:localhost",
+                                        content: {
+                                            body: "main timeline again",
+                                            msgtype: "m.text",
+                                        },
+                                    }],
+                                },
+                            }],
+                        },
+                    },
+                };
+
+                const data = {
+                    results: [],
+                    highlights: [],
+                };
+                client.processRoomEventsSearch(data, response);
+
+                expect(data.results).toHaveLength(1);
+                expect(data.results[0].context.timeline).toHaveLength(2);
+                expect(data.results[0].context.timeline.find(e => e.getId() === "$ev-after:server")).toBeFalsy();
+            });
+
+            it("filters out thread replies from threads other than the thread the result replied to", () => {
+                const response = {
+                    search_categories: {
+                        room_events: {
+                            count: 24,
+                            results: [{
+                                rank: 0.1,
+                                result: {
+                                    event_id: "$flibble:localhost",
+                                    type: "m.room.message",
+                                    user_id: "@alice:localhost",
+                                    room_id: "!feuiwhf:localhost",
+                                    content: {
+                                        "body": "thread 1 reply 1",
+                                        "msgtype": "m.text",
+                                        "m.relates_to": {
+                                            "event_id": "$thread1:server",
+                                            "rel_type": THREAD_RELATION_TYPE.name,
+                                        },
+                                    },
+                                },
+                                context: {
+                                    events_after: [{
+                                        event_id: "$ev-after:server",
+                                        type: "m.room.message",
+                                        user_id: "@alice:localhost",
+                                        room_id: "!feuiwhf:localhost",
+                                        content: {
+                                            "body": "thread 2 reply 2",
+                                            "msgtype": "m.text",
+                                            "m.relates_to": {
+                                                "event_id": "$thread2:server",
+                                                "rel_type": THREAD_RELATION_TYPE.name,
+                                            },
+                                        },
+                                    }],
+                                    events_before: [],
+                                },
+                            }],
+                        },
+                    },
+                };
+
+                const data = {
+                    results: [],
+                    highlights: [],
+                };
+                client.processRoomEventsSearch(data, response);
+
+                expect(data.results).toHaveLength(1);
+                expect(data.results[0].context.timeline).toHaveLength(1);
+                expect(data.results[0].context.timeline.find(e => e.getId() === "$flibble:localhost")).toBeTruthy();
+            });
+
+            it("filters out main timeline events when result is a thread reply", () => {
+                const response = {
+                    search_categories: {
+                        room_events: {
+                            count: 24,
+                            results: [{
+                                rank: 0.1,
+                                result: {
+                                    event_id: "$flibble:localhost",
+                                    type: "m.room.message",
+                                    user_id: "@alice:localhost",
+                                    room_id: "!feuiwhf:localhost",
+                                    content: {
+                                        "body": "thread 1 reply 1",
+                                        "msgtype": "m.text",
+                                        "m.relates_to": {
+                                            "event_id": "$thread1:server",
+                                            "rel_type": THREAD_RELATION_TYPE.name,
+                                        },
+                                    },
+                                },
+                                context: {
+                                    events_after: [{
+                                        event_id: "$ev-after:server",
+                                        type: "m.room.message",
+                                        user_id: "@alice:localhost",
+                                        room_id: "!feuiwhf:localhost",
+                                        content: {
+                                            "body": "main timeline",
+                                            "msgtype": "m.text",
+                                        },
+                                    }],
+                                    events_before: [],
+                                },
+                            }],
+                        },
+                    },
+                };
+
+                const data = {
+                    results: [],
+                    highlights: [],
+                };
+                client.processRoomEventsSearch(data, response);
+
+                expect(data.results).toHaveLength(1);
+                expect(data.results[0].context.timeline).toHaveLength(1);
+                expect(data.results[0].context.timeline.find(e => e.getId() === "$flibble:localhost")).toBeTruthy();
             });
         });
     });
@@ -392,6 +556,545 @@ describe("MatrixClient", function() {
             return prom;
         });
     });
+
+    describe("partitionThreadedEvents", function() {
+        let room;
+        beforeEach(() => {
+            room = new Room("!STrMRsukXHtqQdSeHa:matrix.org", client, userId);
+        });
+
+        it("returns empty arrays when given an empty arrays", function() {
+            const events = [];
+            const [timeline, threaded] = room.partitionThreadedEvents(events);
+            expect(timeline).toEqual([]);
+            expect(threaded).toEqual([]);
+        });
+
+        it("copies pre-thread in-timeline vote events onto both timelines", function() {
+            client.clientOpts = { experimentalThreadSupport: true };
+
+            const eventPollResponseReference = buildEventPollResponseReference();
+            const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
+            const eventMessageInThread = buildEventMessageInThread(eventPollStartThreadRoot);
+
+            const events = [
+                eventPollStartThreadRoot,
+                eventMessageInThread,
+                eventPollResponseReference,
+            ];
+            // Vote has no threadId yet
+            expect(eventPollResponseReference.threadId).toBeFalsy();
+
+            const [timeline, threaded] = room.partitionThreadedEvents(events);
+
+            expect(timeline).toEqual([
+                // The message that was sent in a thread is missing
+                eventPollStartThreadRoot,
+                eventPollResponseReference,
+            ]);
+
+            // The vote event has been copied into the thread
+            const eventRefWithThreadId = withThreadId(
+                eventPollResponseReference, eventPollStartThreadRoot.getId());
+            expect(eventRefWithThreadId.threadId).toBeTruthy();
+
+            expect(threaded).toEqual([
+                eventPollStartThreadRoot,
+                eventMessageInThread,
+                eventRefWithThreadId,
+            ]);
+        });
+
+        it("copies pre-thread in-timeline reactions onto both timelines", function() {
+            client.clientOpts = { experimentalThreadSupport: true };
+
+            const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
+            const eventMessageInThread = buildEventMessageInThread(eventPollStartThreadRoot);
+            const eventReaction = buildEventReaction(eventPollStartThreadRoot);
+
+            const events = [
+                eventPollStartThreadRoot,
+                eventMessageInThread,
+                eventReaction,
+            ];
+
+            const [timeline, threaded] = room.partitionThreadedEvents(events);
+
+            expect(timeline).toEqual([
+                eventPollStartThreadRoot,
+                eventReaction,
+            ]);
+
+            expect(threaded).toEqual([
+                eventPollStartThreadRoot,
+                eventMessageInThread,
+                withThreadId(eventReaction, eventPollStartThreadRoot.getId()),
+            ]);
+        });
+
+        it("copies post-thread in-timeline vote events onto both timelines", function() {
+            client.clientOpts = { experimentalThreadSupport: true };
+
+            const eventPollResponseReference = buildEventPollResponseReference();
+            const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
+            const eventMessageInThread = buildEventMessageInThread(eventPollStartThreadRoot);
+
+            const events = [
+                eventPollStartThreadRoot,
+                eventPollResponseReference,
+                eventMessageInThread,
+            ];
+
+            const [timeline, threaded] = room.partitionThreadedEvents(events);
+
+            expect(timeline).toEqual([
+                eventPollStartThreadRoot,
+                eventPollResponseReference,
+            ]);
+
+            expect(threaded).toEqual([
+                eventPollStartThreadRoot,
+                withThreadId(eventPollResponseReference, eventPollStartThreadRoot.getId()),
+                eventMessageInThread,
+            ]);
+        });
+
+        it("copies post-thread in-timeline reactions onto both timelines", function() {
+            client.clientOpts = { experimentalThreadSupport: true };
+
+            const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
+            const eventMessageInThread = buildEventMessageInThread(eventPollStartThreadRoot);
+            const eventReaction = buildEventReaction(eventPollStartThreadRoot);
+
+            const events = [
+                eventPollStartThreadRoot,
+                eventMessageInThread,
+                eventReaction,
+            ];
+
+            const [timeline, threaded] = room.partitionThreadedEvents(events);
+
+            expect(timeline).toEqual([
+                eventPollStartThreadRoot,
+                eventReaction,
+            ]);
+
+            expect(threaded).toEqual([
+                eventPollStartThreadRoot,
+                eventMessageInThread,
+                withThreadId(eventReaction, eventPollStartThreadRoot.getId()),
+            ]);
+        });
+
+        it("sends room state events to the main timeline only", function() {
+            client.clientOpts = { experimentalThreadSupport: true };
+            // This is based on recording the events in a real room:
+
+            const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
+            const eventPollResponseReference = buildEventPollResponseReference();
+            const eventMessageInThread = buildEventMessageInThread(eventPollStartThreadRoot);
+            const eventRoomName = buildEventRoomName();
+            const eventEncryption = buildEventEncryption();
+            const eventGuestAccess = buildEventGuestAccess();
+            const eventHistoryVisibility = buildEventHistoryVisibility();
+            const eventJoinRules = buildEventJoinRules();
+            const eventPowerLevels = buildEventPowerLevels();
+            const eventMember = buildEventMember();
+            const eventCreate = buildEventCreate();
+
+            const events = [
+                eventPollStartThreadRoot,
+                eventPollResponseReference,
+                eventMessageInThread,
+                eventRoomName,
+                eventEncryption,
+                eventGuestAccess,
+                eventHistoryVisibility,
+                eventJoinRules,
+                eventPowerLevels,
+                eventMember,
+                eventCreate,
+            ];
+            const [timeline, threaded] = room.partitionThreadedEvents(events);
+
+            expect(timeline).toEqual([
+                // The message that was sent in a thread is missing
+                eventPollStartThreadRoot,
+                eventPollResponseReference,
+                eventRoomName,
+                eventEncryption,
+                eventGuestAccess,
+                eventHistoryVisibility,
+                eventJoinRules,
+                eventPowerLevels,
+                eventMember,
+                eventCreate,
+            ]);
+
+            // Thread should contain only stuff that happened in the thread - no room state events
+            expect(threaded).toEqual([
+                eventPollStartThreadRoot,
+                withThreadId(eventPollResponseReference, eventPollStartThreadRoot.getId()),
+                eventMessageInThread,
+            ]);
+        });
+
+        it("sends redactions of reactions to thread responses to thread timeline only", () => {
+            client.clientOpts = { experimentalThreadSupport: true };
+
+            const threadRootEvent = buildEventPollStartThreadRoot();
+            const eventMessageInThread = buildEventMessageInThread(threadRootEvent);
+            const threadedReaction = buildEventReaction(eventMessageInThread);
+            const threadedReactionRedaction = buildEventRedaction(threadedReaction);
+
+            const events = [
+                threadRootEvent,
+                eventMessageInThread,
+                threadedReaction,
+                threadedReactionRedaction,
+            ];
+
+            const [timeline, threaded] = room.partitionThreadedEvents(events);
+
+            expect(timeline).toEqual([
+                threadRootEvent,
+            ]);
+
+            expect(threaded).toEqual([
+                threadRootEvent,
+                eventMessageInThread,
+                threadedReaction,
+                threadedReactionRedaction,
+            ]);
+        });
+
+        it("sends reply to reply to thread root outside of thread to main timeline only", () => {
+            client.clientOpts = { experimentalThreadSupport: true };
+
+            const threadRootEvent = buildEventPollStartThreadRoot();
+            const eventMessageInThread = buildEventMessageInThread(threadRootEvent);
+            const directReplyToThreadRoot = buildEventReply(threadRootEvent);
+            const replyToReply = buildEventReply(directReplyToThreadRoot);
+
+            const events = [
+                threadRootEvent,
+                eventMessageInThread,
+                directReplyToThreadRoot,
+                replyToReply,
+            ];
+
+            const [timeline, threaded] = room.partitionThreadedEvents(events);
+
+            expect(timeline).toEqual([
+                threadRootEvent,
+                directReplyToThreadRoot,
+                replyToReply,
+            ]);
+
+            expect(threaded).toEqual([
+                threadRootEvent,
+                eventMessageInThread,
+            ]);
+        });
+
+        it("sends reply to thread responses to thread timeline only", () => {
+            client.clientOpts = { experimentalThreadSupport: true };
+
+            const threadRootEvent = buildEventPollStartThreadRoot();
+            const eventMessageInThread = buildEventMessageInThread(threadRootEvent);
+            const replyToThreadResponse = buildEventReply(eventMessageInThread);
+
+            const events = [
+                threadRootEvent,
+                eventMessageInThread,
+                replyToThreadResponse,
+            ];
+
+            const [timeline, threaded] = room.partitionThreadedEvents(events);
+
+            expect(timeline).toEqual([
+                threadRootEvent,
+            ]);
+
+            expect(threaded).toEqual([
+                threadRootEvent,
+                eventMessageInThread,
+                replyToThreadResponse,
+            ]);
+        });
+    });
+});
+
+function withThreadId(event, newThreadId) {
+    const ret = event.toSnapshot();
+    ret.setThreadId(newThreadId);
+    return ret;
+}
+
+const buildEventMessageInThread = (root) => new MatrixEvent({
+    "age": 80098509,
+    "content": {
+        "algorithm": "m.megolm.v1.aes-sha2",
+        "ciphertext": "ENCRYPTEDSTUFF",
+        "device_id": "XISFUZSKHH",
+        "m.relates_to": {
+            "event_id": root.getId(),
+            "m.in_reply_to": {
+                "event_id": root.getId(),
+            },
+            "rel_type": "m.thread",
+        },
+        "sender_key": "i3N3CtG/CD2bGB8rA9fW6adLYSDvlUhf2iuU73L65Vg",
+        "session_id": "Ja11R/KG6ua0wdk8zAzognrxjio1Gm/RK2Gn6lFL804",
+    },
+    "event_id": "$W4chKIGYowtBblVLkRimeIg8TcdjETnxhDPGfi6NpDg",
+    "origin_server_ts": 1643815466378,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "type": "m.room.encrypted",
+    "unsigned": { "age": 80098509 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventPollResponseReference = () => new MatrixEvent({
+    "age": 80098509,
+    "content": {
+        "algorithm": "m.megolm.v1.aes-sha2",
+        "ciphertext": "ENCRYPTEDSTUFF",
+        "device_id": "XISFUZSKHH",
+        "m.relates_to": {
+            "event_id": "$VLS2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
+            "rel_type": "m.reference",
+        },
+        "sender_key": "i3N3CtG/CD2bGB8rA9fW6adLYSDvlUhf2iuU73L65Vg",
+        "session_id": "Ja11R/KG6ua0wdk8zAzognrxjio1Gm/RK2Gn6lFL804",
+    },
+    "event_id": "$91JvpezvsF0cKgav3g8W-uEVS4WkDHgxbJZvL3uMR1g",
+    "origin_server_ts": 1643815458650,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "type": "m.room.encrypted",
+    "unsigned": { "age": 80106237 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventReaction = (event) => new MatrixEvent({
+    "content": {
+        "m.relates_to": {
+            "event_id": event.getId(),
+            "key": "🤗",
+            "rel_type": "m.annotation",
+        },
+    },
+    "origin_server_ts": 1643977249238,
+    "sender": "@andybalaam-test1:matrix.org",
+    "type": "m.reaction",
+    "unsigned": {
+        "age": 22598,
+        "transaction_id": "m1643977249073.16",
+    },
+    "event_id": "$86B2b-x3LgE4DlV4y24b7UHnt72LIA3rzjvMysTtAfA",
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+});
+
+const buildEventRedaction = (event) => new MatrixEvent({
+    "content": {
+
+    },
+    "origin_server_ts": 1643977249239,
+    "sender": "@andybalaam-test1:matrix.org",
+    "redacts": event.getId(),
+    "type": "m.room.redaction",
+    "unsigned": {
+        "age": 22597,
+        "transaction_id": "m1643977249073.17",
+    },
+    "event_id": "$86B2b-x3LgE4DlV4y24b7UHnt72LIA3rzjvMysTtAfB",
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+});
+
+const buildEventPollStartThreadRoot = () => new MatrixEvent({
+    "age": 80108647,
+    "content": {
+        "algorithm": "m.megolm.v1.aes-sha2",
+        "ciphertext": "ENCRYPTEDSTUFF",
+        "device_id": "XISFUZSKHH",
+        "sender_key": "i3N3CtG/CD2bGB8rA9fW6adLYSDvlUhf2iuU73L65Vg",
+        "session_id": "Ja11R/KG6ua0wdk8zAzognrxjio1Gm/RK2Gn6lFL804",
+    },
+    "event_id": "$VLS2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
+    "origin_server_ts": 1643815456240,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "type": "m.room.encrypted",
+    "unsigned": { "age": 80108647 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventReply = (target) => new MatrixEvent({
+    "age": 80098509,
+    "content": {
+        "algorithm": "m.megolm.v1.aes-sha2",
+        "ciphertext": "ENCRYPTEDSTUFF",
+        "device_id": "XISFUZSKHH",
+        "m.relates_to": {
+            "m.in_reply_to": {
+                "event_id": target.getId(),
+            },
+        },
+        "sender_key": "i3N3CtG/CD2bGB8rA9fW6adLYSDvlUhf2iuU73L65Vg",
+        "session_id": "Ja11R/KG6ua0wdk8zAzognrxjio1Gm/RK2Gn6lFL804",
+    },
+    "event_id": target.getId() + Math.random(),
+    "origin_server_ts": 1643815466378,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "type": "m.room.encrypted",
+    "unsigned": { "age": 80098509 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventRoomName = () => new MatrixEvent({
+    "age": 80123249,
+    "content": {
+        "name": "1 poll, 1 vote, 1 thread",
+    },
+    "event_id": "$QAdyNJtKnl1j7or2yMycbOCvb6bCgvHs5lg3ZMd5xWk",
+    "origin_server_ts": 1643815441638,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "state_key": "",
+    "type": "m.room.name",
+    "unsigned": { "age": 80123249 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventEncryption = () => new MatrixEvent({
+    "age": 80123383,
+    "content": {
+        "algorithm": "m.megolm.v1.aes-sha2",
+    },
+    "event_id": "$1hGykogKQkXbHw8bVuyE3BjHnFBEJBcUWnakd0ck2K0",
+    "origin_server_ts": 1643815441504,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "state_key": "",
+    "type": "m.room.encryption",
+    "unsigned": { "age": 80123383 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventGuestAccess = () => new MatrixEvent({
+    "age": 80123473,
+    "content": {
+        "guest_access": "can_join",
+    },
+    "event_id": "$4_2n-H6K9-0nPbnjjtIue2SU44tGJsnuTmi6UuSrh-U",
+    "origin_server_ts": 1643815441414,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "state_key": "",
+    "type": "m.room.guest_access",
+    "unsigned": { "age": 80123473 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventHistoryVisibility = () => new MatrixEvent({
+    "age": 80123556,
+    "content": {
+        "history_visibility": "shared",
+    },
+    "event_id": "$W6kp44CTnvciOiHSPyhp8dh4n2v1_9kclUPddeaQj0E",
+    "origin_server_ts": 1643815441331,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "state_key": "",
+    "type": "m.room.history_visibility",
+    "unsigned": { "age": 80123556 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventJoinRules = () => new MatrixEvent({
+    "age": 80123696,
+    "content": {
+        "join_rule": "invite",
+    },
+    "event_id": "$6JDDeDp7fEc0F6YnTWMruNcKWFltR3e9wk7wWDDJrAU",
+    "origin_server_ts": 1643815441191,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "state_key": "",
+    "type": "m.room.join_rules",
+    "unsigned": { "age": 80123696 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventPowerLevels = () => new MatrixEvent({
+    "age": 80124105,
+    "content": {
+        "ban": 50,
+        "events": {
+            "m.room.avatar": 50,
+            "m.room.canonical_alias": 50,
+            "m.room.encryption": 100,
+            "m.room.history_visibility": 100,
+            "m.room.name": 50,
+            "m.room.power_levels": 100,
+            "m.room.server_acl": 100,
+            "m.room.tombstone": 100,
+        },
+        "events_default": 0,
+        "historical": 100,
+        "invite": 0,
+        "kick": 50,
+        "redact": 50,
+        "state_default": 50,
+        "users": {
+            "@andybalaam-test1:matrix.org": 100,
+        },
+        "users_default": 0,
+    },
+    "event_id": "$XZY2YgQhXskpc7gmJJG3S0VmS9_QjjCUVeeFTfgfC2E",
+    "origin_server_ts": 1643815440782,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "state_key": "",
+    "type": "m.room.power_levels",
+    "unsigned": { "age": 80124105 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventMember = () => new MatrixEvent({
+    "age": 80125279,
+    "content": {
+        "avatar_url": "mxc://matrix.org/aNtbVcFfwotudypZcHsIcPOc",
+        "displayname": "andybalaam-test1",
+        "membership": "join",
+    },
+    "event_id": "$Ex5eVmMs_ti784mo8bgddynbwLvy6231lCycJr7Cl9M",
+    "origin_server_ts": 1643815439608,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "state_key": "@andybalaam-test1:matrix.org",
+    "type": "m.room.member",
+    "unsigned": { "age": 80125279 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventCreate = () => new MatrixEvent({
+    "age": 80126105,
+    "content": {
+        "creator": "@andybalaam-test1:matrix.org",
+        "room_version": "6",
+    },
+    "event_id": "$e7j2Gt37k5NPwB6lz2N3V9lO5pUdNK8Ai7i2FPEK-oI",
+    "origin_server_ts": 1643815438782,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "state_key": "",
+    "type": "m.room.create",
+    "unsigned": { "age": 80126105 },
+    "user_id": "@andybalaam-test1:matrix.org",
 });
 
 function assertObjectContains(obj, expected) {

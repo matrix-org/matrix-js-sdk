@@ -255,6 +255,12 @@ if [ -n "$signing_id" ]; then
     # the easiest way to check the validity of the tarball from git is to unzip
     # it and compare it with our own idea of what the tar should look like.
 
+    # This uses git archive which seems to be what github uses. Specifically,
+    # the header fields are set in the same way: same file mode, uid & gid
+    # both zero and mtime set to the timestamp of the commit that the tag
+    # references. Also note that this puts the commit into the tar headers
+    # and can be extracted with gunzip -c foo.tar.gz | git get-tar-commit-id
+
     # the name of the sig file we want to create
     source_sigfile="${tag}-src.tar.gz.asc"
 

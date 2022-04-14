@@ -20,7 +20,6 @@ limitations under the License.
  */
 
 import { EventType } from "../@types/event";
-import { Group } from "../models/group";
 import { Room } from "../models/room";
 import { User } from "../models/user";
 import { IEvent, MatrixEvent } from "../models/event";
@@ -56,32 +55,6 @@ export class StubStore implements IStore {
      */
     public setSyncToken(token: string) {
         this.fromToken = token;
-    }
-
-    /**
-     * No-op.
-     * @param {Group} group
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public storeGroup(group: Group) {}
-
-    /**
-     * No-op.
-     * @param {string} groupId
-     * @return {null}
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public getGroup(groupId: string): Group | null {
-        return null;
-    }
-
-    /**
-     * No-op.
-     * @return {Array} An empty array.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public getGroups(): Group[] {
-        return [];
     }
 
     /**

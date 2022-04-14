@@ -20,17 +20,17 @@ limitations under the License.
  * Manages the list of other users' devices
  */
 
-import { EventEmitter } from 'events';
-
 import { logger } from '../logger';
 import { DeviceInfo, IDevice } from './deviceinfo';
 import { CrossSigningInfo, ICrossSigningInfo } from './CrossSigning';
 import * as olmlib from './olmlib';
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { chunkPromises, defer, IDeferred, sleep } from '../utils';
-import { MatrixClient } from "../client";
+import { IDownloadKeyResult, MatrixClient } from "../client";
 import { OlmDevice } from "./OlmDevice";
 import { CryptoStore } from "./store/base";
+import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { CryptoEvent, CryptoEventHandlerMap } from "./index";
 
 /* State transition diagram for DeviceList.deviceTrackingStatus
  *
@@ -62,10 +62,12 @@ export enum TrackingStatus {
 
 export type DeviceInfoMap = Record<string, Record<string, DeviceInfo>>;
 
+type EmittedEvents = CryptoEvent.WillUpdateDevices | CryptoEvent.DevicesUpdated | CryptoEvent.UserCrossSigningUpdated;
+
 /**
  * @alias module:crypto/DeviceList
  */
-export class DeviceList extends EventEmitter {
+export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHandlerMap> {
     private devices: { [userId: string]: { [deviceId: string]: IDevice } } = {};
 
     public crossSigningInfo: { [userId: string]: ICrossSigningInfo } = {};
@@ -265,8 +267,8 @@ export class DeviceList extends EventEmitter {
      * module:crypto/deviceinfo|DeviceInfo}.
      */
     public downloadKeys(userIds: string[], forceDownload: boolean): Promise<DeviceInfoMap> {
-        const usersToDownload = [];
-        const promises = [];
+        const usersToDownload: string[] = [];
+        const promises: Promise<unknown>[] = [];
 
         userIds.forEach((u) => {
             const trackingStatus = this.deviceTrackingStatus[u];
@@ -633,8 +635,8 @@ export class DeviceList extends EventEmitter {
             }
         });
 
-        const finished = (success) => {
-            this.emit("crypto.willUpdateDevices", users, !this.hasFetched);
+        const finished = (success: boolean): void => {
+            this.emit(CryptoEvent.WillUpdateDevices, users, !this.hasFetched);
             users.forEach((u) => {
                 this.dirty = true;
 
@@ -659,7 +661,7 @@ export class DeviceList extends EventEmitter {
                 }
             });
             this.saveIfDirty();
-            this.emit("crypto.devicesUpdated", users, !this.hasFetched);
+            this.emit(CryptoEvent.DevicesUpdated, users, !this.hasFetched);
             this.hasFetched = true;
         };
 
@@ -756,17 +758,21 @@ class DeviceListUpdateSerialiser {
             opts.token = this.syncToken;
         }
 
-        const factories = [];
+        const factories: Array<() => Promise<IDownloadKeyResult>> = [];
         for (let i = 0; i < downloadUsers.length; i += this.deviceList.keyDownloadChunkSize) {
             const userSlice = downloadUsers.slice(i, i + this.deviceList.keyDownloadChunkSize);
             factories.push(() => this.baseApis.downloadKeysForUsers(userSlice, opts));
         }
 
-        chunkPromises(factories, 3).then(async (responses: any[]) => {
-            const dk = Object.assign({}, ...(responses.map(res => res.device_keys || {})));
-            const masterKeys = Object.assign({}, ...(responses.map(res => res.master_keys || {})));
-            const ssks = Object.assign({}, ...(responses.map(res => res.self_signing_keys || {})));
-            const usks = Object.assign({}, ...(responses.map(res => res.user_signing_keys || {})));
+        chunkPromises(factories, 3).then(async (responses: IDownloadKeyResult[]) => {
+            const dk: IDownloadKeyResult["device_keys"]
+                = Object.assign({}, ...(responses.map(res => res.device_keys || {})));
+            const masterKeys: IDownloadKeyResult["master_keys"]
+                = Object.assign({}, ...(responses.map(res => res.master_keys || {})));
+            const ssks: IDownloadKeyResult["self_signing_keys"]
+                = Object.assign({}, ...(responses.map(res => res.self_signing_keys || {})));
+            const usks: IDownloadKeyResult["user_signing_keys"]
+                = Object.assign({}, ...(responses.map(res => res.user_signing_keys || {})));
 
             // yield to other things that want to execute in between users, to
             // avoid wedging the CPU
@@ -811,8 +817,12 @@ class DeviceListUpdateSerialiser {
 
     private async processQueryResponseForUser(
         userId: string,
-        dkResponse: object,
-        crossSigningResponse: any, // TODO types
+        dkResponse: IDownloadKeyResult["device_keys"]["user_id"],
+        crossSigningResponse: {
+            master: IDownloadKeyResult["master_keys"]["user_id"];
+            self_signing: IDownloadKeyResult["master_keys"]["user_id"]; // eslint-disable-line camelcase
+            user_signing: IDownloadKeyResult["user_signing_keys"]["user_id"]; // eslint-disable-line camelcase
+        },
     ): Promise<void> {
         logger.log('got device keys for ' + userId + ':', dkResponse);
         logger.log('got cross-signing keys for ' + userId + ':', crossSigningResponse);
@@ -859,7 +869,7 @@ class DeviceListUpdateSerialiser {
 
                 // NB. Unlike most events in the js-sdk, this one is internal to the
                 // js-sdk and is not re-emitted
-                this.deviceList.emit('userCrossSigningUpdated', userId);
+                this.deviceList.emit(CryptoEvent.UserCrossSigningUpdated, userId);
             }
         }
     }
@@ -869,7 +879,7 @@ async function updateStoredDeviceKeysForUser(
     olmDevice: OlmDevice,
     userId: string,
     userStore: Record<string, DeviceInfo>,
-    userResult: object,
+    userResult: IDownloadKeyResult["device_keys"]["user_id"],
     localUserId: string,
     localDeviceId: string,
 ): Promise<boolean> {

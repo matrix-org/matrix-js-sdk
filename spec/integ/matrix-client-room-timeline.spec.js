@@ -1,4 +1,4 @@
-import * as utils from "../test-utils";
+import * as utils from "../test-utils/test-utils";
 import { EventStatus } from "../../src/models/event";
 import { TestClient } from "../TestClient";
 
@@ -96,7 +96,7 @@ describe("MatrixClient room timelines", function() {
         });
     }
 
-    beforeEach(function() {
+    beforeEach(async function() {
         // these tests should work with or without timelineSupport
         const testClient = new TestClient(
             userId,
@@ -109,6 +109,7 @@ describe("MatrixClient room timelines", function() {
         client = testClient.client;
 
         setNextSyncData();
+        httpBackend.when("GET", "/versions").respond(200, {});
         httpBackend.when("GET", "/pushrules").respond(200, {});
         httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
         httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
@@ -116,9 +117,10 @@ describe("MatrixClient room timelines", function() {
             return NEXT_SYNC_DATA;
         });
         client.startClient();
-        return httpBackend.flush("/pushrules").then(function() {
-            return httpBackend.flush("/filter");
-        });
+
+        await httpBackend.flush("/versions");
+        await httpBackend.flush("/pushrules");
+        await httpBackend.flush("/filter");
     });
 
     afterEach(function() {
@@ -551,6 +553,7 @@ describe("MatrixClient room timelines", function() {
             NEXT_SYNC_DATA.rooms.join[roomId].timeline.limited = true;
 
             return Promise.all([
+                httpBackend.flush("/versions", 1),
                 httpBackend.flush("/sync", 1),
                 utils.syncPromise(client),
             ]).then(() => {

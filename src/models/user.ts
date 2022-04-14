@@ -18,12 +18,29 @@ limitations under the License.
  * @module models/user
  */
 
-import { EventEmitter } from "events";
-
 import { MatrixEvent } from "./event";
+import { TypedEventEmitter } from "./typed-event-emitter";
 
-export class User extends EventEmitter {
-    // eslint-disable-next-line camelcase
+export enum UserEvent {
+    DisplayName = "User.displayName",
+    AvatarUrl = "User.avatarUrl",
+    Presence = "User.presence",
+    CurrentlyActive = "User.currentlyActive",
+    LastPresenceTs = "User.lastPresenceTs",
+    /* @deprecated */
+    _UnstableStatusMessage = "User.unstable_statusMessage",
+}
+
+export type UserEventHandlerMap = {
+    [UserEvent.DisplayName]: (event: MatrixEvent | undefined, user: User) => void;
+    [UserEvent.AvatarUrl]: (event: MatrixEvent | undefined, user: User) => void;
+    [UserEvent.Presence]: (event: MatrixEvent | undefined, user: User) => void;
+    [UserEvent.CurrentlyActive]: (event: MatrixEvent | undefined, user: User) => void;
+    [UserEvent.LastPresenceTs]: (event: MatrixEvent | undefined, user: User) => void;
+    [UserEvent._UnstableStatusMessage]: (user: User) => void;
+};
+
+export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
     private modified: number;
 
     // XXX these should be read-only
@@ -39,9 +56,9 @@ export class User extends EventEmitter {
         presence?: MatrixEvent;
         profile?: MatrixEvent;
     } = {
-        presence: null,
-        profile: null,
-    };
+            presence: null,
+            profile: null,
+        };
     // eslint-disable-next-line camelcase
     public unstable_statusMessage = "";
 
@@ -94,25 +111,25 @@ export class User extends EventEmitter {
         const firstFire = this.events.presence === null;
         this.events.presence = event;
 
-        const eventsToFire = [];
+        const eventsToFire: UserEvent[] = [];
         if (event.getContent().presence !== this.presence || firstFire) {
-            eventsToFire.push("User.presence");
+            eventsToFire.push(UserEvent.Presence);
         }
         if (event.getContent().avatar_url &&
             event.getContent().avatar_url !== this.avatarUrl) {
-            eventsToFire.push("User.avatarUrl");
+            eventsToFire.push(UserEvent.AvatarUrl);
         }
         if (event.getContent().displayname &&
             event.getContent().displayname !== this.displayName) {
-            eventsToFire.push("User.displayName");
+            eventsToFire.push(UserEvent.DisplayName);
         }
         if (event.getContent().currently_active !== undefined &&
             event.getContent().currently_active !== this.currentlyActive) {
-            eventsToFire.push("User.currentlyActive");
+            eventsToFire.push(UserEvent.CurrentlyActive);
         }
 
         this.presence = event.getContent().presence;
-        eventsToFire.push("User.lastPresenceTs");
+        eventsToFire.push(UserEvent.LastPresenceTs);
 
         if (event.getContent().status_msg) {
             this.presenceStatusMsg = event.getContent().status_msg;
@@ -213,7 +230,7 @@ export class User extends EventEmitter {
         if (!event.getContent()) this.unstable_statusMessage = "";
         else this.unstable_statusMessage = event.getContent()["status"];
         this.updateModifiedTime();
-        this.emit("User.unstable_statusMessage", this);
+        this.emit(UserEvent._UnstableStatusMessage, this);
     }
 }
 

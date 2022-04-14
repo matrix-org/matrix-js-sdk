@@ -1,16 +1,16 @@
-import { EventStatus } from "../../src/matrix";
+import { EventStatus, RoomEvent } from "../../src/matrix";
 import { MatrixScheduler } from "../../src/scheduler";
 import { Room } from "../../src/models/room";
 import { TestClient } from "../TestClient";
 
 describe("MatrixClient retrying", function() {
-    let client = null;
-    let httpBackend = null;
+    let client: TestClient = null;
+    let httpBackend: TestClient["httpBackend"] = null;
     let scheduler;
     const userId = "@alice:localhost";
     const accessToken = "aseukfgwef";
     const roomId = "!room:here";
-    let room;
+    let room: Room;
 
     beforeEach(function() {
         scheduler = new MatrixScheduler();
@@ -53,10 +53,10 @@ describe("MatrixClient retrying", function() {
         const p1 = client.sendMessage(roomId, {
             "msgtype": "m.text",
             "body": "m1",
-        }).then(function(ev) {
+        }).then(function() {
             // we expect the first message to fail
             throw new Error('Message 1 unexpectedly sent successfully');
-        }, (e) => {
+        }, () => {
             // this is expected
         });
 
@@ -78,7 +78,7 @@ describe("MatrixClient retrying", function() {
         expect(ev2.status).toEqual(EventStatus.SENDING);
 
         // the first message should get sent, and the second should get queued
-        httpBackend.when("PUT", "/send/m.room.message/").check(function(rq) {
+        httpBackend.when("PUT", "/send/m.room.message/").check(function() {
             // ev2 should now have been queued
             expect(ev2.status).toEqual(EventStatus.QUEUED);
 
@@ -95,7 +95,7 @@ describe("MatrixClient retrying", function() {
 
         // wait for the localecho of ev1 to be updated
         const p3 = new Promise<void>((resolve, reject) => {
-            room.on("Room.localEchoUpdated", (ev0) => {
+            room.on(RoomEvent.LocalEchoUpdated, (ev0) => {
                 if (ev0 === ev1) {
                     resolve();
                 }

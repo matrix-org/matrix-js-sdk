@@ -20,7 +20,7 @@ limitations under the License.
  * @module crypto/verification/IllegalMethod
  */
 
-import { VerificationBase as Base } from "./Base";
+import { VerificationBase as Base, VerificationEvent, VerificationEventHandlerMap } from "./Base";
 import { IVerificationChannel } from "./request/Channel";
 import { MatrixClient } from "../../client";
 import { MatrixEvent } from "../../models/event";
@@ -30,7 +30,7 @@ import { VerificationRequest } from "./request/VerificationRequest";
  * @class crypto/verification/IllegalMethod/IllegalMethod
  * @extends {module:crypto/verification/Base}
  */
-export class IllegalMethod extends Base {
+export class IllegalMethod extends Base<VerificationEvent, VerificationEventHandlerMap> {
     public static factory(
         channel: IVerificationChannel,
         baseApis: MatrixClient,
