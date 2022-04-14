@@ -73,8 +73,8 @@ export function getHttpUriForMxc(
     const fragmentOffset = serverAndMediaId.indexOf("#");
     let fragment = "";
     if (fragmentOffset >= 0) {
-        fragment = serverAndMediaId.substr(fragmentOffset);
-        serverAndMediaId = serverAndMediaId.substr(0, fragmentOffset);
+        fragment = serverAndMediaId.slice(fragmentOffset);
+        serverAndMediaId = serverAndMediaId.slice(0, fragmentOffset);
     }
 
     const urlParams = (Object.keys(params).length === 0 ? "" : ("?" + utils.encodeParams(params)));
