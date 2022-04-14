@@ -40,6 +40,8 @@ enum OobStatus {
 }
 
 export interface ISetStateOptions {
+    /** Whether the sync response came from cache */
+    fromCache?: boolean;
     /** Whether the state is part of the first state snapshot we're seeing in
      *  the room. This could be happen in a variety of cases:
      *  1. From the initial sync
@@ -337,6 +339,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * @fires module:client~MatrixClient#event:"RoomStateEvent.Marker"
      */
     public setStateEvents(stateEvents: MatrixEvent[], setStateOptions?: ISetStateOptions) {
+        Error.stackTraceLimit = Infinity;
+        console.log(`setStateEvents fromInitialState=${setStateOptions && setStateOptions.fromInitialState} stateEvents:\n`, stateEvents.map((ev) => {
+            return `\t${ev.getType()} ${ev.getId()}`;
+        }).join('\n'), new Error().stack);
         this.updateModifiedTime();
 
         // update the core event dict

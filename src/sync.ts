@@ -1738,6 +1738,7 @@ export class SyncApi {
 
         room.addLiveEvents(timelineEventList || [], {
             fromCache,
+            fromInitialState: timelineWasEmpty || fromCache
         });
         this.client.processBeaconEvents(room, timelineEventList);
     }

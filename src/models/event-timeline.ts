@@ -146,6 +146,7 @@ export class EventTimeline {
      * @throws {Error} if an attempt is made to call this after addEvent is called.
      */
     public initialiseState(stateEvents: MatrixEvent[]): void {
+        console.log('initialiseState', stateEvents.map((ev) => { return ev.getType(); }));
         if (this.events.length > 0) {
             throw new Error("Cannot initialise state after events are added");
         }
@@ -387,7 +388,7 @@ export class EventTimeline {
                 timelineSet.room.getUnfilteredTimelineSet() === timelineSet
             ) {
                 roomState.setStateEvents([event], {
-                    fromInitialState,
+                    fromInitialState: fromInitialState,
                 });
                 // it is possible that the act of setting the state event means we
                 // can set more metadata (specifically sender/target props), so try
