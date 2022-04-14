@@ -1,4 +1,4 @@
-import { SlidingSync, SlidingSyncState } from "../../src/sliding-sync";
+import { SlidingSync, SlidingSyncState, ExtensionState } from "../../src/sliding-sync";
 import { TestClient } from "../TestClient";
 import { logger } from '../../src/logger';
 
@@ -475,16 +475,20 @@ describe("SlidingSync", () => {
         const extResp = {
             baz: "quuz",
         };
+
         let onExtensionRequest;
         let onExtensionResponse;
 
+        const ext = {
+            name: () => extName,
+            onRequest: (initial) => { return onExtensionRequest(initial); },
+            onResponse: (res) => { return onExtensionResponse(res); },
+            when: () => ExtensionState.PreProcess,
+        }
+
         it("should be able to register an extension", async (done) => {
             slidingSync = new SlidingSync(proxyBaseUrl, [], {}, client, 1);
-            slidingSync.registerExtension(extName, () => {
-                return onExtensionRequest();
-            }, (resp) => {
-                return onExtensionResponse(resp);
-            });
+            slidingSync.registerExtension(ext);
 
             let extensionOnResponseCalled = false;
             onExtensionRequest = () => {
