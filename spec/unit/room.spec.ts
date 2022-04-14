@@ -209,7 +209,9 @@ describe("Room", function() {
 
         it("should throw if duplicateStrategy isn't 'replace' or 'ignore'", function() {
             expect(function() {
-                room.addLiveEvents(events, "foo");
+                room.addLiveEvents(events, {
+                    duplicateStrategy: "foo",
+                });
             }).toThrow();
         });
 
@@ -221,7 +223,9 @@ describe("Room", function() {
             dupe.event.event_id = events[0].getId();
             room.addLiveEvents(events);
             expect(room.timeline[0]).toEqual(events[0]);
-            room.addLiveEvents([dupe], DuplicateStrategy.Replace);
+            room.addLiveEvents([dupe], {
+                duplicateStrategy: DuplicateStrategy.Replace,
+            });
             expect(room.timeline[0]).toEqual(dupe);
         });
 
@@ -233,7 +237,9 @@ describe("Room", function() {
             dupe.event.event_id = events[0].getId();
             room.addLiveEvents(events);
             expect(room.timeline[0]).toEqual(events[0]);
-            room.addLiveEvents([dupe], "ignore");
+            room.addLiveEvents([dupe], {
+                duplicateStrategy: "ignore",
+            });
             expect(room.timeline[0]).toEqual(events[0]);
         });
 
@@ -266,9 +272,11 @@ describe("Room", function() {
                 room.addLiveEvents(events);
                 expect(room.currentState.setStateEvents).toHaveBeenCalledWith(
                     [events[0]],
+                    { timelineWasEmpty: undefined },
                 );
                 expect(room.currentState.setStateEvents).toHaveBeenCalledWith(
                     [events[1]],
+                    { timelineWasEmpty: undefined },
                 );
                 expect(events[0].forwardLooking).toBe(true);
                 expect(events[1].forwardLooking).toBe(true);
@@ -470,9 +478,11 @@ describe("Room", function() {
             room.addEventsToTimeline(events, true, room.getLiveTimeline());
             expect(room.oldState.setStateEvents).toHaveBeenCalledWith(
                 [events[0]],
+                { timelineWasEmpty: undefined },
             );
             expect(room.oldState.setStateEvents).toHaveBeenCalledWith(
                 [events[1]],
+                { timelineWasEmpty: undefined },
             );
             expect(events[0].forwardLooking).toBe(false);
             expect(events[1].forwardLooking).toBe(false);
