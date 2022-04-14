@@ -20,10 +20,32 @@ import anotherjson from 'another-json';
 
 import * as olmlib from "../../../src/crypto/olmlib";
 import { TestClient } from '../../TestClient';
-import { HttpResponse, setHttpResponses } from '../../test-utils/test-utils';
 import { resetCrossSigningKeys } from "./crypto-utils";
 import { MatrixError } from '../../../src/http-api';
 import { logger } from '../../../src/logger';
+
+const PUSH_RULES_RESPONSE = {
+    method: "GET",
+    path: "/pushrules/",
+    data: {},
+};
+
+const filterResponse = function(userId) {
+    const filterPath = "/user/" + encodeURIComponent(userId) + "/filter";
+    return {
+        method: "POST",
+        path: filterPath,
+        data: { filter_id: "f1lt3r" },
+    };
+};
+
+function setHttpResponses(httpBackend, responses) {
+    responses.forEach(response => {
+        httpBackend
+            .when(response.method, response.path)
+            .respond(200, response.data);
+    });
+}
 
 async function makeTestClient(userInfo, options, keys) {
     if (!keys) keys = {};
@@ -237,7 +259,7 @@ describe("Cross Signing", function() {
 
         // feed sync result that includes master key, ssk, device key
         const responses = [
-            HttpResponse.PUSH_RULES_RESPONSE,
+            PUSH_RULES_RESPONSE,
             {
                 method: "POST",
                 path: "/keys/upload",
@@ -248,7 +270,7 @@ describe("Cross Signing", function() {
                     },
                 },
             },
-            HttpResponse.filterResponse("@alice:example.com"),
+            filterResponse("@alice:example.com"),
             {
                 method: "GET",
                 path: "/sync",
@@ -493,7 +515,7 @@ describe("Cross Signing", function() {
         // - master key signed by her usk (pretend that it was signed by another
         //   of Alice's devices)
         const responses = [
-            HttpResponse.PUSH_RULES_RESPONSE,
+            PUSH_RULES_RESPONSE,
             {
                 method: "POST",
                 path: "/keys/upload",
@@ -504,7 +526,7 @@ describe("Cross Signing", function() {
                     },
                 },
             },
-            HttpResponse.filterResponse("@alice:example.com"),
+            filterResponse("@alice:example.com"),
             {
                 method: "GET",
                 path: "/sync",

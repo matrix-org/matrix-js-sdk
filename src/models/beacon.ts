@@ -14,21 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { M_BEACON_INFO } from "../@types/beacon";
-import { BeaconInfoState, parseBeaconInfoContent } from "../content-helpers";
+import { MBeaconEventContent } from "../@types/beacon";
+import { M_TIMESTAMP } from "../@types/location";
+import { BeaconInfoState, BeaconLocationState, parseBeaconContent, parseBeaconInfoContent } from "../content-helpers";
 import { MatrixEvent } from "../matrix";
+import { sortEventsByLatestContentTimestamp } from "../utils";
 import { TypedEventEmitter } from "./typed-event-emitter";
 
 export enum BeaconEvent {
     New = "Beacon.new",
     Update = "Beacon.update",
     LivenessChange = "Beacon.LivenessChange",
+    Destroy = "Beacon.Destroy",
+    LocationUpdate = "Beacon.LocationUpdate",
 }
 
 export type BeaconEventHandlerMap = {
-    [BeaconEvent.New]: (event: MatrixEvent, beacon: Beacon) => void;
     [BeaconEvent.Update]: (event: MatrixEvent, beacon: Beacon) => void;
     [BeaconEvent.LivenessChange]: (isLive: boolean, beacon: Beacon) => void;
+    [BeaconEvent.Destroy]: (beaconIdentifier: string) => void;
+    [BeaconEvent.LocationUpdate]: (locationState: BeaconLocationState) => void;
+    [BeaconEvent.Destroy]: (beaconIdentifier: string) => void;
 };
 
 export const isTimestampInDuration = (
@@ -37,16 +43,19 @@ export const isTimestampInDuration = (
     timestamp: number,
 ): boolean => timestamp >= startTimestamp && startTimestamp + durationMs >= timestamp;
 
-export const isBeaconInfoEventType = (type: string) =>
-    type.startsWith(M_BEACON_INFO.name) ||
-    type.startsWith(M_BEACON_INFO.altName);
+// beacon info events are uniquely identified by
+// `<roomId>_<state_key>`
+export type BeaconIdentifier = string;
+export const getBeaconInfoIdentifier = (event: MatrixEvent): BeaconIdentifier =>
+    `${event.getRoomId()}_${event.getStateKey()}`;
 
-// https://github.com/matrix-org/matrix-spec-proposals/pull/3489
-export class Beacon extends TypedEventEmitter<BeaconEvent, BeaconEventHandlerMap> {
+// https://github.com/matrix-org/matrix-spec-proposals/pull/3672
+export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.New>, BeaconEventHandlerMap> {
     public readonly roomId: string;
-    private beaconInfo: BeaconInfoState;
+    private _beaconInfo: BeaconInfoState;
     private _isLive: boolean;
     private livenessWatchInterval: number;
+    private _latestLocationState: BeaconLocationState | undefined;
 
     constructor(
         private rootEvent: MatrixEvent,
@@ -54,11 +63,14 @@ export class Beacon extends TypedEventEmitter<BeaconEvent, BeaconEventHandlerMap
         super();
         this.setBeaconInfo(this.rootEvent);
         this.roomId = this.rootEvent.getRoomId();
-        this.emit(BeaconEvent.New, this.rootEvent, this);
     }
 
     public get isLive(): boolean {
         return this._isLive;
+    }
+
+    public get identifier(): BeaconIdentifier {
+        return getBeaconInfoIdentifier(this.rootEvent);
     }
 
     public get beaconInfoId(): string {
@@ -69,20 +81,40 @@ export class Beacon extends TypedEventEmitter<BeaconEvent, BeaconEventHandlerMap
         return this.rootEvent.getStateKey();
     }
 
+    public get beaconInfoEventType(): string {
+        return this.rootEvent.getType();
+    }
+
+    public get beaconInfo(): BeaconInfoState {
+        return this._beaconInfo;
+    }
+
+    public get latestLocationState(): BeaconLocationState | undefined {
+        return this._latestLocationState;
+    }
+
     public update(beaconInfoEvent: MatrixEvent): void {
-        if (beaconInfoEvent.getId() !== this.beaconInfoId) {
+        if (getBeaconInfoIdentifier(beaconInfoEvent) !== this.identifier) {
             throw new Error('Invalid updating event');
+        }
+        // don't update beacon with an older event
+        if (beaconInfoEvent.event.origin_server_ts < this.rootEvent.event.origin_server_ts) {
+            return;
         }
         this.rootEvent = beaconInfoEvent;
         this.setBeaconInfo(this.rootEvent);
 
         this.emit(BeaconEvent.Update, beaconInfoEvent, this);
+        this.clearLatestLocation();
     }
 
     public destroy(): void {
         if (this.livenessWatchInterval) {
             clearInterval(this.livenessWatchInterval);
         }
+
+        this._isLive = false;
+        this.emit(BeaconEvent.Destroy, this.identifier);
     }
 
     /**
@@ -94,23 +126,60 @@ export class Beacon extends TypedEventEmitter<BeaconEvent, BeaconEventHandlerMap
             clearInterval(this.livenessWatchInterval);
         }
 
+        this.checkLiveness();
         if (this.isLive) {
-            const expiryInMs = (this.beaconInfo?.timestamp + this.beaconInfo?.timeout + 1) - Date.now();
+            const expiryInMs = (this._beaconInfo?.timestamp + this._beaconInfo?.timeout) - Date.now();
             if (expiryInMs > 1) {
-                this.livenessWatchInterval = setInterval(this.checkLiveness.bind(this), expiryInMs);
+                this.livenessWatchInterval = setInterval(
+                    () => { this.monitorLiveness(); },
+                    expiryInMs,
+                );
             }
         }
     }
 
+    /**
+     * Process Beacon locations
+     * Emits BeaconEvent.LocationUpdate
+     */
+    public addLocations(beaconLocationEvents: MatrixEvent[]): void {
+        // discard locations for beacons that are not live
+        if (!this.isLive) {
+            return;
+        }
+
+        const validLocationEvents = beaconLocationEvents.filter(event => {
+            const content = event.getContent<MBeaconEventContent>();
+            const timestamp = M_TIMESTAMP.findIn<number>(content);
+            return (
+                // only include positions that were taken inside the beacon's live period
+                isTimestampInDuration(this._beaconInfo.timestamp, this._beaconInfo.timeout, timestamp) &&
+                // ignore positions older than our current latest location
+                (!this.latestLocationState || timestamp > this.latestLocationState.timestamp)
+            );
+        });
+        const latestLocationEvent = validLocationEvents.sort(sortEventsByLatestContentTimestamp)?.[0];
+
+        if (latestLocationEvent) {
+            this._latestLocationState = parseBeaconContent(latestLocationEvent.getContent());
+            this.emit(BeaconEvent.LocationUpdate, this.latestLocationState);
+        }
+    }
+
+    private clearLatestLocation = () => {
+        this._latestLocationState = undefined;
+        this.emit(BeaconEvent.LocationUpdate, this.latestLocationState);
+    };
+
     private setBeaconInfo(event: MatrixEvent): void {
-        this.beaconInfo = parseBeaconInfoContent(event.getContent());
+        this._beaconInfo = parseBeaconInfoContent(event.getContent());
         this.checkLiveness();
     }
 
     private checkLiveness(): void {
         const prevLiveness = this.isLive;
-        this._isLive = this.beaconInfo?.live &&
-            isTimestampInDuration(this.beaconInfo?.timestamp, this.beaconInfo?.timeout, Date.now());
+        this._isLive = this._beaconInfo?.live &&
+            isTimestampInDuration(this._beaconInfo?.timestamp, this._beaconInfo?.timeout, Date.now());
 
         if (prevLiveness !== this.isLive) {
             this.emit(BeaconEvent.LivenessChange, this.isLive, this);

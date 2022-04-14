@@ -93,14 +93,7 @@ export enum RelationType {
     Annotation = "m.annotation",
     Replace = "m.replace",
     Reference = "m.reference",
-    /**
-     * Note, "io.element.thread" is hardcoded
-     * Should be replaced with "m.thread" once MSC3440 lands
-     * Can not use `UnstableValue` as TypeScript does not
-     * allow computed values in enums
-     * https://github.com/microsoft/TypeScript/issues/27976
-     */
-    Thread = "io.element.thread",
+    Thread = "m.thread",
 }
 
 export enum MsgType {
@@ -119,6 +112,8 @@ export const RoomCreateTypeField = "type";
 
 export enum RoomType {
     Space = "m.space",
+    UnstableCall = "org.matrix.msc3417.call",
+    ElementVideo = "io.element.video",
 }
 
 /**

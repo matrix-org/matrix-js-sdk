@@ -86,9 +86,17 @@ export interface IEvent {
     unsigned: IUnsigned;
     redacts?: string;
 
-    // v1 legacy fields
+    /**
+     * @deprecated
+     */
     user_id?: string;
+    /**
+     * @deprecated
+     */
     prev_content?: IContent;
+    /**
+     * @deprecated
+     */
     age?: number;
 }
 
@@ -109,11 +117,6 @@ export interface IEventRelation {
         event_id: string;
     };
     key?: string;
-}
-
-export interface IVisibilityEventRelation extends IEventRelation {
-    visibility: "visible" | "hidden";
-    reason?: string;
 }
 
 /**
@@ -279,7 +282,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
     public target: RoomMember = null;
     public status: EventStatus = null;
     public error: MatrixError = null;
-    public forwardLooking = true;
+    public forwardLooking = true; // only state events may be backwards looking
 
     /* If the event is a `m.key.verification.request` (or to_device `m.key.verification.start`) event,
      * `Crypto` will set this the `VerificationRequest` for the event
@@ -478,7 +481,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
      *
      * @return {Object} The event content JSON, or an empty object.
      */
-    public getContent<T = IContent>(): T {
+    public getContent<T extends IContent = IContent>(): T {
         if (this._localRedactionEvent) {
             return {} as T;
         } else if (this._replacingEvent) {

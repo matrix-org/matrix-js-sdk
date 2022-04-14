@@ -16,7 +16,6 @@ limitations under the License.
 
 import { REFERENCE_RELATION } from "matrix-events-sdk";
 
-import { M_BEACON_INFO } from "../../src/@types/beacon";
 import { LocationAssetType, M_ASSET, M_LOCATION, M_TIMESTAMP } from "../../src/@types/location";
 import { makeBeaconContent, makeBeaconInfoContent } from "../../src/content-helpers";
 
@@ -36,11 +35,9 @@ describe('Beacon content helpers', () => {
                 'nice beacon_info',
                 LocationAssetType.Pin,
             )).toEqual({
-                [M_BEACON_INFO.name]: {
-                    description: 'nice beacon_info',
-                    timeout: 1234,
-                    live: true,
-                },
+                description: 'nice beacon_info',
+                timeout: 1234,
+                live: true,
                 [M_TIMESTAMP.name]: mockDateNow,
                 [M_ASSET.name]: {
                     type: LocationAssetType.Pin,
@@ -56,6 +53,18 @@ describe('Beacon content helpers', () => {
                 LocationAssetType.Pin,
             )).toEqual(expect.objectContaining({
                 [M_TIMESTAMP.name]: mockDateNow,
+            }));
+        });
+
+        it('uses timestamp when provided', () => {
+            expect(makeBeaconInfoContent(
+                1234,
+                true,
+                'nice beacon_info',
+                LocationAssetType.Pin,
+                99999,
+            )).toEqual(expect.objectContaining({
+                [M_TIMESTAMP.name]: 99999,
             }));
         });
 

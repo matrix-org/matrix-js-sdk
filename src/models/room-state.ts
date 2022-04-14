@@ -26,7 +26,11 @@ import { MatrixEvent } from "./event";
 import { MatrixClient } from "../client";
 import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
 import { TypedEventEmitter } from "./typed-event-emitter";
-import { Beacon, BeaconEvent, isBeaconInfoEventType } from "./beacon";
+import { Beacon, BeaconEvent, BeaconEventHandlerMap } from "./beacon";
+import { TypedReEmitter } from "../ReEmitter";
+import { M_BEACON_INFO } from "../@types/beacon";
+import { getBeaconInfoIdentifier } from "./beacon";
+import { BeaconIdentifier } from "..";
 
 // possible statuses for out-of-band member loading
 enum OobStatus {
@@ -49,9 +53,14 @@ export type RoomStateEventHandlerMap = {
     [RoomStateEvent.NewMember]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
     [RoomStateEvent.Update]: (state: RoomState) => void;
     [RoomStateEvent.BeaconLiveness]: (state: RoomState, hasLiveBeacons: boolean) => void;
+    [BeaconEvent.New]: (event: MatrixEvent, beacon: Beacon) => void;
 };
 
-export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventHandlerMap> {
+type EmittedEvents = RoomStateEvent | BeaconEvent;
+type EventHandlerMap = RoomStateEventHandlerMap & BeaconEventHandlerMap;
+
+export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
+    public readonly reEmitter = new TypedReEmitter<EmittedEvents, EventHandlerMap>(this);
     private sentinels: Record<string, RoomMember> = {}; // userId: RoomMember
     // stores fuzzy matches to a list of userIDs (applies utils.removeHiddenChars to keys)
     private displayNameToUserIds: Record<string, string[]> = {};
@@ -74,8 +83,8 @@ export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventH
     public events = new Map<string, Map<string, MatrixEvent>>(); // Map<eventType, Map<stateKey, MatrixEvent>>
     public paginationToken: string = null;
 
-    public readonly beacons = new Map<string, Beacon>();
-    private liveBeaconIds: string[] = [];
+    public readonly beacons = new Map<BeaconIdentifier, Beacon>();
+    private liveBeaconIds: BeaconIdentifier[] = [];
 
     /**
      * Construct room state.
@@ -324,7 +333,7 @@ export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventH
                 return;
             }
 
-            if (isBeaconInfoEventType(event.getType())) {
+            if (M_BEACON_INFO.matches(event.getType())) {
                 this.setBeacon(event);
             }
 
@@ -398,6 +407,37 @@ export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventH
         this.emit(RoomStateEvent.Update, this);
     }
 
+    public processBeaconEvents(events: MatrixEvent[]): void {
+        if (
+            !events.length ||
+            // discard locations if we have no beacons
+            !this.beacons.size
+        ) {
+            return;
+        }
+
+        // names are confusing here
+        // a Beacon is the parent event, but event type is 'm.beacon_info'
+        // a location is the 'child' related to the Beacon, but the event type is 'm.beacon'
+        // group locations by beaconInfo event id
+        const locationEventsByBeaconEventId = events.reduce<Record<string, MatrixEvent[]>>((acc, event) => {
+            const beaconInfoEventId = event.getRelation()?.event_id;
+            if (!acc[beaconInfoEventId]) {
+                acc[beaconInfoEventId] = [];
+            }
+            acc[beaconInfoEventId].push(event);
+            return acc;
+        }, {});
+
+        Object.entries(locationEventsByBeaconEventId).forEach(([beaconInfoEventId, events]) => {
+            const beacon = [...this.beacons.values()].find(beacon => beacon.beaconInfoId === beaconInfoEventId);
+
+            if (beacon) {
+                beacon.addLocations(events);
+            }
+        });
+    }
+
     /**
      * Looks up a member by the given userId, and if it doesn't exist,
      * create it and emit the `RoomState.newMember` event.
@@ -431,13 +471,39 @@ export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventH
      * @experimental
      */
     private setBeacon(event: MatrixEvent): void {
-        if (this.beacons.has(event.getId())) {
-            return this.beacons.get(event.getId()).update(event);
+        const beaconIdentifier = getBeaconInfoIdentifier(event);
+
+        if (this.beacons.has(beaconIdentifier)) {
+            const beacon = this.beacons.get(beaconIdentifier);
+
+            if (event.isRedacted()) {
+                if (beacon.beaconInfoId === event.getRedactionEvent()?.['redacts']) {
+                    beacon.destroy();
+                    this.beacons.delete(beaconIdentifier);
+                }
+                return;
+            }
+
+            return beacon.update(event);
+        }
+
+        if (event.isRedacted()) {
+            return;
         }
 
         const beacon = new Beacon(event);
+
+        this.reEmitter.reEmit<BeaconEvent, BeaconEvent>(beacon, [
+            BeaconEvent.New,
+            BeaconEvent.Update,
+            BeaconEvent.Destroy,
+            BeaconEvent.LivenessChange,
+        ]);
+
+        this.emit(BeaconEvent.New, event, beacon);
         beacon.on(BeaconEvent.LivenessChange, this.onBeaconLivenessChange.bind(this));
-        this.beacons.set(beacon.beaconInfoId, beacon);
+
+        this.beacons.set(beacon.identifier, beacon);
     }
 
     /**
@@ -450,7 +516,7 @@ export class RoomState extends TypedEventEmitter<RoomStateEvent, RoomStateEventH
         const prevHasLiveBeacons = !!this.liveBeaconIds?.length;
         this.liveBeaconIds = Array.from(this.beacons.values())
             .filter(beacon => beacon.isLive)
-            .map(beacon => beacon.beaconInfoId);
+            .map(beacon => beacon.identifier);
 
         const hasLiveBeacons = !!this.liveBeaconIds.length;
         if (prevHasLiveBeacons !== hasLiveBeacons) {
