@@ -84,7 +84,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     public paginationToken: string = null;
 
     public readonly beacons = new Map<BeaconIdentifier, Beacon>();
-    private liveBeaconIds: BeaconIdentifier[] = [];
+    private _liveBeaconIds: BeaconIdentifier[] = [];
 
     /**
      * Construct room state.
@@ -249,6 +249,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     public get hasLiveBeacons(): boolean {
         return !!this.liveBeaconIds?.length;
+    }
+
+    public get liveBeaconIds(): BeaconIdentifier[] {
+        return this._liveBeaconIds;
     }
 
     /**
@@ -502,6 +506,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
         this.emit(BeaconEvent.New, event, beacon);
         beacon.on(BeaconEvent.LivenessChange, this.onBeaconLivenessChange.bind(this));
+        beacon.on(BeaconEvent.Destroy, this.onBeaconLivenessChange.bind(this));
 
         this.beacons.set(beacon.identifier, beacon);
     }
@@ -509,19 +514,14 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     /**
      * @experimental
      * Check liveness of room beacons
-     * emit RoomStateEvent.BeaconLiveness when
-     * roomstate.hasLiveBeacons has changed
+     * emit RoomStateEvent.BeaconLiveness event
      */
     private onBeaconLivenessChange(): void {
-        const prevHasLiveBeacons = !!this.liveBeaconIds?.length;
-        this.liveBeaconIds = Array.from(this.beacons.values())
+        this._liveBeaconIds = Array.from(this.beacons.values())
             .filter(beacon => beacon.isLive)
             .map(beacon => beacon.identifier);
 
-        const hasLiveBeacons = !!this.liveBeaconIds.length;
-        if (prevHasLiveBeacons !== hasLiveBeacons) {
-            this.emit(RoomStateEvent.BeaconLiveness, this, hasLiveBeacons);
-        }
+        this.emit(RoomStateEvent.BeaconLiveness, this, this.hasLiveBeacons);
     }
 
     private getStateEventMatching(event: MatrixEvent): MatrixEvent | null {
