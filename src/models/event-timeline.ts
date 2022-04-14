@@ -38,7 +38,11 @@ export interface IAddEventOptions {
     toStartOfTimeline: boolean;
     /** The state events to reconcile metadata from */
     roomState?: RoomState;
-    /** TODO */
+    /** Whether the timeline was empty before the marker arrived in
+     *  the room. This could be happen in a variety of cases:
+     *  1. From the initial sync
+     *  2. It's the first state we're seeing after joining the room
+     *  3. Or whether it's coming from `syncFromCache` */
     timelineWasEmpty?: boolean;
 }
 
@@ -364,7 +368,7 @@ export class EventTimeline {
     }
 
     /**
-      * Add a new event to the timeline, and update the state
+     * Add a new event to the timeline, and update the state
      *
      * @param {MatrixEvent} event   new event
      * @param {IAddEventOptions} options addEvent options
