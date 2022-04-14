@@ -1,3 +1,259 @@
+Changes in [17.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v17.0.0) (2022-04-11)
+==================================================================================================
+
+## 🚨 BREAKING CHANGES
+ * Remove groups and groups-related APIs ([\#2234](https://github.com/matrix-org/matrix-js-sdk/pull/2234)).
+
+## ✨ Features
+ * Add Element video room type ([\#2273](https://github.com/matrix-org/matrix-js-sdk/pull/2273)).
+ * Live location sharing - handle redacted beacons ([\#2269](https://github.com/matrix-org/matrix-js-sdk/pull/2269)).
+
+## 🐛 Bug Fixes
+ * Fix getSessionsNeedingBackup() limit support ([\#2270](https://github.com/matrix-org/matrix-js-sdk/pull/2270)). Contributed by @adamvy.
+ * Fix issues with /search and /context API handling for threads ([\#2261](https://github.com/matrix-org/matrix-js-sdk/pull/2261)). Fixes vector-im/element-web#21543.
+ * Prevent exception 'Unable to set up secret storage' ([\#2260](https://github.com/matrix-org/matrix-js-sdk/pull/2260)).
+
+Changes in [16.0.2-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v16.0.2-rc.1) (2022-04-05)
+============================================================================================================
+
+## 🚨 BREAKING CHANGES
+ * Remove groups and groups-related APIs ([\#2234](https://github.com/matrix-org/matrix-js-sdk/pull/2234)).
+
+## ✨ Features
+ * Add Element video room type ([\#2273](https://github.com/matrix-org/matrix-js-sdk/pull/2273)).
+ * Live location sharing - handle redacted beacons ([\#2269](https://github.com/matrix-org/matrix-js-sdk/pull/2269)).
+
+## 🐛 Bug Fixes
+ * Fix getSessionsNeedingBackup() limit support ([\#2270](https://github.com/matrix-org/matrix-js-sdk/pull/2270)). Contributed by @adamvy.
+ * Fix issues with /search and /context API handling for threads ([\#2261](https://github.com/matrix-org/matrix-js-sdk/pull/2261)). Fixes vector-im/element-web#21543.
+ * Prevent exception 'Unable to set up secret storage' ([\#2260](https://github.com/matrix-org/matrix-js-sdk/pull/2260)).
+
+Changes in [16.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v16.0.1) (2022-03-28)
+==================================================================================================
+
+## ✨ Features
+ * emit aggregate room beacon liveness ([\#2241](https://github.com/matrix-org/matrix-js-sdk/pull/2241)).
+ * Live location sharing - create m.beacon_info events ([\#2238](https://github.com/matrix-org/matrix-js-sdk/pull/2238)).
+ * Beacon event types from MSC3489 ([\#2230](https://github.com/matrix-org/matrix-js-sdk/pull/2230)).
+
+## 🐛 Bug Fixes
+ * Fix incorrect usage of unstable variant of `is_falling_back` ([\#2227](https://github.com/matrix-org/matrix-js-sdk/pull/2227)).
+
+Changes in [16.0.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v16.0.1-rc.1) (2022-03-22)
+============================================================================================================
+
+Changes in [16.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v16.0.0) (2022-03-15)
+==================================================================================================
+
+## 🚨 BREAKING CHANGES
+ * Improve typing around event emitter handlers ([\#2180](https://github.com/matrix-org/matrix-js-sdk/pull/2180)).
+
+## ✨ Features
+ * Fix defer not supporting resolving with a Promise<T> ([\#2216](https://github.com/matrix-org/matrix-js-sdk/pull/2216)).
+ * add LocationAssetType enum ([\#2214](https://github.com/matrix-org/matrix-js-sdk/pull/2214)).
+ * Support for mid-call devices changes ([\#2154](https://github.com/matrix-org/matrix-js-sdk/pull/2154)). Contributed by @SimonBrandner.
+ * Add new room state emit RoomStateEvent.Update for lower-frequency hits ([\#2192](https://github.com/matrix-org/matrix-js-sdk/pull/2192)).
+
+## 🐛 Bug Fixes
+ * Fix wrong event_id being sent for m.in_reply_to of threads ([\#2213](https://github.com/matrix-org/matrix-js-sdk/pull/2213)).
+ * Fix wrongly asserting that PushRule::conditions is non-null ([\#2217](https://github.com/matrix-org/matrix-js-sdk/pull/2217)).
+ * Make createThread more resilient when missing rootEvent ([\#2207](https://github.com/matrix-org/matrix-js-sdk/pull/2207)). Fixes vector-im/element-web#21130.
+ * Fix bug with the /hierarchy API sending invalid requests ([\#2201](https://github.com/matrix-org/matrix-js-sdk/pull/2201)). Fixes vector-im/element-web#21170.
+ * fix relation sender filter ([\#2196](https://github.com/matrix-org/matrix-js-sdk/pull/2196)). Fixes vector-im/element-web#20877.
+ * Fix bug with one-way audio after a transfer ([\#2193](https://github.com/matrix-org/matrix-js-sdk/pull/2193)).
+
+Changes in [16.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v16.0.0-rc.1) (2022-03-08)
+============================================================================================================
+
+## 🚨 BREAKING CHANGES
+ * Improve typing around event emitter handlers ([\#2180](https://github.com/matrix-org/matrix-js-sdk/pull/2180)).
+
+## ✨ Features
+ * Fix defer not supporting resolving with a Promise<T> ([\#2216](https://github.com/matrix-org/matrix-js-sdk/pull/2216)).
+ * add LocationAssetType enum ([\#2214](https://github.com/matrix-org/matrix-js-sdk/pull/2214)).
+ * Support for mid-call devices changes ([\#2154](https://github.com/matrix-org/matrix-js-sdk/pull/2154)). Contributed by @SimonBrandner.
+ * Add new room state emit RoomStateEvent.Update for lower-frequency hits ([\#2192](https://github.com/matrix-org/matrix-js-sdk/pull/2192)).
+
+## 🐛 Bug Fixes
+ * Fix wrong event_id being sent for m.in_reply_to of threads ([\#2213](https://github.com/matrix-org/matrix-js-sdk/pull/2213)).
+ * Fix wrongly asserting that PushRule::conditions is non-null ([\#2217](https://github.com/matrix-org/matrix-js-sdk/pull/2217)).
+ * Make createThread more resilient when missing rootEvent ([\#2207](https://github.com/matrix-org/matrix-js-sdk/pull/2207)). Fixes vector-im/element-web#21130.
+ * Fix bug with the /hierarchy API sending invalid requests ([\#2201](https://github.com/matrix-org/matrix-js-sdk/pull/2201)). Fixes vector-im/element-web#21170.
+ * fix relation sender filter ([\#2196](https://github.com/matrix-org/matrix-js-sdk/pull/2196)). Fixes vector-im/element-web#20877.
+ * Fix bug with one-way audio after a transfer ([\#2193](https://github.com/matrix-org/matrix-js-sdk/pull/2193)).
+
+Changes in [15.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.6.0) (2022-02-28)
+==================================================================================================
+
+## ✨ Features
+ * Return send event response from MSC3089Branch.createNewVersion() ([\#2186](https://github.com/matrix-org/matrix-js-sdk/pull/2186)).
+ * Add functions to support refresh tokens ([\#2178](https://github.com/matrix-org/matrix-js-sdk/pull/2178)).
+
+## 🐛 Bug Fixes
+ * [Release] Fix bug with the /hierarchy API sending invalid requests ([\#2202](https://github.com/matrix-org/matrix-js-sdk/pull/2202)).
+ * Fix bug where calls could break if rejected from somewhere else ([\#2189](https://github.com/matrix-org/matrix-js-sdk/pull/2189)).
+ * Fix camera stuck on after call transfer ([\#2188](https://github.com/matrix-org/matrix-js-sdk/pull/2188)).
+ * Fix synthetic read receipt handling ([\#2174](https://github.com/matrix-org/matrix-js-sdk/pull/2174)). Fixes vector-im/element-web#21016.
+ * Revert "Sign backup with cross-signing key when we reset it." ([\#2175](https://github.com/matrix-org/matrix-js-sdk/pull/2175)).
+ * Sign backup with cross-signing key when we reset it. ([\#2170](https://github.com/matrix-org/matrix-js-sdk/pull/2170)).
+ * Fix error in uploadContent() when file is empty under Node.js ([\#2155](https://github.com/matrix-org/matrix-js-sdk/pull/2155)).
+ * Check the backup info against the stored private key when determining trust. ([\#2167](https://github.com/matrix-org/matrix-js-sdk/pull/2167)).
+ * Back up keys before logging out ([\#2158](https://github.com/matrix-org/matrix-js-sdk/pull/2158)). Fixes vector-im/element-web#13151.
+
+Changes in [15.6.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.6.0-rc.1) (2022-02-22)
+============================================================================================================
+
+## ✨ Features
+ * Return send event response from MSC3089Branch.createNewVersion() ([\#2186](https://github.com/matrix-org/matrix-js-sdk/pull/2186)).
+ * Add functions to support refresh tokens ([\#2178](https://github.com/matrix-org/matrix-js-sdk/pull/2178)).
+
+## 🐛 Bug Fixes
+ * Fix bug where calls could break if rejected from somewhere else ([\#2189](https://github.com/matrix-org/matrix-js-sdk/pull/2189)).
+ * Fix camera stuck on after call transfer ([\#2188](https://github.com/matrix-org/matrix-js-sdk/pull/2188)).
+ * Fix synthetic read receipt handling ([\#2174](https://github.com/matrix-org/matrix-js-sdk/pull/2174)). Fixes vector-im/element-web#21016.
+ * Revert "Sign backup with cross-signing key when we reset it." ([\#2175](https://github.com/matrix-org/matrix-js-sdk/pull/2175)).
+ * Sign backup with cross-signing key when we reset it. ([\#2170](https://github.com/matrix-org/matrix-js-sdk/pull/2170)).
+ * Fix error in uploadContent() when file is empty under Node.js ([\#2155](https://github.com/matrix-org/matrix-js-sdk/pull/2155)).
+ * Check the backup info against the stored private key when determining trust. ([\#2167](https://github.com/matrix-org/matrix-js-sdk/pull/2167)).
+ * Back up keys before logging out ([\#2158](https://github.com/matrix-org/matrix-js-sdk/pull/2158)). Fixes vector-im/element-web#13151.
+
+Changes in [15.5.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.5.2) (2022-02-17)
+==================================================================================================
+
+## 🐛 Bug Fixes
+ * Fix synthetic read receipt handling
+
+Changes in [15.5.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.5.1) (2022-02-14)
+==================================================================================================
+
+## 🐛 Bug Fixes
+ * Fix issue with rooms not getting marked as unread ([\#2163](https://github.com/matrix-org/matrix-js-sdk/pull/2163)). Fixes vector-im/element-web#20971.
+ * Don't store streams that are only used once ([\#2157](https://github.com/matrix-org/matrix-js-sdk/pull/2157)). Fixes vector-im/element-web#20932. Contributed by @SimonBrandner.
+ * Fix edge cases around RR calculations ([\#2160](https://github.com/matrix-org/matrix-js-sdk/pull/2160)). Fixes vector-im/element-web#20922.
+ * Account for encryption in `maySendMessage()` ([\#2159](https://github.com/matrix-org/matrix-js-sdk/pull/2159)). Contributed by @SimonBrandner.
+ * Send references to thread root to threads, even out of order ([\#2156](https://github.com/matrix-org/matrix-js-sdk/pull/2156)).
+ * Fix initial sync fail when event fetching unsuccessful ([\#2150](https://github.com/matrix-org/matrix-js-sdk/pull/2150)). Fixes vector-im/element-web#20862.
+ * Don't decrypt redacted messages ([\#2143](https://github.com/matrix-org/matrix-js-sdk/pull/2143)). Contributed by @SimonBrandner.
+
+Changes in [15.5.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.5.1-rc.1) (2022-02-08)
+============================================================================================================
+
+## 🐛 Bug Fixes
+ * Fix issue with rooms not getting marked as unread ([\#2163](https://github.com/matrix-org/matrix-js-sdk/pull/2163)). Fixes vector-im/element-web#20971.
+ * Don't store streams that are only used once ([\#2157](https://github.com/matrix-org/matrix-js-sdk/pull/2157)). Fixes vector-im/element-web#20932. Contributed by @SimonBrandner.
+ * Fix edge cases around RR calculations ([\#2160](https://github.com/matrix-org/matrix-js-sdk/pull/2160)). Fixes vector-im/element-web#20922.
+ * Account for encryption in `maySendMessage()` ([\#2159](https://github.com/matrix-org/matrix-js-sdk/pull/2159)). Contributed by @SimonBrandner.
+ * Send references to thread root to threads, even out of order ([\#2156](https://github.com/matrix-org/matrix-js-sdk/pull/2156)).
+ * Fix initial sync fail when event fetching unsuccessful ([\#2150](https://github.com/matrix-org/matrix-js-sdk/pull/2150)). Fixes vector-im/element-web#20862.
+ * Don't decrypt redacted messages ([\#2143](https://github.com/matrix-org/matrix-js-sdk/pull/2143)). Contributed by @SimonBrandner.
+
+Changes in [15.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.5.0) (2022-01-31)
+==================================================================================================
+
+## ✨ Features
+ * Support m.asset in m.location event content ([\#2109](https://github.com/matrix-org/matrix-js-sdk/pull/2109)).
+ * Send extensible events structure and support on-demand parsing ([\#2091](https://github.com/matrix-org/matrix-js-sdk/pull/2091)).
+ * Support cancelling events whilst they are in status = ENCRYPTING ([\#2095](https://github.com/matrix-org/matrix-js-sdk/pull/2095)).
+
+## 🐛 Bug Fixes
+ * Fix http-api butchering idServer requests ([\#2134](https://github.com/matrix-org/matrix-js-sdk/pull/2134)). Fixes vector-im/element-web#20680.
+ * Don't remove streams that still have tracks ([\#2104](https://github.com/matrix-org/matrix-js-sdk/pull/2104)).
+
+Changes in [15.5.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.5.0-rc.1) (2022-01-26)
+============================================================================================================
+
+## ✨ Features
+ * Support m.asset in m.location event content ([\#2109](https://github.com/matrix-org/matrix-js-sdk/pull/2109)).
+ * Send extensible events structure and support on-demand parsing ([\#2091](https://github.com/matrix-org/matrix-js-sdk/pull/2091)).
+ * Support cancelling events whilst they are in status = ENCRYPTING ([\#2095](https://github.com/matrix-org/matrix-js-sdk/pull/2095)).
+
+## 🐛 Bug Fixes
+ * Fix http-api butchering idServer requests ([\#2134](https://github.com/matrix-org/matrix-js-sdk/pull/2134)). Fixes vector-im/element-web#20680.
+ * Don't remove streams that still have tracks ([\#2104](https://github.com/matrix-org/matrix-js-sdk/pull/2104)).
+
+Changes in [15.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.4.0) (2022-01-17)
+==================================================================================================
+
+## ✨ Features
+ * Don't consider alt_aliases when calculating room name ([\#2094](https://github.com/matrix-org/matrix-js-sdk/pull/2094)). Fixes vector-im/element-web#13887.
+ * Load room history if necessary when searching for MSC3089 getFileEvent() ([\#2066](https://github.com/matrix-org/matrix-js-sdk/pull/2066)).
+ * Add support for MSC3030 `/timestamp_to_event` ([\#2072](https://github.com/matrix-org/matrix-js-sdk/pull/2072)).
+
+## 🐛 Bug Fixes
+ * Stop encrypting redactions as it isn't spec compliant ([\#2098](https://github.com/matrix-org/matrix-js-sdk/pull/2098)). Fixes vector-im/element-web#20460.
+ * Fix more function typings relating to key backup ([\#2086](https://github.com/matrix-org/matrix-js-sdk/pull/2086)).
+ * Fix timeline search in MSC3089 getFileEvent() ([\#2085](https://github.com/matrix-org/matrix-js-sdk/pull/2085)).
+ * Set a `deviceId` for VoIP example and use `const`/`let` ([\#2090](https://github.com/matrix-org/matrix-js-sdk/pull/2090)). Fixes #2083. Contributed by @SimonBrandner.
+ * Fix incorrect TS return type for secret storage and key backup functions ([\#2082](https://github.com/matrix-org/matrix-js-sdk/pull/2082)).
+
+Changes in [15.4.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.4.0-rc.1) (2022-01-11)
+============================================================================================================
+
+## ✨ Features
+ * Don't consider alt_aliases when calculating room name ([\#2094](https://github.com/matrix-org/matrix-js-sdk/pull/2094)). Fixes vector-im/element-web#13887.
+ * Load room history if necessary when searching for MSC3089 getFileEvent() ([\#2066](https://github.com/matrix-org/matrix-js-sdk/pull/2066)).
+ * Add support for MSC3030 `/timestamp_to_event` ([\#2072](https://github.com/matrix-org/matrix-js-sdk/pull/2072)).
+
+## 🐛 Bug Fixes
+ * Stop encrypting redactions as it isn't spec compliant ([\#2098](https://github.com/matrix-org/matrix-js-sdk/pull/2098)). Fixes vector-im/element-web#20460.
+ * Fix more function typings relating to key backup ([\#2086](https://github.com/matrix-org/matrix-js-sdk/pull/2086)).
+ * Fix timeline search in MSC3089 getFileEvent() ([\#2085](https://github.com/matrix-org/matrix-js-sdk/pull/2085)).
+ * Set a `deviceId` for VoIP example and use `const`/`let` ([\#2090](https://github.com/matrix-org/matrix-js-sdk/pull/2090)). Fixes #2083. Contributed by @SimonBrandner.
+ * Fix incorrect TS return type for secret storage and key backup functions ([\#2082](https://github.com/matrix-org/matrix-js-sdk/pull/2082)).
+
+Changes in [15.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.3.0) (2021-12-20)
+==================================================================================================
+
+## ✨ Features
+ * Improve fallback key behaviour ([\#2037](https://github.com/matrix-org/matrix-js-sdk/pull/2037)).
+ * Add new room event filter fields ([\#2051](https://github.com/matrix-org/matrix-js-sdk/pull/2051)).
+ * Add method to fetch /account/whoami ([\#2046](https://github.com/matrix-org/matrix-js-sdk/pull/2046)).
+
+## 🐛 Bug Fixes
+ * Filter out falsey opts in /relations API hits ([\#2059](https://github.com/matrix-org/matrix-js-sdk/pull/2059)). Fixes vector-im/element-web#20137.
+ * Fix paginateEventTimeline resolve to boolean ([\#2054](https://github.com/matrix-org/matrix-js-sdk/pull/2054)).
+ * Fix incorrect MSC3089 typings and add null checks ([\#2049](https://github.com/matrix-org/matrix-js-sdk/pull/2049)).
+
+Changes in [15.3.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.3.0-rc.1) (2021-12-14)
+============================================================================================================
+
+## ✨ Features
+ * Improve fallback key behaviour ([\#2037](https://github.com/matrix-org/matrix-js-sdk/pull/2037)).
+ * Add new room event filter fields ([\#2051](https://github.com/matrix-org/matrix-js-sdk/pull/2051)).
+ * Add method to fetch /account/whoami ([\#2046](https://github.com/matrix-org/matrix-js-sdk/pull/2046)).
+
+## 🐛 Bug Fixes
+ * Filter out falsey opts in /relations API hits ([\#2059](https://github.com/matrix-org/matrix-js-sdk/pull/2059)). Fixes vector-im/element-web#20137.
+ * Fix paginateEventTimeline resolve to boolean ([\#2054](https://github.com/matrix-org/matrix-js-sdk/pull/2054)).
+ * Fix incorrect MSC3089 typings and add null checks ([\#2049](https://github.com/matrix-org/matrix-js-sdk/pull/2049)).
+
+Changes in [15.2.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.2.1) (2021-12-13)
+==================================================================================================
+
+ * Security release with updated version of Olm to fix https://matrix.org/blog/2021/12/03/pre-disclosure-upcoming-security-release-of-libolm-and-matrix-js-sdk
+
+Changes in [15.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.2.0) (2021-12-06)
+==================================================================================================
+
+## ✨ Features
+ * Remove support for `ArrayBuffer` in unstable MSC3089 `createFile()` and `createNewVersion()` and instead use same content types as handled by `MatrixClient.uploadContent()`. This enables support for Node.js. ([\#2014](https://github.com/matrix-org/matrix-js-sdk/pull/2014)).
+ * Support for password-based backup on Node.js ([\#2021](https://github.com/matrix-org/matrix-js-sdk/pull/2021)).
+ * Add optional force parameter when ensuring Olm sessions ([\#2027](https://github.com/matrix-org/matrix-js-sdk/pull/2027)).
+
+## 🐛 Bug Fixes
+ * Fix call upgrades ([\#2024](https://github.com/matrix-org/matrix-js-sdk/pull/2024)). Contributed by @SimonBrandner.
+
+Changes in [15.2.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.2.0-rc.1) (2021-11-30)
+============================================================================================================
+
+## ✨ Features
+ * Remove support for `ArrayBuffer` in unstable MSC3089 `createFile()` and `createNewVersion()` and instead use same content types as handled by `MatrixClient.uploadContent()`. This enables support for Node.js. ([\#2014](https://github.com/matrix-org/matrix-js-sdk/pull/2014)).
+ * Support for password-based backup on Node.js ([\#2021](https://github.com/matrix-org/matrix-js-sdk/pull/2021)).
+ * Add optional force parameter when ensuring Olm sessions ([\#2027](https://github.com/matrix-org/matrix-js-sdk/pull/2027)).
+
+## 🐛 Bug Fixes
+ * Fix call upgrades ([\#2024](https://github.com/matrix-org/matrix-js-sdk/pull/2024)). Contributed by @SimonBrandner.
+
 Changes in [15.1.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v15.1.1) (2021-11-22)
 ==================================================================================================
 
@@ -1761,6 +2017,12 @@ All Changes
    [\#1122](https://github.com/matrix-org/matrix-js-sdk/pull/1122)
  * [BREAKING] Refactor the entire build process
    [\#1113](https://github.com/matrix-org/matrix-js-sdk/pull/1113)
+
+Changes in [3.42.2-rc.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v3.42.2-rc.3) (2022-04-08)
+============================================================================================================
+
+## 🐛 Bug Fixes
+ * Make self membership less prone to races ([\#2277](https://github.com/matrix-org/matrix-js-sdk/pull/2277)). Fixes vector-im/element-web#21661.
 
 Changes in [3.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v3.0.0) (2020-01-13)
 ================================================================================================

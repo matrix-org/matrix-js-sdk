@@ -92,14 +92,8 @@ export enum EventType {
 export enum RelationType {
     Annotation = "m.annotation",
     Replace = "m.replace",
-    /**
-     * Note, "io.element.thread" is hardcoded
-     * Should be replaced with "m.thread" once MSC3440 lands
-     * Can not use `UnstableValue` as TypeScript does not
-     * allow computed values in enums
-     * https://github.com/microsoft/TypeScript/issues/27976
-     */
-    Thread = "io.element.thread",
+    Reference = "m.reference",
+    Thread = "m.thread",
 }
 
 export enum MsgType {
@@ -118,6 +112,8 @@ export const RoomCreateTypeField = "type";
 
 export enum RoomType {
     Space = "m.space",
+    UnstableCall = "org.matrix.msc3417.call",
+    ElementVideo = "io.element.video",
 }
 
 /**
@@ -176,6 +172,16 @@ export const UNSTABLE_MSC3089_BRANCH = new UnstableValue("m.branch", "org.matrix
 export const UNSTABLE_ELEMENT_FUNCTIONAL_USERS = new UnstableValue(
     "io.element.functional_members",
     "io.element.functional_members");
+
+/**
+ * A type of message that affects visibility of a message,
+ * as per https://github.com/matrix-org/matrix-doc/pull/3531
+ *
+ * @experimental
+ */
+export const EVENT_VISIBILITY_CHANGE_TYPE = new UnstableValue(
+    "m.visibility",
+    "org.matrix.msc3531.visibility");
 
 export interface IEncryptedFile {
     url: string;

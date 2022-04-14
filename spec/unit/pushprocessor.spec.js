@@ -1,4 +1,4 @@
-import * as utils from "../test-utils";
+import * as utils from "../test-utils/test-utils";
 import { PushProcessor } from "../../src/pushprocessor";
 
 describe('NotificationService', function() {
@@ -301,5 +301,21 @@ describe('NotificationService', function() {
         testEvent.event.content.body = { "foo": "bar" };
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(false);
+    });
+
+    it("a rule with no conditions matches every event.", function() {
+        expect(pushProcessor.ruleMatchesEvent({
+            rule_id: "rule1",
+            actions: [],
+            conditions: [],
+            default: false,
+            enabled: true,
+        }, testEvent)).toBe(true);
+        expect(pushProcessor.ruleMatchesEvent({
+            rule_id: "rule1",
+            actions: [],
+            default: false,
+            enabled: true,
+        }, testEvent)).toBe(true);
     });
 });

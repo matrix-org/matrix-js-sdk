@@ -18,22 +18,20 @@ limitations under the License.
  * @module models/event-timeline-set
  */
 
-import { EventEmitter } from "events";
-
 import { EventTimeline } from "./event-timeline";
-import { EventStatus, MatrixEvent } from "./event";
+import { EventStatus, MatrixEvent, MatrixEventEvent } from "./event";
 import { logger } from '../logger';
 import { Relations } from './relations';
-import { Room } from "./room";
+import { Room, RoomEvent } from "./room";
 import { Filter } from "../filter";
 import { EventType, RelationType } from "../@types/event";
 import { RoomState } from "./room-state";
-import { Thread } from "./thread";
+import { TypedEventEmitter } from "./typed-event-emitter";
 
 // var DEBUG = false;
 const DEBUG = true;
 
-let debuglog;
+let debuglog: (...args: any[]) => void;
 if (DEBUG) {
     // using bind means that we get to keep useful line numbers in the console
     debuglog = logger.log.bind(logger);
@@ -53,7 +51,20 @@ export enum DuplicateStrategy {
     Replace = "replace",
 }
 
-export class EventTimelineSet extends EventEmitter {
+export interface IRoomTimelineData {
+    timeline: EventTimeline;
+    liveEvent?: boolean;
+}
+
+type EmittedEvents = RoomEvent.Timeline | RoomEvent.TimelineReset;
+
+export type EventTimelineSetHandlerMap = {
+    [RoomEvent.Timeline]:
+        (event: MatrixEvent, room: Room, toStartOfTimeline: boolean, removed: boolean, data: IRoomTimelineData) => void;
+    [RoomEvent.TimelineReset]: (room: Room, eventTimelineSet: EventTimelineSet, resetAllTimelines: boolean) => void;
+};
+
+export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTimelineSetHandlerMap> {
     private readonly timelineSupport: boolean;
     private unstableClientRelationAggregation: boolean;
     private displayPendingEvents: boolean;
@@ -159,12 +170,7 @@ export class EventTimelineSet extends EventEmitter {
             return [];
         }
 
-        const pendingEvents = this.room.getPendingEvents(thread);
-        if (this.filter) {
-            return this.filter.filterRoomTimeline(pendingEvents);
-        } else {
-            return pendingEvents;
-        }
+        return this.room.getPendingEvents();
     }
     /**
      * Get the live timeline for this room.
@@ -209,7 +215,7 @@ export class EventTimelineSet extends EventEmitter {
      *
      * @fires module:client~MatrixClient#event:"Room.timelineReset"
      */
-    public resetLiveTimeline(backPaginationToken: string, forwardPaginationToken?: string): void {
+    public resetLiveTimeline(backPaginationToken?: string, forwardPaginationToken?: string): void {
         // Each EventTimeline has RoomState objects tracking the state at the start
         // and end of that timeline. The copies at the end of the live timeline are
         // special because they will have listeners attached to monitor changes to
@@ -248,7 +254,7 @@ export class EventTimelineSet extends EventEmitter {
 
         // Now we can swap the live timeline to the new one.
         this.liveTimeline = newTimeline;
-        this.emit("Room.timelineReset", this.room, this, resetAllTimelines);
+        this.emit(RoomEvent.TimelineReset, this.room, this, resetAllTimelines);
     }
 
     /**
@@ -594,12 +600,11 @@ export class EventTimelineSet extends EventEmitter {
         this.setRelationsTarget(event);
         this.aggregateRelations(event);
 
-        const data = {
+        const data: IRoomTimelineData = {
             timeline: timeline,
             liveEvent: !toStartOfTimeline && timeline == this.liveTimeline && !fromCache,
         };
-        this.emit("Room.timeline", event, this.room,
-            Boolean(toStartOfTimeline), false, data);
+        this.emit(RoomEvent.Timeline, event, this.room, Boolean(toStartOfTimeline), false, data);
     }
 
     /**
@@ -653,7 +658,7 @@ export class EventTimelineSet extends EventEmitter {
             const data = {
                 timeline: timeline,
             };
-            this.emit("Room.timeline", removed, this.room, undefined, true, data);
+            this.emit(RoomEvent.Timeline, removed, this.room, undefined, true, data);
         }
         return removed;
     }
@@ -751,7 +756,7 @@ export class EventTimelineSet extends EventEmitter {
      */
     public getRelationsForEvent(
         eventId: string,
-        relationType: RelationType,
+        relationType: RelationType | string,
         eventType: EventType | string,
     ): Relations | undefined {
         if (!this.unstableClientRelationAggregation) {
@@ -767,6 +772,17 @@ export class EventTimelineSet extends EventEmitter {
         const relationsForEvent = this.relations[eventId] || {};
         const relationsWithRelType = relationsForEvent[relationType] || {};
         return relationsWithRelType[eventType];
+    }
+
+    public getAllRelationsEventForEvent(eventId: string): MatrixEvent[] {
+        const relationsForEvent = this.relations?.[eventId] || {};
+        const events = [];
+        for (const relationsRecord of Object.values(relationsForEvent)) {
+            for (const relations of Object.values(relationsRecord)) {
+                events.push(...relations.getRelations());
+            }
+        }
+        return events;
     }
 
     /**
@@ -809,7 +825,7 @@ export class EventTimelineSet extends EventEmitter {
 
         // If the event is currently encrypted, wait until it has been decrypted.
         if (event.isBeingDecrypted() || event.shouldAttemptDecryption()) {
-            event.once("Event.decrypted", () => {
+            event.once(MatrixEventEvent.Decrypted, () => {
                 this.aggregateRelations(event);
             });
             return;
@@ -836,7 +852,7 @@ export class EventTimelineSet extends EventEmitter {
         }
         let relationsWithEventType = relationsWithRelType[eventType];
 
-        let relatesToEvent;
+        let relatesToEvent: MatrixEvent;
         if (!relationsWithEventType) {
             relationsWithEventType = relationsWithRelType[eventType] = new Relations(
                 relationType,

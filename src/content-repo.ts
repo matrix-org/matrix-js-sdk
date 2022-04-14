@@ -53,13 +53,13 @@ export function getHttpUriForMxc(
     }
     let serverAndMediaId = mxc.slice(6); // strips mxc://
     let prefix = "/_matrix/media/r0/download/";
-    const params = {};
+    const params: Record<string, string> = {};
 
     if (width) {
-        params["width"] = Math.round(width);
+        params["width"] = Math.round(width).toString();
     }
     if (height) {
-        params["height"] = Math.round(height);
+        params["height"] = Math.round(height).toString();
     }
     if (resizeMethod) {
         params["method"] = resizeMethod;

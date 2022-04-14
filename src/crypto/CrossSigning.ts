@@ -19,13 +19,12 @@ limitations under the License.
  * @module crypto/CrossSigning
  */
 
-import { EventEmitter } from 'events';
+import { PkSigning } from "@matrix-org/olm";
 
 import { decodeBase64, encodeBase64, pkSign, pkVerify } from './olmlib';
 import { logger } from '../logger';
 import { IndexedDBCryptoStore } from '../crypto/store/indexeddb-crypto-store';
 import { decryptAES, encryptAES } from './aes';
-import { PkSigning } from "@matrix-org/olm";
 import { DeviceInfo } from "./deviceinfo";
 import { SecretStorage } from "./SecretStorage";
 import { ICrossSigningKey, ISignedKey, MatrixClient } from "../client";
@@ -33,6 +32,7 @@ import { OlmDevice } from "./OlmDevice";
 import { ICryptoCallbacks } from "../matrix";
 import { ISignatures } from "../@types/signed";
 import { CryptoStore } from "./store/base";
+import { ISecretStorageKeyInfo } from "./api";
 
 const KEY_REQUEST_TIMEOUT_MS = 1000 * 60;
 
@@ -54,7 +54,7 @@ export interface ICrossSigningInfo {
     crossSigningVerifiedBefore: boolean;
 }
 
-export class CrossSigningInfo extends EventEmitter {
+export class CrossSigningInfo {
     public keys: Record<string, ICrossSigningKey> = {};
     public firstUse = true;
     // This tracks whether we've ever verified this user with any identity.
@@ -78,9 +78,7 @@ export class CrossSigningInfo extends EventEmitter {
         public readonly userId: string,
         private callbacks: ICryptoCallbacks = {},
         private cacheCallbacks: ICacheCallbacks = {},
-    ) {
-        super();
-    }
+    ) {}
 
     public static fromStorage(obj: ICrossSigningInfo, userId: string): CrossSigningInfo {
         const res = new CrossSigningInfo(userId);
@@ -175,7 +173,7 @@ export class CrossSigningInfo extends EventEmitter {
         // check what SSSS keys have encrypted the master key (if any)
         const stored = await secretStorage.isStored("m.cross_signing.master", false) || {};
         // then check which of those SSSS keys have also encrypted the SSK and USK
-        function intersect(s) {
+        function intersect(s: Record<string, ISecretStorageKeyInfo>) {
             for (const k of Object.keys(stored)) {
                 if (!s[k]) {
                     delete stored[k];

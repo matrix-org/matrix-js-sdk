@@ -66,7 +66,7 @@ function selectQuery<T>(
 ): Promise<T[]> {
     const query = store.openCursor(keyRange);
     return new Promise((resolve, reject) => {
-        const results = [];
+        const results: T[] = [];
         query.onerror = () => {
             reject(new Error("Query failed: " + query.error));
         };
@@ -215,7 +215,6 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             this.syncAccumulator.accumulate({
                 next_batch: syncData.nextBatch,
                 rooms: syncData.roomsData,
-                groups: syncData.groupsData,
                 account_data: {
                     events: accountData,
                 },
@@ -231,14 +230,14 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * @returns {null} in case the members for this room haven't been stored yet
      */
     public getOutOfBandMembers(roomId: string): Promise<IEvent[] | null> {
-        return new Promise<IEvent[] | null>((resolve, reject) =>{
+        return new Promise<IEvent[] | null>((resolve, reject) => {
             const tx = this.db.transaction(["oob_membership_events"], "readonly");
             const store = tx.objectStore("oob_membership_events");
             const roomIndex = store.index("room");
             const range = IDBKeyRange.only(roomId);
             const request = roomIndex.openCursor(range);
 
-            const membershipEvents = [];
+            const membershipEvents: IEvent[] = [];
             // did we encounter the oob_written marker object
             // amongst the results? That means OOB member
             // loading already happened for this room
@@ -405,7 +404,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         await Promise.all([
             this.persistUserPresenceEvents(userTuples),
             this.persistAccountData(syncData.accountData),
-            this.persistSyncData(syncData.nextBatch, syncData.roomsData, syncData.groupsData),
+            this.persistSyncData(syncData.nextBatch, syncData.roomsData),
         ]);
     }
 
@@ -413,13 +412,11 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * Persist rooms /sync data along with the next batch token.
      * @param {string} nextBatch The next_batch /sync value.
      * @param {Object} roomsData The 'rooms' /sync data from a SyncAccumulator
-     * @param {Object} groupsData The 'groups' /sync data from a SyncAccumulator
      * @return {Promise} Resolves if the data was persisted.
      */
     private persistSyncData(
         nextBatch: string,
         roomsData: ISyncResponse["rooms"],
-        groupsData: ISyncResponse["groups"],
     ): Promise<void> {
         logger.log("Persisting sync data up to", nextBatch);
         return utils.promiseTry<void>(() => {
@@ -429,7 +426,6 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
                 clobber: "-", // constant key so will always clobber
                 nextBatch,
                 roomsData,
-                groupsData,
             }); // put == UPSERT
             return txnAsPromise(txn).then();
         });

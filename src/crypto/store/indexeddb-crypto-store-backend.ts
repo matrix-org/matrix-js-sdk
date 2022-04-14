@@ -200,10 +200,10 @@ export class Backend implements CryptoStore {
 
         // index into the wantedStates array
         let stateIndex = 0;
-        let result;
+        let result: OutgoingRoomKeyRequest;
 
-        function onsuccess(ev) {
-            const cursor = ev.target.result;
+        function onsuccess(this: IDBRequest<IDBCursorWithValue>) {
+            const cursor = this.result;
             if (cursor) {
                 // got a match
                 result = cursor.value;
@@ -218,7 +218,7 @@ export class Backend implements CryptoStore {
             }
 
             const wantedState = wantedStates[stateIndex];
-            const cursorReq = ev.target.source.openCursor(wantedState);
+            const cursorReq = (this.source as IDBIndex).openCursor(wantedState);
             cursorReq.onsuccess = onsuccess;
         }
 
@@ -255,10 +255,10 @@ export class Backend implements CryptoStore {
         wantedStates: number[],
     ): Promise<OutgoingRoomKeyRequest[]> {
         let stateIndex = 0;
-        const results = [];
+        const results: OutgoingRoomKeyRequest[] = [];
 
-        function onsuccess(ev) {
-            const cursor = ev.target.result;
+        function onsuccess(this: IDBRequest<IDBCursorWithValue>) {
+            const cursor = this.result;
             if (cursor) {
                 const keyReq = cursor.value;
                 if (keyReq.recipients.includes({ userId, deviceId })) {
@@ -274,7 +274,7 @@ export class Backend implements CryptoStore {
                 }
 
                 const wantedState = wantedStates[stateIndex];
-                const cursorReq = ev.target.source.openCursor(wantedState);
+                const cursorReq = (this.source as IDBIndex).openCursor(wantedState);
                 cursorReq.onsuccess = onsuccess;
             }
         }
@@ -306,10 +306,10 @@ export class Backend implements CryptoStore {
         expectedState: number,
         updates: Partial<OutgoingRoomKeyRequest>,
     ): Promise<OutgoingRoomKeyRequest | null> {
-        let result = null;
+        let result: OutgoingRoomKeyRequest = null;
 
-        function onsuccess(ev) {
-            const cursor = ev.target.result;
+        function onsuccess(this: IDBRequest<IDBCursorWithValue>) {
+            const cursor = this.result;
             if (!cursor) {
                 return;
             }
@@ -444,7 +444,7 @@ export class Backend implements CryptoStore {
         const objectStore = txn.objectStore("sessions");
         const idx = objectStore.index("deviceKey");
         const getReq = idx.openCursor(deviceKey);
-        const results = {};
+        const results: Parameters<Parameters<Backend["getEndToEndSessions"]>[2]>[0] = {};
         getReq.onsuccess = function() {
             const cursor = getReq.result;
             if (cursor) {
@@ -734,7 +734,7 @@ export class Backend implements CryptoStore {
     }
 
     public getEndToEndRooms(txn: IDBTransaction, func: (rooms: Record<string, IRoomEncryption>) => void): void {
-        const rooms = {};
+        const rooms: Parameters<Parameters<Backend["getEndToEndRooms"]>[1]>[0] = {};
         const objectStore = txn.objectStore("rooms");
         const getReq = objectStore.openCursor();
         getReq.onsuccess = function() {
@@ -756,7 +756,7 @@ export class Backend implements CryptoStore {
 
     public getSessionsNeedingBackup(limit: number): Promise<ISession[]> {
         return new Promise((resolve, reject) => {
-            const sessions = [];
+            const sessions: ISession[] = [];
 
             const txn = this.db.transaction(
                 ["sessions_needing_backup", "inbound_group_sessions"],
@@ -877,8 +877,8 @@ export class Backend implements CryptoStore {
         func: (txn: IDBTransaction) => T,
         log: PrefixedLogger = logger,
     ): Promise<T> {
-        let startTime;
-        let description;
+        let startTime: number;
+        let description: string;
         if (PROFILE_TRANSACTIONS) {
             const txnId = this.nextTxnId++;
             startTime = Date.now();

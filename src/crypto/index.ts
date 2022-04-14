@@ -22,27 +22,36 @@ limitations under the License.
  */
 
 import anotherjson from "another-json";
-import { EventEmitter } from 'events';
 
-import { ReEmitter } from '../ReEmitter';
+import { TypedReEmitter } from '../ReEmitter';
 import { logger } from '../logger';
 import { IExportedDevice, OlmDevice } from "./OlmDevice";
 import * as olmlib from "./olmlib";
 import { DeviceInfoMap, DeviceList } from "./DeviceList";
 import { DeviceInfo, IDevice } from "./deviceinfo";
+import type { DecryptionAlgorithm, EncryptionAlgorithm } from "./algorithms";
 import * as algorithms from "./algorithms";
 import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from './CrossSigning';
 import { EncryptionSetupBuilder } from "./EncryptionSetup";
 import {
+    IAccountDataClient,
+    ISecretRequest,
     SECRET_STORAGE_ALGORITHM_V1_AES,
     SecretStorage,
-    SecretStorageKeyTuple,
-    ISecretRequest,
     SecretStorageKeyObject,
+    SecretStorageKeyTuple,
 } from './SecretStorage';
-import { IAddSecretStorageKeyOpts, ICreateSecretStorageOpts, IImportRoomKeysOpts, ISecretStorageKeyInfo } from "./api";
+import {
+    IAddSecretStorageKeyOpts,
+    ICreateSecretStorageOpts,
+    IEncryptedEventInfo,
+    IImportRoomKeysOpts,
+    IRecoveryKey,
+    ISecretStorageKeyInfo,
+} from "./api";
 import { OutgoingRoomKeyRequestManager } from './OutgoingRoomKeyRequestManager';
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
+import { VerificationBase } from "./verification/Base";
 import { ReciprocateQRCode, SCAN_QR_CODE_METHOD, SHOW_QR_CODE_METHOD } from './verification/QRCode';
 import { SAS as SASVerification } from './verification/SAS';
 import { keyFromPassphrase } from './key_passphrase';
@@ -52,21 +61,28 @@ import { InRoomChannel, InRoomRequests } from "./verification/request/InRoomChan
 import { ToDeviceChannel, ToDeviceRequests } from "./verification/request/ToDeviceChannel";
 import { IllegalMethod } from "./verification/IllegalMethod";
 import { KeySignatureUploadError } from "../errors";
-import { decryptAES, encryptAES, calculateKeyCheck } from './aes';
+import { calculateKeyCheck, decryptAES, encryptAES } from './aes';
 import { DehydrationManager, IDeviceKeys, IOneTimeKey } from './dehydration';
 import { BackupManager } from "./backup";
 import { IStore } from "../store";
-import { Room } from "../models/room";
-import { RoomMember } from "../models/room-member";
-import { MatrixEvent, EventStatus } from "../models/event";
-import { MatrixClient, IKeysUploadResponse, SessionStore, ISignedKey, ICrossSigningKey } from "../client";
-import type { EncryptionAlgorithm, DecryptionAlgorithm } from "./algorithms/base";
+import { Room, RoomEvent } from "../models/room";
+import { RoomMember, RoomMemberEvent } from "../models/room-member";
+import { EventStatus, IClearEvent, IEvent, MatrixEvent, MatrixEventEvent } from "../models/event";
+import {
+    ClientEvent,
+    ICrossSigningKey,
+    IKeysUploadResponse,
+    ISignedKey,
+    IUploadKeySignaturesResponse,
+    MatrixClient,
+    SessionStore,
+} from "../client";
 import type { IRoomEncryption, RoomList } from "./RoomList";
-import { IRecoveryKey, IEncryptedEventInfo } from "./api";
 import { IKeyBackupInfo } from "./keybackup";
 import { ISyncStateData } from "../sync";
 import { CryptoStore } from "./store/base";
 import { IVerificationChannel } from "./verification/request/Channel";
+import { TypedEventEmitter } from "../models/typed-event-emitter";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -172,14 +188,59 @@ interface ISignableObject {
 }
 
 export interface IEventDecryptionResult {
-    clearEvent: object;
+    clearEvent: IClearEvent;
+    forwardingCurve25519KeyChain?: string[];
     senderCurve25519Key?: string;
     claimedEd25519Key?: string;
-    forwardingCurve25519KeyChain?: string[];
     untrusted?: boolean;
 }
 
-export class Crypto extends EventEmitter {
+export interface IRequestsMap {
+    getRequest(event: MatrixEvent): VerificationRequest;
+    getRequestByChannel(channel: IVerificationChannel): VerificationRequest;
+    setRequest(event: MatrixEvent, request: VerificationRequest): void;
+    setRequestByChannel(channel: IVerificationChannel, request: VerificationRequest): void;
+}
+
+export enum CryptoEvent {
+    DeviceVerificationChanged = "deviceVerificationChanged",
+    UserTrustStatusChanged = "userTrustStatusChanged",
+    UserCrossSigningUpdated = "userCrossSigningUpdated",
+    RoomKeyRequest = "crypto.roomKeyRequest",
+    RoomKeyRequestCancellation = "crypto.roomKeyRequestCancellation",
+    KeyBackupStatus = "crypto.keyBackupStatus",
+    KeyBackupFailed = "crypto.keyBackupFailed",
+    KeyBackupSessionsRemaining = "crypto.keyBackupSessionsRemaining",
+    KeySignatureUploadFailure = "crypto.keySignatureUploadFailure",
+    VerificationRequest = "crypto.verification.request",
+    Warning = "crypto.warning",
+    WillUpdateDevices = "crypto.willUpdateDevices",
+    DevicesUpdated = "crypto.devicesUpdated",
+    KeysChanged = "crossSigning.keysChanged",
+}
+
+export type CryptoEventHandlerMap = {
+    [CryptoEvent.DeviceVerificationChanged]: (userId: string, deviceId: string, device: DeviceInfo) => void;
+    [CryptoEvent.UserTrustStatusChanged]: (userId: string, trustLevel: UserTrustLevel) => void;
+    [CryptoEvent.RoomKeyRequest]: (request: IncomingRoomKeyRequest) => void;
+    [CryptoEvent.RoomKeyRequestCancellation]: (request: IncomingRoomKeyRequestCancellation) => void;
+    [CryptoEvent.KeyBackupStatus]: (enabled: boolean) => void;
+    [CryptoEvent.KeyBackupFailed]: (errcode: string) => void;
+    [CryptoEvent.KeyBackupSessionsRemaining]: (remaining: number) => void;
+    [CryptoEvent.KeySignatureUploadFailure]: (
+        failures: IUploadKeySignaturesResponse["failures"],
+        source: "checkOwnCrossSigningTrust" | "afterCrossSigningLocalKeyChange" | "setDeviceVerification",
+        upload: (opts: { shouldEmit: boolean }) => Promise<void>
+    ) => void;
+    [CryptoEvent.VerificationRequest]: (request: VerificationRequest<any>) => void;
+    [CryptoEvent.Warning]: (type: string) => void;
+    [CryptoEvent.KeysChanged]: (data: {}) => void;
+    [CryptoEvent.WillUpdateDevices]: (users: string[], initialFetch: boolean) => void;
+    [CryptoEvent.DevicesUpdated]: (users: string[], initialFetch: boolean) => void;
+    [CryptoEvent.UserCrossSigningUpdated]: (userId: string) => void;
+};
+
+export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap> {
     /**
      * @return {string} The version of Olm.
      */
@@ -194,8 +255,8 @@ export class Crypto extends EventEmitter {
     public readonly dehydrationManager: DehydrationManager;
     public readonly secretStorage: SecretStorage;
 
-    private readonly reEmitter: ReEmitter;
-    private readonly verificationMethods: any; // TODO types
+    private readonly reEmitter: TypedReEmitter<CryptoEvent, CryptoEventHandlerMap>;
+    private readonly verificationMethods: Map<VerificationMethod, typeof VerificationBase>;
     public readonly supportedAlgorithms: string[];
     private readonly outgoingRoomKeyRequestManager: OutgoingRoomKeyRequestManager;
     private readonly toDeviceVerificationRequests: ToDeviceRequests;
@@ -248,6 +309,7 @@ export class Crypto extends EventEmitter {
 
     private oneTimeKeyCount: number;
     private needsNewFallback: boolean;
+    private fallbackCleanup?: number; // setTimeout ID
 
     /**
      * Cryptography bits
@@ -287,10 +349,10 @@ export class Crypto extends EventEmitter {
         private readonly clientStore: IStore,
         public readonly cryptoStore: CryptoStore,
         private readonly roomList: RoomList,
-        verificationMethods: any[], // TODO types
+        verificationMethods: Array<keyof typeof defaultVerificationMethods | typeof VerificationBase>,
     ) {
         super();
-        this.reEmitter = new ReEmitter(this);
+        this.reEmitter = new TypedReEmitter(this);
 
         if (verificationMethods) {
             this.verificationMethods = new Map();
@@ -299,20 +361,21 @@ export class Crypto extends EventEmitter {
                     if (defaultVerificationMethods[method]) {
                         this.verificationMethods.set(
                             method,
-                            defaultVerificationMethods[method],
+                            <typeof VerificationBase>defaultVerificationMethods[method],
                         );
                     }
-                } else if (method.NAME) {
+                } else if (method["NAME"]) {
                     this.verificationMethods.set(
-                        method.NAME,
-                        method,
+                        method["NAME"],
+                        method as typeof VerificationBase,
                     );
                 } else {
                     logger.warn(`Excluding unknown verification method ${method}`);
                 }
             }
         } else {
-            this.verificationMethods = defaultVerificationMethods;
+            this.verificationMethods =
+                new Map(Object.entries(defaultVerificationMethods)) as Map<VerificationMethod, typeof VerificationBase>;
         }
 
         this.backupManager = new BackupManager(baseApis, async () => {
@@ -350,8 +413,8 @@ export class Crypto extends EventEmitter {
 
         // XXX: This isn't removed at any point, but then none of the event listeners
         // this class sets seem to be removed at any point... :/
-        this.deviceList.on('userCrossSigningUpdated', this.onDeviceListUserCrossSigningUpdated);
-        this.reEmitter.reEmit(this.deviceList, ["crypto.devicesUpdated", "crypto.willUpdateDevices"]);
+        this.deviceList.on(CryptoEvent.UserCrossSigningUpdated, this.onDeviceListUserCrossSigningUpdated);
+        this.reEmitter.reEmit(this.deviceList, [CryptoEvent.DevicesUpdated, CryptoEvent.WillUpdateDevices]);
 
         this.supportedAlgorithms = Object.keys(algorithms.DECRYPTION_CLASSES);
 
@@ -367,7 +430,7 @@ export class Crypto extends EventEmitter {
 
         this.crossSigningInfo = new CrossSigningInfo(userId, cryptoCallbacks, cacheCallbacks);
         // Yes, we pass the client twice here: see SecretStorage
-        this.secretStorage = new SecretStorage(baseApis, cryptoCallbacks, baseApis);
+        this.secretStorage = new SecretStorage(baseApis as IAccountDataClient, cryptoCallbacks, baseApis);
         this.dehydrationManager = new DehydrationManager(this);
 
         // Assuming no app-supplied callback, default to getting from SSSS.
@@ -479,7 +542,7 @@ export class Crypto extends EventEmitter {
                     deviceTrust.isCrossSigningVerified()
                 ) {
                     const deviceObj = this.deviceList.getStoredDevice(userId, deviceId);
-                    this.emit("deviceVerificationChanged", userId, deviceId, deviceObj);
+                    this.emit(CryptoEvent.DeviceVerificationChanged, userId, deviceId, deviceObj);
                 }
             }
         }
@@ -807,7 +870,7 @@ export class Crypto extends EventEmitter {
             }
         };
 
-        const signKeyBackupWithCrossSigning = async (keyBackupAuthData) => {
+        const signKeyBackupWithCrossSigning = async (keyBackupAuthData: IKeyBackupInfo["auth_data"]) => {
             if (
                 this.crossSigningInfo.getId() &&
                 await this.crossSigningInfo.isStoredInKeyCache("master")
@@ -857,7 +920,7 @@ export class Crypto extends EventEmitter {
             // secrets using it, in theory. We could move them to the new key but a)
             // that would mean we'd need to prompt for the old passphrase, and b)
             // it's not clear that would be the right thing to do anyway.
-            const { keyInfo, privateKey } = await createSecretStorageKey();
+            const { keyInfo = {} as IAddSecretStorageKeyOpts, privateKey } = await createSecretStorageKey();
             newKeyId = await createSSSS(keyInfo, privateKey);
         } else if (!storageExists && keyBackupInfo) {
             // we have an existing backup, but no SSSS
@@ -1016,7 +1079,7 @@ export class Crypto extends EventEmitter {
     public isSecretStored(
         name: string,
         checkKey?: boolean,
-    ): Promise<Record<string, ISecretStorageKeyInfo>> {
+    ): Promise<Record<string, ISecretStorageKeyInfo> | null> {
         return this.secretStorage.isStored(name, checkKey);
     }
 
@@ -1027,7 +1090,7 @@ export class Crypto extends EventEmitter {
         return this.secretStorage.request(name, devices);
     }
 
-    public getDefaultSecretStorageKeyId(): Promise<string> {
+    public getDefaultSecretStorageKeyId(): Promise<string | null> {
         return this.secretStorage.getDefaultKeyId();
     }
 
@@ -1147,7 +1210,7 @@ export class Crypto extends EventEmitter {
         const signedDevice = await this.crossSigningInfo.signDevice(this.userId, device);
         logger.info(`Starting background key sig upload for ${this.deviceId}`);
 
-        const upload = ({ shouldEmit }) => {
+        const upload = ({ shouldEmit = false }) => {
             return this.baseApis.uploadKeySignatures({
                 [this.userId]: {
                     [this.deviceId]: signedDevice,
@@ -1157,7 +1220,7 @@ export class Crypto extends EventEmitter {
                 if (Object.keys(failures || []).length > 0) {
                     if (shouldEmit) {
                         this.baseApis.emit(
-                            "crypto.keySignatureUploadFailure",
+                            CryptoEvent.KeySignatureUploadFailure,
                             failures,
                             "afterCrossSigningLocalKeyChange",
                             upload, // continuation
@@ -1183,7 +1246,7 @@ export class Crypto extends EventEmitter {
 
             // Check all users for signatures if upgrade callback present
             // FIXME: do this in batches
-            const users = {};
+            const users: Record<string, IDeviceVerificationUpgrade> = {};
             for (const [userId, crossSigningInfo]
                 of Object.entries(this.deviceList.crossSigningInfo)) {
                 const upgradeInfo = await this.checkForDeviceVerificationUpgrade(
@@ -1383,11 +1446,10 @@ export class Crypto extends EventEmitter {
                 // that reset the keys
                 this.storeTrustedSelfKeys(null);
                 // emit cross-signing has been disabled
-                this.emit("crossSigning.keysChanged", {});
+                this.emit(CryptoEvent.KeysChanged, {});
                 // as the trust for our own user has changed,
                 // also emit an event for this
-                this.emit("userTrustStatusChanged",
-                    this.userId, this.checkUserTrust(userId));
+                this.emit(CryptoEvent.UserTrustStatusChanged, this.userId, this.checkUserTrust(userId));
             }
         } else {
             await this.checkDeviceVerifications(userId);
@@ -1402,7 +1464,7 @@ export class Crypto extends EventEmitter {
                 this.deviceList.setRawStoredCrossSigningForUser(userId, crossSigning.toStorage());
             }
 
-            this.emit("userTrustStatusChanged", userId, this.checkUserTrust(userId));
+            this.emit(CryptoEvent.UserTrustStatusChanged, userId, this.checkUserTrust(userId));
         }
     };
 
@@ -1481,7 +1543,7 @@ export class Crypto extends EventEmitter {
             !crossSigningPrivateKeys.has("user_signing")
         );
 
-        const keySignatures = {};
+        const keySignatures: Record<string, ISignedKey> = {};
 
         if (selfSigningChanged) {
             logger.info("Got new self-signing key", newCrossSigning.getId("self_signing"));
@@ -1536,7 +1598,7 @@ export class Crypto extends EventEmitter {
             // We may have existing signatures from deleted devices, which will cause
             // the entire upload to fail.
             keySignatures[this.crossSigningInfo.getId()] = Object.assign(
-                {},
+                {} as ISignedKey,
                 masterKey,
                 {
                     signatures: {
@@ -1550,7 +1612,7 @@ export class Crypto extends EventEmitter {
 
         const keysToUpload = Object.keys(keySignatures);
         if (keysToUpload.length) {
-            const upload = ({ shouldEmit }) => {
+            const upload = ({ shouldEmit = false }) => {
                 logger.info(`Starting background key sig upload for ${keysToUpload}`);
                 return this.baseApis.uploadKeySignatures({ [this.userId]: keySignatures })
                     .then((response) => {
@@ -1559,7 +1621,7 @@ export class Crypto extends EventEmitter {
                         if (Object.keys(failures || []).length > 0) {
                             if (shouldEmit) {
                                 this.baseApis.emit(
-                                    "crypto.keySignatureUploadFailure",
+                                    CryptoEvent.KeySignatureUploadFailure,
                                     failures,
                                     "checkOwnCrossSigningTrust",
                                     upload,
@@ -1577,10 +1639,10 @@ export class Crypto extends EventEmitter {
             upload({ shouldEmit: true });
         }
 
-        this.emit("userTrustStatusChanged", userId, this.checkUserTrust(userId));
+        this.emit(CryptoEvent.UserTrustStatusChanged, userId, this.checkUserTrust(userId));
 
         if (masterChanged) {
-            this.baseApis.emit("crossSigning.keysChanged", {});
+            this.emit(CryptoEvent.KeysChanged, {});
             await this.afterCrossSigningLocalKeyChange();
         }
 
@@ -1667,18 +1729,14 @@ export class Crypto extends EventEmitter {
      * @param {external:EventEmitter} eventEmitter event source where we can register
      *    for event notifications
      */
-    public registerEventHandlers(eventEmitter: EventEmitter): void {
-        eventEmitter.on("RoomMember.membership", (event: MatrixEvent, member: RoomMember, oldMembership?: string) => {
-            try {
-                this.onRoomMembership(event, member, oldMembership);
-            } catch (e) {
-                logger.error("Error handling membership change:", e);
-            }
-        });
-
-        eventEmitter.on("toDeviceEvent", this.onToDeviceEvent);
-        eventEmitter.on("Room.timeline", this.onTimelineEvent);
-        eventEmitter.on("Event.decrypted", this.onTimelineEvent);
+    public registerEventHandlers(eventEmitter: TypedEventEmitter<
+        RoomMemberEvent.Membership | ClientEvent.ToDeviceEvent | RoomEvent.Timeline | MatrixEventEvent.Decrypted,
+        any
+    >): void {
+        eventEmitter.on(RoomMemberEvent.Membership, this.onMembership);
+        eventEmitter.on(ClientEvent.ToDeviceEvent, this.onToDeviceEvent);
+        eventEmitter.on(RoomEvent.Timeline, this.onTimelineEvent);
+        eventEmitter.on(MatrixEventEvent.Decrypted, this.onTimelineEvent);
     }
 
     /** Start background processes related to crypto */
@@ -1850,8 +1908,23 @@ export class Crypto extends EventEmitter {
                 }
 
                 if (this.getNeedsNewFallback()) {
-                    logger.info("generating fallback key");
-                    await this.olmDevice.generateFallbackKey();
+                    const fallbackKeys = await this.olmDevice.getFallbackKey();
+                    // if fallbackKeys is non-empty, we've already generated a
+                    // fallback key, but it hasn't been published yet, so we
+                    // can use that instead of generating a new one
+                    if (!fallbackKeys.curve25519 ||
+                        Object.keys(fallbackKeys.curve25519).length == 0) {
+                        logger.info("generating fallback key");
+                        if (this.fallbackCleanup) {
+                            // cancel any pending fallback cleanup because generating
+                            // a new fallback key will already drop the old fallback
+                            // that would have been dropped, and we don't want to kill
+                            // the current key
+                            clearTimeout(this.fallbackCleanup);
+                            delete this.fallbackCleanup;
+                        }
+                        await this.olmDevice.generateFallbackKey();
+                    }
                 }
 
                 logger.info("calling uploadOneTimeKeys");
@@ -1898,8 +1971,9 @@ export class Crypto extends EventEmitter {
     private async uploadOneTimeKeys() {
         const promises = [];
 
-        const fallbackJson: Record<string, IOneTimeKey> = {};
+        let fallbackJson: Record<string, IOneTimeKey>;
         if (this.getNeedsNewFallback()) {
+            fallbackJson = {};
             const fallbackKeys = await this.olmDevice.getFallbackKey();
             for (const [keyId, key] of Object.entries(fallbackKeys.curve25519)) {
                 const k = { key, fallback: true };
@@ -1910,7 +1984,7 @@ export class Crypto extends EventEmitter {
         }
 
         const oneTimeKeys = await this.olmDevice.getOneTimeKeys();
-        const oneTimeJson = {};
+        const oneTimeJson: Record<string, { key: string }> = {};
 
         for (const keyId in oneTimeKeys.curve25519) {
             if (oneTimeKeys.curve25519.hasOwnProperty(keyId)) {
@@ -1924,10 +1998,23 @@ export class Crypto extends EventEmitter {
 
         await Promise.all(promises);
 
-        const res = await this.baseApis.uploadKeysRequest({
+        const requestBody: Record<string, any> = {
             "one_time_keys": oneTimeJson,
-            "org.matrix.msc2732.fallback_keys": fallbackJson,
-        });
+        };
+
+        if (fallbackJson) {
+            requestBody["org.matrix.msc2732.fallback_keys"] = fallbackJson;
+            requestBody["fallback_keys"] = fallbackJson;
+        }
+
+        const res = await this.baseApis.uploadKeysRequest(requestBody);
+
+        if (fallbackJson) {
+            this.fallbackCleanup = setTimeout(() => {
+                delete this.fallbackCleanup;
+                this.olmDevice.forgetOldFallbackKey();
+            }, 60*60*1000);
+        }
 
         await this.olmDevice.markKeysAsPublished();
         return res;
@@ -2033,9 +2120,7 @@ export class Crypto extends EventEmitter {
             if (!this.crossSigningInfo.getId() && userId === this.crossSigningInfo.userId) {
                 this.storeTrustedSelfKeys(xsk.keys);
                 // This will cause our own user trust to change, so emit the event
-                this.emit(
-                    "userTrustStatusChanged", this.userId, this.checkUserTrust(userId),
-                );
+                this.emit(CryptoEvent.UserTrustStatusChanged, this.userId, this.checkUserTrust(userId));
             }
 
             // Now sign the master key with our user signing key (unless it's ourself)
@@ -2046,7 +2131,7 @@ export class Crypto extends EventEmitter {
                 );
                 const device = await this.crossSigningInfo.signUser(xsk);
                 if (device) {
-                    const upload = async ({ shouldEmit }) => {
+                    const upload = async ({ shouldEmit = false }) => {
                         logger.info("Uploading signature for " + userId + "...");
                         const response = await this.baseApis.uploadKeySignatures({
                             [userId]: {
@@ -2057,7 +2142,7 @@ export class Crypto extends EventEmitter {
                         if (Object.keys(failures || []).length > 0) {
                             if (shouldEmit) {
                                 this.baseApis.emit(
-                                    "crypto.keySignatureUploadFailure",
+                                    CryptoEvent.KeySignatureUploadFailure,
                                     failures,
                                     "setDeviceVerification",
                                     upload,
@@ -2119,7 +2204,7 @@ export class Crypto extends EventEmitter {
             logger.info("Own device " + deviceId + " marked verified: signing");
 
             // Signing only needed if other device not already signed
-            let device;
+            let device: ISignedKey;
             const deviceTrust = this.checkDeviceTrust(userId, deviceId);
             if (deviceTrust.isCrossSigningVerified()) {
                 logger.log(`Own device ${deviceId} already cross-signing verified`);
@@ -2130,7 +2215,7 @@ export class Crypto extends EventEmitter {
             }
 
             if (device) {
-                const upload = async ({ shouldEmit }) => {
+                const upload = async ({ shouldEmit = false }) => {
                     logger.info("Uploading signature for " + deviceId);
                     const response = await this.baseApis.uploadKeySignatures({
                         [userId]: {
@@ -2141,7 +2226,7 @@ export class Crypto extends EventEmitter {
                     if (Object.keys(failures || []).length > 0) {
                         if (shouldEmit) {
                             this.baseApis.emit(
-                                "crypto.keySignatureUploadFailure",
+                                CryptoEvent.KeySignatureUploadFailure,
                                 failures,
                                 "setDeviceVerification",
                                 upload, // continuation
@@ -2156,7 +2241,7 @@ export class Crypto extends EventEmitter {
         }
 
         const deviceObj = DeviceInfo.fromStorage(dev, deviceId);
-        this.emit("deviceVerificationChanged", userId, deviceId, deviceObj);
+        this.emit(CryptoEvent.DeviceVerificationChanged, userId, deviceId, deviceObj);
         return deviceObj;
     }
 
@@ -2174,11 +2259,7 @@ export class Crypto extends EventEmitter {
             return Promise.resolve(existingRequest);
         }
         const channel = new InRoomChannel(this.baseApis, roomId, userId);
-        return this.requestVerificationWithChannel(
-            userId,
-            channel,
-            this.inRoomVerificationRequests,
-        );
+        return this.requestVerificationWithChannel(userId, channel, this.inRoomVerificationRequests);
     }
 
     public requestVerification(userId: string, devices: string[]): Promise<VerificationRequest> {
@@ -2190,17 +2271,13 @@ export class Crypto extends EventEmitter {
             return Promise.resolve(existingRequest);
         }
         const channel = new ToDeviceChannel(this.baseApis, userId, devices, ToDeviceChannel.makeTransactionId());
-        return this.requestVerificationWithChannel(
-            userId,
-            channel,
-            this.toDeviceVerificationRequests,
-        );
+        return this.requestVerificationWithChannel(userId, channel, this.toDeviceVerificationRequests);
     }
 
     private async requestVerificationWithChannel(
         userId: string,
         channel: IVerificationChannel,
-        requestsMap: any, // TODO types
+        requestsMap: IRequestsMap,
     ): Promise<VerificationRequest> {
         let request = new VerificationRequest(channel, this.verificationMethods, this.baseApis);
         // if transaction id is already known, add request
@@ -2588,7 +2665,7 @@ export class Crypto extends EventEmitter {
         users: string[],
         force?: boolean,
     ): Promise<Record<string, Record<string, olmlib.IOlmSessionResult>>> {
-        const devicesByUser = {};
+        const devicesByUser: Record<string, DeviceInfo[]> = {};
 
         for (let i = 0; i < users.length; ++i) {
             const userId = users[i];
@@ -2621,7 +2698,7 @@ export class Crypto extends EventEmitter {
      * @return {module:crypto/OlmDevice.MegolmSessionData[]} a list of session export objects
      */
     public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
-        const exportedSessions = [];
+        const exportedSessions: IMegolmSessionData[] = [];
         await this.cryptoStore.doTxn(
             'readonly', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
                 this.cryptoStore.getAllEndToEndInboundGroupSessions(txn, (s) => {
@@ -2699,7 +2776,6 @@ export class Crypto extends EventEmitter {
         }
     }
 
-    /* eslint-disable valid-jsdoc */    //https://github.com/eslint/eslint/issues/7307
     /**
      * Encrypt an event according to the configuration of the room.
      *
@@ -2710,8 +2786,6 @@ export class Crypto extends EventEmitter {
      * @return {Promise?} Promise which resolves when the event has been
      *     encrypted, or null if nothing was needed
      */
-    /* eslint-enable valid-jsdoc */
-    // TODO this return type lies
     public async encryptEvent(event: MatrixEvent, room: Room): Promise<void> {
         if (!room) {
             throw new Error("Cannot send encrypted messages in unknown rooms");
@@ -2753,8 +2827,7 @@ export class Crypto extends EventEmitter {
             delete content['io.element.performance_metrics'];
         }
 
-        const encryptedContent = await alg.encryptMessage(
-            room, event.getType(), content);
+        const encryptedContent = await alg.encryptMessage(room, event.getType(), content);
 
         if (mRelatesTo) {
             encryptedContent['m.relates_to'] = mRelatesTo;
@@ -2791,7 +2864,7 @@ export class Crypto extends EventEmitter {
                     type: "m.room.message",
                     content: {},
                     unsigned: {
-                        redacted_because: decryptedEvent.clearEvent,
+                        redacted_because: decryptedEvent.clearEvent as IEvent,
                     },
                 },
             };
@@ -3020,6 +3093,14 @@ export class Crypto extends EventEmitter {
         });
     }
 
+    private onMembership = (event: MatrixEvent, member: RoomMember, oldMembership?: string) => {
+        try {
+            this.onRoomMembership(event, member, oldMembership);
+        } catch (e) {
+            logger.error("Error handling membership change:", e);
+        }
+    };
+
     private onToDeviceEvent = (event: MatrixEvent): void => {
         try {
             logger.log(`received to_device ${event.getType()} from: ` +
@@ -3034,7 +3115,8 @@ export class Crypto extends EventEmitter {
                 this.secretStorage.onRequestReceived(event);
             } else if (event.getType() === "m.secret.send") {
                 this.secretStorage.onSecretReceived(event);
-            } else if (event.getType() === "org.matrix.room_key.withheld") {
+            } else if (event.getType() === "m.room_key.withheld"
+                || event.getType() === "org.matrix.room_key.withheld") {
                 this.onRoomKeyWithheldEvent(event);
             } else if (event.getContent().transaction_id) {
                 this.onKeyVerificationMessage(event);
@@ -3045,7 +3127,7 @@ export class Crypto extends EventEmitter {
                     event.attemptDecryption(this);
                 }
                 // once the event has been decrypted, try again
-                event.once('Event.decrypted', (ev) => {
+                event.once(MatrixEventEvent.Decrypted, (ev) => {
                     this.onToDeviceEvent(ev);
                 });
             }
@@ -3124,7 +3206,7 @@ export class Crypto extends EventEmitter {
         if (!ToDeviceChannel.validateEvent(event, this.baseApis)) {
             return;
         }
-        const createRequest = event => {
+        const createRequest = (event: MatrixEvent) => {
             if (!ToDeviceChannel.canCreateRequest(ToDeviceChannel.getEventType(event))) {
                 return;
             }
@@ -3142,11 +3224,7 @@ export class Crypto extends EventEmitter {
             return new VerificationRequest(
                 channel, this.verificationMethods, this.baseApis);
         };
-        this.handleVerificationEvent(
-            event,
-            this.toDeviceVerificationRequests,
-            createRequest,
-        );
+        this.handleVerificationEvent(event, this.toDeviceVerificationRequests, createRequest);
     }
 
     /**
@@ -3169,7 +3247,7 @@ export class Crypto extends EventEmitter {
         if (!InRoomChannel.validateEvent(event, this.baseApis)) {
             return;
         }
-        const createRequest = event => {
+        const createRequest = (event: MatrixEvent) => {
             const channel = new InRoomChannel(
                 this.baseApis,
                 event.getRoomId(),
@@ -3177,18 +3255,13 @@ export class Crypto extends EventEmitter {
             return new VerificationRequest(
                 channel, this.verificationMethods, this.baseApis);
         };
-        this.handleVerificationEvent(
-            event,
-            this.inRoomVerificationRequests,
-            createRequest,
-            liveEvent,
-        );
+        this.handleVerificationEvent(event, this.inRoomVerificationRequests, createRequest, liveEvent);
     };
 
     private async handleVerificationEvent(
         event: MatrixEvent,
-        requestsMap: any, // TODO types
-        createRequest: any, // TODO types
+        requestsMap: IRequestsMap,
+        createRequest: (event: MatrixEvent) => VerificationRequest,
         isLiveEvent = true,
     ): Promise<void> {
         // Wait for event to get its final ID with pendingEventOrdering: "chronological", since DM channels depend on it.
@@ -3203,15 +3276,15 @@ export class Crypto extends EventEmitter {
                             reject(new Error("Event status set to CANCELLED."));
                         }
                     };
-                    event.once("Event.localEventIdReplaced", eventIdListener);
-                    event.on("Event.status", statusListener);
+                    event.once(MatrixEventEvent.LocalEventIdReplaced, eventIdListener);
+                    event.on(MatrixEventEvent.Status, statusListener);
                 });
             } catch (err) {
                 logger.error("error while waiting for the verification event to be sent: " + err.message);
                 return;
             } finally {
-                event.removeListener("Event.localEventIdReplaced", eventIdListener);
-                event.removeListener("Event.status", statusListener);
+                event.removeListener(MatrixEventEvent.LocalEventIdReplaced, eventIdListener);
+                event.removeListener(MatrixEventEvent.Status, statusListener);
             }
         }
         let request = requestsMap.getRequest(event);
@@ -3238,7 +3311,7 @@ export class Crypto extends EventEmitter {
             !request.invalid && // check it has enough events to pass the UNSENT stage
             !request.observeOnly;
         if (shouldEmit) {
-            this.baseApis.emit("crypto.verification.request", request);
+            this.baseApis.emit(CryptoEvent.VerificationRequest, request);
         }
     }
 
@@ -3302,7 +3375,7 @@ export class Crypto extends EventEmitter {
                 return;
             }
         }
-        const devicesByUser = {};
+        const devicesByUser: Record<string, DeviceInfo[]> = {};
         devicesByUser[sender] = [device];
         await olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, devicesByUser, true);
 
@@ -3539,7 +3612,7 @@ export class Crypto extends EventEmitter {
             return;
         }
 
-        this.emit("crypto.roomKeyRequest", req);
+        this.emit(CryptoEvent.RoomKeyRequest, req);
     }
 
     /**
@@ -3558,7 +3631,7 @@ export class Crypto extends EventEmitter {
         // we should probably only notify the app of cancellations we told it
         // about, but we don't currently have a record of that, so we just pass
         // everything through.
-        this.emit("crypto.roomKeyRequestCancellation", cancellation);
+        this.emit(CryptoEvent.RoomKeyRequestCancellation, cancellation);
     }
 
     /**
