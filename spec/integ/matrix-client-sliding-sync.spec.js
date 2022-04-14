@@ -484,7 +484,7 @@ describe("SlidingSync", () => {
             onRequest: (initial) => { return onExtensionRequest(initial); },
             onResponse: (res) => { return onExtensionResponse(res); },
             when: () => ExtensionState.PreProcess,
-        }
+        };
 
         it("should be able to register an extension", async (done) => {
             slidingSync = new SlidingSync(proxyBaseUrl, [], {}, client, 1);
