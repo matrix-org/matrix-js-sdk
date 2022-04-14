@@ -4604,7 +4604,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         ts = Math.floor(ts / 60000) * 60000;
 
         const parsed = new URL(url);
-        parsed.hash = ""; // strip the hash as it won't affect the preview
         url = parsed.toString();
 
         const key = ts + "_" + url;
