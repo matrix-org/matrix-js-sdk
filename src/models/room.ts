@@ -165,6 +165,7 @@ export enum RoomEvent {
     LocalEchoUpdated = "Room.localEchoUpdated",
     Timeline = "Room.timeline",
     TimelineReset = "Room.timelineReset",
+    TimelineRefresh = "RoomEvent.TimelineRefresh",
     historyImportedWithinTimeline = "Room.historyImportedWithinTimeline",
 }
 
@@ -174,6 +175,7 @@ type EmittedEvents = RoomEvent
     | ThreadEvent.NewReply
     | RoomEvent.Timeline
     | RoomEvent.TimelineReset
+    | RoomEvent.TimelineRefresh
     | RoomEvent.historyImportedWithinTimeline
     | MatrixEventEvent.BeforeRedaction;
 
@@ -195,6 +197,7 @@ export type RoomEventHandlerMap = {
         markerEvent: MatrixEvent,
         room: Room,
     ) => void;
+    [RoomEvent.TimelineRefresh]: (room: Room, eventTimelineSet: EventTimelineSet) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
 } & ThreadHandlerMap & MatrixEventHandlerMap;
 
@@ -926,6 +929,98 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         });
     }
 
+    // TODO
+    public async refreshLiveTimeline(): Promise<void> {
+        const liveTimelineBefore = this.getLiveTimeline();
+        const forwardPaginationToken = liveTimelineBefore.getPaginationToken(EventTimeline.FORWARDS);
+        const eventsBefore = liveTimelineBefore.getEvents();
+        const mostRecentEventInTimeline = eventsBefore[eventsBefore.length - 1];
+
+        // Empty out all of `this.timelineSets` but still keeps the same
+        // `timelineSet` references around so the React code updates properly
+        // and doesn't ignore the room events we emit because it checks that the
+        // `timelineSet` references are the same. We need the `timelineSet`
+        // empty so that the `client.getEventTimeline(...)` call later, will
+        // call `/context` and create a new timeline instead of returning the
+        // same one.
+        this.resetLiveTimeline(null, null);
+        //this.resetLiveTimeline(forwardPaginationToken, forwardPaginationToken);
+
+        // Get a reference to the emptied out `timelineSet`
+        //
+        // TODO: Do we want to use `this.getLiveTimeline().getTimelineSet()` instead?
+        // I think it's the same thing but what's more right?
+        const timelineSet = this.getUnfilteredTimelineSet();
+        
+        console.log(`refreshLiveTimeline: after resetLiveTimeline timelineSets=${this.getTimelineSets().length} getUnfilteredTimelineSet=`, timelineSet.getTimelines().length, timelineSet.getTimelines().map((timeline) => {
+            return timeline.getEvents().length;
+        }));
+
+        // Use `client.getEventTimeline(...)` to construct a new timeline from a
+        // `/context` response state and events for the most recent event before
+        // we reset everything. The `timelineSet` needs to be empty in order for
+        // this function to call `/context`
+        const newTimeline = await this.client.getEventTimeline(timelineSet, mostRecentEventInTimeline.getId());
+        console.log('refreshLiveTimeline: after getEventTimeline', timelineSet.getTimelines().length, timelineSet.getTimelines().map((timeline) => {
+            return timeline.getEvents().length;
+        }));
+        // Set the pagination token back to the live sync token instead of using
+        // the /context historical token so that it matches the next response from `/sync`
+        // and we can properly continue the timeline.
+        newTimeline.setPaginationToken(forwardPaginationToken, EventTimeline.FORWARDS);
+
+        timelineSet.setLiveTimeline(newTimeline);
+        //timelineSet.getLiveTimeline().setNeighbouringTimeline(newTimeline, EventTimeline.FORWARDS);
+        // Fixup `this.oldstate` so that `scrollback` has the pagination tokens available 
+        this.fixUpLegacyTimelineFields();
+
+        // TODO: Set timelineNeedsRefresh = false
+
+        // const liveTimeline = this.getLiveTimeline();
+        // liveTimeline.setPaginationToken(forwardPaginationToken, EventTimeline.BACKWARDS);
+        // liveTimeline.setPaginationToken(forwardPaginationToken, EventTimeline.FORWARDS);
+        // await new Promise((resolve) => {
+        //     setTimeout(async () => {
+        //         await this.client.scrollback(this, 30);
+        //         resolve(null);
+        //     }, 2000);
+        // });
+        //await this.client.scrollback(this, 30);
+        this.emit(RoomEvent.TimelineRefresh, this, timelineSet);
+
+        // const timelineSet = new EventTimelineSet(this, this.opts);
+
+        // const liveTimeline = this.getLiveTimeline();
+        // const events = liveTimeline.getEvents();
+        // const mostRecentEventInTimeline = events[events.length - 1];
+
+        // // This will create a timeline with the given event and add it to the timelineSet
+        // const newTimeline = await this.client.getEventTimeline(timelineSet, mostRecentEventInTimeline.getId());
+
+        // console.log('refreshTimeline: timelineSet',
+        //     timelineSet,
+        //     timelineSet.getTimelines().map((timeline) => {
+        //         return timeline.getEvents().length;
+        //     }),
+        // );
+
+        // // Since timelineSets is a readonly property, clear it out this way
+        // this.timelineSets.length = 0;
+        // // Keep track of the new timelineSet
+        // this.timelineSets.push(timelineSet);
+        // // Set our new timeline as the liveTimeline
+        // timelineSet.setLiveTimeline(newTimeline);
+        // // Fixup `this.oldstate` so that `scrollback` has the pagination tokens available 
+        // this.fixUpLegacyTimelineFields();
+        
+
+        // //this.emit(RoomEvent.Timeline, event, this.room, Boolean(toStartOfTimeline), false, data);
+        // // setTimeout(() => {
+        // //     this.emit(RoomEvent.TimelineReset, this, timelineSet, true);
+        // // }, 1000);
+        // this.emit(RoomEvent.TimelineRefresh, this, timelineSet);
+    }
+
     /**
      * Reset the live timeline of all timelineSets, and start new ones.
      *
@@ -953,6 +1048,11 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @private
      */
     private fixUpLegacyTimelineFields(): void {
+        console.log(
+            'fixUpLegacyTimelineFields',
+            this.getLiveTimeline().getState(EventTimeline.BACKWARDS),
+            this.getLiveTimeline().getState(EventTimeline.FORWARDS)
+        );
         // maintain this.timeline as a reference to the live timeline,
         // and this.oldState and this.currentState as references to the
         // state at the start and end of that timeline. These are more

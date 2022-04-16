@@ -217,6 +217,15 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     }
 
     /**
+     * Get the live timeline for this room.
+     *
+     * @return {module:models/event-timeline~EventTimeline} live timeline
+     */
+     public setLiveTimeline(timeline: EventTimeline): void {
+        this.liveTimeline = timeline;
+    }
+
+    /**
      * Return the timeline (if any) this event is in.
      * @param {String} eventId the eventId being sought
      * @return {module:models/event-timeline~EventTimeline} timeline
