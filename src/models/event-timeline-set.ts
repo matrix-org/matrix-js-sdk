@@ -217,7 +217,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     }
 
     /**
-     * Get the live timeline for this room.
+     * Set the live timeline for this room.
      *
      * @return {module:models/event-timeline~EventTimeline} live timeline
      */

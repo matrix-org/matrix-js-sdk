@@ -5135,7 +5135,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public scrollback(room: Room, limit = 30, callback?: Callback): Promise<Room> {
-        console.log('client: scrollback');
         if (utils.isFunction(limit)) {
             callback = limit as any as Callback; // legacy
             limit = undefined;
@@ -5151,13 +5150,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         if (room.oldState.paginationToken === null) {
-            console.log('client: scrollabck already at the start.', room.oldState);
             return Promise.resolve(room); // already at the start.
         }
         // attempt to grab more events from the store first
         const numAdded = this.store.scrollback(room, limit).length;
         if (numAdded === limit) {
-            console.log(`client: scrollback store contained everything we needed numAdded=${numAdded} limit=${limit}`);
             // store contained everything we needed.
             return Promise.resolve(room);
         }
@@ -5184,7 +5181,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 const [timelineEvents, threadedEvents] = room.partitionThreadedEvents(matrixEvents);
 
                 this.processBeaconEvents(room, matrixEvents);
-                console.log('client: scrollback addEventsToTimeline', timelineEvents.length, room.getLiveTimeline());
                 room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
                 await this.processThreadEvents(room, threadedEvents, true);
 
@@ -5311,9 +5307,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         // Here we handle non-thread timelines only, but still process any thread events to populate thread summaries.
-        console.log('getEventTimeline: timeline count1', timelineSet.getTimelines().length);
         let timeline = timelineSet.getTimelineForEvent(events[0].getId());
-        console.log('getEventTimeline: timeline count2', timelineSet.getTimelines().length);
         if (timeline) {
             timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(res.state.map(mapper));
         } else {
@@ -5322,11 +5316,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             timeline.getState(EventTimeline.FORWARDS).paginationToken = res.end;
         }
 
-        console.log('getEventTimeline: timeline before', timelineSet.getTimelines().length, timeline.getEvents().length);
-
         const [timelineEvents, threadedEvents] = timelineSet.room.partitionThreadedEvents(events);
         timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
-        console.log('getEventTimeline: timeline after', timelineSet.getTimelines().length, timeline.getEvents().length);
         // The target event is not in a thread but process the contextual events, so we can show any threads around it.
         await this.processThreadEvents(timelineSet.room, threadedEvents, true);
         this.processBeaconEvents(timelineSet.room, events);
