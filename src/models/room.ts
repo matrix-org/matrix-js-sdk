@@ -948,8 +948,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         const eventsBefore = liveTimelineBefore.getEvents();
         const mostRecentEventInTimeline = eventsBefore[eventsBefore.length - 1];
         logger.log(
-            `[refreshLiveTimeline] for room ${this.roomId} at ` + 
-            `mostRecentEventInTimeline=${mostRecentEventInTimeline.getId()} forwardPaginationToken+${forwardPaginationToken}`
+            `[refreshLiveTimeline] for room ${this.roomId} at ` +
+            `mostRecentEventInTimeline=${mostRecentEventInTimeline.getId()} ` +
+            `forwardPaginationToken+${forwardPaginationToken}`,
         );
 
         // Empty out all of `this.timelineSets` but still keeps the same
