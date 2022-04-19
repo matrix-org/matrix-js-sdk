@@ -221,7 +221,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      *
      * @return {module:models/event-timeline~EventTimeline} live timeline
      */
-     public setLiveTimeline(timeline: EventTimeline): void {
+    public setLiveTimeline(timeline: EventTimeline): void {
         this.liveTimeline = timeline;
     }
 

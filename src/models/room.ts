@@ -947,7 +947,10 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         const forwardPaginationToken = liveTimelineBefore.getPaginationToken(EventTimeline.FORWARDS);
         const eventsBefore = liveTimelineBefore.getEvents();
         const mostRecentEventInTimeline = eventsBefore[eventsBefore.length - 1];
-        logger.log(`[refreshLiveTimeline] for room ${this.roomId} at mostRecentEventInTimeline=${mostRecentEventInTimeline.getId()} forwardPaginationToken+${forwardPaginationToken}`)
+        logger.log(
+            `[refreshLiveTimeline] for room ${this.roomId} at ` + 
+            `mostRecentEventInTimeline=${mostRecentEventInTimeline.getId()} forwardPaginationToken+${forwardPaginationToken}`
+        );
 
         // Empty out all of `this.timelineSets` but still keeps the same
         // `timelineSet` references around so the React code updates properly
@@ -979,7 +982,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         // forwards and back paginating from.
         timelineSet.setLiveTimeline(newTimeline);
         // Fixup `this.oldstate` so that `scrollback` has the pagination tokens
-        // available 
+        // available
         this.fixUpLegacyTimelineFields();
 
         // The timeline has now been refreshed ✅
