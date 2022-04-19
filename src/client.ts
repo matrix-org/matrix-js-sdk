@@ -3778,7 +3778,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const thread = room?.threads.get(threadId);
         if (thread) {
             localEvent.setThread(thread);
-            localEvent.setThreadId(thread.id);
         }
 
         // set up re-emitter for this new event - this is normally the job of EventMapper but we don't use it here
@@ -5280,7 +5279,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // Where the event is a thread reply (not a root) and running in MSC-enabled mode the Thread timeline only
         // functions contiguously, so we have to jump through some hoops to get our target event in it.
         // XXX: workaround for https://github.com/vector-im/element-meta/issues/150
-        if (Thread.hasServerSideSupport && event.isRelation(THREAD_RELATION_TYPE.name)) {
+        if (Thread.hasServerSideSupport &&
+            this.supportsExperimentalThreads() &&
+            event.isRelation(THREAD_RELATION_TYPE.name)
+        ) {
             const [, threadedEvents] = timelineSet.room.partitionThreadedEvents(events);
             const thread = await timelineSet.room.createThreadFetchRoot(event.threadRootId, threadedEvents, true);
 
@@ -6591,6 +6593,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         } catch (e) {
             return null;
         }
+    }
+
+    /**
+     * Query the server to see if it supports the MSC2457 `logout_devices` parameter when setting password
+     * @return {Promise<boolean>} true if server supports the `logout_devices` parameter
+     */
+    public doesServerSupportLogoutDevices(): Promise<boolean> {
+        return this.isVersionSupported("r0.6.1");
     }
 
     /**
