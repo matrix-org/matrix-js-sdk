@@ -21,7 +21,7 @@ limitations under the License.
 import { RoomMember } from "./room-member";
 import { logger } from '../logger';
 import * as utils from "../utils";
-import { EventType } from "../@types/event";
+import { EventType, UNSTABLE_MSC2716_MARKER } from "../@types/event";
 import { MatrixEvent } from "./event";
 import { MatrixClient } from "../client";
 import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
@@ -331,7 +331,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * state with the same {type, stateKey} tuple. Will fire "RoomState.events"
      * for every event added. May fire "RoomState.members" if there are
      * <code>m.room.member</code> events. May fire "RoomStateEvent.Marker" if there are
-     * <code>EventType.Marker</code> events.
+     * <code>UNSTABLE_MSC2716_MARKER</code> events.
      * @param {MatrixEvent[]} stateEvents a list of state events for this room.
      * @param {IMarkerFoundOptions} markerFoundOptions
      * @fires module:client~MatrixClient#event:"RoomState.members"
@@ -419,7 +419,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
                 // assume all our sentinels are now out-of-date
                 this.sentinels = {};
-            } else if (event.getType() === EventType.Marker) {
+            } else if (event.getType() === UNSTABLE_MSC2716_MARKER.name) {
                 this.emit(RoomStateEvent.Marker, event, markerFoundOptions);
             }
         });

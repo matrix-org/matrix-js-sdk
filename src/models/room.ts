@@ -936,7 +936,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * We need to force the client to throw away their current timeline so that
      * when they back paginate over the area again with the historical messages
      * in between, it grabs the newly imported messages. We can listen for
-     * `EventType.Marker`, in order to tell when historical messages are ready
+     * `UNSTABLE_MSC2716_MARKER`, in order to tell when historical messages are ready
      * to be discovered in the room and the timeline needs a refresh. The SDK
      * emits a `RoomEvent.historyImportedWithinTimeline` event when we detect a
      * valid marker and can check the needs refresh status via

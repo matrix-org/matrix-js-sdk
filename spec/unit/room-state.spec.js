@@ -3,7 +3,7 @@ import { makeBeaconEvent, makeBeaconInfoEvent } from "../test-utils/beacon";
 import { filterEmitCallsByEventType } from "../test-utils/emitter";
 import { RoomState, RoomStateEvent } from "../../src/models/room-state";
 import { BeaconEvent, getBeaconInfoIdentifier } from "../../src/models/beacon";
-import { EventType } from "../../src/@types/event";
+import { UNSTABLE_MSC2716_MARKER } from "../../src/@types/event";
 
 describe("RoomState", function() {
     const roomId = "!foo:bar";
@@ -257,7 +257,7 @@ describe("RoomState", function() {
             const events = [
                 utils.mkEvent({
                     event: true,
-                    type: EventType.Marker,
+                    type: UNSTABLE_MSC2716_MARKER.name,
                     room: roomId,
                     user: userA,
                     skey: "",

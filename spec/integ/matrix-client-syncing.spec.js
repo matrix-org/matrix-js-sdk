@@ -1,7 +1,7 @@
 import { MatrixEvent } from "../../src/models/event";
 import { RoomEvent } from "../../src/models/room";
 import { EventTimeline } from "../../src/models/event-timeline";
-import { EventType } from "../../src/@types/event";
+import { UNSTABLE_MSC2716_MARKER } from "../../src/@types/event";
 import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 
@@ -509,7 +509,7 @@ describe("MatrixClient syncing", function() {
                             // being sent by the room creator so it has no
                             // special meaning in existing room versions.
                             utils.mkEvent({
-                                type: EventType.Marker,
+                                type: UNSTABLE_MSC2716_MARKER.name,
                                 room: roomOne,
                                 // The important part we're testing is here!
                                 // `userC` is not the room creator.
@@ -560,7 +560,7 @@ describe("MatrixClient syncing", function() {
                     });
 
                     const markerEventFromRoomCreator = utils.mkEvent({
-                        type: EventType.Marker, room: roomOne, user: otherUserId,
+                        type: UNSTABLE_MSC2716_MARKER.name, room: roomOne, user: otherUserId,
                         skey: "",
                         content: {
                             "m.insertion_id": "$abc",
