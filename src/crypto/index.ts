@@ -1423,6 +1423,25 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
     }
 
+    /**
+     * Check whether one of our own devices is cross-signed by our
+     * user's stored keys, regardless of whether we trust those keys yet.
+     *
+     * @param {string} deviceId The ID of the device to check
+     *
+     * @returns {boolean} true if the device is cross-signed
+     */
+    public checkIfOwnDeviceCrossSigned(deviceId: string): boolean {
+        const device = this.deviceList.getStoredDevice(this.userId, deviceId);
+        const userCrossSigning = this.deviceList.getStoredCrossSigningForUser(this.userId);
+        return userCrossSigning.checkDeviceTrust(
+            userCrossSigning,
+            device,
+            false,
+            true,
+        ).isCrossSigningVerified();
+    }
+
     /*
      * Event handler for DeviceList's userNewDevices event
      */

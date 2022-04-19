@@ -2073,6 +2073,21 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Check whether one of our own devices is cross-signed by our
+     * user's stored keys, regardless of whether we trust those keys yet.
+     *
+     * @param {string} deviceId The ID of the device to check
+     *
+     * @returns {boolean} true if the device is cross-signed
+     */
+    public checkIfOwnDeviceCrossSigned(deviceId: string): boolean {
+        if (!this.crypto) {
+            throw new Error("End-to-end encryption disabled");
+        }
+        return this.crypto.checkIfOwnDeviceCrossSigned(deviceId);
+    }
+
+    /**
      * Check the copy of our cross-signing key that we have in the device list and
      * see if we can get the private key. If so, mark it as trusted.
      * @param {Object} opts ICheckOwnCrossSigningTrustOpts object
@@ -6610,6 +6625,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         } catch (e) {
             return null;
         }
+    }
+
+    /**
+     * Query the server to see if it supports the MSC2457 `logout_devices` parameter when setting password
+     * @return {Promise<boolean>} true if server supports the `logout_devices` parameter
+     */
+    public doesServerSupportLogoutDevices(): Promise<boolean> {
+        return this.isVersionSupported("r0.6.1");
     }
 
     /**
