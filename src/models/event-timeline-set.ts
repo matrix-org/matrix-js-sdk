@@ -77,7 +77,9 @@ export interface IAddLiveEventOptions {
 }
 
 export interface IAddEventToTimelineOptions {
-    /** Whether to insert the new event at the start of the timeline */
+    /** Whether to insert the new event at the start of the timeline where the
+     * oldest events are (timeline is in chronological order, oldest to most
+     * recent) */
     toStartOfTimeline: boolean;
     /** Whether the sync response came from cache */
     fromCache?: boolean;

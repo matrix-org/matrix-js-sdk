@@ -34,7 +34,9 @@ export interface IInitialiseStateOptions {
 }
 
 export interface IAddEventOptions {
-    /** Whether to insert the new event at the start of the timeline */
+    /** Whether to insert the new event at the start of the timeline where the
+     * oldest events are (timeline is in chronological order, oldest to most
+     * recent) */
     toStartOfTimeline: boolean;
     /** The state events to reconcile metadata from */
     roomState?: RoomState;
