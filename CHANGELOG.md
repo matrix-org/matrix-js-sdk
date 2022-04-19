@@ -1,3 +1,17 @@
+Changes in [17.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v17.1.0-rc.1) (2022-04-19)
+============================================================================================================
+
+## ✨ Features
+ * Add MatrixClient.doesServerSupportLogoutDevices() for MSC2457 ([\#2297](https://github.com/matrix-org/matrix-js-sdk/pull/2297)).
+ * Live location sharing - expose room liveBeaconIds ([\#2296](https://github.com/matrix-org/matrix-js-sdk/pull/2296)).
+ * Support for MSC2457 logout_devices param for setPassword() ([\#2285](https://github.com/matrix-org/matrix-js-sdk/pull/2285)).
+ * Stabilise token authenticated registration support ([\#2181](https://github.com/matrix-org/matrix-js-sdk/pull/2181)). Contributed by @govynnus.
+ * Live location sharing - Aggregate beacon locations on beacons ([\#2268](https://github.com/matrix-org/matrix-js-sdk/pull/2268)).
+
+## 🐛 Bug Fixes
+ * Prevent duplicated re-emitter setups in event-mapper ([\#2293](https://github.com/matrix-org/matrix-js-sdk/pull/2293)).
+ * Make self membership less prone to races ([\#2277](https://github.com/matrix-org/matrix-js-sdk/pull/2277)). Fixes vector-im/element-web#21661.
+
 Changes in [17.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v17.0.0) (2022-04-11)
 ==================================================================================================
 
