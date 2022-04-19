@@ -165,7 +165,7 @@ export enum RoomEvent {
     LocalEchoUpdated = "Room.localEchoUpdated",
     Timeline = "Room.timeline",
     TimelineReset = "Room.timelineReset",
-    TimelineRefresh = "RoomEvent.TimelineRefresh",
+    TimelineRefresh = "Room.TimelineRefresh",
     historyImportedWithinTimeline = "Room.historyImportedWithinTimeline",
 }
 

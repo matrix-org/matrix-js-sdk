@@ -1,4 +1,5 @@
 import { MatrixEvent } from "../../src/models/event";
+import { RoomEvent } from "../../src/models/room";
 import { EventTimeline } from "../../src/models/event-timeline";
 import { EventType } from "../../src/@types/event";
 import * as utils from "../test-utils/test-utils";
@@ -696,25 +697,33 @@ describe("MatrixClient syncing", function() {
 
                         const markerEventId = nextSyncData.rooms.join[roomOne].timeline.events[0].event_id;
 
+                        // Only do the first sync
+                        httpBackend.when("GET", "/sync").respond(200, normalFirstSync);
+                        client.startClient();
+                        await Promise.all([
+                            httpBackend.flushAllExpected(),
+                            awaitSyncEvent(),
+                        ]);
+
+                        // Get the room after the first sync so the room is created
+                        const room = client.getRoom(roomOne);
+
                         let emitCount = 0;
-                        client.on("Room.historyImportedWithinTimeline", function(markerEvent, room) {
+                        room.on(RoomEvent.historyImportedWithinTimeline, function(markerEvent, room) {
                             expect(markerEvent.getId()).toEqual(markerEventId);
                             expect(room.roomId).toEqual(roomOne);
                             emitCount += 1;
                         });
 
-                        httpBackend.when("GET", "/sync").respond(200, normalFirstSync);
+                        // Now do a subsequent sync with the marker event
                         httpBackend.when("GET", "/sync").respond(200, nextSyncData);
-
-                        client.startClient();
                         await Promise.all([
                             httpBackend.flushAllExpected(),
-                            awaitSyncEvent(2),
+                            awaitSyncEvent(),
                         ]);
 
-                        const room = client.getRoom(roomOne);
                         expect(room.getTimelineNeedsRefresh()).toEqual(true);
-                        // Make sure "Room.historyImportedWithinTimeline" was emitted
+                        // Make sure `RoomEvent.historyImportedWithinTimeline` was emitted
                         expect(emitCount).toEqual(1);
                         expect(room.getLastMarkerEventIdProcessed()).toEqual(markerEventId);
                     });

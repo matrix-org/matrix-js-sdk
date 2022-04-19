@@ -70,11 +70,22 @@ const BUFFER_PERIOD_MS = 80 * 1000;
 const FAILED_SYNC_ERROR_THRESHOLD = 3;
 
 export enum SyncState {
+    /** Emitted after we try to sync more than `FAILED_SYNC_ERROR_THRESHOLD`
+     * times and are still failing. Or when we enounter a hard error like the
+     * token being invalid. */
     Error = "ERROR",
+    /** Emitted after the first sync events are ready (this could even be sync
+     * events from the cache) */
     Prepared = "PREPARED",
+    /** Emitted when the sync loop is no longer running */
     Stopped = "STOPPED",
+    /** Emitted after each sync request happens */
     Syncing = "SYNCING",
+    /** Emitted after a connectivity error and we're ready to start syncing again */
     Catchup = "CATCHUP",
+    /** Emitted for each time we try reconnecting. Will switch to `Error` after
+     * we reach the `FAILED_SYNC_ERROR_THRESHOLD`
+     */
     Reconnecting = "RECONNECTING",
 }
 
@@ -210,7 +221,6 @@ export class SyncApi {
             RoomEvent.Receipt,
             RoomEvent.Tags,
             RoomEvent.LocalEchoUpdated,
-            RoomEvent.historyImportedWithinTimeline,
             RoomEvent.AccountData,
             RoomEvent.MyMembership,
             RoomEvent.Timeline,
