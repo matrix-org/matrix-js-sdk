@@ -678,7 +678,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             roomState,
             timelineWasEmpty,
         }: IAddEventToTimelineOptions,
-    ): void
+    ): void;
     public addEventToTimeline(
         event: MatrixEvent,
         timeline: EventTimeline,
