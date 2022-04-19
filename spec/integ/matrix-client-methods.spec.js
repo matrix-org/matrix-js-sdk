@@ -797,7 +797,7 @@ describe("MatrixClient", function() {
             ]);
         });
 
-        it("sends reply to thread responses to thread timeline only", () => {
+        it("sends reply to thread responses to main timeline only", () => {
             client.clientOpts = { experimentalThreadSupport: true };
 
             const threadRootEvent = buildEventPollStartThreadRoot();
@@ -814,12 +814,12 @@ describe("MatrixClient", function() {
 
             expect(timeline).toEqual([
                 threadRootEvent,
+                replyToThreadResponse,
             ]);
 
             expect(threaded).toEqual([
                 threadRootEvent,
                 eventMessageInThread,
-                replyToThreadResponse,
             ]);
         });
     });
