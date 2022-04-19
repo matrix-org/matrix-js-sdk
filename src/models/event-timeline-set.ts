@@ -574,15 +574,33 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @param {IAddLiveEventOptions} options addLiveEvent options
      * @param roomState the state events to reconcile metadata from
      */
-    public addLiveEvent(
+     public addLiveEvent(
+        event: MatrixEvent,
+        duplicateStrategy?: DuplicateStrategy,
+        fromCache?: boolean,
+        roomState?: RoomState,
+    ): void;
+     public addLiveEvent(
         event: MatrixEvent,
         {
-            duplicateStrategy = DuplicateStrategy.Ignore,
-            fromCache = false,
+            duplicateStrategy,
+            fromCache,
             roomState,
             timelineWasEmpty,
-        }: IAddLiveEventOptions = {},
+        }: IAddLiveEventOptions,
+    ): void;
+    public addLiveEvent(
+        event: MatrixEvent,
+        duplicateStrategyOrOpts?: DuplicateStrategy | IAddLiveEventOptions,
+        fromCache = false,
+        roomState?: RoomState,
     ): void {
+        let duplicateStrategy = duplicateStrategyOrOpts as DuplicateStrategy || DuplicateStrategy.Ignore;
+        let timelineWasEmpty;
+        if (typeof (duplicateStrategyOrOpts) === 'object') {
+            ({ duplicateStrategy = DuplicateStrategy.Ignore, fromCache = false, roomState, timelineWasEmpty } = duplicateStrategyOrOpts);
+        }
+
         if (this.filter) {
             const events = this.filter.filterRoomTimeline([event]);
             if (!events.length) {
@@ -643,13 +661,33 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     public addEventToTimeline(
         event: MatrixEvent,
         timeline: EventTimeline,
+        toStartOfTimeline: boolean,
+        fromCache?,
+        roomState?: RoomState,
+    ): void;
+    public addEventToTimeline(
+        event: MatrixEvent,
+        timeline: EventTimeline,
         {
             toStartOfTimeline,
-            fromCache = false,
+            fromCache,
             roomState,
             timelineWasEmpty,
         }: IAddEventToTimelineOptions,
-    ) {
+    ): void
+    public addEventToTimeline(
+        event: MatrixEvent,
+        timeline: EventTimeline,
+        toStartOfTimelineOrOpts: boolean | IAddEventToTimelineOptions,
+        fromCache = false,
+        roomState?: RoomState,
+    ): void {
+        let toStartOfTimeline = !!toStartOfTimelineOrOpts;
+        let timelineWasEmpty;
+        if (typeof (toStartOfTimelineOrOpts) === 'object') {
+            ({ toStartOfTimeline, fromCache = false, roomState, timelineWasEmpty } = toStartOfTimelineOrOpts);
+        }
+
         const eventId = event.getId();
         timeline.addEvent(event, {
             toStartOfTimeline,

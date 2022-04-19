@@ -377,12 +377,28 @@ export class EventTimeline {
      */
     public addEvent(
         event: MatrixEvent,
+        toStartOfTimeline: boolean,
+        roomState?: RoomState
+    ): void;
+    public addEvent(
+        event: MatrixEvent,
         {
             toStartOfTimeline,
             roomState,
             timelineWasEmpty,
         }: IAddEventOptions,
+    ): void;
+    public addEvent(
+        event: MatrixEvent,
+        toStartOfTimelineOrOpts: boolean | IAddEventOptions,
+        roomState?: RoomState
     ): void {
+        let toStartOfTimeline = !!toStartOfTimelineOrOpts;
+        let timelineWasEmpty;
+        if (typeof (toStartOfTimelineOrOpts) === 'object') {
+            ({ toStartOfTimeline, roomState, timelineWasEmpty } = toStartOfTimelineOrOpts);
+        }
+
         if (!roomState) {
             roomState = toStartOfTimeline ? this.startState : this.endState;
         }

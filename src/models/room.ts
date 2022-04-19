@@ -1970,10 +1970,31 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @fires module:client~MatrixClient#event:"Room.timeline"
      * @private
      */
-    private addLiveEvent(event: MatrixEvent, addLiveEventOptions: IAddLiveEventOptions = {}): void {
+    private addLiveEvent(event: MatrixEvent, duplicateStrategy: DuplicateStrategy, fromCache?): void;
+    private addLiveEvent(event: MatrixEvent, addLiveEventOptions: IAddLiveEventOptions): void;
+    private addLiveEvent(
+        event: MatrixEvent,
+        duplicateStrategyOrOpts: DuplicateStrategy | IAddLiveEventOptions,
+        fromCache = false,
+    ): void {
+        let duplicateStrategy = duplicateStrategyOrOpts as DuplicateStrategy;
+        let timelineWasEmpty;
+        if (typeof (duplicateStrategyOrOpts) === 'object') {
+            ({
+                duplicateStrategy = DuplicateStrategy.Ignore,
+                fromCache = false,
+                /* roomState, (not used here) */
+                timelineWasEmpty,
+            } = duplicateStrategyOrOpts);
+        }
+
         // add to our timeline sets
         for (let i = 0; i < this.timelineSets.length; i++) {
-            this.timelineSets[i].addLiveEvent(event, addLiveEventOptions);
+            this.timelineSets[i].addLiveEvent(event, {
+                duplicateStrategy,
+                fromCache,
+                timelineWasEmpty,
+            });
         }
 
         // synthesize and inject implicit read receipts
@@ -2307,8 +2328,25 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @param {IAddLiveEventOptions} options addLiveEvent options
      * @throws If <code>duplicateStrategy</code> is not falsey, 'replace' or 'ignore'.
      */
-    public addLiveEvents(events: MatrixEvent[], addLiveEventOptions: IAddLiveEventOptions = {}): void {
-        const { duplicateStrategy } = addLiveEventOptions;
+    public addLiveEvents(events: MatrixEvent[], duplicateStrategy?: DuplicateStrategy, fromCache?: boolean): void;
+    public addLiveEvents(events: MatrixEvent[], addLiveEventOptions?: IAddLiveEventOptions): void
+    public addLiveEvents(
+        events: MatrixEvent[],
+        duplicateStrategyOrOpts?: DuplicateStrategy | IAddLiveEventOptions,
+        fromCache = false,
+    ): void {
+        let duplicateStrategy = duplicateStrategyOrOpts as (DuplicateStrategy | null);
+        let timelineWasEmpty;
+        if (typeof (duplicateStrategyOrOpts) === 'object') {
+            ({
+                duplicateStrategy,
+                fromCache = false,
+                /* roomState, (not used here) */
+                timelineWasEmpty,
+            } = duplicateStrategyOrOpts);
+        }
+
+
         if (duplicateStrategy && ["replace", "ignore"].indexOf(duplicateStrategy) === -1) {
             throw new Error("duplicateStrategy MUST be either 'replace' or 'ignore'");
         }
@@ -2349,7 +2387,11 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             }
 
             if (shouldLiveInRoom) {
-                this.addLiveEvent(events[i], addLiveEventOptions);
+                this.addLiveEvent(events[i], {
+                    duplicateStrategy,
+                    fromCache,
+                    timelineWasEmpty,
+                });
             }
         }
 
