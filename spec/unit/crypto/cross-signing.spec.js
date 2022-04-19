@@ -883,4 +883,138 @@ describe("Cross Signing", function() {
         expect(bobTrust3.isCrossSigningVerified()).toBeTruthy();
         expect(bobTrust3.isTofu()).toBeTruthy();
     });
+
+    it(
+        "should observe that our own device is cross-signed, even if this device doesn't trust the key",
+        async function() {
+            const { client: alice } = await makeTestClient(
+                { userId: "@alice:example.com", deviceId: "Osborne2" },
+            );
+            alice.uploadDeviceSigningKeys = async () => {};
+            alice.uploadKeySignatures = async () => {};
+
+            // Generate Alice's SSK etc
+            const aliceMasterSigning = new global.Olm.PkSigning();
+            const aliceMasterPrivkey = aliceMasterSigning.generate_seed();
+            const aliceMasterPubkey = aliceMasterSigning.init_with_seed(aliceMasterPrivkey);
+            const aliceSigning = new global.Olm.PkSigning();
+            const alicePrivkey = aliceSigning.generate_seed();
+            const alicePubkey = aliceSigning.init_with_seed(alicePrivkey);
+            const aliceSSK = {
+                user_id: "@alice:example.com",
+                usage: ["self_signing"],
+                keys: {
+                    ["ed25519:" + alicePubkey]: alicePubkey,
+                },
+            };
+            const sskSig = aliceMasterSigning.sign(anotherjson.stringify(aliceSSK));
+            aliceSSK.signatures = {
+                "@alice:example.com": {
+                    ["ed25519:" + aliceMasterPubkey]: sskSig,
+                },
+            };
+
+            // Alice's device downloads the keys, but doesn't trust them yet
+            alice.crypto.deviceList.storeCrossSigningForUser("@alice:example.com", {
+                keys: {
+                    master: {
+                        user_id: "@alice:example.com",
+                        usage: ["master"],
+                        keys: {
+                            ["ed25519:" + aliceMasterPubkey]: aliceMasterPubkey,
+                        },
+                    },
+                    self_signing: aliceSSK,
+                },
+                firstUse: 1,
+                unsigned: {},
+            });
+
+            // Alice has a second device that's cross-signed
+            const aliceCrossSignedDevice = {
+                user_id: "@alice:example.com",
+                device_id: "Dynabook",
+                algorithms: ["m.olm.curve25519-aes-sha256", "m.megolm.v1.aes-sha"],
+                keys: {
+                    "curve25519:Dynabook": "somePubkey",
+                    "ed25519:Dynabook": "someOtherPubkey",
+                },
+            };
+            const sig = aliceSigning.sign(anotherjson.stringify(aliceCrossSignedDevice));
+            aliceCrossSignedDevice.signatures = {
+                "@alice:example.com": {
+                    ["ed25519:" + alicePubkey]: sig,
+                },
+            };
+            alice.crypto.deviceList.storeDevicesForUser("@alice:example.com", {
+                Dynabook: aliceCrossSignedDevice,
+            });
+
+            // We don't trust the cross-signing keys yet...
+            expect(alice.checkDeviceTrust(aliceCrossSignedDevice.device_id).isCrossSigningVerified()).toBeFalsy();
+            // ... but we do acknowledge that the device is signed by them
+            expect(alice.checkIfOwnDeviceCrossSigned(aliceCrossSignedDevice.device_id)).toBeTruthy();
+        },
+    );
+
+    it("should observe that our own device isn't cross-signed", async function() {
+        const { client: alice } = await makeTestClient(
+            { userId: "@alice:example.com", deviceId: "Osborne2" },
+        );
+        alice.uploadDeviceSigningKeys = async () => {};
+        alice.uploadKeySignatures = async () => {};
+
+        // Generate Alice's SSK etc
+        const aliceMasterSigning = new global.Olm.PkSigning();
+        const aliceMasterPrivkey = aliceMasterSigning.generate_seed();
+        const aliceMasterPubkey = aliceMasterSigning.init_with_seed(aliceMasterPrivkey);
+        const aliceSigning = new global.Olm.PkSigning();
+        const alicePrivkey = aliceSigning.generate_seed();
+        const alicePubkey = aliceSigning.init_with_seed(alicePrivkey);
+        const aliceSSK = {
+            user_id: "@alice:example.com",
+            usage: ["self_signing"],
+            keys: {
+                ["ed25519:" + alicePubkey]: alicePubkey,
+            },
+        };
+        const sskSig = aliceMasterSigning.sign(anotherjson.stringify(aliceSSK));
+        aliceSSK.signatures = {
+            "@alice:example.com": {
+                ["ed25519:" + aliceMasterPubkey]: sskSig,
+            },
+        };
+
+        // Alice's device downloads the keys
+        alice.crypto.deviceList.storeCrossSigningForUser("@alice:example.com", {
+            keys: {
+                master: {
+                    user_id: "@alice:example.com",
+                    usage: ["master"],
+                    keys: {
+                        ["ed25519:" + aliceMasterPubkey]: aliceMasterPubkey,
+                    },
+                },
+                self_signing: aliceSSK,
+            },
+            firstUse: 1,
+            unsigned: {},
+        });
+
+        // Alice has a second device that's also not cross-signed
+        const aliceNotCrossSignedDevice = {
+            user_id: "@alice:example.com",
+            device_id: "Dynabook",
+            algorithms: ["m.olm.curve25519-aes-sha256", "m.megolm.v1.aes-sha"],
+            keys: {
+                "curve25519:Dynabook": "somePubkey",
+                "ed25519:Dynabook": "someOtherPubkey",
+            },
+        };
+        alice.crypto.deviceList.storeDevicesForUser("@alice:example.com", {
+            Dynabook: aliceNotCrossSignedDevice,
+        });
+
+        expect(alice.checkIfOwnDeviceCrossSigned(aliceNotCrossSignedDevice.device_id)).toBeFalsy();
+    });
 });
