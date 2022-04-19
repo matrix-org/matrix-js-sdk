@@ -574,13 +574,13 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @param {IAddLiveEventOptions} options addLiveEvent options
      * @param roomState the state events to reconcile metadata from
      */
-     public addLiveEvent(
+    public addLiveEvent(
         event: MatrixEvent,
         duplicateStrategy?: DuplicateStrategy,
         fromCache?: boolean,
         roomState?: RoomState,
     ): void;
-     public addLiveEvent(
+    public addLiveEvent(
         event: MatrixEvent,
         {
             duplicateStrategy,
@@ -598,7 +598,11 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         let duplicateStrategy = duplicateStrategyOrOpts as DuplicateStrategy || DuplicateStrategy.Ignore;
         let timelineWasEmpty;
         if (typeof (duplicateStrategyOrOpts) === 'object') {
-            ({ duplicateStrategy = DuplicateStrategy.Ignore, fromCache = false, roomState, timelineWasEmpty } = duplicateStrategyOrOpts);
+            ({
+                duplicateStrategy = DuplicateStrategy.Ignore,
+                fromCache = false, roomState,
+                timelineWasEmpty,
+            } = duplicateStrategyOrOpts);
         }
 
         if (this.filter) {

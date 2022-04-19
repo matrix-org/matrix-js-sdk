@@ -391,7 +391,7 @@ export class EventTimeline {
     public addEvent(
         event: MatrixEvent,
         toStartOfTimelineOrOpts: boolean | IAddEventOptions,
-        roomState?: RoomState
+        roomState?: RoomState,
     ): void {
         let toStartOfTimeline = !!toStartOfTimelineOrOpts;
         let timelineWasEmpty;
