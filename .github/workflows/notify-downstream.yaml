@@ -1,7 +1,7 @@
 name: Notify Downstream Projects
 on:
   push:
-    branches: [ develop, t3chguy/ci1 ]
+    branches: [ develop ]
 jobs:
   notify-matrix-react-sdk:
     runs-on: ubuntu-latest
@@ -11,4 +11,4 @@ jobs:
         with:
           token: ${{ secrets.ELEMENT_BOT_TOKEN }}
           repository: vector-im/element-web
-          event-type: element-web-notify
+          event-type: upstream-sdk-notify
