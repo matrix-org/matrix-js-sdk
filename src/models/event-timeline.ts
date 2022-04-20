@@ -394,7 +394,7 @@ export class EventTimeline {
         roomState?: RoomState,
     ): void {
         let toStartOfTimeline = !!toStartOfTimelineOrOpts;
-        let timelineWasEmpty;
+        let timelineWasEmpty: boolean;
         if (typeof (toStartOfTimelineOrOpts) === 'object') {
             ({ toStartOfTimeline, roomState, timelineWasEmpty } = toStartOfTimelineOrOpts);
         }

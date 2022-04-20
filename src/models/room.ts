@@ -1978,7 +1978,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         fromCache = false,
     ): void {
         let duplicateStrategy = duplicateStrategyOrOpts as DuplicateStrategy;
-        let timelineWasEmpty;
+        let timelineWasEmpty: boolean;
         if (typeof (duplicateStrategyOrOpts) === 'object') {
             ({
                 duplicateStrategy = DuplicateStrategy.Ignore,
@@ -2335,8 +2335,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         duplicateStrategyOrOpts?: DuplicateStrategy | IAddLiveEventOptions,
         fromCache = false,
     ): void {
-        let duplicateStrategy = duplicateStrategyOrOpts as (DuplicateStrategy | null);
-        let timelineWasEmpty;
+        let duplicateStrategy = duplicateStrategyOrOpts as DuplicateStrategy;
+        let timelineWasEmpty: boolean;
         if (typeof (duplicateStrategyOrOpts) === 'object') {
             ({
                 duplicateStrategy,

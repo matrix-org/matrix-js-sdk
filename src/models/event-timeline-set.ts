@@ -596,7 +596,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         roomState?: RoomState,
     ): void {
         let duplicateStrategy = duplicateStrategyOrOpts as DuplicateStrategy || DuplicateStrategy.Ignore;
-        let timelineWasEmpty;
+        let timelineWasEmpty: boolean;
         if (typeof (duplicateStrategyOrOpts) === 'object') {
             ({
                 duplicateStrategy = DuplicateStrategy.Ignore,
@@ -687,7 +687,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         roomState?: RoomState,
     ): void {
         let toStartOfTimeline = !!toStartOfTimelineOrOpts;
-        let timelineWasEmpty;
+        let timelineWasEmpty: boolean;
         if (typeof (toStartOfTimelineOrOpts) === 'object') {
             ({ toStartOfTimeline, fromCache = false, roomState, timelineWasEmpty } = toStartOfTimelineOrOpts);
         }
