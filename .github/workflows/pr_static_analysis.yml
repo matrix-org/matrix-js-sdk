@@ -3,6 +3,7 @@ on:
   pull_request: { }
 jobs:
   ts_lint:
+    name: "Typescript Syntax Check"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -18,6 +19,7 @@ jobs:
         run: "yarn run lint:types"
 
   js_lint:
+    name: "ESLint"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -33,6 +35,7 @@ jobs:
         run: "yarn run lint:js"
 
   style_lint:
+    name: "Style Lint"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -48,6 +51,7 @@ jobs:
         run: "yarn run lint:js"
 
   docs:
+    name: "JSDoc Checker"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
