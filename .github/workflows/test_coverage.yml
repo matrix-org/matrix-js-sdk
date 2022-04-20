@@ -6,9 +6,6 @@ on:
 jobs:
   test-coverage:
     runs-on: ubuntu-latest
-    env:
-      # This must be set for fetchdep.sh to get the right branch
-      PR_NUMBER: ${{github.event.number}}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -23,8 +20,14 @@ jobs:
         with:
           cache: 'yarn'
 
+      - name: Install dependencies
+        run: "yarn install"
+
+      - name: Build
+        run: "yarn build"
+
       - name: Run tests with coverage
-        run: "yarn install && yarn build && yarn coverage"
+        run: "yarn coverage"
 
       - name: Upload coverage
         uses: codecov/codecov-action@v2
