@@ -1,0 +1,63 @@
+name: Static Analysis
+on:
+  pull_request: { }
+jobs:
+  ts_lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-node@v3
+        with:
+          cache: 'yarn'
+
+      - name: Install Deps
+        run: "yarn install"
+
+      - name: Typecheck
+        run: "yarn run lint:types"
+
+  js_lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-node@v3
+        with:
+          cache: 'yarn'
+
+      - name: Install Deps
+        run: "yarn install"
+
+      - name: JS Lint
+        run: "yarn run lint:js"
+
+  style_lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-node@v3
+        with:
+          cache: 'yarn'
+
+      - name: Install Deps
+        run: "yarn install"
+
+      - name: JS Lint
+        run: "yarn run lint:js"
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-node@v3
+        with:
+          cache: 'yarn'
+
+      - name: Install Deps
+        run: "yarn install"
+
+      - name: Generate Docs
+        run: "yarn run gendoc"
