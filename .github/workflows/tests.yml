@@ -4,7 +4,7 @@ on:
   push:
     branches: [develop, main, master]
 jobs:
-  test-coverage:
+  jest:
     name: Jest with Codecov
     runs-on: ubuntu-latest
     env:
