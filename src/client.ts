@@ -790,7 +790,7 @@ type RoomEvents = RoomEvent.Name
     | RoomEvent.Receipt
     | RoomEvent.Tags
     | RoomEvent.LocalEchoUpdated
-    | RoomEvent.historyImportedWithinTimeline
+    | RoomEvent.HistoryImportedWithinTimeline
     | RoomEvent.AccountData
     | RoomEvent.MyMembership
     | RoomEvent.Timeline

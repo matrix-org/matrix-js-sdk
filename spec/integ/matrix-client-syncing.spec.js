@@ -709,7 +709,7 @@ describe("MatrixClient syncing", function() {
                         const room = client.getRoom(roomOne);
 
                         let emitCount = 0;
-                        room.on(RoomEvent.historyImportedWithinTimeline, function(markerEvent, room) {
+                        room.on(RoomEvent.HistoryImportedWithinTimeline, function(markerEvent, room) {
                             expect(markerEvent.getId()).toEqual(markerEventId);
                             expect(room.roomId).toEqual(roomOne);
                             emitCount += 1;
@@ -723,7 +723,7 @@ describe("MatrixClient syncing", function() {
                         ]);
 
                         expect(room.getTimelineNeedsRefresh()).toEqual(true);
-                        // Make sure `RoomEvent.historyImportedWithinTimeline` was emitted
+                        // Make sure `RoomEvent.HistoryImportedWithinTimeline` was emitted
                         expect(emitCount).toEqual(1);
                         expect(room.getLastMarkerEventIdProcessed()).toEqual(markerEventId);
                     });

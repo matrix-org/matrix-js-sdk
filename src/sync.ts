@@ -357,7 +357,7 @@ export class SyncApi {
                 `a new markerEventId=${markerEvent.getId()} was sent in roomId=${room.roomId}`,
             );
             room.setTimelineNeedsRefresh(true);
-            room.emit(RoomEvent.historyImportedWithinTimeline, markerEvent, room);
+            room.emit(RoomEvent.HistoryImportedWithinTimeline, markerEvent, room);
             room.setLastMarkerEventIdProcessed(markerEvent.getId());
         }
     }

@@ -166,7 +166,7 @@ export enum RoomEvent {
     Timeline = "Room.timeline",
     TimelineReset = "Room.timelineReset",
     TimelineRefresh = "Room.TimelineRefresh",
-    historyImportedWithinTimeline = "Room.historyImportedWithinTimeline",
+    HistoryImportedWithinTimeline = "Room.historyImportedWithinTimeline",
 }
 
 type EmittedEvents = RoomEvent
@@ -176,7 +176,7 @@ type EmittedEvents = RoomEvent
     | RoomEvent.Timeline
     | RoomEvent.TimelineReset
     | RoomEvent.TimelineRefresh
-    | RoomEvent.historyImportedWithinTimeline
+    | RoomEvent.HistoryImportedWithinTimeline
     | MatrixEventEvent.BeforeRedaction;
 
 export type RoomEventHandlerMap = {
@@ -193,7 +193,7 @@ export type RoomEventHandlerMap = {
         oldEventId?: string,
         oldStatus?: EventStatus,
     ) => void;
-    [RoomEvent.historyImportedWithinTimeline]: (
+    [RoomEvent.HistoryImportedWithinTimeline]: (
         markerEvent: MatrixEvent,
         room: Room,
     ) => void;
@@ -938,7 +938,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * in between, it grabs the newly imported messages. We can listen for
      * `UNSTABLE_MSC2716_MARKER`, in order to tell when historical messages are ready
      * to be discovered in the room and the timeline needs a refresh. The SDK
-     * emits a `RoomEvent.historyImportedWithinTimeline` event when we detect a
+     * emits a `RoomEvent.HistoryImportedWithinTimeline` event when we detect a
      * valid marker and can check the needs refresh status via
      * `room.getTimelineNeedsRefresh()`.
      */
