@@ -19,7 +19,9 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
 
       - name: Yarn cache
-        uses: c-hive/gha-yarn-cache@v2
+        uses: actions/setup-node@v3
+        with:
+          cache: 'yarn'
 
       - name: Run tests with coverage
         run: "yarn install && yarn build && yarn coverage"
