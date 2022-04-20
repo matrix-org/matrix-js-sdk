@@ -1,0 +1,53 @@
+name: Static Analysis
+on:
+  pull_request: { }
+  push:
+    branches: [ develop, master ]
+jobs:
+  ts_lint:
+    name: "Typescript Syntax Check"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-node@v3
+        with:
+          cache: 'yarn'
+
+      - name: Install Deps
+        run: "yarn install"
+
+      - name: Typecheck
+        run: "yarn run lint:types"
+
+  js_lint:
+    name: "ESLint"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-node@v3
+        with:
+          cache: 'yarn'
+
+      - name: Install Deps
+        run: "yarn install"
+
+      - name: Run Linter
+        run: "yarn run lint:js"
+
+  docs:
+    name: "JSDoc Checker"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-node@v3
+        with:
+          cache: 'yarn'
+
+      - name: Install Deps
+        run: "yarn install"
+
+      - name: Generate Docs
+        run: "yarn run gendoc"

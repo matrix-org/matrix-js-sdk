@@ -1,10 +1,11 @@
-name: Test coverage
+name: Tests
 on:
   pull_request: {}
   push:
     branches: [develop, main, master]
 jobs:
   test-coverage:
+    name: Jest with Codecov
     runs-on: ubuntu-latest
     env:
       # This must be set for fetchdep.sh to get the right branch
