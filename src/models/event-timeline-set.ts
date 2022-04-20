@@ -666,7 +666,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         event: MatrixEvent,
         timeline: EventTimeline,
         toStartOfTimeline: boolean,
-        fromCache?,
+        fromCache?: boolean,
         roomState?: RoomState,
     ): void;
     public addEventToTimeline(
