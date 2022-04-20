@@ -419,7 +419,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
                 // assume all our sentinels are now out-of-date
                 this.sentinels = {};
-            } else if (event.getType() === UNSTABLE_MSC2716_MARKER.name) {
+            } else if (UNSTABLE_MSC2716_MARKER.matches(event.getType())) {
                 this.emit(RoomStateEvent.Marker, event, markerFoundOptions);
             }
         });
