@@ -130,4 +130,53 @@ describe("Relations", function() {
             await relationsCreated;
         }
     });
+
+    it("edits shouldn't apply to state events", async () => {
+        const userId = "@bob:example.com";
+        const room = new Room("room123", null, userId);
+        const relations = new Relations("m.replace", "m.room.topic", room);
+
+        // Create an instance of a state event with rel_type m.replace
+        const originalTopic = new MatrixEvent({
+            "sender": userId,
+            "type": "m.room.topic",
+            "event_id": "$orig",
+            "room_id": room.roomId,
+            "content": {
+                "topic": "orig",
+            },
+        });
+        const badlyEditedTopic = new MatrixEvent({
+            "sender": userId,
+            "type": "m.room.topic",
+            "event_id": "$orig",
+            "room_id": room.roomId,
+            "content": {
+                "topic": "topic",
+                "m.new_content": {
+                    "topic": "edit",
+                },
+                "m.relates_to": {
+                    "event_id": "$orig",
+                    "rel_type": "m.replace",
+                },
+            },
+        });
+
+        // Add the original topic and check results
+        {
+            relations.addEvent(originalTopic);
+            expect(originalTopic.replacingEvent()).toBe(null);
+            expect(originalTopic.getContent().topic).toBe("orig");
+        }
+
+        // Add the badly edited topic and check results
+        {
+            relations.addEvent(badlyEditedTopic);
+            expect(originalTopic.replacingEvent()).toBe(null);
+            expect(originalTopic.getContent().topic).toBe("orig");
+            expect(badlyEditedTopic.replacingEvent()).toBe(null);
+            expect(badlyEditedTopic.getContent().topic).toBe("topic");
+        }
+    });
 });
