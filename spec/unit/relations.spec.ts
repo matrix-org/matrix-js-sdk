@@ -131,7 +131,7 @@ describe("Relations", function() {
         }
     });
 
-    it("edits shouldn't apply to state events", async () => {
+    it("should ignore m.replace for state events", async () => {
         const userId = "@bob:example.com";
         const room = new Room("room123", null, userId);
         const relations = new Relations("m.replace", "m.room.topic", room);
@@ -145,6 +145,7 @@ describe("Relations", function() {
             "content": {
                 "topic": "orig",
             },
+            "state_key": "",
         });
         const badlyEditedTopic = new MatrixEvent({
             "sender": userId,
@@ -161,22 +162,17 @@ describe("Relations", function() {
                     "rel_type": "m.replace",
                 },
             },
+            "state_key": "",
         });
 
-        // Add the original topic and check results
-        {
-            relations.addEvent(originalTopic);
-            expect(originalTopic.replacingEvent()).toBe(null);
-            expect(originalTopic.getContent().topic).toBe("orig");
-        }
+        await relations.setTargetEvent(originalTopic);
+        expect(originalTopic.replacingEvent()).toBe(null);
+        expect(originalTopic.getContent().topic).toBe("orig");
 
-        // Add the badly edited topic and check results
-        {
-            relations.addEvent(badlyEditedTopic);
-            expect(originalTopic.replacingEvent()).toBe(null);
-            expect(originalTopic.getContent().topic).toBe("orig");
-            expect(badlyEditedTopic.replacingEvent()).toBe(null);
-            expect(badlyEditedTopic.getContent().topic).toBe("topic");
-        }
+        await relations.addEvent(badlyEditedTopic);
+        expect(originalTopic.replacingEvent()).toBe(null);
+        expect(originalTopic.getContent().topic).toBe("orig");
+        expect(badlyEditedTopic.replacingEvent()).toBe(null);
+        expect(badlyEditedTopic.getContent().topic).toBe("topic");
     });
 });
