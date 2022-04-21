@@ -112,6 +112,7 @@ export class GroupCall extends EventEmitter {
     public activeSpeakerInterval = 1000;
     public retryCallInterval = 5000;
     public participantTimeout = 1000 * 15;
+    public pttMaxTransmitTime = 1000 * 20;
 
     public state = GroupCallState.LocalCallFeedUninitialized;
     public activeSpeaker?: string; // userId
@@ -129,6 +130,7 @@ export class GroupCall extends EventEmitter {
     private retryCallLoopTimeout?: number;
     private retryCallCounts: Map<string, number> = new Map();
     private reEmitter: ReEmitter;
+    private transmitTimer: number | null = null;
 
     constructor(
         private client: MatrixClient,
@@ -325,16 +327,31 @@ export class GroupCall extends EventEmitter {
         this.retryCallCounts.clear();
         clearTimeout(this.retryCallLoopTimeout);
 
+        if (this.transmitTimer !== null) {
+            clearTimeout(this.transmitTimer);
+            this.transmitTimer = null;
+        }
+
         this.client.removeListener("Call.incoming", this.onIncomingCall);
     }
 
     public leave() {
+        if (this.transmitTimer !== null) {
+            clearTimeout(this.transmitTimer);
+            this.transmitTimer = null;
+        }
+
         this.dispose();
         this.setState(GroupCallState.LocalCallFeedUninitialized);
     }
 
     public async terminate(emitStateEvent = true) {
         this.dispose();
+
+        if (this.transmitTimer !== null) {
+            clearTimeout(this.transmitTimer);
+            this.transmitTimer = null;
+        }
 
         this.participants = [];
         this.client.removeListener(
@@ -387,6 +404,18 @@ export class GroupCall extends EventEmitter {
     public async setMicrophoneMuted(muted) {
         if (!await this.client.getMediaHandler().hasAudioDevice()) {
             return false;
+        }
+
+        // set a timer for the maximum transmit time on PTT calls
+        if (this.isPtt) {
+            if (!muted && this.isMicrophoneMuted()) {
+                this.transmitTimer = setTimeout(() => {
+                    this.setMicrophoneMuted(true);
+                }, this.pttMaxTransmitTime);
+            } else if (muted && !this.isMicrophoneMuted()) {
+                clearTimeout(this.transmitTimer);
+                this.transmitTimer = null;
+            }
         }
 
         if (this.localCallFeed) {
