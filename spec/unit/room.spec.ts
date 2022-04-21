@@ -2046,6 +2046,42 @@ describe("Room", function() {
             expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
         });
 
+        it("should not decrement the length when the thread root is redacted", async () => {
+            room.client.supportsExperimentalThreads = () => true;
+
+            const threadRoot = mkMessage();
+            const threadResponse1 = mkThreadResponse(threadRoot);
+            threadResponse1.localTimestamp += 1000;
+            const threadResponse2 = mkThreadResponse(threadRoot);
+            threadResponse2.localTimestamp += 2000;
+            const threadResponse2Reaction = mkReaction(threadResponse2);
+
+            room.client.fetchRoomEvent = (eventId: string) => Promise.resolve({
+                ...threadRoot.event,
+                unsigned: {
+                    "age": 123,
+                    "m.relations": {
+                        "m.thread": {
+                            latest_event: threadResponse2.event,
+                            count: 2,
+                            current_user_participated: true,
+                        },
+                    },
+                },
+            });
+
+            room.addLiveEvents([threadRoot, threadResponse1, threadResponse2, threadResponse2Reaction]);
+            const thread = await emitPromise(room, ThreadEvent.New);
+
+            expect(thread).toHaveLength(2);
+            expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
+
+            const threadRootRedaction = mkRedaction(threadRoot);
+            room.addLiveEvents([threadRootRedaction]);
+            await emitPromise(thread, ThreadEvent.Update);
+            expect(thread).toHaveLength(2);
+        });
+
         it("Redacting the lastEvent finds a new lastEvent", async () => {
             room.client.supportsExperimentalThreads = () => true;
 
