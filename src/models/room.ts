@@ -1691,11 +1691,13 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
 
         const eventsByThread: { [threadId: string]: MatrixEvent[] } = {};
         for (const event of events) {
-            const { threadId } = this.eventShouldLiveIn(event);
-            if (!eventsByThread[threadId]) {
-                eventsByThread[threadId] = [];
+            const { threadId, shouldLiveInThread } = this.eventShouldLiveIn(event);
+            if (shouldLiveInThread) {
+                if (!eventsByThread[threadId]) {
+                    eventsByThread[threadId] = [];
+                }
+                eventsByThread[threadId].push(event);
             }
-            eventsByThread[threadId].push(event);
         }
 
         return Promise.all(Object.entries(eventsByThread).map(([threadId, events]) => (
