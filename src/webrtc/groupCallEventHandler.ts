@@ -93,6 +93,8 @@ export class GroupCallEventHandler {
             return;
         }
 
+        const isPtt = Boolean(content["io.element.ptt"]);
+
         let dataChannelOptions: IGroupCallDataChannelOptions | undefined;
 
         if (content?.dataChannelsEnabled && content?.dataChannelOptions) {
@@ -105,6 +107,7 @@ export class GroupCallEventHandler {
             this.client,
             room,
             callType,
+            isPtt,
             callIntent,
             groupCallId,
             content?.dataChannelsEnabled,

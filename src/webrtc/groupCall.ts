@@ -134,6 +134,7 @@ export class GroupCall extends EventEmitter {
         private client: MatrixClient,
         public room: Room,
         public type: GroupCallType,
+        public isPtt: boolean,
         public intent: GroupCallIntent,
         groupCallId?: string,
         private dataChannelsEnabled?: boolean,
@@ -160,6 +161,7 @@ export class GroupCall extends EventEmitter {
             {
                 "m.intent": this.intent,
                 "m.type": this.type,
+                "io.element.ptt": this.isPtt,
                 // TODO: Specify datachannels
                 "dataChannelsEnabled": this.dataChannelsEnabled,
                 "dataChannelOptions": this.dataChannelOptions,
@@ -208,6 +210,11 @@ export class GroupCall extends EventEmitter {
             throw error;
         }
 
+        // start muted on ptt calls
+        if (this.isPtt) {
+            setTracksEnabled(stream.getAudioTracks(), false);
+        }
+
         const userId = this.client.getUserId();
 
         const callFeed = new CallFeed({
@@ -216,7 +223,7 @@ export class GroupCall extends EventEmitter {
             userId,
             stream,
             purpose: SDPStreamMetadataPurpose.Usermedia,
-            audioMuted: stream.getAudioTracks().length === 0,
+            audioMuted: stream.getAudioTracks().length === 0 || this.isPtt,
             videoMuted: stream.getVideoTracks().length === 0,
         });
 
