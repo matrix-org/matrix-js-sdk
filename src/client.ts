@@ -1322,7 +1322,7 @@ export class MatrixClient extends EventEmitter {
     public async createGroupCall(
         roomId: string,
         type: GroupCallType,
-        isPtt, boolean,
+        isPtt: boolean,
         intent: GroupCallIntent,
         dataChannelsEnabled?: boolean,
         dataChannelOptions?: IGroupCallDataChannelOptions,
