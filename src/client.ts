@@ -7277,12 +7277,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public members(
         roomId: string,
-        includeMembership?: string[],
-        excludeMembership?: string[],
+        includeMembership?: string,
+        excludeMembership?: string,
         atEventId?: string,
         callback?: Callback,
-    ): Promise<{ [userId: string]: IStateEventWithRoomId }> {
-        const queryParams: any = {};
+    ): Promise<{ [userId: string]: IStateEventWithRoomId[] }> {
+        const queryParams: Record<string, string> = {};
         if (includeMembership) {
             queryParams.membership = includeMembership;
         }

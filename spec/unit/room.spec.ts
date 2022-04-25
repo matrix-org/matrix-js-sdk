@@ -1471,16 +1471,13 @@ describe("Room", function() {
                 isRoomEncrypted: function() {
                     return false;
                 },
-                http: {
-                    serverResponse,
-                    authedRequest: function() {
-                        if (this.serverResponse instanceof Error) {
-                            return Promise.reject(this.serverResponse);
-                        } else {
-                            return Promise.resolve({ chunk: this.serverResponse });
-                        }
-                    },
-                },
+                members: jest.fn().mockImplementation(() => {
+                    if (serverResponse instanceof Error) {
+                        return Promise.reject(serverResponse);
+                    } else {
+                        return Promise.resolve({ chunk: serverResponse });
+                    }
+                }),
                 store: {
                     storageResponse,
                     storedMembers: null,
@@ -1547,7 +1544,7 @@ describe("Room", function() {
             }
             expect(hasThrown).toEqual(true);
 
-            client.http.serverResponse = [memberEvent];
+            client.members.mockReturnValue({ chunk: [memberEvent] });
             await room.loadMembersIfNeeded();
             const memberA = room.getMember("@user_a:bar");
             expect(memberA.name).toEqual("User A");
