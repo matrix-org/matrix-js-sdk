@@ -56,7 +56,7 @@ import { TypedEventEmitter } from "./typed-event-emitter";
 // to upgrade (ie: "stable"). Eventually, we should remove these when all homeservers
 // return an m.room_versions capability.
 const KNOWN_SAFE_ROOM_VERSION = '6';
-const SAFE_ROOM_VERSIONS = ['1', '2', '3', '4', '5', '6'];
+const SAFE_ROOM_VERSIONS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: string): MatrixEvent {
     // console.log("synthesizing receipt for "+event.getId());
