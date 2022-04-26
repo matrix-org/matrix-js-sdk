@@ -24,6 +24,8 @@ import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
 
 import type NodeCrypto from "crypto";
+import { MatrixEvent } from ".";
+import { M_TIMESTAMP } from "./@types/location";
 
 /**
  * Encode a dictionary of query parameters.
@@ -425,7 +427,7 @@ export function globToRegexp(glob: string, extended?: any): string {
 
 export function ensureNoTrailingSlash(url: string): string {
     if (url && url.endsWith("/")) {
-        return url.substr(0, url.length - 1);
+        return url.slice(0, -1);
     } else {
         return url;
     }
@@ -707,4 +709,16 @@ export function recursivelyAssign(target: Object, source: Object, ignoreNullish 
         }
     }
     return target;
+}
+
+function getContentTimestampWithFallback(event: MatrixEvent): number {
+    return M_TIMESTAMP.findIn<number>(event.getContent()) ?? -1;
+}
+
+/**
+ * Sort events by their content m.ts property
+ * Latest timestamp first
+ */
+export function sortEventsByLatestContentTimestamp(left: MatrixEvent, right: MatrixEvent): number {
+    return getContentTimestampWithFallback(right) - getContentTimestampWithFallback(left);
 }

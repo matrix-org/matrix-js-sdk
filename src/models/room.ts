@@ -1474,7 +1474,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     public threadsReady = false;
 
     public async fetchRoomThreads(): Promise<void> {
-        if (this.threadsReady) {
+        if (this.threadsReady || !this.client.supportsExperimentalThreads()) {
             return;
         }
 
@@ -1662,7 +1662,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 // benefit from all the APIs a homeserver can provide to enhance the thread experience
                 thread = this.createThread(rootEvent, events, toStartOfTimeline);
                 if (thread) {
-                    rootEvent.setThread(thread);
+                    rootEvent?.setThread(thread);
                 }
                 deferred.resolve(thread);
             }
@@ -2339,22 +2339,27 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         // set fake stripped state events if this is an invite room so logic remains
         // consistent elsewhere.
         const membershipEvent = this.currentState.getStateEvents(EventType.RoomMember, this.myUserId);
-        if (membershipEvent && membershipEvent.getContent().membership === "invite") {
-            const strippedStateEvents = membershipEvent.getUnsigned().invite_room_state || [];
-            strippedStateEvents.forEach((strippedEvent) => {
-                const existingEvent = this.currentState.getStateEvents(strippedEvent.type, strippedEvent.state_key);
-                if (!existingEvent) {
-                    // set the fake stripped event instead
-                    this.currentState.setStateEvents([new MatrixEvent({
-                        type: strippedEvent.type,
-                        state_key: strippedEvent.state_key,
-                        content: strippedEvent.content,
-                        event_id: "$fake" + Date.now(),
-                        room_id: this.roomId,
-                        user_id: this.myUserId, // technically a lie
-                    })]);
-                }
-            });
+        if (membershipEvent) {
+            const membership = membershipEvent.getContent().membership;
+            this.updateMyMembership(membership);
+
+            if (membership === "invite") {
+                const strippedStateEvents = membershipEvent.getUnsigned().invite_room_state || [];
+                strippedStateEvents.forEach((strippedEvent) => {
+                    const existingEvent = this.currentState.getStateEvents(strippedEvent.type, strippedEvent.state_key);
+                    if (!existingEvent) {
+                        // set the fake stripped event instead
+                        this.currentState.setStateEvents([new MatrixEvent({
+                            type: strippedEvent.type,
+                            state_key: strippedEvent.state_key,
+                            content: strippedEvent.content,
+                            event_id: "$fake" + Date.now(),
+                            room_id: this.roomId,
+                            user_id: this.myUserId, // technically a lie
+                        })]);
+                    }
+                });
+            }
         }
 
         const oldName = this.name;

@@ -14,15 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventType } from "../../../src";
-import { M_BEACON_INFO } from "../../../src/@types/beacon";
 import {
     isTimestampInDuration,
-    isBeaconInfoEventType,
     Beacon,
     BeaconEvent,
 } from "../../../src/models/beacon";
-import { makeBeaconInfoEvent } from "../../test-utils/beacon";
+import { makeBeaconEvent, makeBeaconInfoEvent } from "../../test-utils/beacon";
 
 jest.useFakeTimers();
 
@@ -57,27 +54,9 @@ describe('Beacon', () => {
         });
     });
 
-    describe('isBeaconInfoEventType', () => {
-        it.each([
-            EventType.CallAnswer,
-            `prefix.${M_BEACON_INFO.name}`,
-            `prefix.${M_BEACON_INFO.altName}`,
-        ])('returns false for %s', (type) => {
-            expect(isBeaconInfoEventType(type)).toBe(false);
-        });
-
-        it.each([
-            M_BEACON_INFO.name,
-            M_BEACON_INFO.altName,
-            `${M_BEACON_INFO.name}.@test:server.org.12345`,
-            `${M_BEACON_INFO.altName}.@test:server.org.12345`,
-        ])('returns true for %s', (type) => {
-            expect(isBeaconInfoEventType(type)).toBe(true);
-        });
-    });
-
     describe('Beacon', () => {
         const userId = '@user:server.org';
+        const userId2 = '@user2:server.org';
         const roomId = '$room:server.org';
         // 14.03.2022 16:15
         const now = 1647270879403;
@@ -88,6 +67,7 @@ describe('Beacon', () => {
         // without timeout of 3 hours
         let liveBeaconEvent;
         let notLiveBeaconEvent;
+        let user2BeaconEvent;
 
         const advanceDateAndTime = (ms: number) => {
             // bc liveness check uses Date.now we have to advance this mock
@@ -107,14 +87,21 @@ describe('Beacon', () => {
                     isLive: true,
                 },
                 '$live123',
-                '$live123',
             );
             notLiveBeaconEvent = makeBeaconInfoEvent(
                 userId,
                 roomId,
                 { timeout: HOUR_MS * 3, isLive: false },
                 '$dead123',
-                '$dead123',
+            );
+            user2BeaconEvent = makeBeaconInfoEvent(
+                userId2,
+                roomId,
+                {
+                    timeout: HOUR_MS * 3,
+                    isLive: true,
+                },
+                '$user2live123',
             );
 
             // back to now
@@ -133,7 +120,7 @@ describe('Beacon', () => {
             expect(beacon.isLive).toEqual(true);
             expect(beacon.beaconInfoOwner).toEqual(userId);
             expect(beacon.beaconInfoEventType).toEqual(liveBeaconEvent.getType());
-            expect(beacon.identifier).toEqual(liveBeaconEvent.getType());
+            expect(beacon.identifier).toEqual(`${roomId}_${userId}`);
             expect(beacon.beaconInfo).toBeTruthy();
         });
 
@@ -171,8 +158,27 @@ describe('Beacon', () => {
 
                 expect(beacon.beaconInfoId).toEqual(liveBeaconEvent.getId());
 
-                expect(() => beacon.update(notLiveBeaconEvent)).toThrow();
-                expect(beacon.isLive).toEqual(true);
+                expect(() => beacon.update(user2BeaconEvent)).toThrow();
+                // didnt update
+                expect(beacon.identifier).toEqual(`${roomId}_${userId}`);
+            });
+
+            it('does not update with an older event', () => {
+                const beacon = new Beacon(liveBeaconEvent);
+                const emitSpy = jest.spyOn(beacon, 'emit').mockClear();
+                expect(beacon.beaconInfoId).toEqual(liveBeaconEvent.getId());
+
+                const oldUpdateEvent = makeBeaconInfoEvent(
+                    userId,
+                    roomId,
+                );
+                // less than the original event
+                oldUpdateEvent.event.origin_server_ts = liveBeaconEvent.event.origin_server_ts - 1000;
+
+                beacon.update(oldUpdateEvent);
+                // didnt update
+                expect(emitSpy).not.toHaveBeenCalled();
+                expect(beacon.beaconInfoId).toEqual(liveBeaconEvent.getId());
             });
 
             it('updates event', () => {
@@ -182,7 +188,7 @@ describe('Beacon', () => {
                 expect(beacon.isLive).toEqual(true);
 
                 const updatedBeaconEvent = makeBeaconInfoEvent(
-                    userId, roomId, { timeout: HOUR_MS * 3, isLive: false }, '$live123', '$live123');
+                    userId, roomId, { timeout: HOUR_MS * 3, isLive: false }, '$live123');
 
                 beacon.update(updatedBeaconEvent);
                 expect(beacon.isLive).toEqual(false);
@@ -200,7 +206,6 @@ describe('Beacon', () => {
                     roomId,
                     { timeout: HOUR_MS * 3, isLive: false },
                     beacon.beaconInfoId,
-                    '$live123',
                 );
 
                 beacon.update(updatedBeaconEvent);
@@ -275,6 +280,94 @@ describe('Beacon', () => {
 
                 // no additional calls
                 expect(emitSpy).toHaveBeenCalledTimes(1);
+            });
+        });
+
+        describe('addLocations', () => {
+            it('ignores locations when beacon is not live', () => {
+                const beacon = new Beacon(makeBeaconInfoEvent(userId, roomId, { isLive: false }));
+                const emitSpy = jest.spyOn(beacon, 'emit');
+
+                beacon.addLocations([
+                    makeBeaconEvent(userId, { beaconInfoId: beacon.beaconInfoId, timestamp: now + 1 }),
+                ]);
+
+                expect(beacon.latestLocationState).toBeFalsy();
+                expect(emitSpy).not.toHaveBeenCalled();
+            });
+
+            it('ignores locations outside the beacon live duration', () => {
+                const beacon = new Beacon(makeBeaconInfoEvent(userId, roomId, { isLive: true, timeout: 60000 }));
+                const emitSpy = jest.spyOn(beacon, 'emit');
+
+                beacon.addLocations([
+                    // beacon has now + 60000 live period
+                    makeBeaconEvent(userId, { beaconInfoId: beacon.beaconInfoId, timestamp: now + 100000 }),
+                ]);
+
+                expect(beacon.latestLocationState).toBeFalsy();
+                expect(emitSpy).not.toHaveBeenCalled();
+            });
+
+            it('sets latest location state to most recent location', () => {
+                const beacon = new Beacon(makeBeaconInfoEvent(userId, roomId, { isLive: true, timeout: 60000 }));
+                const emitSpy = jest.spyOn(beacon, 'emit');
+
+                const locations = [
+                    // older
+                    makeBeaconEvent(
+                        userId, { beaconInfoId: beacon.beaconInfoId, uri: 'geo:foo', timestamp: now + 1 },
+                    ),
+                    // newer
+                    makeBeaconEvent(
+                        userId, { beaconInfoId: beacon.beaconInfoId, uri: 'geo:bar', timestamp: now + 10000 },
+                    ),
+                    // not valid
+                    makeBeaconEvent(
+                        userId, { beaconInfoId: beacon.beaconInfoId, uri: 'geo:baz', timestamp: now - 5 },
+                    ),
+                ];
+
+                beacon.addLocations(locations);
+
+                const expectedLatestLocation = {
+                    description: undefined,
+                    timestamp: now + 10000,
+                    uri: 'geo:bar',
+                };
+
+                // the newest valid location
+                expect(beacon.latestLocationState).toEqual(expectedLatestLocation);
+                expect(emitSpy).toHaveBeenCalledWith(BeaconEvent.LocationUpdate, expectedLatestLocation);
+            });
+
+            it('ignores locations that are less recent that the current latest location', () => {
+                const beacon = new Beacon(makeBeaconInfoEvent(userId, roomId, { isLive: true, timeout: 60000 }));
+
+                const olderLocation = makeBeaconEvent(
+                    userId, { beaconInfoId: beacon.beaconInfoId, uri: 'geo:foo', timestamp: now + 1 },
+                );
+                const newerLocation = makeBeaconEvent(
+                    userId, { beaconInfoId: beacon.beaconInfoId, uri: 'geo:bar', timestamp: now + 10000 },
+                );
+
+                beacon.addLocations([newerLocation]);
+                // latest location set to newerLocation
+                expect(beacon.latestLocationState).toEqual(expect.objectContaining({
+                    uri: 'geo:bar',
+                }));
+
+                const emitSpy = jest.spyOn(beacon, 'emit').mockClear();
+
+                // add older location
+                beacon.addLocations([olderLocation]);
+
+                // no change
+                expect(beacon.latestLocationState).toEqual(expect.objectContaining({
+                    uri: 'geo:bar',
+                }));
+                // no emit
+                expect(emitSpy).not.toHaveBeenCalled();
             });
         });
     });
