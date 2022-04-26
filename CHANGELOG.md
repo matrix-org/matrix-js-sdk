@@ -1,5 +1,5 @@
-Changes in [17.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v17.1.0-rc.1) (2022-04-19)
-============================================================================================================
+Changes in [17.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v17.1.0) (2022-04-26)
+==================================================================================================
 
 ## ✨ Features
  * Add MatrixClient.doesServerSupportLogoutDevices() for MSC2457 ([\#2297](https://github.com/matrix-org/matrix-js-sdk/pull/2297)).
