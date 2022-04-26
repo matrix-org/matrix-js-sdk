@@ -3036,7 +3036,7 @@ export class Crypto extends EventEmitter {
      * set of devices.  Factored out from encryptAndSendKeysToDevices in
      * megolm.ts.
      *
-     * @param {object<userId, deviceInfo>} userDeviceMap
+     * @param {object[]} userDeviceInfoArr
      *   mapping from userId to deviceInfo
      *
      * @param {object} payload fields to include in the encrypted payload
@@ -3047,20 +3047,20 @@ export class Crypto extends EventEmitter {
      *     of the successfully sent messages.
      */
     public encryptAndSendToDevices(
-        userDeviceMap: IOlmDevice<DeviceInfo>[],
+        userDeviceInfoArr: IOlmDevice<DeviceInfo>[],
         payload: object,
     ): Promise<{contentMap, deviceInfoByDeviceId}> {
         const contentMap = {};
         const deviceInfoByDeviceId = new Map<string, DeviceInfo>();
 
         const promises = [];
-        for (let i = 0; i < userDeviceMap.length; i++) {
+        for (let i = 0; i < userDeviceInfoArr.length; i++) {
             const encryptedContent = {
                 algorithm: olmlib.OLM_ALGORITHM,
                 sender_key: this.olmDevice.deviceCurve25519Key,
                 ciphertext: {},
             };
-            const val = userDeviceMap[i];
+            const val = userDeviceInfoArr[i];
             const userId = val.userId;
             const deviceInfo = val.deviceInfo;
             const deviceId = deviceInfo.deviceId;

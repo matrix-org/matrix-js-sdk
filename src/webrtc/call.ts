@@ -2005,7 +2005,7 @@ export class MatrixCall extends EventEmitter {
      * @param {Object} content
      * @return {Promise}
      */
-    private sendVoipEvent(eventType: string, content: object): Promise<ISendEventResponse | {}> {
+    private async sendVoipEvent(eventType: string, content: object): Promise<ISendEventResponse | {}> {
         const realContent = Object.assign({}, content, {
             version: VOIP_PROTO_VERSION,
             call_id: this.callId,
@@ -2030,17 +2030,20 @@ export class MatrixCall extends EventEmitter {
                 },
             });
 
-            return this.client.sendToDevice(eventType, {
-                [this.invitee || this.getOpponentMember().userId]: {
-                    [this.opponentDeviceId]: {
-                        ...realContent,
-                        device_id: this.client.deviceId,
-                        sender_session_id: this.client.getSessionId(),
-                        dest_session_id: this.opponentSessionId,
-                        seq: toDeviceSeq,
-                    },
+            const payload = {
+                type: eventType,
+                content: {
+                    ...realContent,
+                    device_id: this.client.deviceId,
+                    sender_session_id: this.client.getSessionId(),
+                    dest_session_id: this.opponentSessionId,
+                    seq: toDeviceSeq,
                 },
-            });
+            };
+            const userId = this.invitee || this.getOpponentMember().userId;
+            const deviceInfoMap = await this.client.crypto.deviceList.downloadKeys([userId], false);
+            const deviceInfo = deviceInfoMap[userId][this.opponentDeviceId];
+            return this.client.crypto.encryptAndSendToDevices([{ userId, deviceInfo }], payload);
         } else {
             this.emit(CallEvent.SendVoipEvent, {
                 type: "sendEvent",
