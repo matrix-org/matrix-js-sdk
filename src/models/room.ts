@@ -46,8 +46,8 @@ import {
     FILTER_RELATED_BY_SENDERS,
     ThreadFilterType,
 } from "./thread";
-import { Method } from "../http-api";
 import { TypedEventEmitter } from "./typed-event-emitter";
+import { IStateEventWithRoomId } from "../@types/search";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -788,16 +788,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
     }
 
-    private async loadMembersFromServer(): Promise<IEvent[]> {
+    private async loadMembersFromServer(): Promise<IStateEventWithRoomId[]> {
         const lastSyncToken = this.client.store.getSyncToken();
-        const queryString = utils.encodeParams({
-            not_membership: "leave",
-            at: lastSyncToken,
-        });
-        const path = utils.encodeUri("/rooms/$roomId/members?" + queryString,
-            { $roomId: this.roomId });
-        const http = this.client.http;
-        const response = await http.authedRequest<{ chunk: IEvent[] }>(undefined, Method.Get, path);
+        const response = await this.client.members(this.roomId, undefined, "leave", lastSyncToken);
         return response.chunk;
     }
 
@@ -806,12 +799,13 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         let fromServer = false;
         let rawMembersEvents = await this.client.store.getOutOfBandMembers(this.roomId);
         // If the room is encrypted, we always fetch members from the server at
-        // least once, in case the latest state wasn't persisted properly.  Note
+        // least once, in case the latest state wasn't persisted properly. Note
         // that this function is only called once (unless loading the members
         // fails), since loadMembersIfNeeded always returns this.membersPromise
         // if set, which will be the result of the first (successful) call.
         if (rawMembersEvents === null ||
-            (this.client.isCryptoEnabled() && this.client.isRoomEncrypted(this.roomId))) {
+            (this.client.isCryptoEnabled() && this.client.isRoomEncrypted(this.roomId))
+        ) {
             fromServer = true;
             rawMembersEvents = await this.loadMembersFromServer();
             logger.log(`LL: got ${rawMembersEvents.length} ` +
@@ -857,7 +851,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             if (fromServer) {
                 const oobMembers = this.currentState.getMembers()
                     .filter((m) => m.isOutOfBand())
-                    .map((m) => m.events.member.event as IEvent);
+                    .map((m) => m.events.member.event as IStateEventWithRoomId);
                 logger.log(`LL: telling store to write ${oobMembers.length}`
                     + ` members for room ${this.roomId}`);
                 const store = this.client.store;
@@ -1691,11 +1685,13 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
 
         const eventsByThread: { [threadId: string]: MatrixEvent[] } = {};
         for (const event of events) {
-            const { threadId } = this.eventShouldLiveIn(event);
-            if (!eventsByThread[threadId]) {
-                eventsByThread[threadId] = [];
+            const { threadId, shouldLiveInThread } = this.eventShouldLiveIn(event);
+            if (shouldLiveInThread) {
+                if (!eventsByThread[threadId]) {
+                    eventsByThread[threadId] = [];
+                }
+                eventsByThread[threadId].push(event);
             }
-            eventsByThread[threadId].push(event);
         }
 
         return Promise.all(Object.entries(eventsByThread).map(([threadId, events]) => (
