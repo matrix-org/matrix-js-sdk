@@ -867,7 +867,6 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
         relationsWithEventType.addEvent(event);
     }
-
 }
 
 /**

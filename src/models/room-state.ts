@@ -21,7 +21,7 @@ limitations under the License.
 import { RoomMember } from "./room-member";
 import { logger } from '../logger';
 import * as utils from "../utils";
-import { EventType, RelationType } from "../@types/event";
+import { EventType } from "../@types/event";
 import { MatrixEvent, MatrixEventEvent } from "./event";
 import { MatrixClient } from "../client";
 import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
@@ -432,7 +432,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             if (beacon) {
                 beacon.addLocations([event]);
             }
-        }
+        };
 
         events.forEach((event: MatrixEvent) => {
             const relatedToEventId = event.getRelation()?.event_id;
@@ -443,12 +443,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             }
 
             matrixClient.decryptEventIfNeeded(event);
-            
 
             if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
                 // add an event listener for once the event is decrypted.
                 event.once(MatrixEventEvent.Decrypted, async () => {
-
                     processBeaconRelation(relatedToEventId, event);
                 });
             } else {
