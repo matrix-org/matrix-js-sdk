@@ -30,9 +30,10 @@ jobs:
       - name: Run tests with coverage
         run: "yarn coverage"
 
-      - name: Upload coverage
-        uses: codecov/codecov-action@v2
+      - name: Upload Artifact
+        if: failure()
+        uses: actions/upload-artifact@v2
         with:
-          fail_ci_if_error: false
-          verbose: true
-          override_commit: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
+          name: coverage
+          path: |
+            test-report.xml
