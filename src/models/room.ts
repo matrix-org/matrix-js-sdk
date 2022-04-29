@@ -266,7 +266,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     /**
      * @experimental
      */
-    public threads = new Map<string, Thread>();
+    private threads = new Map<string, Thread>();
     public lastThread: Thread;
 
     /**
@@ -1208,9 +1208,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @experimental
      */
     public getThread(eventId: string): Thread {
-        return this.getThreads().find(thread => {
-            return thread.id === eventId;
-        });
+        return this.threads.get(eventId);
     }
 
     /**

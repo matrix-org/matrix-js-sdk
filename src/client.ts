@@ -3739,7 +3739,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 "rel_type": THREAD_RELATION_TYPE.name,
                 "event_id": threadId,
             };
-            const thread = this.getRoom(roomId)?.threads.get(threadId);
+            const thread = this.getRoom(roomId)?.getThread(threadId);
             if (thread) {
                 content["m.relates_to"]["m.in_reply_to"] = {
                     "event_id": thread.lastReply((ev: MatrixEvent) => {
@@ -3788,7 +3788,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }));
 
         const room = this.getRoom(roomId);
-        const thread = room?.threads.get(threadId);
+        const thread = room?.getThread(threadId);
         if (thread) {
             localEvent.setThread(thread);
         }
