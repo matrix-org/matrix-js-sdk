@@ -48,7 +48,9 @@ import { IRoomEncryption, RoomList } from './crypto/RoomList';
 import { logger } from './logger';
 import { SERVICE_TYPES } from './service-types';
 import {
-    FileType, HttpApiEvent, HttpApiEventHandlerMap,
+    FileType,
+    HttpApiEvent,
+    HttpApiEventHandlerMap,
     IHttpOpts,
     IUpload,
     MatrixError,
@@ -5183,7 +5185,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     limit,
                     Direction.Backward,
                 );
-            }).then(async (res: IMessagesResponse) => {
+            }).then((res: IMessagesResponse) => {
                 const matrixEvents = res.chunk.map(this.getEventMapper());
                 if (res.state) {
                     const stateEvents = res.state.map(this.getEventMapper());
@@ -5194,7 +5196,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
                 this.processBeaconEvents(room, matrixEvents);
                 room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
-                await this.processThreadEvents(room, threadedEvents, true);
+                this.processThreadEvents(room, threadedEvents, true);
 
                 room.oldState.paginationToken = res.end;
                 if (res.chunk.length === 0) {
@@ -5297,25 +5299,27 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             event.isRelation(THREAD_RELATION_TYPE.name)
         ) {
             const [, threadedEvents] = timelineSet.room.partitionThreadedEvents(events);
-            const thread = await timelineSet.room.createThreadFetchRoot(event.threadRootId, threadedEvents, true);
-
-            let nextBatch: string;
-            const response = await thread.fetchInitialEvents();
-            if (response?.nextBatch) {
-                nextBatch = response.nextBatch;
+            let thread = timelineSet.room.getThread(event.threadRootId);
+            if (!thread) {
+                thread = timelineSet.room.createThread(event.threadRootId, undefined, threadedEvents, true);
             }
 
             const opts: IRelationsRequestOpts = {
+                direction: Direction.Backward,
                 limit: 50,
             };
 
-            // Fetch events until we find the one we were asked for
+            await thread.fetchInitialEvents();
+            let nextBatch = thread.liveTimeline.getPaginationToken(Direction.Backward);
+
+            // Fetch events until we find the one we were asked for, or we run out of pages
             while (!thread.findEventById(eventId)) {
                 if (nextBatch) {
                     opts.from = nextBatch;
                 }
 
                 ({ nextBatch } = await thread.fetchEvents(opts));
+                if (!nextBatch) break;
             }
 
             return thread.liveTimeline;
@@ -5334,7 +5338,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const [timelineEvents, threadedEvents] = timelineSet.room.partitionThreadedEvents(events);
         timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
         // The target event is not in a thread but process the contextual events, so we can show any threads around it.
-        await this.processThreadEvents(timelineSet.room, threadedEvents, true);
+        this.processThreadEvents(timelineSet.room, threadedEvents, true);
         this.processBeaconEvents(timelineSet.room, events);
 
         // There is no guarantee that the event ended up in "timeline" (we might have switched to a neighbouring
@@ -5491,7 +5495,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 opts.limit,
                 dir,
                 eventTimeline.getFilter(),
-            ).then(async (res) => {
+            ).then((res) => {
                 if (res.state) {
                     const roomState = eventTimeline.getState(dir);
                     const stateEvents = res.state.map(this.getEventMapper());
@@ -5504,7 +5508,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 const [timelineEvents, threadedEvents] = timelineSet.room.partitionThreadedEvents(matrixEvents);
                 timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
                 this.processBeaconEvents(timelineSet.room, matrixEvents);
-                await this.processThreadEvents(room, threadedEvents, backwards);
+                this.processThreadEvents(room, threadedEvents, backwards);
 
                 // if we've hit the end of the timeline, we need to stop trying to
                 // paginate. We need to keep the 'forwards' token though, to make sure
@@ -6661,7 +6665,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         eventId: string,
         relationType?: RelationType | string | null,
         eventType?: EventType | string | null,
-        opts: IRelationsRequestOpts = {},
+        opts: IRelationsRequestOpts = { direction: Direction.Backward },
     ): Promise<{
         originalEvent: MatrixEvent;
         events: MatrixEvent[];
@@ -7202,7 +7206,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         eventId: string,
         relationType?: RelationType | string | null,
         eventType?: EventType | string | null,
-        opts: IRelationsRequestOpts = {},
+        opts: IRelationsRequestOpts = { direction: Direction.Backward },
     ): Promise<IRelationsResponse> {
         const queryString = utils.encodeParams(opts as Record<string, string | number>);
 
@@ -8914,12 +8918,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * @experimental
      */
-    public async processThreadEvents(
-        room: Room,
-        threadedEvents: MatrixEvent[],
-        toStartOfTimeline: boolean,
-    ): Promise<void> {
-        await room.processThreadedEvents(threadedEvents, toStartOfTimeline);
+    public processThreadEvents(room: Room, threadedEvents: MatrixEvent[], toStartOfTimeline: boolean): void {
+        room.processThreadedEvents(threadedEvents, toStartOfTimeline);
     }
 
     public processBeaconEvents(

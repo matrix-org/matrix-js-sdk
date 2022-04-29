@@ -1914,7 +1914,7 @@ describe("Room", function() {
                 },
             });
 
-            room.createThread(undefined, [eventWithoutARootEvent]);
+            room.createThread("$000", undefined, [eventWithoutARootEvent]);
 
             const rootEvent = new MatrixEvent({
                 event_id: "$666",
@@ -1932,7 +1932,7 @@ describe("Room", function() {
                 },
             });
 
-            expect(() => room.createThread(rootEvent, [])).not.toThrow();
+            expect(() => room.createThread(rootEvent.getId(), rootEvent, [])).not.toThrow();
         });
 
         it("Edits update the lastReply event", async () => {
@@ -1959,14 +1959,16 @@ describe("Room", function() {
                 },
             });
 
+            let prom = emitPromise(room, ThreadEvent.New);
             room.addLiveEvents([randomMessage, threadRoot, threadResponse]);
-            const thread = await emitPromise(room, ThreadEvent.New);
+            const thread = await prom;
 
             expect(thread.replyToEvent).toBe(threadResponse);
             expect(thread.replyToEvent.getContent().body).toBe(threadResponse.getContent().body);
 
+            prom = emitPromise(thread, ThreadEvent.Update);
             room.addLiveEvents([threadResponseEdit]);
-            await emitPromise(thread, ThreadEvent.Update);
+            await prom;
             expect(thread.replyToEvent.getContent().body).toBe(threadResponseEdit.getContent()["m.new_content"].body);
         });
 
@@ -1993,15 +1995,17 @@ describe("Room", function() {
                 },
             });
 
+            let prom = emitPromise(room, ThreadEvent.New);
             room.addLiveEvents([threadRoot, threadResponse1, threadResponse2]);
-            const thread = await emitPromise(room, ThreadEvent.New);
+            const thread = await prom;
 
             expect(thread).toHaveLength(2);
             expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
 
+            prom = emitPromise(thread, ThreadEvent.Update);
             const threadResponse1Redaction = mkRedaction(threadResponse1);
             room.addLiveEvents([threadResponse1Redaction]);
-            await emitPromise(thread, ThreadEvent.Update);
+            await prom;
             expect(thread).toHaveLength(1);
             expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
         });
@@ -2030,15 +2034,17 @@ describe("Room", function() {
                 },
             });
 
+            let prom = emitPromise(room, ThreadEvent.New);
             room.addLiveEvents([threadRoot, threadResponse1, threadResponse2, threadResponse2Reaction]);
-            const thread = await emitPromise(room, ThreadEvent.New);
+            const thread = await prom;
 
             expect(thread).toHaveLength(2);
             expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
 
+            prom = emitPromise(thread, ThreadEvent.Update);
             const threadResponse2ReactionRedaction = mkRedaction(threadResponse2Reaction);
             room.addLiveEvents([threadResponse2ReactionRedaction]);
-            await emitPromise(thread, ThreadEvent.Update);
+            await prom;
             expect(thread).toHaveLength(2);
             expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
         });
@@ -2067,15 +2073,17 @@ describe("Room", function() {
                 },
             });
 
+            let prom = emitPromise(room, ThreadEvent.New);
             room.addLiveEvents([threadRoot, threadResponse1, threadResponse2, threadResponse2Reaction]);
-            const thread = await emitPromise(room, ThreadEvent.New);
+            const thread = await prom;
 
             expect(thread).toHaveLength(2);
             expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
 
+            prom = emitPromise(room, ThreadEvent.Update);
             const threadRootRedaction = mkRedaction(threadRoot);
             room.addLiveEvents([threadRootRedaction]);
-            await emitPromise(thread, ThreadEvent.Update);
+            await prom;
             expect(thread).toHaveLength(2);
         });
 
@@ -2102,21 +2110,24 @@ describe("Room", function() {
                 },
             });
 
+            let prom = emitPromise(room, ThreadEvent.New);
             room.addLiveEvents([threadRoot, threadResponse1, threadResponse2]);
-            const thread = await emitPromise(room, ThreadEvent.New);
+            const thread = await prom;
 
             expect(thread).toHaveLength(2);
             expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
 
+            prom = emitPromise(room, ThreadEvent.Update);
             const threadResponse2Redaction = mkRedaction(threadResponse2);
             room.addLiveEvents([threadResponse2Redaction]);
-            await emitPromise(thread, ThreadEvent.Update);
+            await prom;
             expect(thread).toHaveLength(1);
             expect(thread.replyToEvent.getId()).toBe(threadResponse1.getId());
 
+            prom = emitPromise(room, ThreadEvent.Update);
             const threadResponse1Redaction = mkRedaction(threadResponse1);
             room.addLiveEvents([threadResponse1Redaction]);
-            await emitPromise(thread, ThreadEvent.Update);
+            await prom;
             expect(thread).toHaveLength(0);
             expect(thread.replyToEvent.getId()).toBe(threadRoot.getId());
         });

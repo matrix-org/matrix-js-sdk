@@ -22,7 +22,7 @@ import { EventTimelineSet, DuplicateStrategy } from "./event-timeline-set";
 import { Direction, EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
-import { defer, normalize } from "../utils";
+import { normalize } from "../utils";
 import { IEvent, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent, MatrixEventHandlerMap } from "./event";
 import { EventStatus } from "./event-status";
 import { RoomMember } from "./room-member";
@@ -214,8 +214,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     private getTypeWarning = false;
     private getVersionWarning = false;
     private membersPromise?: Promise<boolean>;
-    // Map from threadId to pending Thread instance created by createThreadFetchRoot
-    private threadPromises = new Map<string, Promise<Thread>>();
 
     // XXX: These should be read-only
     /**
@@ -1522,7 +1520,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             }
 
             if (!this.getThread(rootEvent.getId())) {
-                this.createThread(rootEvent, [], true);
+                this.createThread(rootEvent.getId(), rootEvent, [], true);
             }
         }
 
@@ -1618,58 +1616,14 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         return threadId ? this.getThread(threadId) : null;
     }
 
-    public async createThreadFetchRoot(
-        threadId: string,
-        events?: MatrixEvent[],
-        toStartOfTimeline?: boolean,
-    ): Promise<Thread | null> {
+    private addThreadedEvents(threadId: string, events: MatrixEvent[], toStartOfTimeline = false): void {
         let thread = this.getThread(threadId);
-
-        if (!thread) {
-            const deferred = defer<Thread | null>();
-            this.threadPromises.set(threadId, deferred.promise);
-
-            let rootEvent = this.findEventById(threadId);
-            // If the rootEvent does not exist in the local stores, then fetch it from the server.
-            try {
-                const eventData = await this.client.fetchRoomEvent(this.roomId, threadId);
-                const mapper = this.client.getEventMapper();
-                rootEvent = mapper(eventData); // will merge with existing event object if such is known
-            } catch (e) {
-                logger.error("Failed to fetch thread root to construct thread with", e);
-            } finally {
-                this.threadPromises.delete(threadId);
-                // The root event might be not be visible to the person requesting it.
-                // If it wasn't fetched successfully the thread will work in "limited" mode and won't
-                // benefit from all the APIs a homeserver can provide to enhance the thread experience
-                thread = this.createThread(rootEvent, events, toStartOfTimeline);
-                if (thread) {
-                    rootEvent?.setThread(thread);
-                }
-                deferred.resolve(thread);
-            }
-        }
-
-        return thread;
-    }
-
-    private async addThreadedEvents(events: MatrixEvent[], threadId: string, toStartOfTimeline = false): Promise<void> {
-        let thread = this.getThread(threadId);
-        if (this.threadPromises.has(threadId)) {
-            thread = await this.threadPromises.get(threadId);
-        }
-
-        events = events.filter(e => e.getId() !== threadId); // filter out any root events
 
         if (thread) {
-            for (const event of events) {
-                await thread.addEvent(event, toStartOfTimeline);
-            }
+            thread.addEvents(events, toStartOfTimeline);
         } else {
-            thread = await this.createThreadFetchRoot(threadId, events, toStartOfTimeline);
-        }
-
-        if (thread) {
+            const rootEvent = events.find(e => e.getId() === threadId);
+            thread = this.createThread(threadId, rootEvent, events, toStartOfTimeline);
             this.emit(ThreadEvent.Update, thread);
         }
     }
@@ -1678,30 +1632,29 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * Adds events to a thread's timeline. Will fire "Thread.update"
      * @experimental
      */
-    public async processThreadedEvents(events: MatrixEvent[], toStartOfTimeline: boolean): Promise<unknown> {
+    public processThreadedEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {
         events.forEach(this.applyRedaction);
 
         const eventsByThread: { [threadId: string]: MatrixEvent[] } = {};
         for (const event of events) {
             const { threadId, shouldLiveInThread } = this.eventShouldLiveIn(event);
-            if (shouldLiveInThread) {
-                if (!eventsByThread[threadId]) {
-                    eventsByThread[threadId] = [];
-                }
-                eventsByThread[threadId].push(event);
+            if (shouldLiveInThread && !eventsByThread[threadId]) {
+                eventsByThread[threadId] = [];
             }
+            eventsByThread[threadId]?.push(event);
         }
 
-        return Promise.all(Object.entries(eventsByThread).map(([threadId, events]) => (
-            this.addThreadedEvents(events, threadId, toStartOfTimeline)
-        )));
+        Object.entries(eventsByThread).map(([threadId, events]) => (
+            this.addThreadedEvents(threadId, events, toStartOfTimeline)
+        ));
     }
 
     public createThread(
+        threadId: string,
         rootEvent: MatrixEvent | undefined,
         events: MatrixEvent[] = [],
         toStartOfTimeline: boolean,
-    ): Thread | undefined {
+    ): Thread {
         if (rootEvent) {
             const tl = this.getTimelineForEvent(rootEvent.getId());
             const relatedEvents = tl?.getTimelineSet().getAllRelationsEventForEvent(rootEvent.getId());
@@ -1710,45 +1663,44 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             }
         }
 
-        const thread = new Thread(rootEvent, {
+        const thread = new Thread(threadId, rootEvent, {
             initialEvents: events,
             room: this,
             client: this.client,
         });
+
         // If we managed to create a thread and figure out its `id` then we can use it
-        if (thread.id) {
-            this.threads.set(thread.id, thread);
-            this.reEmitter.reEmit(thread, [
-                ThreadEvent.Update,
-                ThreadEvent.NewReply,
-                RoomEvent.Timeline,
-                RoomEvent.TimelineReset,
-            ]);
+        this.threads.set(thread.id, thread);
+        this.reEmitter.reEmit(thread, [
+            ThreadEvent.Update,
+            ThreadEvent.NewReply,
+            RoomEvent.Timeline,
+            RoomEvent.TimelineReset,
+        ]);
 
-            if (!this.lastThread || this.lastThread.rootEvent?.localTimestamp < rootEvent?.localTimestamp) {
-                this.lastThread = thread;
-            }
-
-            this.emit(ThreadEvent.New, thread, toStartOfTimeline);
-
-            if (this.threadsReady) {
-                this.threadsTimelineSets.forEach(timelineSet => {
-                    if (thread.rootEvent) {
-                        if (Thread.hasServerSideSupport) {
-                            timelineSet.addLiveEvent(thread.rootEvent);
-                        } else {
-                            timelineSet.addEventToTimeline(
-                                thread.rootEvent,
-                                timelineSet.getLiveTimeline(),
-                                toStartOfTimeline,
-                            );
-                        }
-                    }
-                });
-            }
-
-            return thread;
+        if (!this.lastThread || this.lastThread.rootEvent?.localTimestamp < rootEvent?.localTimestamp) {
+            this.lastThread = thread;
         }
+
+        this.emit(ThreadEvent.New, thread, toStartOfTimeline);
+
+        if (this.threadsReady) {
+            this.threadsTimelineSets.forEach(timelineSet => {
+                if (thread.rootEvent) {
+                    if (Thread.hasServerSideSupport) {
+                        timelineSet.addLiveEvent(thread.rootEvent);
+                    } else {
+                        timelineSet.addEventToTimeline(
+                            thread.rootEvent,
+                            timelineSet.getLiveTimeline(),
+                            toStartOfTimeline,
+                        );
+                    }
+                }
+            });
+        }
+
+        return thread;
     }
 
     private applyRedaction = (event: MatrixEvent): void => {
@@ -2202,12 +2154,10 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 threadId,
             } = threadInfos[i];
 
-            if (shouldLiveInThread) {
-                if (!eventsByThread[threadId]) {
-                    eventsByThread[threadId] = [];
-                }
-                eventsByThread[threadId].push(events[i]);
+            if (shouldLiveInThread && !eventsByThread[threadId]) {
+                eventsByThread[threadId] = [];
             }
+            eventsByThread[threadId]?.push(events[i]);
 
             if (shouldLiveInRoom) {
                 this.addLiveEvent(events[i], duplicateStrategy, fromCache);
@@ -2215,7 +2165,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
 
         Object.entries(eventsByThread).forEach(([threadId, threadEvents]) => {
-            this.addThreadedEvents(threadEvents, threadId, false);
+            this.addThreadedEvents(threadId, threadEvents, false);
         });
     }
 
