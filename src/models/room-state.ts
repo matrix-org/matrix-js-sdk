@@ -22,15 +22,14 @@ import { RoomMember } from "./room-member";
 import { logger } from '../logger';
 import * as utils from "../utils";
 import { EventType } from "../@types/event";
-import { MatrixEvent } from "./event";
+import { MatrixEvent, MatrixEventEvent } from "./event";
 import { MatrixClient } from "../client";
 import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { Beacon, BeaconEvent, BeaconEventHandlerMap } from "./beacon";
 import { TypedReEmitter } from "../ReEmitter";
-import { M_BEACON_INFO } from "../@types/beacon";
-import { getBeaconInfoIdentifier } from "./beacon";
-import { BeaconIdentifier } from "..";
+import { M_BEACON, M_BEACON_INFO } from "../@types/beacon";
+import { getBeaconInfoIdentifier, BeaconIdentifier } from "./beacon";
 
 // possible statuses for out-of-band member loading
 enum OobStatus {
@@ -411,7 +410,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         this.emit(RoomStateEvent.Update, this);
     }
 
-    public processBeaconEvents(events: MatrixEvent[]): void {
+    public processBeaconEvents(events: MatrixEvent[], matrixClient: MatrixClient): void {
         if (
             !events.length ||
             // discard locations if we have no beacons
@@ -420,24 +419,38 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             return;
         }
 
-        // names are confusing here
-        // a Beacon is the parent event, but event type is 'm.beacon_info'
-        // a location is the 'child' related to the Beacon, but the event type is 'm.beacon'
-        // group locations by beaconInfo event id
-        const locationEventsByBeaconEventId = events.reduce<Record<string, MatrixEvent[]>>((acc, event) => {
-            const beaconInfoEventId = event.getRelation()?.event_id;
-            if (!acc[beaconInfoEventId]) {
-                acc[beaconInfoEventId] = [];
-            }
-            acc[beaconInfoEventId].push(event);
-            return acc;
-        }, {});
+        const beaconByEventIdDict: Record<string, Beacon> =
+            [...this.beacons.values()].reduce((dict, beacon) => ({ ...dict, [beacon.beaconInfoId]: beacon }), {});
 
-        Object.entries(locationEventsByBeaconEventId).forEach(([beaconInfoEventId, events]) => {
-            const beacon = [...this.beacons.values()].find(beacon => beacon.beaconInfoId === beaconInfoEventId);
+        const processBeaconRelation = (beaconInfoEventId: string, event: MatrixEvent): void => {
+            if (!M_BEACON.matches(event.getType())) {
+                return;
+            }
+
+            const beacon = beaconByEventIdDict[beaconInfoEventId];
 
             if (beacon) {
-                beacon.addLocations(events);
+                beacon.addLocations([event]);
+            }
+        };
+
+        events.forEach((event: MatrixEvent) => {
+            const relatedToEventId = event.getRelation()?.event_id;
+            // not related to a beacon we know about
+            // discard
+            if (!beaconByEventIdDict[relatedToEventId]) {
+                return;
+            }
+
+            matrixClient.decryptEventIfNeeded(event);
+
+            if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
+                // add an event listener for once the event is decrypted.
+                event.once(MatrixEventEvent.Decrypted, async () => {
+                    processBeaconRelation(relatedToEventId, event);
+                });
+            } else {
+                processBeaconRelation(relatedToEventId, event);
             }
         });
     }
