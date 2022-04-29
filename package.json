@@ -2,6 +2,9 @@
   "name": "matrix-js-sdk",
   "version": "17.1.0",
   "description": "Matrix Client-Server SDK for Javascript",
+  "engines": {
+      "node": ">=12.9.0"
+  },
   "scripts": {
     "prepublishOnly": "yarn build",
     "start": "echo THIS IS FOR LEGACY PURPOSES ONLY. && babel src -w -s -d lib --verbose --extensions \".ts,.js\"",
