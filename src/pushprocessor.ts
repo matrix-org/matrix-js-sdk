@@ -34,6 +34,7 @@ import {
     PushRuleSet,
     TweakName,
 } from "./@types/PushRules";
+import { EventType } from "./@types/event";
 
 /**
  * @module pushprocessor
@@ -90,6 +91,22 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
                 kind: ConditionKind.EventMatch,
                 key: "type",
                 pattern: "m.reaction",
+            },
+        ],
+        actions: [
+            PushRuleActionName.DontNotify,
+        ],
+    },
+    {
+        // Make sure we don't notify on ACL changes - https://github.com/vector-im/element-web/issues/20788
+        rule_id: ".m.rule.server_acl",
+        default: true,
+        enabled: true,
+        conditions: [
+            {
+                kind: ConditionKind.EventMatch,
+                key: "type",
+                pattern: EventType.RoomServerAcl,
             },
         ],
         actions: [
