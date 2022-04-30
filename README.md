@@ -16,7 +16,7 @@ attached to ``window`` through which you can access the SDK. See below for how t
 include libolm to enable end-to-end-encryption.
 
 The browser bundle supports recent versions of browsers. Typically this is ES2015
-or `> 0.5%, last 2 versions, Firefox ESR, not dead` if using 
+or `> 0.5%, last 2 versions, Firefox ESR, not dead` if using
 [browserlists](https://github.com/browserslist/browserslist).
 
 Please check [the working browser example](examples/browser) for more information.
@@ -26,11 +26,11 @@ In Node.js
 
 Ensure you have the latest LTS version of Node.js installed.
 
-This SDK targets Node 10 for compatibility, which translates to ES6. If you're using
+This SDK targets Node 12 for compatibility, which translates to ES6. If you're using
 a bundler like webpack you'll likely have to transpile dependencies, including this
 SDK, to match your target browsers.
 
-Using `yarn` instead of `npm` is recommended. Please see the Yarn [install guide](https://classic.yarnpkg.com/en/docs/install) 
+Using `yarn` instead of `npm` is recommended. Please see the Yarn [install guide](https://classic.yarnpkg.com/en/docs/install)
 if you do not have it already.
 
 ``yarn add matrix-js-sdk``
@@ -307,7 +307,7 @@ The SDK supports end-to-end encryption via the Olm and Megolm protocols, using
 [libolm](https://gitlab.matrix.org/matrix-org/olm). It is left up to the
 application to make libolm available, via the ``Olm`` global.
 
-It is also necessary to call ``matrixClient.initCrypto()`` after creating a new
+It is also necessary to call ``await matrixClient.initCrypto()`` after creating a new
 ``MatrixClient`` (but **before** calling ``matrixClient.startClient()``) to
 initialise the crypto layer.
 

@@ -427,7 +427,7 @@ export function globToRegexp(glob: string, extended?: any): string {
 
 export function ensureNoTrailingSlash(url: string): string {
     if (url && url.endsWith("/")) {
-        return url.substr(0, url.length - 1);
+        return url.slice(0, -1);
     } else {
         return url;
     }

@@ -1336,6 +1336,10 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
         if (this.isRedacted() && newEvent) {
             return;
         }
+        // don't allow state events to be replaced using this mechanism as per MSC2676
+        if (this.isState()) {
+            return;
+        }
         if (this._replacingEvent !== newEvent) {
             this._replacingEvent = newEvent;
             this.emit(MatrixEventEvent.Replaced, this);

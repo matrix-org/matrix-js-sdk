@@ -119,6 +119,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     private onBeforeRedaction = (event: MatrixEvent, redaction: MatrixEvent) => {
         if (event?.isRelation(THREAD_RELATION_TYPE.name) &&
             this.room.eventShouldLiveIn(event).threadId === this.id &&
+            event.getId() !== this.id && // the root event isn't counted in the length so ignore this redaction
             !redaction.status // only respect it when it succeeds
         ) {
             this.replyCount--;
