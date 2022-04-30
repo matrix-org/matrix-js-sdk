@@ -34,7 +34,9 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: coverage
-          path: coverage
+          path: |
+            coverage
+            !coverage/lcov-report
 
       - name: Upload coverage
         uses: codecov/codecov-action@v2

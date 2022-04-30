@@ -118,6 +118,7 @@
     ],
     "coverageReporters": [
       "text-summary",
+      "json",
       "lcov"
     ],
     "testResultsProcessor": "jest-sonar-reporter"
