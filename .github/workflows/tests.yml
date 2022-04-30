@@ -28,14 +28,13 @@ jobs:
         run: "yarn build"
 
       - name: Run tests with coverage
-        run: "yarn coverage"
+        run: "yarn coverage --ci"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v2
         with:
           name: coverage
-          path: |
-            test-report.xml
+          path: coverage
 
       - name: Upload coverage
         uses: codecov/codecov-action@v2

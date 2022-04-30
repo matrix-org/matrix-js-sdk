@@ -13,10 +13,9 @@ jobs:
         with:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
 
-      # There's a 'download artifact' action, but it hasn't been updated for the
-      # workflow_run action (https://github.com/actions/download-artifact/issues/60)
-      # so instead we get this mess:
-      - name: 'Download coverage report'
+      # There's a 'download artifact' action, but it hasn't been updated for the workflow_run action
+      # (https://github.com/actions/download-artifact/issues/60) so instead we get this mess:
+      - name: Download Coverage Report
         uses: actions/github-script@v3.1.0
         if: github.event.workflow_run.conclusion == 'success'
         with:
@@ -38,7 +37,7 @@ jobs:
             const fs = require('fs');
             fs.writeFileSync('${{github.workspace}}/coverage.zip', Buffer.from(download.data));
 
-      - name: Extract Artifacts
+      - name: Extract Coverage Report
         run: unzip coverage.zip && rm coverage.zip
         if: github.event.workflow_run.conclusion == 'success'
 
