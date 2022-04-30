@@ -99,7 +99,7 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
     },
     {
         // For homeservers which don't support MSC3786 yet
-        rule_id: "org.matrix.msc0000.rule.room.server_acl",
+        rule_id: ".org.matrix.msc0000.rule.room.server_acl",
         default: true,
         enabled: true,
         conditions: [
