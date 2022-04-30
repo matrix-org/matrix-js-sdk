@@ -1,3 +1,11 @@
+![npm](https://img.shields.io/npm/v/matrix-js-sdk)
+![Tests](https://github.com/matrix-org/matrix-js-sdk/actions/workflows/tests.yml/badge.svg)
+![Static Analysis](https://github.com/matrix-org/matrix-js-sdk/actions/workflows/static_analysis.yml/badge.svg)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=matrix-js-sdk&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=matrix-js-sdk)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=matrix-js-sdk&metric=coverage)](https://sonarcloud.io/summary/new_code?id=matrix-js-sdk)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=matrix-js-sdk&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=matrix-js-sdk)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=matrix-js-sdk&metric=bugs)](https://sonarcloud.io/summary/new_code?id=matrix-js-sdk)
+
 Matrix Javascript SDK
 =====================
 
