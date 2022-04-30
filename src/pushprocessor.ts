@@ -99,7 +99,7 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
     },
     {
         // Make sure we don't notify on ACL changes - https://github.com/vector-im/element-web/issues/20788
-        rule_id: ".m.rule.server_acl",
+        rule_id: "org.matrix.msc0000.rule.room.server_acl",
         default: true,
         enabled: true,
         conditions: [
