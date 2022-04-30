@@ -1,4 +1,4 @@
-name: Tests
+name: SonarQube
 on:
   workflow_run:
     workflows: [ "Tests" ]
