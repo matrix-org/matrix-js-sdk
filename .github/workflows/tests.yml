@@ -31,4 +31,4 @@ jobs:
           name: coverage
           path: |
             coverage
-            !coverage/lcov-reportw
+            !coverage/lcov-report
