@@ -193,6 +193,7 @@ function calculateMAC(olmSAS: OlmSAS, method: string) {
 }
 
 const calculateKeyAgreement = {
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     "curve25519-hkdf-sha256": function(sas: SAS, olmSAS: OlmSAS, bytes: number): Uint8Array {
         const ourInfo = `${sas.baseApis.getUserId()}|${sas.baseApis.deviceId}|`
               + `${sas.ourSASPubKey}|`;

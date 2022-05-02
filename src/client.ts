@@ -180,7 +180,7 @@ import { MediaHandler } from "./webrtc/mediaHandler";
 import { IRefreshTokenResponse } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { Thread, THREAD_RELATION_TYPE } from "./models/thread";
-import { MBeaconInfoEventContent, M_BEACON, M_BEACON_INFO } from "./@types/beacon";
+import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -3415,7 +3415,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public setIgnoredUsers(userIds: string[], callback?: Callback): Promise<{}> {
         const content = { ignored_users: {} };
-        userIds.map((u) => content.ignored_users[u] = {});
+        userIds.forEach((u) => {
+            content.ignored_users[u] = {};
+        });
         return this.setAccountData("m.ignored_user_list", content, callback);
     }
 
@@ -5211,7 +5213,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
                 const [timelineEvents, threadedEvents] = room.partitionThreadedEvents(matrixEvents);
 
-                this.processBeaconEvents(room, matrixEvents);
+                this.processBeaconEvents(room, timelineEvents);
                 room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
                 await this.processThreadEvents(room, threadedEvents, true);
 
@@ -5354,7 +5356,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
         // The target event is not in a thread but process the contextual events, so we can show any threads around it.
         await this.processThreadEvents(timelineSet.room, threadedEvents, true);
-        this.processBeaconEvents(timelineSet.room, events);
+        this.processBeaconEvents(timelineSet.room, timelineEvents);
 
         // There is no guarantee that the event ended up in "timeline" (we might have switched to a neighbouring
         // timeline) - so check the room's index again. On the other hand, there's no guarantee the event ended up
@@ -5522,7 +5524,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 const timelineSet = eventTimeline.getTimelineSet();
                 const [timelineEvents, threadedEvents] = timelineSet.room.partitionThreadedEvents(matrixEvents);
                 timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
-                this.processBeaconEvents(timelineSet.room, matrixEvents);
+                this.processBeaconEvents(timelineSet.room, timelineEvents);
                 await this.processThreadEvents(room, threadedEvents, backwards);
 
                 // if we've hit the end of the timeline, we need to stop trying to
@@ -7296,12 +7298,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public members(
         roomId: string,
-        includeMembership?: string[],
-        excludeMembership?: string[],
+        includeMembership?: string,
+        excludeMembership?: string,
         atEventId?: string,
         callback?: Callback,
-    ): Promise<{ [userId: string]: IStateEventWithRoomId }> {
-        const queryParams: any = {};
+    ): Promise<{ [userId: string]: IStateEventWithRoomId[] }> {
+        const queryParams: Record<string, string> = {};
         if (includeMembership) {
             queryParams.membership = includeMembership;
         }
@@ -8948,8 +8950,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!events?.length) {
             return;
         }
-        const beaconEvents = events.filter(event => M_BEACON.matches(event.getType()));
-        room.currentState.processBeaconEvents(beaconEvents);
+        room.currentState.processBeaconEvents(events, this);
     }
 
     /**

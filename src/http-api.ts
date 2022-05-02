@@ -1105,7 +1105,7 @@ export class AbortError extends Error {
  * @return {any} the result of the network operation
  * @throws {ConnectionError} If after maxAttempts the callback still throws ConnectionError
  */
-export async function retryNetworkOperation<T>(maxAttempts: number, callback: () => T): Promise<T> {
+export async function retryNetworkOperation<T>(maxAttempts: number, callback: () => Promise<T>): Promise<T> {
     let attempts = 0;
     let lastConnectionError = null;
     while (attempts < maxAttempts) {

@@ -22,11 +22,12 @@ limitations under the License.
 import { EventType } from "../@types/event";
 import { Room } from "../models/room";
 import { User } from "../models/user";
-import { IEvent, MatrixEvent } from "../models/event";
+import { MatrixEvent } from "../models/event";
 import { Filter } from "../filter";
 import { ISavedSync, IStore } from "./index";
 import { RoomSummary } from "../models/room-summary";
 import { ISyncResponse } from "../sync-accumulator";
+import { IStateEventWithRoomId } from "../@types/search";
 
 /**
  * Construct a stub store. This does no-ops on most store methods.
@@ -242,11 +243,11 @@ export class StubStore implements IStore {
         return Promise.resolve();
     }
 
-    public getOutOfBandMembers(): Promise<IEvent[]> {
+    public getOutOfBandMembers(): Promise<IStateEventWithRoomId[]> {
         return Promise.resolve(null);
     }
 
-    public setOutOfBandMembers(roomId: string, membershipEvents: IEvent[]): Promise<void> {
+    public setOutOfBandMembers(roomId: string, membershipEvents: IStateEventWithRoomId[]): Promise<void> {
         return Promise.resolve();
     }
 

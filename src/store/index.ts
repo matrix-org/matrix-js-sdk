@@ -17,11 +17,12 @@ limitations under the License.
 import { EventType } from "../@types/event";
 import { Room } from "../models/room";
 import { User } from "../models/user";
-import { IEvent, MatrixEvent } from "../models/event";
+import { MatrixEvent } from "../models/event";
 import { Filter } from "../filter";
 import { RoomSummary } from "../models/room-summary";
 import { IMinimalEvent, IRooms, ISyncResponse } from "../sync-accumulator";
 import { IStartClientOpts } from "../client";
+import { IStateEventWithRoomId } from "../@types/search";
 
 export interface ISavedSync {
     nextBatch: string;
@@ -204,9 +205,9 @@ export interface IStore {
      */
     deleteAllData(): Promise<void>;
 
-    getOutOfBandMembers(roomId: string): Promise<IEvent[] | null>;
+    getOutOfBandMembers(roomId: string): Promise<IStateEventWithRoomId[] | null>;
 
-    setOutOfBandMembers(roomId: string, membershipEvents: IEvent[]): Promise<void>;
+    setOutOfBandMembers(roomId: string, membershipEvents: IStateEventWithRoomId[]): Promise<void>;
 
     clearOutOfBandMembers(roomId: string): Promise<void>;
 
