@@ -3415,7 +3415,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public setIgnoredUsers(userIds: string[], callback?: Callback): Promise<{}> {
         const content = { ignored_users: {} };
-        userIds.map((u) => content.ignored_users[u] = {});
+        userIds.forEach((u) => {
+            content.ignored_users[u] = {};
+        });
         return this.setAccountData("m.ignored_user_list", content, callback);
     }
 

@@ -249,21 +249,20 @@ export class AutoDiscovery {
 
         // Step 7: Copy any other keys directly into the clientConfig. This is for
         // things like custom configuration of services.
-        Object.keys(wellknown)
-            .map((k) => {
-                if (k === "m.homeserver" || k === "m.identity_server") {
-                    // Only copy selected parts of the config to avoid overwriting
-                    // properties computed by the validation logic above.
-                    const notProps = ["error", "state", "base_url"];
-                    for (const prop of Object.keys(wellknown[k])) {
-                        if (notProps.includes(prop)) continue;
-                        clientConfig[k][prop] = wellknown[k][prop];
-                    }
-                } else {
-                    // Just copy the whole thing over otherwise
-                    clientConfig[k] = wellknown[k];
+        Object.keys(wellknown).forEach((k) => {
+            if (k === "m.homeserver" || k === "m.identity_server") {
+                // Only copy selected parts of the config to avoid overwriting
+                // properties computed by the validation logic above.
+                const notProps = ["error", "state", "base_url"];
+                for (const prop of Object.keys(wellknown[k])) {
+                    if (notProps.includes(prop)) continue;
+                    clientConfig[k][prop] = wellknown[k][prop];
                 }
-            });
+            } else {
+                // Just copy the whole thing over otherwise
+                clientConfig[k] = wellknown[k];
+            }
+        });
 
         // Step 8: Give the config to the caller (finally)
         return Promise.resolve(clientConfig);
