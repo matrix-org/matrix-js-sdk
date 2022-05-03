@@ -988,9 +988,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * @param {string} desktopCapturerSourceId optional id of the desktop capturer source to use
      * @returns {boolean} new screensharing state
      */
-    public async setScreensharingEnabled(
-        enabled: boolean, desktopCapturerSourceId?: string,
-    ): Promise<boolean> {
+    public async setScreensharingEnabled(enabled: boolean, desktopCapturerSourceId?: string): Promise<boolean> {
         // Skip if there is nothing to do
         if (enabled && this.isScreensharing()) {
             logger.warn(`There is already a screensharing stream - there is nothing to do!`);
@@ -1002,7 +1000,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         // Fallback to replaceTrack()
         if (!this.opponentSupportsSDPStreamMetadata()) {
-            return await this.setScreensharingEnabledWithoutMetadataSupport(enabled, desktopCapturerSourceId);
+            return this.setScreensharingEnabledWithoutMetadataSupport(enabled, desktopCapturerSourceId);
         }
 
         logger.debug(`Set screensharing enabled? ${enabled}`);

@@ -30,7 +30,7 @@ import type { Request as _Request, CoreOptions } from "request";
 import * as callbacks from "./realtime-callbacks";
 import { IUploadOpts } from "./@types/requests";
 import { IAbortablePromise, IUsageLimit } from "./@types/partials";
-import { IDeferred } from "./utils";
+import { IDeferred, sleep } from "./utils";
 import { Callback } from "./client";
 import * as utils from "./utils";
 import { logger } from './logger';
@@ -1114,9 +1114,9 @@ export async function retryNetworkOperation<T>(maxAttempts: number, callback: ()
                 const timeout = 1000 * Math.pow(2, attempts);
                 logger.log(`network operation failed ${attempts} times,` +
                     ` retrying in ${timeout}ms...`);
-                await new Promise(r => setTimeout(r, timeout));
+                await sleep(timeout);
             }
-            return await callback();
+            return callback();
         } catch (err) {
             if (err instanceof ConnectionError) {
                 attempts += 1;

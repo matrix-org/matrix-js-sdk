@@ -138,12 +138,12 @@ export class BackupManager {
         return Algorithm.checkBackupVersion(info);
     }
 
-    public static async makeAlgorithm(info: IKeyBackupInfo, getKey: GetKey): Promise<BackupAlgorithm> {
+    public static makeAlgorithm(info: IKeyBackupInfo, getKey: GetKey): Promise<BackupAlgorithm> {
         const Algorithm = algorithmsByName[info.algorithm];
         if (!Algorithm) {
             throw new Error("Unknown backup algorithm");
         }
-        return await Algorithm.init(info.auth_data, getKey);
+        return Algorithm.init(info.auth_data, getKey);
     }
 
     public async enableKeyBackup(info: IKeyBackupInfo): Promise<void> {
@@ -777,15 +777,15 @@ export class Aes256 implements BackupAlgorithm {
 
     public get untrusted() { return false; }
 
-    async encryptSession(data: Record<string, any>): Promise<any> {
+    public encryptSession(data: Record<string, any>): Promise<any> {
         const plainText: Record<string, any> = Object.assign({}, data);
         delete plainText.session_id;
         delete plainText.room_id;
         delete plainText.first_known_index;
-        return await encryptAES(JSON.stringify(plainText), this.key, data.session_id);
+        return encryptAES(JSON.stringify(plainText), this.key, data.session_id);
     }
 
-    async decryptSessions(sessions: Record<string, IKeyBackupSession>): Promise<IMegolmSessionData[]> {
+    public async decryptSessions(sessions: Record<string, IKeyBackupSession>): Promise<IMegolmSessionData[]> {
         const keys: IMegolmSessionData[] = [];
 
         for (const [sessionId, sessionData] of Object.entries(sessions)) {
@@ -800,7 +800,7 @@ export class Aes256 implements BackupAlgorithm {
         return keys;
     }
 
-    async keyMatches(key: Uint8Array): Promise<boolean> {
+    public async keyMatches(key: Uint8Array): Promise<boolean> {
         if (this.authData.mac) {
             const { mac } = await calculateKeyCheck(key, this.authData.iv);
             return this.authData.mac.replace(/=+$/g, '') === mac.replace(/=+/g, '');

@@ -402,7 +402,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
             // try to get key from app
             if (this.baseApis.cryptoCallbacks && this.baseApis.cryptoCallbacks.getBackupKey) {
-                return await this.baseApis.cryptoCallbacks.getBackupKey();
+                return this.baseApis.cryptoCallbacks.getBackupKey();
             }
 
             throw new Error("Unable to get private key");
@@ -2890,7 +2890,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         } else {
             const content = event.getWireContent();
             const alg = this.getRoomDecryptor(event.getRoomId(), content.algorithm);
-            return await alg.decryptEvent(event);
+            return alg.decryptEvent(event);
         }
     }
 

@@ -410,14 +410,14 @@ export class AutoDiscovery {
      * the following properties:
      *   raw: The JSON object returned by the server.
      *   action: One of SUCCESS, IGNORE, or FAIL_PROMPT.
-     *   reason: Relatively human readable description of what went wrong.
+     *   reason: Relatively human-readable description of what went wrong.
      *   error: The actual Error, if one exists.
      * @param {string} url The URL to fetch a JSON object from.
      * @return {Promise<object>} Resolves to the returned state.
      * @private
      */
-    private static async fetchWellKnownObject(url: string): Promise<IWellKnownConfig> {
-        return new Promise(function(resolve, reject) {
+    private static fetchWellKnownObject(url: string): Promise<IWellKnownConfig> {
+        return new Promise(function(resolve) {
             // eslint-disable-next-line
             const request = require("./matrix").getRequest();
             if (!request) throw new Error("No request library available");
