@@ -123,7 +123,6 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         // If it wasn't fetched successfully the thread will work in "limited" mode and won't
         // benefit from all the APIs a homeserver can provide to enhance the thread experience
         this.rootEvent?.setThread(this);
-        // TODO test case without rootEvent visible
 
         this.emit(ThreadEvent.Update, this);
     }
@@ -247,7 +246,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
 
         // If no thread support exists we want to count all thread relation
         // added as a reply. We can't rely on the bundled relationships count
-        if (!Thread.hasServerSideSupport && event.isRelation(THREAD_RELATION_TYPE.name)) {
+        if ((!Thread.hasServerSideSupport || !this.rootEvent) && event.isRelation(THREAD_RELATION_TYPE.name)) {
             this.replyCount++;
         }
 

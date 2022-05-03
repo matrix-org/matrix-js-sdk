@@ -36,7 +36,7 @@ import { RoomState } from "../../src/models/room-state";
 import { UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../../src/@types/event";
 import { TestClient } from "../TestClient";
 import { emitPromise } from "../test-utils/test-utils";
-import { ThreadEvent } from "../../src/models/thread";
+import { Thread, ThreadEvent } from "../../src/models/thread";
 
 describe("Room", function() {
     const roomId = "!foo:bar";
@@ -2244,6 +2244,46 @@ describe("Room", function() {
             expect(room.eventShouldLiveIn(reply1, events, roots).shouldLiveInThread).toBeFalsy();
             expect(room.eventShouldLiveIn(reply2, events, roots).shouldLiveInRoom).toBeTruthy();
             expect(room.eventShouldLiveIn(reply2, events, roots).shouldLiveInThread).toBeFalsy();
+        });
+
+        it("should aggregate relations in thread event timeline set", () => {
+            Thread.setServerSideSupport(true, true);
+            const threadRoot = mkMessage();
+            const rootReaction = mkReaction(threadRoot);
+            const threadResponse = mkThreadResponse(threadRoot);
+            const threadReaction = mkReaction(threadResponse);
+
+            const events = [
+                threadRoot,
+                rootReaction,
+                threadResponse,
+                threadReaction,
+            ];
+
+            room.addLiveEvents(events);
+
+            const thread = threadRoot.getThread();
+            expect(thread.rootEvent).toBe(threadRoot);
+
+            const rootRelations = thread.timelineSet.getRelationsForEvent(
+                threadRoot.getId(),
+                RelationType.Annotation,
+                EventType.Reaction,
+            ).getSortedAnnotationsByKey();
+            expect(rootRelations).toHaveLength(1);
+            expect(rootRelations[0][0]).toEqual(rootReaction.getRelation().key);
+            expect(rootRelations[0][1].size).toEqual(1);
+            expect(rootRelations[0][1].has(rootReaction)).toBeTruthy();
+
+            const responseRelations = thread.timelineSet.getRelationsForEvent(
+                threadResponse.getId(),
+                RelationType.Annotation,
+                EventType.Reaction,
+            ).getSortedAnnotationsByKey();
+            expect(responseRelations).toHaveLength(1);
+            expect(responseRelations[0][0]).toEqual(threadReaction.getRelation().key);
+            expect(responseRelations[0][1].size).toEqual(1);
+            expect(responseRelations[0][1].has(threadReaction)).toBeTruthy();
         });
     });
 });
