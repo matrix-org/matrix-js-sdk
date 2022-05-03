@@ -59,6 +59,12 @@ export class GroupCallError extends Error {
     }
 }
 
+export class OtherUserSpeakingError extends Error {
+    constructor() {
+        super("Cannot unmute: another user is speaking");
+    }
+}
+
 export interface IGroupCallDataChannelOptions {
     ordered: boolean;
     maxPacketLifeTime: number;
@@ -112,6 +118,7 @@ export class GroupCall extends EventEmitter {
     public activeSpeakerInterval = 1000;
     public retryCallInterval = 5000;
     public participantTimeout = 1000 * 15;
+    public pttMaxTransmitTime = 1000 * 20;
 
     public state = GroupCallState.LocalCallFeedUninitialized;
     public activeSpeaker?: string; // userId
@@ -129,11 +136,13 @@ export class GroupCall extends EventEmitter {
     private retryCallLoopTimeout?: number;
     private retryCallCounts: Map<string, number> = new Map();
     private reEmitter: ReEmitter;
+    private transmitTimer: number | null = null;
 
     constructor(
         private client: MatrixClient,
         public room: Room,
         public type: GroupCallType,
+        public isPtt: boolean,
         public intent: GroupCallIntent,
         groupCallId?: string,
         private dataChannelsEnabled?: boolean,
@@ -160,6 +169,7 @@ export class GroupCall extends EventEmitter {
             {
                 "m.intent": this.intent,
                 "m.type": this.type,
+                "io.element.ptt": this.isPtt,
                 // TODO: Specify datachannels
                 "dataChannelsEnabled": this.dataChannelsEnabled,
                 "dataChannelOptions": this.dataChannelOptions,
@@ -208,6 +218,11 @@ export class GroupCall extends EventEmitter {
             throw error;
         }
 
+        // start muted on ptt calls
+        if (this.isPtt) {
+            setTracksEnabled(stream.getAudioTracks(), false);
+        }
+
         const userId = this.client.getUserId();
 
         const callFeed = new CallFeed({
@@ -216,7 +231,7 @@ export class GroupCall extends EventEmitter {
             userId,
             stream,
             purpose: SDPStreamMetadataPurpose.Usermedia,
-            audioMuted: stream.getAudioTracks().length === 0,
+            audioMuted: stream.getAudioTracks().length === 0 || this.isPtt,
             videoMuted: stream.getVideoTracks().length === 0,
         });
 
@@ -318,16 +333,31 @@ export class GroupCall extends EventEmitter {
         this.retryCallCounts.clear();
         clearTimeout(this.retryCallLoopTimeout);
 
+        if (this.transmitTimer !== null) {
+            clearTimeout(this.transmitTimer);
+            this.transmitTimer = null;
+        }
+
         this.client.removeListener("Call.incoming", this.onIncomingCall);
     }
 
     public leave() {
+        if (this.transmitTimer !== null) {
+            clearTimeout(this.transmitTimer);
+            this.transmitTimer = null;
+        }
+
         this.dispose();
         this.setState(GroupCallState.LocalCallFeedUninitialized);
     }
 
     public async terminate(emitStateEvent = true) {
         this.dispose();
+
+        if (this.transmitTimer !== null) {
+            clearTimeout(this.transmitTimer);
+            this.transmitTimer = null;
+        }
 
         this.participants = [];
         this.client.removeListener(
@@ -380,6 +410,24 @@ export class GroupCall extends EventEmitter {
     public async setMicrophoneMuted(muted) {
         if (!await this.client.getMediaHandler().hasAudioDevice()) {
             return false;
+        }
+
+        // set a timer for the maximum transmit time on PTT calls
+        if (this.isPtt) {
+            // if anoher user is currently unmuted, we can't unmute
+            if (!muted && this.userMediaFeeds.some(f => !f.isAudioMuted())) {
+                throw new OtherUserSpeakingError();
+            }
+
+            // Set or clear the max transmit timer
+            if (!muted && this.isMicrophoneMuted()) {
+                this.transmitTimer = setTimeout(() => {
+                    this.setMicrophoneMuted(true);
+                }, this.pttMaxTransmitTime);
+            } else if (muted && !this.isMicrophoneMuted()) {
+                clearTimeout(this.transmitTimer);
+                this.transmitTimer = null;
+            }
         }
 
         if (this.localCallFeed) {

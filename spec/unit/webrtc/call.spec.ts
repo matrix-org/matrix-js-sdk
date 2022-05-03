@@ -145,6 +145,14 @@ describe('Call', function() {
         client.client.mediaHandler = new MockMediaHandler;
         client.client.getMediaHandler = () => client.client.mediaHandler;
         client.httpBackend.when("GET", "/voip/turnServer").respond(200, {});
+        client.client.getRoom = () => {
+            return {
+                getMember: () => {
+                    return {};
+                },
+            };
+        };
+
         call = new MatrixCall({
             client: client.client,
             roomId: '!foo:bar',
@@ -175,6 +183,7 @@ describe('Call', function() {
                     },
                 };
             },
+            getSender: () => "@test:foo",
         });
 
         call.peerConn.addIceCandidate = jest.fn();
@@ -192,6 +201,7 @@ describe('Call', function() {
                     ],
                 };
             },
+            getSender: () => "@test:foo",
         });
         expect(call.peerConn.addIceCandidate.mock.calls.length).toBe(1);
 
@@ -209,6 +219,7 @@ describe('Call', function() {
                     ],
                 };
             },
+            getSender: () => "@test:foo",
         });
         expect(call.peerConn.addIceCandidate.mock.calls.length).toBe(1);
 
@@ -236,6 +247,7 @@ describe('Call', function() {
                     ],
                 };
             },
+            getSender: () => "@test:foo",
         });
 
         call.onRemoteIceCandidatesReceived({
@@ -252,6 +264,7 @@ describe('Call', function() {
                     ],
                 };
             },
+            getSender: () => "@test:foo",
         });
 
         expect(call.peerConn.addIceCandidate.mock.calls.length).toBe(0);
@@ -267,6 +280,7 @@ describe('Call', function() {
                     },
                 };
             },
+            getSender: () => "@test:foo",
         });
 
         expect(call.peerConn.addIceCandidate.mock.calls.length).toBe(1);
@@ -291,6 +305,7 @@ describe('Call', function() {
                     },
                 };
             },
+            getSender: () => "@test:foo",
         });
 
         const identChangedCallback = jest.fn();
@@ -308,6 +323,7 @@ describe('Call', function() {
                     },
                 };
             },
+            getSender: () => "@test:foo",
         });
 
         expect(identChangedCallback).toHaveBeenCalled();
@@ -347,6 +363,7 @@ describe('Call', function() {
                     },
                 };
             },
+            getSender: () => "@test:foo",
         });
 
         call.pushRemoteFeed(new MockMediaStream("remote_stream"));
@@ -376,6 +393,7 @@ describe('Call', function() {
                     },
                 };
             },
+            getSender: () => "@test:foo",
         });
 
         call.setScreensharingEnabledWithoutMetadataSupport = jest.fn();
