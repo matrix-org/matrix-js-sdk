@@ -217,6 +217,16 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     public addEvent(event: MatrixEvent, toStartOfTimeline: boolean, emit = true): void {
         event.setThread(this);
 
+        if (!this._currentUserParticipated && event.getSender() === this.client.getUserId()) {
+            this._currentUserParticipated = true;
+        }
+
+        // Add all annotations and replace relations to the timeline so that the relations are processed accordingly
+        if ([RelationType.Annotation, RelationType.Replace].includes(event.getRelation()?.rel_type as RelationType)) {
+            this.addEventToTimeline(event, toStartOfTimeline);
+            return;
+        }
+
         // Add all incoming events to the thread's timeline set when there's  no server support
         if (!Thread.hasServerSideSupport) {
             // all the relevant membership info to hydrate events with a sender
@@ -232,10 +242,6 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         ) {
             this.fetchEditsWhereNeeded(event);
             this.addEventToTimeline(event, false);
-        }
-
-        if (!this._currentUserParticipated && event.getSender() === this.client.getUserId()) {
-            this._currentUserParticipated = true;
         }
 
         // If no thread support exists we want to count all thread relation

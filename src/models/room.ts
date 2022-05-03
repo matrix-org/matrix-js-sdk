@@ -1622,7 +1622,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         if (thread) {
             thread.addEvents(events, toStartOfTimeline);
         } else {
-            const rootEvent = events.find(e => e.getId() === threadId);
+            const rootEvent = this.findEventById(threadId) ?? events.find(e => e.getId() === threadId);
             thread = this.createThread(threadId, rootEvent, events, toStartOfTimeline);
             this.emit(ThreadEvent.Update, thread);
         }
@@ -2141,7 +2141,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
 
         const threadRoots = this.findThreadRoots(events);
-        const threadInfos = events.map(e => this.eventShouldLiveIn(e, events, threadRoots));
         const eventsByThread: { [threadId: string]: MatrixEvent[] } = {};
 
         for (let i = 0; i < events.length; i++) {
@@ -2152,7 +2151,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 shouldLiveInRoom,
                 shouldLiveInThread,
                 threadId,
-            } = threadInfos[i];
+            } = this.eventShouldLiveIn(events[i], events, threadRoots);
 
             if (shouldLiveInThread && !eventsByThread[threadId]) {
                 eventsByThread[threadId] = [];
