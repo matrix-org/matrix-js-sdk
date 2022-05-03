@@ -1,0 +1,24 @@
+name: Upgrade Dependencies
+on:
+  workflow_dispatch: { }
+  workflow_call: { }
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          cache: 'yarn'
+
+      - name: Upgrade
+        run: yarn upgrade && yarn install
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v4
+        with:
+          branch: actions/upgrade-deps
+          delete-branch: true
+          title: Upgrade dependencies
+          labels: T-Task
