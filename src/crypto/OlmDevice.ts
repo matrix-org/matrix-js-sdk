@@ -913,7 +913,7 @@ export class OlmDevice {
         return this.cryptoStore.getEndToEndSessionProblem(deviceKey, timestamp);
     }
 
-    public  filterOutNotifiedErrorDevices(devices: IOlmDevice[]): Promise<IOlmDevice[]> {
+    public filterOutNotifiedErrorDevices(devices: IOlmDevice[]): Promise<IOlmDevice[]> {
         return this.cryptoStore.filterOutNotifiedErrorDevices(devices);
     }
 
