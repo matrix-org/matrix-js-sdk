@@ -300,7 +300,7 @@ export class PushProcessor {
 
         const memberCount = room.currentState.getJoinedMemberCount();
 
-        const m = cond.is.match(/^([=<>]*)([0-9]*)$/);
+        const m = cond.is.match(/^([=<>]*)(\d*)$/);
         if (!m) {
             return false;
         }

@@ -70,7 +70,7 @@ class OlmEncryption extends EncryptionAlgorithm {
             return Promise.resolve();
         }
 
-        this.prepPromise = this.crypto.downloadKeys(roomMembers).then((res) => {
+        this.prepPromise = this.crypto.downloadKeys(roomMembers).then(() => {
             return this.crypto.ensureOlmSessionsForUsers(roomMembers);
         }).then(() => {
             this.sessionPrepared = true;

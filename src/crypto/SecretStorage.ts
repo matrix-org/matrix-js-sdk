@@ -345,15 +345,10 @@ export class SecretStorage {
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    public async isStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo> | null> {
+    public async isStored(name: string, checkKey = true): Promise<Record<string, ISecretStorageKeyInfo> | null> {
         // check if secret exists
         const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretInfo>(name);
-        if (!secretInfo) return null;
-        if (!secretInfo.encrypted) {
-            return null;
-        }
-
-        if (checkKey === undefined) checkKey = true;
+        if (!secretInfo?.encrypted) return null;
 
         const ret = {};
 

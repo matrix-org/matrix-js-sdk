@@ -132,7 +132,7 @@ export class BackupManager {
         if (!Algorithm) {
             throw new Error("Unknown backup algorithm: " + info.algorithm);
         }
-        if (!(typeof info.auth_data === "object")) {
+        if (typeof info.auth_data !== "object") {
             throw new Error("Invalid backup data returned");
         }
         return Algorithm.checkBackupVersion(info);

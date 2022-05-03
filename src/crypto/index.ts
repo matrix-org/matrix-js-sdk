@@ -690,7 +690,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
             // Cross-sign own device
             const device = this.deviceList.getStoredDevice(this.userId, this.deviceId);
-            const deviceSignature = await crossSigningInfo.signDevice(this.userId, device) as ISignedKey;
+            const deviceSignature = await crossSigningInfo.signDevice(this.userId, device);
             builder.addKeySignature(this.userId, this.deviceId, deviceSignature);
 
             // Sign message key backup with cross-signing master key

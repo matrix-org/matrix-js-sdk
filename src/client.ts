@@ -2602,9 +2602,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns {Promise<IKeyBackupInfo | null>} Information object from API or null
      */
     public async getKeyBackupVersion(): Promise<IKeyBackupInfo | null> {
-        let res;
+        let res: IKeyBackupInfo;
         try {
-            res = await this.http.authedRequest(
+            res = await this.http.authedRequest<IKeyBackupInfo>(
                 undefined, Method.Get, "/room_keys/version", undefined, undefined,
                 { prefix: PREFIX_UNSTABLE },
             );
@@ -2615,11 +2615,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 throw e;
             }
         }
-        try {
-            BackupManager.checkBackupVersion(res);
-        } catch (e) {
-            throw e;
-        }
+        BackupManager.checkBackupVersion(res);
         return res;
     }
 
@@ -3141,10 +3137,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 });
             }
 
-            const res = await this.http.authedRequest(
+            const res = await this.http.authedRequest<IRoomsKeysResponse | IRoomKeysResponse | IKeyBackupSession>(
                 undefined, Method.Get, path.path, path.queryData, undefined,
                 { prefix: PREFIX_UNSTABLE },
-            ) as IRoomsKeysResponse | IRoomKeysResponse | IKeyBackupSession;
+            );
 
             if ((res as IRoomsKeysResponse).rooms) {
                 const rooms = (res as IRoomsKeysResponse).rooms;
@@ -3652,7 +3648,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (event?.getType() === EventType.RoomPowerLevels) {
             // take a copy of the content to ensure we don't corrupt
             // existing client state with a failed power level change
-            content = utils.deepCopy(event.getContent()) as typeof content;
+            content = utils.deepCopy(event.getContent());
         }
         content.users[userId] = powerLevel;
         const path = utils.encodeUri("/rooms/$roomId/state/m.room.power_levels", {
@@ -6106,7 +6102,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.syncLeftRoomsPromise = syncApi.syncLeftRooms();
 
         // cleanup locks
-        this.syncLeftRoomsPromise.then((res) => {
+        this.syncLeftRoomsPromise.then(() => {
             logger.log("Marking success of sync left room request");
             this.syncedLeftRooms = true; // flip the bit on success
         }).finally(() => {
