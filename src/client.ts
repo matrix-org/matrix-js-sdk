@@ -1296,9 +1296,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Get the current dehydrated device, if any
      * @return {Promise} A promise of an object containing the dehydrated device
      */
-    public async getDehydratedDevice(): Promise<IDehydratedDevice> {
+    public getDehydratedDevice(): Promise<IDehydratedDevice> {
         try {
-            return await this.http.authedRequest<IDehydratedDevice>(
+            return this.http.authedRequest<IDehydratedDevice>(
                 undefined,
                 Method.Get,
                 "/dehydrated_device",
@@ -1324,7 +1324,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     dehydrated device.
      * @return {Promise} A promise that resolves when the dehydrated device is stored.
      */
-    public async setDehydrationKey(
+    public setDehydrationKey(
         key: Uint8Array,
         keyInfo: IDehydratedDeviceKeyInfo,
         deviceDisplayName?: string,
@@ -1333,7 +1333,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             logger.warn('not dehydrating device if crypto is not enabled');
             return;
         }
-        return await this.crypto.dehydrationManager.setKeyAndQueueDehydration(key, keyInfo, deviceDisplayName);
+        return this.crypto.dehydrationManager.setKeyAndQueueDehydration(key, keyInfo, deviceDisplayName);
     }
 
     /**
@@ -1354,11 +1354,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             logger.warn('not dehydrating device if crypto is not enabled');
             return;
         }
-        await this.crypto.dehydrationManager.setKey(
-            key, keyInfo, deviceDisplayName,
-        );
-        // XXX: Private member access.
-        return await this.crypto.dehydrationManager.dehydrateDevice();
+        await this.crypto.dehydrationManager.setKey(key, keyInfo, deviceDisplayName);
+        return this.crypto.dehydrationManager.dehydrateDevice();
     }
 
     public async exportDevice(): Promise<IExportedDevice> {
@@ -2605,9 +2602,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns {Promise<IKeyBackupInfo | null>} Information object from API or null
      */
     public async getKeyBackupVersion(): Promise<IKeyBackupInfo | null> {
-        let res;
+        let res: IKeyBackupInfo;
         try {
-            res = await this.http.authedRequest(
+            res = await this.http.authedRequest<IKeyBackupInfo>(
                 undefined, Method.Get, "/room_keys/version", undefined, undefined,
                 { prefix: PREFIX_UNSTABLE },
             );
@@ -2618,11 +2615,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 throw e;
             }
         }
-        try {
-            BackupManager.checkBackupVersion(res);
-        } catch (e) {
-            throw e;
-        }
+        BackupManager.checkBackupVersion(res);
         return res;
     }
 
@@ -3144,10 +3137,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 });
             }
 
-            const res = await this.http.authedRequest(
+            const res = await this.http.authedRequest<IRoomsKeysResponse | IRoomKeysResponse | IKeyBackupSession>(
                 undefined, Method.Get, path.path, path.queryData, undefined,
                 { prefix: PREFIX_UNSTABLE },
-            ) as IRoomsKeysResponse | IRoomKeysResponse | IKeyBackupSession;
+            );
 
             if ((res as IRoomsKeysResponse).rooms) {
                 const rooms = (res as IRoomsKeysResponse).rooms;
@@ -3372,7 +3365,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * data event.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async getAccountDataFromServer<T extends {[k: string]: any}>(eventType: string): Promise<T> {
+    public getAccountDataFromServer<T extends {[k: string]: any}>(eventType: string): Promise<T> {
         if (this.isInitialSyncComplete()) {
             const event = this.store.getAccountData(eventType);
             if (!event) {
@@ -3387,7 +3380,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $type: eventType,
         });
         try {
-            return await this.http.authedRequest(
+            return this.http.authedRequest(
                 undefined, Method.Get, path, undefined,
             );
         } catch (e) {
@@ -3655,7 +3648,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (event?.getType() === EventType.RoomPowerLevels) {
             // take a copy of the content to ensure we don't corrupt
             // existing client state with a failed power level change
-            content = utils.deepCopy(event.getContent()) as typeof content;
+            content = utils.deepCopy(event.getContent());
         }
         content.users[userId] = powerLevel;
         const path = utils.encodeUri("/rooms/$roomId/state/m.room.power_levels", {
@@ -6109,7 +6102,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.syncLeftRoomsPromise = syncApi.syncLeftRooms();
 
         // cleanup locks
-        this.syncLeftRoomsPromise.then((res) => {
+        this.syncLeftRoomsPromise.then(() => {
             logger.log("Marking success of sync left room request");
             this.syncedLeftRooms = true; // flip the bit on success
         }).finally(() => {
@@ -7203,7 +7196,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {Object} [opts] options with optional values for the request.
     * @return {Object} the response, with chunk, prev_batch and, next_batch.
      */
-    public async fetchRelations(
+    public fetchRelations(
         roomId: string,
         eventId: string,
         relationType?: RelationType | string | null,
@@ -7231,7 +7224,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 $relationType: relationType,
                 $eventType: eventType,
             });
-        return await this.http.authedRequest(
+        return this.http.authedRequest(
             undefined, Method.Get, path, null, null, {
                 prefix: PREFIX_UNSTABLE,
             },
@@ -8324,7 +8317,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      * @throws Error if no identity server is set
      */
-    public async requestEmailToken(
+    public requestEmailToken(
         email: string,
         clientSecret: string,
         sendAttempt: number,
@@ -8339,7 +8332,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             next_link: nextLink,
         };
 
-        return await this.http.idServerRequest(
+        return this.http.idServerRequest(
             callback, Method.Post, "/validate/email/requestToken",
             params, PREFIX_IDENTITY_V2, identityAccessToken,
         );
@@ -8372,7 +8365,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      * @throws Error if no identity server is set
      */
-    public async requestMsisdnToken(
+    public requestMsisdnToken(
         phoneCountry: string,
         phoneNumber: string,
         clientSecret: string,
@@ -8389,7 +8382,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             next_link: nextLink,
         };
 
-        return await this.http.idServerRequest(
+        return this.http.idServerRequest(
             callback, Method.Post, "/validate/msisdn/requestToken",
             params, PREFIX_IDENTITY_V2, identityAccessToken,
         );
@@ -8414,7 +8407,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      * @throws Error if No identity server is set
      */
-    public async submitMsisdnToken(
+    public submitMsisdnToken(
         sid: string,
         clientSecret: string,
         msisdnToken: string,
@@ -8426,7 +8419,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             token: msisdnToken,
         };
 
-        return await this.http.idServerRequest(
+        return this.http.idServerRequest(
             undefined, Method.Post, "/validate/msisdn/submitToken",
             params, PREFIX_IDENTITY_V2, identityAccessToken,
         );
@@ -8947,7 +8940,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *    origin_server_ts of the closest event to the timestamp in the given
      *    direction
      */
-    public async timestampToEvent(
+    public timestampToEvent(
         roomId: string,
         timestamp: number,
         dir: Direction,
@@ -8956,7 +8949,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $roomId: roomId,
         });
 
-        return await this.http.authedRequest(
+        return this.http.authedRequest(
             undefined,
             Method.Get,
             path,
