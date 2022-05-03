@@ -711,6 +711,7 @@ export function recursivelyAssign(target: Object, source: Object, ignoreNullish 
         }
         if ((sourceValue !== null && sourceValue !== undefined) || !ignoreNullish) {
             target[sourceKey] = sourceValue;
+            continue;
         }
     }
     return target;
