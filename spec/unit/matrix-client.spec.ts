@@ -811,9 +811,7 @@ describe("MatrixClient", function() {
                     }
                 },
             },
-            threads: {
-                get: jest.fn(),
-            },
+            getThread: jest.fn(),
             addPendingEvent: jest.fn(),
             updatePendingEvent: jest.fn(),
             reEmitter: {
