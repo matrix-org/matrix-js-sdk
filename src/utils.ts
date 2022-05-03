@@ -465,7 +465,7 @@ export function defer<T = void>(): IDeferred<T> {
 
 export async function promiseMapSeries<T>(
     promises: Array<T | Promise<T>>,
-    fn: (t: T) => Promise<T> | void,
+    fn: (t: T) => Promise<unknown> | void, // if async/promise we don't care about the type as we only await resolution
 ): Promise<void> {
     for (const o of promises) {
         await fn(await o);
