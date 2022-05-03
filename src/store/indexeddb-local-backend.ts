@@ -530,9 +530,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             const txn = this.db.transaction(["client_options"], "readonly");
             const store = txn.objectStore("client_options");
             return selectQuery(store, undefined, (cursor) => {
-                if (cursor.value && cursor.value && cursor.value.options) {
-                    return cursor.value.options;
-                }
+                return cursor.value?.options;
             }).then((results) => results[0]);
         });
     }

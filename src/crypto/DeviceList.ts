@@ -309,10 +309,10 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      */
     private getDevicesFromStore(userIds: string[]): DeviceInfoMap {
         const stored: DeviceInfoMap = {};
-        userIds.map((u) => {
+        userIds.forEach((u) => {
             stored[u] = {};
             const devices = this.getStoredDevicesForUser(u) || [];
-            devices.map(function(dev) {
+            devices.forEach(function(dev) {
                 stored[u][dev.deviceId] = dev;
             });
         });
