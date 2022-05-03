@@ -213,6 +213,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
      * @param event The event to add
      * @param {boolean} toStartOfTimeline whether the event is being added
      * to the start (and not the end) of the timeline.
+     * @param {boolean} emit whether to emit the Update event if the thread was updated or not.
      */
     public addEvent(event: MatrixEvent, toStartOfTimeline: boolean, emit = true): void {
         event.setThread(this);
