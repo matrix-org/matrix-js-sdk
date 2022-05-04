@@ -57,4 +57,31 @@ describe('MatrixEvent', () => {
         expect(a.toSnapshot().isEquivalentTo(a)).toBe(true);
         expect(a.toSnapshot().isEquivalentTo(b)).toBe(false);
     });
+
+    it("should prune clearEvent when being redacted", () => {
+        const ev = new MatrixEvent({
+            type: "m.room.message",
+            content: {
+                body: "Test",
+            },
+            event_id: "$event1:server",
+        });
+
+        expect(ev.getContent().body).toBe("Test");
+        expect(ev.getWireContent().body).toBe("Test");
+        ev.makeEncrypted("m.room.encrypted", { ciphertext: "xyz" }, "", "");
+        expect(ev.getContent().body).toBe("Test");
+        expect(ev.getWireContent().body).toBeUndefined();
+        expect(ev.getWireContent().ciphertext).toBe("xyz");
+
+        const redaction = new MatrixEvent({
+            type: "m.room.redaction",
+            redacts: ev.getId(),
+        });
+
+        ev.makeRedacted(redaction);
+        expect(ev.getContent().body).toBeUndefined();
+        expect(ev.getWireContent().body).toBeUndefined();
+        expect(ev.getWireContent().ciphertext).toBeUndefined();
+    });
 });
