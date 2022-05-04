@@ -34,6 +34,7 @@ import {
     PushRuleSet,
     TweakName,
 } from "./@types/PushRules";
+import { EventType } from "./@types/event";
 
 /**
  * @module pushprocessor
@@ -90,6 +91,22 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
                 kind: ConditionKind.EventMatch,
                 key: "type",
                 pattern: "m.reaction",
+            },
+        ],
+        actions: [
+            PushRuleActionName.DontNotify,
+        ],
+    },
+    {
+        // For homeservers which don't support MSC3786 yet
+        rule_id: ".org.matrix.msc3786.rule.room.server_acl",
+        default: true,
+        enabled: true,
+        conditions: [
+            {
+                kind: ConditionKind.EventMatch,
+                key: "type",
+                pattern: EventType.RoomServerAcl,
             },
         ],
         actions: [
