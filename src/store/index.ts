@@ -37,7 +37,7 @@ export interface ISavedSync {
 export interface IStore {
     readonly accountData: Record<string, MatrixEvent>; // type : content
 
-    /** @return {Promise<bool>} whether or not the database was newly created in this session. */
+    /** @return {Promise<boolean>} whether or not the database was newly created in this session. */
     isNewlyCreated(): Promise<boolean>;
 
     /**
