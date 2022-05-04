@@ -57,6 +57,11 @@ export enum JoinRule {
     Private = "private",
     Knock = "knock",
     Restricted = "restricted",
+    /**
+     * @deprecated Relies on unstable functionality from MSC3787. Identifier may be removed
+     * or replaced without notice.
+     */
+    MSC3787KnockRestricted = "knock_restricted",
 }
 
 export enum RestrictedAllowType {
