@@ -796,8 +796,7 @@ export class VerificationRequest<
     }
 
     private setupTimeout(phase: Phase): void {
-        const shouldTimeout = !this.timeoutTimer && !this.observeOnly &&
-            phase === PHASE_REQUESTED;
+        const shouldTimeout = !this.timeoutTimer && !this.observeOnly && phase === PHASE_REQUESTED;
 
         if (shouldTimeout) {
             this.timeoutTimer = setTimeout(this.cancelOnTimeout, this.timeout);
@@ -814,15 +813,15 @@ export class VerificationRequest<
         }
     }
 
-    private cancelOnTimeout = () => {
+    private cancelOnTimeout = async () => {
         try {
             if (this.initiatedByMe) {
-                this.cancel({
+                await this.cancel({
                     reason: "Other party didn't accept in time",
                     code: "m.timeout",
                 });
             } else {
-                this.cancel({
+                await this.cancel({
                     reason: "User didn't accept in time",
                     code: "m.timeout",
                 });

@@ -402,7 +402,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
             // try to get key from app
             if (this.baseApis.cryptoCallbacks && this.baseApis.cryptoCallbacks.getBackupKey) {
-                return await this.baseApis.cryptoCallbacks.getBackupKey();
+                return this.baseApis.cryptoCallbacks.getBackupKey();
             }
 
             throw new Error("Unable to get private key");
@@ -690,7 +690,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
             // Cross-sign own device
             const device = this.deviceList.getStoredDevice(this.userId, this.deviceId);
-            const deviceSignature = await crossSigningInfo.signDevice(this.userId, device) as ISignedKey;
+            const deviceSignature = await crossSigningInfo.signDevice(this.userId, device);
             builder.addKeySignature(this.userId, this.deviceId, deviceSignature);
 
             // Sign message key backup with cross-signing master key
@@ -1026,7 +1026,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             const decodedBackupKey = new Uint8Array(olmlib.decodeBase64(
                 fixedBackupKey || sessionBackupKey,
             ));
-            await builder.addSessionBackupPrivateKeyToCache(decodedBackupKey);
+            builder.addSessionBackupPrivateKeyToCache(decodedBackupKey);
         } else if (this.backupManager.getKeyBackupEnabled()) {
             // key backup is enabled but we don't have a session backup key in SSSS: see if we have one in
             // the cache or the user can provide one, and if so, write it to SSSS
@@ -2890,7 +2890,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         } else {
             const content = event.getWireContent();
             const alg = this.getRoomDecryptor(event.getRoomId(), content.algorithm);
-            return await alg.decryptEvent(event);
+            return alg.decryptEvent(event);
         }
     }
 
