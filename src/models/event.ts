@@ -1118,22 +1118,16 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
             }
         }
 
+        // If the event is encrypted prune the decrypted bits
+        if (this.isEncrypted()) {
+            this.clearEvent = null;
+        }
+
         const keeps = REDACT_KEEP_CONTENT_MAP[this.getType()] || {};
         const content = this.getContent();
         for (const key in content) {
             if (content.hasOwnProperty(key) && !keeps[key]) {
                 delete content[key];
-            }
-        }
-
-        // If the event is encrypted also prune the wire content
-        if (this.isEncrypted()) {
-            const keeps = REDACT_KEEP_CONTENT_MAP[this.getWireType()] || {};
-            const content = this.getWireContent();
-            for (const key in content) {
-                if (content.hasOwnProperty(key) && !keeps[key]) {
-                    delete content[key];
-                }
             }
         }
 
