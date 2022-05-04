@@ -1112,24 +1112,28 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
         }
         this.event.unsigned.redacted_because = redactionEvent.event as IEvent;
 
-        let key;
-        for (key in this.event) {
-            if (!this.event.hasOwnProperty(key)) {
-                continue;
-            }
-            if (!REDACT_KEEP_KEYS.has(key)) {
+        for (const key in this.event) {
+            if (this.event.hasOwnProperty(key) && !REDACT_KEEP_KEYS.has(key)) {
                 delete this.event[key];
             }
         }
 
         const keeps = REDACT_KEEP_CONTENT_MAP[this.getType()] || {};
         const content = this.getContent();
-        for (key in content) {
-            if (!content.hasOwnProperty(key)) {
-                continue;
-            }
-            if (!keeps[key]) {
+        for (const key in content) {
+            if (content.hasOwnProperty(key) && !keeps[key]) {
                 delete content[key];
+            }
+        }
+
+        // If the event is encrypted also prune the wire content
+        if (this.isEncrypted()) {
+            const keeps = REDACT_KEEP_CONTENT_MAP[this.getWireType()] || {};
+            const content = this.getWireContent();
+            for (const key in content) {
+                if (content.hasOwnProperty(key) && !keeps[key]) {
+                    delete content[key];
+                }
             }
         }
 
@@ -1589,7 +1593,7 @@ const REDACT_KEEP_KEYS = new Set([
     'content', 'unsigned', 'origin_server_ts',
 ]);
 
-// a map from event type to the .content keys we keep when an event is redacted
+// a map from state event type to the .content keys we keep when an event is redacted
 const REDACT_KEEP_CONTENT_MAP = {
     [EventType.RoomMember]: { 'membership': 1 },
     [EventType.RoomCreate]: { 'creator': 1 },
