@@ -26,7 +26,9 @@ jobs:
           branch: actions/upgrade-deps
           delete-branch: true
           title: Upgrade dependencies
-          labels: T-Task
+          labels: |
+            Dependencies
+            T-Task
           
       - name: Enable automerge
         uses: peter-evans/enable-pull-request-automerge@v2
