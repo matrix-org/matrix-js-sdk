@@ -1217,13 +1217,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     }
 
     /**
-     * @experimental
-     */
-    public getThreadsMap(): Map<string, Thread> {
-        return this.threads;
-    }
-
-    /**
      * Get a member from the current room state.
      * @param {string} userId The user ID of the member.
      * @return {RoomMember} The member or <code>null</code>.
