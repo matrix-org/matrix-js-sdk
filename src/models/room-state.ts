@@ -26,10 +26,9 @@ import { MatrixEvent, MatrixEventEvent } from "./event";
 import { MatrixClient } from "../client";
 import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
 import { TypedEventEmitter } from "./typed-event-emitter";
-import { Beacon, BeaconEvent, BeaconEventHandlerMap } from "./beacon";
+import { Beacon, BeaconEvent, BeaconEventHandlerMap, getBeaconInfoIdentifier, BeaconIdentifier } from "./beacon";
 import { TypedReEmitter } from "../ReEmitter";
 import { M_BEACON, M_BEACON_INFO } from "../@types/beacon";
-import { getBeaconInfoIdentifier, BeaconIdentifier } from "./beacon";
 
 // possible statuses for out-of-band member loading
 enum OobStatus {

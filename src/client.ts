@@ -1298,9 +1298,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Get the current dehydrated device, if any
      * @return {Promise} A promise of an object containing the dehydrated device
      */
-    public getDehydratedDevice(): Promise<IDehydratedDevice> {
+    public async getDehydratedDevice(): Promise<IDehydratedDevice> {
         try {
-            return this.http.authedRequest<IDehydratedDevice>(
+            return await this.http.authedRequest<IDehydratedDevice>(
                 undefined,
                 Method.Get,
                 "/dehydrated_device",
@@ -3367,7 +3367,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * data event.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getAccountDataFromServer<T extends {[k: string]: any}>(eventType: string): Promise<T> {
+    public async getAccountDataFromServer<T extends {[k: string]: any}>(eventType: string): Promise<T> {
         if (this.isInitialSyncComplete()) {
             const event = this.store.getAccountData(eventType);
             if (!event) {
@@ -3382,11 +3382,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $type: eventType,
         });
         try {
-            return this.http.authedRequest(
-                undefined, Method.Get, path, undefined,
-            );
+            return await this.http.authedRequest(undefined, Method.Get, path);
         } catch (e) {
-            if (e.data && e.data.errcode === 'M_NOT_FOUND') {
+            if (e.data?.errcode === 'M_NOT_FOUND') {
                 return null;
             }
             throw e;
@@ -4853,7 +4851,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
         }
 
-        const populationResults: Record<string, Error> = {}; // {roomId: Error}
+        const populationResults: { [roomId: string]: Error } = {};
         const promises = [];
 
         const doLeave = (roomId: string) => {
@@ -5877,7 +5875,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public setRoomMutePushRule(scope: string, roomId: string, mute: boolean): Promise<void> | void {
         let promise: Promise<void>;
-        let hasDontNotifyRule;
+        let hasDontNotifyRule = false;
 
         // Get the existing room-kind push rule if any
         const roomPushRule = this.getRoomPushRule(scope, roomId);
@@ -5930,7 +5928,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     });
                 }).catch((err: Error) => {
                     // Update it even if the previous operation fails. This can help the
-                    // app to recover when push settings has been modifed from another client
+                    // app to recover when push settings has been modified from another client
                     this.getPushRules().then((result) => {
                         this.pushRules = result;
                         reject(err);
