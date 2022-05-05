@@ -784,6 +784,7 @@ export enum ClientEvent {
     DeleteRoom = "deleteRoom",
     SyncUnexpectedError = "sync.unexpectedError",
     ClientWellKnown = "WellKnown.client",
+    DumpDebugLogs = "logging.dumpDebugLogs",
 }
 
 type RoomEvents = RoomEvent.Name
@@ -852,6 +853,7 @@ export type ClientEventHandlerMap = {
     [ClientEvent.DeleteRoom]: (roomId: string) => void;
     [ClientEvent.SyncUnexpectedError]: (error: Error) => void;
     [ClientEvent.ClientWellKnown]: (data: IClientWellKnown) => void;
+    [ClientEvent.DumpDebugLogs]: () => void;
 } & RoomEventHandlerMap
     & RoomStateEventHandlerMap
     & CryptoEventHandlerMap
@@ -8962,6 +8964,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 prefix: "/_matrix/client/unstable/org.matrix.msc3030",
             },
         );
+    }
+
+    public dumpDebugLogs() {
+        logger.debug('matrix-js-sdk: dumping extra debug logs to the console');
+        this.emit(ClientEvent.DumpDebugLogs);
     }
 }
 
