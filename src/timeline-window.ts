@@ -18,7 +18,7 @@ limitations under the License.
 
 import { Direction, EventTimeline } from './models/event-timeline';
 import { logger } from './logger';
-import { MatrixClient, ClientEvent } from "./client";
+import { MatrixClient } from "./client";
 import { EventTimelineSet } from "./models/event-timeline-set";
 import { MatrixEvent } from "./models/event";
 
@@ -41,14 +41,10 @@ const DEFAULT_PAGINATE_LOOP_LIMIT = 5;
 
 interface IOpts {
     windowLimit?: number;
-    // A label used in the logs to namespace and differentiate the timelines.
-    //ex. main timeline from the thread timeline.
-    contextLabel?: string;
 }
 
 export class TimelineWindow {
     private readonly windowLimit: number;
-    private readonly contextLabel: string;
     // these will be TimelineIndex objects; they delineate the 'start' and
     // 'end' of the window.
     //
@@ -84,9 +80,6 @@ export class TimelineWindow {
      *    in the window. If more events are retrieved via pagination requests,
      *    excess events will be dropped from the other end of the window.
      *
-     * @param {number} [opts.contextLabel] A label used in the logs to namespace
-     * and differentiate the timelines. ex. main timeline from the thread timeline.
-     *
      * @constructor
      */
     constructor(
@@ -94,16 +87,7 @@ export class TimelineWindow {
         private readonly timelineSet: EventTimelineSet,
         opts: IOpts = {},
     ) {
-        console.log('timeline-window', opts);
         this.windowLimit = opts.windowLimit || 1000;
-        this.contextLabel = opts.contextLabel || '';
-
-        // TODO: Unbind this when the object is destroyed
-        client.on(ClientEvent.DumpDebugLogs, this.onDumpDebugLogs);
-    }
-
-    private onDumpDebugLogs = (): void => {
-        logger.debug(`timeline-window(${this.contextLabel}): TODO: dumpDebugLogs`);
     }
 
     /**
