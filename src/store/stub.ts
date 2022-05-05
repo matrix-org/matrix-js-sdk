@@ -123,7 +123,7 @@ export class StubStore implements IStore {
     /**
      * No-op.
      * @param {Room} room
-     * @param {integer} limit
+     * @param {number} limit
      * @return {Array}
      */
     public scrollback(room: Room, limit: number): MatrixEvent[] {

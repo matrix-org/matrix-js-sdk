@@ -1124,14 +1124,14 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * The aliases returned by this function may not necessarily
      * still point to this room.
      * @return {array} The room's alias as an array of strings
+     * @deprecated this uses m.room.aliases events, replaced by Room::getAltAliases()
      */
     public getAliases(): string[] {
         const aliasStrings: string[] = [];
 
         const aliasEvents = this.currentState.getStateEvents(EventType.RoomAliases);
         if (aliasEvents) {
-            for (let i = 0; i < aliasEvents.length; ++i) {
-                const aliasEvent = aliasEvents[i];
+            for (const aliasEvent of aliasEvents) {
                 if (Array.isArray(aliasEvent.getContent().aliases)) {
                     const filteredAliases = aliasEvent.getContent<{ aliases: string[] }>().aliases.filter(a => {
                         if (typeof(a) !== "string") return false;
@@ -1141,7 +1141,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                         // It's probably valid by here.
                         return true;
                     });
-                    Array.prototype.push.apply(aliasStrings, filteredAliases);
+                    aliasStrings.push(...filteredAliases);
                 }
             }
         }
@@ -1644,8 +1644,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             eventsByThread[threadId]?.push(event);
         }
 
-        Object.entries(eventsByThread).map(([threadId, events]) => (
-            this.addThreadedEvents(threadId, events, toStartOfTimeline)
+        Object.entries(eventsByThread).map(([threadId, threadEvents]) => (
+            this.addThreadedEvents(threadId, threadEvents, toStartOfTimeline)
         ));
     }
 
@@ -2143,23 +2143,23 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         const threadRoots = this.findThreadRoots(events);
         const eventsByThread: { [threadId: string]: MatrixEvent[] } = {};
 
-        for (let i = 0; i < events.length; i++) {
+        for (const event of events) {
             // TODO: We should have a filter to say "only add state event types X Y Z to the timeline".
-            this.processLiveEvent(events[i]);
+            this.processLiveEvent(event);
 
             const {
                 shouldLiveInRoom,
                 shouldLiveInThread,
                 threadId,
-            } = this.eventShouldLiveIn(events[i], events, threadRoots);
+            } = this.eventShouldLiveIn(event, events, threadRoots);
 
             if (shouldLiveInThread && !eventsByThread[threadId]) {
                 eventsByThread[threadId] = [];
             }
-            eventsByThread[threadId]?.push(events[i]);
+            eventsByThread[threadId]?.push(event);
 
             if (shouldLiveInRoom) {
-                this.addLiveEvent(events[i], duplicateStrategy, fromCache);
+                this.addLiveEvent(event, duplicateStrategy, fromCache);
             }
         }
 

@@ -271,9 +271,9 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
         do {
             try {
                 if (this.initiatedByMe) {
-                    return this.doSendVerification();
+                    return await this.doSendVerification();
                 } else {
-                    return this.doRespondVerification();
+                    return await this.doRespondVerification();
                 }
             } catch (err) {
                 if (err instanceof SwitchStartEventError) {
