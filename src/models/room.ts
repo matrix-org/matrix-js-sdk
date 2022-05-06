@@ -47,6 +47,7 @@ import {
     ThreadFilterType,
 } from "./thread";
 import { TypedEventEmitter } from "./typed-event-emitter";
+import { ReceiptType } from "../@types/read_receipts";
 import { IStateEventWithRoomId } from "../@types/search";
 
 // These constants are used as sane defaults when the homeserver doesn't support
@@ -58,7 +59,7 @@ import { IStateEventWithRoomId } from "../@types/search";
 const KNOWN_SAFE_ROOM_VERSION = '9';
 const SAFE_ROOM_VERSIONS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
-function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: string): MatrixEvent {
+function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: ReceiptType): MatrixEvent {
     // console.log("synthesizing receipt for "+event.getId());
     return new MatrixEvent({
         content: {
@@ -93,13 +94,13 @@ interface IReceipt {
     ts: number;
 }
 
-interface IWrappedReceipt {
+export interface IWrappedReceipt {
     eventId: string;
     data: IReceipt;
 }
 
 interface ICachedReceipt {
-    type: string;
+    type: ReceiptType;
     userId: string;
     data: IReceipt;
 }
@@ -108,7 +109,7 @@ type ReceiptCache = {[eventId: string]: ICachedReceipt[]};
 
 interface IReceiptContent {
     [eventId: string]: {
-        [type: string]: {
+        [key in ReceiptType]: {
             [userId: string]: IReceipt;
         };
     };
@@ -1792,7 +1793,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         // Don't synthesize RR for m.room.redaction as this causes the RR to go missing.
         if (event.sender && event.getType() !== EventType.RoomRedaction) {
             this.addReceipt(synthesizeReceipt(
-                event.sender.userId, event, "m.read",
+                event.sender.userId, event, ReceiptType.Read,
             ), true);
 
             // Any live events from a user could be taken as implicit
@@ -2314,14 +2315,23 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     public getUsersReadUpTo(event: MatrixEvent): string[] {
         return this.getReceiptsForEvent(event).filter(function(receipt) {
-            return receipt.type === "m.read";
+            return [ReceiptType.Read, ReceiptType.ReadPrivate].includes(receipt.type);
         }).map(function(receipt) {
             return receipt.userId;
         });
     }
 
-    public getReadReceiptForUserId(userId: string, ignoreSynthesized = false): IWrappedReceipt | null {
-        const [realReceipt, syntheticReceipt] = this.receipts["m.read"]?.[userId] ?? [];
+    /**
+     * Gets the latest receipt for a given user in the room
+     * @param userId The id of the user for which we want the receipt
+     * @param ignoreSynthesized Whether to ignore synthesized receipts or not
+     * @param receiptType Optional. The type of the receipt we want to get
+     * @returns the latest receipts of the chosen type for the chosen user
+     */
+    public getReadReceiptForUserId(
+        userId: string, ignoreSynthesized = false, receiptType = ReceiptType.Read,
+    ): IWrappedReceipt | null {
+        const [realReceipt, syntheticReceipt] = this.receipts[receiptType]?.[userId] ?? [];
         if (ignoreSynthesized) {
             return realReceipt;
         }
@@ -2339,8 +2349,25 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @return {String} ID of the latest event that the given user has read, or null.
      */
     public getEventReadUpTo(userId: string, ignoreSynthesized = false): string | null {
-        const readReceipt = this.getReadReceiptForUserId(userId, ignoreSynthesized);
-        return readReceipt?.eventId ?? null;
+        const timelineSet = this.getUnfilteredTimelineSet();
+        const publicReadReceipt = this.getReadReceiptForUserId(userId, ignoreSynthesized, ReceiptType.Read);
+        const privateReadReceipt = this.getReadReceiptForUserId(userId, ignoreSynthesized, ReceiptType.ReadPrivate);
+
+        // If we have both, compare them
+        let comparison: number | undefined;
+        if (publicReadReceipt?.eventId && privateReadReceipt?.eventId) {
+            comparison = timelineSet.compareEventOrdering(publicReadReceipt?.eventId, privateReadReceipt?.eventId);
+        }
+
+        // If we didn't get a comparison try to compare the ts of the receipts
+        if (!comparison) comparison = publicReadReceipt?.data?.ts - privateReadReceipt?.data?.ts;
+
+        // The public receipt is more likely to drift out of date so the private
+        // one has precedence
+        if (!comparison) return privateReadReceipt?.eventId ?? publicReadReceipt?.eventId ?? null;
+
+        // If public read receipt is older, return the private one
+        return (comparison < 0) ? privateReadReceipt?.eventId : publicReadReceipt?.eventId;
     }
 
     /**
@@ -2493,7 +2520,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                     }
                     this.receiptCacheByEventId[eventId].push({
                         userId: userId,
-                        type: receiptType,
+                        type: receiptType as ReceiptType,
                         data: receipt,
                     });
                 });
@@ -2506,9 +2533,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * client the fact that we've sent one.
      * @param {string} userId The user ID if the receipt sender
      * @param {MatrixEvent} e The event that is to be acknowledged
-     * @param {string} receiptType The type of receipt
+     * @param {ReceiptType} receiptType The type of receipt
      */
-    public addLocalEchoReceipt(userId: string, e: MatrixEvent, receiptType: string): void {
+    public addLocalEchoReceipt(userId: string, e: MatrixEvent, receiptType: ReceiptType): void {
         this.addReceipt(synthesizeReceipt(userId, e, receiptType), true);
     }
 

@@ -23,6 +23,7 @@ import * as utils from "../test-utils/test-utils";
 import {
     DuplicateStrategy,
     EventStatus,
+    EventTimelineSet,
     EventType,
     JoinRule,
     MatrixEvent,
@@ -31,11 +32,12 @@ import {
     RoomEvent,
 } from "../../src";
 import { EventTimeline } from "../../src/models/event-timeline";
-import { Room } from "../../src/models/room";
+import { IWrappedReceipt, Room } from "../../src/models/room";
 import { RoomState } from "../../src/models/room-state";
 import { UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../../src/@types/event";
 import { TestClient } from "../TestClient";
 import { emitPromise } from "../test-utils/test-utils";
+import { ReceiptType } from "../../src/@types/read_receipts";
 import { Thread, ThreadEvent } from "../../src/models/thread";
 
 describe("Room", function() {
@@ -2284,6 +2286,31 @@ describe("Room", function() {
             expect(responseRelations[0][0]).toEqual(threadReaction.getRelation().key);
             expect(responseRelations[0][1].size).toEqual(1);
             expect(responseRelations[0][1].has(threadReaction)).toBeTruthy();
+        });
+    });
+
+    describe("getEventReadUpTo()", () => {
+        const client = new TestClient(userA).client;
+        const room = new Room(roomId, client, userA);
+
+        it("handles missing receipt type", () => {
+            room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
+                return receiptType === ReceiptType.ReadPrivate ? { eventId: "eventId" } as IWrappedReceipt : null;
+            };
+
+            expect(room.getEventReadUpTo(userA)).toEqual("eventId");
+        });
+
+        it("prefers older receipt", () => {
+            room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
+                return (receiptType === ReceiptType.Read
+                    ? { eventId: "eventId1" }
+                    : { eventId: "eventId2" }
+                    ) as IWrappedReceipt;
+            };
+            room.getUnfilteredTimelineSet = () => ({ compareEventOrdering: (event1, event2) => 1 } as EventTimelineSet);
+
+            expect(room.getEventReadUpTo(userA)).toEqual("eventId1");
         });
     });
 });
