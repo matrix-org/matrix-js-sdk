@@ -2321,6 +2321,13 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         });
     }
 
+    /**
+     * Gets the latest receipt for a given user in the room
+     * @param userId The id of the user for which we want the receipt
+     * @param ignoreSynthesized Whether to ignore synthesized receipts or not
+     * @param receiptType Optional. The type of the receipt we want to get
+     * @returns the latest receipts of the chosen type for the chosen user
+     */
     public getReadReceiptForUserId(
         userId: string, ignoreSynthesized = false, receiptType = ReceiptType.Read,
     ): IWrappedReceipt | null {
