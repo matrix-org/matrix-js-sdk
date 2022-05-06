@@ -2354,7 +2354,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         const privateReadReceipt = this.getReadReceiptForUserId(userId, ignoreSynthesized, ReceiptType.ReadPrivate);
 
         // If we have both, compare them
-        let comparison;
+        let comparison: number | undefined;
         if (publicReadReceipt?.eventId && privateReadReceipt?.eventId) {
             comparison = timelineSet.compareEventOrdering(publicReadReceipt?.eventId, privateReadReceipt?.eventId);
         }
