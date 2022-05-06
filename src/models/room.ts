@@ -2359,6 +2359,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             comparison = timelineSet.compareEventOrdering(publicReadReceipt?.eventId, privateReadReceipt?.eventId);
         }
 
+        // If we didn't get a comparison try to compare the ts of the receipts
+        if (!comparison) comparison = publicReadReceipt?.data?.ts - privateReadReceipt?.data?.ts;
+
         // The public receipt is more likely to drift out of date so the private
         // one has precedence
         if (!comparison) return privateReadReceipt?.eventId ?? publicReadReceipt?.eventId ?? null;
