@@ -5064,26 +5064,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Sets a new status message for the user. The message may be null/falsey
-     * to clear the message.
-     * @param {string} newMessage The new message to set.
-     * @return {Promise} Resolves: to nothing
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     */
-    public _unstable_setStatusMessage(newMessage: string): Promise<void> { // eslint-disable-line
-        const type = "im.vector.user_status";
-        return Promise.all(this.getRooms().map(async (room) => {
-            const isJoined = room.getMyMembership() === "join";
-            const looksLikeDm = room.getInvitedAndJoinedMemberCount() === 2;
-            if (!isJoined || !looksLikeDm) return;
-            // Check power level separately as it's a bit more expensive.
-            const maySend = room.currentState.mayClientSendStateEvent(type, this);
-            if (!maySend) return;
-            await this.sendStateEvent(room.roomId, type, { status: newMessage }, this.getUserId());
-        })).then(); // .then to fix return type
-    }
-
-    /**
      * @param {Object} opts Options to apply
      * @param {string} opts.presence One of "online", "offline" or "unavailable"
      * @param {string} opts.status_msg The status message to attach.
