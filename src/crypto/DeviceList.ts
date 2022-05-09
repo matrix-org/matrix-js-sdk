@@ -95,7 +95,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
     // The time the save is scheduled for
     private savePromiseTime: number = null;
     // The timer used to delay the save
-    private saveTimer: number = null;
+    private saveTimer: ReturnType<typeof setTimeout> = null;
     // True if we have fetched data from the server or loaded a non-empty
     // set of device data from the store
     private hasFetched: boolean = null;
