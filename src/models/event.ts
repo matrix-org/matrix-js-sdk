@@ -1112,23 +1112,21 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
         }
         this.event.unsigned.redacted_because = redactionEvent.event as IEvent;
 
-        let key;
-        for (key in this.event) {
-            if (!this.event.hasOwnProperty(key)) {
-                continue;
-            }
-            if (!REDACT_KEEP_KEYS.has(key)) {
+        for (const key in this.event) {
+            if (this.event.hasOwnProperty(key) && !REDACT_KEEP_KEYS.has(key)) {
                 delete this.event[key];
             }
         }
 
+        // If the event is encrypted prune the decrypted bits
+        if (this.isEncrypted()) {
+            this.clearEvent = null;
+        }
+
         const keeps = REDACT_KEEP_CONTENT_MAP[this.getType()] || {};
         const content = this.getContent();
-        for (key in content) {
-            if (!content.hasOwnProperty(key)) {
-                continue;
-            }
-            if (!keeps[key]) {
+        for (const key in content) {
+            if (content.hasOwnProperty(key) && !keeps[key]) {
                 delete content[key];
             }
         }
@@ -1303,8 +1301,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
     public isRelation(relType: string = undefined): boolean {
         // Relation info is lifted out of the encrypted content when sent to
         // encrypted rooms, so we have to check `getWireContent` for this.
-        const content = this.getWireContent();
-        const relation = content && content["m.relates_to"];
+        const relation = this.getWireContent()?.["m.relates_to"];
         return relation && relation.rel_type && relation.event_id &&
             ((relType && relation.rel_type === relType) || !relType);
     }
@@ -1590,7 +1587,7 @@ const REDACT_KEEP_KEYS = new Set([
     'content', 'unsigned', 'origin_server_ts',
 ]);
 
-// a map from event type to the .content keys we keep when an event is redacted
+// a map from state event type to the .content keys we keep when an event is redacted
 const REDACT_KEEP_CONTENT_MAP = {
     [EventType.RoomMember]: { 'membership': 1 },
     [EventType.RoomCreate]: { 'creator': 1 },

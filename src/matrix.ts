@@ -17,8 +17,7 @@ limitations under the License.
 import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store";
 import { MemoryStore } from "./store/memory";
 import { MatrixScheduler } from "./scheduler";
-import { MatrixClient } from "./client";
-import { ICreateClientOpts } from "./client";
+import { MatrixClient, ICreateClientOpts } from "./client";
 import { DeviceTrustLevel } from "./crypto/CrossSigning";
 import { ISecretStorageKeyInfo } from "./crypto/api";
 
@@ -153,7 +152,7 @@ export interface ICryptoCallbacks {
 export function createClient(opts: ICreateClientOpts | string) {
     if (typeof opts === "string") {
         opts = {
-            "baseUrl": opts as string,
+            "baseUrl": opts,
         };
     }
     opts.request = opts.request || requestInstance;

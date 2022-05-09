@@ -55,7 +55,7 @@ export class VerificationBase<
     private cancelled = false;
     private _done = false;
     private promise: Promise<void> = null;
-    private transactionTimeoutTimer: number = null;
+    private transactionTimeoutTimer: ReturnType<typeof setTimeout> = null;
     protected expectedEvent: string;
     private resolve: () => void;
     private reject: (e: Error | MatrixEvent) => void;

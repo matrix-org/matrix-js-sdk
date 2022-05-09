@@ -152,7 +152,7 @@ export class SyncApi {
     private syncStateData: ISyncStateData = null; // additional data (eg. error object for failed sync)
     private catchingUp = false;
     private running = false;
-    private keepAliveTimer: number = null;
+    private keepAliveTimer: ReturnType<typeof setTimeout> = null;
     private connectionReturnedDefer: IDeferred<boolean> = null;
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
     private failedSyncCount = 0; // Number of consecutive failed /sync requests
@@ -1295,16 +1295,6 @@ export class SyncApi {
                 if (e.isState() && e.getType() == "m.room.encryption" && this.opts.crypto) {
                     await this.opts.crypto.onCryptoEvent(e);
                 }
-                if (e.isState() && e.getType() === "im.vector.user_status") {
-                    let user = client.store.getUser(e.getStateKey());
-                    if (user) {
-                        user.unstable_updateStatusMessage(e);
-                    } else {
-                        user = createNewUser(client, e.getStateKey());
-                        user.unstable_updateStatusMessage(e);
-                        client.store.storeUser(user);
-                    }
-                }
             };
 
             await utils.promiseMapSeries(stateEvents, processRoomEvent);
@@ -1400,7 +1390,7 @@ export class SyncApi {
      * Starts polling the connectivity check endpoint
      * @param {number} delay How long to delay until the first poll.
      *        defaults to a short, randomised interval (to prevent
-     *        tightlooping if /versions succeeds but /sync etc. fail).
+     *        tight-looping if /versions succeeds but /sync etc. fail).
      * @return {promise} which resolves once the connection returns
      */
     private startKeepAlives(delay?: number): Promise<boolean> {
