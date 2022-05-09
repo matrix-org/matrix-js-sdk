@@ -1167,12 +1167,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.syncApi.stop();
         }
 
-        // Always enable "stable" threads usage as we should be able to function well
-        // enough. Server support is still optional, however.
         try {
-            const { serverSupport } = await this.doesServerSupportThread();
-            Thread.setServerSideSupport(serverSupport, true);
+            const { serverSupport, stable } = await this.doesServerSupportThread();
+            Thread.setServerSideSupport(serverSupport, stable);
         } catch (e) {
+            // Most likely cause is that `doesServerSupportThread` returned `null` (as it
+            // is allowed to do) and thus we enter "degraded mode" on threads.
             Thread.setServerSideSupport(false, true);
         }
 
@@ -6586,6 +6586,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 stable: hasStableSupport,
             };
         } catch (e) {
+            // Assume server support and stability aren't available: null/no data return.
+            // XXX: This should just return an object with `false` booleans instead.
             return null;
         }
     }

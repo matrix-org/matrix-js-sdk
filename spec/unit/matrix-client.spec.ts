@@ -91,7 +91,12 @@ describe("MatrixClient", function() {
     let pendingLookup = null;
     function httpReq(cb, method, path, qp, data, prefix) {
         if (path === KEEP_ALIVE_PATH && acceptKeepalives) {
-            return Promise.resolve();
+            return Promise.resolve({
+                unstable_features: {
+                    "org.matrix.msc3440.stable": true,
+                },
+                versions: ["r0.6.0", "r0.6.1"],
+            });
         }
         const next = httpLookups.shift();
         const logLine = (
