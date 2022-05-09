@@ -14,16 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import anotherjson from "another-json";
+
 import { decodeBase64, encodeBase64 } from './olmlib';
 import { IndexedDBCryptoStore } from '../crypto/store/indexeddb-crypto-store';
 import { decryptAES, encryptAES } from './aes';
-import anotherjson from "another-json";
 import { logger } from '../logger';
 import { ISecretStorageKeyInfo } from "./api";
 import { Crypto } from "./index";
-
-// FIXME: these types should eventually go in a different file
-type Signatures = Record<string, Record<string, string>>;
+import { Method } from "../http-api";
+import { ISignatures } from "../@types/signed";
 
 export interface IDehydratedDevice {
     device_id: string; // eslint-disable-line camelcase
@@ -42,13 +42,13 @@ export interface IDeviceKeys {
     device_id: string; // eslint-disable-line camelcase
     user_id: string; // eslint-disable-line camelcase
     keys: Record<string, string>;
-    signatures?: Signatures;
+    signatures?: ISignatures;
 }
 
 export interface IOneTimeKey {
     key: string;
     fallback?: boolean;
-    signatures?: Signatures;
+    signatures?: ISignatures;
 }
 
 export const DEHYDRATION_ALGORITHM = "org.matrix.msc2697.v1.olm.libolm_pickle";
@@ -61,11 +61,13 @@ export class DehydrationManager {
     private key: Uint8Array;
     private keyInfo: {[props: string]: any};
     private deviceDisplayName: string;
+
     constructor(private readonly crypto: Crypto) {
         this.getDehydrationKeyFromCache();
     }
-    async getDehydrationKeyFromCache(): Promise<void> {
-        return await this.crypto.cryptoStore.doTxn(
+
+    public getDehydrationKeyFromCache(): Promise<void> {
+        return this.crypto.cryptoStore.doTxn(
             'readonly',
             [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
@@ -93,7 +95,7 @@ export class DehydrationManager {
     }
 
     /** set the key, and queue periodic dehydration to the server in the background */
-    async setKeyAndQueueDehydration(
+    public async setKeyAndQueueDehydration(
         key: Uint8Array, keyInfo: {[props: string]: any} = {},
         deviceDisplayName: string = undefined,
     ): Promise<void> {
@@ -104,7 +106,7 @@ export class DehydrationManager {
         }
     }
 
-    async setKey(
+    public async setKey(
         key: Uint8Array, keyInfo: {[props: string]: any} = {},
         deviceDisplayName: string = undefined,
     ): Promise<boolean> {
@@ -148,7 +150,7 @@ export class DehydrationManager {
     }
 
     /** returns the device id of the newly created dehydrated device */
-    async dehydrateDevice(): Promise<string> {
+    public async dehydrateDevice(): Promise<string> {
         if (this.inProgress) {
             logger.log("Dehydration already in progress -- not starting new dehydration");
             return;
@@ -206,9 +208,10 @@ export class DehydrationManager {
             }
 
             logger.log("Uploading account to server");
-            const dehydrateResult = await this.crypto.baseApis.http.authedRequest(
+            // eslint-disable-next-line camelcase
+            const dehydrateResult = await this.crypto.baseApis.http.authedRequest<{ device_id: string }>(
                 undefined,
-                "PUT",
+                Method.Put,
                 "/dehydrated_device",
                 undefined,
                 {
@@ -243,7 +246,7 @@ export class DehydrationManager {
             }
 
             logger.log("Preparing one-time keys");
-            const oneTimeKeys = {};
+            const oneTimeKeys: Record<string, IOneTimeKey> = {};
             for (const [keyId, key] of Object.entries(otks.curve25519)) {
                 const k: IOneTimeKey = { key };
                 const signature = account.sign(anotherjson.stringify(k));
@@ -271,7 +274,7 @@ export class DehydrationManager {
             logger.log("Uploading keys to server");
             await this.crypto.baseApis.http.authedRequest(
                 undefined,
-                "POST",
+                Method.Post,
                 "/keys/upload/" + encodeURI(deviceId),
                 undefined,
                 {

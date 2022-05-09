@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import { InRoomChannel } from "../../../../src/crypto/verification/request/InRoomChannel";
-    "../../../../src/crypto/verification/request/ToDeviceChannel";
 import { MatrixEvent } from "../../../../src/models/event";
+    "../../../../src/crypto/verification/request/ToDeviceChannel";
 
 describe("InRoomChannel tests", function() {
     const ALICE = "@alice:hs.tld";

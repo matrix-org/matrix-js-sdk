@@ -20,16 +20,16 @@ limitations under the License.
  */
 
 import { EventType } from "../@types/event";
-import { Group } from "../models/group";
 import { Room } from "../models/room";
 import { User } from "../models/user";
-import { IEvent, MatrixEvent } from "../models/event";
-import { RoomState } from "../models/room-state";
+import { MatrixEvent } from "../models/event";
+import { RoomState, RoomStateEvent } from "../models/room-state";
 import { RoomMember } from "../models/room-member";
 import { Filter } from "../filter";
 import { ISavedSync, IStore } from "./index";
 import { RoomSummary } from "../models/room-summary";
 import { ISyncResponse } from "../sync-accumulator";
+import { IStateEventWithRoomId } from "../@types/search";
 
 function isValidFilterId(filterId: string): boolean {
     const isValidStr = typeof filterId === "string" &&
@@ -53,7 +53,6 @@ export interface IOpts {
  */
 export class MemoryStore implements IStore {
     private rooms: Record<string, Room> = {}; // roomId: Room
-    private groups: Record<string, Group> = {}; // groupId: Group
     private users: Record<string, User> = {}; // userId: User
     private syncToken: string = null;
     // userId: {
@@ -62,7 +61,7 @@ export class MemoryStore implements IStore {
     private filters: Record<string, Record<string, Filter>> = {};
     public accountData: Record<string, MatrixEvent> = {}; // type : content
     private readonly localStorage: Storage;
-    private oobMembers: Record<string, IEvent[]> = {}; // roomId: [member events]
+    private oobMembers: Record<string, IStateEventWithRoomId[]> = {}; // roomId: [member events]
     private clientOptions = {};
 
     constructor(opts: IOpts = {}) {
@@ -92,41 +91,13 @@ export class MemoryStore implements IStore {
 
     /**
      * Store the given room.
-     * @param {Group} group The group to be stored
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public storeGroup(group: Group) {
-        this.groups[group.groupId] = group;
-    }
-
-    /**
-     * Retrieve a group by its group ID.
-     * @param {string} groupId The group ID.
-     * @return {Group} The group or null.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public getGroup(groupId: string): Group | null {
-        return this.groups[groupId] || null;
-    }
-
-    /**
-     * Retrieve all known groups.
-     * @return {Group[]} A list of groups, which may be empty.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public getGroups(): Group[] {
-        return Object.values(this.groups);
-    }
-
-    /**
-     * Store the given room.
      * @param {Room} room The room to be stored. All properties must be stored.
      */
     public storeRoom(room: Room) {
         this.rooms[room.roomId] = room;
         // add listeners for room member changes so we can keep the room member
         // map up-to-date.
-        room.currentState.on("RoomState.members", this.onRoomMember);
+        room.currentState.on(RoomStateEvent.Members, this.onRoomMember);
         // add existing members
         room.currentState.getMembers().forEach((m) => {
             this.onRoomMember(null, room.currentState, m);
@@ -185,7 +156,7 @@ export class MemoryStore implements IStore {
      */
     public removeRoom(roomId: string): void {
         if (this.rooms[roomId]) {
-            this.rooms[roomId].removeListener("RoomState.members", this.onRoomMember);
+            this.rooms[roomId].currentState.removeListener(RoomStateEvent.Members, this.onRoomMember);
         }
         delete this.rooms[roomId];
     }
@@ -419,7 +390,7 @@ export class MemoryStore implements IStore {
      * @returns {event[]} the events, potentially an empty array if OOB loading didn't yield any new members
      * @returns {null} in case the members for this room haven't been stored yet
      */
-    public getOutOfBandMembers(roomId: string): Promise<IEvent[] | null> {
+    public getOutOfBandMembers(roomId: string): Promise<IStateEventWithRoomId[] | null> {
         return Promise.resolve(this.oobMembers[roomId] || null);
     }
 
@@ -431,7 +402,7 @@ export class MemoryStore implements IStore {
      * @param {event[]} membershipEvents the membership events to store
      * @returns {Promise} when all members have been stored
      */
-    public setOutOfBandMembers(roomId: string, membershipEvents: IEvent[]): Promise<void> {
+    public setOutOfBandMembers(roomId: string, membershipEvents: IStateEventWithRoomId[]): Promise<void> {
         this.oobMembers[roomId] = membershipEvents;
         return Promise.resolve();
     }

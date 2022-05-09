@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { VerificationBase } from '../../../../src/crypto/verification/Base';
 import { CrossSigningInfo } from '../../../../src/crypto/CrossSigning';
 import { encodeBase64 } from "../../../../src/crypto/olmlib";
 import { setupWebcrypto, teardownWebcrypto } from './util';
+import { VerificationBase } from '../../../../src/crypto/verification/Base';
 
 jest.useFakeTimers();
 

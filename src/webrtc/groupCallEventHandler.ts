@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { MatrixEvent } from '../models/event';
+import { RoomStateEvent } from '../models/room-state';
 import { MatrixClient } from '../client';
 import {
     GroupCall,
@@ -26,6 +27,19 @@ import { Room } from "../models/room";
 import { RoomState } from "../models/room-state";
 import { logger } from '../logger';
 import { EventType } from "../@types/event";
+import { ClientEvent, RoomMember } from '../matrix';
+
+export enum GroupCallEventHandlerEvent {
+    Incoming = "GroupCall.incoming",
+    Ended = "GroupCall.ended",
+    Participants = "GroupCall.participants",
+}
+
+export type GroupCallEventHandlerEventHandlerMap = {
+    [GroupCallEventHandlerEvent.Incoming]: (call: GroupCall) => void;
+    [GroupCallEventHandlerEvent.Ended]: (call: GroupCall) => void;
+    [GroupCallEventHandlerEvent.Participants]: (participants: RoomMember[], call: GroupCall) => void;
+};
 
 export class GroupCallEventHandler {
     public groupCalls = new Map<string, GroupCall>(); // roomId -> GroupCall
@@ -39,12 +53,12 @@ export class GroupCallEventHandler {
             this.createGroupCallForRoom(room);
         }
 
-        this.client.on("Room", this.onRoomsChanged);
-        this.client.on("RoomState.events", this.onRoomStateChanged);
+        this.client.on(ClientEvent.Room, this.onRoomsChanged);
+        this.client.on(RoomStateEvent.Events, this.onRoomStateChanged);
     }
 
     public stop(): void {
-        this.client.removeListener("RoomState.events", this.onRoomStateChanged);
+        this.client.removeListener(RoomStateEvent.Events, this.onRoomStateChanged);
     }
 
     public getGroupCallById(groupCallId: string): GroupCall {
@@ -115,7 +129,7 @@ export class GroupCallEventHandler {
         );
 
         this.groupCalls.set(room.roomId, groupCall);
-        this.client.emit("GroupCall.incoming", groupCall);
+        this.client.emit(GroupCallEventHandlerEvent.Incoming, groupCall);
 
         return groupCall;
     }

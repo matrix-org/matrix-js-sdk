@@ -18,6 +18,10 @@ limitations under the License.
  * @module filter
  */
 
+import {
+    EventType,
+    RelationType,
+} from "./@types/event";
 import { FilterComponent, IFilterComponent } from "./filter-component";
 import { MatrixEvent } from "./models/event";
 
@@ -50,6 +54,13 @@ export interface IFilterDefinition {
 export interface IRoomEventFilter extends IFilterComponent {
     lazy_load_members?: boolean;
     include_redundant_members?: boolean;
+    types?: Array<EventType | string>;
+    related_by_senders?: Array<RelationType | string>;
+    related_by_rel_types?: string[];
+
+    // Unstable values
+    "io.element.relation_senders"?: Array<RelationType | string>;
+    "io.element.relation_types"?: string[];
 }
 
 interface IStateFilter extends IRoomEventFilter {}
@@ -167,8 +178,8 @@ export class Filter {
             }
         }
 
-        this.roomFilter = new FilterComponent(roomFilterFields);
-        this.roomTimelineFilter = new FilterComponent(roomFilterJson?.timeline || {});
+        this.roomFilter = new FilterComponent(roomFilterFields, this.userId);
+        this.roomTimelineFilter = new FilterComponent(roomFilterJson?.timeline || {}, this.userId);
 
         // don't bother porting this from synapse yet:
         // this._room_state_filter =

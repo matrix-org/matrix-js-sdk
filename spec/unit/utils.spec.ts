@@ -10,8 +10,11 @@ import {
     prevString,
     simpleRetryOperation,
     stringToBase,
+    sortEventsByLatestContentTimestamp,
 } from "../../src/utils";
 import { logger } from "../../src/logger";
+import { mkMessage } from "../test-utils/test-utils";
+import { makeBeaconEvent } from "../test-utils/beacon";
 
 // TODO: Fix types throughout
 
@@ -25,6 +28,15 @@ describe("utils", function() {
             expect(utils.encodeParams(params)).toEqual(
                 "foo=bar&baz=beer%40",
             );
+        });
+
+        it("should handle boolean and numeric values", function() {
+            const params = {
+                string: "foobar",
+                number: 12345,
+                boolean: false,
+            };
+            expect(utils.encodeParams(params)).toEqual("string=foobar&number=12345&boolean=false");
         });
     });
 
@@ -111,10 +123,10 @@ describe("utils", function() {
 
     describe("deepCompare", function() {
         const assert = {
-            isTrue: function(x) {
+            isTrue: function(x: any) {
                 expect(x).toBe(true);
             },
-            isFalse: function(x) {
+            isFalse: function(x: any) {
                 expect(x).toBe(false);
             },
         };
@@ -176,76 +188,16 @@ describe("utils", function() {
             // no two different function is equal really, they capture their
             // context variables so even if they have same toString(), they
             // won't have same functionality
-            const func = function(x) {
+            const func = function() {
                 return true;
             };
-            const func2 = function(x) {
+            const func2 = function() {
                 return true;
             };
             assert.isTrue(utils.deepCompare(func, func));
             assert.isFalse(utils.deepCompare(func, func2));
             assert.isTrue(utils.deepCompare({ a: { b: func } }, { a: { b: func } }));
             assert.isFalse(utils.deepCompare({ a: { b: func } }, { a: { b: func2 } }));
-        });
-    });
-
-    describe("extend", function() {
-        const SOURCE = { "prop2": 1, "string2": "x", "newprop": "new" };
-
-        it("should extend", function() {
-            const target = {
-                "prop1": 5, "prop2": 7, "string1": "baz", "string2": "foo",
-            };
-            const merged = {
-                "prop1": 5, "prop2": 1, "string1": "baz", "string2": "x",
-                "newprop": "new",
-            };
-            const sourceOrig = JSON.stringify(SOURCE);
-
-            utils.extend(target, SOURCE);
-            expect(JSON.stringify(target)).toEqual(JSON.stringify(merged));
-
-            // check the originial wasn't modified
-            expect(JSON.stringify(SOURCE)).toEqual(sourceOrig);
-        });
-
-        it("should ignore null", function() {
-            const target = {
-                "prop1": 5, "prop2": 7, "string1": "baz", "string2": "foo",
-            };
-            const merged = {
-                "prop1": 5, "prop2": 1, "string1": "baz", "string2": "x",
-                "newprop": "new",
-            };
-            const sourceOrig = JSON.stringify(SOURCE);
-
-            utils.extend(target, null, SOURCE);
-            expect(JSON.stringify(target)).toEqual(JSON.stringify(merged));
-
-            // check the originial wasn't modified
-            expect(JSON.stringify(SOURCE)).toEqual(sourceOrig);
-        });
-
-        it("should handle properties created with defineProperties", function() {
-            const source = Object.defineProperties({}, {
-                "enumerableProp": {
-                    get: function() {
-                        return true;
-                    },
-                    enumerable: true,
-                },
-                "nonenumerableProp": {
-                    get: function() {
-                        return true;
-                    },
-                },
-            });
-
-            // TODO: Fix type
-            const target: any = {};
-            utils.extend(target, source);
-            expect(target.enumerableProp).toBe(true);
-            expect(target.nonenumerableProp).toBe(undefined);
         });
     });
 
@@ -273,7 +225,7 @@ describe("utils", function() {
         it('should retry', async () => {
             let count = 0;
             const val = {};
-            const fn = (attempt) => {
+            const fn = (attempt: any) => {
                 count++;
 
                 // If this expectation fails then it can appear as a Jest Timeout due to
@@ -480,7 +432,7 @@ describe("utils", function() {
                 },
                 [72]: "test",
             };
-            const output = [
+            const output: any = [
                 ["72", "test"],
                 ["a", 42],
                 ["b", [
@@ -555,6 +507,32 @@ describe("utils", function() {
                     aSubThing: "something",
                 },
             });
+        });
+    });
+
+    describe('sortEventsByLatestContentTimestamp', () => {
+        const roomId = '!room:server';
+        const userId = '@user:server';
+        const eventWithoutContentTimestamp = mkMessage({ room: roomId, user: userId, event: true });
+        // m.beacon events have timestamp in content
+        const beaconEvent1 = makeBeaconEvent(userId, { timestamp: 1648804528557 });
+        const beaconEvent2 = makeBeaconEvent(userId, { timestamp: 1648804528558 });
+        const beaconEvent3 = makeBeaconEvent(userId, { timestamp: 1648804528000 });
+        const beaconEvent4 = makeBeaconEvent(userId, { timestamp: 0 });
+
+        it('sorts events with timestamps as later than events without', () => {
+            expect(
+                [beaconEvent4, eventWithoutContentTimestamp, beaconEvent1]
+                    .sort(utils.sortEventsByLatestContentTimestamp),
+            ).toEqual([
+                beaconEvent1, beaconEvent4, eventWithoutContentTimestamp,
+            ]);
+        });
+
+        it('sorts by content timestamps correctly', () => {
+            expect(
+                [beaconEvent1, beaconEvent2, beaconEvent3].sort(sortEventsByLatestContentTimestamp),
+            ).toEqual([beaconEvent2, beaconEvent1, beaconEvent3]);
         });
     });
 });

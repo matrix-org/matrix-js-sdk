@@ -24,6 +24,7 @@ import { deepCopy } from "./utils";
 import { IContent, IUnsigned } from "./models/event";
 import { IRoomSummary } from "./models/room-summary";
 import { EventType } from "./@types/event";
+import { ReceiptType } from "./@types/read_receipts";
 
 interface IOpts {
     maxTimelineEntries?: number;
@@ -32,6 +33,7 @@ interface IOpts {
 export interface IMinimalEvent {
     content: IContent;
     type: EventType | string;
+    unsigned?: IUnsigned;
 }
 
 export interface IEphemeral {
@@ -127,12 +129,6 @@ interface IDeviceLists {
     left: string[];
 }
 
-export interface IGroups {
-    [Category.Join]: object;
-    [Category.Invite]: object;
-    [Category.Leave]: object;
-}
-
 export interface ISyncResponse {
     next_batch: string;
     rooms: IRooms;
@@ -141,8 +137,6 @@ export interface ISyncResponse {
     to_device?: IToDevice;
     device_lists?: IDeviceLists;
     device_one_time_keys_count?: Record<string, number>;
-
-    groups: IGroups; // unspecced
 }
 /* eslint-enable camelcase */
 
@@ -164,6 +158,7 @@ interface IRoom {
     _readReceipts: {
         [userId: string]: {
             data: IMinimalEvent;
+            type: ReceiptType;
             eventId: string;
         };
     };
@@ -173,7 +168,6 @@ export interface ISyncData {
     nextBatch: string;
     accountData: IMinimalEvent[];
     roomsData: IRooms;
-    groupsData: IGroups;
 }
 
 /**
@@ -196,13 +190,6 @@ export class SyncAccumulator {
     // streaming from without losing events.
     private nextBatch: string = null;
 
-    // { ('invite'|'join'|'leave'): $groupId: { ... sync 'group' data } }
-    private groups: Record<Category, object> = {
-        invite: {},
-        join: {},
-        leave: {},
-    };
-
     /**
      * @param {Object} opts
      * @param {Number=} opts.maxTimelineEntries The ideal maximum number of
@@ -218,7 +205,6 @@ export class SyncAccumulator {
 
     public accumulate(syncResponse: ISyncResponse, fromDatabase = false): void {
         this.accumulateRooms(syncResponse, fromDatabase);
-        this.accumulateGroups(syncResponse);
         this.accumulateAccountData(syncResponse);
         this.nextBatch = syncResponse.next_batch;
     }
@@ -432,16 +418,31 @@ export class SyncAccumulator {
                 // of a hassle to work with. We'll inflate this back out when
                 // getJSON() is called.
                 Object.keys(e.content).forEach((eventId) => {
-                    if (!e.content[eventId]["m.read"]) {
+                    if (!e.content[eventId][ReceiptType.Read] && !e.content[eventId][ReceiptType.ReadPrivate]) {
                         return;
                     }
-                    Object.keys(e.content[eventId]["m.read"]).forEach((userId) => {
-                        // clobber on user ID
-                        currentData._readReceipts[userId] = {
-                            data: e.content[eventId]["m.read"][userId],
-                            eventId: eventId,
-                        };
-                    });
+                    const read = e.content[eventId][ReceiptType.Read];
+                    if (read) {
+                        Object.keys(read).forEach((userId) => {
+                            // clobber on user ID
+                            currentData._readReceipts[userId] = {
+                                data: e.content[eventId][ReceiptType.Read][userId],
+                                type: ReceiptType.Read,
+                                eventId: eventId,
+                            };
+                        });
+                    }
+                    const readPrivate = e.content[eventId][ReceiptType.ReadPrivate];
+                    if (readPrivate) {
+                        Object.keys(readPrivate).forEach((userId) => {
+                            // clobber on user ID
+                            currentData._readReceipts[userId] = {
+                                data: e.content[eventId][ReceiptType.ReadPrivate][userId],
+                                type: ReceiptType.ReadPrivate,
+                                eventId: eventId,
+                            };
+                        });
+                    }
                 });
             });
         }
@@ -502,38 +503,6 @@ export class SyncAccumulator {
                 }
             }
         }
-    }
-
-    /**
-     * Accumulate incremental /sync group data.
-     * @param {Object} syncResponse the complete /sync JSON
-     */
-    private accumulateGroups(syncResponse: ISyncResponse): void {
-        if (!syncResponse.groups) {
-            return;
-        }
-        if (syncResponse.groups.invite) {
-            Object.keys(syncResponse.groups.invite).forEach((groupId) => {
-                this.accumulateGroup(groupId, Category.Invite, syncResponse.groups.invite[groupId]);
-            });
-        }
-        if (syncResponse.groups.join) {
-            Object.keys(syncResponse.groups.join).forEach((groupId) => {
-                this.accumulateGroup(groupId, Category.Join, syncResponse.groups.join[groupId]);
-            });
-        }
-        if (syncResponse.groups.leave) {
-            Object.keys(syncResponse.groups.leave).forEach((groupId) => {
-                this.accumulateGroup(groupId, Category.Leave, syncResponse.groups.leave[groupId]);
-            });
-        }
-    }
-
-    private accumulateGroup(groupId: string, category: Category, data: object): void {
-        for (const cat of [Category.Invite, Category.Leave, Category.Join]) {
-            delete this.groups[cat][groupId];
-        }
-        this.groups[category][groupId] = data;
     }
 
     /**
@@ -600,11 +569,12 @@ export class SyncAccumulator {
             Object.keys(roomData._readReceipts).forEach((userId) => {
                 const receiptData = roomData._readReceipts[userId];
                 if (!receiptEvent.content[receiptData.eventId]) {
-                    receiptEvent.content[receiptData.eventId] = {
-                        "m.read": {},
-                    };
+                    receiptEvent.content[receiptData.eventId] = {};
                 }
-                receiptEvent.content[receiptData.eventId]["m.read"][userId] = (
+                if (!receiptEvent.content[receiptData.eventId][receiptData.type]) {
+                    receiptEvent.content[receiptData.eventId][receiptData.type] = {};
+                }
+                receiptEvent.content[receiptData.eventId][receiptData.type][userId] = (
                     receiptData.data
                 );
             });
@@ -693,7 +663,6 @@ export class SyncAccumulator {
         return {
             nextBatch: this.nextBatch,
             roomsData: data,
-            groupsData: this.groups,
             accountData: accData,
         };
     }

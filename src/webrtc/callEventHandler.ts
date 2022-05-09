@@ -14,17 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from '../models/event';
+import { MatrixEvent, MatrixEventEvent } from '../models/event';
 import { logger } from '../logger';
-import { createNewMatrixCall, MatrixCall, CallErrorCode, CallState, CallDirection } from './call';
+import { CallDirection, CallErrorCode, CallState, createNewMatrixCall, MatrixCall } from './call';
 import { EventType } from '../@types/event';
-import { MatrixClient } from '../client';
+import { ClientEvent, MatrixClient } from '../client';
 import { MCallAnswer, MCallHangupReject } from "./callEventTypes";
 import { GroupCallError, GroupCallErrorCode, GroupCallEvent } from './groupCall';
+import { RoomEvent } from "../models/room";
 
 // Don't ring unless we'd be ringing for at least 3 seconds: the user needs some
 // time to press the 'accept' button
 const RING_GRACE_PERIOD = 3000;
+
+export enum CallEventHandlerEvent {
+    Incoming = "Call.incoming",
+}
+
+export type CallEventHandlerEventHandlerMap = {
+    [CallEventHandlerEvent.Incoming]: (call: MatrixCall) => void;
+};
 
 export class CallEventHandler {
     client: MatrixClient;
@@ -52,15 +61,15 @@ export class CallEventHandler {
     }
 
     public start() {
-        this.client.on("sync", this.onSync);
-        this.client.on("Room.timeline", this.onRoomTimeline);
-        this.client.on("toDeviceEvent", this.onToDeviceEvent);
+        this.client.on(ClientEvent.Sync, this.onSync);
+        this.client.on(RoomEvent.Timeline, this.onRoomTimeline);
+        this.client.on(ClientEvent.ToDeviceEvent, this.onToDeviceEvent);
     }
 
     public stop() {
-        this.client.removeListener("sync", this.onSync);
-        this.client.removeListener("Room.timeline", this.onRoomTimeline);
-        this.client.removeListener("toDeviceEvent", this.onToDeviceEvent);
+        this.client.removeListener(ClientEvent.Sync, this.onSync);
+        this.client.removeListener(RoomEvent.Timeline, this.onRoomTimeline);
+        this.client.removeListener(ClientEvent.ToDeviceEvent, this.onToDeviceEvent);
     }
 
     private onSync = (): void => {
@@ -74,59 +83,6 @@ export class CallEventHandler {
                 this.eventBufferPromiseChain.then(() => this.evaluateEventBuffer(currentEventBuffer));
         } else {
             this.eventBufferPromiseChain = this.evaluateEventBuffer(currentEventBuffer);
-        }
-    };
-
-    private onRoomTimeline = (event: MatrixEvent) => {
-        this.callEventBuffer.push(event);
-    };
-
-    private onToDeviceEvent = (event: MatrixEvent): void => {
-        const content = event.getContent();
-
-        if (!content.call_id) {
-            this.callEventBuffer.push(event);
-            return;
-        }
-
-        if (!this.nextSeqByCall.has(content.call_id)) {
-            this.nextSeqByCall.set(content.call_id, 0);
-        }
-
-        if (content.seq === undefined) {
-            this.callEventBuffer.push(event);
-            return;
-        }
-
-        const nextSeq = this.nextSeqByCall.get(content.call_id) || 0;
-
-        if (content.seq !== nextSeq) {
-            if (!this.toDeviceEventBuffers.has(content.call_id)) {
-                this.toDeviceEventBuffers.set(content.call_id, []);
-            }
-
-            const buffer = this.toDeviceEventBuffers.get(content.call_id);
-            const index = buffer.findIndex((e) => e.getContent().seq > content.seq);
-
-            if (index === -1) {
-                buffer.push(event);
-            } else {
-                buffer.splice(index, 0, event);
-            }
-        } else {
-            const callId = content.call_id;
-            this.callEventBuffer.push(event);
-            this.nextSeqByCall.set(callId, content.seq + 1);
-
-            const buffer = this.toDeviceEventBuffers.get(callId);
-
-            let nextEvent = buffer && buffer.shift();
-
-            while (nextEvent && nextEvent.getContent().seq === this.nextSeqByCall.get(callId)) {
-                this.callEventBuffer.push(nextEvent);
-                this.nextSeqByCall.set(callId, nextEvent.getContent().seq + 1);
-                nextEvent = buffer.shift();
-            }
         }
     };
 
@@ -168,8 +124,77 @@ export class CallEventHandler {
         }
     }
 
+    private onRoomTimeline = (event: MatrixEvent) => {
+        this.callEventBuffer.push(event);
+    };
+
+    private onToDeviceEvent = (event: MatrixEvent): void => {
+        const content = event.getContent();
+
+        if (!content.call_id) {
+            this.callEventBuffer.push(event);
+            return;
+        }
+
+        if (!this.nextSeqByCall.has(content.call_id)) {
+            this.nextSeqByCall.set(content.call_id, 0);
+        }
+
+        if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
+            // add an event listener for once the event is decrypted.
+            event.once(MatrixEventEvent.Decrypted, async () => {
+                if (!this.eventIsACall(event)) return;
+            });
+        }
+
+        if (content.seq === undefined) {
+            this.callEventBuffer.push(event);
+            return;
+        }
+
+        const nextSeq = this.nextSeqByCall.get(content.call_id) || 0;
+
+        if (content.seq !== nextSeq) {
+            if (!this.toDeviceEventBuffers.has(content.call_id)) {
+                this.toDeviceEventBuffers.set(content.call_id, []);
+            }
+
+            const buffer = this.toDeviceEventBuffers.get(content.call_id);
+            const index = buffer.findIndex((e) => e.getContent().seq > content.seq);
+
+            if (index === -1) {
+                buffer.push(event);
+            } else {
+                buffer.splice(index, 0, event);
+            }
+        } else {
+            const callId = content.call_id;
+            this.callEventBuffer.push(event);
+            this.nextSeqByCall.set(callId, content.seq + 1);
+
+            const buffer = this.toDeviceEventBuffers.get(callId);
+
+            let nextEvent = buffer && buffer.shift();
+
+            while (nextEvent && nextEvent.getContent().seq === this.nextSeqByCall.get(callId)) {
+                this.callEventBuffer.push(nextEvent);
+                this.nextSeqByCall.set(callId, nextEvent.getContent().seq + 1);
+                nextEvent = buffer.shift();
+            }
+        }
+    };
+
+    private eventIsACall(event: MatrixEvent): boolean {
+        const type = event.getType();
+        /**
+         * Unstable prefixes:
+         *   - org.matrix.call. : MSC3086 https://github.com/matrix-org/matrix-doc/pull/3086
+         */
+        return type.startsWith("m.call.") || type.startsWith("org.matrix.call.");
+    }
+
     private async handleCallEvent(event: MatrixEvent) {
-        this.client.emit("received_voip_event", event);
+        this.client.emit(ClientEvent.ReceivedVoipEvent, event);
 
         const content = event.getContent();
         const callRoomId = (
@@ -300,7 +325,7 @@ export class CallEventHandler {
                     call.hangup(CallErrorCode.Replaced, true);
                 }
             } else {
-                this.client.emit("Call.incoming", call);
+                this.client.emit(CallEventHandlerEvent.Incoming, call);
             }
             return;
         } else if (type === EventType.CallCandidates) {
@@ -343,7 +368,11 @@ export class CallEventHandler {
                     } else {
                         call.onRejectReceived(content as MCallHangupReject);
                     }
-                    this.calls.delete(content.call_id);
+
+                    // @ts-expect-error typescript thinks the state can't be 'ended' because we're
+                    // inside the if block where it wasn't, but it could have changed because
+                    // on[Hangup|Reject]Received are side-effecty.
+                    if (call.state === CallState.Ended) this.calls.delete(content.call_id);
                 }
             }
             return;

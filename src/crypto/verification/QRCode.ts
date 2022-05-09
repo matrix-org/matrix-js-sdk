@@ -19,7 +19,7 @@ limitations under the License.
  * @module crypto/verification/QRCode
  */
 
-import { VerificationBase as Base } from "./Base";
+import { VerificationBase as Base, VerificationEventHandlerMap } from "./Base";
 import { newKeyMismatchError, newUserCancelledError } from './Error';
 import { decodeBase64, encodeUnpaddedBase64 } from "../olmlib";
 import { logger } from '../../logger';
@@ -31,15 +31,25 @@ import { MatrixEvent } from "../../models/event";
 export const SHOW_QR_CODE_METHOD = "m.qr_code.show.v1";
 export const SCAN_QR_CODE_METHOD = "m.qr_code.scan.v1";
 
+interface IReciprocateQr {
+    confirm(): void;
+    cancel(): void;
+}
+
+export enum QrCodeEvent {
+    ShowReciprocateQr = "show_reciprocate_qr",
+}
+
+type EventHandlerMap = {
+    [QrCodeEvent.ShowReciprocateQr]: (qr: IReciprocateQr) => void;
+} & VerificationEventHandlerMap;
+
 /**
  * @class crypto/verification/QRCode/ReciprocateQRCode
  * @extends {module:crypto/verification/Base}
  */
-export class ReciprocateQRCode extends Base {
-    public reciprocateQREvent: {
-        confirm(): void;
-        cancel(): void;
-    };
+export class ReciprocateQRCode extends Base<QrCodeEvent, EventHandlerMap> {
+    public reciprocateQREvent: IReciprocateQr;
 
     public static factory(
         channel: IVerificationChannel,
@@ -76,7 +86,7 @@ export class ReciprocateQRCode extends Base {
                 confirm: resolve,
                 cancel: () => reject(newUserCancelledError()),
             };
-            this.emit("show_reciprocate_qr", this.reciprocateQREvent);
+            this.emit(QrCodeEvent.ShowReciprocateQr, this.reciprocateQREvent);
         });
 
         // 3. determine key to sign / mark as trusted

@@ -30,8 +30,9 @@ import { errorFromEvent, newUnexpectedMessageError } from "../Error";
 import { MatrixEvent } from "../../../models/event";
 import { IVerificationChannel } from "./Channel";
 import { MatrixClient } from "../../../client";
+import { IRequestsMap } from '../..';
 
-type Request = VerificationRequest<ToDeviceChannel>;
+export type Request = VerificationRequest<ToDeviceChannel>;
 
 /**
  * A key verification channel that sends verification events over to_device messages.
@@ -276,7 +277,7 @@ export class ToDeviceChannel implements IVerificationChannel {
 
     private async sendToDevices(type: string, content: Record<string, any>, devices: string[]): Promise<void> {
         if (devices.length) {
-            const msgMap = {};
+            const msgMap: Record<string, Record<string, any>> = {};
             for (const deviceId of devices) {
                 msgMap[deviceId] = content;
             }
@@ -294,7 +295,7 @@ export class ToDeviceChannel implements IVerificationChannel {
     }
 }
 
-export class ToDeviceRequests {
+export class ToDeviceRequests implements IRequestsMap {
     private requestsByUserId = new Map<string, Map<string, Request>>();
 
     public getRequest(event: MatrixEvent): Request {

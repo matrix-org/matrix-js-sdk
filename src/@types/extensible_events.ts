@@ -14,13 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// TODO: Merge this with sync.js once converted
+// Types for MSC1767: Extensible events in Matrix
 
-export enum SyncState {
-    Error = "ERROR",
-    Prepared = "PREPARED",
-    Stopped = "STOPPED",
-    Syncing = "SYNCING",
-    Catchup = "CATCHUP",
-    Reconnecting = "RECONNECTING",
-}
+import { UnstableValue } from "../NamespacedValue";
+
+export const TEXT_NODE_TYPE = new UnstableValue("m.text", "org.matrix.msc1767.text");

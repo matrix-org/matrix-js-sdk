@@ -1,4 +1,4 @@
-import EventEmitter from "events";
+import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { CallFeed, SPEAKING_THRESHOLD } from "./callFeed";
 import { MatrixClient } from "../client";
 import { CallErrorCode, CallEvent, CallState, genCallID, MatrixCall, setTracksEnabled } from "./call";
@@ -11,6 +11,9 @@ import { createNewMatrixCall } from "./call";
 import { ISendEventResponse } from "../@types/requests";
 import { MatrixEvent } from "../models/event";
 import { EventType } from "../@types/event";
+import { CallEventHandlerEvent } from "./callEventHandler";
+import { RoomStateEvent } from "../matrix";
+import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -38,6 +41,20 @@ export enum GroupCallEvent {
     ParticipantsChanged = "participants_changed",
     Error = "error"
 }
+
+export type GroupCallEventHandlerMap = {
+    [GroupCallEvent.GroupCallStateChanged]: (newState: GroupCallState, oldState: GroupCallState) => void;
+    [GroupCallEvent.ActiveSpeakerChanged]: (activeSpeaker: string) => void;
+    [GroupCallEvent.CallsChanged]: (calls: MatrixCall[]) => void;
+    [GroupCallEvent.UserMediaFeedsChanged]: (feeds: CallFeed[]) => void;
+    [GroupCallEvent.ScreenshareFeedsChanged]: (feeds: CallFeed[]) => void;
+    [GroupCallEvent.LocalScreenshareStateChanged]: (
+        isScreensharing: boolean, feed: CallFeed, sourceId: string,
+    ) => void;
+    [GroupCallEvent.LocalMuteStateChanged]: (audioMuted: boolean, videoMuted: boolean) => void;
+    [GroupCallEvent.ParticipantsChanged]: (participants: RoomMember[]) => void;
+    [GroupCallEvent.Error]: (error: GroupCallError) => void;
+};
 
 export enum GroupCallErrorCode {
     NoUserMedia = "no_user_media",
@@ -113,7 +130,7 @@ function getCallUserId(call: MatrixCall): string | null {
     return call.getOpponentMember()?.userId || call.invitee || null;
 }
 
-export class GroupCall extends EventEmitter {
+export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventHandlerMap> {
     // Config
     public activeSpeakerInterval = 1000;
     public retryCallInterval = 5000;
@@ -278,7 +295,7 @@ export class GroupCall extends EventEmitter {
 
         logger.log(`Entered group call ${this.groupCallId}`);
 
-        this.client.on("Call.incoming", this.onIncomingCall);
+        this.client.on(CallEventHandlerEvent.Incoming, this.onIncomingCall);
 
         const calls = this.client.callEventHandler.calls.values();
 
@@ -338,7 +355,7 @@ export class GroupCall extends EventEmitter {
             this.transmitTimer = null;
         }
 
-        this.client.removeListener("Call.incoming", this.onIncomingCall);
+        this.client.removeListener(CallEventHandlerEvent.Incoming, this.onIncomingCall);
     }
 
     public leave() {
@@ -361,7 +378,7 @@ export class GroupCall extends EventEmitter {
 
         this.participants = [];
         this.client.removeListener(
-            "RoomState.members",
+            RoomStateEvent.Members,
             this.onMemberStateChanged,
         );
 
@@ -383,7 +400,7 @@ export class GroupCall extends EventEmitter {
             );
         }
 
-        this.client.emit("GroupCall.ended", this);
+        this.client.emit(GroupCallEventHandlerEvent.Ended, this);
         this.setState(GroupCallState.Ended);
     }
 
@@ -1114,7 +1131,7 @@ export class GroupCall extends EventEmitter {
         this.participants.push(member);
 
         this.emit(GroupCallEvent.ParticipantsChanged, this.participants);
-        this.client.emit("GroupCall.participants", this.participants, this);
+        this.client.emit(GroupCallEventHandlerEvent.Participants, this.participants, this);
     }
 
     private removeParticipant(member: RoomMember) {
@@ -1127,6 +1144,6 @@ export class GroupCall extends EventEmitter {
         this.participants.splice(index, 1);
 
         this.emit(GroupCallEvent.ParticipantsChanged, this.participants);
-        this.client.emit("GroupCall.participants", this.participants, this);
+        this.client.emit(GroupCallEventHandlerEvent.Participants, this.participants, this);
     }
 }

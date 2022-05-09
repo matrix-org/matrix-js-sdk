@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import type { BinaryLike } from "crypto";
-
 import { getCrypto } from '../utils';
 import { decodeBase64, encodeBase64 } from './olmlib';
 
@@ -251,7 +250,7 @@ async function deriveKeysBrowser(key: Uint8Array, name: string): Promise<[Crypto
         ['sign', 'verify'],
     );
 
-    return await Promise.all([aesProm, hmacProm]);
+    return Promise.all([aesProm, hmacProm]);
 }
 
 export function encryptAES(data: string, key: Uint8Array, name: string, ivStr?: string): Promise<IEncryptedPayload> {

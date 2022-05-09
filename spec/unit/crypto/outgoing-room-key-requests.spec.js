@@ -18,10 +18,10 @@ import {
     IndexedDBCryptoStore,
 } from '../../../src/crypto/store/indexeddb-crypto-store';
 import { MemoryCryptoStore } from '../../../src/crypto/store/memory-crypto-store';
+import { RoomKeyRequestState } from '../../../src/crypto/OutgoingRoomKeyRequestManager';
+
 import 'fake-indexeddb/auto';
 import 'jest-localstorage-mock';
-
-import { RoomKeyRequestState } from '../../../src/crypto/OutgoingRoomKeyRequestManager';
 
 const requests = [
     {

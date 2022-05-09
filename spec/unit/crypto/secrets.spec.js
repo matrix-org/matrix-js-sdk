@@ -23,7 +23,6 @@ import { makeTestClients } from './verification/util';
 import { encryptAES } from "../../../src/crypto/aes";
 import { resetCrossSigningKeys, createSecretStorageKey } from "./crypto-utils";
 import { logger } from '../../../src/logger';
-
 import * as utils from "../../../src/utils";
 
 try {

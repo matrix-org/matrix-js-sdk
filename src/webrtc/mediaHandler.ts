@@ -2,7 +2,7 @@
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2017 New Vector Ltd
 Copyright 2019, 2020 The Matrix.org Foundation C.I.C.
-Copyright 2021 Šimon Brandner <simon.bra.ag@gmail.com>
+Copyright 2021 - 2022 Šimon Brandner <simon.bra.ag@gmail.com>
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,16 +17,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import EventEmitter from "events";
+import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { GroupCallType, GroupCallState } from "../webrtc/groupCall";
-import { MatrixClient } from "../client";
 import { logger } from "../logger";
+import { MatrixClient } from "../client";
 
 export enum MediaHandlerEvent {
     LocalStreamsChanged = "local_streams_changed"
 }
 
-export class MediaHandler extends EventEmitter {
+export type MediaHandlerEventHandlerMap = {
+    [MediaHandlerEvent.LocalStreamsChanged]: () => void;
+};
+
+export class MediaHandler extends TypedEventEmitter<
+    MediaHandlerEvent.LocalStreamsChanged, MediaHandlerEventHandlerMap
+> {
     private audioInput: string;
     private videoInput: string;
     private localUserMediaStream?: MediaStream;
@@ -48,7 +54,10 @@ export class MediaHandler extends EventEmitter {
      * undefined treated as unset
      */
     public async setAudioInput(deviceId: string): Promise<void> {
-        logger.log(`mediaHandler setAudioInput ${deviceId}`);
+        logger.info("LOG setting audio input to", deviceId);
+
+        if (this.audioInput === deviceId) return;
+
         this.audioInput = deviceId;
         await this.updateLocalUsermediaStreams();
     }
@@ -59,14 +68,18 @@ export class MediaHandler extends EventEmitter {
      * undefined treated as unset
      */
     public async setVideoInput(deviceId: string): Promise<void> {
-        logger.log(`mediaHandler setVideoInput ${deviceId}`);
+        logger.info("LOG setting video input to", deviceId);
+
+        if (this.videoInput === deviceId) return;
+
         this.videoInput = deviceId;
         await this.updateLocalUsermediaStreams();
     }
 
     /**
      * Set media input devices to use for MatrixCalls
-     * @param {string} deviceId the identifier for the device
+     * @param {string} audioInput the identifier for the audio device
+     * @param {string} videoInput the identifier for the video device
      * undefined treated as unset
      */
     public async setMediaInputs(audioInput: string, videoInput: string): Promise<void> {
@@ -76,7 +89,12 @@ export class MediaHandler extends EventEmitter {
         await this.updateLocalUsermediaStreams();
     }
 
+    /*
+     * Requests new usermedia streams and replace the old ones
+     */
     public async updateLocalUsermediaStreams(): Promise<void> {
+        if (this.userMediaStreams.length === 0) return;
+
         const callMediaStreamParams: Map<string, { audio: boolean, video: boolean }> = new Map();
         for (const call of this.client.callEventHandler.calls.values()) {
             callMediaStreamParams.set(call.callId, {
@@ -145,9 +163,12 @@ export class MediaHandler extends EventEmitter {
     }
 
     /**
+     * @param audio should have an audio track
+     * @param video should have a video track
+     * @param reusable is allowed to be reused by the MediaHandler
      * @returns {MediaStream} based on passed parameters
      */
-    public async getUserMediaStream(audio: boolean, video: boolean): Promise<MediaStream> {
+    public async getUserMediaStream(audio: boolean, video: boolean, reusable = true): Promise<MediaStream> {
         const shouldRequestAudio = audio && await this.hasAudioDevice();
         const shouldRequestVideo = video && await this.hasVideoDevice();
 
@@ -156,7 +177,9 @@ export class MediaHandler extends EventEmitter {
         if (
             !this.localUserMediaStream ||
             (this.localUserMediaStream.getAudioTracks().length === 0 && shouldRequestAudio) ||
-            (this.localUserMediaStream.getVideoTracks().length === 0 && shouldRequestVideo)
+            (this.localUserMediaStream.getVideoTracks().length === 0 && shouldRequestVideo) ||
+            (this.localUserMediaStream.getAudioTracks()[0]?.getSettings()?.deviceId !== this.audioInput) ||
+            (this.localUserMediaStream.getVideoTracks()[0]?.getSettings()?.deviceId !== this.videoInput)
         ) {
             const constraints = this.getUserMediaContraints(shouldRequestAudio, shouldRequestVideo);
             stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -173,7 +196,9 @@ export class MediaHandler extends EventEmitter {
                 }
             }
 
-            this.localUserMediaStream = stream;
+            if (reusable) {
+                this.localUserMediaStream = stream;
+            }
         } else {
             stream = this.localUserMediaStream.clone();
             logger.log(`mediaHandler clone userMediaStream ${this.localUserMediaStream.id} new stream ${
@@ -192,7 +217,9 @@ export class MediaHandler extends EventEmitter {
             }
         }
 
-        this.userMediaStreams.push(stream);
+        if (reusable) {
+            this.userMediaStreams.push(stream);
+        }
 
         this.emit(MediaHandlerEvent.LocalStreamsChanged);
 
@@ -216,12 +243,18 @@ export class MediaHandler extends EventEmitter {
         }
 
         this.emit(MediaHandlerEvent.LocalStreamsChanged);
+
+        if (this.localUserMediaStream === mediaStream) {
+            this.localUserMediaStream = undefined;
+        }
     }
 
     /**
+     * @param desktopCapturerSourceId sourceId for Electron DesktopCapturer
+     * @param reusable is allowed to be reused by the MediaHandler
      * @returns {MediaStream} based on passed parameters
      */
-    public async getScreensharingStream(desktopCapturerSourceId?: string): Promise<MediaStream | null> {
+    public async getScreensharingStream(desktopCapturerSourceId: string, reusable = true): Promise<MediaStream | null> {
         let stream: MediaStream;
 
         if (this.screensharingStreams.length === 0) {
@@ -243,7 +276,9 @@ export class MediaHandler extends EventEmitter {
             stream = matchingStream.clone();
         }
 
-        this.screensharingStreams.push(stream);
+        if (reusable) {
+            this.screensharingStreams.push(stream);
+        }
 
         this.emit(MediaHandlerEvent.LocalStreamsChanged);
 
