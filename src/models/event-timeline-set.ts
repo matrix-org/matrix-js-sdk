@@ -28,7 +28,6 @@ import { EventType, RelationType } from "../@types/event";
 import { RoomState } from "./room-state";
 import { TypedEventEmitter } from "./typed-event-emitter";
 
-// var DEBUG = false;
 const DEBUG = true;
 
 let debuglog: (...args: any[]) => void;

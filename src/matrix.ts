@@ -152,7 +152,7 @@ export interface ICryptoCallbacks {
 export function createClient(opts: ICreateClientOpts | string) {
     if (typeof opts === "string") {
         opts = {
-            "baseUrl": opts as string,
+            "baseUrl": opts,
         };
     }
     opts.request = opts.request || requestInstance;

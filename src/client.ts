@@ -181,6 +181,7 @@ import { CryptoStore } from "./crypto/store/base";
 import { MediaHandler } from "./webrtc/mediaHandler";
 import { IRefreshTokenResponse } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
+import { ReceiptType } from "./@types/read_receipts";
 import { Thread, THREAD_RELATION_TYPE } from "./models/thread";
 import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
 
@@ -1078,7 +1079,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 // Figure out if we've read something or if it's just informational
                 const content = event.getContent();
                 const isSelf = Object.keys(content).filter(eid => {
-                    return Object.keys(content[eid]['m.read']).includes(this.getUserId());
+                    const read = content[eid][ReceiptType.Read];
+                    if (read && Object.keys(read).includes(this.getUserId())) return true;
+
+                    const readPrivate = content[eid][ReceiptType.ReadPrivate];
+                    if (readPrivate && Object.keys(readPrivate).includes(this.getUserId())) return true;
+
+                    return false;
                 }).length > 0;
 
                 if (!isSelf) return;
@@ -1296,9 +1303,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Get the current dehydrated device, if any
      * @return {Promise} A promise of an object containing the dehydrated device
      */
-    public getDehydratedDevice(): Promise<IDehydratedDevice> {
+    public async getDehydratedDevice(): Promise<IDehydratedDevice> {
         try {
-            return this.http.authedRequest<IDehydratedDevice>(
+            return await this.http.authedRequest<IDehydratedDevice>(
                 undefined,
                 Method.Get,
                 "/dehydrated_device",
@@ -3365,7 +3372,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * data event.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getAccountDataFromServer<T extends {[k: string]: any}>(eventType: string): Promise<T> {
+    public async getAccountDataFromServer<T extends {[k: string]: any}>(eventType: string): Promise<T> {
         if (this.isInitialSyncComplete()) {
             const event = this.store.getAccountData(eventType);
             if (!event) {
@@ -3380,11 +3387,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $type: eventType,
         });
         try {
-            return this.http.authedRequest(
-                undefined, Method.Get, path, undefined,
-            );
+            return await this.http.authedRequest(undefined, Method.Get, path);
         } catch (e) {
-            if (e.data && e.data.errcode === 'M_NOT_FOUND') {
+            if (e.data?.errcode === 'M_NOT_FOUND') {
                 return null;
             }
             throw e;
@@ -4493,13 +4498,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Send a receipt.
      * @param {Event} event The event being acknowledged
-     * @param {string} receiptType The kind of receipt e.g. "m.read"
+     * @param {ReceiptType} receiptType The kind of receipt e.g. "m.read". Other than
+     * ReceiptType.Read are experimental!
      * @param {object} body Additional content to send alongside the receipt.
      * @param {module:client.callback} callback Optional.
      * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public sendReceipt(event: MatrixEvent, receiptType: string, body: any, callback?: Callback): Promise<{}> {
+    public sendReceipt(event: MatrixEvent, receiptType: ReceiptType, body: any, callback?: Callback): Promise<{}> {
         if (typeof (body) === 'function') {
             callback = body as any as Callback; // legacy
             body = {};
@@ -4526,32 +4532,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Send a read receipt.
      * @param {Event} event The event that has been read.
-     * @param {object} opts The options for the read receipt.
-     * @param {boolean} opts.hidden True to prevent the receipt from being sent to
-     * other users and homeservers. Default false (send to everyone). <b>This
-     * property is unstable and may change in the future.</b>
+     * @param {ReceiptType} receiptType other than ReceiptType.Read are experimental! Optional.
      * @param {module:client.callback} callback Optional.
      * @return {Promise} Resolves: to an empty object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async sendReadReceipt(event: MatrixEvent, opts?: { hidden?: boolean }, callback?: Callback): Promise<{}> {
-        if (typeof (opts) === 'function') {
-            callback = opts as any as Callback; // legacy
-            opts = {};
-        }
-        if (!opts) opts = {};
-
+    public async sendReadReceipt(event: MatrixEvent, receiptType = ReceiptType.Read, callback?: Callback): Promise<{}> {
         const eventId = event.getId();
         const room = this.getRoom(event.getRoomId());
         if (room && room.hasPendingEvent(eventId)) {
             throw new Error(`Cannot set read receipt to a pending event (${eventId})`);
         }
 
-        const addlContent = {
-            "org.matrix.msc2285.hidden": Boolean(opts.hidden),
-        };
-
-        return this.sendReceipt(event, "m.read", addlContent, callback);
+        return this.sendReceipt(event, receiptType, {}, callback);
     }
 
     /**
@@ -4564,16 +4557,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {MatrixEvent} rrEvent the event tracked by the read receipt. This is here for
      * convenience because the RR and the RM are commonly updated at the same time as each
      * other. The local echo of this receipt will be done if set. Optional.
-     * @param {object} opts Options for the read markers
-     * @param {object} opts.hidden True to hide the receipt from other users and homeservers.
-     * <b>This property is unstable and may change in the future.</b>
+     * @param {MatrixEvent} rpEvent the m.read.private read receipt event for when we don't
+     * want other users to see the read receipts. This is experimental. Optional.
      * @return {Promise} Resolves: the empty object, {}.
      */
     public async setRoomReadMarkers(
         roomId: string,
         rmEventId: string,
-        rrEvent: MatrixEvent,
-        opts: { hidden?: boolean },
+        rrEvent?: MatrixEvent,
+        rpEvent?: MatrixEvent,
     ): Promise<{}> {
         const room = this.getRoom(roomId);
         if (room && room.hasPendingEvent(rmEventId)) {
@@ -4581,18 +4573,26 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         // Add the optional RR update, do local echo like `sendReceipt`
-        let rrEventId;
+        let rrEventId: string;
         if (rrEvent) {
             rrEventId = rrEvent.getId();
-            if (room && room.hasPendingEvent(rrEventId)) {
+            if (room?.hasPendingEvent(rrEventId)) {
                 throw new Error(`Cannot set read receipt to a pending event (${rrEventId})`);
             }
-            if (room) {
-                room.addLocalEchoReceipt(this.credentials.userId, rrEvent, "m.read");
-            }
+            room?.addLocalEchoReceipt(this.credentials.userId, rrEvent, ReceiptType.Read);
         }
 
-        return this.setRoomReadMarkersHttpRequest(roomId, rmEventId, rrEventId, opts);
+        // Add the optional private RR update, do local echo like `sendReceipt`
+        let rpEventId: string;
+        if (rpEvent) {
+            rpEventId = rpEvent.getId();
+            if (room?.hasPendingEvent(rpEventId)) {
+                throw new Error(`Cannot set read receipt to a pending event (${rpEventId})`);
+            }
+            room?.addLocalEchoReceipt(this.credentials.userId, rpEvent, ReceiptType.ReadPrivate);
+        }
+
+        return this.setRoomReadMarkersHttpRequest(roomId, rmEventId, rrEventId, rpEventId);
     }
 
     /**
@@ -4851,7 +4851,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
         }
 
-        const populationResults: Record<string, Error> = {}; // {roomId: Error}
+        const populationResults: { [roomId: string]: Error } = {};
         const promises = [];
 
         const doLeave = (roomId: string) => {
@@ -5063,26 +5063,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         allowDirectLinks?: boolean,
     ): string | null {
         return getHttpUriForMxc(this.baseUrl, mxcUrl, width, height, resizeMethod, allowDirectLinks);
-    }
-
-    /**
-     * Sets a new status message for the user. The message may be null/falsey
-     * to clear the message.
-     * @param {string} newMessage The new message to set.
-     * @return {Promise} Resolves: to nothing
-     * @return {module:http-api.MatrixError} Rejects: with an error response.
-     */
-    public _unstable_setStatusMessage(newMessage: string): Promise<void> { // eslint-disable-line
-        const type = "im.vector.user_status";
-        return Promise.all(this.getRooms().map(async (room) => {
-            const isJoined = room.getMyMembership() === "join";
-            const looksLikeDm = room.getInvitedAndJoinedMemberCount() === 2;
-            if (!isJoined || !looksLikeDm) return;
-            // Check power level separately as it's a bit more expensive.
-            const maySend = room.currentState.mayClientSendStateEvent(type, this);
-            if (!maySend) return;
-            await this.sendStateEvent(room.roomId, type, { status: newMessage }, this.getUserId());
-        })).then(); // .then to fix return type
     }
 
     /**
@@ -5875,7 +5855,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public setRoomMutePushRule(scope: string, roomId: string, mute: boolean): Promise<void> | void {
         let promise: Promise<void>;
-        let hasDontNotifyRule;
+        let hasDontNotifyRule = false;
 
         // Get the existing room-kind push rule if any
         const roomPushRule = this.getRoomPushRule(scope, roomId);
@@ -5928,7 +5908,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     });
                 }).catch((err: Error) => {
                     // Update it even if the previous operation fails. This can help the
-                    // app to recover when push settings has been modifed from another client
+                    // app to recover when push settings has been modified from another client
                     this.getPushRules().then((result) => {
                         this.pushRules = result;
                         reject(err);
@@ -7403,25 +7383,24 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} rrEventId ID of the event tracked by the read receipt. This is here
      * for convenience because the RR and the RM are commonly updated at the same time as
      * each other. Optional.
-     * @param {object} opts Options for the read markers.
-     * @param {object} opts.hidden True to hide the read receipt from other users. <b>This
-     * property is currently unstable and may change in the future.</b>
+     * @param {string} rpEventId rpEvent the m.read.private read receipt event for when we
+     * don't want other users to see the read receipts. This is experimental. Optional.
      * @return {Promise} Resolves: the empty object, {}.
      */
     public setRoomReadMarkersHttpRequest(
         roomId: string,
         rmEventId: string,
         rrEventId: string,
-        opts: { hidden?: boolean },
+        rpEventId: string,
     ): Promise<{}> {
         const path = utils.encodeUri("/rooms/$roomId/read_markers", {
             $roomId: roomId,
         });
 
         const content = {
-            "m.fully_read": rmEventId,
-            "m.read": rrEventId,
-            "org.matrix.msc2285.hidden": Boolean(opts ? opts.hidden : false),
+            [ReceiptType.FullyRead]: rmEventId,
+            [ReceiptType.Read]: rrEventId,
+            [ReceiptType.ReadPrivate]: rpEventId,
         };
 
         return this.http.authedRequest(undefined, Method.Post, path, undefined, content);
