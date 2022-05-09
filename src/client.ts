@@ -1167,9 +1167,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.syncApi.stop();
         }
 
+        // Always enable "stable" threads usage as we should be able to function well
+        // enough. Server support is still optional, however.
         try {
-            const { serverSupport, stable } = await this.doesServerSupportThread();
-            Thread.setServerSideSupport(serverSupport, stable);
+            const { serverSupport } = await this.doesServerSupportThread();
+            Thread.setServerSideSupport(serverSupport, true);
         } catch (e) {
             Thread.setServerSideSupport(false, true);
         }
