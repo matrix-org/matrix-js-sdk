@@ -95,7 +95,7 @@ export class VerificationRequest<
     private eventsByUs = new Map<string, MatrixEvent>();
     private eventsByThem = new Map<string, MatrixEvent>();
     private _observeOnly = false;
-    private timeoutTimer: number = null;
+    private timeoutTimer: ReturnType<typeof setTimeout> = null;
     private _accepting = false;
     private _declining = false;
     private verifierHasFinished = false;

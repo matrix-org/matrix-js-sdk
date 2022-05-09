@@ -78,7 +78,7 @@ export enum RoomKeyRequestState {
 export class OutgoingRoomKeyRequestManager {
     // handle for the delayed call to sendOutgoingRoomKeyRequests. Non-null
     // if the callback has been set, or if it is still running.
-    private sendOutgoingRoomKeyRequestsTimer: number = null;
+    private sendOutgoingRoomKeyRequestsTimer: ReturnType<typeof setTimeout> = null;
 
     // sanity check to ensure that we don't end up with two concurrent runs
     // of sendOutgoingRoomKeyRequests

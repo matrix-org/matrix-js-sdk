@@ -309,7 +309,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
     private oneTimeKeyCount: number;
     private needsNewFallback: boolean;
-    private fallbackCleanup?: number; // setTimeout ID
+    private fallbackCleanup?: ReturnType<typeof setTimeout>;
 
     /**
      * Cryptography bits

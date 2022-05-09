@@ -183,6 +183,7 @@ import { IRefreshTokenResponse } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { Thread, THREAD_RELATION_TYPE } from "./models/thread";
 import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
+import { setInterval } from "timers";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -912,7 +913,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected syncLeftRoomsPromise: Promise<Room[]>;
     protected syncedLeftRooms = false;
     protected clientOpts: IStoredClientOpts;
-    protected clientWellKnownIntervalID: number;
+    protected clientWellKnownIntervalID: ReturnType<typeof setInterval>;
     protected canResetTimelineCallback: ResetTimelineCallback;
 
     // The pushprocessor caches useful things, so keep one and re-use it
@@ -930,7 +931,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected clientWellKnownPromise: Promise<IClientWellKnown>;
     protected turnServers: ITurnServer[] = [];
     protected turnServersExpiry = 0;
-    protected checkTurnServersIntervalID: number;
+    protected checkTurnServersIntervalID: ReturnType<typeof setInterval>;
     protected exportedOlmDeviceToImport: IOlmDevice;
     protected txnCtr = 0;
     protected mediaHandler = new MediaHandler(this);

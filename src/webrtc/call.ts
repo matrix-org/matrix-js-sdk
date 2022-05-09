@@ -47,6 +47,7 @@ import { CallFeed } from './callFeed';
 import { MatrixClient } from "../client";
 import { ISendEventResponse } from "../@types/requests";
 import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter";
+import { setInterval } from "timers";
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
@@ -298,7 +299,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     // yet, null if we have but they didn't send a party ID.
     private opponentPartyId: string;
     private opponentCaps: CallCapabilities;
-    private inviteTimeout: number;
+    private inviteTimeout: ReturnType<typeof setTimeout>;
 
     // The logic of when & if a call is on hold is nontrivial and explained in is*OnHold
     // This flag represents whether we want the other party to be on hold
@@ -322,7 +323,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     private remoteSDPStreamMetadata: SDPStreamMetadata;
 
-    private callLengthInterval: number;
+    private callLengthInterval: ReturnType<typeof setInterval>;
     private callLength = 0;
 
     constructor(opts: CallOpts) {
