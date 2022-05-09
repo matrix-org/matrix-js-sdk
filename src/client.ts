@@ -3078,6 +3078,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.restoreKeyBackup(privKey, targetRoomId, targetSessionId, backupInfo, opts);
     }
 
+    public async restoreKeyBackupWithBackupManager(
+        targetRoomId: string | undefined,
+        targetSessionId: string | undefined,
+        backupInfo: IKeyBackupInfo,
+        opts: IKeyBackupRestoreOpts,
+    ): Promise<IKeyBackupRestoreResult> {
+        const privKey = await this.crypto.backupManager.getKey();
+        return this.restoreKeyBackup(
+            privKey, targetRoomId, targetSessionId, backupInfo, opts,
+        );
+    }
+
     private async restoreKeyBackup(
         privKey: ArrayLike<number>,
         targetRoomId: undefined,

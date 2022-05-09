@@ -1298,6 +1298,12 @@ class MegolmDecryption extends DecryptionAlgorithm {
 
         if (res === null) {
             // We've got a message for a session we don't have.
+
+            try {
+                await this.baseApis.restoreKeyBackupWithBackupManager(event.getRoomId(), content.session_id, this.crypto.backupManager.backupInfo, {});
+            } catch (e) {
+                logger.warn("Unable to retrieve key from backup");
+            }
             //
             // (XXX: We might actually have received this key since we started
             // decrypting, in which case we'll have scheduled a retry, and this
