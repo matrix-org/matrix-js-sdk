@@ -184,7 +184,6 @@ import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { ReceiptType } from "./@types/read_receipts";
 import { Thread, THREAD_RELATION_TYPE } from "./models/thread";
 import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
-import { setInterval } from "timers";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;

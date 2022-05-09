@@ -47,7 +47,6 @@ import { CallFeed } from './callFeed';
 import { MatrixClient } from "../client";
 import { ISendEventResponse } from "../@types/requests";
 import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter";
-import { setInterval } from "timers";
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 

@@ -20,7 +20,6 @@ import { BeaconInfoState, BeaconLocationState, parseBeaconContent, parseBeaconIn
 import { MatrixEvent } from "../matrix";
 import { sortEventsByLatestContentTimestamp } from "../utils";
 import { TypedEventEmitter } from "./typed-event-emitter";
-import { setInterval } from "timers";
 
 export enum BeaconEvent {
     New = "Beacon.new",
