@@ -6575,8 +6575,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     } | null> {
         try {
             const hasUnstableSupport = await this.doesServerSupportUnstableFeature("org.matrix.msc3440");
-            const hasStableSupport = await this.doesServerSupportUnstableFeature("org.matrix.msc3440.stable")
-                || await this.isVersionSupported("v1.3");
+            const hasStableSupport = await this.doesServerSupportUnstableFeature("org.matrix.msc3440.stable");
+
+            // TODO: Use `this.isVersionSupported("v1.3")` for whatever spec version includes MSC3440 formally.
 
             return {
                 serverSupport: hasUnstableSupport || hasStableSupport,
