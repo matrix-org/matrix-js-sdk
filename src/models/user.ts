@@ -27,8 +27,6 @@ export enum UserEvent {
     Presence = "User.presence",
     CurrentlyActive = "User.currentlyActive",
     LastPresenceTs = "User.lastPresenceTs",
-    /* @deprecated */
-    _UnstableStatusMessage = "User.unstable_statusMessage",
 }
 
 export type UserEventHandlerMap = {
@@ -37,7 +35,6 @@ export type UserEventHandlerMap = {
     [UserEvent.Presence]: (event: MatrixEvent | undefined, user: User) => void;
     [UserEvent.CurrentlyActive]: (event: MatrixEvent | undefined, user: User) => void;
     [UserEvent.LastPresenceTs]: (event: MatrixEvent | undefined, user: User) => void;
-    [UserEvent._UnstableStatusMessage]: (user: User) => void;
 };
 
 export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
@@ -59,8 +56,6 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
             presence: null,
             profile: null,
         };
-    // eslint-disable-next-line camelcase
-    public unstable_statusMessage = "";
 
     /**
      * Construct a new User. A User must have an ID and can optionally have extra
@@ -81,9 +76,6 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
      *                when a user was last active.
      * @prop {Boolean} currentlyActive Whether we should consider lastActiveAgo to be
      *               an approximation and that the user should be seen as active 'now'
-     * @prop {string} unstable_statusMessage The status message for the user, if known. This is
-     *                different from the presenceStatusMsg in that this is not tied to
-     *                the user's presence, and should be represented differently.
      * @prop {Object} events The events describing this user.
      * @prop {MatrixEvent} events.presence The m.presence event for this user.
      */
@@ -218,19 +210,6 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
      */
     public getLastActiveTs(): number {
         return this.lastPresenceTs - this.lastActiveAgo;
-    }
-
-    /**
-     * Manually set the user's status message.
-     * @param {MatrixEvent} event The <code>im.vector.user_status</code> event.
-     * @fires module:client~MatrixClient#event:"User.unstable_statusMessage"
-     */
-    // eslint-disable-next-line
-    public unstable_updateStatusMessage(event: MatrixEvent): void {
-        if (!event.getContent()) this.unstable_statusMessage = "";
-        else this.unstable_statusMessage = event.getContent()["status"];
-        this.updateModifiedTime();
-        this.emit(UserEvent._UnstableStatusMessage, this);
     }
 }
 

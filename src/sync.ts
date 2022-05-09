@@ -1295,16 +1295,6 @@ export class SyncApi {
                 if (e.isState() && e.getType() == "m.room.encryption" && this.opts.crypto) {
                     await this.opts.crypto.onCryptoEvent(e);
                 }
-                if (e.isState() && e.getType() === "im.vector.user_status") {
-                    let user = client.store.getUser(e.getStateKey());
-                    if (user) {
-                        user.unstable_updateStatusMessage(e);
-                    } else {
-                        user = createNewUser(client, e.getStateKey());
-                        user.unstable_updateStatusMessage(e);
-                        client.store.storeUser(user);
-                    }
-                }
             };
 
             await utils.promiseMapSeries(stateEvents, processRoomEvent);
