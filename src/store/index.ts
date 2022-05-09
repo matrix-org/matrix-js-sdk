@@ -37,7 +37,11 @@ export interface ISavedSync {
 export interface IStore {
     readonly accountData: Record<string, MatrixEvent>; // type : content
 
-    /** @return {Promise<bool>} whether or not the database was newly created in this session. */
+    // XXX: The indexeddb store exposes a non-standard emitter for the "degraded" event
+    // for when it falls back to being a memory store due to errors.
+    on?: (event: string, handler: (...args: any[]) => void) => void;
+
+    /** @return {Promise<boolean>} whether or not the database was newly created in this session. */
     isNewlyCreated(): Promise<boolean>;
 
     /**
@@ -105,7 +109,7 @@ export interface IStore {
     /**
      * No-op.
      * @param {Room} room
-     * @param {integer} limit
+     * @param {number} limit
      * @return {Array}
      */
     scrollback(room: Room, limit: number): MatrixEvent[];
