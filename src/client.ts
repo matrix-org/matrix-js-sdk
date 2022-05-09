@@ -1171,6 +1171,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             const { serverSupport, stable } = await this.doesServerSupportThread();
             Thread.setServerSideSupport(serverSupport, stable);
         } catch (e) {
+            // Most likely cause is that `doesServerSupportThread` returned `null` (as it
+            // is allowed to do) and thus we enter "degraded mode" on threads.
             Thread.setServerSideSupport(false, true);
         }
 
@@ -6575,14 +6577,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     } | null> {
         try {
             const hasUnstableSupport = await this.doesServerSupportUnstableFeature("org.matrix.msc3440");
-            const hasStableSupport = await this.doesServerSupportUnstableFeature("org.matrix.msc3440.stable")
-                || await this.isVersionSupported("v1.3");
+            const hasStableSupport = await this.doesServerSupportUnstableFeature("org.matrix.msc3440.stable");
+
+            // TODO: Use `this.isVersionSupported("v1.3")` for whatever spec version includes MSC3440 formally.
 
             return {
                 serverSupport: hasUnstableSupport || hasStableSupport,
                 stable: hasStableSupport,
             };
         } catch (e) {
+            // Assume server support and stability aren't available: null/no data return.
+            // XXX: This should just return an object with `false` booleans instead.
             return null;
         }
     }
