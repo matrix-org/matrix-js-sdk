@@ -10,9 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.workflow_run.conclusion == 'success'
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+          ref: ${{ github.event.workflow_run.head_sha }} # checkout commit that triggered this workflow
+          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
+
+      # fetch develop so that Sonar can identify new issues in PR builds
+      - name: Fetch develop
+        if: "github.event.workflow_run.head_branch != 'develop'"
+        run: git rev-parse HEAD && git fetch origin develop:develop && git status && git rev-parse HEAD
 
       # There's a 'download artifact' action, but it hasn't been updated for the workflow_run action
       # (https://github.com/actions/download-artifact/issues/60) so instead we get this mess:
@@ -49,6 +55,7 @@ jobs:
         with:
           args: >
             -Dsonar.projectVersion=${{ steps.version.outputs.tag }}
+            -Dsonar.scm.revision=${{ github.event.workflow_run.head_sha }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
