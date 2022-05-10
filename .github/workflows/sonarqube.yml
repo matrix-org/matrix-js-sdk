@@ -40,8 +40,15 @@ jobs:
       - name: Extract Coverage Report
         run: unzip -d coverage coverage.zip && rm coverage.zip
 
+      - name: Read version
+        id: version
+        uses: WyriHaximus/github-action-get-previous-tag@v1
+
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
+        with:
+          args: >
+            -Dsonar.projectVersion=${{ steps.version.outputs.tag }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
