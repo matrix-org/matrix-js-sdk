@@ -471,6 +471,7 @@ describe('Call', function() {
                     },
                 };
             },
+            getSender: () => "@test:foo",
         });
 
         await call.updateLocalUsermediaStream(
@@ -510,6 +511,7 @@ describe('Call', function() {
                     [SDPStreamMetadataKey]: {},
                 };
             },
+            getSender: () => "@test:foo",
         });
 
         await call.upgradeCall(false, true);

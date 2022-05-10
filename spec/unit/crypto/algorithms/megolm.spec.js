@@ -321,6 +321,13 @@ describe("MegolmDecryption", function() {
                         rotation_period_ms: 9999999999999,
                     },
                 });
+
+                // Splice the real method onto the mock object as megolm uses this method
+                // on the crypto class in order to encrypt / start sessions
+                mockCrypto.encryptAndSendToDevices = Crypto.prototype.encryptAndSendToDevices;
+                mockCrypto.olmDevice = olmDevice;
+                mockCrypto.baseApis = mockBaseApis;
+
                 mockRoom = {
                     getEncryptionTargetMembers: jest.fn().mockReturnValue(
                         [{ userId: "@alice:home.server" }],
