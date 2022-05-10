@@ -149,11 +149,11 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
     public groupCallId: string;
 
     private callHandlers: Map<string, ICallHandlers> = new Map();
-    private activeSpeakerLoopTimeout?: number;
-    private retryCallLoopTimeout?: number;
+    private activeSpeakerLoopTimeout?: ReturnType<typeof setTimeout>;
+    private retryCallLoopTimeout?: ReturnType<typeof setTimeout>;
     private retryCallCounts: Map<string, number> = new Map();
     private reEmitter: ReEmitter;
-    private transmitTimer: number | null = null;
+    private transmitTimer: ReturnType<typeof setTimeout> | null = null;
 
     constructor(
         private client: MatrixClient,
