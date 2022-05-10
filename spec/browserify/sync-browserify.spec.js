@@ -17,7 +17,7 @@ limitations under the License.
 // load XmlHttpRequest mock
 import "./setupTests";
 import "../../dist/browser-matrix"; // uses browser-matrix instead of the src
-import * as utils from "../test-utils";
+import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 
 const USER_ID = "@user:test.server";
@@ -35,7 +35,7 @@ describe("Browserify Test", function() {
         client = testClient.client;
         httpBackend = testClient.httpBackend;
 
-        httpBackend.when("GET", "/capabilities").respond(200, { capabilities: {} });
+        httpBackend.when("GET", "/versions").respond(200, {});
         httpBackend.when("GET", "/pushrules").respond(200, {});
         httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
 
@@ -47,7 +47,7 @@ describe("Browserify Test", function() {
         httpBackend.stop();
     });
 
-    it("Sync", async function() {
+    it("Sync", function() {
         const event = utils.mkMembership({
             room: ROOM_ID,
             mship: "join",
@@ -71,7 +71,7 @@ describe("Browserify Test", function() {
         };
 
         httpBackend.when("GET", "/sync").respond(200, syncData);
-        return await Promise.race([
+        return Promise.race([
             httpBackend.flushAllExpected(),
             new Promise((_, reject) => {
                 client.once("sync.unexpectedError", reject);

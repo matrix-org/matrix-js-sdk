@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventEmitter } from 'stream';
-
 import { logger } from '../logger';
 import * as olmlib from './olmlib';
+import { encodeBase64 } from './olmlib';
 import { randomString } from '../randomstring';
-import { encryptAES, decryptAES, IEncryptedPayload, calculateKeyCheck } from './aes';
-import { encodeBase64 } from "./olmlib";
-import { ICryptoCallbacks, MatrixClient, MatrixEvent } from '../matrix';
+import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from './aes';
+import { ClientEvent, ICryptoCallbacks, MatrixEvent } from '../matrix';
+import { ClientEventHandlerMap, MatrixClient } from "../client";
 import { IAddSecretStorageKeyOpts, ISecretStorageKeyInfo } from './api';
+import { TypedEventEmitter } from '../models/typed-event-emitter';
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
 
@@ -36,7 +36,7 @@ export interface ISecretRequest {
     cancel: (reason: string) => void;
 }
 
-export interface IAccountDataClient extends EventEmitter {
+export interface IAccountDataClient extends TypedEventEmitter<ClientEvent.AccountData, ClientEventHandlerMap> {
     // Subset of MatrixClient (which also uses any for the event content)
     getAccountDataFromServer: <T extends {[k: string]: any}>(eventType: string) => Promise<T>;
     getAccountData: (eventType: string) => MatrixEvent;
@@ -98,17 +98,17 @@ export class SecretStorage {
                     ev.getType() === 'm.secret_storage.default_key' &&
                     ev.getContent().key === keyId
                 ) {
-                    this.accountDataAdapter.removeListener('accountData', listener);
+                    this.accountDataAdapter.removeListener(ClientEvent.AccountData, listener);
                     resolve();
                 }
             };
-            this.accountDataAdapter.on('accountData', listener);
+            this.accountDataAdapter.on(ClientEvent.AccountData, listener);
 
             this.accountDataAdapter.setAccountData(
                 'm.secret_storage.default_key',
                 { key: keyId },
             ).catch(e => {
-                this.accountDataAdapter.removeListener('accountData', listener);
+                this.accountDataAdapter.removeListener(ClientEvent.AccountData, listener);
                 reject(e);
             });
         });
@@ -329,7 +329,7 @@ export class SecretStorage {
             // encoded, since this is how a key would normally be stored.
             if (encInfo.passthrough) return encodeBase64(decryption.get_private_key());
 
-            return await decryption.decrypt(encInfo);
+            return decryption.decrypt(encInfo);
         } finally {
             if (decryption && decryption.free) decryption.free();
         }
@@ -345,15 +345,10 @@ export class SecretStorage {
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    public async isStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo> | null> {
+    public async isStored(name: string, checkKey = true): Promise<Record<string, ISecretStorageKeyInfo> | null> {
         // check if secret exists
         const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretInfo>(name);
-        if (!secretInfo) return null;
-        if (!secretInfo.encrypted) {
-            return null;
-        }
-
-        if (checkKey === undefined) checkKey = true;
+        if (!secretInfo?.encrypted) return null;
 
         const ret = {};
 
@@ -598,11 +593,11 @@ export class SecretStorage {
 
         if (keys[keyId].algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             const decryption = {
-                encrypt: async function(secret: string): Promise<IEncryptedPayload> {
-                    return await encryptAES(secret, privateKey, name);
+                encrypt: function(secret: string): Promise<IEncryptedPayload> {
+                    return encryptAES(secret, privateKey, name);
                 },
-                decrypt: async function(encInfo: IEncryptedPayload): Promise<string> {
-                    return await decryptAES(encInfo, privateKey, name);
+                decrypt: function(encInfo: IEncryptedPayload): Promise<string> {
+                    return decryptAES(encInfo, privateKey, name);
                 },
             };
             return [keyId, decryption];

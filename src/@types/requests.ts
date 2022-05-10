@@ -19,6 +19,7 @@ import { IContent, IEvent } from "../models/event";
 import { Preset, Visibility } from "./partials";
 import { SearchKey } from "./search";
 import { IRoomEventFilter } from "../filter";
+import { Direction } from "../models/event-timeline";
 
 // allow camelcase as these are things that go onto the wire
 /* eslint-disable camelcase */
@@ -144,6 +145,7 @@ export interface IRelationsRequestOpts {
     from?: string;
     to?: string;
     limit?: number;
+    direction?: Direction;
 }
 
 export interface IRelationsResponse {

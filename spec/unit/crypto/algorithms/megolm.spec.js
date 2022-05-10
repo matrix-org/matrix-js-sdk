@@ -2,7 +2,7 @@ import '../../../olm-loader';
 import * as algorithms from "../../../../src/crypto/algorithms";
 import { MemoryCryptoStore } from "../../../../src/crypto/store/memory-crypto-store";
 import { MockStorageApi } from "../../../MockStorageApi";
-import * as testUtils from "../../../test-utils";
+import * as testUtils from "../../../test-utils/test-utils";
 import { OlmDevice } from "../../../../src/crypto/OlmDevice";
 import { Crypto } from "../../../../src/crypto";
 import { logger } from "../../../../src/logger";
@@ -462,7 +462,7 @@ describe("MegolmDecryption", function() {
         let run = false;
         aliceClient.sendToDevice = async (msgtype, contentMap) => {
             run = true;
-            expect(msgtype).toBe("org.matrix.room_key.withheld");
+            expect(msgtype).toMatch(/^(org.matrix|m).room_key.withheld$/);
             delete contentMap["@bob:example.com"].bobdevice1.session_id;
             delete contentMap["@bob:example.com"].bobdevice2.session_id;
             expect(contentMap).toStrictEqual({
@@ -572,7 +572,7 @@ describe("MegolmDecryption", function() {
 
         const sendPromise = new Promise((resolve, reject) => {
             aliceClient.sendToDevice = async (msgtype, contentMap) => {
-                expect(msgtype).toBe("org.matrix.room_key.withheld");
+                expect(msgtype).toMatch(/^(org.matrix|m).room_key.withheld$/);
                 expect(contentMap).toStrictEqual({
                     '@bob:example.com': {
                         bobdevice: {
@@ -619,7 +619,7 @@ describe("MegolmDecryption", function() {
             content: {
                 algorithm: "m.megolm.v1.aes-sha2",
                 room_id: roomId,
-                session_id: "session_id",
+                session_id: "session_id1",
                 sender_key: bobDevice.deviceCurve25519Key,
                 code: "m.blacklisted",
                 reason: "You have been blocked",
@@ -636,7 +636,34 @@ describe("MegolmDecryption", function() {
                 ciphertext: "blablabla",
                 device_id: "bobdevice",
                 sender_key: bobDevice.deviceCurve25519Key,
-                session_id: "session_id",
+                session_id: "session_id1",
+            },
+        }))).rejects.toThrow("The sender has blocked you.");
+
+        aliceClient.crypto.onToDeviceEvent(new MatrixEvent({
+            type: "m.room_key.withheld",
+            sender: "@bob:example.com",
+            content: {
+                algorithm: "m.megolm.v1.aes-sha2",
+                room_id: roomId,
+                session_id: "session_id2",
+                sender_key: bobDevice.deviceCurve25519Key,
+                code: "m.blacklisted",
+                reason: "You have been blocked",
+            },
+        }));
+
+        await expect(aliceClient.crypto.decryptEvent(new MatrixEvent({
+            type: "m.room.encrypted",
+            sender: "@bob:example.com",
+            event_id: "$event",
+            room_id: roomId,
+            content: {
+                algorithm: "m.megolm.v1.aes-sha2",
+                ciphertext: "blablabla",
+                device_id: "bobdevice",
+                sender_key: bobDevice.deviceCurve25519Key,
+                session_id: "session_id2",
             },
         }))).rejects.toThrow("The sender has blocked you.");
     });
@@ -665,7 +692,7 @@ describe("MegolmDecryption", function() {
             content: {
                 algorithm: "m.megolm.v1.aes-sha2",
                 room_id: roomId,
-                session_id: "session_id",
+                session_id: "session_id1",
                 sender_key: bobDevice.deviceCurve25519Key,
                 code: "m.no_olm",
                 reason: "Unable to establish a secure channel.",
@@ -686,7 +713,39 @@ describe("MegolmDecryption", function() {
                 ciphertext: "blablabla",
                 device_id: "bobdevice",
                 sender_key: bobDevice.deviceCurve25519Key,
-                session_id: "session_id",
+                session_id: "session_id1",
+            },
+            origin_server_ts: now,
+        }))).rejects.toThrow("The sender was unable to establish a secure channel.");
+
+        aliceClient.crypto.onToDeviceEvent(new MatrixEvent({
+            type: "m.room_key.withheld",
+            sender: "@bob:example.com",
+            content: {
+                algorithm: "m.megolm.v1.aes-sha2",
+                room_id: roomId,
+                session_id: "session_id2",
+                sender_key: bobDevice.deviceCurve25519Key,
+                code: "m.no_olm",
+                reason: "Unable to establish a secure channel.",
+            },
+        }));
+
+        await new Promise((resolve) => {
+            setTimeout(resolve, 100);
+        });
+
+        await expect(aliceClient.crypto.decryptEvent(new MatrixEvent({
+            type: "m.room.encrypted",
+            sender: "@bob:example.com",
+            event_id: "$event",
+            room_id: roomId,
+            content: {
+                algorithm: "m.megolm.v1.aes-sha2",
+                ciphertext: "blablabla",
+                device_id: "bobdevice",
+                sender_key: bobDevice.deviceCurve25519Key,
+                session_id: "session_id2",
             },
             origin_server_ts: now,
         }))).rejects.toThrow("The sender was unable to establish a secure channel.");

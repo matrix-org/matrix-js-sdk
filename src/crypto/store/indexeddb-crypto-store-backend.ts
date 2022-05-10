@@ -873,7 +873,7 @@ export class Backend implements CryptoStore {
 
     public doTxn<T>(
         mode: Mode,
-        stores: Iterable<string>,
+        stores: string | string[],
         func: (txn: IDBTransaction) => T,
         log: PrefixedLogger = logger,
     ): Promise<T> {

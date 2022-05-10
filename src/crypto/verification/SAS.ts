@@ -22,7 +22,7 @@ limitations under the License.
 import anotherjson from 'another-json';
 import { Utility, SAS as OlmSAS } from "@matrix-org/olm";
 
-import { VerificationBase as Base, SwitchStartEventError } from "./Base";
+import { VerificationBase as Base, SwitchStartEventError, VerificationEventHandlerMap } from "./Base";
 import {
     errorFactory,
     newInvalidMessageError,
@@ -193,6 +193,7 @@ function calculateMAC(olmSAS: OlmSAS, method: string) {
 }
 
 const calculateKeyAgreement = {
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     "curve25519-hkdf-sha256": function(sas: SAS, olmSAS: OlmSAS, bytes: number): Uint8Array {
         const ourInfo = `${sas.baseApis.getUserId()}|${sas.baseApis.deviceId}|`
               + `${sas.ourSASPubKey}|`;
@@ -232,11 +233,19 @@ function intersection<T>(anArray: T[], aSet: Set<T>): T[] {
     return anArray instanceof Array ? anArray.filter(x => aSet.has(x)) : [];
 }
 
+export enum SasEvent {
+    ShowSas = "show_sas",
+}
+
+type EventHandlerMap = {
+    [SasEvent.ShowSas]: (sas: ISasEvent) => void;
+} & VerificationEventHandlerMap;
+
 /**
  * @alias module:crypto/verification/SAS
  * @extends {module:crypto/verification/Base}
  */
-export class SAS extends Base {
+export class SAS extends Base<SasEvent, EventHandlerMap> {
     private waitingForAccept: boolean;
     public ourSASPubKey: string;
     public theirSASPubKey: string;
@@ -371,7 +380,7 @@ export class SAS extends Base {
                     cancel: () => reject(newUserCancelledError()),
                     mismatch: () => reject(newMismatchedSASError()),
                 };
-                this.emit("show_sas", this.sasEvent);
+                this.emit(SasEvent.ShowSas, this.sasEvent);
             });
 
             [e] = await Promise.all([
@@ -447,7 +456,7 @@ export class SAS extends Base {
                     cancel: () => reject(newUserCancelledError()),
                     mismatch: () => reject(newMismatchedSASError()),
                 };
-                this.emit("show_sas", this.sasEvent);
+                this.emit(SasEvent.ShowSas, this.sasEvent);
             });
 
             [e] = await Promise.all([

@@ -1,4 +1,4 @@
-import { EventStatus } from "../../src/matrix";
+import { EventStatus, RoomEvent } from "../../src/matrix";
 import { MatrixScheduler } from "../../src/scheduler";
 import { Room } from "../../src/models/room";
 import { TestClient } from "../TestClient";
@@ -95,7 +95,7 @@ describe("MatrixClient retrying", function() {
 
         // wait for the localecho of ev1 to be updated
         const p3 = new Promise<void>((resolve, reject) => {
-            room.on("Room.localEchoUpdated", (ev0) => {
+            room.on(RoomEvent.LocalEchoUpdated, (ev0) => {
                 if (ev0 === ev1) {
                     resolve();
                 }

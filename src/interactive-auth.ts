@@ -60,7 +60,11 @@ export enum AuthType {
     Sso = "m.login.sso",
     SsoUnstable = "org.matrix.login.sso",
     Dummy = "m.login.dummy",
-    RegistrationToken = "org.matrix.msc3231.login.registration_token",
+    RegistrationToken = "m.login.registration_token",
+    // For backwards compatability with servers that have not yet updated to
+    // use the stable "m.login.registration_token" type.
+    // The authentication flow is the same in both cases.
+    UnstableRegistrationToken = "org.matrix.msc3231.login.registration_token",
 }
 
 export interface IAuthDict {
@@ -79,7 +83,8 @@ export interface IAuthDict {
     // eslint-disable-next-line camelcase
     threepid_creds?: any;
     threepidCreds?: any;
-    registrationToken?: string;
+    // For m.login.registration_token type
+    token?: string;
 }
 
 class NoAuthFlowFoundError extends Error {

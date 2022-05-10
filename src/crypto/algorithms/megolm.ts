@@ -709,6 +709,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
         }
 
         await this.baseApis.sendToDevice("org.matrix.room_key.withheld", contentMap);
+        await this.baseApis.sendToDevice("m.room_key.withheld", contentMap);
 
         // record the fact that we notified these blocked devices
         for (const userId of Object.keys(contentMap)) {

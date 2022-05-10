@@ -21,7 +21,6 @@ limitations under the License.
  */
 
 import { parse as parseContentType, ParsedMediaType } from "content-type";
-import EventEmitter from "events";
 
 import type { IncomingHttpHeaders, IncomingMessage } from "http";
 import type { Request as _Request, CoreOptions } from "request";
@@ -31,10 +30,11 @@ import type { Request as _Request, CoreOptions } from "request";
 import * as callbacks from "./realtime-callbacks";
 import { IUploadOpts } from "./@types/requests";
 import { IAbortablePromise, IUsageLimit } from "./@types/partials";
-import { IDeferred } from "./utils";
+import { IDeferred, sleep } from "./utils";
 import { Callback } from "./client";
 import * as utils from "./utils";
 import { logger } from './logger';
+import { TypedEventEmitter } from "./models/typed-event-emitter";
 
 /*
 TODO:
@@ -111,6 +111,12 @@ interface IRequestOpts<T> {
     json?: boolean; // defaults to true
     qsStringifyOptions?: CoreOptions["qsStringifyOptions"];
     bodyParser?(body: string): T;
+
+    // Set to true to prevent the request function from emitting
+    // a Session.logged_out event. This is intended for use on
+    // endpoints where M_UNKNOWN_TOKEN is a valid/notable error
+    // response, such as with token refreshes.
+    inhibitLogoutEmit?: boolean;
 }
 
 export interface IUpload {
@@ -158,6 +164,16 @@ export enum Method {
 
 export type FileType = Document | XMLHttpRequestBodyInit;
 
+export enum HttpApiEvent {
+    SessionLoggedOut = "Session.logged_out",
+    NoConsent = "no_consent",
+}
+
+export type HttpApiEventHandlerMap = {
+    [HttpApiEvent.SessionLoggedOut]: (err: MatrixError) => void;
+    [HttpApiEvent.NoConsent]: (message: string, consentUri: string) => void;
+};
+
 /**
  * Construct a MatrixHttpApi.
  * @constructor
@@ -186,7 +202,10 @@ export type FileType = Document | XMLHttpRequestBodyInit;
 export class MatrixHttpApi {
     private uploads: IUpload[] = [];
 
-    constructor(private eventEmitter: EventEmitter, public readonly opts: IHttpOpts) {
+    constructor(
+        private eventEmitter: TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>,
+        public readonly opts: IHttpOpts,
+    ) {
         utils.checkObjectHasKeys(opts, ["baseUrl", "request", "prefix"]);
         opts.onlyData = !!opts.onlyData;
         opts.useAuthorizationHeader = !!opts.useAuthorizationHeader;
@@ -437,10 +456,20 @@ export class MatrixHttpApi {
                 queryParams.filename = fileName;
             }
 
+            const headers: Record<string, string> = { "Content-Type": contentType };
+
+            // authedRequest uses `request` which is no longer maintained.
+            // `request` has a bug where if the body is zero bytes then you get an error: `Argument error, options.body`.
+            // See https://github.com/request/request/issues/920
+            // if body looks like a byte array and empty then set the Content-Length explicitly as a workaround:
+            if ((body as unknown as ArrayLike<number>).length === 0) {
+                headers["Content-Length"] = "0";
+            }
+
             promise = this.authedRequest(
                 opts.callback, Method.Post, "/upload", queryParams, body, {
                     prefix: "/_matrix/media/r0",
-                    headers: { "Content-Type": contentType },
+                    headers,
                     json: false,
                     bodyParser,
                 },
@@ -586,14 +615,10 @@ export class MatrixHttpApi {
         const requestPromise = this.request<T, O>(callback, method, path, queryParams, data, requestOpts);
 
         requestPromise.catch((err: MatrixError) => {
-            if (err.errcode == 'M_UNKNOWN_TOKEN') {
-                this.eventEmitter.emit("Session.logged_out", err);
+            if (err.errcode == 'M_UNKNOWN_TOKEN' && !requestOpts?.inhibitLogoutEmit) {
+                this.eventEmitter.emit(HttpApiEvent.SessionLoggedOut, err);
             } else if (err.errcode == 'M_CONSENT_NOT_GIVEN') {
-                this.eventEmitter.emit(
-                    "no_consent",
-                    err.message,
-                    err.data.consent_uri,
-                );
+                this.eventEmitter.emit(HttpApiEvent.NoConsent, err.message, err.data.consent_uri);
             }
         });
 
@@ -1054,7 +1079,7 @@ export class MatrixError extends Error {
  * @constructor
  */
 export class ConnectionError extends Error {
-    constructor(message: string, private readonly cause: Error = undefined) {
+    constructor(message: string, cause: Error = undefined) {
         super(message + (cause ? `: ${cause.message}` : ""));
     }
 
@@ -1080,7 +1105,7 @@ export class AbortError extends Error {
  * @return {any} the result of the network operation
  * @throws {ConnectionError} If after maxAttempts the callback still throws ConnectionError
  */
-export async function retryNetworkOperation<T>(maxAttempts: number, callback: () => T): Promise<T> {
+export async function retryNetworkOperation<T>(maxAttempts: number, callback: () => Promise<T>): Promise<T> {
     let attempts = 0;
     let lastConnectionError = null;
     while (attempts < maxAttempts) {
@@ -1089,9 +1114,9 @@ export async function retryNetworkOperation<T>(maxAttempts: number, callback: ()
                 const timeout = 1000 * Math.pow(2, attempts);
                 logger.log(`network operation failed ${attempts} times,` +
                     ` retrying in ${timeout}ms...`);
-                await new Promise(r => setTimeout(r, timeout));
+                await sleep(timeout);
             }
-            return await callback();
+            return callback();
         } catch (err) {
             if (err instanceof ConnectionError) {
                 attempts += 1;

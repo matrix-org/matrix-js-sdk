@@ -16,14 +16,21 @@ limitations under the License.
 
 /** @module ContentHelpers */
 
+import { REFERENCE_RELATION } from "matrix-events-sdk";
+
+import { MBeaconEventContent, MBeaconInfoContent, MBeaconInfoEventContent } from "./@types/beacon";
 import { MsgType } from "./@types/event";
 import { TEXT_NODE_TYPE } from "./@types/extensible_events";
 import {
-    ASSET_NODE_TYPE,
-    ASSET_TYPE_SELF,
-    ILocationContent,
-    LOCATION_EVENT_TYPE,
-    TIMESTAMP_NODE_TYPE,
+    M_ASSET,
+    LocationAssetType,
+    M_LOCATION,
+    M_TIMESTAMP,
+    LocationEventWireContent,
+    MLocationEventContent,
+    MLocationContent,
+    MAssetContent,
+    LegacyLocationEventContent,
 } from "./@types/location";
 
 /**
@@ -107,35 +114,165 @@ export function makeEmoteMessage(body: string) {
     };
 }
 
+/** Location content helpers */
+
+export const getTextForLocationEvent = (
+    uri: string,
+    assetType: LocationAssetType,
+    timestamp: number,
+    description?: string,
+): string => {
+    const date = `at ${new Date(timestamp).toISOString()}`;
+    const assetName = assetType === LocationAssetType.Self ? 'User' : undefined;
+    const quotedDescription = description ? `"${description}"` : undefined;
+
+    return [
+        assetName,
+        'Location',
+        quotedDescription,
+        uri,
+        date,
+    ].filter(Boolean).join(' ');
+};
+
 /**
  * Generates the content for a Location event
- * @param text a text for of our location
  * @param uri a geo:// uri for the location
  * @param ts the timestamp when the location was correct (milliseconds since
  *           the UNIX epoch)
  * @param description the (optional) label for this location on the map
  * @param asset_type the (optional) asset type of this location e.g. "m.self"
+ * @param text optional. A text for the location
  */
-export function makeLocationContent(
-    text: string,
+export const makeLocationContent = (
+    // this is first but optional
+    // to avoid a breaking change
+    text: string | undefined,
     uri: string,
-    ts: number,
+    timestamp?: number,
     description?: string,
-    assetType?: string,
-): ILocationContent {
+    assetType?: LocationAssetType,
+): LegacyLocationEventContent & MLocationEventContent => {
+    const defaultedText = text ??
+        getTextForLocationEvent(uri, assetType || LocationAssetType.Self, timestamp, description);
+    const timestampEvent = timestamp ? { [M_TIMESTAMP.name]: timestamp } : {};
     return {
-        "body": text,
-        "msgtype": MsgType.Location,
-        "geo_uri": uri,
-        [LOCATION_EVENT_TYPE.name]: {
-            uri,
+        msgtype: MsgType.Location,
+        body: defaultedText,
+        geo_uri: uri,
+        [M_LOCATION.name]: {
             description,
+            uri,
         },
-        [ASSET_NODE_TYPE.name]: {
-            type: assetType ?? ASSET_TYPE_SELF,
+        [M_ASSET.name]: {
+            type: assetType || LocationAssetType.Self,
         },
-        [TEXT_NODE_TYPE.name]: text,
-        [TIMESTAMP_NODE_TYPE.name]: ts,
-        // TODO: MSC1767 fallbacks m.image thumbnail
+        [TEXT_NODE_TYPE.name]: defaultedText,
+        ...timestampEvent,
+    } as LegacyLocationEventContent & MLocationEventContent;
+};
+
+/**
+ * Parse location event content and transform to
+ * a backwards compatible modern m.location event format
+ */
+export const parseLocationEvent = (wireEventContent: LocationEventWireContent): MLocationEventContent => {
+    const location = M_LOCATION.findIn<MLocationContent>(wireEventContent);
+    const asset = M_ASSET.findIn<MAssetContent>(wireEventContent);
+    const timestamp = M_TIMESTAMP.findIn<number>(wireEventContent);
+    const text = TEXT_NODE_TYPE.findIn<string>(wireEventContent);
+
+    const geoUri = location?.uri ?? wireEventContent?.geo_uri;
+    const description = location?.description;
+    const assetType = asset?.type ?? LocationAssetType.Self;
+    const fallbackText = text ?? wireEventContent.body;
+
+    return makeLocationContent(fallbackText, geoUri, timestamp, description, assetType);
+};
+
+/**
+ * Beacon event helpers
+ */
+export type MakeBeaconInfoContent = (
+    timeout: number,
+    isLive?: boolean,
+    description?: string,
+    assetType?: LocationAssetType,
+    timestamp?: number
+) => MBeaconInfoEventContent;
+
+export const makeBeaconInfoContent: MakeBeaconInfoContent = (
+    timeout,
+    isLive,
+    description,
+    assetType,
+    timestamp,
+) => ({
+    description,
+    timeout,
+    live: isLive,
+    [M_TIMESTAMP.name]: timestamp || Date.now(),
+    [M_ASSET.name]: {
+        type: assetType ?? LocationAssetType.Self,
+    },
+});
+
+export type BeaconInfoState = MBeaconInfoContent & {
+    assetType: LocationAssetType;
+    timestamp: number;
+};
+/**
+ * Flatten beacon info event content
+ */
+export const parseBeaconInfoContent = (content: MBeaconInfoEventContent): BeaconInfoState => {
+    const { description, timeout, live } = content;
+    const { type: assetType } = M_ASSET.findIn<MAssetContent>(content);
+    const timestamp = M_TIMESTAMP.findIn<number>(content);
+
+    return {
+        description,
+        timeout,
+        live,
+        assetType,
+        timestamp,
     };
-}
+};
+
+export type MakeBeaconContent = (
+    uri: string,
+    timestamp: number,
+    beaconInfoEventId: string,
+    description?: string,
+) => MBeaconEventContent;
+
+export const makeBeaconContent: MakeBeaconContent = (
+    uri,
+    timestamp,
+    beaconInfoEventId,
+    description,
+) => ({
+    [M_LOCATION.name]: {
+        description,
+        uri,
+    },
+    [M_TIMESTAMP.name]: timestamp,
+    "m.relates_to": {
+        rel_type: REFERENCE_RELATION.name,
+        event_id: beaconInfoEventId,
+    },
+});
+
+export type BeaconLocationState = MLocationContent & {
+    timestamp: number;
+};
+
+export const parseBeaconContent = (content: MBeaconEventContent): BeaconLocationState => {
+    const { description, uri } = M_LOCATION.findIn<MLocationContent>(content);
+    const timestamp = M_TIMESTAMP.findIn<number>(content);
+
+    return {
+        description,
+        uri,
+        timestamp,
+    };
+};

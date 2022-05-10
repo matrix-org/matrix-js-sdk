@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { EventTimelineSet } from "../../src/models/event-timeline-set";
-import { MatrixEvent } from "../../src/models/event";
+import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { Room } from "../../src/models/room";
 import { Relations } from "../../src/models/relations";
 
@@ -103,7 +103,7 @@ describe("Relations", function() {
         // Add the target event first, then the relation event
         {
             const relationsCreated = new Promise(resolve => {
-                targetEvent.once("Event.relationsCreated", resolve);
+                targetEvent.once(MatrixEventEvent.RelationsCreated, resolve);
             });
 
             const timelineSet = new EventTimelineSet(room, {
@@ -118,7 +118,7 @@ describe("Relations", function() {
         // Add the relation event first, then the target event
         {
             const relationsCreated = new Promise(resolve => {
-                targetEvent.once("Event.relationsCreated", resolve);
+                targetEvent.once(MatrixEventEvent.RelationsCreated, resolve);
             });
 
             const timelineSet = new EventTimelineSet(room, {
@@ -129,5 +129,50 @@ describe("Relations", function() {
 
             await relationsCreated;
         }
+    });
+
+    it("should ignore m.replace for state events", async () => {
+        const userId = "@bob:example.com";
+        const room = new Room("room123", null, userId);
+        const relations = new Relations("m.replace", "m.room.topic", room);
+
+        // Create an instance of a state event with rel_type m.replace
+        const originalTopic = new MatrixEvent({
+            "sender": userId,
+            "type": "m.room.topic",
+            "event_id": "$orig",
+            "room_id": room.roomId,
+            "content": {
+                "topic": "orig",
+            },
+            "state_key": "",
+        });
+        const badlyEditedTopic = new MatrixEvent({
+            "sender": userId,
+            "type": "m.room.topic",
+            "event_id": "$orig",
+            "room_id": room.roomId,
+            "content": {
+                "topic": "topic",
+                "m.new_content": {
+                    "topic": "edit",
+                },
+                "m.relates_to": {
+                    "event_id": "$orig",
+                    "rel_type": "m.replace",
+                },
+            },
+            "state_key": "",
+        });
+
+        await relations.setTargetEvent(originalTopic);
+        expect(originalTopic.replacingEvent()).toBe(null);
+        expect(originalTopic.getContent().topic).toBe("orig");
+
+        await relations.addEvent(badlyEditedTopic);
+        expect(originalTopic.replacingEvent()).toBe(null);
+        expect(originalTopic.getContent().topic).toBe("orig");
+        expect(badlyEditedTopic.replacingEvent()).toBe(null);
+        expect(badlyEditedTopic.getContent().topic).toBe("topic");
     });
 });
