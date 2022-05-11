@@ -1,6 +1,14 @@
-import * as utils from "../test-utils";
-import {RoomState} from "../../src/models/room-state";
-import {RoomMember} from "../../src/models/room-member";
+import * as utils from "../test-utils/test-utils";
+import { makeBeaconEvent, makeBeaconInfoEvent } from "../test-utils/beacon";
+import { filterEmitCallsByEventType } from "../test-utils/emitter";
+import { RoomState, RoomStateEvent } from "../../src/models/room-state";
+import { BeaconEvent, getBeaconInfoIdentifier } from "../../src/models/beacon";
+import { EventType, RelationType } from "../../src/@types/event";
+import {
+    MatrixEvent,
+    MatrixEventEvent,
+} from "../../src/models/event";
+import { M_BEACON } from "../../src/@types/beacon";
 
 describe("RoomState", function() {
     const roomId = "!foo:bar";
@@ -121,7 +129,7 @@ describe("RoomState", function() {
         it("should return a single MatrixEvent if a state_key was specified",
         function() {
             const event = state.getStateEvents("m.room.member", userA);
-            expect(event.getContent()).toEqual({
+            expect(event.getContent()).toMatchObject({
                 membership: "join",
             });
         });
@@ -193,12 +201,7 @@ describe("RoomState", function() {
             expect(emitCount).toEqual(2);
         });
 
-        it("should call setPowerLevelEvent on each RoomMember for m.room.power_levels",
-        function() {
-            // mock up the room members
-            state.members[userA] = utils.mock(RoomMember);
-            state.members[userB] = utils.mock(RoomMember);
-
+        it("should call setPowerLevelEvent on each RoomMember for m.room.power_levels", function() {
             const powerLevelEvent = utils.mkEvent({
                 type: "m.room.power_levels", room: roomId, user: userA, event: true,
                 content: {
@@ -208,18 +211,16 @@ describe("RoomState", function() {
                 },
             });
 
+            // spy on the room members
+            jest.spyOn(state.members[userA], "setPowerLevelEvent");
+            jest.spyOn(state.members[userB], "setPowerLevelEvent");
             state.setStateEvents([powerLevelEvent]);
 
-            expect(state.members[userA].setPowerLevelEvent).toHaveBeenCalledWith(
-                powerLevelEvent,
-            );
-            expect(state.members[userB].setPowerLevelEvent).toHaveBeenCalledWith(
-                powerLevelEvent,
-            );
+            expect(state.members[userA].setPowerLevelEvent).toHaveBeenCalledWith(powerLevelEvent);
+            expect(state.members[userB].setPowerLevelEvent).toHaveBeenCalledWith(powerLevelEvent);
         });
 
-        it("should call setPowerLevelEvent on a new RoomMember if power levels exist",
-        function() {
+        it("should call setPowerLevelEvent on a new RoomMember if power levels exist", function() {
             const memberEvent = utils.mkMembership({
                 mship: "join", user: userC, room: roomId, event: true,
             });
@@ -243,19 +244,105 @@ describe("RoomState", function() {
         });
 
         it("should call setMembershipEvent on the right RoomMember", function() {
-            // mock up the room members
-            state.members[userA] = utils.mock(RoomMember);
-            state.members[userB] = utils.mock(RoomMember);
-
             const memberEvent = utils.mkMembership({
                 user: userB, mship: "leave", room: roomId, event: true,
             });
+            // spy on the room members
+            jest.spyOn(state.members[userA], "setMembershipEvent");
+            jest.spyOn(state.members[userB], "setMembershipEvent");
             state.setStateEvents([memberEvent]);
 
             expect(state.members[userA].setMembershipEvent).not.toHaveBeenCalled();
             expect(state.members[userB].setMembershipEvent).toHaveBeenCalledWith(
                 memberEvent, state,
             );
+        });
+
+        describe('beacon events', () => {
+            it('adds new beacon info events to state and emits', () => {
+                const beaconEvent = makeBeaconInfoEvent(userA, roomId);
+                const emitSpy = jest.spyOn(state, 'emit');
+
+                state.setStateEvents([beaconEvent]);
+
+                expect(state.beacons.size).toEqual(1);
+                const beaconInstance = state.beacons.get(`${roomId}_${userA}`);
+                expect(beaconInstance).toBeTruthy();
+                expect(emitSpy).toHaveBeenCalledWith(BeaconEvent.New, beaconEvent, beaconInstance);
+            });
+
+            it('does not add redacted beacon info events to state', () => {
+                const redactedBeaconEvent = makeBeaconInfoEvent(userA, roomId);
+                const redactionEvent = { event: { type: 'm.room.redaction' } };
+                redactedBeaconEvent.makeRedacted(redactionEvent);
+                const emitSpy = jest.spyOn(state, 'emit');
+
+                state.setStateEvents([redactedBeaconEvent]);
+
+                // no beacon added
+                expect(state.beacons.size).toEqual(0);
+                expect(state.beacons.get(getBeaconInfoIdentifier(redactedBeaconEvent))).toBeFalsy();
+                // no new beacon emit
+                expect(filterEmitCallsByEventType(BeaconEvent.New, emitSpy).length).toBeFalsy();
+            });
+
+            it('updates existing beacon info events in state', () => {
+                const beaconId = '$beacon1';
+                const beaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId);
+                const updatedBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: false }, beaconId);
+
+                state.setStateEvents([beaconEvent]);
+                const beaconInstance = state.beacons.get(getBeaconInfoIdentifier(beaconEvent));
+                expect(beaconInstance.isLive).toEqual(true);
+
+                state.setStateEvents([updatedBeaconEvent]);
+
+                // same Beacon
+                expect(state.beacons.get(getBeaconInfoIdentifier(beaconEvent))).toBe(beaconInstance);
+                // updated liveness
+                expect(state.beacons.get(getBeaconInfoIdentifier(beaconEvent)).isLive).toEqual(false);
+            });
+
+            it('destroys and removes redacted beacon events', () => {
+                const beaconId = '$beacon1';
+                const beaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId);
+                const redactedBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId);
+                const redactionEvent = { event: { type: 'm.room.redaction', redacts: beaconEvent.getId() } };
+                redactedBeaconEvent.makeRedacted(redactionEvent);
+
+                state.setStateEvents([beaconEvent]);
+                const beaconInstance = state.beacons.get(getBeaconInfoIdentifier(beaconEvent));
+                const destroySpy = jest.spyOn(beaconInstance, 'destroy');
+                expect(beaconInstance.isLive).toEqual(true);
+
+                state.setStateEvents([redactedBeaconEvent]);
+
+                expect(destroySpy).toHaveBeenCalled();
+                expect(state.beacons.get(getBeaconInfoIdentifier(beaconEvent))).toBe(undefined);
+            });
+
+            it('updates live beacon ids once after setting state events', () => {
+                const liveBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, '$beacon1');
+                const deadBeaconEvent = makeBeaconInfoEvent(userB, roomId, { isLive: false }, '$beacon2');
+
+                const emitSpy = jest.spyOn(state, 'emit');
+
+                state.setStateEvents([liveBeaconEvent, deadBeaconEvent]);
+
+                // called once
+                expect(filterEmitCallsByEventType(RoomStateEvent.BeaconLiveness, emitSpy).length).toBe(1);
+
+                // live beacon is now not live
+                const updatedLiveBeaconEvent = makeBeaconInfoEvent(
+                    userA, roomId, { isLive: false }, liveBeaconEvent.getId(), '$beacon1',
+                );
+
+                state.setStateEvents([updatedLiveBeaconEvent]);
+
+                expect(state.hasLiveBeacons).toBe(false);
+                expect(filterEmitCallsByEventType(RoomStateEvent.BeaconLiveness, emitSpy).length).toBe(3);
+                expect(emitSpy).toHaveBeenCalledWith(RoomStateEvent.BeaconLiveness, state, false);
+            });
         });
     });
 
@@ -374,17 +461,13 @@ describe("RoomState", function() {
                     user_ids: [userA],
                 },
             });
-            // mock up the room members
-            state.members[userA] = utils.mock(RoomMember);
-            state.members[userB] = utils.mock(RoomMember);
+            // spy on the room members
+            jest.spyOn(state.members[userA], "setTypingEvent");
+            jest.spyOn(state.members[userB], "setTypingEvent");
             state.setTypingEvent(typingEvent);
 
-            expect(state.members[userA].setTypingEvent).toHaveBeenCalledWith(
-                typingEvent,
-            );
-            expect(state.members[userB].setTypingEvent).toHaveBeenCalledWith(
-                typingEvent,
-            );
+            expect(state.members[userA].setTypingEvent).toHaveBeenCalledWith(typingEvent);
+            expect(state.members[userB].setTypingEvent).toHaveBeenCalledWith(typingEvent);
         });
     });
 
@@ -471,13 +554,13 @@ describe("RoomState", function() {
 
         it("should update after adding joined member", function() {
             state.setStateEvents([
-                utils.mkMembership({event: true, mship: "join",
-                    user: userA, room: roomId}),
+                utils.mkMembership({ event: true, mship: "join",
+                    user: userA, room: roomId }),
             ]);
             expect(state.getJoinedMemberCount()).toEqual(1);
             state.setStateEvents([
-                utils.mkMembership({event: true, mship: "join",
-                    user: userC, room: roomId}),
+                utils.mkMembership({ event: true, mship: "join",
+                    user: userC, room: roomId }),
             ]);
             expect(state.getJoinedMemberCount()).toEqual(2);
         });
@@ -490,13 +573,13 @@ describe("RoomState", function() {
 
         it("should update after adding invited member", function() {
             state.setStateEvents([
-                utils.mkMembership({event: true, mship: "invite",
-                    user: userA, room: roomId}),
+                utils.mkMembership({ event: true, mship: "invite",
+                    user: userA, room: roomId }),
             ]);
             expect(state.getInvitedMemberCount()).toEqual(1);
             state.setStateEvents([
-                utils.mkMembership({event: true, mship: "invite",
-                    user: userC, room: roomId}),
+                utils.mkMembership({ event: true, mship: "invite",
+                    user: userC, room: roomId }),
             ]);
             expect(state.getInvitedMemberCount()).toEqual(2);
         });
@@ -509,15 +592,15 @@ describe("RoomState", function() {
 
         it("should, once used, override counting members from state", function() {
             state.setStateEvents([
-                utils.mkMembership({event: true, mship: "join",
-                    user: userA, room: roomId}),
+                utils.mkMembership({ event: true, mship: "join",
+                    user: userA, room: roomId }),
             ]);
             expect(state.getJoinedMemberCount()).toEqual(1);
             state.setJoinedMemberCount(100);
             expect(state.getJoinedMemberCount()).toEqual(100);
             state.setStateEvents([
-                utils.mkMembership({event: true, mship: "join",
-                    user: userC, room: roomId}),
+                utils.mkMembership({ event: true, mship: "join",
+                    user: userC, room: roomId }),
             ]);
             expect(state.getJoinedMemberCount()).toEqual(100);
         });
@@ -525,14 +608,14 @@ describe("RoomState", function() {
         it("should, once used, override counting members from state, " +
         "also after clone", function() {
             state.setStateEvents([
-                utils.mkMembership({event: true, mship: "join",
-                    user: userA, room: roomId}),
+                utils.mkMembership({ event: true, mship: "join",
+                    user: userA, room: roomId }),
             ]);
             state.setJoinedMemberCount(100);
             const copy = state.clone();
             copy.setStateEvents([
-                utils.mkMembership({event: true, mship: "join",
-                    user: userC, room: roomId}),
+                utils.mkMembership({ event: true, mship: "join",
+                    user: userC, room: roomId }),
             ]);
             expect(state.getJoinedMemberCount()).toEqual(100);
         });
@@ -545,15 +628,15 @@ describe("RoomState", function() {
 
         it("should, once used, override counting members from state", function() {
             state.setStateEvents([
-                utils.mkMembership({event: true, mship: "invite",
-                    user: userB, room: roomId}),
+                utils.mkMembership({ event: true, mship: "invite",
+                    user: userB, room: roomId }),
             ]);
             expect(state.getInvitedMemberCount()).toEqual(1);
             state.setInvitedMemberCount(100);
             expect(state.getInvitedMemberCount()).toEqual(100);
             state.setStateEvents([
-                utils.mkMembership({event: true, mship: "invite",
-                    user: userC, room: roomId}),
+                utils.mkMembership({ event: true, mship: "invite",
+                    user: userC, room: roomId }),
             ]);
             expect(state.getInvitedMemberCount()).toEqual(100);
         });
@@ -561,14 +644,14 @@ describe("RoomState", function() {
         it("should, once used, override counting members from state, " +
         "also after clone", function() {
             state.setStateEvents([
-                utils.mkMembership({event: true, mship: "invite",
-                    user: userB, room: roomId}),
+                utils.mkMembership({ event: true, mship: "invite",
+                    user: userB, room: roomId }),
             ]);
             state.setInvitedMemberCount(100);
             const copy = state.clone();
             copy.setStateEvents([
-                utils.mkMembership({event: true, mship: "invite",
-                    user: userC, room: roomId}),
+                utils.mkMembership({ event: true, mship: "invite",
+                    user: userC, room: roomId }),
             ]);
             expect(state.getInvitedMemberCount()).toEqual(100);
         });
@@ -633,6 +716,245 @@ describe("RoomState", function() {
 
             expect(state.maySendEvent('m.room.other_thing', userA)).toEqual(true);
             expect(state.maySendEvent('m.room.other_thing', userB)).toEqual(false);
+        });
+    });
+
+    describe('processBeaconEvents', () => {
+        const beacon1 = makeBeaconInfoEvent(userA, roomId, {}, '$beacon1', '$beacon1');
+        const beacon2 = makeBeaconInfoEvent(userB, roomId, {}, '$beacon2', '$beacon2');
+
+        const mockClient = { decryptEventIfNeeded: jest.fn() };
+
+        beforeEach(() => {
+            mockClient.decryptEventIfNeeded.mockClear();
+        });
+
+        it('does nothing when state has no beacons', () => {
+            const emitSpy = jest.spyOn(state, 'emit');
+            state.processBeaconEvents([makeBeaconEvent(userA, { beaconInfoId: '$beacon1' })], mockClient);
+            expect(emitSpy).not.toHaveBeenCalled();
+            expect(mockClient.decryptEventIfNeeded).not.toHaveBeenCalled();
+        });
+
+        it('does nothing when there are no events', () => {
+            state.setStateEvents([beacon1, beacon2]);
+            const emitSpy = jest.spyOn(state, 'emit').mockClear();
+            state.processBeaconEvents([], mockClient);
+            expect(emitSpy).not.toHaveBeenCalled();
+            expect(mockClient.decryptEventIfNeeded).not.toHaveBeenCalled();
+        });
+
+        describe('without encryption', () => {
+            it('discards events for beacons that are not in state', () => {
+                const location = makeBeaconEvent(userA, {
+                    beaconInfoId: 'some-other-beacon',
+                });
+                const otherRelatedEvent = new MatrixEvent({
+                    sender: userA,
+                    type: EventType.RoomMessage,
+                    content: {
+                        ['m.relates_to']: {
+                            event_id: 'whatever',
+                        },
+                    },
+                });
+                state.setStateEvents([beacon1, beacon2]);
+                const emitSpy = jest.spyOn(state, 'emit').mockClear();
+                state.processBeaconEvents([location, otherRelatedEvent], mockClient);
+                expect(emitSpy).not.toHaveBeenCalled();
+            });
+
+            it('discards events that are not beacon type', () => {
+                // related to beacon1
+                const otherRelatedEvent = new MatrixEvent({
+                    sender: userA,
+                    type: EventType.RoomMessage,
+                    content: {
+                        ['m.relates_to']: {
+                            rel_type: RelationType.Reference,
+                            event_id: beacon1.getId(),
+                        },
+                    },
+                });
+                state.setStateEvents([beacon1, beacon2]);
+                const emitSpy = jest.spyOn(state, 'emit').mockClear();
+                state.processBeaconEvents([otherRelatedEvent], mockClient);
+                expect(emitSpy).not.toHaveBeenCalled();
+            });
+
+            it('adds locations to beacons', () => {
+                const location1 = makeBeaconEvent(userA, {
+                    beaconInfoId: '$beacon1', timestamp: Date.now() + 1,
+                });
+                const location2 = makeBeaconEvent(userA, {
+                    beaconInfoId: '$beacon1', timestamp: Date.now() + 2,
+                });
+                const location3 = makeBeaconEvent(userB, {
+                    beaconInfoId: 'some-other-beacon',
+                });
+
+                state.setStateEvents([beacon1, beacon2], mockClient);
+
+                expect(state.beacons.size).toEqual(2);
+
+                const beaconInstance = state.beacons.get(getBeaconInfoIdentifier(beacon1));
+                const addLocationsSpy = jest.spyOn(beaconInstance, 'addLocations');
+
+                state.processBeaconEvents([location1, location2, location3], mockClient);
+
+                expect(addLocationsSpy).toHaveBeenCalledTimes(2);
+                // only called with locations for beacon1
+                expect(addLocationsSpy).toHaveBeenCalledWith([location1]);
+                expect(addLocationsSpy).toHaveBeenCalledWith([location2]);
+            });
+        });
+
+        describe('with encryption', () => {
+            const beacon1RelationContent = { ['m.relates_to']: {
+                rel_type: RelationType.Reference,
+                event_id: beacon1.getId(),
+            } };
+            const relatedEncryptedEvent = new MatrixEvent({
+                sender: userA,
+                type: EventType.RoomMessageEncrypted,
+                content: beacon1RelationContent,
+            });
+            const decryptingRelatedEvent = new MatrixEvent({
+                sender: userA,
+                type: EventType.RoomMessageEncrypted,
+                content: beacon1RelationContent,
+            });
+            jest.spyOn(decryptingRelatedEvent, 'isBeingDecrypted').mockReturnValue(true);
+
+            const failedDecryptionRelatedEvent = new MatrixEvent({
+                sender: userA,
+                type: EventType.RoomMessageEncrypted,
+                content: beacon1RelationContent,
+            });
+            jest.spyOn(failedDecryptionRelatedEvent, 'isDecryptionFailure').mockReturnValue(true);
+
+            it('discards events without relations', () => {
+                const unrelatedEvent = new MatrixEvent({
+                    sender: userA,
+                    type: EventType.RoomMessageEncrypted,
+                });
+                state.setStateEvents([beacon1, beacon2]);
+                const emitSpy = jest.spyOn(state, 'emit').mockClear();
+                state.processBeaconEvents([unrelatedEvent], mockClient);
+                expect(emitSpy).not.toHaveBeenCalled();
+                // discard unrelated events early
+                expect(mockClient.decryptEventIfNeeded).not.toHaveBeenCalled();
+            });
+
+            it('discards events for beacons that are not in state', () => {
+                const location = makeBeaconEvent(userA, {
+                    beaconInfoId: 'some-other-beacon',
+                });
+                const otherRelatedEvent = new MatrixEvent({
+                    sender: userA,
+                    type: EventType.RoomMessageEncrypted,
+                    content: {
+                        ['m.relates_to']: {
+                            rel_type: RelationType.Reference,
+                            event_id: 'whatever',
+                        },
+                    },
+                });
+                state.setStateEvents([beacon1, beacon2]);
+
+                const beacon = state.beacons.get(getBeaconInfoIdentifier(beacon1));
+                const addLocationsSpy = jest.spyOn(beacon, 'addLocations').mockClear();
+                state.processBeaconEvents([location, otherRelatedEvent], mockClient);
+                expect(addLocationsSpy).not.toHaveBeenCalled();
+                // discard unrelated events early
+                expect(mockClient.decryptEventIfNeeded).not.toHaveBeenCalled();
+            });
+
+            it('decrypts related events if needed', () => {
+                const location = makeBeaconEvent(userA, {
+                    beaconInfoId: beacon1.getId(),
+                });
+                state.setStateEvents([beacon1, beacon2]);
+                state.processBeaconEvents([location, relatedEncryptedEvent], mockClient);
+                // discard unrelated events early
+                expect(mockClient.decryptEventIfNeeded).toHaveBeenCalledTimes(2);
+            });
+
+            it('listens for decryption on events that are being decrypted', () => {
+                const decryptingRelatedEvent = new MatrixEvent({
+                    sender: userA,
+                    type: EventType.RoomMessageEncrypted,
+                    content: beacon1RelationContent,
+                });
+                jest.spyOn(decryptingRelatedEvent, 'isBeingDecrypted').mockReturnValue(true);
+                // spy on event.once
+                const eventOnceSpy = jest.spyOn(decryptingRelatedEvent, 'once');
+
+                state.setStateEvents([beacon1, beacon2]);
+                state.processBeaconEvents([decryptingRelatedEvent], mockClient);
+
+                // listener was added
+                expect(eventOnceSpy).toHaveBeenCalled();
+            });
+
+            it('listens for decryption on events that have decryption failure', () => {
+                const failedDecryptionRelatedEvent = new MatrixEvent({
+                    sender: userA,
+                    type: EventType.RoomMessageEncrypted,
+                    content: beacon1RelationContent,
+                });
+                jest.spyOn(failedDecryptionRelatedEvent, 'isDecryptionFailure').mockReturnValue(true);
+                // spy on event.once
+                const eventOnceSpy = jest.spyOn(decryptingRelatedEvent, 'once');
+
+                state.setStateEvents([beacon1, beacon2]);
+                state.processBeaconEvents([decryptingRelatedEvent], mockClient);
+
+                // listener was added
+                expect(eventOnceSpy).toHaveBeenCalled();
+            });
+
+            it('discard events that are not m.beacon type after decryption', () => {
+                const decryptingRelatedEvent = new MatrixEvent({
+                    sender: userA,
+                    type: EventType.RoomMessageEncrypted,
+                    content: beacon1RelationContent,
+                });
+                jest.spyOn(decryptingRelatedEvent, 'isBeingDecrypted').mockReturnValue(true);
+                state.setStateEvents([beacon1, beacon2]);
+                const beacon = state.beacons.get(getBeaconInfoIdentifier(beacon1));
+                const addLocationsSpy = jest.spyOn(beacon, 'addLocations').mockClear();
+                state.processBeaconEvents([decryptingRelatedEvent], mockClient);
+
+                // this event is a message after decryption
+                decryptingRelatedEvent.type = EventType.RoomMessage;
+                decryptingRelatedEvent.emit(MatrixEventEvent.Decrypted);
+
+                expect(addLocationsSpy).not.toHaveBeenCalled();
+            });
+
+            it('adds locations to beacons after decryption', () => {
+                const decryptingRelatedEvent = new MatrixEvent({
+                    sender: userA,
+                    type: EventType.RoomMessageEncrypted,
+                    content: beacon1RelationContent,
+                });
+                const locationEvent = makeBeaconEvent(userA, {
+                    beaconInfoId: '$beacon1', timestamp: Date.now() + 1,
+                });
+                jest.spyOn(decryptingRelatedEvent, 'isBeingDecrypted').mockReturnValue(true);
+                state.setStateEvents([beacon1, beacon2]);
+                const beacon = state.beacons.get(getBeaconInfoIdentifier(beacon1));
+                const addLocationsSpy = jest.spyOn(beacon, 'addLocations').mockClear();
+                state.processBeaconEvents([decryptingRelatedEvent], mockClient);
+
+                // update type after '''decryption'''
+                decryptingRelatedEvent.event.type = M_BEACON.name;
+                decryptingRelatedEvent.event.content = locationEvent.content;
+                decryptingRelatedEvent.emit(MatrixEventEvent.Decrypted);
+
+                expect(addLocationsSpy).toHaveBeenCalledWith([decryptingRelatedEvent]);
+            });
         });
     });
 });

@@ -1,0 +1,14 @@
+name: Notify Downstream Projects
+on:
+  push:
+    branches: [ develop ]
+jobs:
+  notify-matrix-react-sdk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify matrix-react-sdk repo that a new SDK build is on develop so it can CI against it
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+          repository: vector-im/element-web
+          event-type: upstream-sdk-notify

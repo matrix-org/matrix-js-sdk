@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import "../../../olm-loader";
-import {logger} from "../../../../src/logger";
+import { logger } from "../../../../src/logger";
 
 const Olm = global.Olm;
 

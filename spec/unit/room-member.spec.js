@@ -1,5 +1,5 @@
-import * as utils from "../test-utils";
-import {RoomMember} from "../../src/models/room-member";
+import * as utils from "../test-utils/test-utils";
+import { RoomMember } from "../../src/models/room-member";
 
 describe("RoomMember", function() {
     const roomId = "!foo:bar";
@@ -31,12 +31,6 @@ describe("RoomMember", function() {
             // we don't care about how the mxc->http conversion is done, other
             // than it contains the mxc body.
             expect(url.indexOf("flibble/wibble")).not.toEqual(-1);
-        });
-
-        it("should return an identicon HTTP URL if allowDefault was set and there " +
-        "was no m.room.member event", function() {
-            const url = member.getAvatarUrl(hsUrl, 64, 64, "crop", true);
-            expect(url.indexOf("http")).toEqual(0); // don't care about form
         });
 
         it("should return nothing if there is no m.room.member and allowDefault=false",
@@ -128,6 +122,34 @@ describe("RoomMember", function() {
 
             member.setPowerLevelEvent(event);
             expect(member.powerLevel).toEqual(0);
+            expect(emitCount).toEqual(1);
+        });
+
+        it("should not honor string power levels.",
+        function() {
+            const event = utils.mkEvent({
+                type: "m.room.power_levels",
+                room: roomId,
+                user: userA,
+                content: {
+                    users_default: 20,
+                    users: {
+                        "@alice:bar": "5",
+                    },
+                },
+                event: true,
+            });
+            let emitCount = 0;
+
+            member.on("RoomMember.powerLevel", function(emitEvent, emitMember) {
+                emitCount += 1;
+                expect(emitMember.userId).toEqual('@alice:bar');
+                expect(emitMember.powerLevel).toEqual(20);
+                expect(emitEvent).toEqual(event);
+            });
+
+            member.setPowerLevelEvent(event);
+            expect(member.powerLevel).toEqual(20);
             expect(emitCount).toEqual(1);
         });
     });

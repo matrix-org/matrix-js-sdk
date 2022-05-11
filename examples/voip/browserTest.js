@@ -1,16 +1,17 @@
 console.log("Loading browser sdk");
-var BASE_URL = "https://matrix.org";
-var TOKEN = "accesstokengoeshere";
-var USER_ID = "@username:localhost";
-var ROOM_ID = "!room:id";
+const BASE_URL = "https://matrix.org";
+const TOKEN = "accesstokengoeshere";
+const USER_ID = "@username:localhost";
+const ROOM_ID = "!room:id";
+const DEVICE_ID = "some_device_id";
 
-
-var client = matrixcs.createClient({
+const client = matrixcs.createClient({
     baseUrl: BASE_URL,
     accessToken: TOKEN,
-    userId: USER_ID
+    userId: USER_ID,
+    deviceId: DEVICE_ID
 });
-var call;
+let call;
 
 function disableButtons(place, answer, hangup) {
     document.getElementById("hangup").disabled = hangup;
@@ -19,7 +20,7 @@ function disableButtons(place, answer, hangup) {
 }
 
 function addListeners(call) {
-    var lastError = "";
+    let lastError = "";
     call.on("hangup", function() {
         disableButtons(false, true, true);
         document.getElementById("result").innerHTML = (
@@ -30,6 +31,23 @@ function addListeners(call) {
         lastError = err.message;
         call.hangup();
         disableButtons(false, true, true);
+    });
+    call.on("feeds_changed", function(feeds) {
+        const localFeed = feeds.find((feed) => feed.isLocal());
+        const remoteFeed = feeds.find((feed) => !feed.isLocal());
+
+        const remoteElement = document.getElementById("remote");
+        const localElement = document.getElementById("local");
+
+        if (remoteFeed) {
+            remoteElement.srcObject = remoteFeed.stream;
+            remoteElement.play();
+        }
+        if (localFeed) {
+            localElement.muted = true;
+            localElement.srcObject = localFeed.stream;
+            localElement.play();
+        }
     });
 }
 
@@ -62,10 +80,7 @@ function syncComplete() {
         );
         console.log("Call => %s", call);
         addListeners(call);
-        call.placeVideoCall(
-            document.getElementById("remote"),
-            document.getElementById("local")
-        );
+        call.placeVideoCall();
         document.getElementById("result").innerHTML = "<p>Placed call.</p>";
         disableButtons(true, true, false);
     };

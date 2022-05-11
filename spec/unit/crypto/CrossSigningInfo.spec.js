@@ -22,9 +22,11 @@ import {
 import {
     IndexedDBCryptoStore,
 } from '../../../src/crypto/store/indexeddb-crypto-store';
-import {MemoryCryptoStore} from '../../../src/crypto/store/memory-crypto-store';
+import { MemoryCryptoStore } from '../../../src/crypto/store/memory-crypto-store';
 import 'fake-indexeddb/auto';
 import 'jest-localstorage-mock';
+import { OlmDevice } from "../../../src/crypto/OlmDevice";
+import { logger } from '../../../src/logger';
 
 const userId = "@alice:example.com";
 
@@ -37,7 +39,7 @@ const testKey = new Uint8Array([
 ]);
 
 const types = [
-    { type: "master", shouldCache: false },
+    { type: "master", shouldCache: true },
     { type: "self_signing", shouldCache: true },
     { type: "user_signing", shouldCache: true },
     { type: "invalid", shouldCache: false },
@@ -50,7 +52,7 @@ const masterKeyPub = "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk";
 
 describe("CrossSigningInfo.getCrossSigningKey", function() {
     if (!global.Olm) {
-        console.warn('Not running megolm backup unit tests: libolm not present');
+        logger.warn('Not running megolm backup unit tests: libolm not present');
         return;
     }
 
@@ -64,7 +66,7 @@ describe("CrossSigningInfo.getCrossSigningKey", function() {
     });
 
     it.each(types)("should throw if the callback returns falsey",
-                   async ({type, shouldCache}) => {
+                   async ({ type, shouldCache }) => {
         const info = new CrossSigningInfo(userId, {
             getCrossSigningKey: () => false,
         });
@@ -82,9 +84,16 @@ describe("CrossSigningInfo.getCrossSigningKey", function() {
         const info = new CrossSigningInfo(userId, {
             getCrossSigningKey: () => testKey,
         });
-        const [pubKey, ab] = await info.getCrossSigningKey("master", masterKeyPub);
+        const [pubKey, pkSigning] = await info.getCrossSigningKey("master", masterKeyPub);
         expect(pubKey).toEqual(masterKeyPub);
-        expect(ab).toEqual({a: 106712, b: 106712});
+        // check that the pkSigning object corresponds to the pubKey
+        const signature = pkSigning.sign("message");
+        const util = new global.Olm.Utility();
+        try {
+            util.ed25519_verify(pubKey, "message", signature);
+        } finally {
+            util.free();
+        }
     });
 
     it.each(types)("should request a key from the cache callback (if set)" +
@@ -233,8 +242,9 @@ describe.each([
 
     it("should cache data to the store and retrieve it", async () => {
         await store.startup();
+        const olmDevice = new OlmDevice(store);
         const { getCrossSigningKeyCache, storeCrossSigningKeyCache } =
-          createCryptoStoreCacheCallbacks(store);
+              createCryptoStoreCacheCallbacks(store, olmDevice);
         await storeCrossSigningKeyCache("self_signing", testKey);
 
         // If we've not saved anything, don't expect anything
@@ -243,6 +253,6 @@ describe.each([
         expect(nokey).toBeNull();
 
         const key = await getCrossSigningKeyCache("self_signing", "");
-        expect(key).toEqual(testKey);
+        expect(new Uint8Array(key)).toEqual(testKey);
     });
 });

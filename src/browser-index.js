@@ -14,9 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as matrixcs from "./matrix";
 import request from "browser-request";
 import queryString from "qs";
+
+import * as matrixcs from "./matrix";
+
+if (matrixcs.getRequest()) {
+    throw new Error("Multiple matrix-js-sdk entrypoints detected!");
+}
 
 matrixcs.request(function(opts, fn) {
     // We manually fix the query string for browser-request because
@@ -34,7 +39,7 @@ matrixcs.request(function(opts, fn) {
 let indexedDB;
 try {
     indexedDB = global.indexedDB;
-} catch(e) {}
+} catch (e) {}
 
 // if our browser (appears to) support indexeddb, use an indexeddb crypto store.
 if (indexedDB) {

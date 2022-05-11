@@ -1,5 +1,6 @@
-import * as utils from "../test-utils";
-import {PushProcessor} from "../../src/pushprocessor";
+import * as utils from "../test-utils/test-utils";
+import { PushProcessor } from "../../src/pushprocessor";
+import { EventType } from "../../src";
 
 describe('NotificationService', function() {
     const testUserId = "@ali:matrix.org";
@@ -208,6 +209,7 @@ describe('NotificationService', function() {
                 msgtype: "m.text",
             },
         });
+        matrixClient.pushRules = PushProcessor.rewriteDefaultRules(matrixClient.pushRules);
         pushProcessor = new PushProcessor(matrixClient);
     });
 
@@ -295,11 +297,42 @@ describe('NotificationService', function() {
         expect(actions.tweaks.highlight).toEqual(false);
     });
 
+    it('should not bing on room server ACL changes', function() {
+        testEvent = utils.mkEvent({
+            type: EventType.RoomServerAcl,
+            room: testRoomId,
+            user: "@alfred:localhost",
+            event: true,
+            content: {},
+        });
+
+        const actions = pushProcessor.actionsForEvent(testEvent);
+        expect(actions.tweaks.highlight).toBeFalsy();
+        expect(actions.tweaks.sound).toBeFalsy();
+        expect(actions.notify).toBeFalsy();
+    });
+
     // invalid
 
     it('should gracefully handle bad input.', function() {
         testEvent.event.content.body = { "foo": "bar" };
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(false);
+    });
+
+    it("a rule with no conditions matches every event.", function() {
+        expect(pushProcessor.ruleMatchesEvent({
+            rule_id: "rule1",
+            actions: [],
+            conditions: [],
+            default: false,
+            enabled: true,
+        }, testEvent)).toBe(true);
+        expect(pushProcessor.ruleMatchesEvent({
+            rule_id: "rule1",
+            actions: [],
+            default: false,
+            enabled: true,
+        }, testEvent)).toBe(true);
     });
 });

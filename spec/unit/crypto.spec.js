@@ -1,15 +1,19 @@
 import '../olm-loader';
-import {Crypto} from "../../src/crypto";
-import {WebStorageSessionStore} from "../../src/store/session/webstorage";
-import {MemoryCryptoStore} from "../../src/crypto/store/memory-crypto-store";
-import {MockStorageApi} from "../MockStorageApi";
-import {TestClient} from "../TestClient";
-import {MatrixEvent} from "../../src/models/event";
-import {Room} from "../../src/models/room";
+// eslint-disable-next-line no-restricted-imports
+import { EventEmitter } from "events";
+
+import { Crypto } from "../../src/crypto";
+import { WebStorageSessionStore } from "../../src/store/session/webstorage";
+import { MemoryCryptoStore } from "../../src/crypto/store/memory-crypto-store";
+import { MockStorageApi } from "../MockStorageApi";
+import { TestClient } from "../TestClient";
+import { MatrixEvent } from "../../src/models/event";
+import { Room } from "../../src/models/room";
 import * as olmlib from "../../src/crypto/olmlib";
-import {sleep} from "../../src/utils";
-import {EventEmitter} from "events";
-import {CRYPTO_ENABLED} from "../../src/client";
+import { sleep } from "../../src/utils";
+import { CRYPTO_ENABLED } from "../../src/client";
+import { DeviceInfo } from "../../src/crypto/deviceinfo";
+import { logger } from '../../src/logger';
 
 const Olm = global.Olm;
 
@@ -26,6 +30,66 @@ describe("Crypto", function() {
         expect(Crypto.getOlmVersion()[0]).toEqual(3);
     });
 
+    describe("encrypted events", function() {
+        it("provides encryption information", async function() {
+            const client = (new TestClient(
+                "@alice:example.com", "deviceid",
+            )).client;
+            await client.initCrypto();
+
+            // unencrypted event
+            const event = {
+                getId: () => "$event_id",
+                getSenderKey: () => null,
+                getWireContent: () => {return {};},
+            };
+
+            let encryptionInfo = client.getEventEncryptionInfo(event);
+            expect(encryptionInfo.encrypted).toBeFalsy();
+
+            // unknown sender (e.g. deleted device), forwarded megolm key (untrusted)
+            event.getSenderKey = () => 'YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI';
+            event.getWireContent = () => {return { algorithm: olmlib.MEGOLM_ALGORITHM };};
+            event.getForwardingCurve25519KeyChain = () => ["not empty"];
+            event.isKeySourceUntrusted = () => false;
+            event.getClaimedEd25519Key =
+                () => 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+
+            encryptionInfo = client.getEventEncryptionInfo(event);
+            expect(encryptionInfo.encrypted).toBeTruthy();
+            expect(encryptionInfo.authenticated).toBeFalsy();
+            expect(encryptionInfo.sender).toBeFalsy();
+
+            // known sender, megolm key from backup
+            event.getForwardingCurve25519KeyChain = () => [];
+            event.isKeySourceUntrusted = () => true;
+            const device = new DeviceInfo("FLIBBLE");
+            device.keys["curve25519:FLIBBLE"] =
+                'YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI';
+            device.keys["ed25519:FLIBBLE"] =
+                'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+            client.crypto.deviceList.getDeviceByIdentityKey = () => device;
+
+            encryptionInfo = client.getEventEncryptionInfo(event);
+            expect(encryptionInfo.encrypted).toBeTruthy();
+            expect(encryptionInfo.authenticated).toBeFalsy();
+            expect(encryptionInfo.sender).toBeTruthy();
+            expect(encryptionInfo.mismatchedSender).toBeFalsy();
+
+            // known sender, trusted megolm key, but bad ed25519key
+            event.isKeySourceUntrusted = () => false;
+            device.keys["ed25519:FLIBBLE"] =
+                'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
+
+            encryptionInfo = client.getEventEncryptionInfo(event);
+            expect(encryptionInfo.encrypted).toBeTruthy();
+            expect(encryptionInfo.authenticated).toBeTruthy();
+            expect(encryptionInfo.sender).toBeTruthy();
+            expect(encryptionInfo.mismatchedSender).toBeTruthy();
+
+            client.stopClient();
+        });
+    });
 
     describe('Session management', function() {
         const otkResponse = {
@@ -152,7 +216,7 @@ describe("Crypto", function() {
 
                 async function keyshareEventForEvent(event, index) {
                     const eventContent = event.getWireContent();
-                    const key = await aliceClient._crypto._olmDevice
+                    const key = await aliceClient.crypto.olmDevice
                         .getInboundGroupSessionKey(
                             roomId, eventContent.sender_key, eventContent.session_id,
                             index,
@@ -173,7 +237,7 @@ describe("Crypto", function() {
                         },
                     });
                     // make onRoomKeyEvent think this was an encrypted event
-                    ksEvent._senderCurve25519Key = "akey";
+                    ksEvent.senderCurve25519Key = "akey";
                     return ksEvent;
                 }
 
@@ -212,19 +276,19 @@ describe("Crypto", function() {
                 await Promise.all(events.map(async (event) => {
                     // alice encrypts each event, and then bob tries to decrypt
                     // them without any keys, so that they'll be in pending
-                    await aliceClient._crypto.encryptEvent(event, aliceRoom);
-                    event._clearEvent = {};
-                    event._senderCurve25519Key = null;
-                    event._claimedEd25519Key = null;
+                    await aliceClient.crypto.encryptEvent(event, aliceRoom);
+                    event.clearEvent = undefined;
+                    event.senderCurve25519Key = null;
+                    event.claimedEd25519Key = null;
                     try {
-                        await bobClient._crypto.decryptEvent(event);
+                        await bobClient.crypto.decryptEvent(event);
                     } catch (e) {
                         // we expect this to fail because we don't have the
                         // decryption keys yet
                     }
                 }));
 
-                const bobDecryptor = bobClient._crypto._getRoomDecryptor(
+                const bobDecryptor = bobClient.crypto.getRoomDecryptor(
                     roomId, olmlib.MEGOLM_ALGORITHM,
                 );
 
@@ -241,7 +305,7 @@ describe("Crypto", function() {
                 expect(events[0].getContent().msgtype).toBe("m.bad.encrypted");
                 expect(events[1].getContent().msgtype).not.toBe("m.bad.encrypted");
 
-                const cryptoStore = bobClient._cryptoStore;
+                const cryptoStore = bobClient.cryptoStore;
                 const eventContent = events[0].getWireContent();
                 const senderKey = eventContent.sender_key;
                 const sessionId = eventContent.session_id;
@@ -283,7 +347,7 @@ describe("Crypto", function() {
                 },
             });
             await aliceClient.cancelAndResendEventRoomKeyRequest(event);
-            const cryptoStore = aliceClient._cryptoStore;
+            const cryptoStore = aliceClient.cryptoStore;
             const roomKeyRequestBody = {
                 algorithm: olmlib.MEGOLM_ALGORITHM,
                 room_id: "!someroom",
@@ -316,7 +380,7 @@ describe("Crypto", function() {
             // key requests get queued until the sync has finished, but we don't
             // let the client set up enough for that to happen, so gut-wrench a bit
             // to force it to send now.
-            aliceClient._crypto._outgoingRoomKeyRequestManager.sendQueuedRequests();
+            aliceClient.crypto.outgoingRoomKeyRequestManager.sendQueuedRequests();
             jest.runAllTimers();
             await Promise.resolve();
             expect(aliceClient.sendToDevice).toBeCalledTimes(1);
@@ -335,6 +399,30 @@ describe("Crypto", function() {
             // the second call to sendToDevice will be the key request
             expect(aliceClient.sendToDevice).toBeCalledTimes(3);
             expect(aliceClient.sendToDevice.mock.calls[2][2]).not.toBe(txnId);
+        });
+    });
+
+    describe('Secret storage', function() {
+        it("creates secret storage even if there is no keyInfo", async function() {
+            jest.spyOn(logger, 'log').mockImplementation(() => {});
+            jest.setTimeout(10000);
+            const client = (new TestClient("@a:example.com", "dev")).client;
+            await client.initCrypto();
+            client.crypto.getSecretStorageKey = async () => null;
+            client.crypto.isCrossSigningReady = async () => false;
+            client.crypto.baseApis.uploadDeviceSigningKeys = () => null;
+            client.crypto.baseApis.setAccountData = () => null;
+            client.crypto.baseApis.uploadKeySignatures = () => null;
+            client.crypto.baseApis.http.authedRequest = () => null;
+            const createSecretStorageKey = async () => {
+                return {
+                    keyInfo: undefined, // Returning undefined here used to cause a crash
+                    privateKey: Uint8Array.of(32, 33),
+                };
+            };
+            await client.crypto.bootstrapSecretStorage({
+                createSecretStorageKey,
+            });
         });
     });
 });

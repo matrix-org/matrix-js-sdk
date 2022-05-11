@@ -13,13 +13,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import {VerificationRequest, READY_TYPE, START_TYPE, DONE_TYPE} from
+import { VerificationRequest, READY_TYPE, START_TYPE, DONE_TYPE } from
     "../../../../src/crypto/verification/request/VerificationRequest";
-import {InRoomChannel} from "../../../../src/crypto/verification/request/InRoomChannel";
-import {ToDeviceChannel} from
+import { InRoomChannel } from "../../../../src/crypto/verification/request/InRoomChannel";
+import { ToDeviceChannel } from
     "../../../../src/crypto/verification/request/ToDeviceChannel";
-import {MatrixEvent} from "../../../../src/models/event";
-import {setupWebcrypto, teardownWebcrypto} from "./util";
+import { MatrixEvent } from "../../../../src/models/event";
+import { setupWebcrypto, teardownWebcrypto } from "./util";
 
 function makeMockClient(userId, deviceId) {
     let counter = 1;
@@ -40,7 +40,7 @@ function makeMockClient(userId, deviceId) {
                 content,
                 origin_server_ts: Date.now(),
             }));
-            return Promise.resolve({event_id: eventId});
+            return Promise.resolve({ event_id: eventId });
         },
 
         sendToDevice(type, msgMap) {
@@ -48,7 +48,7 @@ function makeMockClient(userId, deviceId) {
                 const deviceMap = msgMap[userId];
                 for (const deviceId of Object.keys(deviceMap)) {
                     const content = deviceMap[deviceId];
-                    const event = new MatrixEvent({content, type});
+                    const event = new MatrixEvent({ content, type });
                     deviceEvents[userId] = deviceEvents[userId] || {};
                     deviceEvents[userId][deviceId] = deviceEvents[userId][deviceId] || [];
                     deviceEvents[userId][deviceId].push(event);
@@ -90,7 +90,7 @@ class MockVerifier {
         if (this._startEvent) {
             await this._channel.send(DONE_TYPE, {});
         } else {
-            await this._channel.send(START_TYPE, {method: MOCK_METHOD});
+            await this._channel.send(START_TYPE, { method: MOCK_METHOD });
         }
     }
 
@@ -118,6 +118,8 @@ async function distributeEvent(ownRequest, theirRequest, event) {
             makeRemoteEcho(event), ownRequest, true);
     await theirRequest.channel.handleEvent(event, theirRequest, true);
 }
+
+jest.useFakeTimers();
 
 describe("verification request unit tests", function() {
     beforeAll(function() {
@@ -224,7 +226,7 @@ describe("verification request unit tests", function() {
             new ToDeviceChannel(bob1, bob1.getUserId(), ["device1", "device2"],
                 ToDeviceChannel.makeTransactionId(), "device2"),
             new Map([[MOCK_METHOD, MockVerifier]]), bob1);
-        const to = {userId: "@bob:matrix.tld", deviceId: "device2"};
+        const to = { userId: "@bob:matrix.tld", deviceId: "device2" };
         const verifier = bob1Request.beginKeyVerification(MOCK_METHOD, to);
         expect(verifier).toBeInstanceOf(MockVerifier);
         await verifier.start();
@@ -245,5 +247,39 @@ describe("verification request unit tests", function() {
 
         expect(bob1Request.done).toBe(true);
         expect(bob2Request.done).toBe(true);
+    });
+
+    it("request times out after 10 minutes", async function() {
+        const alice = makeMockClient("@alice:matrix.tld", "device1");
+        const bob = makeMockClient("@bob:matrix.tld", "device1");
+        const aliceRequest = new VerificationRequest(
+            new InRoomChannel(alice, "!room", bob.getUserId()), new Map(), alice);
+        await aliceRequest.sendRequest();
+        const [requestEvent] = alice.popEvents();
+        await aliceRequest.channel.handleEvent(requestEvent, aliceRequest, true,
+            true, true);
+
+        expect(aliceRequest.cancelled).toBe(false);
+        expect(aliceRequest._cancellingUserId).toBe(undefined);
+        jest.advanceTimersByTime(10 * 60 * 1000);
+        expect(aliceRequest._cancellingUserId).toBe(alice.getUserId());
+    });
+
+    it("request times out 2 minutes after receipt", async function() {
+        const alice = makeMockClient("@alice:matrix.tld", "device1");
+        const bob = makeMockClient("@bob:matrix.tld", "device1");
+        const aliceRequest = new VerificationRequest(
+            new InRoomChannel(alice, "!room", bob.getUserId()), new Map(), alice);
+        await aliceRequest.sendRequest();
+        const [requestEvent] = alice.popEvents();
+        const bobRequest = new VerificationRequest(
+            new InRoomChannel(bob, "!room"), new Map(), bob);
+
+        await bobRequest.channel.handleEvent(requestEvent, bobRequest, true);
+
+        expect(bobRequest.cancelled).toBe(false);
+        expect(bobRequest._cancellingUserId).toBe(undefined);
+        jest.advanceTimersByTime(2 * 60 * 1000);
+        expect(bobRequest._cancellingUserId).toBe(bob.getUserId());
     });
 });

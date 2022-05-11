@@ -1,4 +1,4 @@
-import {Filter} from "../../src/filter";
+import { Filter } from "../../src/filter";
 
 describe("Filter", function() {
     const filterId = "f1lt3ring15g00d4ursoul";

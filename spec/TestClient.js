@@ -20,12 +20,13 @@ limitations under the License.
 import './olm-loader';
 
 import MockHttpBackend from 'matrix-mock-request';
-import {LocalStorageCryptoStore} from '../src/crypto/store/localStorage-crypto-store';
-import {logger} from '../src/logger';
-import {WebStorageSessionStore} from "../src/store/session/webstorage";
-import {syncPromise} from "./test-utils";
-import {createClient} from "../src/matrix";
-import {MockStorageApi} from "./MockStorageApi";
+
+import { LocalStorageCryptoStore } from '../src/crypto/store/localStorage-crypto-store';
+import { logger } from '../src/logger';
+import { WebStorageSessionStore } from "../src/store/session/webstorage";
+import { syncPromise } from "./test-utils/test-utils";
+import { createClient } from "../src/matrix";
+import { MockStorageApi } from "./MockStorageApi";
 
 /**
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient
@@ -69,6 +70,9 @@ export function TestClient(
 
     this.deviceKeys = null;
     this.oneTimeKeys = {};
+    this.callEventHandler = {
+        calls: new Map(),
+    };
 }
 
 TestClient.prototype.toString = function() {
@@ -82,6 +86,7 @@ TestClient.prototype.toString = function() {
  */
 TestClient.prototype.start = function() {
     logger.log(this + ': starting');
+    this.httpBackend.when("GET", "/versions").respond(200, {});
     this.httpBackend.when("GET", "/pushrules").respond(200, {});
     this.httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
     this.expectDeviceKeyUpload();
@@ -126,10 +131,9 @@ TestClient.prototype.expectDeviceKeyUpload = function() {
         expect(Object.keys(self.oneTimeKeys).length).toEqual(0);
 
         self.deviceKeys = content.device_keys;
-        return {one_time_key_counts: {signed_curve25519: 0}};
+        return { one_time_key_counts: { signed_curve25519: 0 } };
     });
 };
-
 
 /**
  * If one-time keys have already been uploaded, return them. Otherwise,
@@ -148,9 +152,9 @@ TestClient.prototype.awaitOneTimeKeyUpload = function() {
         .respond(200, (path, content) => {
             expect(content.device_keys).toBe(undefined);
             expect(content.one_time_keys).toBe(undefined);
-            return {one_time_key_counts: {
+            return { one_time_key_counts: {
                 signed_curve25519: Object.keys(this.oneTimeKeys).length,
-            }};
+            } };
         });
 
     this.httpBackend.when("POST", "/keys/upload")
@@ -161,9 +165,9 @@ TestClient.prototype.awaitOneTimeKeyUpload = function() {
               logger.log('%s: received %i one-time keys', this,
                           Object.keys(content.one_time_keys).length);
               this.oneTimeKeys = content.one_time_keys;
-              return {one_time_key_counts: {
+              return { one_time_key_counts: {
                   signed_curve25519: Object.keys(this.oneTimeKeys).length,
-              }};
+              } };
           });
 
     // this can take ages
@@ -194,7 +198,6 @@ TestClient.prototype.expectKeyQuery = function(response) {
         });
 };
 
-
 /**
  * get the uploaded curve25519 device key
  *
@@ -204,7 +207,6 @@ TestClient.prototype.getDeviceKey = function() {
     const keyId = 'curve25519:' + this.deviceId;
     return this.deviceKeys.keys[keyId];
 };
-
 
 /**
  * get the uploaded ed25519 device key
@@ -229,4 +231,8 @@ TestClient.prototype.flushSync = function() {
     ]).then(() => {
         logger.log(`${this}: flushSync completed`);
     });
+};
+
+TestClient.prototype.isFallbackICEServerAllowed = function() {
+    return true;
 };

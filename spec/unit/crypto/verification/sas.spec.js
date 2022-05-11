@@ -15,13 +15,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import "../../../olm-loader";
-import {makeTestClients, setupWebcrypto, teardownWebcrypto} from './util';
-import {MatrixEvent} from "../../../../src/models/event";
-import {SAS} from "../../../../src/crypto/verification/SAS";
-import {DeviceInfo} from "../../../../src/crypto/deviceinfo";
-import {verificationMethods} from "../../../../src/crypto";
+import { makeTestClients, setupWebcrypto, teardownWebcrypto } from './util';
+import { MatrixEvent } from "../../../../src/models/event";
+import { SAS } from "../../../../src/crypto/verification/SAS";
+import { DeviceInfo } from "../../../../src/crypto/deviceinfo";
+import { verificationMethods } from "../../../../src/crypto";
 import * as olmlib from "../../../../src/crypto/olmlib";
-import {logger} from "../../../../src/logger";
+import { logger } from "../../../../src/logger";
+import { resetCrossSigningKeys } from "../crypto-utils";
 
 const Olm = global.Olm;
 
@@ -78,16 +79,16 @@ describe("SAS verification", function() {
         beforeEach(async () => {
             [alice, bob] = await makeTestClients(
                 [
-                    {userId: "@alice:example.com", deviceId: "Osborne2"},
-                    {userId: "@bob:example.com", deviceId: "Dynabook"},
+                    { userId: "@alice:example.com", deviceId: "Osborne2" },
+                    { userId: "@bob:example.com", deviceId: "Dynabook" },
                 ],
                 {
                     verificationMethods: [verificationMethods.SAS],
                 },
             );
 
-            const aliceDevice = alice.client._crypto._olmDevice;
-            const bobDevice = bob.client._crypto._olmDevice;
+            const aliceDevice = alice.client.crypto.olmDevice;
+            const bobDevice = bob.client.crypto.olmDevice;
 
             ALICE_DEVICES = {
                 Osborne2: {
@@ -113,14 +114,14 @@ describe("SAS verification", function() {
                 },
             };
 
-            alice.client._crypto._deviceList.storeDevicesForUser(
+            alice.client.crypto.deviceList.storeDevicesForUser(
                 "@bob:example.com", BOB_DEVICES,
             );
             alice.client.downloadKeys = () => {
                 return Promise.resolve();
             };
 
-            bob.client._crypto._deviceList.storeDevicesForUser(
+            bob.client.crypto.deviceList.storeDevicesForUser(
                 "@alice:example.com", ALICE_DEVICES,
             );
             bob.client.downloadKeys = () => {
@@ -181,11 +182,14 @@ describe("SAS verification", function() {
 
         it("should verify a key", async () => {
             let macMethod;
+            let keyAgreement;
             const origSendToDevice = bob.client.sendToDevice.bind(bob.client);
             bob.client.sendToDevice = function(type, map) {
                 if (type === "m.key.verification.accept") {
                     macMethod = map[alice.client.getUserId()][alice.client.deviceId]
                         .message_authentication_code;
+                    keyAgreement = map[alice.client.getUserId()][alice.client.deviceId]
+                        .key_agreement_protocol;
                 }
                 return origSendToDevice(type, map);
             };
@@ -212,6 +216,7 @@ describe("SAS verification", function() {
 
             // make sure that it uses the preferred method
             expect(macMethod).toBe("hkdf-hmac-sha256");
+            expect(keyAgreement).toBe("curve25519-hkdf-sha256");
 
             // make sure Alice and Bob verified each other
             const bobDevice
@@ -284,16 +289,16 @@ describe("SAS verification", function() {
             );
             alice.httpBackend.when('POST', '/keys/signatures/upload').respond(200, {});
             alice.httpBackend.flush(undefined, 2);
-            await alice.client.resetCrossSigningKeys();
+            await resetCrossSigningKeys(alice.client);
             bob.httpBackend.when('POST', '/keys/device_signing/upload').respond(200, {});
             bob.httpBackend.when('POST', '/keys/signatures/upload').respond(200, {});
             bob.httpBackend.flush(undefined, 2);
 
-            await bob.client.resetCrossSigningKeys();
+            await resetCrossSigningKeys(bob.client);
 
-            bob.client._crypto._deviceList.storeCrossSigningForUser(
+            bob.client.crypto.deviceList.storeCrossSigningForUser(
                 "@alice:example.com", {
-                    keys: alice.client._crypto._crossSigningInfo.keys,
+                    keys: alice.client.crypto.crossSigningInfo.keys,
                 },
             );
 
@@ -331,8 +336,8 @@ describe("SAS verification", function() {
     it("should send a cancellation message on error", async function() {
         const [alice, bob] = await makeTestClients(
             [
-                {userId: "@alice:example.com", deviceId: "Osborne2"},
-                {userId: "@bob:example.com", deviceId: "Dynabook"},
+                { userId: "@alice:example.com", deviceId: "Osborne2" },
+                { userId: "@bob:example.com", deviceId: "Dynabook" },
             ],
             {
                 verificationMethods: [verificationMethods.SAS],
@@ -385,8 +390,8 @@ describe("SAS verification", function() {
         beforeEach(async function() {
             [alice, bob] = await makeTestClients(
                 [
-                    {userId: "@alice:example.com", deviceId: "Osborne2"},
-                    {userId: "@bob:example.com", deviceId: "Dynabook"},
+                    { userId: "@alice:example.com", deviceId: "Osborne2" },
+                    { userId: "@bob:example.com", deviceId: "Dynabook" },
                 ],
                 {
                     verificationMethods: [verificationMethods.SAS],

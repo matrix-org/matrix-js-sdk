@@ -1,9 +1,10 @@
-import * as utils from "../test-utils";
 import HttpBackend from "matrix-mock-request";
-import {MatrixClient} from "../../src/matrix";
-import {MatrixScheduler} from "../../src/scheduler";
-import {MemoryStore} from "../../src/store/memory";
-import {MatrixError} from "../../src/http-api";
+
+import * as utils from "../test-utils/test-utils";
+import { MatrixClient } from "../../src/matrix";
+import { MatrixScheduler } from "../../src/scheduler";
+import { MemoryStore } from "../../src/store/memory";
+import { MatrixError } from "../../src/http-api";
 
 describe("MatrixClient opts", function() {
     const baseUrl = "http://localhost.or.something";
@@ -104,10 +105,12 @@ describe("MatrixClient opts", function() {
                     expectedEventTypes.indexOf(event.getType()), 1,
                 );
             });
+            httpBackend.when("GET", "/versions").respond(200, {});
             httpBackend.when("GET", "/pushrules").respond(200, {});
             httpBackend.when("POST", "/filter").respond(200, { filter_id: "foo" });
             httpBackend.when("GET", "/sync").respond(200, syncData);
-            await client.startClient();
+            client.startClient();
+            await httpBackend.flush("/versions", 1);
             await httpBackend.flush("/pushrules", 1);
             await httpBackend.flush("/filter", 1);
             await Promise.all([

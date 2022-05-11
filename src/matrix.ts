@@ -1,7 +1,5 @@
 /*
-Copyright 2015, 2016 OpenMarket Ltd
-Copyright 2017 Vector Creations Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2015-2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,26 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type Request from "request";
-
-import {MemoryCryptoStore} from "./crypto/store/memory-crypto-store";
-import {LocalStorageCryptoStore} from "./crypto/store/localStorage-crypto-store";
-import {IndexedDBCryptoStore} from "./crypto/store/indexeddb-crypto-store";
-import {MemoryStore} from "./store/memory";
-import {StubStore} from "./store/stub";
-import {LocalIndexedDBStoreBackend} from "./store/indexeddb-local-backend";
-import {RemoteIndexedDBStoreBackend} from "./store/indexeddb-remote-backend";
-import {MatrixScheduler} from "./scheduler";
-import {MatrixClient} from "./client";
+import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store";
+import { MemoryStore } from "./store/memory";
+import { MatrixScheduler } from "./scheduler";
+import { MatrixClient, ICreateClientOpts } from "./client";
+import { DeviceTrustLevel } from "./crypto/CrossSigning";
+import { ISecretStorageKeyInfo } from "./crypto/api";
 
 export * from "./client";
 export * from "./http-api";
 export * from "./autodiscovery";
 export * from "./sync-accumulator";
 export * from "./errors";
+export * from "./models/beacon";
 export * from "./models/event";
 export * from "./models/room";
-export * from "./models/group";
 export * from "./models/event-timeline";
 export * from "./models/event-timeline-set";
 export * from "./models/room-member";
@@ -52,14 +45,16 @@ export * from "./store/session/webstorage";
 export * from "./crypto/store/memory-crypto-store";
 export * from "./crypto/store/indexeddb-crypto-store";
 export * from "./content-repo";
-export const ContentHelpers = import("./content-helpers");
+export * from './@types/event';
+export * from './@types/PushRules';
+export * from './@types/partials';
+export * from './@types/requests';
+export * from './@types/search';
+export * from './models/room-summary';
+export * as ContentHelpers from "./content-helpers";
 export {
     createNewMatrixCall,
-    setAudioOutput as setMatrixCallAudioOutput,
-    setAudioInput as setMatrixCallAudioInput,
-    setVideoInput as setMatrixCallVideoInput,
 } from "./webrtc/call";
-
 
 // expose the underlying request object so different environments can use
 // different request libs (e.g. request or browser-request)
@@ -96,11 +91,6 @@ export function wrapRequest(wrapper) {
     };
 }
 
-type Store =
-    StubStore | MemoryStore | LocalIndexedDBStoreBackend | RemoteIndexedDBStoreBackend;
-
-type CryptoStore = MemoryCryptoStore | LocalStorageCryptoStore | IndexedDBCryptoStore;
-
 let cryptoStoreFactory = () => new MemoryCryptoStore;
 
 /**
@@ -113,13 +103,27 @@ export function setCryptoStoreFactory(fac) {
     cryptoStoreFactory = fac;
 }
 
-
-interface ICreateClientOpts {
-    baseUrl: string;
-    store?: Store;
-    cryptoStore?: CryptoStore;
-    scheduler?: MatrixScheduler;
-    request?: Request;
+export interface ICryptoCallbacks {
+    getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array>;
+    saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
+    shouldUpgradeDeviceVerifications?: (
+        users: Record<string, any>
+    ) => Promise<string[]>;
+    getSecretStorageKey?: (
+        keys: {keys: Record<string, ISecretStorageKeyInfo>}, name: string
+    ) => Promise<[string, Uint8Array] | null>;
+    cacheSecretStorageKey?: (
+        keyId: string, keyInfo: ISecretStorageKeyInfo, key: Uint8Array
+    ) => void;
+    onSecretRequested?: (
+        userId: string, deviceId: string,
+        requestId: string, secretName: string, deviceTrust: DeviceTrustLevel
+    ) => Promise<string>;
+    getDehydrationKey?: (
+        keyInfo: ISecretStorageKeyInfo,
+        checkFunc: (key: Uint8Array) => void,
+    ) => Promise<Uint8Array>;
+    getBackupKey?: () => Promise<Uint8Array>;
 }
 
 /**
@@ -148,12 +152,12 @@ interface ICreateClientOpts {
 export function createClient(opts: ICreateClientOpts | string) {
     if (typeof opts === "string") {
         opts = {
-            "baseUrl": opts as string,
+            "baseUrl": opts,
         };
     }
     opts.request = opts.request || requestInstance;
     opts.store = opts.store || new MemoryStore({
-      localStorage: global.localStorage,
+        localStorage: global.localStorage,
     });
     opts.scheduler = opts.scheduler || new MatrixScheduler();
     opts.cryptoStore = opts.cryptoStore || cryptoStoreFactory();
@@ -187,7 +191,7 @@ export function createClient(opts: ICreateClientOpts | string) {
  * @param {requestCallback} callback The request callback.
  */
 
- /**
+/**
   * The request callback interface for performing HTTP requests. This matches the
   * API for the {@link https://github.com/request/request#requestoptions-callback|
   * request NPM module}. The SDK will implement a callback which meets this

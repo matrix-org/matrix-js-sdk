@@ -16,8 +16,9 @@ limitations under the License.
 */
 
 import MockHttpBackend from "matrix-mock-request";
+
 import * as sdk from "../../src";
-import {AutoDiscovery} from "../../src/autodiscovery";
+import { AutoDiscovery } from "../../src/autodiscovery";
 
 describe("AutoDiscovery", function() {
     let httpBackend = null;
