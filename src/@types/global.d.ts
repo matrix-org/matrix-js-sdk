@@ -23,6 +23,7 @@ declare global {
     // use `number` as the return type in all cases for global.set{Interval,Timeout},
     // so we don't accidentally use the methods on NodeJS.Timeout - they only exist in a subset of environments.
     // The overload for clear{Interval,Timeout} is resolved as expected.
+    // We use `ReturnType<typeof setTimeout>` in the code to be agnostic of if this definition gets loaded.
     function setInterval(handler: TimerHandler, timeout: number, ...arguments: any[]): number;
     function setTimeout(handler: TimerHandler, timeout: number, ...arguments: any[]): number;
 
@@ -60,12 +61,6 @@ declare global {
                 chromeMediaSourceId: string;
             };
         };
-    }
-
-    interface HTMLAudioElement {
-        // sinkId & setSinkId are experimental and typescript doesn't know about them
-        sinkId: string;
-        setSinkId(outputId: string);
     }
 
     interface DummyInterfaceWeShouldntBeUsingThis {}

@@ -1,4 +1,7 @@
 import '../olm-loader';
+// eslint-disable-next-line no-restricted-imports
+import { EventEmitter } from "events";
+
 import { Crypto } from "../../src/crypto";
 import { WebStorageSessionStore } from "../../src/store/session/webstorage";
 import { MemoryCryptoStore } from "../../src/crypto/store/memory-crypto-store";
@@ -8,9 +11,9 @@ import { MatrixEvent } from "../../src/models/event";
 import { Room } from "../../src/models/room";
 import * as olmlib from "../../src/crypto/olmlib";
 import { sleep } from "../../src/utils";
-import { EventEmitter } from "events";
 import { CRYPTO_ENABLED } from "../../src/client";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
+import { logger } from '../../src/logger';
 
 const Olm = global.Olm;
 
@@ -396,6 +399,30 @@ describe("Crypto", function() {
             // the second call to sendToDevice will be the key request
             expect(aliceClient.sendToDevice).toBeCalledTimes(3);
             expect(aliceClient.sendToDevice.mock.calls[2][2]).not.toBe(txnId);
+        });
+    });
+
+    describe('Secret storage', function() {
+        it("creates secret storage even if there is no keyInfo", async function() {
+            jest.spyOn(logger, 'log').mockImplementation(() => {});
+            jest.setTimeout(10000);
+            const client = (new TestClient("@a:example.com", "dev")).client;
+            await client.initCrypto();
+            client.crypto.getSecretStorageKey = async () => null;
+            client.crypto.isCrossSigningReady = async () => false;
+            client.crypto.baseApis.uploadDeviceSigningKeys = () => null;
+            client.crypto.baseApis.setAccountData = () => null;
+            client.crypto.baseApis.uploadKeySignatures = () => null;
+            client.crypto.baseApis.http.authedRequest = () => null;
+            const createSecretStorageKey = async () => {
+                return {
+                    keyInfo: undefined, // Returning undefined here used to cause a crash
+                    privateKey: Uint8Array.of(32, 33),
+                };
+            };
+            await client.crypto.bootstrapSecretStorage({
+                createSecretStorageKey,
+            });
         });
     });
 });

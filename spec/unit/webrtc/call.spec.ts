@@ -82,17 +82,34 @@ class MockRTCPeerConnection {
     }
     close() {}
     getStats() { return []; }
+    addTrack(track: MockMediaStreamTrack) {return new MockRTCRtpSender(track);}
+}
+
+class MockRTCRtpSender {
+    constructor(public track: MockMediaStreamTrack) {}
+
+    replaceTrack(track: MockMediaStreamTrack) {this.track = track;}
+}
+
+class MockMediaStreamTrack {
+    constructor(public readonly id: string, public readonly kind: "audio" | "video", public enabled = true) {}
+
+    stop() {}
 }
 
 class MockMediaStream {
     constructor(
         public id: string,
+        private tracks: MockMediaStreamTrack[] = [],
     ) {}
 
-    getTracks() { return []; }
-    getAudioTracks() { return [{ enabled: true }]; }
-    getVideoTracks() { return [{ enabled: true }]; }
+    getTracks() { return this.tracks; }
+    getAudioTracks() { return this.tracks.filter((track) => track.kind === "audio"); }
+    getVideoTracks() { return this.tracks.filter((track) => track.kind === "video"); }
     addEventListener() {}
+    removeEventListener() { }
+    addTrack(track: MockMediaStreamTrack) {this.tracks.push(track);}
+    removeTrack(track: MockMediaStreamTrack) {this.tracks.splice(this.tracks.indexOf(track), 1);}
 }
 
 class MockMediaDeviceInfo {
@@ -102,7 +119,13 @@ class MockMediaDeviceInfo {
 }
 
 class MockMediaHandler {
-    getUserMediaStream() { return new MockMediaStream("mock_stream_from_media_handler"); }
+    getUserMediaStream(audio: boolean, video: boolean) {
+        const tracks = [];
+        if (audio) tracks.push(new MockMediaStreamTrack("audio_track", "audio"));
+        if (video) tracks.push(new MockMediaStreamTrack("video_track", "video"));
+
+        return new MockMediaStream("mock_stream_from_media_handler", tracks);
+    }
     stopUserMediaStream() {}
 }
 
@@ -350,7 +373,15 @@ describe('Call', function() {
             },
         });
 
-        call.pushRemoteFeed(new MockMediaStream("remote_stream"));
+        call.pushRemoteFeed(
+            new MockMediaStream(
+                "remote_stream",
+                [
+                    new MockMediaStreamTrack("remote_audio_track", "audio"),
+                    new MockMediaStreamTrack("remote_video_track", "video"),
+                ],
+            ),
+        );
         const feed = call.getFeeds().find((feed) => feed.stream.id === "remote_stream");
         expect(feed?.purpose).toBe(SDPStreamMetadataPurpose.Usermedia);
         expect(feed?.isAudioMuted()).toBeTruthy();
@@ -395,5 +426,83 @@ describe('Call', function() {
 
         expect(client.client.mediaHandler.getUserMediaStream).toHaveBeenNthCalledWith(1, true, true);
         expect(client.client.mediaHandler.getUserMediaStream).toHaveBeenNthCalledWith(2, true, false);
+    });
+
+    it("should handle mid-call device changes", async () => {
+        client.client.mediaHandler.getUserMediaStream = jest.fn().mockReturnValue(
+            new MockMediaStream(
+                "stream", [
+                    new MockMediaStreamTrack("audio_track", "audio"),
+                    new MockMediaStreamTrack("video_track", "video"),
+                ],
+            ),
+        );
+
+        const callPromise = call.placeVideoCall();
+        await client.httpBackend.flush();
+        await callPromise;
+
+        await call.onAnswerReceived({
+            getContent: () => {
+                return {
+                    version: 1,
+                    call_id: call.callId,
+                    party_id: 'party_id',
+                    answer: {
+                        sdp: DUMMY_SDP,
+                    },
+                };
+            },
+        });
+
+        await call.updateLocalUsermediaStream(
+            new MockMediaStream(
+                "replacement_stream",
+                [
+                    new MockMediaStreamTrack("new_audio_track", "audio"),
+                    new MockMediaStreamTrack("video_track", "video"),
+                ],
+            ),
+        );
+        expect(call.localUsermediaStream.id).toBe("stream");
+        expect(call.localUsermediaStream.getAudioTracks()[0].id).toBe("new_audio_track");
+        expect(call.localUsermediaStream.getVideoTracks()[0].id).toBe("video_track");
+        expect(call.usermediaSenders.find((sender) => {
+            return sender?.track?.kind === "audio";
+        }).track.id).toBe("new_audio_track");
+        expect(call.usermediaSenders.find((sender) => {
+            return sender?.track?.kind === "video";
+        }).track.id).toBe("video_track");
+    });
+
+    it("should handle upgrade to video call", async () => {
+        const callPromise = call.placeVoiceCall();
+        await client.httpBackend.flush();
+        await callPromise;
+
+        await call.onAnswerReceived({
+            getContent: () => {
+                return {
+                    version: 1,
+                    call_id: call.callId,
+                    party_id: 'party_id',
+                    answer: {
+                        sdp: DUMMY_SDP,
+                    },
+                    [SDPStreamMetadataKey]: {},
+                };
+            },
+        });
+
+        await call.upgradeCall(false, true);
+
+        expect(call.localUsermediaStream.getAudioTracks()[0].id).toBe("audio_track");
+        expect(call.localUsermediaStream.getVideoTracks()[0].id).toBe("video_track");
+        expect(call.usermediaSenders.find((sender) => {
+            return sender?.track?.kind === "audio";
+        }).track.id).toBe("audio_track");
+        expect(call.usermediaSenders.find((sender) => {
+            return sender?.track?.kind === "video";
+        }).track.id).toBe("video_track");
     });
 });

@@ -34,6 +34,7 @@ import {
     PushRuleSet,
     TweakName,
 } from "./@types/PushRules";
+import { EventType } from "./@types/event";
 
 /**
  * @module pushprocessor
@@ -90,6 +91,22 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
                 kind: ConditionKind.EventMatch,
                 key: "type",
                 pattern: "m.reaction",
+            },
+        ],
+        actions: [
+            PushRuleActionName.DontNotify,
+        ],
+    },
+    {
+        // For homeservers which don't support MSC3786 yet
+        rule_id: ".org.matrix.msc3786.rule.room.server_acl",
+        default: true,
+        enabled: true,
+        conditions: [
+            {
+                kind: ConditionKind.EventMatch,
+                key: "type",
+                pattern: EventType.RoomServerAcl,
             },
         ],
         actions: [
@@ -158,8 +175,7 @@ export class PushProcessor {
                 .find((r) => r.rule_id === override.rule_id);
 
             if (existingRule) {
-                // Copy over the actions, default, and conditions. Don't touch the user's
-                // preference.
+                // Copy over the actions, default, and conditions. Don't touch the user's preference.
                 existingRule.default = override.default;
                 existingRule.conditions = override.conditions;
                 existingRule.actions = override.actions;
@@ -301,7 +317,7 @@ export class PushProcessor {
 
         const memberCount = room.currentState.getJoinedMemberCount();
 
-        const m = cond.is.match(/^([=<>]*)([0-9]*)$/);
+        const m = cond.is.match(/^([=<>]*)(\d*)$/);
         if (!m) {
             return false;
         }
@@ -447,6 +463,8 @@ export class PushProcessor {
     }
 
     public ruleMatchesEvent(rule: IPushRule, ev: MatrixEvent): boolean {
+        if (!rule.conditions?.length) return true;
+
         let ret = true;
         for (let i = 0; i < rule.conditions.length; ++i) {
             const cond = rule.conditions[i];

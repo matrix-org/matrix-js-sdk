@@ -709,6 +709,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
         }
 
         await this.baseApis.sendToDevice("org.matrix.room_key.withheld", contentMap);
+        await this.baseApis.sendToDevice("m.room_key.withheld", contentMap);
 
         // record the fact that we notified these blocked devices
         for (const userId of Object.keys(contentMap)) {
@@ -1114,8 +1115,8 @@ class MegolmEncryption extends EncryptionAlgorithm {
     private checkForUnknownDevices(devicesInRoom: DeviceInfoMap): void {
         const unknownDevices: Record<string, Record<string, DeviceInfo>> = {};
 
-        Object.keys(devicesInRoom).forEach((userId)=>{
-            Object.keys(devicesInRoom[userId]).forEach((deviceId)=>{
+        Object.keys(devicesInRoom).forEach((userId) => {
+            Object.keys(devicesInRoom[userId]).forEach((deviceId) => {
                 const device = devicesInRoom[userId][deviceId];
                 if (device.isUnverified() && !device.isKnown()) {
                     if (!unknownDevices[userId]) {

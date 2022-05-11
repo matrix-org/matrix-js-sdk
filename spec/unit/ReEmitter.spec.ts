@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// eslint-disable-next-line no-restricted-imports
 import { EventEmitter } from "events";
+
 import { ReEmitter } from "../../src/ReEmitter";
 
 const EVENTNAME = "UnknownEntry";

@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { MatrixClient } from "./client";
-import { IEvent, MatrixEvent } from "./models/event";
+import { IEvent, MatrixEvent, MatrixEventEvent } from "./models/event";
 
 export type EventMapper = (obj: Partial<IEvent>) => MatrixEvent;
 
@@ -25,23 +25,52 @@ export interface MapperOpts {
 }
 
 export function eventMapperFor(client: MatrixClient, options: MapperOpts): EventMapper {
-    const preventReEmit = Boolean(options.preventReEmit);
+    let preventReEmit = Boolean(options.preventReEmit);
     const decrypt = options.decrypt !== false;
 
     function mapper(plainOldJsObject: Partial<IEvent>) {
-        const event = new MatrixEvent(plainOldJsObject);
+        const room = client.getRoom(plainOldJsObject.room_id);
+
+        let event: MatrixEvent;
+        // If the event is already known to the room, let's re-use the model rather than duplicating.
+        // We avoid doing this to state events as they may be forward or backwards looking which tweaks behaviour.
+        if (room && plainOldJsObject.state_key === undefined) {
+            event = room.findEventById(plainOldJsObject.event_id);
+        }
+
+        if (!event || event.status) {
+            event = new MatrixEvent(plainOldJsObject);
+        } else {
+            // merge the latest unsigned data from the server
+            event.setUnsigned({ ...event.getUnsigned(), ...plainOldJsObject.unsigned });
+            // prevent doubling up re-emitters
+            preventReEmit = true;
+        }
+
+        const thread = room?.findThreadForEvent(event);
+        if (thread) {
+            event.setThread(thread);
+        }
+
         if (event.isEncrypted()) {
             if (!preventReEmit) {
                 client.reEmitter.reEmit(event, [
-                    "Event.decrypted",
+                    MatrixEventEvent.Decrypted,
                 ]);
             }
             if (decrypt) {
                 client.decryptEventIfNeeded(event);
             }
         }
+
         if (!preventReEmit) {
-            client.reEmitter.reEmit(event, ["Event.replaced"]);
+            client.reEmitter.reEmit(event, [
+                MatrixEventEvent.Replaced,
+                MatrixEventEvent.VisibilityChange,
+            ]);
+            room?.reEmitter.reEmit(event, [
+                MatrixEventEvent.BeforeRedaction,
+            ]);
         }
         return event;
     }

@@ -31,6 +31,9 @@ module.exports = {
         "no-async-promise-executor": "off",
         // We use a `logger` intermediary module
         "no-console": "error",
+
+        // restrict EventEmitters to force callers to use TypedEventEmitter
+        "no-restricted-imports": ["error", "events"],
     },
     overrides: [{
         files: [

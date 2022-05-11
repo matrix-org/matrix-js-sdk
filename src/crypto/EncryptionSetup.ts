@@ -16,13 +16,14 @@ limitations under the License.
 
 import { logger } from "../logger";
 import { MatrixEvent } from "../models/event";
-import { EventEmitter } from "events";
 import { createCryptoStoreCacheCallbacks, ICacheCallbacks } from "./CrossSigning";
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
-import { PREFIX_UNSTABLE } from "../http-api";
+import { Method, PREFIX_UNSTABLE } from "../http-api";
 import { Crypto, IBootstrapCrossSigningOpts } from "./index";
 import {
+    ClientEvent,
     CrossSigningKeys,
+    ClientEventHandlerMap,
     ICrossSigningKey,
     ICryptoCallbacks,
     ISignedKey,
@@ -30,6 +31,8 @@ import {
 } from "../matrix";
 import { ISecretStorageKeyInfo } from "./api";
 import { IKeyBackupInfo } from "./keybackup";
+import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { IAccountDataClient } from "./SecretStorage";
 
 interface ICrossSigningKeys {
     authUpload: IBootstrapCrossSigningOpts["authUploadDeviceSigningKeys"];
@@ -238,7 +241,7 @@ export class EncryptionSetupOperation {
                 // Sign the backup with the cross signing key so the key backup can
                 // be trusted via cross-signing.
                 await baseApis.http.authedRequest(
-                    undefined, "PUT", "/room_keys/version/" + this.keyBackupInfo.version,
+                    undefined, Method.Put, "/room_keys/version/" + this.keyBackupInfo.version,
                     undefined, {
                         algorithm: this.keyBackupInfo.algorithm,
                         auth_data: this.keyBackupInfo.auth_data,
@@ -248,7 +251,7 @@ export class EncryptionSetupOperation {
             } else {
                 // add new key backup
                 await baseApis.http.authedRequest(
-                    undefined, "POST", "/room_keys/version",
+                    undefined, Method.Post, "/room_keys/version",
                     undefined, this.keyBackupInfo,
                     { prefix: PREFIX_UNSTABLE },
                 );
@@ -261,7 +264,10 @@ export class EncryptionSetupOperation {
  * Catches account data set by SecretStorage during bootstrapping by
  * implementing the methods related to account data in MatrixClient
  */
-class AccountDataClientAdapter extends EventEmitter {
+class AccountDataClientAdapter
+    extends TypedEventEmitter<ClientEvent.AccountData, ClientEventHandlerMap>
+    implements IAccountDataClient {
+    //
     public readonly values = new Map<string, MatrixEvent>();
 
     /**
@@ -308,7 +314,7 @@ class AccountDataClientAdapter extends EventEmitter {
         // and it seems to rely on this.
         return Promise.resolve().then(() => {
             const event = new MatrixEvent({ type, content });
-            this.emit("accountData", event, lastEvent);
+            this.emit(ClientEvent.AccountData, event, lastEvent);
             return {};
         });
     }
