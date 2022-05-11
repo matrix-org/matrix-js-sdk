@@ -1076,11 +1076,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         return this.secretStorage.get(name);
     }
 
-    public isSecretStored(
-        name: string,
-        checkKey?: boolean,
-    ): Promise<Record<string, ISecretStorageKeyInfo> | null> {
-        return this.secretStorage.isStored(name, checkKey);
+    public isSecretStored(name: string): Promise<Record<string, ISecretStorageKeyInfo> | null> {
+        return this.secretStorage.isStored(name);
     }
 
     public requestSecret(name: string, devices: string[]): ISecretRequest {

@@ -1171,6 +1171,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             const { serverSupport, stable } = await this.doesServerSupportThread();
             Thread.setServerSideSupport(serverSupport, stable);
         } catch (e) {
+            // Most likely cause is that `doesServerSupportThread` returned `null` (as it
+            // is allowed to do) and thus we enter "degraded mode" on threads.
             Thread.setServerSideSupport(false, true);
         }
 
@@ -2386,18 +2388,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
      *
      * @param {string} name the name of the secret
-     * @param {boolean} checkKey check if the secret is encrypted by a trusted
-     *     key
-     *
      * @return {object?} map of key name to key info the secret is encrypted
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    public isSecretStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo> | null> {
+    public isSecretStored(name: string): Promise<Record<string, ISecretStorageKeyInfo> | null> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.isSecretStored(name, checkKey);
+        return this.crypto.isSecretStored(name);
     }
 
     /**
@@ -2726,7 +2725,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     trusted key
      */
     public isKeyBackupKeyStored(): Promise<Record<string, ISecretStorageKeyInfo> | null> {
-        return Promise.resolve(this.isSecretStored("m.megolm_backup.v1", false /* checkKey */));
+        return Promise.resolve(this.isSecretStored("m.megolm_backup.v1"));
     }
 
     /**
@@ -6594,14 +6593,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     } | null> {
         try {
             const hasUnstableSupport = await this.doesServerSupportUnstableFeature("org.matrix.msc3440");
-            const hasStableSupport = await this.doesServerSupportUnstableFeature("org.matrix.msc3440.stable")
-                || await this.isVersionSupported("v1.3");
+            const hasStableSupport = await this.doesServerSupportUnstableFeature("org.matrix.msc3440.stable");
+
+            // TODO: Use `this.isVersionSupported("v1.3")` for whatever spec version includes MSC3440 formally.
 
             return {
                 serverSupport: hasUnstableSupport || hasStableSupport,
                 stable: hasStableSupport,
             };
         } catch (e) {
+            // Assume server support and stability aren't available: null/no data return.
+            // XXX: This should just return an object with `false` booleans instead.
             return null;
         }
     }
