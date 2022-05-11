@@ -431,11 +431,6 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
 
         // set a timer for the maximum transmit time on PTT calls
         if (this.isPtt) {
-            // if anoher user is currently unmuted, we can't unmute
-            if (!muted && this.userMediaFeeds.some(f => !f.isAudioMuted())) {
-                throw new OtherUserSpeakingError();
-            }
-
             // Set or clear the max transmit timer
             if (!muted && this.isMicrophoneMuted()) {
                 this.transmitTimer = setTimeout(() => {
