@@ -2388,18 +2388,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
      *
      * @param {string} name the name of the secret
-     * @param {boolean} checkKey check if the secret is encrypted by a trusted
-     *     key
-     *
      * @return {object?} map of key name to key info the secret is encrypted
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    public isSecretStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo> | null> {
+    public isSecretStored(name: string): Promise<Record<string, ISecretStorageKeyInfo> | null> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.isSecretStored(name, checkKey);
+        return this.crypto.isSecretStored(name);
     }
 
     /**
@@ -2728,7 +2725,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     trusted key
      */
     public isKeyBackupKeyStored(): Promise<Record<string, ISecretStorageKeyInfo> | null> {
-        return Promise.resolve(this.isSecretStored("m.megolm_backup.v1", false /* checkKey */));
+        return Promise.resolve(this.isSecretStored("m.megolm_backup.v1"));
     }
 
     /**
