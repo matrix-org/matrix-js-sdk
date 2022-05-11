@@ -18,6 +18,8 @@ limitations under the License.
 import { logger } from "../../src/logger";
 import { InteractiveAuth } from "../../src/interactive-auth";
 import { MatrixError } from "../../src/http-api";
+import { sleep } from "../../src/utils";
+import { randomString } from "../../src/randomstring";
 
 // Trivial client object to test interactive auth
 // (we do not need TestClient here)
@@ -170,6 +172,109 @@ describe("InteractiveAuth", function() {
 
         return ia.attemptAuth().catch(function(error) {
             expect(error.message).toBe('No appropriate authentication flow found');
+        });
+    });
+
+    describe("requestEmailToken", () => {
+        it("increases auth attempts", async () => {
+            const doRequest = jest.fn();
+            const stateUpdated = jest.fn();
+            const requestEmailToken = jest.fn();
+            requestEmailToken.mockImplementation(async () => ({ sid: "" }));
+
+            const ia = new InteractiveAuth({
+                matrixClient: new FakeClient(),
+                doRequest, stateUpdated, requestEmailToken,
+            });
+
+            await ia.requestEmailToken();
+            expect(requestEmailToken).toHaveBeenLastCalledWith(undefined, ia.getClientSecret(), 1, undefined);
+            requestEmailToken.mockClear();
+            await ia.requestEmailToken();
+            expect(requestEmailToken).toHaveBeenLastCalledWith(undefined, ia.getClientSecret(), 2, undefined);
+            requestEmailToken.mockClear();
+            await ia.requestEmailToken();
+            expect(requestEmailToken).toHaveBeenLastCalledWith(undefined, ia.getClientSecret(), 3, undefined);
+            requestEmailToken.mockClear();
+            await ia.requestEmailToken();
+            expect(requestEmailToken).toHaveBeenLastCalledWith(undefined, ia.getClientSecret(), 4, undefined);
+            requestEmailToken.mockClear();
+            await ia.requestEmailToken();
+            expect(requestEmailToken).toHaveBeenLastCalledWith(undefined, ia.getClientSecret(), 5, undefined);
+        });
+
+        it("increases auth attempts", async () => {
+            const doRequest = jest.fn();
+            const stateUpdated = jest.fn();
+            const requestEmailToken = jest.fn();
+            requestEmailToken.mockImplementation(async () => ({ sid: "" }));
+
+            const ia = new InteractiveAuth({
+                matrixClient: new FakeClient(),
+                doRequest, stateUpdated, requestEmailToken,
+            });
+
+            await ia.requestEmailToken();
+            expect(requestEmailToken).toHaveBeenLastCalledWith(undefined, ia.getClientSecret(), 1, undefined);
+            requestEmailToken.mockClear();
+            await ia.requestEmailToken();
+            expect(requestEmailToken).toHaveBeenLastCalledWith(undefined, ia.getClientSecret(), 2, undefined);
+            requestEmailToken.mockClear();
+            await ia.requestEmailToken();
+            expect(requestEmailToken).toHaveBeenLastCalledWith(undefined, ia.getClientSecret(), 3, undefined);
+            requestEmailToken.mockClear();
+            await ia.requestEmailToken();
+            expect(requestEmailToken).toHaveBeenLastCalledWith(undefined, ia.getClientSecret(), 4, undefined);
+            requestEmailToken.mockClear();
+            await ia.requestEmailToken();
+            expect(requestEmailToken).toHaveBeenLastCalledWith(undefined, ia.getClientSecret(), 5, undefined);
+        });
+
+        it("passes errors through", async () => {
+            const doRequest = jest.fn();
+            const stateUpdated = jest.fn();
+            const requestEmailToken = jest.fn();
+            requestEmailToken.mockImplementation(async () => {
+                throw new Error("unspecific network error");
+            });
+
+            const ia = new InteractiveAuth({
+                matrixClient: new FakeClient(),
+                doRequest, stateUpdated, requestEmailToken,
+            });
+
+            expect(async () => await ia.requestEmailToken()).rejects.toThrowError("unspecific network error");
+        });
+
+        it("only starts one request at a time", async () => {
+            const doRequest = jest.fn();
+            const stateUpdated = jest.fn();
+            const requestEmailToken = jest.fn();
+            requestEmailToken.mockImplementation(() => sleep(500, { sid: "" }));
+
+            const ia = new InteractiveAuth({
+                matrixClient: new FakeClient(),
+                doRequest, stateUpdated, requestEmailToken,
+            });
+
+            await Promise.all([ia.requestEmailToken(), ia.requestEmailToken(), ia.requestEmailToken()]);
+            expect(requestEmailToken).toHaveBeenCalledTimes(1);
+        });
+
+        it("stores result in email sid", async () => {
+            const doRequest = jest.fn();
+            const stateUpdated = jest.fn();
+            const requestEmailToken = jest.fn();
+            const sid = randomString(24);
+            requestEmailToken.mockImplementation(() => sleep(500, { sid }));
+
+            const ia = new InteractiveAuth({
+                matrixClient: new FakeClient(),
+                doRequest, stateUpdated, requestEmailToken,
+            });
+
+            await ia.requestEmailToken();
+            expect(ia.getEmailSid()).toEqual(sid);
         });
     });
 });
