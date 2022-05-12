@@ -2262,25 +2262,12 @@ function setTracksEnabled(tracks: Array<MediaStreamTrack>, enabled: boolean): vo
     }
 }
 
-/**
- * DEPRECATED
- * Use client.createCall()
- *
- * Create a new Matrix call for the browser.
- * @param {MatrixClient} client The client instance to use.
- * @param {string} roomId The room the call is in.
- * @param {Object?} options DEPRECATED optional options map.
- * @param {boolean} options.forceTURN DEPRECATED whether relay through TURN should be
- * forced. This option is deprecated - use opts.forceTURN when creating the matrix client
- * since it's only possible to set this option on outbound calls.
- * @return {MatrixCall} the call or null if the browser doesn't support calling.
- */
-export function createNewMatrixCall(client: any, roomId: string, options?: CallOpts): MatrixCall {
+export function supportsMatrixCall(): boolean {
     // typeof prevents Node from erroring on an undefined reference
     if (typeof(window) === 'undefined' || typeof(document) === 'undefined') {
         // NB. We don't log here as apps try to create a call object as a test for
         // whether calls are supported, so we shouldn't fill the logs up.
-        return null;
+        return false;
     }
 
     // Firefox throws on so little as accessing the RTCPeerConnection when operating in
@@ -2297,12 +2284,31 @@ export function createNewMatrixCall(client: any, roomId: string, options?: CallO
             if (process.env.NODE_ENV !== "test") {
                 logger.error("WebRTC is not supported in this browser / environment");
             }
-            return null;
+            return false;
         }
     } catch (e) {
         logger.error("Exception thrown when trying to access WebRTC", e);
-        return null;
+        return false;
     }
+
+    return true;
+}
+
+/**
+ * DEPRECATED
+ * Use client.createCall()
+ *
+ * Create a new Matrix call for the browser.
+ * @param {MatrixClient} client The client instance to use.
+ * @param {string} roomId The room the call is in.
+ * @param {Object?} options DEPRECATED optional options map.
+ * @param {boolean} options.forceTURN DEPRECATED whether relay through TURN should be
+ * forced. This option is deprecated - use opts.forceTURN when creating the matrix client
+ * since it's only possible to set this option on outbound calls.
+ * @return {MatrixCall} the call or null if the browser doesn't support calling.
+ */
+export function createNewMatrixCall(client: any, roomId: string, options?: CallOpts): MatrixCall | null {
+    if (!supportsMatrixCall()) return null;
 
     const optionsForceTURN = options ? options.forceTURN : false;
 
