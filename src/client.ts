@@ -8670,7 +8670,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getThirdpartyProtocols(): Promise<{ [protocol: string]: IProtocol }> {
         return this.http.authedRequest<Record<string, IProtocol>>(
-            undefined, Method.Get, "/thirdparty/protocols"
+            undefined, Method.Get, "/thirdparty/protocols",
         ).then((response) => {
             // sanity check
             if (!response || typeof (response) !== 'object') {
