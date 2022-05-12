@@ -113,6 +113,8 @@ import {
     RoomMemberEventHandlerMap,
     RoomStateEvent,
     RoomStateEventHandlerMap,
+    INotificationsResponse,
+    IFilterResponse,
 } from "./matrix";
 import {
     CrossSigningKey,
@@ -132,6 +134,7 @@ import { Room } from "./models/room";
 import {
     IAddThreePidOnlyBody,
     IBindThreePidBody,
+    IContextResponse,
     ICreateRoomOpts,
     IEventSearchOpts,
     IGuestAccessOpts,
@@ -5264,7 +5267,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         // TODO: we should implement a backoff (as per scrollback()) to deal more nicely with HTTP errors.
-        const res = await this.http.authedRequest<any>(undefined, Method.Get, path, params); // TODO types
+        const res = await this.http.authedRequest<IContextResponse>(undefined, Method.Get, path, params);
         if (!res.event) {
             throw new Error("'event' not in '/context' result - homeserver too old?");
         }
@@ -5443,7 +5446,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 params.from = token;
             }
 
-            promise = this.http.authedRequest<any>( // TODO types
+            promise = this.http.authedRequest<INotificationsResponse>(
                 undefined, Method.Get, path, params, undefined,
             ).then(async (res) => {
                 const token = res.next_token;
@@ -6120,15 +6123,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const path = utils.encodeUri("/user/$userId/filter", {
             $userId: this.credentials.userId,
         });
-        // TODO types
-        return this.http.authedRequest<any>(undefined, Method.Post, path, undefined, content).then((response) => {
-            // persist the filter
-            const filter = Filter.fromJson(
-                this.credentials.userId, response.filter_id, content,
-            );
-            this.store.storeFilter(filter);
-            return filter;
-        });
+        return this.http.authedRequest<IFilterResponse>(undefined, Method.Post, path, undefined, content)
+            .then((response) => {
+                // persist the filter
+                const filter = Filter.fromJson(this.credentials.userId, response.filter_id, content);
+                this.store.storeFilter(filter);
+                return filter;
+            });
     }
 
     /**
