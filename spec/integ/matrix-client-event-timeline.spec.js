@@ -536,8 +536,8 @@ describe("MatrixClient event timelines", function() {
 
             const timeline = await timelinePromise;
 
-            expect(timeline.getEvents().find(e => e.getId() === THREAD_ROOT.event_id));
-            expect(timeline.getEvents().find(e => e.getId() === THREAD_REPLY.event_id));
+            expect(timeline.getEvents().find(e => e.getId() === THREAD_ROOT.event_id)).toBeTruthy();
+            expect(timeline.getEvents().find(e => e.getId() === THREAD_REPLY.event_id)).toBeTruthy();
         });
     });
 

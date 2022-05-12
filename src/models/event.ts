@@ -1043,7 +1043,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
      *   caused a change in the actual visibility of this event, either by making it
      *   visible (if it was hidden), by making it hidden (if it was visible) or by
      *   changing the reason (if it was hidden).
-     * @param visibilityEvent event holding a hide/unhide payload, or nothing
+     * @param visibilityChange event holding a hide/unhide payload, or nothing
      *   if the event is being reset to its original visibility (presumably
      *   by a visibility event being redacted).
      */
@@ -1065,9 +1065,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
                     reason: reason,
                 });
             }
-            if (change) {
-                this.emit(MatrixEventEvent.VisibilityChange, this, visible);
-            }
+            this.emit(MatrixEventEvent.VisibilityChange, this, visible);
         }
     }
 

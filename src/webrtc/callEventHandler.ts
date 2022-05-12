@@ -72,7 +72,7 @@ export class CallEventHandler {
                 this.client.decryptEventIfNeeded(event);
             }));
 
-            const ignoreCallIds = new Set<String>();
+            const ignoreCallIds = new Set<string>();
             // inspect the buffer and mark all calls which have been answered
             // or hung up before passing them to the call event handler.
             for (const ev of this.callEventBuffer) {

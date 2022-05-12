@@ -54,6 +54,7 @@ import { IPushRules } from "./@types/PushRules";
 import { RoomStateEvent } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
 import { BeaconEvent } from "./models/beacon";
+import { IEventsResponse } from "./@types/requests";
 
 const DEBUG = true;
 
@@ -274,7 +275,7 @@ export class SyncApi {
             getFilterName(client.credentials.userId, "LEFT_ROOMS"), filter,
         ).then(function(filterId) {
             qps.filter = filterId;
-            return client.http.authedRequest<any>( // TODO types
+            return client.http.authedRequest<ISyncResponse>(
                 undefined, Method.Get, "/sync", qps as any, undefined, localTimeoutMs,
             );
         }).then(async (data) => {
@@ -409,8 +410,7 @@ export class SyncApi {
         }
 
         // FIXME: gut wrenching; hard-coded timeout values
-        // TODO types
-        this.client.http.authedRequest<any>(undefined, Method.Get, "/events", {
+        this.client.http.authedRequest<IEventsResponse>(undefined, Method.Get, "/events", {
             room_id: peekRoom.roomId,
             timeout: String(30 * 1000),
             from: token,
@@ -874,7 +874,7 @@ export class SyncApi {
 
     private doSyncRequest(syncOptions: ISyncOptions, syncToken: string): IRequestPromise<ISyncResponse> {
         const qps = this.getSyncParams(syncOptions, syncToken);
-        return this.client.http.authedRequest( // TODO types
+        return this.client.http.authedRequest<ISyncResponse>(
             undefined, Method.Get, "/sync", qps as any, undefined,
             qps.timeout + BUFFER_PERIOD_MS,
         );
