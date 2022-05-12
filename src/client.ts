@@ -114,7 +114,12 @@ import {
     RoomStateEvent,
     RoomStateEventHandlerMap,
     INotificationsResponse,
-    IFilterResponse, ITagsResponse, IStatusResponse, IPushRule, PushRuleActionName, IAuthDict,
+    IFilterResponse,
+    ITagsResponse,
+    IStatusResponse,
+    IPushRule,
+    PushRuleActionName,
+    IAuthDict,
 } from "./matrix";
 import {
     CrossSigningKey,
@@ -5852,10 +5857,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // Get the existing room-kind push rule if any
         const roomPushRule = this.getRoomPushRule(scope, roomId);
-        if (roomPushRule) {
-            if (0 <= roomPushRule.actions.indexOf(PushRuleActionName.DontNotify)) {
-                hasDontNotifyRule = true;
-            }
+        if (roomPushRule && roomPushRule.actions.includes(PushRuleActionName.DontNotify)) {
+            hasDontNotifyRule = true;
         }
 
         if (!mute) {

@@ -2270,10 +2270,9 @@ export function supportsMatrixCall(): boolean {
         return false;
     }
 
-    // Firefox throws on so little as accessing the RTCPeerConnection when operating in
-    // a secure mode. There's some information at https://bugzilla.mozilla.org/show_bug.cgi?id=1542616
-    // though the concern is that the browser throwing a SecurityError will brick the
-    // client creation process.
+    // Firefox throws on so little as accessing the RTCPeerConnection when operating in a secure mode.
+    // There's some information at https://bugzilla.mozilla.org/show_bug.cgi?id=1542616 though the concern
+    // is that the browser throwing a SecurityError will brick the client creation process.
     try {
         const supported = Boolean(
             window.RTCPeerConnection || window.RTCSessionDescription ||
