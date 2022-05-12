@@ -156,7 +156,18 @@ describe('Topic content helpers', () => {
     });
 
     describe('parseTopicContent()', () => {
-        it('parses event content without html', () => {
+        it('parses event content with plain text topic without mimetype', () => {
+            expect(parseTopicContent({
+                topic: "pizza",
+                [M_TOPIC.name]: [{
+                    body: "pizza",
+                }],
+            })).toEqual({
+                text: "pizza",
+            });
+        });
+
+        it('parses event content with plain text topic', () => {
             expect(parseTopicContent({
                 topic: "pizza",
                 [M_TOPIC.name]: [{
@@ -168,13 +179,10 @@ describe('Topic content helpers', () => {
             });
         });
 
-        it('parses event content with html', () => {
+        it('parses event content with html topic', () => {
             expect(parseTopicContent({
                 topic: "pizza",
                 [M_TOPIC.name]: [{
-                    body: "pizza",
-                    mimetype: "text/plain",
-                }, {
                     body: "<b>pizza</b>",
                     mimetype: "text/html",
                 }],

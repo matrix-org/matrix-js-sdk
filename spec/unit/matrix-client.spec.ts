@@ -33,7 +33,7 @@ import { ReceiptType } from "../../src/@types/read_receipts";
 import * as testUtils from "../test-utils/test-utils";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
-import { Room } from "../../src";
+import { ContentHelpers, Room } from "../../src";
 import { makeBeaconEvent } from "../test-utils/beacon";
 
 jest.useFakeTimers();
@@ -1101,6 +1101,41 @@ describe("MatrixClient", function() {
                 client.processBeaconEvents(room, [messageEvent, beaconEvent]);
                 expect(roomStateProcessSpy).toHaveBeenCalledWith([messageEvent, beaconEvent], client);
             });
+        });
+    });
+
+    describe("setRoomTopic", () => {
+        const roomId = "!foofoofoofoofoofoo:matrix.org";
+        const createSendStateEventMock = (topic: string, htmlTopic?: string) => {
+            return jest.fn()
+                .mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
+                    expect(roomId).toEqual(roomId);
+                    expect(eventType).toEqual(EventType.RoomTopic);
+                    expect(content).toMatchObject(ContentHelpers.makeTopicContent(topic, htmlTopic));
+                    expect(stateKey).toBeUndefined();
+                    return Promise.resolve();
+                });
+        };
+
+        it("is called with plain text topic and sends state event", async () => {
+            const sendStateEvent = createSendStateEventMock("pizza");
+            client.sendStateEvent = sendStateEvent;
+            await client.setRoomTopic(roomId, "pizza");
+            expect(sendStateEvent).toHaveBeenCalledTimes(1);
+        });
+
+        it("is called with plain text topic and callback and sends state event", async () => {
+            const sendStateEvent = createSendStateEventMock("pizza");
+            client.sendStateEvent = sendStateEvent;
+            await client.setRoomTopic(roomId, "pizza", () => {});
+            expect(sendStateEvent).toHaveBeenCalledTimes(1);
+        });
+
+        it("is called with plain text and HTML topic and sends state event", async () => {
+            const sendStateEvent = createSendStateEventMock("pizza", "<b>pizza</b>");
+            client.sendStateEvent = sendStateEvent;
+            await client.setRoomTopic(roomId, "pizza", "<b>pizza</b>");
+            expect(sendStateEvent).toHaveBeenCalledTimes(1);
         });
     });
 
