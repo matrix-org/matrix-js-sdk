@@ -520,6 +520,7 @@ describe('Call', function() {
         });
 
         it("should return false if RTCPeerConnection throws", () => {
+            // @ts-ignore - writing to window as we are simulating browser edge-cases
             global.window = {};
             Object.defineProperty(global.window, "RTCPeerConnection", {
                 get: () => {
@@ -535,6 +536,7 @@ describe('Call', function() {
             global.window.RTCPeerConnection = undefined;
             global.window.RTCSessionDescription = undefined;
             global.window.RTCIceCandidate = undefined;
+            // @ts-ignore - writing to a read-only property as we are simulating faulty browsers
             global.navigator.mediaDevices = undefined;
             expect(supportsMatrixCall()).toBe(false);
         });
