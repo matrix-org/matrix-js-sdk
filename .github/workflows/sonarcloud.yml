@@ -2,18 +2,10 @@ name: SonarCloud Analysis
 on:
   workflow_call:
     inputs:
-      is_pr:
-        type: boolean
-        required: true
-        description: Whether the workflow is running due to a PR
       repo:
         type: string
         required: true
         description: The full name of the repo in org/repo format
-      owner:
-        type: string
-        required: true
-        description: The github username of the owner of the head branch
       head_branch:
         type: string
         required: true
@@ -30,6 +22,18 @@ on:
         type: number
         required: false
         description: The run_id of the workflow which upload the coverage relevant to this run
+
+      # PR specific parameters
+      prnumber:
+        type: number
+        required: false
+        description: The ID number of the PR if this workflow is being triggered due to one
+      base_branch:
+        type: string
+        required: false
+        description: The base branch of the PR if this workflow is being triggered due to one
+
+      # Org specific parameters
       main_branch:
         type: string
         required: false
@@ -39,16 +43,8 @@ on:
       SONAR_TOKEN:
         required: true
 jobs:
-  prdetails:
-    if: inputs.is_pr
-    uses: matrix-org/matrix-js-sdk/.github/workflows/upgrade_dependencies.yml@develop
-    with:
-      owner: ${{ inputs.owner }}
-      branch: ${{ inputs.head_branch }}
-
   sonarcloud:
     name: SonarCloud
-    needs: prdetails
     runs-on: ubuntu-latest
     steps:
       - name: "🧮 Checkout code"
@@ -81,11 +77,11 @@ jobs:
         uses: SonarSource/sonarcloud-github-action@master
         with:
           args: >
-            -Dsonar.projectVersion=${{ steps.version.outputs.current-version}}
+            -Dsonar.projectVersion=${{ steps.version.outputs.current-version }}
             -Dsonar.scm.revision=${{ inputs.revision }}
-            -Dsonar.pullrequest.key=${{ needs.prdetails.outputs.prnumber }}
-            -Dsonar.pullrequest.branch=${{ needs.prdetails.outputs.headref }}
-            -Dsonar.pullrequest.base=${{ needs.prdetails.outputs.baseref }}
+            -Dsonar.pullrequest.key=${{ inputs.prnumber }}
+            -Dsonar.pullrequest.branch=${{ inputs.head_branch }}
+            -Dsonar.pullrequest.base=${{ inputs.base_branch }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed to get PR information, if any
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

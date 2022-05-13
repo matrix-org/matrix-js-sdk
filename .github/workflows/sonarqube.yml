@@ -5,14 +5,21 @@ on:
     types:
       - completed
 jobs:
+  prdetails:
+    if: github.event.workflow_run.event == 'pull_request'
+    uses: matrix-org/matrix-js-sdk/.github/workflows/upgrade_dependencies.yml@develop
+    with:
+      owner: ${{ github.event.workflow_run.head_repository.owner.login }}
+      branch: ${{ github.event.workflow_run.head_branch }}
+
   sonarqube:
+    needs: prdetails
     if: github.event.workflow_run.conclusion == 'success'
     uses: matrix-org/matrix-js-sdk/.github/workflows/sonarcloud.yml@develop
     with:
-      is_pr: ${{ github.event.workflow_run.event == 'pull_request' }}
       repo: ${{ github.event.workflow_run.head_repository.full_name }}
-      owner: ${{ github.event.workflow_run.head_repository.owner.login }}
-      head_branch: ${{ github.event.workflow_run.head_branch }}
+      head_branch: ${{ needs.prdetails.outputs.headref || github.event.workflow_run.head_branch }}
+      base_branch: ${{ needs.prdetails.outputs.baseref }}
       revision: ${{ github.event.workflow_run.head_sha }}
       coverage_workflow_name: tests.yml
       coverage_run_id: ${{ github.event.workflow_run.id }}
