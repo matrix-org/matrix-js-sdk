@@ -2,6 +2,7 @@ name: Notify Downstream Projects
 on:
   push:
     branches: [ develop ]
+concurrency: ${{ github.workflow }}-${{ github.ref }}
 jobs:
   notify-matrix-react-sdk:
     runs-on: ubuntu-latest

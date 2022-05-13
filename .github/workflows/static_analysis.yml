@@ -3,6 +3,9 @@ on:
   pull_request: { }
   push:
     branches: [ develop, master ]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   ts_lint:
     name: "Typescript Syntax Check"
