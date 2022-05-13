@@ -80,8 +80,8 @@ jobs:
             -Dsonar.projectVersion=${{ steps.version.outputs.current-version }}
             -Dsonar.scm.revision=${{ inputs.revision }}
             -Dsonar.pullrequest.key=${{ inputs.prnumber }}
-            -Dsonar.pullrequest.branch=${{ inputs.head_branch }}
-            -Dsonar.pullrequest.base=${{ inputs.base_branch }}
+            -Dsonar.pullrequest.branch=${{ inputs.prnumber && inputs.head_branch || '' }}
+            -Dsonar.pullrequest.base=${{ inputs.prnumber && inputs.base_branch || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed to get PR information, if any
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
