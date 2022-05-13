@@ -450,7 +450,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
         }
 
         for (const call of this.calls) {
-            call.setMicrophoneMuted(muted);
+            await call.setMicrophoneMuted(muted);
         }
 
         this.emit(GroupCallEvent.LocalMuteStateChanged, muted, this.isLocalVideoMuted());
