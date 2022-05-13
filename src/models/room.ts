@@ -1656,14 +1656,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         events: MatrixEvent[] = [],
         toStartOfTimeline: boolean,
     ): Thread {
-        if (rootEvent) {
-            const tl = this.getTimelineForEvent(rootEvent.getId());
-            const relatedEvents = tl?.getTimelineSet().getAllRelationsEventForEvent(rootEvent.getId());
-            if (relatedEvents) {
-                events = events.concat(relatedEvents);
-            }
-        }
-
         const thread = new Thread(threadId, rootEvent, {
             initialEvents: events,
             room: this,
