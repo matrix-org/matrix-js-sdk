@@ -2,6 +2,9 @@ name: Pull Request
 on:
   pull_request_target:
     types: [ opened, edited, labeled, unlabeled ]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   changelog:
     name: Preview Changelog

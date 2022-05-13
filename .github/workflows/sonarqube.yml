@@ -4,6 +4,9 @@ on:
     workflows: [ "Tests" ]
     types:
       - completed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   prdetails:
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request'
@@ -22,7 +25,7 @@ jobs:
     uses: matrix-org/matrix-js-sdk/.github/workflows/sonarcloud.yml@develop
     with:
       repo: ${{ github.event.workflow_run.head_repository.full_name }}
-      pr_id: ${{ needs.prdetails.output.prnumber }}
+      pr_id: ${{ needs.prdetails.output.prnumber || null }}
       head_branch: ${{ needs.prdetails.outputs.headref || github.event.workflow_run.head_branch }}
       base_branch: ${{ needs.prdetails.outputs.baseref }}
       revision: ${{ github.event.workflow_run.head_sha }}
