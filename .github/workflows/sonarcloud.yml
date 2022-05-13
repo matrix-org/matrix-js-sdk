@@ -25,7 +25,7 @@ on:
         description: The run_id of the workflow which upload the coverage relevant to this run
 
       # PR specific parameters
-      prnumber:
+      pr_id:
         type: number
         required: false
         description: The ID number of the PR if this workflow is being triggered due to one
@@ -80,9 +80,9 @@ jobs:
           args: >
             -Dsonar.projectVersion=${{ steps.version.outputs.current-version }}
             -Dsonar.scm.revision=${{ inputs.revision }}
-            -Dsonar.pullrequest.key=${{ inputs.prnumber }}
-            -Dsonar.pullrequest.branch=${{ inputs.prnumber && inputs.head_branch || '' }}
-            -Dsonar.pullrequest.base=${{ inputs.prnumber && inputs.base_branch || '' }}
+            -Dsonar.pullrequest.key=${{ inputs.pr_id }}
+            -Dsonar.pullrequest.branch=${{ inputs.pr_id && inputs.head_branch || '' }}
+            -Dsonar.pullrequest.base=${{ inputs.pr_id && inputs.base_branch || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed to get PR information, if any
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

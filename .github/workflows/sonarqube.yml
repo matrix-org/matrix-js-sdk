@@ -18,6 +18,7 @@ jobs:
     uses: matrix-org/matrix-js-sdk/.github/workflows/sonarcloud.yml@develop
     with:
       repo: ${{ github.event.workflow_run.head_repository.full_name }}
+      pr_id: ${{ needs.prdetails.output.prnumber }}
       head_branch: ${{ needs.prdetails.outputs.headref || github.event.workflow_run.head_branch }}
       base_branch: ${{ needs.prdetails.outputs.baseref }}
       revision: ${{ github.event.workflow_run.head_sha }}
