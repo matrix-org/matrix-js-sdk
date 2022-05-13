@@ -5857,7 +5857,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // Get the existing room-kind push rule if any
         const roomPushRule = this.getRoomPushRule(scope, roomId);
-        if (roomPushRule && roomPushRule.actions.includes(PushRuleActionName.DontNotify)) {
+        if (roomPushRule?.actions.includes(PushRuleActionName.DontNotify)) {
             hasDontNotifyRule = true;
         }
 
@@ -6523,8 +6523,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const versions = response["versions"];
         const unstableFeatures = response["unstable_features"];
 
-        return (versions && versions.includes("r0.6.0"))
-            || (unstableFeatures && unstableFeatures["m.separate_add_and_bind"]);
+        return versions?.includes("r0.6.0") || unstableFeatures?.["m.separate_add_and_bind"];
     }
 
     /**

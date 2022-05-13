@@ -980,6 +980,30 @@ describe("MatrixClient", function() {
             expect(await prom).toStrictEqual(response);
         });
     });
+
+    describe("requestRegisterEmailToken", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {
+                sid: "random_sid",
+                submit_url: "https://foobar.matrix/_matrix/matrix",
+            };
+
+            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
+                versions: ["r0.5.0"],
+            });
+
+            const prom = client.requestRegisterEmailToken("bob@email", "secret", 1);
+            httpBackend.when("POST", "/register/email/requestToken").check(req => {
+                expect(req.data).toStrictEqual({
+                    email: "bob@email",
+                    client_secret: "secret",
+                    send_attempt: 1,
+                });
+            }).respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
 });
 
 function withThreadId(event, newThreadId) {
