@@ -3,7 +3,7 @@
 #  prnumber: the ID number of the associated PR
 #  headref: the name of the head branch of the PR
 #  baseref: the name of the base branch of the PR
-name: Find PR Details
+name: PR Details
 on:
   workflow_call:
     inputs:
@@ -17,6 +17,7 @@ on:
         description: The name of the head branch
 jobs:
   prdetails:
+    name: Find PR Details
     runs-on: ubuntu-latest
     steps:
       - name: "🔍 Read PR details"

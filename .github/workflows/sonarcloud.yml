@@ -1,4 +1,4 @@
-name: SonarCloud Analysis
+name: SonarCloud
 on:
   workflow_call:
     inputs:
@@ -22,13 +22,13 @@ on:
         required: false
         description: The name of the workflow which uploaded the `coverage` artifact, if any
       coverage_run_id:
-        type: number
+        type: string
         required: false
         description: The run_id of the workflow which upload the coverage relevant to this run
 
       # PR specific parameters
       pr_id:
-        type: number
+        type: string
         required: false
         description: The ID number of the PR if this workflow is being triggered due to one
       base_branch:
@@ -46,8 +46,8 @@ on:
       SONAR_TOKEN:
         required: true
 jobs:
-  sonarcloud:
-    name: SonarCloud
+  analysis:
+    name: Analysis
     runs-on: ubuntu-latest
     steps:
       - name: "🧮 Checkout code"
@@ -71,6 +71,7 @@ jobs:
           workflow: ${{ inputs.coverage_workflow_name }}
           run_id: ${{ inputs.coverage_run_id }}
           name: coverage
+          path: coverage
 
       - name: "🔍 Read package.json version"
         id: version
