@@ -4536,7 +4536,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {Event} event The event that has been read.
      * @param {ReceiptType} receiptType other than ReceiptType.Read are experimental! Optional.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: to an empty object
+     * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public async sendReadReceipt(event: MatrixEvent, receiptType = ReceiptType.Read, callback?: Callback): Promise<{}> {
@@ -4959,7 +4959,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         membership: string,
         reason?: string,
         callback?: Callback,
-    ): Promise<{}> {
+    ): Promise<{}> { // API returns an empty object
         if (utils.isFunction(reason)) {
             callback = reason as any as Callback; // legacy
             reason = undefined;
@@ -7057,7 +7057,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * it is up to the caller to either reset or destroy the MatrixClient after
      * this method succeeds.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: On success, the empty object
+     * @return {Promise} Resolves: On success, the empty object {}
      */
     public async logout(callback?: Callback): Promise<{}> {
         if (this.crypto?.backupManager?.getKeyBackupEnabled()) {
@@ -7480,7 +7480,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * and you must have sufficient access to do this operation.
      * @param {string} alias The room alias to delete.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: an empty object.
+     * @return {Promise} Resolves: an empty object {}.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public deleteAlias(alias: string, callback?: Callback): Promise<{}> {
@@ -7555,7 +7555,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *                 in the public directory, or "private" to make
      *                 it invisible.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: result object
+     * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public setRoomDirectoryVisibility(roomId: string, visibility: Visibility, callback?: Callback): Promise<{}> {
@@ -7750,7 +7750,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param {Object} data A object with 3PID validation data from having called
      * `account/3pid/<medium>/requestToken` on the homeserver.
-     * @return {Promise} Resolves: on success
+     * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public async addThreePidOnly(data: IAddThreePidOnlyBody): Promise<{}> {
@@ -7770,7 +7770,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {Object} data A object with 3PID validation data from having called
      * `validate/<medium>/requestToken` on the identity server. It should also
      * contain `id_server` and `id_access_token` fields as well.
-     * @return {Promise} Resolves: on success
+     * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public async bindThreePid(data: IBindThreePidBody): Promise<{}> {
@@ -7831,7 +7831,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} newPassword The new desired password.
      * @param {boolean} logoutDevices Should all sessions be logged out after the password change. Defaults to true.
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public setPassword(
@@ -7899,7 +7899,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param {string} deviceId  device to update
      * @param {Object} body       body of request
-     * @return {Promise} Resolves: result object
+     * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     // eslint-disable-next-line camelcase
@@ -8041,7 +8041,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} ruleId
      * @param {boolean} enabled
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: result object
+     * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public setPushRuleEnabled(
@@ -8067,7 +8067,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} ruleId
      * @param {array} actions
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: result object
+     * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public setPushRuleActions(
@@ -8227,7 +8227,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.http.authedRequest(undefined, Method.Get, "/keys/changes", qps);
     }
 
-    public uploadDeviceSigningKeys(auth?: IAuthData, keys?: CrossSigningKeys): Promise<{}> {
+    public uploadDeviceSigningKeys(auth?: IAuthData, keys?: CrossSigningKeys): Promise<{}> { // API returns empty object
         const data = Object.assign({}, keys);
         if (auth) Object.assign(data, { auth });
         return this.http.authedRequest(
@@ -8637,7 +8637,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *    content to send. Map from user_id to device_id to content object.
      * @param {string=} txnId     transaction id. One will be made up if not
      *    supplied.
-     * @return {Promise} Resolves to the result object
+     * @return {Promise} Resolves: to an empty object {}
      */
     public sendToDevice(
         eventType: string,
