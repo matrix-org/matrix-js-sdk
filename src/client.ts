@@ -1204,6 +1204,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * clean shutdown.
      */
     public stopClient() {
+        if (!this.clientRunning) return; // already stopped
+
         logger.log('stopping MatrixClient');
 
         this.clientRunning = false;
