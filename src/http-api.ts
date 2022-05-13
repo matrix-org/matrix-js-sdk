@@ -1055,7 +1055,7 @@ interface IErrorJson extends Partial<IUsageLimit> {
  * @prop {string} name Same as MatrixError.errcode but with a default unknown string.
  * @prop {string} message The Matrix 'error' value, e.g. "Missing token."
  * @prop {Object} data The raw Matrix error JSON used to construct this object.
- * @prop {integer} httpStatus The numeric HTTP status code given
+ * @prop {number} httpStatus The numeric HTTP status code given
  */
 export class MatrixError extends Error {
     public readonly errcode: string;

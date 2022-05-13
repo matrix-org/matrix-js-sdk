@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { TestClient } from '../../TestClient';
-import { MatrixCall, CallErrorCode, CallEvent } from '../../../src/webrtc/call';
+import { MatrixCall, CallErrorCode, CallEvent, supportsMatrixCall } from '../../../src/webrtc/call';
 import { SDPStreamMetadataKey, SDPStreamMetadataPurpose } from '../../../src/webrtc/callEventTypes';
 import { RoomMember } from "../../../src";
 
@@ -504,5 +504,41 @@ describe('Call', function() {
         expect(call.usermediaSenders.find((sender) => {
             return sender?.track?.kind === "video";
         }).track.id).toBe("video_track");
+    });
+
+    describe("supportsMatrixCall", () => {
+        it("should return true when the environment is right", () => {
+            expect(supportsMatrixCall()).toBe(true);
+        });
+
+        it("should return false if window or document are undefined", () => {
+            global.window = undefined;
+            expect(supportsMatrixCall()).toBe(false);
+            global.window = prevWindow;
+            global.document = undefined;
+            expect(supportsMatrixCall()).toBe(false);
+        });
+
+        it("should return false if RTCPeerConnection throws", () => {
+            // @ts-ignore - writing to window as we are simulating browser edge-cases
+            global.window = {};
+            Object.defineProperty(global.window, "RTCPeerConnection", {
+                get: () => {
+                    throw Error("Secure mode, naaah!");
+                },
+            });
+            expect(supportsMatrixCall()).toBe(false);
+        });
+
+        it("should return false if RTCPeerConnection & RTCSessionDescription " +
+            "& RTCIceCandidate & mediaDevices are unavailable",
+        () => {
+            global.window.RTCPeerConnection = undefined;
+            global.window.RTCSessionDescription = undefined;
+            global.window.RTCIceCandidate = undefined;
+            // @ts-ignore - writing to a read-only property as we are simulating faulty browsers
+            global.navigator.mediaDevices = undefined;
+            expect(supportsMatrixCall()).toBe(false);
+        });
     });
 });

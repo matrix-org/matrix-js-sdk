@@ -428,7 +428,7 @@ export class BackupManager {
             // requests from different clients hitting the server all at
             // the same time when a new key is sent
             const delay = Math.random() * maxDelay;
-            await sleep(delay, undefined);
+            await sleep(delay);
             let numFailures = 0; // number of consecutive failures
             for (;;) {
                 if (!this.algorithm) {
@@ -462,7 +462,7 @@ export class BackupManager {
                 }
                 if (numFailures) {
                     // exponential backoff if we have failures
-                    await sleep(1000 * Math.pow(2, Math.min(numFailures - 1, 4)), undefined);
+                    await sleep(1000 * Math.pow(2, Math.min(numFailures - 1, 4)));
                 }
             }
         } finally {
@@ -474,8 +474,8 @@ export class BackupManager {
      * Take some e2e keys waiting to be backed up and send them
      * to the backup.
      *
-     * @param {integer} limit Maximum number of keys to back up
-     * @returns {integer} Number of sessions backed up
+     * @param {number} limit Maximum number of keys to back up
+     * @returns {number} Number of sessions backed up
      */
     public async backupPendingKeys(limit: number): Promise<number> {
         const sessions = await this.baseApis.crypto.cryptoStore.getSessionsNeedingBackup(limit);
