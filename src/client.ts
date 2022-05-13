@@ -1204,6 +1204,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * clean shutdown.
      */
     public stopClient() {
+        if (!this.clientRunning) return; // already stopped
+
         logger.log('stopping MatrixClient');
 
         this.clientRunning = false;
@@ -7067,9 +7069,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * it is up to the caller to either reset or destroy the MatrixClient after
      * this method succeeds.
      * @param {module:client.callback} callback Optional.
+     * @param {boolean} stopClient whether to stop the client before calling /logout to prevent invalid token errors.
      * @return {Promise} Resolves: On success, the empty object
      */
-    public async logout(callback?: Callback): Promise<{}> {
+    public async logout(callback?: Callback, stopClient = false): Promise<{}> {
         if (this.crypto?.backupManager?.getKeyBackupEnabled()) {
             try {
                 while (await this.crypto.backupManager.backupPendingKeys(200) > 0);
@@ -7080,6 +7083,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 );
             }
         }
+
+        if (stopClient) {
+            this.stopClient();
+        }
+
         return this.http.authedRequest(
             callback, Method.Post, '/logout',
         );
