@@ -221,9 +221,10 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             this._currentUserParticipated = true;
         }
 
-        // Add all annotations and replace relations to the timeline so that the relations are processed accordingly
         if ([RelationType.Annotation, RelationType.Replace].includes(event.getRelation()?.rel_type as RelationType)) {
-            this.addEventToTimeline(event, toStartOfTimeline);
+            // Apply annotations and replace relations to the relations of the timeline only
+            this.timelineSet.setRelationsTarget(event);
+            this.timelineSet.aggregateRelations(event);
             return;
         }
 
