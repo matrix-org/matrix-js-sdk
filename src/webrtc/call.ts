@@ -2279,7 +2279,7 @@ export function supportsMatrixCall(): boolean {
             window.RTCIceCandidate || navigator.mediaDevices,
         );
         if (!supported) {
-            // Adds a lot of noise to test runs, so disable logging there.
+            /* istanbul ignore if */ // Adds a lot of noise to test runs, so disable logging there.
             if (process.env.NODE_ENV !== "test") {
                 logger.error("WebRTC is not supported in this browser / environment");
             }
