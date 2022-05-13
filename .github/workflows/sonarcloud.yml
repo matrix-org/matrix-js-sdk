@@ -10,6 +10,7 @@ on:
         type: string
         required: true
         description: The name of the head branch
+      # We cannot use ${{ github.sha }} here as for pull requests it'll be a simulated merge commit instead
       revision:
         type: string
         required: true
