@@ -1,3 +1,19 @@
+/*
+Copyright 2022 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 import * as utils from "../test-utils/test-utils";
 import { CRYPTO_ENABLED } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
@@ -821,6 +837,171 @@ describe("MatrixClient", function() {
                 threadRootEvent,
                 eventMessageInThread,
             ]);
+        });
+    });
+
+    describe("getThirdpartyUser", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = [{
+                userid: "@Bob",
+                protocol: "irc",
+                fields: {},
+            }];
+
+            const prom = client.getThirdpartyUser("irc", {});
+            httpBackend.when("GET", "/thirdparty/user/irc").respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("getThirdpartyLocation", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = [{
+                alias: "#alias",
+                protocol: "irc",
+                fields: {},
+            }];
+
+            const prom = client.getThirdpartyLocation("irc", {});
+            httpBackend.when("GET", "/thirdparty/location/irc").respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("getPushers", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {
+                pushers: [],
+            };
+
+            const prom = client.getPushers();
+            httpBackend.when("GET", "/pushers").respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("getKeyChanges", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {
+                changed: [],
+                left: [],
+            };
+
+            const prom = client.getKeyChanges("old", "new");
+            httpBackend.when("GET", "/keys/changes").check((req) => {
+                expect(req.queryParams.from).toEqual("old");
+                expect(req.queryParams.to).toEqual("new");
+            }).respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("getDevices", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {
+                devices: [],
+            };
+
+            const prom = client.getDevices();
+            httpBackend.when("GET", "/devices").respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("getDevice", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {
+                device_id: "DEADBEEF",
+                display_name: "NotAPhone",
+                last_seen_ip: "127.0.0.1",
+                last_seen_ts: 1,
+            };
+
+            const prom = client.getDevice("DEADBEEF");
+            httpBackend.when("GET", "/devices/DEADBEEF").respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("getThreePids", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {
+                threepids: [],
+            };
+
+            const prom = client.getThreePids();
+            httpBackend.when("GET", "/account/3pid").respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("deleteAlias", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {};
+            const prom = client.deleteAlias("#foo:bar");
+            httpBackend.when("DELETE", "/directory/room/" + encodeURIComponent("#foo:bar")).respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("deleteRoomTag", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {};
+            const prom = client.deleteRoomTag("!roomId:server", "u.tag");
+            const url = `/user/${encodeURIComponent(userId)}/rooms/${encodeURIComponent("!roomId:server")}/tags/u.tag`;
+            httpBackend.when("DELETE", url).respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("getRoomTags", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {
+                tags: {
+                    "u.tag": {
+                        order: 0.5,
+                    },
+                },
+            };
+
+            const prom = client.getRoomTags("!roomId:server");
+            const url = `/user/${encodeURIComponent(userId)}/rooms/${encodeURIComponent("!roomId:server")}/tags`;
+            httpBackend.when("GET", url).respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("requestRegisterEmailToken", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {
+                sid: "random_sid",
+                submit_url: "https://foobar.matrix/_matrix/matrix",
+            };
+
+            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
+                versions: ["r0.5.0"],
+            });
+
+            const prom = client.requestRegisterEmailToken("bob@email", "secret", 1);
+            httpBackend.when("POST", "/register/email/requestToken").check(req => {
+                expect(req.data).toStrictEqual({
+                    email: "bob@email",
+                    client_secret: "secret",
+                    send_attempt: 1,
+                });
+            }).respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
         });
     });
 });
