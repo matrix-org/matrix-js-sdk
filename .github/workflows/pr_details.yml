@@ -15,12 +15,18 @@ on:
         type: string
         required: true
         description: The name of the head branch
+    outputs:
+      pr_id: ${{ jobs.prdetails.outputs.pr_id }}
+      head_branch: ${{ jobs.prdetails.outputs.head_branch }}
+      base_branch: ${{ jobs.prdetails.outputs.base_branch }}
+
 jobs:
   prdetails:
     name: Find PR Details
     runs-on: ubuntu-latest
     steps:
       - name: "🔍 Read PR details"
+        id: details
         # We need to find the PR number that corresponds to the branch, which we do by searching the GH API
         # The workflow_run event includes a list of pull requests, but it doesn't get populated for
         # forked PRs: https://docs.github.com/en/rest/reference/checks#create-a-check-run
@@ -41,3 +47,7 @@ jobs:
           base_ref=$(jq -r '.[] | .base.ref' <<< "$pr_data")
           echo "Base ref: $base_ref"
           echo "::set-output name=baseref::$base_ref"
+      outputs:
+        pr_id: ${{ steps.details.outputs.prnumber }}
+        head_branch: ${{ steps.details.outputs.headref }}
+        base_branch: ${{ steps.details.outputs.baseref }}
