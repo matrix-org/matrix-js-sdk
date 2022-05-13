@@ -7715,8 +7715,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public getThreePids(callback?: Callback): Promise<{ threepids: IThreepid[] }> {
-        const path = "/account/3pid";
-        return this.http.authedRequest(callback, Method.Get, path);
+        return this.http.authedRequest(callback, Method.Get, "/account/3pid");
     }
 
     /**
@@ -7962,8 +7961,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public getPushers(callback?: Callback): Promise<{ pushers: IPusher[] }> {
-        const path = "/pushers";
-        return this.http.authedRequest(callback, Method.Get, path);
+        return this.http.authedRequest(callback, Method.Get, "/pushers");
     }
 
     /**
@@ -8227,8 +8225,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             to: newToken,
         };
 
-        const path = "/keys/changes";
-        return this.http.authedRequest(undefined, Method.Get, path, qps);
+        return this.http.authedRequest(undefined, Method.Get, "/keys/changes", qps);
     }
 
     public uploadDeviceSigningKeys(auth?: IAuthData, keys?: CrossSigningKeys): Promise<{}> {

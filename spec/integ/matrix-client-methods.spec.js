@@ -841,43 +841,144 @@ describe("MatrixClient", function() {
     });
 
     describe("getThirdpartyUser", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = [{
+                userid: "@Bob",
+                protocol: "irc",
+                fields: {},
+            }];
 
+            const prom = client.getThirdpartyUser("irc", {});
+            httpBackend.when("GET", "/thirdparty/user/irc").respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
     });
 
     describe("getThirdpartyLocation", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = [{
+                alias: "#alias",
+                protocol: "irc",
+                fields: {},
+            }];
 
+            const prom = client.getThirdpartyLocation("irc", {});
+            httpBackend.when("GET", "/thirdparty/location/irc").respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
     });
 
     describe("getPushers", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {
+                pushers: [],
+            };
 
+            const prom = client.getPushers();
+            httpBackend.when("GET", "/pushers").respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
     });
 
-    it("getKeyChanges", () => {
+    describe("getKeyChanges", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {
+                changed: [],
+                left: [],
+            };
 
+            const prom = client.getKeyChanges("old", "new");
+            httpBackend.when("GET", "/keys/changes").check((req) => {
+                expect(req.queryParams.from).toEqual("old");
+                expect(req.queryParams.to).toEqual("new");
+            }).respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
     });
 
     describe("getDevices", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {
+                devices: [],
+            };
 
+            const prom = client.getDevices();
+            httpBackend.when("GET", "/devices").respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
     });
 
     describe("getDevice", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {
+                device_id: "DEADBEEF",
+                display_name: "NotAPhone",
+                last_seen_ip: "127.0.0.1",
+                last_seen_ts: 1,
+            };
 
+            const prom = client.getDevice("DEADBEEF");
+            httpBackend.when("GET", "/devices/DEADBEEF").respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
     });
 
     describe("getThreePids", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {
+                threepids: [],
+            };
 
+            const prom = client.getThreePids();
+            httpBackend.when("GET", "/account/3pid").respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
     });
 
     describe("deleteAlias", () => {
-
+        it("should hit the expected API endpoint", async () => {
+            const response = {};
+            const prom = client.deleteAlias("#foo:bar");
+            httpBackend.when("DELETE", "/directory/room/" + encodeURIComponent("#foo:bar")).respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
     });
 
     describe("deleteRoomTag", () => {
-
+        it("should hit the expected API endpoint", async () => {
+            const response = {};
+            const prom = client.deleteRoomTag("!roomId:server", "u.tag");
+            const url = `/user/${encodeURIComponent(userId)}/rooms/${encodeURIComponent("!roomId:server")}/tags/u.tag`;
+            httpBackend.when("DELETE", url).respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
     });
 
     describe("getRoomTags", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {
+                tags: {
+                    "u.tag": {
+                        order: 0.5,
+                    },
+                },
+            };
 
+            const prom = client.getRoomTags("!roomId:server");
+            const url = `/user/${encodeURIComponent(userId)}/rooms/${encodeURIComponent("!roomId:server")}/tags`;
+            httpBackend.when("GET", url).respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
     });
 });
 
