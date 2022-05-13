@@ -14,7 +14,11 @@ jobs:
 
   sonarqube:
     needs: prdetails
-    if: github.event.workflow_run.conclusion == 'success'
+    # Only wait for prdetails if it isn't skipped
+    if: |
+      always() &&
+      (needs.prdetails.result == 'success' || needs.prdetails.result == 'skipped') &&
+      needs.prdetails.result github.event.workflow_run.conclusion == 'success'
     uses: matrix-org/matrix-js-sdk/.github/workflows/sonarcloud.yml@develop
     with:
       repo: ${{ github.event.workflow_run.head_repository.full_name }}
