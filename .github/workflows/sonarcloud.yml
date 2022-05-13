@@ -16,7 +16,7 @@ on:
         required: true
         description: The git revision with which this sonar run should be associated
 
-      # Coverage specific parameters
+      # Coverage specific parameters, assumes coverage reports live in a /coverage/ directory
       coverage_workflow_name:
         type: string
         required: false
