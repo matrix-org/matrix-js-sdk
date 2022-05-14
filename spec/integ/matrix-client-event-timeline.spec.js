@@ -526,8 +526,7 @@ describe("MatrixClient event timelines", function() {
                     return {
                         original_event: THREAD_ROOT,
                         chunk: [THREAD_REPLY],
-                        next_batch: "next_batch_token0",
-                        prev_batch: "prev_batch_token0",
+                        // no next batch as this is the oldest end of the timeline
                     };
                 });
 
@@ -536,8 +535,8 @@ describe("MatrixClient event timelines", function() {
 
             const timeline = await timelinePromise;
 
-            expect(timeline.getEvents().find(e => e.getId() === THREAD_ROOT.event_id));
-            expect(timeline.getEvents().find(e => e.getId() === THREAD_REPLY.event_id));
+            expect(timeline.getEvents().find(e => e.getId() === THREAD_ROOT.event_id)).toBeTruthy();
+            expect(timeline.getEvents().find(e => e.getId() === THREAD_REPLY.event_id)).toBeTruthy();
         });
     });
 

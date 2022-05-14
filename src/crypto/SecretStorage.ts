@@ -329,7 +329,7 @@ export class SecretStorage {
             // encoded, since this is how a key would normally be stored.
             if (encInfo.passthrough) return encodeBase64(decryption.get_private_key());
 
-            return await decryption.decrypt(encInfo);
+            return decryption.decrypt(encInfo);
         } finally {
             if (decryption && decryption.free) decryption.free();
         }
@@ -339,21 +339,15 @@ export class SecretStorage {
      * Check if a secret is stored on the server.
      *
      * @param {string} name the name of the secret
-     * @param {boolean} checkKey check if the secret is encrypted by a trusted key
      *
      * @return {object?} map of key name to key info the secret is encrypted
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    public async isStored(name: string, checkKey: boolean): Promise<Record<string, ISecretStorageKeyInfo> | null> {
+    public async isStored(name: string): Promise<Record<string, ISecretStorageKeyInfo> | null> {
         // check if secret exists
         const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretInfo>(name);
-        if (!secretInfo) return null;
-        if (!secretInfo.encrypted) {
-            return null;
-        }
-
-        if (checkKey === undefined) checkKey = true;
+        if (!secretInfo?.encrypted) return null;
 
         const ret = {};
 
@@ -598,11 +592,11 @@ export class SecretStorage {
 
         if (keys[keyId].algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             const decryption = {
-                encrypt: async function(secret: string): Promise<IEncryptedPayload> {
-                    return await encryptAES(secret, privateKey, name);
+                encrypt: function(secret: string): Promise<IEncryptedPayload> {
+                    return encryptAES(secret, privateKey, name);
                 },
-                decrypt: async function(encInfo: IEncryptedPayload): Promise<string> {
-                    return await decryptAES(encInfo, privateKey, name);
+                decrypt: function(encInfo: IEncryptedPayload): Promise<string> {
+                    return decryptAES(encInfo, privateKey, name);
                 },
             };
             return [keyId, decryption];

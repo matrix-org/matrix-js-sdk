@@ -78,7 +78,7 @@ export enum RoomKeyRequestState {
 export class OutgoingRoomKeyRequestManager {
     // handle for the delayed call to sendOutgoingRoomKeyRequests. Non-null
     // if the callback has been set, or if it is still running.
-    private sendOutgoingRoomKeyRequestsTimer: number = null;
+    private sendOutgoingRoomKeyRequestsTimer: ReturnType<typeof setTimeout> = null;
 
     // sanity check to ensure that we don't end up with two concurrent runs
     // of sendOutgoingRoomKeyRequests
@@ -189,9 +189,7 @@ export class OutgoingRoomKeyRequestManager {
                             // in state ROOM_KEY_REQUEST_STATES.SENT, so we must have
                             // raced with another tab to mark the request cancelled.
                             // Try again, to make sure the request is resent.
-                            return await this.queueRoomKeyRequest(
-                                requestBody, recipients, resend,
-                            );
+                            return this.queueRoomKeyRequest(requestBody, recipients, resend);
                         }
 
                         // We don't want to wait for the timer, so we send it

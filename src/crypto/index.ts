@@ -58,7 +58,7 @@ import { keyFromPassphrase } from './key_passphrase';
 import { decodeRecoveryKey, encodeRecoveryKey } from './recoverykey';
 import { VerificationRequest } from "./verification/request/VerificationRequest";
 import { InRoomChannel, InRoomRequests } from "./verification/request/InRoomChannel";
-import { ToDeviceChannel, ToDeviceRequests } from "./verification/request/ToDeviceChannel";
+import { ToDeviceChannel, ToDeviceRequests, Request } from "./verification/request/ToDeviceChannel";
 import { IllegalMethod } from "./verification/IllegalMethod";
 import { KeySignatureUploadError } from "../errors";
 import { calculateKeyCheck, decryptAES, encryptAES } from './aes';
@@ -309,7 +309,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
     private oneTimeKeyCount: number;
     private needsNewFallback: boolean;
-    private fallbackCleanup?: number; // setTimeout ID
+    private fallbackCleanup?: ReturnType<typeof setTimeout>;
 
     /**
      * Cryptography bits
@@ -402,7 +402,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
             // try to get key from app
             if (this.baseApis.cryptoCallbacks && this.baseApis.cryptoCallbacks.getBackupKey) {
-                return await this.baseApis.cryptoCallbacks.getBackupKey();
+                return this.baseApis.cryptoCallbacks.getBackupKey();
             }
 
             throw new Error("Unable to get private key");
@@ -690,7 +690,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
             // Cross-sign own device
             const device = this.deviceList.getStoredDevice(this.userId, this.deviceId);
-            const deviceSignature = await crossSigningInfo.signDevice(this.userId, device) as ISignedKey;
+            const deviceSignature = await crossSigningInfo.signDevice(this.userId, device);
             builder.addKeySignature(this.userId, this.deviceId, deviceSignature);
 
             // Sign message key backup with cross-signing master key
@@ -1026,7 +1026,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             const decodedBackupKey = new Uint8Array(olmlib.decodeBase64(
                 fixedBackupKey || sessionBackupKey,
             ));
-            await builder.addSessionBackupPrivateKeyToCache(decodedBackupKey);
+            builder.addSessionBackupPrivateKeyToCache(decodedBackupKey);
         } else if (this.backupManager.getKeyBackupEnabled()) {
             // key backup is enabled but we don't have a session backup key in SSSS: see if we have one in
             // the cache or the user can provide one, and if so, write it to SSSS
@@ -1076,11 +1076,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         return this.secretStorage.get(name);
     }
 
-    public isSecretStored(
-        name: string,
-        checkKey?: boolean,
-    ): Promise<Record<string, ISecretStorageKeyInfo> | null> {
-        return this.secretStorage.isStored(name, checkKey);
+    public isSecretStored(name: string): Promise<Record<string, ISecretStorageKeyInfo> | null> {
+        return this.secretStorage.isStored(name);
     }
 
     public requestSecret(name: string, devices: string[]): ISecretRequest {
@@ -1421,6 +1418,25 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         } else {
             return new DeviceTrustLevel(false, false, trustedLocally, false);
         }
+    }
+
+    /**
+     * Check whether one of our own devices is cross-signed by our
+     * user's stored keys, regardless of whether we trust those keys yet.
+     *
+     * @param {string} deviceId The ID of the device to check
+     *
+     * @returns {boolean} true if the device is cross-signed
+     */
+    public checkIfOwnDeviceCrossSigned(deviceId: string): boolean {
+        const device = this.deviceList.getStoredDevice(this.userId, deviceId);
+        const userCrossSigning = this.deviceList.getStoredCrossSigningForUser(this.userId);
+        return userCrossSigning.checkDeviceTrust(
+            userCrossSigning,
+            device,
+            false,
+            true,
+        ).isCrossSigningVerified();
     }
 
     /*
@@ -2302,8 +2318,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         userId: string,
         deviceId: string,
         transactionId: string = null,
-    ): any { // TODO types
-        let request;
+    ): VerificationBase<any, any> {
+        let request: Request;
         if (transactionId) {
             request = this.toDeviceVerificationRequests.getRequestBySenderAndTxnId(userId, transactionId);
             if (!request) {
@@ -2871,7 +2887,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         } else {
             const content = event.getWireContent();
             const alg = this.getRoomDecryptor(event.getRoomId(), content.algorithm);
-            return await alg.decryptEvent(event);
+            return alg.decryptEvent(event);
         }
     }
 

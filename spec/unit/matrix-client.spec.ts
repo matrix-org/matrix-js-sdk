@@ -29,6 +29,7 @@ import {
 import { MEGOLM_ALGORITHM } from "../../src/crypto/olmlib";
 import { EventStatus, MatrixEvent } from "../../src/models/event";
 import { Preset } from "../../src/@types/partials";
+import { ReceiptType } from "../../src/@types/read_receipts";
 import * as testUtils from "../test-utils/test-utils";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
@@ -90,7 +91,12 @@ describe("MatrixClient", function() {
     let pendingLookup = null;
     function httpReq(cb, method, path, qp, data, prefix) {
         if (path === KEEP_ALIVE_PATH && acceptKeepalives) {
-            return Promise.resolve();
+            return Promise.resolve({
+                unstable_features: {
+                    "org.matrix.msc3440.stable": true,
+                },
+                versions: ["r0.6.0", "r0.6.1"],
+            });
         }
         const next = httpLookups.shift();
         const logLine = (
@@ -811,9 +817,7 @@ describe("MatrixClient", function() {
                     }
                 },
             },
-            threads: {
-                get: jest.fn(),
-            },
+            getThread: jest.fn(),
             addPendingEvent: jest.fn(),
             updatePendingEvent: jest.fn(),
             reEmitter: {
@@ -994,6 +998,46 @@ describe("MatrixClient", function() {
         });
     });
 
+    describe("read-markers and read-receipts", () => {
+        it("setRoomReadMarkers", () => {
+            client.setRoomReadMarkersHttpRequest = jest.fn();
+            const room = {
+                hasPendingEvent: jest.fn().mockReturnValue(false),
+                addLocalEchoReceipt: jest.fn(),
+            };
+            const rrEvent = new MatrixEvent({ event_id: "read_event_id" });
+            const rpEvent = new MatrixEvent({ event_id: "read_private_event_id" });
+            client.getRoom = () => room;
+
+            client.setRoomReadMarkers(
+                "room_id",
+                "read_marker_event_id",
+                rrEvent,
+                rpEvent,
+            );
+
+            expect(client.setRoomReadMarkersHttpRequest).toHaveBeenCalledWith(
+                "room_id",
+                "read_marker_event_id",
+                "read_event_id",
+                "read_private_event_id",
+            );
+            expect(room.addLocalEchoReceipt).toHaveBeenCalledTimes(2);
+            expect(room.addLocalEchoReceipt).toHaveBeenNthCalledWith(
+                1,
+                client.credentials.userId,
+                rrEvent,
+                ReceiptType.Read,
+            );
+            expect(room.addLocalEchoReceipt).toHaveBeenNthCalledWith(
+                2,
+                client.credentials.userId,
+                rpEvent,
+                ReceiptType.ReadPrivate,
+            );
+        });
+    });
+
     describe("beacons", () => {
         const roomId = '!room:server.org';
         const content = makeBeaconInfoContent(100, true);
@@ -1047,7 +1091,7 @@ describe("MatrixClient", function() {
                 expect(roomStateProcessSpy).not.toHaveBeenCalled();
             });
 
-            it('calls room states processBeaconEvents with m.beacon events', () => {
+            it('calls room states processBeaconEvents with events', () => {
                 const room = new Room(roomId, client, userId);
                 const roomStateProcessSpy = jest.spyOn(room.currentState, 'processBeaconEvents');
 
@@ -1055,7 +1099,7 @@ describe("MatrixClient", function() {
                 const beaconEvent = makeBeaconEvent(userId);
 
                 client.processBeaconEvents(room, [messageEvent, beaconEvent]);
-                expect(roomStateProcessSpy).toHaveBeenCalledWith([beaconEvent]);
+                expect(roomStateProcessSpy).toHaveBeenCalledWith([messageEvent, beaconEvent], client);
             });
         });
     });

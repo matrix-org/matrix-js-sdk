@@ -54,7 +54,7 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
     public readonly roomId: string;
     private _beaconInfo: BeaconInfoState;
     private _isLive: boolean;
-    private livenessWatchInterval: number;
+    private livenessWatchInterval: ReturnType<typeof setInterval>;
     private _latestLocationState: BeaconLocationState | undefined;
 
     constructor(

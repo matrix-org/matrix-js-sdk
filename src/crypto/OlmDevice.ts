@@ -909,12 +909,12 @@ export class OlmDevice {
         await this.cryptoStore.storeEndToEndSessionProblem(deviceKey, type, fixed);
     }
 
-    public async sessionMayHaveProblems(deviceKey: string, timestamp: number): Promise<IProblem> {
-        return await this.cryptoStore.getEndToEndSessionProblem(deviceKey, timestamp);
+    public sessionMayHaveProblems(deviceKey: string, timestamp: number): Promise<IProblem> {
+        return this.cryptoStore.getEndToEndSessionProblem(deviceKey, timestamp);
     }
 
-    public async filterOutNotifiedErrorDevices(devices: IOlmDevice[]): Promise<IOlmDevice[]> {
-        return await this.cryptoStore.filterOutNotifiedErrorDevices(devices);
+    public filterOutNotifiedErrorDevices(devices: IOlmDevice[]): Promise<IOlmDevice[]> {
+        return this.cryptoStore.filterOutNotifiedErrorDevices(devices);
     }
 
     // Outbound group session
