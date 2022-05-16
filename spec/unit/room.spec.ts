@@ -1937,6 +1937,15 @@ describe("Room", function() {
             expect(() => room.createThread(rootEvent.getId(), rootEvent, [])).not.toThrow();
         });
 
+        it("creating thread from edited event should not conflate old versions of the event", () => {
+            const message = mkMessage();
+            const edit = mkEdit(message);
+            message.makeReplaced(edit);
+
+            const thread = room.createThread("$000", message, [], true);
+            expect(thread).toHaveLength(0);
+        });
+
         it("Edits update the lastReply event", async () => {
             room.client.supportsExperimentalThreads = () => true;
 
@@ -2036,17 +2045,15 @@ describe("Room", function() {
                 },
             });
 
-            let prom = emitPromise(room, ThreadEvent.New);
+            const prom = emitPromise(room, ThreadEvent.New);
             room.addLiveEvents([threadRoot, threadResponse1, threadResponse2, threadResponse2Reaction]);
             const thread = await prom;
 
             expect(thread).toHaveLength(2);
             expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
 
-            prom = emitPromise(thread, ThreadEvent.Update);
             const threadResponse2ReactionRedaction = mkRedaction(threadResponse2Reaction);
             room.addLiveEvents([threadResponse2ReactionRedaction]);
-            await prom;
             expect(thread).toHaveLength(2);
             expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
         });

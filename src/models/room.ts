@@ -1659,8 +1659,10 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         if (rootEvent) {
             const tl = this.getTimelineForEvent(rootEvent.getId());
             const relatedEvents = tl?.getTimelineSet().getAllRelationsEventForEvent(rootEvent.getId());
-            if (relatedEvents) {
-                events = events.concat(relatedEvents);
+            if (relatedEvents?.length) {
+                // Include all relations of the root event, given it'll be visible in both timelines,
+                // except `m.replace` as that will already be applied atop the event using `MatrixEvent::makeReplaced`
+                events = events.concat(relatedEvents.filter(e => !e.isRelation(RelationType.Replace)));
             }
         }
 
