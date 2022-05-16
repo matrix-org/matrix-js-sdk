@@ -297,7 +297,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
 
         // Ensure any failures are logged for debugging
         prom.catch(e => {
-            logger.error(`Failed to ensure outbound session in ${this.roomId}`, e);
+            logger.error(`Failed to setup outbound session in ${this.roomId}`, e);
         });
 
         // setupPromise resolves to `session` whether or not the share succeeds
