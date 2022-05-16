@@ -1,0 +1,91 @@
+name: SonarCloud
+on:
+  workflow_call:
+    inputs:
+      repo:
+        type: string
+        required: true
+        description: The full name of the repo in org/repo format
+      head_branch:
+        type: string
+        required: true
+        description: The name of the head branch
+      # We cannot use ${{ github.sha }} here as for pull requests it'll be a simulated merge commit instead
+      revision:
+        type: string
+        required: true
+        description: The git revision with which this sonar run should be associated
+
+      # Coverage specific parameters, assumes coverage reports live in a /coverage/ directory
+      coverage_workflow_name:
+        type: string
+        required: false
+        description: The name of the workflow which uploaded the `coverage` artifact, if any
+      coverage_run_id:
+        type: string
+        required: false
+        description: The run_id of the workflow which upload the coverage relevant to this run
+
+      # PR specific parameters
+      pr_id:
+        type: string
+        required: false
+        description: The ID number of the PR if this workflow is being triggered due to one
+      base_branch:
+        type: string
+        required: false
+        description: The base branch of the PR if this workflow is being triggered due to one
+
+      # Org specific parameters
+      main_branch:
+        type: string
+        required: false
+        description: The default branch of the repository
+        default: "develop"
+    secrets:
+      SONAR_TOKEN:
+        required: true
+jobs:
+  analysis:
+    name: Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: "🧮 Checkout code"
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ inputs.repo }}
+          ref: ${{ inputs.head_branch }} # checkout commit that triggered this workflow
+          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
+
+      # Fetch develop so that Sonar can identify new issues in PR builds
+      - name: "📕 Fetch ${{ inputs.main_branch }}"
+        if: inputs.head_branch != inputs.main_branch
+        run: git rev-parse HEAD && git fetch origin ${{ inputs.main_branch }}:${{ inputs.main_branch }} && git status && git rev-parse HEAD
+
+      # There's a 'download artifact' action, but it hasn't been updated for the workflow_run action
+      # (https://github.com/actions/download-artifact/issues/60) so instead we get this mess:
+      - name: "📥 Download Coverage Report"
+        uses: dawidd6/action-download-artifact@v2
+        if: inputs.coverage_workflow_name
+        with:
+          workflow: ${{ inputs.coverage_workflow_name }}
+          run_id: ${{ inputs.coverage_run_id }}
+          name: coverage
+          path: coverage
+
+      - name: "🔍 Read package.json version"
+        id: version
+        uses: martinbeentjes/npm-get-version-action@main
+
+      - name: "🩻 SonarCloud Scan"
+        uses: SonarSource/sonarcloud-github-action@master
+        with:
+          args: >
+            -Dsonar.projectVersion=${{ steps.version.outputs.current-version }}
+            -Dsonar.scm.revision=${{ inputs.revision }}
+            -Dsonar.pullrequest.key=${{ inputs.pr_id }}
+            -Dsonar.pullrequest.branch=${{ inputs.pr_id && inputs.head_branch }}
+            -Dsonar.pullrequest.base=${{ inputs.pr_id && inputs.base_branch }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed to get PR information, if any
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
