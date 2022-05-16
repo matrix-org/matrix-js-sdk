@@ -1390,8 +1390,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
         if (!senderPendingEvents.has(sessionId)) {
             senderPendingEvents.set(sessionId, new Set());
         }
-        // @ts-ignore: TS isn't smart enough to figure out `has` + `set` above makes this non-null
-        senderPendingEvents.get(sessionId).add(event);
+        senderPendingEvents.get(sessionId)?.add(event);
     }
 
     /**
@@ -1448,7 +1447,8 @@ class MegolmDecryption extends DecryptionAlgorithm {
 
         if (event.getType() == "m.forwarded_room_key") {
             exportFormat = true;
-            forwardingKeyChain = content.forwarding_curve25519_key_chain ?? [];
+            forwardingKeyChain = Array.isArray(content.forwarding_curve25519_key_chain) ?
+                content.forwarding_curve25519_key_chain : [];
 
             // copy content before we modify it
             forwardingKeyChain = forwardingKeyChain.slice();
