@@ -278,7 +278,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
         // Returns the successful session whether keyshare succeeds or not.
         //
         // returns a promise which resolves once the keyshare is successful.
-        const prepareSession = async (oldSession: OutboundSessionInfo | null): Promise<OutboundSessionInfo> => {
+        const setup = async (oldSession: OutboundSessionInfo | null): Promise<OutboundSessionInfo> => {
             const sharedHistory = isRoomSharedHistory(room);
 
             const session = await this.prepareSession(devicesInRoom, sharedHistory, oldSession);
@@ -293,7 +293,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
         };
 
         // first wait for the previous share to complete
-        const prom = this.setupPromise.then(prepareSession);
+        const prom = this.setupPromise.then(setup);
 
         // Ensure any failures are logged for debugging
         prom.catch(e => {
