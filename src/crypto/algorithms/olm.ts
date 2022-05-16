@@ -122,6 +122,10 @@ class OlmEncryption extends EncryptionAlgorithm {
             const userId = users[i];
             const devices = this.crypto.getStoredDevicesForUser(userId);
 
+            if (devices == null) {
+                continue;
+            }
+
             for (let j = 0; j < devices.length; ++j) {
                 const deviceInfo = devices[j];
                 const key = deviceInfo.getIdentityKey();
@@ -239,7 +243,7 @@ class OlmDecryption extends DecryptionAlgorithm {
             throw new DecryptionError(
                 "OLM_BAD_ROOM",
                 "Message intended for room " + payload.room_id, {
-                    reported_room: event.getRoomId(),
+                    reported_room: event.getRoomId() || "ROOM_ID_UNDEFINED",
                 },
             );
         }
