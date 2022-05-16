@@ -42,7 +42,7 @@ export class TestClient {
     private oneTimeKeys: Record<string, IOneTimeKey>;
 
     constructor(
-        public readonly userId: string,
+        public readonly userId?: string,
         public readonly deviceId?: string,
         accessToken?: string,
         sessionStoreBackend?: Storage,
