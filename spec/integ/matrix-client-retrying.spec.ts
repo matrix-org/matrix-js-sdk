@@ -1,10 +1,10 @@
-import { EventStatus, RoomEvent } from "../../src/matrix";
+import { EventStatus, RoomEvent, MatrixClient } from "../../src/matrix";
 import { MatrixScheduler } from "../../src/scheduler";
 import { Room } from "../../src/models/room";
 import { TestClient } from "../TestClient";
 
 describe("MatrixClient retrying", function() {
-    let client: TestClient = null;
+    let client: MatrixClient = null;
     let httpBackend: TestClient["httpBackend"] = null;
     let scheduler;
     const userId = "@alice:localhost";
