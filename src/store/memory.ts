@@ -199,7 +199,7 @@ export class MemoryStore implements IStore {
     /**
      * Retrieve scrollback for this room.
      * @param {Room} room The matrix room
-     * @param {integer} limit The max number of old events to retrieve.
+     * @param {number} limit The max number of old events to retrieve.
      * @return {Array<Object>} An array of objects which will be at most 'limit'
      * length and at least 0. The objects are the raw event JSON.
      */

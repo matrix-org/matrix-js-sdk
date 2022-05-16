@@ -2,7 +2,10 @@ name: Tests
 on:
   pull_request: { }
   push:
-    branches: [ develop, main, master ]
+    branches: [ develop, master ]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   jest:
     name: Jest

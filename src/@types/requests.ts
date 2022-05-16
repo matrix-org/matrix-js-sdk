@@ -190,4 +190,17 @@ export interface IFilterResponse {
     filter_id: string;
 }
 
+export interface ITagsResponse {
+    tags: {
+        [tagId: string]: {
+            order: number;
+        };
+    };
+}
+
+export interface IStatusResponse extends IPresenceOpts {
+    currently_active?: boolean;
+    last_active_ago?: number;
+}
+
 /* eslint-enable camelcase */
