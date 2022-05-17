@@ -1,5 +1,4 @@
-import { MatrixEvent } from "../../src/models/event";
-import { EventTimeline } from "../../src/models/event-timeline";
+import { EventTimeline, MatrixEvent, RoomEvent } from "../../src";
 import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 
@@ -59,6 +58,112 @@ describe("MatrixClient syncing", function() {
             httpBackend.flushAllExpected().then(function() {
                 done();
             });
+        });
+
+        it("should emit Room.myMembership for invite->leave->invite cycles", async () => {
+            const roomId = "!cycles:example.org";
+
+            // First sync: an invite
+            const inviteSyncRoomSection = {
+                invite: {
+                    [roomId]: {
+                        invite_state: {
+                            events: [{
+                                type: "m.room.member",
+                                state_key: selfUserId,
+                                content: {
+                                    membership: "invite",
+                                },
+                            }],
+                        },
+                    },
+                },
+            };
+            httpBackend.when("GET", "/sync").respond(200, {
+                ...syncData,
+                rooms: inviteSyncRoomSection,
+            });
+
+            // Second sync: a leave (reject of some kind)
+            httpBackend.when("POST", "/leave").respond(200, {});
+            httpBackend.when("GET", "/sync").respond(200, {
+                ...syncData,
+                rooms: {
+                    leave: {
+                        [roomId]: {
+                            account_data: { events: [] },
+                            ephemeral: { events: [] },
+                            state: {
+                                events: [{
+                                    type: "m.room.member",
+                                    state_key: selfUserId,
+                                    content: {
+                                        membership: "leave",
+                                    },
+                                    prev_content: {
+                                        membership: "invite",
+                                    },
+                                    // XXX: And other fields required on an event
+                                }],
+                            },
+                            timeline: {
+                                limited: false,
+                                events: [{
+                                    type: "m.room.member",
+                                    state_key: selfUserId,
+                                    content: {
+                                        membership: "leave",
+                                    },
+                                    prev_content: {
+                                        membership: "invite",
+                                    },
+                                    // XXX: And other fields required on an event
+                                }],
+                            },
+                        },
+                    },
+                },
+            });
+
+            // Third sync: another invite
+            httpBackend.when("GET", "/sync").respond(200, {
+                ...syncData,
+                rooms: inviteSyncRoomSection,
+            });
+
+            // First fire: an initial invite
+            let fires = 0;
+            client.once(RoomEvent.MyMembership, (room, membership, oldMembership) => { // Room, string, string
+                fires++;
+                expect(room.roomId).toBe(roomId);
+                expect(membership).toBe("invite");
+                expect(oldMembership).toBeFalsy();
+
+                // Second fire: a leave
+                client.once(RoomEvent.MyMembership, (room, membership, oldMembership) => {
+                    fires++;
+                    expect(room.roomId).toBe(roomId);
+                    expect(membership).toBe("leave");
+                    expect(oldMembership).toBe("invite");
+
+                    // Third/final fire: a second invite
+                    client.once(RoomEvent.MyMembership, (room, membership, oldMembership) => {
+                        fires++;
+                        expect(room.roomId).toBe(roomId);
+                        expect(membership).toBe("invite");
+                        expect(oldMembership).toBe("leave");
+                    });
+                });
+
+                // For maximum safety, "leave" the room after we register the handler
+                client.leave(roomId);
+            });
+
+            // noinspection ES6MissingAwait
+            client.startClient();
+            await httpBackend.flushAllExpected();
+
+            expect(fires).toBe(3);
         });
     });
 
