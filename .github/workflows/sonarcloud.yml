@@ -36,7 +36,11 @@ on:
         required: false
         description: The base branch of the PR if this workflow is being triggered due to one
 
-      # Org specific parameters
+      # Repo specific parameters
+      upstream_repo:
+        type: string
+        required: true
+        description: The owner/repo of the main upstream repository
       main_branch:
         type: string
         required: false
@@ -57,10 +61,15 @@ jobs:
           ref: ${{ inputs.head_branch }} # checkout commit that triggered this workflow
           fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
 
-      # Fetch develop so that Sonar can identify new issues in PR builds
+      # Fetch upstream main branch so that Sonar can identify new issues in PR builds
       - name: "📕 Fetch ${{ inputs.main_branch }}"
-        if: inputs.head_branch != inputs.main_branch
-        run: git rev-parse HEAD && git fetch origin ${{ inputs.main_branch }}:${{ inputs.main_branch }} && git status && git rev-parse HEAD
+        if: inputs.head_branch == inputs.main_branch
+        run: |
+          git remote add upstream https://github.com/${{ inputs.upstream_repo }}.git
+          git rev-parse HEAD
+          git fetch upstream ${{ inputs.main_branch }}:${{ inputs.main_branch }}
+          git status
+          git rev-parse HEAD
 
       # There's a 'download artifact' action, but it hasn't been updated for the workflow_run action
       # (https://github.com/actions/download-artifact/issues/60) so instead we get this mess:
