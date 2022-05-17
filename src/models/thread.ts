@@ -79,6 +79,12 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     ) {
         super();
 
+        if (!opts?.room) {
+            // Logging/debugging for https://github.com/vector-im/element-web/issues/22141
+            // Hope is that we end up with a more obvious stack trace.
+            throw new Error("element-web#22141: A thread requires a room in order to function");
+        }
+
         this.room = opts.room;
         this.client = opts.client;
         this.timelineSet = new EventTimelineSet(this.room, {
