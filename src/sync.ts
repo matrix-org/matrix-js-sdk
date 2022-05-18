@@ -1166,6 +1166,9 @@ export class SyncApi {
                 room.recalculate();
                 client.store.storeRoom(room);
                 client.emit(ClientEvent.Room, room);
+            } else {
+                // Update room state for invite->reject->invite cycles
+                room.recalculate();
             }
             stateEvents.forEach(function(e) {
                 client.emit(ClientEvent.Event, e);
