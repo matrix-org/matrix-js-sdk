@@ -293,6 +293,8 @@ export class BackupManager {
         targetRoomId: string | undefined,
         targetSessionId: string | undefined,
     ): Promise<void> {
+        if (!this.backupInfo) { return; }
+
         const now = new Date().getTime();
         if (
             !this.sessionLastCheckAttemptedTime[targetSessionId]
