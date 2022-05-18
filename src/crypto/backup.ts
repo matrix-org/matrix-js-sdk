@@ -35,7 +35,7 @@ import { UnstableValue } from "../NamespacedValue";
 import { CryptoEvent, IMegolmSessionData } from "./index";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
-const KEY_BACKUP_CHECK_RATE_LIMIT = 5000;
+const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
 
 type AuthData = IKeyBackupInfo["auth_data"];
 
