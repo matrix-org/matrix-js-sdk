@@ -113,6 +113,7 @@ export class BackupManager {
     public checkedForBackup: boolean; // Have we checked the server for a backup we can use?
     private sendingBackups: boolean; // Are we currently sending backups?
     private sessionLastCheckAttemptedTime: Record<string, number> = {}; // When did we last try to check the server for a given session id?
+
     constructor(private readonly baseApis: MatrixClient, public readonly getKey: GetKey) {
         this.checkedForBackup = false;
         this.sendingBackups = false;
