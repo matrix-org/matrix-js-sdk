@@ -1,0 +1,53 @@
+name: Release Process
+on:
+  push:
+    branches-ignore:  [ "!release-*" ]
+    tags: [ "v*" ]
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+jobs:
+  jsdoc:
+    name: Publish Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🧮 Checkout code
+        uses: actions/checkout@v3
+
+      - name: 🔧 Yarn cache
+        uses: actions/setup-node@v3
+        with:
+          cache: "yarn"
+
+      - name: 🔨 Install dependencies
+        run: "yarn install --pure-lockfile"
+
+      - name: 📖 Generate JSDoc
+        run: "yarn gendoc"
+
+      - name: 🧮 Checkout gh-pages
+        uses: actions/checkout@v3
+        with:
+          ref: gh-pages
+          clean: false
+
+      - name: 🎏 Resolve version from tag
+        id: version
+        run: |
+          tag="${{ github.ref_name }}"
+          echo "RELEASE_VERSION=${tag#v}" >> $GITHUB_ENV
+
+      - name: 📋 Copy to gh-pages
+        run: |
+          # Copy into the folder structure
+          cp -a ".jsdoc/matrix-js-sdk/$RELEASE_VERSION" .
+
+          # Add the new directory to the index if it isn't there already
+          if ! grep -q "Version $RELEASE_VERSION" index.html; then
+            perl -i -pe 'BEGIN {$rel=shift} $_ =~ /^<\/ul>/ && print
+              "<li><a href=\"${rel}/index.html\">Version ${rel}</a></li>\n"' "$RELEASE_VERSION" index.html
+          fi
+
+      - name: 🌐 Deploy to Github Pages
+        run: |
+          git add "$RELEASE_VERSION"
+          git commit --no-verify -m "Add jsdoc for $RELEASE_VERSION" index.html "$RELEASE_VERSION"
+          git push origin gh-pages
