@@ -47,6 +47,7 @@ import { CallFeed } from './callFeed';
 import { MatrixClient } from "../client";
 import { ISendEventResponse } from "../@types/requests";
 import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter";
+import { DeviceInfo } from '../crypto/deviceinfo';
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
@@ -343,6 +344,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private callLength = 0;
 
     private opponentDeviceId: string;
+    private opponentDeviceInfo: DeviceInfo;
     private opponentSessionId: string;
     public groupCallId: string;
 
@@ -506,6 +508,17 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      */
     public getRemoteFeeds(): Array<CallFeed> {
         return this.feeds.filter((feed) => !feed.isLocal());
+    }
+
+    private async initOpponentCrypto() {
+        if (!this.opponentDeviceId) return;
+
+        const userId = this.invitee || this.getOpponentMember().userId;
+        const deviceInfoMap = await this.client.crypto.deviceList.downloadKeys([userId], false);
+        this.opponentDeviceInfo = deviceInfoMap[userId][this.opponentDeviceId];
+        if (this.opponentDeviceInfo === undefined) {
+            throw new Error(`No keys found for opponent device ${this.opponentDeviceId}!`);
+        }
     }
 
     /**
@@ -792,6 +805,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // handler will start giving us more call events (eg. candidates) so if
         // we haven't set the party ID, we'll ignore them.
         this.chooseOpponent(event);
+        await this.initOpponentCrypto();
         try {
             await this.peerConn.setRemoteDescription(invite.offer);
             await this.addBufferedIceCandidates();
@@ -2052,9 +2066,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 },
             };
             const userId = this.invitee || this.getOpponentMember().userId;
-            const deviceInfoMap = await this.client.crypto.deviceList.downloadKeys([userId], false);
-            const deviceInfo = deviceInfoMap[userId][this.opponentDeviceId];
-            return this.client.crypto.encryptAndSendToDevices([{ userId, deviceInfo }], payload);
+            return this.client.crypto.encryptAndSendToDevices([{
+                userId,
+                deviceInfo: this.opponentDeviceInfo,
+            }], payload);
         } else {
             this.emit(CallEvent.SendVoipEvent, {
                 type: "sendEvent",
@@ -2350,6 +2365,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     public async placeCallWithCallFeeds(callFeeds: CallFeed[], requestScreenshareFeed = false): Promise<void> {
         this.checkForErrorListener();
         this.direction = CallDirection.Outbound;
+
+        await this.initOpponentCrypto();
 
         // XXX Find a better way to do this
         this.client.callEventHandler.calls.set(this.callId, this);
