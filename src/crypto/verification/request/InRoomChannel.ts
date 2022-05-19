@@ -184,7 +184,7 @@ export class InRoomChannel implements IVerificationChannel {
      * @param {boolean} isLiveEvent whether this is an even received through sync or not
      * @returns {Promise} a promise that resolves when any requests as an answer to the passed-in event are sent.
      */
-    public async handleEvent(event: MatrixEvent, request: VerificationRequest, isLiveEvent = false): Promise<void> {
+    public handleEvent(event: MatrixEvent, request: VerificationRequest, isLiveEvent = false): Promise<void> {
         // prevent processing the same event multiple times, as under
         // some circumstances Room.timeline can get emitted twice for the same event
         if (request.hasEventId(event.getId())) {
@@ -221,8 +221,7 @@ export class InRoomChannel implements IVerificationChannel {
         const isRemoteEcho = !!event.getUnsigned().transaction_id;
         const isSentByUs = event.getSender() === this.client.getUserId();
 
-        return await request.handleEvent(
-            type, event, isLiveEvent, isRemoteEcho, isSentByUs);
+        return request.handleEvent(type, event, isLiveEvent, isRemoteEcho, isSentByUs);
     }
 
     /**

@@ -54,6 +54,7 @@ import { IPushRules } from "./@types/PushRules";
 import { RoomStateEvent } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
 import { BeaconEvent } from "./models/beacon";
+import { IEventsResponse } from "./@types/requests";
 import { IMarkerFoundOptions } from "./models/room-state";
 
 const DEBUG = true;
@@ -171,7 +172,7 @@ export class SyncApi {
     private syncStateData: ISyncStateData = null; // additional data (eg. error object for failed sync)
     private catchingUp = false;
     private running = false;
-    private keepAliveTimer: number = null;
+    private keepAliveTimer: ReturnType<typeof setTimeout> = null;
     private connectionReturnedDefer: IDeferred<boolean> = null;
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
     private failedSyncCount = 0; // Number of consecutive failed /sync requests
@@ -383,7 +384,7 @@ export class SyncApi {
             getFilterName(client.credentials.userId, "LEFT_ROOMS"), filter,
         ).then(function(filterId) {
             qps.filter = filterId;
-            return client.http.authedRequest<any>( // TODO types
+            return client.http.authedRequest<ISyncResponse>(
                 undefined, Method.Get, "/sync", qps as any, undefined, localTimeoutMs,
             );
         }).then(async (data) => {
@@ -518,8 +519,7 @@ export class SyncApi {
         }
 
         // FIXME: gut wrenching; hard-coded timeout values
-        // TODO types
-        this.client.http.authedRequest<any>(undefined, Method.Get, "/events", {
+        this.client.http.authedRequest<IEventsResponse>(undefined, Method.Get, "/events", {
             room_id: peekRoom.roomId,
             timeout: String(30 * 1000),
             from: token,
@@ -983,7 +983,7 @@ export class SyncApi {
 
     private doSyncRequest(syncOptions: ISyncOptions, syncToken: string): IRequestPromise<ISyncResponse> {
         const qps = this.getSyncParams(syncOptions, syncToken);
-        return this.client.http.authedRequest( // TODO types
+        return this.client.http.authedRequest<ISyncResponse>(
             undefined, Method.Get, "/sync", qps as any, undefined,
             qps.timeout + BUFFER_PERIOD_MS,
         );
@@ -1275,6 +1275,9 @@ export class SyncApi {
                 room.recalculate();
                 client.store.storeRoom(room);
                 client.emit(ClientEvent.Room, room);
+            } else {
+                // Update room state for invite->reject->invite cycles
+                room.recalculate();
             }
             stateEvents.forEach(function(e) {
                 client.emit(ClientEvent.Event, e);
@@ -1404,16 +1407,6 @@ export class SyncApi {
                 if (e.isState() && e.getType() == "m.room.encryption" && this.opts.crypto) {
                     await this.opts.crypto.onCryptoEvent(e);
                 }
-                if (e.isState() && e.getType() === "im.vector.user_status") {
-                    let user = client.store.getUser(e.getStateKey());
-                    if (user) {
-                        user.unstable_updateStatusMessage(e);
-                    } else {
-                        user = createNewUser(client, e.getStateKey());
-                        user.unstable_updateStatusMessage(e);
-                        client.store.storeUser(user);
-                    }
-                }
             };
 
             await utils.promiseMapSeries(stateEvents, processRoomEvent);
@@ -1509,7 +1502,7 @@ export class SyncApi {
      * Starts polling the connectivity check endpoint
      * @param {number} delay How long to delay until the first poll.
      *        defaults to a short, randomised interval (to prevent
-     *        tightlooping if /versions succeeds but /sync etc. fail).
+     *        tight-looping if /versions succeeds but /sync etc. fail).
      * @return {promise} which resolves once the connection returns
      */
     private startKeepAlives(delay?: number): Promise<boolean> {

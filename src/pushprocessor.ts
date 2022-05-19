@@ -34,6 +34,7 @@ import {
     PushRuleSet,
     TweakName,
 } from "./@types/PushRules";
+import { EventType } from "./@types/event";
 
 /**
  * @module pushprocessor
@@ -56,31 +57,6 @@ const RULEKINDS_IN_ORDER = [
 //      and so we can put them here.
 const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
     {
-        // For homeservers which don't support MSC1930 yet
-        rule_id: ".m.rule.tombstone",
-        default: true,
-        enabled: true,
-        conditions: [
-            {
-                kind: ConditionKind.EventMatch,
-                key: "type",
-                pattern: "m.room.tombstone",
-            },
-            {
-                kind: ConditionKind.EventMatch,
-                key: "state_key",
-                pattern: "",
-            },
-        ],
-        actions: [
-            PushRuleActionName.Notify,
-            {
-                set_tweak: TweakName.Highlight,
-                value: true,
-            },
-        ],
-    },
-    {
         // For homeservers which don't support MSC2153 yet
         rule_id: ".m.rule.reaction",
         default: true,
@@ -90,6 +66,22 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
                 kind: ConditionKind.EventMatch,
                 key: "type",
                 pattern: "m.reaction",
+            },
+        ],
+        actions: [
+            PushRuleActionName.DontNotify,
+        ],
+    },
+    {
+        // For homeservers which don't support MSC3786 yet
+        rule_id: ".org.matrix.msc3786.rule.room.server_acl",
+        default: true,
+        enabled: true,
+        conditions: [
+            {
+                kind: ConditionKind.EventMatch,
+                key: "type",
+                pattern: EventType.RoomServerAcl,
             },
         ],
         actions: [
@@ -300,7 +292,7 @@ export class PushProcessor {
 
         const memberCount = room.currentState.getJoinedMemberCount();
 
-        const m = cond.is.match(/^([=<>]*)([0-9]*)$/);
+        const m = cond.is.match(/^([=<>]*)(\d*)$/);
         if (!m) {
             return false;
         }

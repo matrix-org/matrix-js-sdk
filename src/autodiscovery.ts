@@ -17,8 +17,6 @@ limitations under the License.
 
 /** @module auto-discovery */
 
-import { URL as NodeURL } from "url";
-
 import { IClientWellKnown, IWellKnownConfig } from "./client";
 import { logger } from './logger';
 
@@ -249,21 +247,20 @@ export class AutoDiscovery {
 
         // Step 7: Copy any other keys directly into the clientConfig. This is for
         // things like custom configuration of services.
-        Object.keys(wellknown)
-            .map((k) => {
-                if (k === "m.homeserver" || k === "m.identity_server") {
-                    // Only copy selected parts of the config to avoid overwriting
-                    // properties computed by the validation logic above.
-                    const notProps = ["error", "state", "base_url"];
-                    for (const prop of Object.keys(wellknown[k])) {
-                        if (notProps.includes(prop)) continue;
-                        clientConfig[k][prop] = wellknown[k][prop];
-                    }
-                } else {
-                    // Just copy the whole thing over otherwise
-                    clientConfig[k] = wellknown[k];
+        Object.keys(wellknown).forEach((k) => {
+            if (k === "m.homeserver" || k === "m.identity_server") {
+                // Only copy selected parts of the config to avoid overwriting
+                // properties computed by the validation logic above.
+                const notProps = ["error", "state", "base_url"];
+                for (const prop of Object.keys(wellknown[k])) {
+                    if (notProps.includes(prop)) continue;
+                    clientConfig[k][prop] = wellknown[k][prop];
                 }
-            });
+            } else {
+                // Just copy the whole thing over otherwise
+                clientConfig[k] = wellknown[k];
+            }
+        });
 
         // Step 8: Give the config to the caller (finally)
         return Promise.resolve(clientConfig);
@@ -373,16 +370,11 @@ export class AutoDiscovery {
         if (!url) return false;
 
         try {
-            // We have to try and parse the URL using the NodeJS URL
-            // library if we're on NodeJS and use the browser's URL
-            // library when we're in a browser. To accomplish this, we
-            // try the NodeJS version first and fall back to the browser.
             let parsed = null;
             try {
-                if (NodeURL) parsed = new NodeURL(url);
-                else parsed = new URL(url);
-            } catch (e) {
                 parsed = new URL(url);
+            } catch (e) {
+                logger.error("Could not parse url", e);
             }
 
             if (!parsed || !parsed.hostname) return false;
@@ -411,14 +403,14 @@ export class AutoDiscovery {
      * the following properties:
      *   raw: The JSON object returned by the server.
      *   action: One of SUCCESS, IGNORE, or FAIL_PROMPT.
-     *   reason: Relatively human readable description of what went wrong.
+     *   reason: Relatively human-readable description of what went wrong.
      *   error: The actual Error, if one exists.
      * @param {string} url The URL to fetch a JSON object from.
      * @return {Promise<object>} Resolves to the returned state.
      * @private
      */
-    private static async fetchWellKnownObject(url: string): Promise<IWellKnownConfig> {
-        return new Promise(function(resolve, reject) {
+    private static fetchWellKnownObject(url: string): Promise<IWellKnownConfig> {
+        return new Promise(function(resolve) {
             // eslint-disable-next-line
             const request = require("./matrix").getRequest();
             if (!request) throw new Error("No request library available");

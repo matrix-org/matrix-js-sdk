@@ -29,10 +29,11 @@ import {
 import { MEGOLM_ALGORITHM } from "../../src/crypto/olmlib";
 import { EventStatus, MatrixEvent } from "../../src/models/event";
 import { Preset } from "../../src/@types/partials";
+import { ReceiptType } from "../../src/@types/read_receipts";
 import * as testUtils from "../test-utils/test-utils";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
-import { Room } from "../../src";
+import { ContentHelpers, Room } from "../../src";
 import { makeBeaconEvent } from "../test-utils/beacon";
 
 jest.useFakeTimers();
@@ -90,7 +91,12 @@ describe("MatrixClient", function() {
     let pendingLookup = null;
     function httpReq(cb, method, path, qp, data, prefix) {
         if (path === KEEP_ALIVE_PATH && acceptKeepalives) {
-            return Promise.resolve();
+            return Promise.resolve({
+                unstable_features: {
+                    "org.matrix.msc3440.stable": true,
+                },
+                versions: ["r0.6.0", "r0.6.1"],
+            });
         }
         const next = httpLookups.shift();
         const logLine = (
@@ -811,9 +817,7 @@ describe("MatrixClient", function() {
                     }
                 },
             },
-            threads: {
-                get: jest.fn(),
-            },
+            getThread: jest.fn(),
             addPendingEvent: jest.fn(),
             updatePendingEvent: jest.fn(),
             reEmitter: {
@@ -994,6 +998,46 @@ describe("MatrixClient", function() {
         });
     });
 
+    describe("read-markers and read-receipts", () => {
+        it("setRoomReadMarkers", () => {
+            client.setRoomReadMarkersHttpRequest = jest.fn();
+            const room = {
+                hasPendingEvent: jest.fn().mockReturnValue(false),
+                addLocalEchoReceipt: jest.fn(),
+            };
+            const rrEvent = new MatrixEvent({ event_id: "read_event_id" });
+            const rpEvent = new MatrixEvent({ event_id: "read_private_event_id" });
+            client.getRoom = () => room;
+
+            client.setRoomReadMarkers(
+                "room_id",
+                "read_marker_event_id",
+                rrEvent,
+                rpEvent,
+            );
+
+            expect(client.setRoomReadMarkersHttpRequest).toHaveBeenCalledWith(
+                "room_id",
+                "read_marker_event_id",
+                "read_event_id",
+                "read_private_event_id",
+            );
+            expect(room.addLocalEchoReceipt).toHaveBeenCalledTimes(2);
+            expect(room.addLocalEchoReceipt).toHaveBeenNthCalledWith(
+                1,
+                client.credentials.userId,
+                rrEvent,
+                ReceiptType.Read,
+            );
+            expect(room.addLocalEchoReceipt).toHaveBeenNthCalledWith(
+                2,
+                client.credentials.userId,
+                rpEvent,
+                ReceiptType.ReadPrivate,
+            );
+        });
+    });
+
     describe("beacons", () => {
         const roomId = '!room:server.org';
         const content = makeBeaconInfoContent(100, true);
@@ -1047,7 +1091,7 @@ describe("MatrixClient", function() {
                 expect(roomStateProcessSpy).not.toHaveBeenCalled();
             });
 
-            it('calls room states processBeaconEvents with m.beacon events', () => {
+            it('calls room states processBeaconEvents with events', () => {
                 const room = new Room(roomId, client, userId);
                 const roomStateProcessSpy = jest.spyOn(room.currentState, 'processBeaconEvents');
 
@@ -1055,8 +1099,43 @@ describe("MatrixClient", function() {
                 const beaconEvent = makeBeaconEvent(userId);
 
                 client.processBeaconEvents(room, [messageEvent, beaconEvent]);
-                expect(roomStateProcessSpy).toHaveBeenCalledWith([beaconEvent]);
+                expect(roomStateProcessSpy).toHaveBeenCalledWith([messageEvent, beaconEvent], client);
             });
+        });
+    });
+
+    describe("setRoomTopic", () => {
+        const roomId = "!foofoofoofoofoofoo:matrix.org";
+        const createSendStateEventMock = (topic: string, htmlTopic?: string) => {
+            return jest.fn()
+                .mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
+                    expect(roomId).toEqual(roomId);
+                    expect(eventType).toEqual(EventType.RoomTopic);
+                    expect(content).toMatchObject(ContentHelpers.makeTopicContent(topic, htmlTopic));
+                    expect(stateKey).toBeUndefined();
+                    return Promise.resolve();
+                });
+        };
+
+        it("is called with plain text topic and sends state event", async () => {
+            const sendStateEvent = createSendStateEventMock("pizza");
+            client.sendStateEvent = sendStateEvent;
+            await client.setRoomTopic(roomId, "pizza");
+            expect(sendStateEvent).toHaveBeenCalledTimes(1);
+        });
+
+        it("is called with plain text topic and callback and sends state event", async () => {
+            const sendStateEvent = createSendStateEventMock("pizza");
+            client.sendStateEvent = sendStateEvent;
+            await client.setRoomTopic(roomId, "pizza", () => {});
+            expect(sendStateEvent).toHaveBeenCalledTimes(1);
+        });
+
+        it("is called with plain text and HTML topic and sends state event", async () => {
+            const sendStateEvent = createSendStateEventMock("pizza", "<b>pizza</b>");
+            client.sendStateEvent = sendStateEvent;
+            await client.setRoomTopic(roomId, "pizza", "<b>pizza</b>");
+            expect(sendStateEvent).toHaveBeenCalledTimes(1);
         });
     });
 
