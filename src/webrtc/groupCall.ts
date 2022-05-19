@@ -58,7 +58,8 @@ export type GroupCallEventHandlerMap = {
 
 export enum GroupCallErrorCode {
     NoUserMedia = "no_user_media",
-    UnknownDevice = "unknown_device"
+    UnknownDevice = "unknown_device",
+    PlaceCallFailed = "place_call_failed"
 }
 
 export class GroupCallError extends Error {
@@ -653,7 +654,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
         return this.client.sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, content, localUserId);
     }
 
-    public onMemberStateChanged = (event: MatrixEvent) => {
+    public onMemberStateChanged = async (event: MatrixEvent) => {
         // The member events may be received for another room, which we will ignore.
         if (event.getRoomId() !== this.room.roomId) {
             return;
@@ -751,8 +752,23 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
         const requestScreenshareFeed = opponentDevice.feeds.some(
             (feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
 
-        // Safari can't send a MediaStream to multiple sources, so clone it
-        newCall.placeCallWithCallFeeds(this.getLocalFeeds().map(feed => feed.clone()), requestScreenshareFeed);
+        try {
+            // Safari can't send a MediaStream to multiple sources, so clone it
+            await newCall.placeCallWithCallFeeds(
+                this.getLocalFeeds().map(feed => feed.clone()),
+                requestScreenshareFeed,
+            );
+        } catch (e) {
+            logger.warn(`Failed to place call to ${member.userId}!`, e);
+            this.emit(
+                GroupCallEvent.Error,
+                new GroupCallError(
+                    GroupCallErrorCode.PlaceCallFailed,
+                    `Failed to place call to ${member.userId}.`,
+                ),
+            );
+            return;
+        }
 
         if (this.dataChannelsEnabled) {
             newCall.createDataChannel("datachannel", this.dataChannelOptions);
