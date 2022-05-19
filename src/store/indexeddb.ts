@@ -297,7 +297,7 @@ export class IndexedDBStore extends MemoryStore {
 
         return async (...args) => {
             try {
-                return func.call(this, ...args);
+                return await func.call(this, ...args);
             } catch (e) {
                 logger.error("IndexedDBStore failure, degrading to MemoryStore", e);
                 this.emitter.emit("degraded", e);
