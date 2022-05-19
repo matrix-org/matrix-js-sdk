@@ -92,14 +92,19 @@ describe('EventTimelineSet', () => {
 
         describe('with events to be decrypted', () => {
             let messageEventShouldAttemptDecryptionSpy: jest.SpyInstance;
+            let messageEventIsDecryptionFailureSpy: jest.SpyInstance;
+
             let replyEventShouldAttemptDecryptionSpy: jest.SpyInstance;
+            let replyEventIsDecryptionFailureSpy: jest.SpyInstance;
 
             beforeEach(() => {
                 messageEventShouldAttemptDecryptionSpy = jest.spyOn(messageEvent, 'shouldAttemptDecryption');
                 messageEventShouldAttemptDecryptionSpy.mockReturnValue(true);
+                messageEventIsDecryptionFailureSpy = jest.spyOn(messageEvent, 'isDecryptionFailure');
 
                 replyEventShouldAttemptDecryptionSpy = jest.spyOn(replyEvent, 'shouldAttemptDecryption');
                 replyEventShouldAttemptDecryptionSpy.mockReturnValue(true);
+                replyEventIsDecryptionFailureSpy = jest.spyOn(messageEvent, 'isDecryptionFailure');
 
                 eventTimelineSet.addEventsToTimeline(
                     [
@@ -124,6 +129,17 @@ describe('EventTimelineSet', () => {
 
             describe('after decryption', () => {
                 beforeEach(() => {
+                    // simulate decryption failure once
+                    messageEventIsDecryptionFailureSpy.mockReturnValue(true);
+                    replyEventIsDecryptionFailureSpy.mockReturnValue(true);
+
+                    messageEvent.emit(MatrixEventEvent.Decrypted, messageEvent);
+                    replyEvent.emit(MatrixEventEvent.Decrypted, replyEvent);
+
+                    // simulate decryption
+                    messageEventIsDecryptionFailureSpy.mockReturnValue(false);
+                    replyEventIsDecryptionFailureSpy.mockReturnValue(false);
+
                     messageEventShouldAttemptDecryptionSpy.mockReturnValue(false);
                     replyEventShouldAttemptDecryptionSpy.mockReturnValue(false);
 
