@@ -94,6 +94,7 @@ export enum RelationType {
     Replace = "m.replace",
     Reference = "m.reference",
     Thread = "m.thread",
+    Reply = "m.in_reply_to",
 }
 
 export enum MsgType {
