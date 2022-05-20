@@ -168,6 +168,8 @@ describe("Relations", function() {
         await relations.setTargetEvent(originalTopic);
         expect(originalTopic.replacingEvent()).toBe(null);
         expect(originalTopic.getContent().topic).toBe("orig");
+        expect(badlyEditedTopic.isRelation()).toBe(false);
+        expect(badlyEditedTopic.isRelation("m.replace")).toBe(false);
 
         await relations.addEvent(badlyEditedTopic);
         expect(originalTopic.replacingEvent()).toBe(null);
