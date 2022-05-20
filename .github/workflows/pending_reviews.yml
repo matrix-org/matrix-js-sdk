@@ -12,7 +12,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
-      checks: write
     steps:
       - name: Fetch review details
         id: info
@@ -26,13 +25,13 @@ jobs:
         if: steps.info.outputs.changes_requested > 0 || steps.info.pending > 0
         uses: LouisBrunner/checks-action@v1.2.0
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.ELEMENT_BOT_TOKEN }}
           name: "No outstanding reviews"
           conclusion: success
       - name: Update status check (failure)
         if: steps.info.outputs.changes_requested < 1 && steps.info.pending < 1
         uses: LouisBrunner/checks-action@v1.2.0
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.ELEMENT_BOT_TOKEN }}
           name: "No outstanding reviews"
           conclusion: failure
