@@ -1290,7 +1290,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
 
     /**
      * Get whether the event is a relation event, and of a given type if
-     * `relType` is passed in.
+     * `relType` is passed in. State events cannot be relation events
      *
      * @param {string?} relType if given, checks that the relation is of the
      * given type
@@ -1300,8 +1300,11 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
         // Relation info is lifted out of the encrypted content when sent to
         // encrypted rooms, so we have to check `getWireContent` for this.
         const relation = this.getWireContent()?.["m.relates_to"];
-        return relation && relation.rel_type && relation.event_id &&
-            ((relType && relation.rel_type === relType) || !relType);
+        if (this.isState() && relation?.rel_type === RelationType.Replace) {
+            // State events cannot be m.replace relations
+            return false;
+        }
+        return relation?.rel_type && relation.event_id && (relType ? relation.rel_type === relType : true);
     }
 
     /**
