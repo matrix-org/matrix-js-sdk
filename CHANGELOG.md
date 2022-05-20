@@ -1,3 +1,9 @@
+Changes in [18.0.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v18.0.0-rc.2) (2022-05-20)
+============================================================================================================
+
+## 🐛 Bug Fixes
+ * Catch promise errors in degradable ([\#2388](https://github.com/matrix-org/matrix-js-sdk/pull/2388)). Fixes #2384.
+
 Changes in [18.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v18.0.0-rc.1) (2022-05-17)
 ============================================================================================================
 
