@@ -825,19 +825,17 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         const onEventDecrypted = (event: MatrixEvent) => {
             if (event.isDecryptionFailure()) {
                 // This could for example happen if the encryption keys are not yet available.
-                // The event may still be decrypted later. Keep the event listener.
+                // The event may still be decrypted later. Register the listener again.
+                event.once(MatrixEventEvent.Decrypted, onEventDecrypted);
                 return;
             }
 
-            event.off(MatrixEventEvent.Decrypted, onEventDecrypted);
             this.aggregateRelations(event);
         };
 
         // If the event is currently encrypted, wait until it has been decrypted.
         if (event.isBeingDecrypted() || event.shouldAttemptDecryption()) {
-            // off/on to prevent duplicate listeners
-            event.off(MatrixEventEvent.Decrypted, onEventDecrypted);
-            event.on(MatrixEventEvent.Decrypted, onEventDecrypted);
+            event.once(MatrixEventEvent.Decrypted, onEventDecrypted);
             return;
         }
 
