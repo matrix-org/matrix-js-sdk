@@ -1,18 +1,18 @@
 # Can be workflow_call'd only from pull_request & pull_request_review
 name: Pending Reviews
 on:
-  pull_request:
+  pull_request_target:
     types: [ opened, synchronize, review_requested, review_request_removed, ready_for_review ]
   pull_request_review:
-    types: [ edited, submitted, dismissed ]
-  workflow_call: { }
+    types: [ submitted, dismissed ]
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 jobs:
   reviews:
-    name: Demand approval from all reviewers
+    name: Assert no outstanding reviews
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
+      checks: write
     steps:
       - name: Fetch review details
         id: info
@@ -20,8 +20,11 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Demand approval
-        if: steps.info.outputs.approved < 1 || steps.info.outputs.changes_requested > 0 || steps.info.pending > 0
-        run: |
-          echo "This PR has pending or changes requested reviews outstanding, you must settle them before merging."
-          exit 1
+      # We can't just rely on this workflow passing/failing as github breaks it up into pull_request and _review
+      # which means this check could be both passing & failing which is just confusing.
+      - name: Update status check
+        uses: LouisBrunner/checks-action@v1.2.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          name: "No outstanding reviews"
+          conclusion: (steps.info.outputs.changes_requested > 0 || steps.info.pending > 0) && 'failure' || 'success'
