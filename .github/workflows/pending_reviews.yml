@@ -1,37 +1,14 @@
 # Can be workflow_call'd only from pull_request & pull_request_review
 name: Pending Reviews
 on:
-  pull_request_target:
+  pull_request:
     types: [ opened, synchronize, review_requested, review_request_removed, ready_for_review ]
   pull_request_review:
     types: [ submitted, dismissed ]
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 jobs:
-  reviews:
-    name: Assert no outstanding reviews
+  dummy:
+    name: Trigger Pending Reviews workflow_run
     runs-on: ubuntu-latest
-    permissions:
-      pull-requests: read
     steps:
-      - name: Fetch review details
-        id: info
-        uses: jrylan/github-action-reviews-counter@main
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-
-      # We can't just rely on this workflow passing/failing as github breaks it up into pull_request and _review
-      # which means this check could be both passing & failing which is just confusing.
-      - name: Update status check (success)
-        if: steps.info.outputs.changes_requested > 0 || steps.info.pending > 0
-        uses: LouisBrunner/checks-action@v1.2.0
-        with:
-          token: ${{ secrets.ELEMENT_BOT_TOKEN }}
-          name: "No outstanding reviews"
-          conclusion: success
-      - name: Update status check (failure)
-        if: steps.info.outputs.changes_requested < 1 && steps.info.pending < 1
-        uses: LouisBrunner/checks-action@v1.2.0
-        with:
-          token: ${{ secrets.ELEMENT_BOT_TOKEN }}
-          name: "No outstanding reviews"
-          conclusion: failure
+      - run: echo "I am a dummy"

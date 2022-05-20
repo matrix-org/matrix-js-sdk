@@ -2,7 +2,17 @@
 name: Pending Reviews (Run)
 on:
   workflow_call:
-
+    inputs:
+      owner:
+        type: string
+        required: false
+        description: The github username of the owner of the head branch
+        default: "${{ github.event.workflow_run.head_repository.owner.login }}"
+      branch:
+        type: string
+        required: false
+        description: The name of the head branch
+        default: "${{ github.event.workflow_run.head_branch }}"
   workflow_run:
     workflows: [ "Pending Reviews" ]
     types:
@@ -16,25 +26,36 @@ jobs:
       pull-requests: read
       checks: write
     steps:
-      - name: Fetch review details
-        id: info
-        uses: jrylan/github-action-reviews-counter@main
+      - name: 🔍 Check reviewers
+        uses: actions/github-script@v5
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          # We need to find the PR number that corresponds to the branch, which we do by searching the GH API
+          # The workflow_run event includes a list of pull requests, but it doesn't get populated for
+          # forked PRs: https://docs.github.com/en/rest/reference/checks#create-a-check-run
+          script: |
+            const [owner, repo] = "${{ github.action_repository }}".split("/");
+            const pulls = await github.rest.pulls.list({
+              head: "${{ inputs.owner }}:${{ inputs.branch }}",
+              owner,
+              repo,
+            });
+            const pull = pulls[0];
+            const pull_number = pull.number;
+            const reviews = await github.rest.pulls.listReviews({
+              pull_number,
+              owner,
+              repo,
+            });
 
-      # We can't just rely on this workflow passing/failing as github breaks it up into pull_request and _review
-      # which means this check could be both passing & failing which is just confusing.
-      - name: Update status check (success)
-        if: steps.info.outputs.changes_requested > 0 || steps.info.pending > 0
-        uses: LouisBrunner/checks-action@v1.2.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          name: "No outstanding reviews"
-          conclusion: success
-      - name: Update status check (failure)
-        if: steps.info.outputs.changes_requested < 1 && steps.info.pending < 1
-        uses: LouisBrunner/checks-action@v1.2.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          name: "No outstanding reviews"
-          conclusion: failure
+            const pending = pull.requested_reviewers.length
+              || pull.requested_teams.length
+              || reviews.some(r => r.state !== "APPROVED");
+
+            await octokit.rest.checks.create({
+              conclusion: pending ? "failure" : "success",
+              name: "Pending reviews",
+              head_sha: pull.head.sha,
+              status: "completed",
+              owner,
+              repo,
+            });
