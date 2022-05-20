@@ -22,9 +22,17 @@ jobs:
 
       # We can't just rely on this workflow passing/failing as github breaks it up into pull_request and _review
       # which means this check could be both passing & failing which is just confusing.
-      - name: Update status check
+      - name: Update status check (success)
+        if: steps.info.outputs.changes_requested > 0 || steps.info.pending > 0
         uses: LouisBrunner/checks-action@v1.2.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           name: "No outstanding reviews"
-          conclusion: (steps.info.outputs.changes_requested > 0 || steps.info.pending > 0) && 'failure' || 'success'
+          conclusion: success
+      - name: Update status check (failure)
+        if: steps.info.outputs.changes_requested < 1 && steps.info.pending < 1
+        uses: LouisBrunner/checks-action@v1.2.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          name: "No outstanding reviews"
+          conclusion: failure
