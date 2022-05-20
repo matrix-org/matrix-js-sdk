@@ -51,7 +51,7 @@ jobs:
               console.log"::set-output name=headref::" + pr.head.ref);
               console.log"::set-output name=baseref::" + pr.base.ref);
             }
-      outputs:
-        pr_id: ${{ steps.details.outputs.prnumber }}
-        head_branch: ${{ steps.details.outputs.headref }}
-        base_branch: ${{ steps.details.outputs.baseref }}
+    outputs:
+      pr_id: ${{ steps.details.outputs.prnumber }}
+      head_branch: ${{ steps.details.outputs.headref }}
+      base_branch: ${{ steps.details.outputs.baseref }}
