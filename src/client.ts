@@ -633,6 +633,19 @@ interface IJoinedMembersResponse {
     };
 }
 
+export interface IRegisterRequestParams {
+    auth?: IAuthData;
+    username?: string;
+    password?: string;
+    refresh_token?: boolean;
+    guest_access_token?: string;
+    x_show_msisdn?: boolean;
+    bind_msisdn?: boolean;
+    bind_email?: boolean;
+    inhibit_login?: boolean;
+    initial_device_display_name?: string;
+}
+
 export interface IPublicRoomsChunkRoom {
     room_id: string;
     name?: string;
@@ -6846,7 +6859,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         guestAccessToken?: string,
         inhibitLogin?: boolean,
         callback?: Callback,
-    ): Promise<any> { // TODO: Types (many)
+    ): Promise<IAuthData> {
         // backwards compat
         if (bindThreepids === true) {
             bindThreepids = { email: true };
@@ -6862,7 +6875,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             auth.session = sessionId;
         }
 
-        const params: any = {
+        const params: IRegisterRequestParams = {
             auth: auth,
             refresh_token: true, // always ask for a refresh token - does nothing if unsupported
         };
@@ -6933,8 +6946,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {Promise} Resolves: to the /register response
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public registerRequest(data: any, kind?: string, callback?: Callback): Promise<any> { // TODO: Types
-        const params: any = {};
+    public registerRequest(data: IRegisterRequestParams, kind?: string, callback?: Callback): Promise<IAuthData> {
+        const params: { kind?: string } = {};
         if (kind) {
             params.kind = kind;
         }
