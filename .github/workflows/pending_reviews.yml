@@ -1,0 +1,27 @@
+# Can be workflow_call'd only from pull_request & pull_request_review
+name: Pending Reviews
+on:
+  pull_request:
+    types: [ opened, synchronize, review_requested, review_request_removed, ready_for_review ]
+  pull_request_review:
+    types: [ edited, submitted, dismissed ]
+  workflow_call: { }
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+jobs:
+  reviews:
+    name: Demand approval from all reviewers
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Fetch review details
+        id: info
+        uses: jrylan/github-action-reviews-counter@main
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Demand approval
+        if: steps.info.outputs.approved < 1 || steps.info.outputs.changes_requested > 0 || steps.info.pending > 0
+        run: |
+          echo "This PR has pending or changes requested reviews outstanding, you must settle them before merging."
+          exit 1
