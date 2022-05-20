@@ -776,6 +776,25 @@ interface ITimestampToEventResponse {
     event_id: string;
     origin_server_ts: string;
 }
+
+interface IBatchSendResponse {
+    /** List of state event ID's we inserted */
+    state_event_ids: string[];
+    /** List of historical event ID's we inserted */
+    event_ids: string[];
+    next_batch_id: string;
+    insertion_event_id: string;
+    batch_event_id: string;
+    /** When `?batch_id` isn't provided, the homeserver automatically creates an
+     * insertion event as a starting place to hang the history off of. This
+     * automatic insertion event ID is returned in this field.
+     *
+     * When `?batch_id` is provided, this field is not present because we can
+     * hang the history off the insertion event specified and associated by the
+     * batch ID.
+     */
+    base_insertion_event_id?: string;
+}
 /* eslint-enable camelcase */
 
 // We're using this constant for methods overloading and inspect whether a variable
@@ -8958,6 +8977,40 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             undefined,
             {
                 prefix: "/_matrix/client/unstable/org.matrix.msc3030",
+            },
+        );
+    }
+
+    /**
+     * Import a batch of historical events (MSC2716)
+     * @return {Promise} A promise of an batch send response data
+     */
+     public batchSend(
+        roomId: string,
+        prev_event_id: string,
+        batch_id: string | null,
+        payload: { state_events_at_start?: any[], events: any[] },
+    ): Promise<IBatchSendResponse> {
+        const path = utils.encodeUri("/rooms/$roomId/batch_send", {
+            $roomId: roomId,
+        });
+
+        const queryParams: { prev_event_id: string, batch_id?: string } = {
+            prev_event_id,
+        };
+        // Avoid passing literally "null" as the query parameter
+        if (batch_id !== null) {
+            queryParams.batch_id = batch_id;
+        }
+
+        return this.http.authedRequest(
+            undefined,
+            Method.Post,
+            path,
+            queryParams,
+            payload,
+            {
+                prefix: "/_matrix/client/unstable/org.matrix.msc2716",
             },
         );
     }
