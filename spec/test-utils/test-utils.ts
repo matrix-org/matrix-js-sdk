@@ -6,7 +6,7 @@ import '../olm-loader';
 
 import { logger } from '../../src/logger';
 import { IContent, IEvent, IUnsigned, MatrixEvent, MatrixEventEvent } from "../../src/models/event";
-import { ClientEvent, EventType, MatrixClient, RelationType } from "../../src";
+import { ClientEvent, EventType, MatrixClient } from "../../src";
 import { SyncState } from "../../src/sync";
 import { eventMapperFor } from "../../src/event-mapper";
 
@@ -260,9 +260,9 @@ export function mkReplyMessage(opts: IReplyMessageOpts, client?: MatrixClient): 
             "msgtype": "m.text",
             "body": opts.msg,
             "m.relates_to": {
-                "rel_type": RelationType.Reply,
+                "rel_type": "m.in_reply_to",
                 "event_id": opts.replyToMessage.getId(),
-                [RelationType.Reply]: {
+                "m.in_reply_to": {
                     "event_id": opts.replyToMessage.getId(),
                 },
             },

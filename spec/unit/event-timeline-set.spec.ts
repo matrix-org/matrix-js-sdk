@@ -22,7 +22,6 @@ import {
     MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
-    RelationType,
     Room,
 } from '../../src';
 
@@ -43,7 +42,7 @@ describe('EventTimelineSet', () => {
             eventTimelineSet.aggregateRelations(messageEvent);
             const relations = eventTimelineSet.getRelationsForEvent(
                 messageEvent.getId(),
-                RelationType.Reply,
+                "m.in_reply_to",
                 EventType.RoomMessage,
             );
             expect(relations).toBeDefined();
@@ -122,7 +121,7 @@ describe('EventTimelineSet', () => {
                 eventTimelineSet.aggregateRelations(messageEvent);
                 const relations = eventTimelineSet.getRelationsForEvent(
                     messageEvent.getId(),
-                    RelationType.Reply,
+                    "m.in_reply_to",
                     EventType.RoomMessage,
                 );
                 expect(relations).toBeUndefined();
