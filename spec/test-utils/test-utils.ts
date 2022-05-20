@@ -6,7 +6,7 @@ import '../olm-loader';
 
 import { logger } from '../../src/logger';
 import { IContent, IEvent, IUnsigned, MatrixEvent, MatrixEventEvent } from "../../src/models/event";
-import { ClientEvent, EventType, MatrixClient } from "../../src";
+import { ClientEvent, EventType, MatrixClient, MsgType } from "../../src";
 import { SyncState } from "../../src/sync";
 import { eventMapperFor } from "../../src/event-mapper";
 
@@ -225,7 +225,7 @@ export function mkMessage(opts: IMessageOpts, client?: MatrixClient): object | M
         ...opts,
         type: EventType.RoomMessage,
         content: {
-            msgtype: "m.text",
+            msgtype: MsgType.Text,
             body: opts.msg,
         },
     };
@@ -257,7 +257,7 @@ export function mkReplyMessage(opts: IReplyMessageOpts, client?: MatrixClient): 
         ...opts,
         type: EventType.RoomMessage,
         content: {
-            "msgtype": "m.text",
+            "msgtype": MsgType.Text,
             "body": opts.msg,
             "m.relates_to": {
                 "rel_type": "m.in_reply_to",
