@@ -412,13 +412,15 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             this.isPersisting = true;
         }
 
-        await Promise.all([
-            this.persistUserPresenceEvents(userTuples),
-            this.persistAccountData(syncData.accountData),
-            this.persistSyncData(syncData.nextBatch, syncData.roomsData),
-        ]).finally(() => {
+        try {
+            await Promise.all([
+                this.persistUserPresenceEvents(userTuples),
+                this.persistAccountData(syncData.accountData),
+                this.persistSyncData(syncData.nextBatch, syncData.roomsData),
+            ]);
+        } finally {
             this.isPersisting = false;
-        });
+        }
     }
 
     /**
