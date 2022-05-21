@@ -127,8 +127,8 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     private db: IDBDatabase = null;
     private disconnected = true;
     private _isNewlyCreated = false;
-    private _isPersisting = false;
-    private _pendingUserPresenceData: UserTuple[] = [];
+    private isPersisting = false;
+    private pendingUserPresenceData: UserTuple[] = [];
 
     /**
      * Does the actual reading from and writing to the indexeddb
@@ -403,13 +403,13 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     public async syncToDatabase(userTuples: UserTuple[]): Promise<void> {
         const syncData = this.syncAccumulator.getJSON(true);
 
-        if (this._isPersisting) {
+        if (this.isPersisting) {
             logger.warn("Skipping syncToDatabase() as persist already in flight");
-            this._pendingUserPresenceData.push(...userTuples);
+            this.pendingUserPresenceData.push(...userTuples);
             return;
         } else {
-            userTuples.unshift(...this._pendingUserPresenceData);
-            this._isPersisting = true;
+            userTuples.unshift(...this.pendingUserPresenceData);
+            this.isPersisting = true;
         }
 
         await Promise.all([
@@ -417,7 +417,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             this.persistAccountData(syncData.accountData),
             this.persistSyncData(syncData.nextBatch, syncData.roomsData),
         ]).finally(() => {
-            this._isPersisting = false;
+            this.isPersisting = false;
         });
     }
 
