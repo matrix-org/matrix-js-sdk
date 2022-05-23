@@ -58,7 +58,7 @@ import { keyFromPassphrase } from './key_passphrase';
 import { decodeRecoveryKey, encodeRecoveryKey } from './recoverykey';
 import { VerificationRequest } from "./verification/request/VerificationRequest";
 import { InRoomChannel, InRoomRequests } from "./verification/request/InRoomChannel";
-import { ToDeviceChannel, ToDeviceRequests } from "./verification/request/ToDeviceChannel";
+import { ToDeviceChannel, ToDeviceRequests, Request } from "./verification/request/ToDeviceChannel";
 import { IllegalMethod } from "./verification/IllegalMethod";
 import { KeySignatureUploadError } from "../errors";
 import { calculateKeyCheck, decryptAES, encryptAES } from './aes';
@@ -2318,8 +2318,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         userId: string,
         deviceId: string,
         transactionId: string = null,
-    ): any { // TODO types
-        let request;
+    ): VerificationBase<any, any> {
+        let request: Request;
         if (transactionId) {
             request = this.toDeviceVerificationRequests.getRequestBySenderAndTxnId(userId, transactionId);
             if (!request) {

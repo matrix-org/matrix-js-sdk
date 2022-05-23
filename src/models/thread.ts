@@ -79,6 +79,12 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     ) {
         super();
 
+        if (!opts?.room) {
+            // Logging/debugging for https://github.com/vector-im/element-web/issues/22141
+            // Hope is that we end up with a more obvious stack trace.
+            throw new Error("element-web#22141: A thread requires a room in order to function");
+        }
+
         this.room = opts.room;
         this.client = opts.client;
         this.timelineSet = new EventTimelineSet(this.room, {
@@ -221,9 +227,10 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             this._currentUserParticipated = true;
         }
 
-        // Add all annotations and replace relations to the timeline so that the relations are processed accordingly
         if ([RelationType.Annotation, RelationType.Replace].includes(event.getRelation()?.rel_type as RelationType)) {
-            this.addEventToTimeline(event, toStartOfTimeline);
+            // Apply annotations and replace relations to the relations of the timeline only
+            this.timelineSet.setRelationsTarget(event);
+            this.timelineSet.aggregateRelations(event);
             return;
         }
 

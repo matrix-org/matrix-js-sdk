@@ -46,9 +46,16 @@ export interface IAuthData {
     session?: string;
     completed?: string[];
     flows?: IFlow[];
+    available_flows?: IFlow[];
+    stages?: string[];
+    required_stages?: AuthType[];
     params?: Record<string, Record<string, any>>;
+    data?: Record<string, string>;
     errcode?: string;
     error?: string;
+    user_id?: string;
+    device_id?: string;
+    access_token?: string;
 }
 
 export enum AuthType {
