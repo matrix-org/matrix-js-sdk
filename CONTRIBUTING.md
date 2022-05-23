@@ -243,3 +243,18 @@ on Git 2.17+ you can mass signoff using rebase:
 ```
 git rebase --signoff origin/develop
 ```
+
+Merge Strategy
+==============
+
+The preferred method for merging pull requests is squash merging to keep the
+commit history trim, but it is up to the discretion of the team member merging
+the change. We do not support rebase merges due to `allchange` being unable to
+handle them. When merging make sure to leave the default commit title, or 
+at least leave the PR number at the end in brackets like by default.
+When stacking pull requests, you may wish to do the following:
+
+1. Branch from develop to your branch (branch1), push commits onto it and open a pull request
+2. Branch from your base branch (branch1) to your work branch (branch2), push commits and open a pull request configuring the base to be branch1, saying in the description that it is based on your other PR.
+3. Merge the first PR using a merge commit otherwise your stacked PR will need a rebase. Github will automatically adjust the base branch of your other PR to be develop.
+

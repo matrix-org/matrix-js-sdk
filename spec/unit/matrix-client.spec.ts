@@ -1,3 +1,19 @@
+/*
+Copyright 2022 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 import { logger } from "../../src/logger";
 import { MatrixClient } from "../../src/client";
 import { Filter } from "../../src/filter";
@@ -13,9 +29,12 @@ import {
 import { MEGOLM_ALGORITHM } from "../../src/crypto/olmlib";
 import { EventStatus, MatrixEvent } from "../../src/models/event";
 import { Preset } from "../../src/@types/partials";
+import { ReceiptType } from "../../src/@types/read_receipts";
 import * as testUtils from "../test-utils/test-utils";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
+import { ContentHelpers, Room } from "../../src";
+import { makeBeaconEvent } from "../test-utils/beacon";
 
 jest.useFakeTimers();
 
@@ -72,7 +91,12 @@ describe("MatrixClient", function() {
     let pendingLookup = null;
     function httpReq(cb, method, path, qp, data, prefix) {
         if (path === KEEP_ALIVE_PATH && acceptKeepalives) {
-            return Promise.resolve();
+            return Promise.resolve({
+                unstable_features: {
+                    "org.matrix.msc3440.stable": true,
+                },
+                versions: ["r0.6.0", "r0.6.1"],
+            });
         }
         const next = httpLookups.shift();
         const logLine = (
@@ -793,11 +817,12 @@ describe("MatrixClient", function() {
                     }
                 },
             },
-            threads: {
-                get: jest.fn(),
-            },
+            getThread: jest.fn(),
             addPendingEvent: jest.fn(),
             updatePendingEvent: jest.fn(),
+            reEmitter: {
+                reEmit: jest.fn(),
+            },
         };
 
         beforeEach(() => {
@@ -941,6 +966,7 @@ describe("MatrixClient", function() {
         it("partitions root events to room timeline and thread timeline", () => {
             const supportsExperimentalThreads = client.supportsExperimentalThreads;
             client.supportsExperimentalThreads = () => true;
+            const room = new Room("!room1:matrix.org", client, userId);
 
             const rootEvent = new MatrixEvent({
                 "content": {},
@@ -963,12 +989,52 @@ describe("MatrixClient", function() {
 
             expect(rootEvent.isThreadRoot).toBe(true);
 
-            const [room, threads] = client.partitionThreadedEvents([rootEvent]);
-            expect(room).toHaveLength(1);
-            expect(threads).toHaveLength(1);
+            const [roomEvents, threadEvents] = room.partitionThreadedEvents([rootEvent]);
+            expect(roomEvents).toHaveLength(1);
+            expect(threadEvents).toHaveLength(1);
 
             // Restore method
             client.supportsExperimentalThreads = supportsExperimentalThreads;
+        });
+    });
+
+    describe("read-markers and read-receipts", () => {
+        it("setRoomReadMarkers", () => {
+            client.setRoomReadMarkersHttpRequest = jest.fn();
+            const room = {
+                hasPendingEvent: jest.fn().mockReturnValue(false),
+                addLocalEchoReceipt: jest.fn(),
+            };
+            const rrEvent = new MatrixEvent({ event_id: "read_event_id" });
+            const rpEvent = new MatrixEvent({ event_id: "read_private_event_id" });
+            client.getRoom = () => room;
+
+            client.setRoomReadMarkers(
+                "room_id",
+                "read_marker_event_id",
+                rrEvent,
+                rpEvent,
+            );
+
+            expect(client.setRoomReadMarkersHttpRequest).toHaveBeenCalledWith(
+                "room_id",
+                "read_marker_event_id",
+                "read_event_id",
+                "read_private_event_id",
+            );
+            expect(room.addLocalEchoReceipt).toHaveBeenCalledTimes(2);
+            expect(room.addLocalEchoReceipt).toHaveBeenNthCalledWith(
+                1,
+                client.credentials.userId,
+                rrEvent,
+                ReceiptType.Read,
+            );
+            expect(room.addLocalEchoReceipt).toHaveBeenNthCalledWith(
+                2,
+                client.credentials.userId,
+                rpEvent,
+                ReceiptType.ReadPrivate,
+            );
         });
     });
 
@@ -981,10 +1047,10 @@ describe("MatrixClient", function() {
         });
 
         it("creates new beacon info", async () => {
-            await client.unstable_createLiveBeacon(roomId, content, '123');
+            await client.unstable_createLiveBeacon(roomId, content);
 
             // event type combined
-            const expectedEventType = `${M_BEACON_INFO.name}.${userId}.123`;
+            const expectedEventType = M_BEACON_INFO.name;
             const [callback, method, path, queryParams, requestContent] = client.http.authedRequest.mock.calls[0];
             expect(callback).toBeFalsy();
             expect(method).toBe('PUT');
@@ -997,17 +1063,132 @@ describe("MatrixClient", function() {
         });
 
         it("updates beacon info with specific event type", async () => {
-            const eventType = `${M_BEACON_INFO.name}.${userId}.456`;
-
-            await client.unstable_setLiveBeacon(roomId, eventType, content);
+            await client.unstable_setLiveBeacon(roomId, content);
 
             // event type combined
             const [, , path, , requestContent] = client.http.authedRequest.mock.calls[0];
             expect(path).toEqual(
                 `/rooms/${encodeURIComponent(roomId)}/state/` +
-                `${encodeURIComponent(eventType)}/${encodeURIComponent(userId)}`,
+                `${encodeURIComponent(M_BEACON_INFO.name)}/${encodeURIComponent(userId)}`,
             );
             expect(requestContent).toEqual(content);
+        });
+
+        describe('processBeaconEvents()', () => {
+            it('does nothing when events is falsy', () => {
+                const room = new Room(roomId, client, userId);
+                const roomStateProcessSpy = jest.spyOn(room.currentState, 'processBeaconEvents');
+
+                client.processBeaconEvents(room, undefined);
+                expect(roomStateProcessSpy).not.toHaveBeenCalled();
+            });
+
+            it('does nothing when events is of length 0', () => {
+                const room = new Room(roomId, client, userId);
+                const roomStateProcessSpy = jest.spyOn(room.currentState, 'processBeaconEvents');
+
+                client.processBeaconEvents(room, []);
+                expect(roomStateProcessSpy).not.toHaveBeenCalled();
+            });
+
+            it('calls room states processBeaconEvents with events', () => {
+                const room = new Room(roomId, client, userId);
+                const roomStateProcessSpy = jest.spyOn(room.currentState, 'processBeaconEvents');
+
+                const messageEvent = testUtils.mkMessage({ room: roomId, user: userId, event: true });
+                const beaconEvent = makeBeaconEvent(userId);
+
+                client.processBeaconEvents(room, [messageEvent, beaconEvent]);
+                expect(roomStateProcessSpy).toHaveBeenCalledWith([messageEvent, beaconEvent], client);
+            });
+        });
+    });
+
+    describe("setRoomTopic", () => {
+        const roomId = "!foofoofoofoofoofoo:matrix.org";
+        const createSendStateEventMock = (topic: string, htmlTopic?: string) => {
+            return jest.fn()
+                .mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
+                    expect(roomId).toEqual(roomId);
+                    expect(eventType).toEqual(EventType.RoomTopic);
+                    expect(content).toMatchObject(ContentHelpers.makeTopicContent(topic, htmlTopic));
+                    expect(stateKey).toBeUndefined();
+                    return Promise.resolve();
+                });
+        };
+
+        it("is called with plain text topic and sends state event", async () => {
+            const sendStateEvent = createSendStateEventMock("pizza");
+            client.sendStateEvent = sendStateEvent;
+            await client.setRoomTopic(roomId, "pizza");
+            expect(sendStateEvent).toHaveBeenCalledTimes(1);
+        });
+
+        it("is called with plain text topic and callback and sends state event", async () => {
+            const sendStateEvent = createSendStateEventMock("pizza");
+            client.sendStateEvent = sendStateEvent;
+            await client.setRoomTopic(roomId, "pizza", () => {});
+            expect(sendStateEvent).toHaveBeenCalledTimes(1);
+        });
+
+        it("is called with plain text and HTML topic and sends state event", async () => {
+            const sendStateEvent = createSendStateEventMock("pizza", "<b>pizza</b>");
+            client.sendStateEvent = sendStateEvent;
+            await client.setRoomTopic(roomId, "pizza", "<b>pizza</b>");
+            expect(sendStateEvent).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe("setPassword", () => {
+        const auth = { session: 'abcdef', type: 'foo' };
+        const newPassword = 'newpassword';
+        const callback = () => {};
+
+        const passwordTest = (expectedRequestContent: any, expectedCallback?: Function) => {
+            const [callback, method, path, queryParams, requestContent] = client.http.authedRequest.mock.calls[0];
+            if (expectedCallback) {
+                expect(callback).toBe(expectedCallback);
+            } else {
+                expect(callback).toBeFalsy();
+            }
+            expect(method).toBe('POST');
+            expect(path).toEqual('/account/password');
+            expect(queryParams).toBeFalsy();
+            expect(requestContent).toEqual(expectedRequestContent);
+        };
+
+        beforeEach(() => {
+            client.http.authedRequest.mockClear().mockResolvedValue({});
+        });
+
+        it("no logout_devices specified", async () => {
+            await client.setPassword(auth, newPassword);
+            passwordTest({ auth, new_password: newPassword });
+        });
+
+        it("no logout_devices specified + callback", async () => {
+            await client.setPassword(auth, newPassword, callback);
+            passwordTest({ auth, new_password: newPassword }, callback);
+        });
+
+        it("overload logoutDevices=true", async () => {
+            await client.setPassword(auth, newPassword, true);
+            passwordTest({ auth, new_password: newPassword, logout_devices: true });
+        });
+
+        it("overload logoutDevices=true + callback", async () => {
+            await client.setPassword(auth, newPassword, true, callback);
+            passwordTest({ auth, new_password: newPassword, logout_devices: true }, callback);
+        });
+
+        it("overload logoutDevices=false", async () => {
+            await client.setPassword(auth, newPassword, false);
+            passwordTest({ auth, new_password: newPassword, logout_devices: false });
+        });
+
+        it("overload logoutDevices=false + callback", async () => {
+            await client.setPassword(auth, newPassword, false, callback);
+            passwordTest({ auth, new_password: newPassword, logout_devices: false }, callback);
         });
     });
 });

@@ -23,7 +23,9 @@ limitations under the License.
 import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
 
-import type NodeCrypto from "crypto";
+import type * as NodeCrypto from "crypto";
+import { MatrixEvent } from ".";
+import { M_TIMESTAMP } from "./@types/location";
 
 /**
  * Encode a dictionary of query parameters.
@@ -425,7 +427,7 @@ export function globToRegexp(glob: string, extended?: any): string {
 
 export function ensureNoTrailingSlash(url: string): string {
     if (url && url.endsWith("/")) {
-        return url.substr(0, url.length - 1);
+        return url.slice(0, -1);
     } else {
         return url;
     }
@@ -462,8 +464,8 @@ export function defer<T = void>(): IDeferred<T> {
 }
 
 export async function promiseMapSeries<T>(
-    promises: T[],
-    fn: (t: T) => void,
+    promises: Array<T | Promise<T>>,
+    fn: (t: T) => Promise<unknown> | void, // if async/promise we don't care about the type as we only await resolution
 ): Promise<void> {
     for (const o of promises) {
         await fn(await o);
@@ -471,7 +473,7 @@ export async function promiseMapSeries<T>(
 }
 
 export function promiseTry<T>(fn: () => T | Promise<T>): Promise<T> {
-    return new Promise((resolve) => resolve(fn()));
+    return Promise.resolve(fn());
 }
 
 // Creates and awaits all promises, running no more than `chunkSize` at the same time
@@ -674,7 +676,13 @@ export function prevString(s: string, alphabet = DEFAULT_ALPHABET): string {
 export function lexicographicCompare(a: string, b: string): number {
     // Dev note: this exists because I'm sad that you can use math operators on strings, so I've
     // hidden the operation in this function.
-    return (a < b) ? -1 : ((a === b) ? 0 : 1);
+    if (a < b) {
+        return -1;
+    } else if (a > b) {
+        return 1;
+    } else {
+        return 0;
+    }
 }
 
 const collator = new Intl.Collator();
@@ -707,4 +715,16 @@ export function recursivelyAssign(target: Object, source: Object, ignoreNullish 
         }
     }
     return target;
+}
+
+function getContentTimestampWithFallback(event: MatrixEvent): number {
+    return M_TIMESTAMP.findIn<number>(event.getContent()) ?? -1;
+}
+
+/**
+ * Sort events by their content m.ts property
+ * Latest timestamp first
+ */
+export function sortEventsByLatestContentTimestamp(left: MatrixEvent, right: MatrixEvent): number {
+    return getContentTimestampWithFallback(right) - getContentTimestampWithFallback(left);
 }

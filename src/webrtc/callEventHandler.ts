@@ -72,21 +72,17 @@ export class CallEventHandler {
                 this.client.decryptEventIfNeeded(event);
             }));
 
-            const ignoreCallIds = new Set<String>();
+            const ignoreCallIds = new Set<string>();
             // inspect the buffer and mark all calls which have been answered
             // or hung up before passing them to the call event handler.
             for (const ev of this.callEventBuffer) {
-                if (ev.getType() === EventType.CallAnswer ||
-                        ev.getType() === EventType.CallHangup) {
+                if (ev.getType() === EventType.CallAnswer || ev.getType() === EventType.CallHangup) {
                     ignoreCallIds.add(ev.getContent().call_id);
                 }
             }
             // now loop through the buffer chronologically and inject them
             for (const e of this.callEventBuffer) {
-                if (
-                    e.getType() === EventType.CallInvite &&
-                    ignoreCallIds.has(e.getContent().call_id)
-                ) {
+                if (e.getType() === EventType.CallInvite && ignoreCallIds.has(e.getContent().call_id)) {
                     // This call has previously been answered or hung up: ignore it
                     continue;
                 }
@@ -191,7 +187,7 @@ export class CallEventHandler {
             }
 
             // Were we trying to call that user (room)?
-            let existingCall;
+            let existingCall: MatrixCall;
             for (const thisCall of this.calls.values()) {
                 const isCalling = [CallState.WaitLocalMedia, CallState.CreateOffer, CallState.InviteSent].includes(
                     thisCall.state,

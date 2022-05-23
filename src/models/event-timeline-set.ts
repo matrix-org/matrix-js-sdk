@@ -28,7 +28,6 @@ import { EventType, RelationType } from "../@types/event";
 import { RoomState } from "./room-state";
 import { TypedEventEmitter } from "./typed-event-emitter";
 
-// var DEBUG = false;
 const DEBUG = true;
 
 let debuglog: (...args: any[]) => void;
@@ -775,7 +774,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     }
 
     public getAllRelationsEventForEvent(eventId: string): MatrixEvent[] {
-        const relationsForEvent = this.relations[eventId] || {};
+        const relationsForEvent = this.relations?.[eventId] || {};
         const events = [];
         for (const relationsRecord of Object.values(relationsForEvent)) {
             for (const relations of Object.values(relationsRecord)) {
@@ -852,14 +851,13 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         }
         let relationsWithEventType = relationsWithRelType[eventType];
 
-        let relatesToEvent;
         if (!relationsWithEventType) {
             relationsWithEventType = relationsWithRelType[eventType] = new Relations(
                 relationType,
                 eventType,
                 this.room,
             );
-            relatesToEvent = this.findEventById(relatesToEventId) || this.room.getPendingEvent(relatesToEventId);
+            const relatesToEvent = this.findEventById(relatesToEventId) || this.room.getPendingEvent(relatesToEventId);
             if (relatesToEvent) {
                 relationsWithEventType.setTargetEvent(relatesToEvent);
             }

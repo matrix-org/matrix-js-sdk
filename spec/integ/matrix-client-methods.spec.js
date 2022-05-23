@@ -1,8 +1,25 @@
+/*
+Copyright 2022 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 import * as utils from "../test-utils/test-utils";
 import { CRYPTO_ENABLED } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
 import { Filter, MemoryStore, Room } from "../../src/matrix";
 import { TestClient } from "../TestClient";
+import { THREAD_RELATION_TYPE } from "../../src/models/thread";
 
 describe("MatrixClient", function() {
     let client = null;
@@ -14,9 +31,7 @@ describe("MatrixClient", function() {
     beforeEach(function() {
         store = new MemoryStore();
 
-        const testClient = new TestClient(userId, "aliceDevice", accessToken, undefined, {
-            store: store,
-        });
+        const testClient = new TestClient(userId, "aliceDevice", accessToken, undefined, { store });
         httpBackend = testClient.httpBackend;
         client = testClient.client;
     });
@@ -146,12 +161,14 @@ describe("MatrixClient", function() {
     describe("joinRoom", function() {
         it("should no-op if you've already joined a room", function() {
             const roomId = "!foo:bar";
-            const room = new Room(roomId, userId);
+            const room = new Room(roomId, client, userId);
+            client.fetchRoomEvent = () => Promise.resolve({});
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userId, room: roomId, mship: "join", event: true,
                 }),
             ]);
+            httpBackend.verifyNoOutstandingRequests();
             store.storeRoom(room);
             client.joinRoom(roomId);
             httpBackend.verifyNoOutstandingRequests();
@@ -244,14 +261,15 @@ describe("MatrixClient", function() {
     });
 
     describe("searching", function() {
-        const response = {
-            search_categories: {
-                room_events: {
-                    count: 24,
-                    results: {
-                        "$flibble:localhost": {
+        it("searchMessageText should perform a /search for room_events", function() {
+            const response = {
+                search_categories: {
+                    room_events: {
+                        count: 24,
+                        results: [{
                             rank: 0.1,
                             result: {
+                                event_id: "$flibble:localhost",
                                 type: "m.room.message",
                                 user_id: "@alice:localhost",
                                 room_id: "!feuiwhf:localhost",
@@ -260,13 +278,11 @@ describe("MatrixClient", function() {
                                     msgtype: "m.text",
                                 },
                             },
-                        },
+                        }],
                     },
                 },
-            },
-        };
+            };
 
-        it("searchMessageText should perform a /search for room_events", function(done) {
             client.searchMessageText({
                 query: "monkeys",
             });
@@ -280,8 +296,171 @@ describe("MatrixClient", function() {
                 });
             }).respond(200, response);
 
-            httpBackend.flush().then(function() {
-                done();
+            return httpBackend.flush();
+        });
+
+        describe("should filter out context from different timelines (threads)", () => {
+            it("filters out thread replies when result is in the main timeline", async () => {
+                const response = {
+                    search_categories: {
+                        room_events: {
+                            count: 24,
+                            results: [{
+                                rank: 0.1,
+                                result: {
+                                    event_id: "$flibble:localhost",
+                                    type: "m.room.message",
+                                    user_id: "@alice:localhost",
+                                    room_id: "!feuiwhf:localhost",
+                                    content: {
+                                        body: "main timeline",
+                                        msgtype: "m.text",
+                                    },
+                                },
+                                context: {
+                                    events_after: [{
+                                        event_id: "$ev-after:server",
+                                        type: "m.room.message",
+                                        user_id: "@alice:localhost",
+                                        room_id: "!feuiwhf:localhost",
+                                        content: {
+                                            "body": "thread reply",
+                                            "msgtype": "m.text",
+                                            "m.relates_to": {
+                                                "event_id": "$some-thread:server",
+                                                "rel_type": THREAD_RELATION_TYPE.name,
+                                            },
+                                        },
+                                    }],
+                                    events_before: [{
+                                        event_id: "$ev-before:server",
+                                        type: "m.room.message",
+                                        user_id: "@alice:localhost",
+                                        room_id: "!feuiwhf:localhost",
+                                        content: {
+                                            body: "main timeline again",
+                                            msgtype: "m.text",
+                                        },
+                                    }],
+                                },
+                            }],
+                        },
+                    },
+                };
+
+                const data = {
+                    results: [],
+                    highlights: [],
+                };
+                client.processRoomEventsSearch(data, response);
+
+                expect(data.results).toHaveLength(1);
+                expect(data.results[0].context.timeline).toHaveLength(2);
+                expect(data.results[0].context.timeline.find(e => e.getId() === "$ev-after:server")).toBeFalsy();
+            });
+
+            it("filters out thread replies from threads other than the thread the result replied to", () => {
+                const response = {
+                    search_categories: {
+                        room_events: {
+                            count: 24,
+                            results: [{
+                                rank: 0.1,
+                                result: {
+                                    event_id: "$flibble:localhost",
+                                    type: "m.room.message",
+                                    user_id: "@alice:localhost",
+                                    room_id: "!feuiwhf:localhost",
+                                    content: {
+                                        "body": "thread 1 reply 1",
+                                        "msgtype": "m.text",
+                                        "m.relates_to": {
+                                            "event_id": "$thread1:server",
+                                            "rel_type": THREAD_RELATION_TYPE.name,
+                                        },
+                                    },
+                                },
+                                context: {
+                                    events_after: [{
+                                        event_id: "$ev-after:server",
+                                        type: "m.room.message",
+                                        user_id: "@alice:localhost",
+                                        room_id: "!feuiwhf:localhost",
+                                        content: {
+                                            "body": "thread 2 reply 2",
+                                            "msgtype": "m.text",
+                                            "m.relates_to": {
+                                                "event_id": "$thread2:server",
+                                                "rel_type": THREAD_RELATION_TYPE.name,
+                                            },
+                                        },
+                                    }],
+                                    events_before: [],
+                                },
+                            }],
+                        },
+                    },
+                };
+
+                const data = {
+                    results: [],
+                    highlights: [],
+                };
+                client.processRoomEventsSearch(data, response);
+
+                expect(data.results).toHaveLength(1);
+                expect(data.results[0].context.timeline).toHaveLength(1);
+                expect(data.results[0].context.timeline.find(e => e.getId() === "$flibble:localhost")).toBeTruthy();
+            });
+
+            it("filters out main timeline events when result is a thread reply", () => {
+                const response = {
+                    search_categories: {
+                        room_events: {
+                            count: 24,
+                            results: [{
+                                rank: 0.1,
+                                result: {
+                                    event_id: "$flibble:localhost",
+                                    type: "m.room.message",
+                                    user_id: "@alice:localhost",
+                                    room_id: "!feuiwhf:localhost",
+                                    content: {
+                                        "body": "thread 1 reply 1",
+                                        "msgtype": "m.text",
+                                        "m.relates_to": {
+                                            "event_id": "$thread1:server",
+                                            "rel_type": THREAD_RELATION_TYPE.name,
+                                        },
+                                    },
+                                },
+                                context: {
+                                    events_after: [{
+                                        event_id: "$ev-after:server",
+                                        type: "m.room.message",
+                                        user_id: "@alice:localhost",
+                                        room_id: "!feuiwhf:localhost",
+                                        content: {
+                                            "body": "main timeline",
+                                            "msgtype": "m.text",
+                                        },
+                                    }],
+                                    events_before: [],
+                                },
+                            }],
+                        },
+                    },
+                };
+
+                const data = {
+                    results: [],
+                    highlights: [],
+                };
+                client.processRoomEventsSearch(data, response);
+
+                expect(data.results).toHaveLength(1);
+                expect(data.results[0].context.timeline).toHaveLength(1);
+                expect(data.results[0].context.timeline.find(e => e.getId() === "$flibble:localhost")).toBeTruthy();
             });
         });
     });
@@ -395,9 +574,14 @@ describe("MatrixClient", function() {
     });
 
     describe("partitionThreadedEvents", function() {
+        let room;
+        beforeEach(() => {
+            room = new Room("!STrMRsukXHtqQdSeHa:matrix.org", client, userId);
+        });
+
         it("returns empty arrays when given an empty arrays", function() {
             const events = [];
-            const [timeline, threaded] = client.partitionThreadedEvents(events);
+            const [timeline, threaded] = room.partitionThreadedEvents(events);
             expect(timeline).toEqual([]);
             expect(threaded).toEqual([]);
         });
@@ -405,24 +589,24 @@ describe("MatrixClient", function() {
         it("copies pre-thread in-timeline vote events onto both timelines", function() {
             client.clientOpts = { experimentalThreadSupport: true };
 
-            const eventMessageInThread = buildEventMessageInThread();
             const eventPollResponseReference = buildEventPollResponseReference();
             const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
+            const eventMessageInThread = buildEventMessageInThread(eventPollStartThreadRoot);
 
             const events = [
+                eventPollStartThreadRoot,
                 eventMessageInThread,
                 eventPollResponseReference,
-                eventPollStartThreadRoot,
             ];
             // Vote has no threadId yet
             expect(eventPollResponseReference.threadId).toBeFalsy();
 
-            const [timeline, threaded] = client.partitionThreadedEvents(events);
+            const [timeline, threaded] = room.partitionThreadedEvents(events);
 
             expect(timeline).toEqual([
                 // The message that was sent in a thread is missing
-                eventPollResponseReference,
                 eventPollStartThreadRoot,
+                eventPollResponseReference,
             ]);
 
             // The vote event has been copied into the thread
@@ -431,33 +615,34 @@ describe("MatrixClient", function() {
             expect(eventRefWithThreadId.threadId).toBeTruthy();
 
             expect(threaded).toEqual([
+                eventPollStartThreadRoot,
                 eventMessageInThread,
                 eventRefWithThreadId,
-                // Thread does not see thread root
             ]);
         });
 
         it("copies pre-thread in-timeline reactions onto both timelines", function() {
             client.clientOpts = { experimentalThreadSupport: true };
 
-            const eventMessageInThread = buildEventMessageInThread();
-            const eventReaction = buildEventReaction();
             const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
+            const eventMessageInThread = buildEventMessageInThread(eventPollStartThreadRoot);
+            const eventReaction = buildEventReaction(eventPollStartThreadRoot);
 
             const events = [
+                eventPollStartThreadRoot,
                 eventMessageInThread,
                 eventReaction,
-                eventPollStartThreadRoot,
             ];
 
-            const [timeline, threaded] = client.partitionThreadedEvents(events);
+            const [timeline, threaded] = room.partitionThreadedEvents(events);
 
             expect(timeline).toEqual([
-                eventReaction,
                 eventPollStartThreadRoot,
+                eventReaction,
             ]);
 
             expect(threaded).toEqual([
+                eventPollStartThreadRoot,
                 eventMessageInThread,
                 withThreadId(eventReaction, eventPollStartThreadRoot.getId()),
             ]);
@@ -467,23 +652,24 @@ describe("MatrixClient", function() {
             client.clientOpts = { experimentalThreadSupport: true };
 
             const eventPollResponseReference = buildEventPollResponseReference();
-            const eventMessageInThread = buildEventMessageInThread();
             const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
+            const eventMessageInThread = buildEventMessageInThread(eventPollStartThreadRoot);
 
             const events = [
+                eventPollStartThreadRoot,
                 eventPollResponseReference,
                 eventMessageInThread,
-                eventPollStartThreadRoot,
             ];
 
-            const [timeline, threaded] = client.partitionThreadedEvents(events);
+            const [timeline, threaded] = room.partitionThreadedEvents(events);
 
             expect(timeline).toEqual([
-                eventPollResponseReference,
                 eventPollStartThreadRoot,
+                eventPollResponseReference,
             ]);
 
             expect(threaded).toEqual([
+                eventPollStartThreadRoot,
                 withThreadId(eventPollResponseReference, eventPollStartThreadRoot.getId()),
                 eventMessageInThread,
             ]);
@@ -492,26 +678,27 @@ describe("MatrixClient", function() {
         it("copies post-thread in-timeline reactions onto both timelines", function() {
             client.clientOpts = { experimentalThreadSupport: true };
 
-            const eventReaction = buildEventReaction();
-            const eventMessageInThread = buildEventMessageInThread();
             const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
+            const eventMessageInThread = buildEventMessageInThread(eventPollStartThreadRoot);
+            const eventReaction = buildEventReaction(eventPollStartThreadRoot);
 
             const events = [
-                eventReaction,
-                eventMessageInThread,
                 eventPollStartThreadRoot,
+                eventMessageInThread,
+                eventReaction,
             ];
 
-            const [timeline, threaded] = client.partitionThreadedEvents(events);
+            const [timeline, threaded] = room.partitionThreadedEvents(events);
 
             expect(timeline).toEqual([
-                eventReaction,
                 eventPollStartThreadRoot,
+                eventReaction,
             ]);
 
             expect(threaded).toEqual([
-                withThreadId(eventReaction, eventPollStartThreadRoot.getId()),
+                eventPollStartThreadRoot,
                 eventMessageInThread,
+                withThreadId(eventReaction, eventPollStartThreadRoot.getId()),
             ]);
         });
 
@@ -519,9 +706,9 @@ describe("MatrixClient", function() {
             client.clientOpts = { experimentalThreadSupport: true };
             // This is based on recording the events in a real room:
 
-            const eventMessageInThread = buildEventMessageInThread();
-            const eventPollResponseReference = buildEventPollResponseReference();
             const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
+            const eventPollResponseReference = buildEventPollResponseReference();
+            const eventMessageInThread = buildEventMessageInThread(eventPollStartThreadRoot);
             const eventRoomName = buildEventRoomName();
             const eventEncryption = buildEventEncryption();
             const eventGuestAccess = buildEventGuestAccess();
@@ -532,9 +719,9 @@ describe("MatrixClient", function() {
             const eventCreate = buildEventCreate();
 
             const events = [
-                eventMessageInThread,
-                eventPollResponseReference,
                 eventPollStartThreadRoot,
+                eventPollResponseReference,
+                eventMessageInThread,
                 eventRoomName,
                 eventEncryption,
                 eventGuestAccess,
@@ -544,12 +731,12 @@ describe("MatrixClient", function() {
                 eventMember,
                 eventCreate,
             ];
-            const [timeline, threaded] = client.partitionThreadedEvents(events);
+            const [timeline, threaded] = room.partitionThreadedEvents(events);
 
             expect(timeline).toEqual([
                 // The message that was sent in a thread is missing
-                eventPollResponseReference,
                 eventPollStartThreadRoot,
+                eventPollResponseReference,
                 eventRoomName,
                 eventEncryption,
                 eventGuestAccess,
@@ -560,12 +747,261 @@ describe("MatrixClient", function() {
                 eventCreate,
             ]);
 
-            // Thread should contain only stuff that happened in the thread -
-            // no thread root, and no room state events
+            // Thread should contain only stuff that happened in the thread - no room state events
             expect(threaded).toEqual([
-                eventMessageInThread,
+                eventPollStartThreadRoot,
                 withThreadId(eventPollResponseReference, eventPollStartThreadRoot.getId()),
+                eventMessageInThread,
             ]);
+        });
+
+        it("sends redactions of reactions to thread responses to thread timeline only", () => {
+            client.clientOpts = { experimentalThreadSupport: true };
+
+            const threadRootEvent = buildEventPollStartThreadRoot();
+            const eventMessageInThread = buildEventMessageInThread(threadRootEvent);
+            const threadedReaction = buildEventReaction(eventMessageInThread);
+            const threadedReactionRedaction = buildEventRedaction(threadedReaction);
+
+            const events = [
+                threadRootEvent,
+                eventMessageInThread,
+                threadedReaction,
+                threadedReactionRedaction,
+            ];
+
+            const [timeline, threaded] = room.partitionThreadedEvents(events);
+
+            expect(timeline).toEqual([
+                threadRootEvent,
+            ]);
+
+            expect(threaded).toEqual([
+                threadRootEvent,
+                eventMessageInThread,
+                threadedReaction,
+                threadedReactionRedaction,
+            ]);
+        });
+
+        it("sends reply to reply to thread root outside of thread to main timeline only", () => {
+            client.clientOpts = { experimentalThreadSupport: true };
+
+            const threadRootEvent = buildEventPollStartThreadRoot();
+            const eventMessageInThread = buildEventMessageInThread(threadRootEvent);
+            const directReplyToThreadRoot = buildEventReply(threadRootEvent);
+            const replyToReply = buildEventReply(directReplyToThreadRoot);
+
+            const events = [
+                threadRootEvent,
+                eventMessageInThread,
+                directReplyToThreadRoot,
+                replyToReply,
+            ];
+
+            const [timeline, threaded] = room.partitionThreadedEvents(events);
+
+            expect(timeline).toEqual([
+                threadRootEvent,
+                directReplyToThreadRoot,
+                replyToReply,
+            ]);
+
+            expect(threaded).toEqual([
+                threadRootEvent,
+                eventMessageInThread,
+            ]);
+        });
+
+        it("sends reply to thread responses to main timeline only", () => {
+            client.clientOpts = { experimentalThreadSupport: true };
+
+            const threadRootEvent = buildEventPollStartThreadRoot();
+            const eventMessageInThread = buildEventMessageInThread(threadRootEvent);
+            const replyToThreadResponse = buildEventReply(eventMessageInThread);
+
+            const events = [
+                threadRootEvent,
+                eventMessageInThread,
+                replyToThreadResponse,
+            ];
+
+            const [timeline, threaded] = room.partitionThreadedEvents(events);
+
+            expect(timeline).toEqual([
+                threadRootEvent,
+                replyToThreadResponse,
+            ]);
+
+            expect(threaded).toEqual([
+                threadRootEvent,
+                eventMessageInThread,
+            ]);
+        });
+    });
+
+    describe("getThirdpartyUser", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = [{
+                userid: "@Bob",
+                protocol: "irc",
+                fields: {},
+            }];
+
+            const prom = client.getThirdpartyUser("irc", {});
+            httpBackend.when("GET", "/thirdparty/user/irc").respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("getThirdpartyLocation", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = [{
+                alias: "#alias",
+                protocol: "irc",
+                fields: {},
+            }];
+
+            const prom = client.getThirdpartyLocation("irc", {});
+            httpBackend.when("GET", "/thirdparty/location/irc").respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("getPushers", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {
+                pushers: [],
+            };
+
+            const prom = client.getPushers();
+            httpBackend.when("GET", "/pushers").respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("getKeyChanges", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {
+                changed: [],
+                left: [],
+            };
+
+            const prom = client.getKeyChanges("old", "new");
+            httpBackend.when("GET", "/keys/changes").check((req) => {
+                expect(req.queryParams.from).toEqual("old");
+                expect(req.queryParams.to).toEqual("new");
+            }).respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("getDevices", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {
+                devices: [],
+            };
+
+            const prom = client.getDevices();
+            httpBackend.when("GET", "/devices").respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("getDevice", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {
+                device_id: "DEADBEEF",
+                display_name: "NotAPhone",
+                last_seen_ip: "127.0.0.1",
+                last_seen_ts: 1,
+            };
+
+            const prom = client.getDevice("DEADBEEF");
+            httpBackend.when("GET", "/devices/DEADBEEF").respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("getThreePids", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {
+                threepids: [],
+            };
+
+            const prom = client.getThreePids();
+            httpBackend.when("GET", "/account/3pid").respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("deleteAlias", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {};
+            const prom = client.deleteAlias("#foo:bar");
+            httpBackend.when("DELETE", "/directory/room/" + encodeURIComponent("#foo:bar")).respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("deleteRoomTag", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {};
+            const prom = client.deleteRoomTag("!roomId:server", "u.tag");
+            const url = `/user/${encodeURIComponent(userId)}/rooms/${encodeURIComponent("!roomId:server")}/tags/u.tag`;
+            httpBackend.when("DELETE", url).respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("getRoomTags", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {
+                tags: {
+                    "u.tag": {
+                        order: 0.5,
+                    },
+                },
+            };
+
+            const prom = client.getRoomTags("!roomId:server");
+            const url = `/user/${encodeURIComponent(userId)}/rooms/${encodeURIComponent("!roomId:server")}/tags`;
+            httpBackend.when("GET", url).respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("requestRegisterEmailToken", () => {
+        it("should hit the expected API endpoint", async () => {
+            const response = {
+                sid: "random_sid",
+                submit_url: "https://foobar.matrix/_matrix/matrix",
+            };
+
+            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
+                versions: ["r0.5.0"],
+            });
+
+            const prom = client.requestRegisterEmailToken("bob@email", "secret", 1);
+            httpBackend.when("POST", "/register/email/requestToken").check(req => {
+                expect(req.data).toStrictEqual({
+                    email: "bob@email",
+                    client_secret: "secret",
+                    send_attempt: 1,
+                });
+            }).respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
         });
     });
 });
@@ -576,16 +1012,16 @@ function withThreadId(event, newThreadId) {
     return ret;
 }
 
-const buildEventMessageInThread = () => new MatrixEvent({
+const buildEventMessageInThread = (root) => new MatrixEvent({
     "age": 80098509,
     "content": {
         "algorithm": "m.megolm.v1.aes-sha2",
         "ciphertext": "ENCRYPTEDSTUFF",
         "device_id": "XISFUZSKHH",
         "m.relates_to": {
-            "event_id": "$VLS2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
+            "event_id": root.getId(),
             "m.in_reply_to": {
-                "event_id": "$VLS2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
+                "event_id": root.getId(),
             },
             "rel_type": "m.thread",
         },
@@ -623,10 +1059,10 @@ const buildEventPollResponseReference = () => new MatrixEvent({
     "user_id": "@andybalaam-test1:matrix.org",
 });
 
-const buildEventReaction = () => new MatrixEvent({
+const buildEventReaction = (event) => new MatrixEvent({
     "content": {
         "m.relates_to": {
-            "event_id": "$VLS2ojbPmxb6x8ECetn45hmND6cRDcjgv-j-to9m7Vo",
+            "event_id": event.getId(),
             "key": "🤗",
             "rel_type": "m.annotation",
         },
@@ -639,6 +1075,22 @@ const buildEventReaction = () => new MatrixEvent({
         "transaction_id": "m1643977249073.16",
     },
     "event_id": "$86B2b-x3LgE4DlV4y24b7UHnt72LIA3rzjvMysTtAfA",
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+});
+
+const buildEventRedaction = (event) => new MatrixEvent({
+    "content": {
+
+    },
+    "origin_server_ts": 1643977249239,
+    "sender": "@andybalaam-test1:matrix.org",
+    "redacts": event.getId(),
+    "type": "m.room.redaction",
+    "unsigned": {
+        "age": 22597,
+        "transaction_id": "m1643977249073.17",
+    },
+    "event_id": "$86B2b-x3LgE4DlV4y24b7UHnt72LIA3rzjvMysTtAfB",
     "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
 });
 
@@ -657,6 +1109,29 @@ const buildEventPollStartThreadRoot = () => new MatrixEvent({
     "sender": "@andybalaam-test1:matrix.org",
     "type": "m.room.encrypted",
     "unsigned": { "age": 80108647 },
+    "user_id": "@andybalaam-test1:matrix.org",
+});
+
+const buildEventReply = (target) => new MatrixEvent({
+    "age": 80098509,
+    "content": {
+        "algorithm": "m.megolm.v1.aes-sha2",
+        "ciphertext": "ENCRYPTEDSTUFF",
+        "device_id": "XISFUZSKHH",
+        "m.relates_to": {
+            "m.in_reply_to": {
+                "event_id": target.getId(),
+            },
+        },
+        "sender_key": "i3N3CtG/CD2bGB8rA9fW6adLYSDvlUhf2iuU73L65Vg",
+        "session_id": "Ja11R/KG6ua0wdk8zAzognrxjio1Gm/RK2Gn6lFL804",
+    },
+    "event_id": target.getId() + Math.random(),
+    "origin_server_ts": 1643815466378,
+    "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
+    "sender": "@andybalaam-test1:matrix.org",
+    "type": "m.room.encrypted",
+    "unsigned": { "age": 80098509 },
     "user_id": "@andybalaam-test1:matrix.org",
 });
 

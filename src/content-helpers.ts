@@ -16,9 +16,9 @@ limitations under the License.
 
 /** @module ContentHelpers */
 
-import { REFERENCE_RELATION } from "matrix-events-sdk";
+import { isProvided, REFERENCE_RELATION } from "matrix-events-sdk";
 
-import { MBeaconEventContent, MBeaconInfoContent, MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
+import { MBeaconEventContent, MBeaconInfoContent, MBeaconInfoEventContent } from "./@types/beacon";
 import { MsgType } from "./@types/event";
 import { TEXT_NODE_TYPE } from "./@types/extensible_events";
 import {
@@ -32,6 +32,7 @@ import {
     MAssetContent,
     LegacyLocationEventContent,
 } from "./@types/location";
+import { MRoomTopicEventContent, MTopicContent, M_TOPIC } from "./@types/topic";
 
 /**
  * Generates the content for a HTML Message event
@@ -191,6 +192,34 @@ export const parseLocationEvent = (wireEventContent: LocationEventWireContent): 
 };
 
 /**
+ * Topic event helpers
+ */
+export type MakeTopicContent = (
+    topic: string,
+    htmlTopic?: string,
+) => MRoomTopicEventContent;
+
+export const makeTopicContent: MakeTopicContent = (topic, htmlTopic) => {
+    const renderings = [{ body: topic, mimetype: "text/plain" }];
+    if (isProvided(htmlTopic)) {
+        renderings.push({ body: htmlTopic, mimetype: "text/html" });
+    }
+    return { topic, [M_TOPIC.name]: renderings };
+};
+
+export type TopicState = {
+    text: string;
+    html?: string;
+};
+
+export const parseTopicContent = (content: MRoomTopicEventContent): TopicState => {
+    const mtopic = M_TOPIC.findIn<MTopicContent>(content);
+    const text = mtopic?.find(r => !isProvided(r.mimetype) || r.mimetype === "text/plain")?.body ?? content.topic;
+    const html = mtopic?.find(r => r.mimetype === "text/html")?.body;
+    return { text, html };
+};
+
+/**
  * Beacon event helpers
  */
 export type MakeBeaconInfoContent = (
@@ -208,11 +237,9 @@ export const makeBeaconInfoContent: MakeBeaconInfoContent = (
     assetType,
     timestamp,
 ) => ({
-    [M_BEACON_INFO.name]: {
-        description,
-        timeout,
-        live: isLive,
-    },
+    description,
+    timeout,
+    live: isLive,
     [M_TIMESTAMP.name]: timestamp || Date.now(),
     [M_ASSET.name]: {
         type: assetType ?? LocationAssetType.Self,
@@ -227,7 +254,7 @@ export type BeaconInfoState = MBeaconInfoContent & {
  * Flatten beacon info event content
  */
 export const parseBeaconInfoContent = (content: MBeaconInfoEventContent): BeaconInfoState => {
-    const { description, timeout, live } = M_BEACON_INFO.findIn<MBeaconInfoContent>(content);
+    const { description, timeout, live } = content;
     const { type: assetType } = M_ASSET.findIn<MAssetContent>(content);
     const timestamp = M_TIMESTAMP.findIn<number>(content);
 
@@ -243,14 +270,14 @@ export const parseBeaconInfoContent = (content: MBeaconInfoEventContent): Beacon
 export type MakeBeaconContent = (
     uri: string,
     timestamp: number,
-    beaconInfoId: string,
+    beaconInfoEventId: string,
     description?: string,
 ) => MBeaconEventContent;
 
 export const makeBeaconContent: MakeBeaconContent = (
     uri,
     timestamp,
-    beaconInfoId,
+    beaconInfoEventId,
     description,
 ) => ({
     [M_LOCATION.name]: {
@@ -260,6 +287,21 @@ export const makeBeaconContent: MakeBeaconContent = (
     [M_TIMESTAMP.name]: timestamp,
     "m.relates_to": {
         rel_type: REFERENCE_RELATION.name,
-        event_id: beaconInfoId,
+        event_id: beaconInfoEventId,
     },
 });
+
+export type BeaconLocationState = MLocationContent & {
+    timestamp: number;
+};
+
+export const parseBeaconContent = (content: MBeaconEventContent): BeaconLocationState => {
+    const { description, uri } = M_LOCATION.findIn<MLocationContent>(content);
+    const timestamp = M_TIMESTAMP.findIn<number>(content);
+
+    return {
+        description,
+        uri,
+        timestamp,
+    };
+};

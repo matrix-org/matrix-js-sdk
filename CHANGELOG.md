@@ -1,3 +1,75 @@
+Changes in [17.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v17.2.0) (2022-05-10)
+==================================================================================================
+
+## ✨ Features
+ * Live location sharing: handle encrypted messages in processBeaconEvents ([\#2327](https://github.com/matrix-org/matrix-js-sdk/pull/2327)).
+
+## 🐛 Bug Fixes
+ * Fix race conditions around threads ([\#2331](https://github.com/matrix-org/matrix-js-sdk/pull/2331)). Fixes vector-im/element-web#21627.
+ * Ignore m.replace relations on state events, they're invalid ([\#2306](https://github.com/matrix-org/matrix-js-sdk/pull/2306)). Fixes vector-im/element-web#21851.
+ * fix example in readme ([\#2315](https://github.com/matrix-org/matrix-js-sdk/pull/2315)).
+ * Don't decrement the length count of a thread when root redacted ([\#2314](https://github.com/matrix-org/matrix-js-sdk/pull/2314)).
+ * Prevent attempt to create thread with id "undefined" ([\#2308](https://github.com/matrix-org/matrix-js-sdk/pull/2308)).
+ * Update threads handling for replies-to-thread-responses as per MSC update ([\#2305](https://github.com/matrix-org/matrix-js-sdk/pull/2305)). Fixes vector-im/element-web#19678.
+
+Changes in [17.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v17.1.0) (2022-04-26)
+==================================================================================================
+
+## ✨ Features
+ * Add MatrixClient.doesServerSupportLogoutDevices() for MSC2457 ([\#2297](https://github.com/matrix-org/matrix-js-sdk/pull/2297)).
+ * Live location sharing - expose room liveBeaconIds ([\#2296](https://github.com/matrix-org/matrix-js-sdk/pull/2296)).
+ * Support for MSC2457 logout_devices param for setPassword() ([\#2285](https://github.com/matrix-org/matrix-js-sdk/pull/2285)).
+ * Stabilise token authenticated registration support ([\#2181](https://github.com/matrix-org/matrix-js-sdk/pull/2181)). Contributed by @govynnus.
+ * Live location sharing - Aggregate beacon locations on beacons ([\#2268](https://github.com/matrix-org/matrix-js-sdk/pull/2268)).
+
+## 🐛 Bug Fixes
+ * Prevent duplicated re-emitter setups in event-mapper ([\#2293](https://github.com/matrix-org/matrix-js-sdk/pull/2293)).
+ * Make self membership less prone to races ([\#2277](https://github.com/matrix-org/matrix-js-sdk/pull/2277)). Fixes vector-im/element-web#21661.
+
+Changes in [17.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v17.0.0) (2022-04-11)
+==================================================================================================
+
+## 🚨 BREAKING CHANGES
+ * Remove groups and groups-related APIs ([\#2234](https://github.com/matrix-org/matrix-js-sdk/pull/2234)).
+
+## ✨ Features
+ * Add Element video room type ([\#2273](https://github.com/matrix-org/matrix-js-sdk/pull/2273)).
+ * Live location sharing - handle redacted beacons ([\#2269](https://github.com/matrix-org/matrix-js-sdk/pull/2269)).
+
+## 🐛 Bug Fixes
+ * Fix getSessionsNeedingBackup() limit support ([\#2270](https://github.com/matrix-org/matrix-js-sdk/pull/2270)). Contributed by @adamvy.
+ * Fix issues with /search and /context API handling for threads ([\#2261](https://github.com/matrix-org/matrix-js-sdk/pull/2261)). Fixes vector-im/element-web#21543.
+ * Prevent exception 'Unable to set up secret storage' ([\#2260](https://github.com/matrix-org/matrix-js-sdk/pull/2260)).
+
+Changes in [16.0.2-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v16.0.2-rc.1) (2022-04-05)
+============================================================================================================
+
+## 🚨 BREAKING CHANGES
+ * Remove groups and groups-related APIs ([\#2234](https://github.com/matrix-org/matrix-js-sdk/pull/2234)).
+
+## ✨ Features
+ * Add Element video room type ([\#2273](https://github.com/matrix-org/matrix-js-sdk/pull/2273)).
+ * Live location sharing - handle redacted beacons ([\#2269](https://github.com/matrix-org/matrix-js-sdk/pull/2269)).
+
+## 🐛 Bug Fixes
+ * Fix getSessionsNeedingBackup() limit support ([\#2270](https://github.com/matrix-org/matrix-js-sdk/pull/2270)). Contributed by @adamvy.
+ * Fix issues with /search and /context API handling for threads ([\#2261](https://github.com/matrix-org/matrix-js-sdk/pull/2261)). Fixes vector-im/element-web#21543.
+ * Prevent exception 'Unable to set up secret storage' ([\#2260](https://github.com/matrix-org/matrix-js-sdk/pull/2260)).
+
+Changes in [16.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v16.0.1) (2022-03-28)
+==================================================================================================
+
+## ✨ Features
+ * emit aggregate room beacon liveness ([\#2241](https://github.com/matrix-org/matrix-js-sdk/pull/2241)).
+ * Live location sharing - create m.beacon_info events ([\#2238](https://github.com/matrix-org/matrix-js-sdk/pull/2238)).
+ * Beacon event types from MSC3489 ([\#2230](https://github.com/matrix-org/matrix-js-sdk/pull/2230)).
+
+## 🐛 Bug Fixes
+ * Fix incorrect usage of unstable variant of `is_falling_back` ([\#2227](https://github.com/matrix-org/matrix-js-sdk/pull/2227)).
+
+Changes in [16.0.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v16.0.1-rc.1) (2022-03-22)
+============================================================================================================
+
 Changes in [16.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v16.0.0) (2022-03-15)
 ==================================================================================================
 
@@ -626,7 +698,7 @@ Changes in [11.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/ta
 BREAKING CHANGES
 ---
 
- * `MatrixCall` and related APIs have been redesigned to support multiple streams 
+ * `MatrixCall` and related APIs have been redesigned to support multiple streams
    (see [\#1660](https://github.com/matrix-org/matrix-js-sdk/pull/1660) for more details)
 
 All changes
@@ -1299,7 +1371,7 @@ BREAKING CHANGES
 ---
 
 * `RoomState` events changed to use a Map instead of an object, which changes the collection APIs available to access them.
- 
+
 All Changes
 ---
 
@@ -1973,6 +2045,12 @@ All Changes
    [\#1122](https://github.com/matrix-org/matrix-js-sdk/pull/1122)
  * [BREAKING] Refactor the entire build process
    [\#1113](https://github.com/matrix-org/matrix-js-sdk/pull/1113)
+
+Changes in [3.42.2-rc.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v3.42.2-rc.3) (2022-04-08)
+============================================================================================================
+
+## 🐛 Bug Fixes
+ * Make self membership less prone to races ([\#2277](https://github.com/matrix-org/matrix-js-sdk/pull/2277)). Fixes vector-im/element-web#21661.
 
 Changes in [3.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v3.0.0) (2020-01-13)
 ================================================================================================

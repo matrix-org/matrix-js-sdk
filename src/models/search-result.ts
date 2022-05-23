@@ -33,14 +33,19 @@ export class SearchResult {
 
     public static fromJson(jsonObj: ISearchResult, eventMapper: EventMapper): SearchResult {
         const jsonContext = jsonObj.context || {} as IResultContext;
-        const eventsBefore = jsonContext.events_before || [];
-        const eventsAfter = jsonContext.events_after || [];
+        let eventsBefore = (jsonContext.events_before || []).map(eventMapper);
+        let eventsAfter = (jsonContext.events_after || []).map(eventMapper);
 
         const context = new EventContext(eventMapper(jsonObj.result));
 
+        // Filter out any contextual events which do not correspond to the same timeline (thread or room)
+        const threadRootId = context.ourEvent.threadRootId;
+        eventsBefore = eventsBefore.filter(e => e.threadRootId === threadRootId);
+        eventsAfter = eventsAfter.filter(e => e.threadRootId === threadRootId);
+
         context.setPaginateToken(jsonContext.start, true);
-        context.addEvents(eventsBefore.map(eventMapper), true);
-        context.addEvents(eventsAfter.map(eventMapper), false);
+        context.addEvents(eventsBefore, true);
+        context.addEvents(eventsAfter, false);
         context.setPaginateToken(jsonContext.end, false);
 
         return new SearchResult(jsonObj.rank, context);

@@ -103,7 +103,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
 
         if (this.relationType === RelationType.Annotation) {
             this.addAnnotationToAggregation(event);
-        } else if (this.relationType === RelationType.Replace && this.targetEvent) {
+        } else if (this.relationType === RelationType.Replace && this.targetEvent && !this.targetEvent.isState()) {
             const lastReplacement = await this.getLastReplacement();
             this.targetEvent.makeReplaced(lastReplacement);
         }
@@ -144,7 +144,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
 
         if (this.relationType === RelationType.Annotation) {
             this.removeAnnotationFromAggregation(event);
-        } else if (this.relationType === RelationType.Replace && this.targetEvent) {
+        } else if (this.relationType === RelationType.Replace && this.targetEvent && !this.targetEvent.isState()) {
             const lastReplacement = await this.getLastReplacement();
             this.targetEvent.makeReplaced(lastReplacement);
         }
@@ -261,7 +261,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         if (this.relationType === RelationType.Annotation) {
             // Remove the redacted annotation from aggregation by key
             this.removeAnnotationFromAggregation(redactedEvent);
-        } else if (this.relationType === RelationType.Replace && this.targetEvent) {
+        } else if (this.relationType === RelationType.Replace && this.targetEvent && !this.targetEvent.isState()) {
             const lastReplacement = await this.getLastReplacement();
             this.targetEvent.makeReplaced(lastReplacement);
         }
@@ -331,7 +331,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         // the all-knowning server tells us that the event at some point had
         // this timestamp for its replacement, so any following replacement should definitely not be less
         const replaceRelation = this.targetEvent.getServerAggregatedRelation<IAggregatedRelation>(RelationType.Replace);
-        const minTs = replaceRelation && replaceRelation.origin_server_ts;
+        const minTs = replaceRelation?.origin_server_ts;
 
         const lastReplacement = this.getRelations().reduce((last, event) => {
             if (event.getSender() !== this.targetEvent.getSender()) {
@@ -364,7 +364,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         }
         this.targetEvent = event;
 
-        if (this.relationType === RelationType.Replace) {
+        if (this.relationType === RelationType.Replace && !this.targetEvent.isState()) {
             const replacement = await this.getLastReplacement();
             // this is the initial update, so only call it if we already have something
             // to not emit Event.replaced needlessly
