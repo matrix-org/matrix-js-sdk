@@ -63,7 +63,7 @@ jobs:
           git rev-parse HEAD
 
       # There's a 'download artifact' action, but it hasn't been updated for the workflow_run action
-      # (https://github.com/actions/download-artifact/issues/60) so instead we get this mess:
+      # (https://github.com/actions/download-artifact/issues/60) so instead we get this alternative:
       - name: "📥 Download Coverage Report"
         uses: dawidd6/action-download-artifact@v2
         if: inputs.coverage_workflow_name
