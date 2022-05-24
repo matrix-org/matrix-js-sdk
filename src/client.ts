@@ -5271,7 +5271,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         // TODO: we should implement a backoff (as per scrollback()) to deal more nicely with HTTP errors.
+        console.log("getEventTimeline: before /context");
         const res = await this.http.authedRequest<IContextResponse>(undefined, Method.Get, path, params);
+        console.log("getEventTimeline: after /context");
         if (!res.event) {
             throw new Error("'event' not in '/context' result - homeserver too old?");
         }
