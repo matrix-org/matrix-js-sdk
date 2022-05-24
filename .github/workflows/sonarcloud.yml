@@ -1,3 +1,4 @@
+# Must only be called from a workflow_run in the context of the upstream repo
 name: SonarCloud
 on:
   workflow_call:
@@ -52,11 +53,11 @@ jobs:
 
       # Fetch base branch from the upstream repo so that Sonar can identify new code in PR builds
       - name: "📕 Fetch upstream base branch"
-        # workflow_call retains the github context of the caller, so `action_repository` will be upstream always
-        # due to it running on `workflow_run` which is called from the context of the target repo and not the fork.
-        if: inputs.base_branch && github.action_repository != inputs.repo
+        # workflow_call retains the github context of the caller, so `repository` & `repositoryUrl` will be upstream
+        # always due to it running on `workflow_run` which is called from the context of the target repo and not the fork.
+        if: inputs.base_branch && github.repository != inputs.repo
         run: |
-          git remote add upstream https://github.com/${{ github.action_repository }}.git
+          git remote add upstream ${{ github.repositoryUrl }}
           git rev-parse HEAD
           git fetch upstream ${{ inputs.base_branch }}:${{ inputs.base_branch }}
           git status
