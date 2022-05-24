@@ -18,16 +18,16 @@ on:
     outputs:
       pr_id:
         description: The ID of the PR found
-        value: ${{ jobs.prdetails.outputs.pr_id }}
+        value: ${{ jobs.prdetails.outputs.result.number }}
       head_branch:
         description: The head branch of the PR found
-        value: ${{ jobs.prdetails.outputs.head_branch }}
+        value: ${{ jobs.prdetails.outputs.result.head.ref }}
       base_branch:
         description: The base branch of the PR found
-        value: ${{ jobs.prdetails.outputs.base_branch }}
+        value: ${{ jobs.prdetails.outputs.result.base.ref }}
       labels:
         description: JSON array of labels which the PR has
-        value: fromJSON{{ jobs.prdetails.outputs.labels }})
+        value: ${{ jobs.prdetails.outputs.result.labels }})
 
 jobs:
   prdetails:
@@ -48,15 +48,6 @@ jobs:
               owner,
               repo,
             });
-            const pr = pulls[0];
-            if (pr) {
-              console.log("::set-output name=prnumber::" + pr.number);
-              console.log("::set-output name=headref::" + pr.head.ref);
-              console.log("::set-output name=baseref::" + pr.base.ref);
-              console.log("::set-output name=labels::" + JSON.stringify(pr.labels.map(l => l.name)));
-            }
+            return pulls[0];
     outputs:
-      pr_id: ${{ steps.details.outputs.prnumber }}
-      head_branch: ${{ steps.details.outputs.headref }}
-      base_branch: ${{ steps.details.outputs.baseref }}
-      labels: ${{ steps.details.outputs.labels }}
+      result: ${{ fromJSON(steps.details.output.result) }}
