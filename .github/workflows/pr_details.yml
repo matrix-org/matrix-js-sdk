@@ -14,13 +14,13 @@ on:
     outputs:
       pr_id:
         description: The ID of the PR found
-        value: ${{ jobs.prdetails.outputs.result.number }}
+        value: ${{ fromJSON(jobs.prdetails.outputs.result).number }}
       head_branch:
         description: The head branch of the PR found
-        value: ${{ jobs.prdetails.outputs.result.head.ref }}
+        value: ${{ fromJSON(jobs.prdetails.outputs.result).head.ref }}
       base_branch:
         description: The base branch of the PR found
-        value: ${{ jobs.prdetails.outputs.result.base.ref }}
+        value: ${{ fromJSON(jobs.prdetails.outputs.result).base.ref }}
       data:
         description: The JSON data of the pull request API object
         value: ${{ jobs.prdetails.outputs.result }})
@@ -46,4 +46,4 @@ jobs:
             });
             return response.data[0];
     outputs:
-      result: ${{ fromJSON(steps.details.outputs.result) }}
+      result: ${{ steps.details.outputs.result }}
