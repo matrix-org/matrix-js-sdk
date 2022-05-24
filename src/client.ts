@@ -7061,15 +7061,21 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} loginType The type of SSO login we are doing (sso or cas).
      *     Defaults to 'sso'.
      * @param {string} idpId The ID of the Identity Provider being targeted, optional.
+     * @param {"login"|"register"} action the SSO flow to indicate to the IdP, optional.
      * @return {string} The HS URL to hit to begin the SSO login process.
      */
-    public getSsoLoginUrl(redirectUrl: string, loginType = "sso", idpId?: string): string {
+    public getSsoLoginUrl(
+        redirectUrl: string,
+        loginType = "sso",
+        idpId?: string,
+        action?: "login" | "register",
+    ): string {
         let url = "/login/" + loginType + "/redirect";
         if (idpId) {
             url += "/" + idpId;
         }
 
-        return this.http.getUrl(url, { redirectUrl }, PREFIX_R0);
+        return this.http.getUrl(url, { redirectUrl, action }, PREFIX_R0);
     }
 
     /**
