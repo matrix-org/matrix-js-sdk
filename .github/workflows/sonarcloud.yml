@@ -58,7 +58,7 @@ jobs:
         run: |
           git remote add upstream https://github.com/${{ github.action_repository }}.git
           git rev-parse HEAD
-          git fetch origin ${{ inputs.base_branch }}:${{ inputs.base_branch }}
+          git fetch upstream ${{ inputs.base_branch }}:${{ inputs.base_branch }}
           git status
           git rev-parse HEAD
 
