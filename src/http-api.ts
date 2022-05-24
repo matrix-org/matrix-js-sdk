@@ -403,7 +403,7 @@ export class MatrixHttpApi {
                                 resp = bodyParser(resp);
                             }
                         } catch (err) {
-                            err.http_status = xhr.status;
+                            err.httpStatus = xhr.status;
                             cb(err);
                             return;
                         }
