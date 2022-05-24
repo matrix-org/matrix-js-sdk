@@ -48,6 +48,7 @@ jobs:
               owner,
               repo,
             });
+            console.log("@@", pulls);
             return pulls[0];
     outputs:
-      result: ${{ steps.details.outputs.result }}
+      result: ${{ fromJSON(steps.details.outputs.result) }}
