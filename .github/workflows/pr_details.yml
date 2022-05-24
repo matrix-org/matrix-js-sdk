@@ -38,7 +38,7 @@ jobs:
           # The workflow_run event includes a list of pull requests, but it doesn't get populated for
           # forked PRs: https://docs.github.com/en/rest/reference/checks#create-a-check-run
           script: |
-            const [owner, repo] = "${{ github.action_repository }}".split("/");
+            const [owner, repo] = "${{ github.repository }}".split("/");
             const response = await github.rest.pulls.list({
               head: "${{ inputs.owner }}:${{ inputs.branch }}",
               owner,
