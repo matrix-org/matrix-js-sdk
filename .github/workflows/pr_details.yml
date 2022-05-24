@@ -1,8 +1,4 @@
 # Find details about the PR associated with this ref
-# Outputs:
-#  prnumber: the ID number of the associated PR
-#  headref: the name of the head branch of the PR
-#  baseref: the name of the base branch of the PR
 name: PR Details
 on:
   workflow_call:
@@ -25,9 +21,9 @@ on:
       base_branch:
         description: The base branch of the PR found
         value: ${{ jobs.prdetails.outputs.result.base.ref }}
-      labels:
-        description: JSON array of labels which the PR has
-        value: ${{ jobs.prdetails.outputs.result.labels }})
+      data:
+        description: The JSON data of the pull request API object
+        value: ${{ jobs.prdetails.outputs.result }})
 
 jobs:
   prdetails:
@@ -43,12 +39,11 @@ jobs:
           # forked PRs: https://docs.github.com/en/rest/reference/checks#create-a-check-run
           script: |
             const [owner, repo] = "${{ github.action_repository }}".split("/");
-            const pulls = await github.rest.pulls.list({
+            const response = await github.rest.pulls.list({
               head: "${{ inputs.owner }}:${{ inputs.branch }}",
               owner,
               repo,
             });
-            console.log("@@", pulls);
-            return pulls[0];
+            return response.data[0];
     outputs:
       result: ${{ fromJSON(steps.details.outputs.result) }}
