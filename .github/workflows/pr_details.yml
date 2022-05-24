@@ -50,4 +50,4 @@ jobs:
             });
             return pulls[0];
     outputs:
-      result: ${{ fromJSON(steps.details.output.result) }}
+      result: ${{ fromJSON(steps.details.outputs.result) }}
