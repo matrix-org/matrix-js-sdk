@@ -50,10 +50,10 @@ jobs:
             });
             const pr = pulls[0];
             if (pr) {
-              console.log"::set-output name=prnumber::" + pr.number);
-              console.log"::set-output name=headref::" + pr.head.ref);
-              console.log"::set-output name=baseref::" + pr.base.ref);
-              console.log"::set-output name=labels::" + JSON.stringify(pr.labels.map(l => l.name)));
+              console.log("::set-output name=prnumber::" + pr.number);
+              console.log("::set-output name=headref::" + pr.head.ref);
+              console.log("::set-output name=baseref::" + pr.base.ref);
+              console.log("::set-output name=labels::" + JSON.stringify(pr.labels.map(l => l.name)));
             }
     outputs:
       pr_id: ${{ steps.details.outputs.prnumber }}
