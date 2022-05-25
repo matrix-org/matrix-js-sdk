@@ -1207,8 +1207,9 @@ describe("MatrixClient", function() {
             const result = await client.getLocalAliases(roomId);
 
             // Current version of the endpoint we support is v3
-            const [callback, method, path, queryParams, _, opts] = client.http.authedRequest.mock.calls[0];
+            const [callback, method, path, queryParams, data, opts] = client.http.authedRequest.mock.calls[0];
             expect(callback).toBeFalsy();
+            expect(data).toBeFalsy();
             expect(method).toBe('GET');
             expect(path).toEqual(`/rooms/${encodeURIComponent(roomId)}/aliases`);
             expect(opts).toMatchObject({ prefix: "/_matrix/client/v3" });
