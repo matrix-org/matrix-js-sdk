@@ -28,25 +28,20 @@ jobs:
           ref: gh-pages
           clean: false
 
-      - name: 🎏 Resolve version from tag
-        id: version
-        run: |
-          tag="${{ github.ref_name }}"
-          echo "RELEASE_VERSION=${tag#v}" >> $GITHUB_ENV
-
       - name: 📋 Copy to gh-pages
         run: |
           # Copy into the folder structure
-          cp -a ".jsdoc/matrix-js-sdk/$RELEASE_VERSION" .
+          cp -a ".jsdoc/matrix-js-sdk/*" .
+          tag="${{ github.ref_name }}"
 
           # Add the new directory to the index if it isn't there already
-          if ! grep -q "Version $RELEASE_VERSION" index.html; then
+          if ! grep -q "Version ${tag#v}" index.html; then
             perl -i -pe 'BEGIN {$rel=shift} $_ =~ /^<\/ul>/ && print
-              "<li><a href=\"${rel}/index.html\">Version ${rel}</a></li>\n"' "$RELEASE_VERSION" index.html
+              "<li><a href=\"${rel}/index.html\">Version ${rel}</a></li>\n"' "${tag#v}" index.html
           fi
 
       - name: 🌐 Deploy to Github Pages
         run: |
-          git add "$RELEASE_VERSION"
-          git commit --no-verify -m "Add jsdoc for $RELEASE_VERSION" index.html "$RELEASE_VERSION"
+          git add --all .
+          git commit --no-verify -am "Add jsdoc for ${{ github.ref_name }}"
           git push origin gh-pages
