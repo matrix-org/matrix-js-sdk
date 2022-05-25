@@ -22,29 +22,28 @@ jobs:
       - name: 📖 Generate JSDoc
         run: "yarn gendoc"
 
+      - name: 📋 Copy to temp
+        run: |
+          ls -lah
+          tag="${{ github.ref_name }}"
+          version="${tag#v}"
+          echo "VERSION=$version" >> $GITHUB_ENV
+          cp -a "./.jsdoc/matrix-js-sdk/$version" $RUNNER_TEMP
+
       - name: 🧮 Checkout gh-pages
         uses: actions/checkout@v3
         with:
           ref: gh-pages
-          path: gh_pages
-
-      - name: 📋 Copy to gh-pages
-        run: |
-          # Copy into the folder structure
-          tag="${{ github.ref_name }}"
-          version="${tag#v}"
-          ls -lah
-          cp -a "./.jsdoc/matrix-js-sdk/$version" ./gh_pages/
-
-          # Add the new directory to the index if it isn't there already
-          if ! grep -q "Version $version" gh_pages/index.html; then
-            perl -i -pe 'BEGIN {$rel=shift} $_ =~ /^<\/ul>/ && print
-              "<li><a href=\"${rel}/index.html\">Version ${rel}</a></li>\n"' "$version" gh_pages/index.html
-          fi
 
       - name: 🌐 Deploy to Github Pages
         working-directory: gh_pages
         run: |
+          # Add the new directory to the index if it isn't there already
+          if ! grep -q "Version $VERSION" index.html; then
+            perl -i -pe 'BEGIN {$rel=shift} $_ =~ /^<\/ul>/ && print
+              "<li><a href=\"${rel}/index.html\">Version ${rel}</a></li>\n"' "$VERSION" index.html
+          fi
+
           git add --all .
           git commit --no-verify -am "Add jsdoc for ${{ github.ref_name }}"
           git push origin gh-pages
