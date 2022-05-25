@@ -938,44 +938,56 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     public async refreshLiveTimeline(): Promise<void> {
         const liveTimelineBefore = this.getLiveTimeline();
         const forwardPaginationToken = liveTimelineBefore.getPaginationToken(EventTimeline.FORWARDS);
+        const backwardPaginationToken = liveTimelineBefore.getPaginationToken(EventTimeline.BACKWARDS);
         const eventsBefore = liveTimelineBefore.getEvents();
         const mostRecentEventInTimeline = eventsBefore[eventsBefore.length - 1];
         logger.log(
             `[refreshLiveTimeline] for room ${this.roomId} at ` +
-            `mostRecentEventInTimeline=${mostRecentEventInTimeline.getId()} ` +
-            `forwardPaginationToken+${forwardPaginationToken}`,
+            `mostRecentEventInTimeline=${mostRecentEventInTimeline && mostRecentEventInTimeline.getId()} ` +
+            `liveTimelineBefore=${liveTimelineBefore.toString()} ` +
+            `forwardPaginationToken=${forwardPaginationToken} ` +
+            `backwardPaginationToken=${backwardPaginationToken}`,
         );
 
-        // Empty out all of `this.timelineSets` but still keeps the same
-        // `timelineSet` references around so the React code updates properly
-        // and doesn't ignore the room events we emit because it checks that the
-        // `timelineSet` references are the same. We need the `timelineSet`
-        // empty so that the `client.getEventTimeline(...)` call later, will
-        // call `/context` and create a new timeline instead of returning the
-        // same one.
-        this.resetLiveTimeline(null, null);
-
-        // await new Promise((resolve) => {
-        //     setTimeout(resolve, 2000);
-        // })
-
-        // Get a reference to the emptied out `timelineSet`
-        //
-        // TODO: Do we want to use `this.getLiveTimeline().getTimelineSet()`
-        // instead? I think it's the same thing but what's more right?
+        // Get the main TimelineSet
         const timelineSet = this.getUnfilteredTimelineSet();
 
-        // TODO: Testing this
-        this.emit(RoomEvent.TimelineRefresh, this, timelineSet);
+        let newTimeline;
+        // If there isn't any event in the timeline, let's go fetch the latest
+        // event and construct a timeline from it.
+        //
+        // This should only really happen if the user ran into an error
+        // with refreshing the timeline before which left them in a blank
+        // timeline from `resetLiveTimeline`.
+        if (!mostRecentEventInTimeline) {
+            newTimeline = await this.client.getLatestTimeline(timelineSet);
+        } else {
+            // Empty out all of `this.timelineSets`. But we also need to keep the
+            // same `timelineSet` references around so the React code updates
+            // properly and doesn't ignore the room events we emit because it checks
+            // that the `timelineSet` references are the same. We need the
+            // `timelineSet` empty so that the `client.getEventTimeline(...)` call
+            // later, will call `/context` and create a new timeline instead of
+            // returning the same one.
+            this.resetLiveTimeline(null, null);
 
-        // Use `client.getEventTimeline(...)` to construct a new timeline from a
-        // `/context` response state and events for the most recent event before
-        // we reset everything. The `timelineSet` we pass in needs to be empty
-        // in order for this function to call `/context` and generate a new
-        // timeline.
-        console.log('refreshLiveTimeline before getEventTimeline');
-        const newTimeline = await this.client.getEventTimeline(timelineSet, mostRecentEventInTimeline.getId());
-        console.log('refreshLiveTimeline after getEventTimeline');
+            // await new Promise((resolve) => {
+            //     setTimeout(resolve, 2000);
+            // })
+
+            // TODO: Testing this, this makes the TimelinePanel show the new blank timeline
+            this.emit(RoomEvent.TimelineRefresh, this, timelineSet);
+
+            // Use `client.getEventTimeline(...)` to construct a new timeline from a
+            // `/context` response state and events for the most recent event before
+            // we reset everything. The `timelineSet` we pass in needs to be empty
+            // in order for this function to call `/context` and generate a new
+            // timeline.
+            console.log('refreshLiveTimeline before getEventTimeline');
+            newTimeline = await this.client.getEventTimeline(timelineSet, mostRecentEventInTimeline.getId());
+            console.log('refreshLiveTimeline after getEventTimeline');
+        }
+
         // Set the pagination token back to the live sync token instead of using
         // the `/context` historical token so that it matches the next response
         // from `/sync` and we can properly continue the timeline.

@@ -5271,9 +5271,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         // TODO: we should implement a backoff (as per scrollback()) to deal more nicely with HTTP errors.
-        console.log("getEventTimeline: before /context");
         const res = await this.http.authedRequest<IContextResponse>(undefined, Method.Get, path, params);
-        console.log("getEventTimeline: after /context");
         if (!res.event) {
             throw new Error("'event' not in '/context' result - homeserver too old?");
         }
@@ -5286,12 +5284,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const mapper = this.getEventMapper();
         const event = mapper(res.event);
         const events = [
-            // we start with the last event, since that's the point at which we have known state.
+            // Order events from most recent to oldest (reverse-chronological).
+            // We start with the last event, since that's the point at which we have known state.
             // events_after is already backwards; events_before is forwards.
             ...res.events_after.reverse().map(mapper),
             event,
             ...res.events_before.map(mapper),
         ];
+
 
         // Where the event is a thread reply (not a root) and running in MSC-enabled mode the Thread timeline only
         // functions contiguously, so we have to jump through some hoops to get our target event in it.
@@ -5349,6 +5349,48 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return timelineSet.getTimelineForEvent(eventId)
             ?? timelineSet.room.findThreadForEvent(event)?.liveTimeline // for Threads degraded support
             ?? timeline;
+    }
+
+    /**
+     * Get an EventTimeline for the latest events in the room. This will just
+     * call `/messages` to get the latest message in the room, then use
+     * `client.getEventTimeline(...)` to construct a new timeline from it.
+     *
+     * @param {EventTimelineSet} timelineSet  The timelineSet to look for the
+     * event in
+     * @param {string} eventId  The ID of the event to look for
+     *
+     * @return {Promise} Resolves:
+     *    {@link module:models/event-timeline~EventTimeline} including the given
+     *    event
+     */
+     public async getLatestTimeline(timelineSet: EventTimelineSet): Promise<EventTimeline> {
+        // don't allow any timeline support unless it's been enabled.
+        if (!this.timelineSupport) {
+            throw new Error("timeline support is disabled. Set the 'timelineSupport'" +
+                " parameter to true when creating MatrixClient to enable it.");
+        }
+
+        const messagesPath = utils.encodeUri(
+            "/rooms/$roomId/messages", {
+                $roomId: timelineSet.room.roomId
+            },
+        );
+
+        let params: Record<string, string | string[]> = {
+            dir: 'b',
+        };
+        if (this.clientOpts.lazyLoadMembers) {
+            params.filter = JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER);
+        }
+
+        const res = await this.http.authedRequest<IMessagesResponse>(undefined, Method.Get, messagesPath, params);
+        const event = res.chunk[0];
+        if (!event) {
+            throw new Error("No message returned from /messages when trying to construct getLatestTimeline");
+        }
+
+        return this.getEventTimeline(timelineSet, event.event_id);
     }
 
     /**
