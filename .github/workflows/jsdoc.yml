@@ -1,8 +1,7 @@
 name: Release Process
 on:
-  push:
-    branches-ignore:  [ "!release-*" ]
-    tags: [ "v*" ]
+  release:
+    types: [ published ]
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 jobs:
   jsdoc:
