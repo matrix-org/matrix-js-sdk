@@ -971,11 +971,11 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             // returning the same one.
             this.resetLiveTimeline(null, null);
 
-            // await new Promise((resolve) => {
-            //     setTimeout(resolve, 2000);
-            // })
-
-            // TODO: Testing this, this makes the TimelinePanel show the new blank timeline
+            // Make the UI timeline show the new blank live timeline we just
+            // reset so that if the network fails below it's showing the
+            // accurate state of what we're working with instead of the
+            // disconnected one in the TimelineWindow which is just hanging
+            // around by reference.
             this.emit(RoomEvent.TimelineRefresh, this, timelineSet);
 
             // Use `client.getEventTimeline(...)` to construct a new timeline from a
@@ -983,9 +983,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             // we reset everything. The `timelineSet` we pass in needs to be empty
             // in order for this function to call `/context` and generate a new
             // timeline.
-            console.log('refreshLiveTimeline before getEventTimeline');
             newTimeline = await this.client.getEventTimeline(timelineSet, mostRecentEventInTimeline.getId());
-            console.log('refreshLiveTimeline after getEventTimeline');
         }
 
         // Set the pagination token back to the live sync token instead of using
