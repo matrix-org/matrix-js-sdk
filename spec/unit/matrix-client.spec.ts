@@ -150,6 +150,10 @@ describe("MatrixClient", function() {
             }
             return Promise.resolve(next.data);
         }
+        // Jest doesn't let us have custom expectation errors, so if you're seeing this then
+        // you forgot to handle at least 1 pending request. Check your tests to ensure your
+        // number of expectations lines up with your number of requests made, and that those
+        // requests match your expectations.
         expect(true).toBe(false);
         return new Promise(() => {});
     }
@@ -1189,6 +1193,27 @@ describe("MatrixClient", function() {
         it("overload logoutDevices=false + callback", async () => {
             await client.setPassword(auth, newPassword, false, callback);
             passwordTest({ auth, new_password: newPassword, logout_devices: false }, callback);
+        });
+    });
+
+    describe("getLocalAliases", () => {
+        it("should call the right endpoint", async () => {
+            const response = {
+                aliases: ["#woop:example.org", "#another:example.org"],
+            };
+            client.http.authedRequest.mockClear().mockResolvedValue(response);
+
+            const roomId = "!whatever:example.org";
+            const result = await client.getLocalAliases(roomId);
+
+            // Current version of the endpoint we support is v3
+            const [callback, method, path, queryParams, _, opts] = client.http.authedRequest.mock.calls[0];
+            expect(callback).toBeFalsy();
+            expect(method).toBe('GET');
+            expect(path).toEqual(`/rooms/${encodeURIComponent(roomId)}/aliases`);
+            expect(opts).toMatchObject({ prefix: "/_matrix/client/v3" });
+            expect(queryParams).toBeFalsy();
+            expect(result!.aliases).toEqual(response.aliases);
         });
     });
 });

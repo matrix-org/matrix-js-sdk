@@ -48,9 +48,14 @@ TODO:
 export const PREFIX_R0 = "/_matrix/client/r0";
 
 /**
- * A constant representing the URI path for release v1 of the Client-Server HTTP API.
+ * A constant representing the URI path for the legacy release v1 of the Client-Server HTTP API.
  */
 export const PREFIX_V1 = "/_matrix/client/v1";
+
+/**
+ * A constant representing the URI path for Client-Server API endpoints versioned at v3.
+ */
+export const PREFIX_V3 = "/_matrix/client/v3";
 
 /**
  * A constant representing the URI path for as-yet unspecified Client-Server HTTP APIs.
