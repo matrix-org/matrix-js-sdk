@@ -31,13 +31,15 @@ jobs:
       - name: 📋 Copy to gh-pages
         run: |
           # Copy into the folder structure
-          cp -a ".jsdoc/matrix-js-sdk/*" ./gh_pages/
           tag="${{ github.ref_name }}"
+          version="${tag#v}"
+          ls -lah
+          cp -a "./.jsdoc/matrix-js-sdk/$version" ./gh_pages/
 
           # Add the new directory to the index if it isn't there already
-          if ! grep -q "Version ${tag#v}" gh_pages/index.html; then
+          if ! grep -q "Version $version" gh_pages/index.html; then
             perl -i -pe 'BEGIN {$rel=shift} $_ =~ /^<\/ul>/ && print
-              "<li><a href=\"${rel}/index.html\">Version ${rel}</a></li>\n"' "${tag#v}" gh_pages/index.html
+              "<li><a href=\"${rel}/index.html\">Version ${rel}</a></li>\n"' "$version" gh_pages/index.html
           fi
 
       - name: 🌐 Deploy to Github Pages
