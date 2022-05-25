@@ -36,8 +36,9 @@ jobs:
           ref: gh-pages
 
       - name: 🌐 Deploy to Github Pages
-        working-directory: gh_pages
         run: |
+          cp -a "$RUNNER_TEMP/$VERSION" .
+
           # Add the new directory to the index if it isn't there already
           if ! grep -q "Version $VERSION" index.html; then
             perl -i -pe 'BEGIN {$rel=shift} $_ =~ /^<\/ul>/ && print
