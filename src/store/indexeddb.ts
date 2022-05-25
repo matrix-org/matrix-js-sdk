@@ -243,7 +243,7 @@ export class IndexedDBStore extends MemoryStore {
      * @returns {event[]} the events, potentially an empty array if OOB loading didn't yield any new members
      * @returns {null} in case the members for this room haven't been stored yet
      */
-    public getOutOfBandMembers = this.degradable((roomId: string): Promise<IStateEventWithRoomId[]> => {
+    public getOutOfBandMembers = this.degradable((roomId: string): Promise<IStateEventWithRoomId[] | null> => {
         return this.backend.getOutOfBandMembers(roomId);
     }, "getOutOfBandMembers");
 
@@ -320,7 +320,7 @@ export class IndexedDBStore extends MemoryStore {
                 // `IndexedDBStore` also maintain the state that `MemoryStore` uses (many are
                 // not overridden at all).
                 if (fallbackFn) {
-                    return fallbackFn(...args);
+                    return fallbackFn.call(this, ...args);
                 }
             }
         };
