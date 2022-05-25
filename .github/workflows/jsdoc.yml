@@ -1,8 +1,7 @@
 name: Release Process
 on:
-  push:
-    branches-ignore:  [ "!release-*" ]
-    tags: [ "v*" ]
+  release:
+    types: [ published ]
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 jobs:
   jsdoc:
@@ -23,31 +22,32 @@ jobs:
       - name: 📖 Generate JSDoc
         run: "yarn gendoc"
 
+      - name: 📋 Copy to temp
+        run: |
+          ls -lah
+          tag="${{ github.ref_name }}"
+          version="${tag#v}"
+          echo "VERSION=$version" >> $GITHUB_ENV
+          cp -a "./.jsdoc/matrix-js-sdk/$version" $RUNNER_TEMP
+
       - name: 🧮 Checkout gh-pages
         uses: actions/checkout@v3
         with:
           ref: gh-pages
-          clean: false
 
-      - name: 🎏 Resolve version from tag
-        id: version
+      - name: 🔪 Prepare
         run: |
-          tag="${{ github.ref_name }}"
-          echo "RELEASE_VERSION=${tag#v}" >> $GITHUB_ENV
-
-      - name: 📋 Copy to gh-pages
-        run: |
-          # Copy into the folder structure
-          cp -a ".jsdoc/matrix-js-sdk/$RELEASE_VERSION" .
+          cp -a "$RUNNER_TEMP/$VERSION" .
 
           # Add the new directory to the index if it isn't there already
-          if ! grep -q "Version $RELEASE_VERSION" index.html; then
+          if ! grep -q "Version $VERSION" index.html; then
             perl -i -pe 'BEGIN {$rel=shift} $_ =~ /^<\/ul>/ && print
-              "<li><a href=\"${rel}/index.html\">Version ${rel}</a></li>\n"' "$RELEASE_VERSION" index.html
+              "<li><a href=\"${rel}/index.html\">Version ${rel}</a></li>\n"' "$VERSION" index.html
           fi
 
-      - name: 🌐 Deploy to Github Pages
-        run: |
-          git add "$RELEASE_VERSION"
-          git commit --no-verify -m "Add jsdoc for $RELEASE_VERSION" index.html "$RELEASE_VERSION"
-          git push origin gh-pages
+      - name: 🚀 Deploy
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          keep_files: true
+          publish_dir: .
