@@ -35,7 +35,7 @@ jobs:
         with:
           ref: gh-pages
 
-      - name: 🌐 Deploy to Github Pages
+      - name: 🔪 Prepare
         run: |
           cp -a "$RUNNER_TEMP/$VERSION" .
 
@@ -45,6 +45,9 @@ jobs:
               "<li><a href=\"${rel}/index.html\">Version ${rel}</a></li>\n"' "$VERSION" index.html
           fi
 
-          git add --all .
-          git commit --no-verify -am "Add jsdoc for ${{ github.ref_name }}"
-          git push origin gh-pages
+      - name: 🚀 Deploy
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          keep_files: true
+          publish_dir: .
