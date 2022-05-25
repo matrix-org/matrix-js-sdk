@@ -26,21 +26,22 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: gh-pages
-          clean: false
+          path: gh_pages
 
       - name: 📋 Copy to gh-pages
         run: |
           # Copy into the folder structure
-          cp -a ".jsdoc/matrix-js-sdk/*" .
+          cp -a ".jsdoc/matrix-js-sdk/*" ./gh_pages/
           tag="${{ github.ref_name }}"
 
           # Add the new directory to the index if it isn't there already
-          if ! grep -q "Version ${tag#v}" index.html; then
+          if ! grep -q "Version ${tag#v}" gh_pages/index.html; then
             perl -i -pe 'BEGIN {$rel=shift} $_ =~ /^<\/ul>/ && print
-              "<li><a href=\"${rel}/index.html\">Version ${rel}</a></li>\n"' "${tag#v}" index.html
+              "<li><a href=\"${rel}/index.html\">Version ${rel}</a></li>\n"' "${tag#v}" gh_pages/index.html
           fi
 
       - name: 🌐 Deploy to Github Pages
+        working-directory: gh_pages
         run: |
           git add --all .
           git commit --no-verify -am "Add jsdoc for ${{ github.ref_name }}"
