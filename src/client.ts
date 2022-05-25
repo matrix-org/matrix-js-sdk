@@ -5292,7 +5292,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             ...res.events_before.map(mapper),
         ];
 
-
         // Where the event is a thread reply (not a root) and running in MSC-enabled mode the Thread timeline only
         // functions contiguously, so we have to jump through some hoops to get our target event in it.
         // XXX: workaround for https://github.com/vector-im/element-meta/issues/150
@@ -5364,7 +5363,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *    {@link module:models/event-timeline~EventTimeline} including the given
      *    event
      */
-     public async getLatestTimeline(timelineSet: EventTimelineSet): Promise<EventTimeline> {
+    public async getLatestTimeline(timelineSet: EventTimelineSet): Promise<EventTimeline> {
         // don't allow any timeline support unless it's been enabled.
         if (!this.timelineSupport) {
             throw new Error("timeline support is disabled. Set the 'timelineSupport'" +
@@ -5373,11 +5372,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const messagesPath = utils.encodeUri(
             "/rooms/$roomId/messages", {
-                $roomId: timelineSet.room.roomId
+                $roomId: timelineSet.room.roomId,
             },
         );
 
-        let params: Record<string, string | string[]> = {
+        const params: Record<string, string | string[]> = {
             dir: 'b',
         };
         if (this.clientOpts.lazyLoadMembers) {
