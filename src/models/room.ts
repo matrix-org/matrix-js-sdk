@@ -462,7 +462,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * Gets the creator of the room
      * @returns {string} The creator of the room, or null if it could not be determined
      */
-    public getRoomCreator(): string | null {
+    public getCreator(): string | null {
         const createEvent = this.currentState.getStateEvents(EventType.RoomCreate, "");
         if (!createEvent) {
             return null;
@@ -954,6 +954,10 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             `backwardPaginationToken=${backwardPaginationToken}`,
         );
 
+        await new Promise((resolve) => {
+            setTimeout(resolve, 12000);
+        });
+
         // Get the main TimelineSet
         const timelineSet = this.getUnfilteredTimelineSet();
 
@@ -1053,7 +1057,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             .getState(EventTimeline.FORWARDS);
 
         // Let people know to register listeners for the new state references
-        this.emit(RoomEvent.OldStateUpdated, this, previousOldState, this.currentState);
+        this.emit(RoomEvent.OldStateUpdated, this, previousOldState, this.oldState);
         this.emit(RoomEvent.CurrentStateUpdated, this, previousCurrentState, this.currentState);
     }
 

@@ -322,7 +322,7 @@ export class SyncApi {
             // MSC2716 is also supported in all existing room versions but
             // special meaning should only be given to "insertion", "batch",
             // and "marker" events when they come from the room creator
-            markerEvent.getSender() === room.getRoomCreator();
+            markerEvent.getSender() === room.getCreator();
 
         if (!isValidMsc2716Event) {
             logger.debug(

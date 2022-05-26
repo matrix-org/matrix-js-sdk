@@ -5397,7 +5397,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         const res = await this.http.authedRequest<IMessagesResponse>(undefined, Method.Get, messagesPath, params);
-        const event = res.chunk[0];
+        const event = res.chunk?.[0];
         if (!event) {
             throw new Error("No message returned from /messages when trying to construct getLatestTimeline");
         }
