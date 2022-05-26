@@ -1,5 +1,10 @@
 {
     "extends": [
         "config:base"
-    ]
+    ],
+    "lockFileMaintenance": { "enabled": true },
+    "packageRules": [{
+        "matchFiles": ["package.json"],
+        "rangeStrategy": "update-lockfile"
+    }]
 }
