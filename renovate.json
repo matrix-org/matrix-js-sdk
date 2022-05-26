@@ -1,6 +1,7 @@
 {
     "extends": [
-        "config:base"
+        "config:base",
+        ":dependencyDashboardApproval"
     ],
     "labels": ["T-Task", "Dependencies"],
     "lockFileMaintenance": { "enabled": true },
