@@ -986,9 +986,10 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             newTimeline = await this.client.getEventTimeline(timelineSet, mostRecentEventInTimeline.getId());
         }
 
-        // Set the pagination token back to the live sync token instead of using
-        // the `/context` historical token so that it matches the next response
-        // from `/sync` and we can properly continue the timeline.
+        // Set the pagination token back to the live sync token (`null`) instead
+        // of using the `/context` historical token (ex. `t12-13_0_0_0_0_0_0_0_0`)
+        // so that it matches the next response from `/sync` and we can properly
+        // continue the timeline.
         newTimeline.setPaginationToken(forwardPaginationToken, EventTimeline.FORWARDS);
 
         // Set our new fresh timeline as the live timeline to continue syncing
