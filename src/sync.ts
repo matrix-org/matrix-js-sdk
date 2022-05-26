@@ -51,7 +51,7 @@ import { MatrixError, Method } from "./http-api";
 import { ISavedSync } from "./store";
 import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
-import { RoomStateEvent } from "./models/room-state";
+import { RoomState, RoomStateEvent } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
 import { BeaconEvent } from "./models/beacon";
 import { IEventsResponse } from "./@types/requests";
@@ -228,6 +228,15 @@ export class SyncApi {
             RoomEvent.TimelineReset,
         ]);
         this.registerStateListeners(room);
+        // Register listeners again after the state reference changes
+        room.on(RoomEvent.CurrentStateUpdated, (targetRoom, previousCurrentState) => {
+            if (targetRoom !== room) {
+                return;
+            }
+
+            this.deregisterStateListeners(previousCurrentState);
+            this.registerStateListeners(room);
+        });
         return room;
     }
 
@@ -267,15 +276,15 @@ export class SyncApi {
     }
 
     /**
-     * @param {Room} room
+     * @param {RoomState} roomState The roomState to clear listeners from
      * @private
      */
-    private deregisterStateListeners(room: Room): void {
+    private deregisterStateListeners(roomState: RoomState): void {
         // could do with a better way of achieving this.
-        room.currentState.removeAllListeners(RoomStateEvent.Events);
-        room.currentState.removeAllListeners(RoomStateEvent.Members);
-        room.currentState.removeAllListeners(RoomStateEvent.NewMember);
-        room.currentState.removeAllListeners(RoomStateEvent.Marker);
+        roomState.removeAllListeners(RoomStateEvent.Events);
+        roomState.removeAllListeners(RoomStateEvent.Members);
+        roomState.removeAllListeners(RoomStateEvent.NewMember);
+        roomState.removeAllListeners(RoomStateEvent.Marker);
     }
 
     /** When we see the marker state change in the room, we know there is some
@@ -1363,7 +1372,6 @@ export class SyncApi {
                 }
 
                 if (limited) {
-                    this.deregisterStateListeners(room);
                     room.resetLiveTimeline(
                         joinObj.timeline.prev_batch,
                         this.opts.canResetEntireTimeline(room.roomId) ?
@@ -1374,8 +1382,6 @@ export class SyncApi {
                     // reason to stop incrementally tracking notifications and
                     // reset the timeline.
                     client.resetNotifTimelineSet();
-
-                    this.registerStateListeners(room);
                 }
             }
 

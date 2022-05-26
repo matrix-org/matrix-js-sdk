@@ -167,6 +167,8 @@ export enum RoomEvent {
     Timeline = "Room.timeline",
     TimelineReset = "Room.timelineReset",
     TimelineRefresh = "Room.TimelineRefresh",
+    OldStateUpdated = "Room.OldStateUpdated",
+    CurrentStateUpdated = "Room.CurrentStateUpdated",
     HistoryImportedWithinTimeline = "Room.historyImportedWithinTimeline",
 }
 
@@ -178,6 +180,8 @@ type EmittedEvents = RoomEvent
     | RoomEvent.TimelineReset
     | RoomEvent.TimelineRefresh
     | RoomEvent.HistoryImportedWithinTimeline
+    | RoomEvent.OldStateUpdated
+    | RoomEvent.CurrentStateUpdated
     | MatrixEventEvent.BeforeRedaction;
 
 export type RoomEventHandlerMap = {
@@ -194,6 +198,8 @@ export type RoomEventHandlerMap = {
         oldEventId?: string,
         oldStatus?: EventStatus,
     ) => void;
+    [RoomEvent.OldStateUpdated]: (room: Room, previousRoomState: RoomState, roomState: RoomState) => void;
+    [RoomEvent.CurrentStateUpdated]: (room: Room, previousRoomState: RoomState, roomState: RoomState) => void;
     [RoomEvent.HistoryImportedWithinTimeline]: (
         markerEvent: MatrixEvent,
         room: Room,
@@ -1034,6 +1040,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @private
      */
     private fixUpLegacyTimelineFields(): void {
+        const previousOldState = this.oldState;
+        const previousCurrentState = this.currentState;
+
         // maintain this.timeline as a reference to the live timeline,
         // and this.oldState and this.currentState as references to the
         // state at the start and end of that timeline. These are more
@@ -1043,6 +1052,10 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             .getState(EventTimeline.BACKWARDS);
         this.currentState = this.getLiveTimeline()
             .getState(EventTimeline.FORWARDS);
+
+        // Let people know to register listeners for the new state references
+        this.emit(RoomEvent.OldStateUpdated, this, previousOldState, this.currentState);
+        this.emit(RoomEvent.CurrentStateUpdated, this, previousCurrentState, this.currentState);
     }
 
     /**
