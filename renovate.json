@@ -2,6 +2,7 @@
     "extends": [
         "config:base"
     ],
+    "labels": ["T-Task", "Dependencies"],
     "lockFileMaintenance": { "enabled": true },
     "packageRules": [{
         "matchFiles": ["package.json"],
