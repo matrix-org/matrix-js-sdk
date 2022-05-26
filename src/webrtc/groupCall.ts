@@ -430,6 +430,8 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
             return false;
         }
 
+        const sendUpdatesBefore = !muted && this.isPtt;
+
         // set a timer for the maximum transmit time on PTT calls
         if (this.isPtt) {
             // Set or clear the max transmit timer
@@ -443,15 +445,39 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
             }
         }
 
+        for (const call of this.calls) {
+            call.localUsermediaFeed.setAudioMuted(muted);
+        }
+
+        if (sendUpdatesBefore) {
+            try {
+                await Promise.all(this.calls.map(c => c.sendMetadataUpdate()));
+            } catch (e) {
+                logger.info("Failed to send one or more metadata updates", e);
+            }
+        }
+
         if (this.localCallFeed) {
             logger.log(`groupCall ${this.groupCallId} setMicrophoneMuted stream ${
                 this.localCallFeed.stream.id} muted ${muted}`);
             this.localCallFeed.setAudioMuted(muted);
+            // I don't believe its actually necessary to enable these tracks: they
+            // are the one on the groupcall's own CallFeed and are cloned before being
+            // given to any of the actual calls, so these tracks don't actually go
+            // anywhere. Let's do it anyway to avoid confusion.
             setTracksEnabled(this.localCallFeed.stream.getAudioTracks(), !muted);
         }
 
         for (const call of this.calls) {
-            await call.setMicrophoneMuted(muted);
+            setTracksEnabled(call.localUsermediaFeed.stream.getAudioTracks(), !muted);
+        }
+
+        if (!sendUpdatesBefore) {
+            try {
+                await Promise.all(this.calls.map(c => c.sendMetadataUpdate()));
+            } catch (e) {
+                logger.info("Failed to send one or more metadata updates", e);
+            }
         }
 
         this.emit(GroupCallEvent.LocalMuteStateChanged, muted, this.isLocalVideoMuted());

@@ -1223,6 +1223,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
         this.localUsermediaFeed?.setVideoMuted(muted);
         this.updateMuteStatus();
+        await this.sendMetadataUpdate();
         return this.isLocalVideoMuted();
     }
 
@@ -1256,6 +1257,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
         this.localUsermediaFeed?.setAudioMuted(muted);
         this.updateMuteStatus();
+        await this.sendMetadataUpdate();
         return this.isMicrophoneMuted();
     }
 
@@ -1291,6 +1293,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             transceiver.direction = onHold ? 'sendonly' : 'sendrecv';
         }
         this.updateMuteStatus();
+        this.sendMetadataUpdate();
 
         this.emit(CallEvent.RemoteHoldUnhold, this.remoteOnHold);
     }
@@ -1332,10 +1335,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     private updateMuteStatus(): void {
-        this.sendVoipEvent(EventType.CallSDPStreamMetadataChangedPrefix, {
-            [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(),
-        });
-
         const micShouldBeMuted = this.isMicrophoneMuted() || this.remoteOnHold;
         const vidShouldBeMuted = this.isLocalVideoMuted() || this.remoteOnHold;
 
@@ -1343,6 +1342,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             micShouldBeMuted} vidShouldBeMuted ${vidShouldBeMuted}`);
         setTracksEnabled(this.localUsermediaStream.getAudioTracks(), !micShouldBeMuted);
         setTracksEnabled(this.localUsermediaStream.getVideoTracks(), !vidShouldBeMuted);
+    }
+
+    public async sendMetadataUpdate(): Promise<void> {
+        await this.sendVoipEvent(EventType.CallSDPStreamMetadataChangedPrefix, {
+            [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(),
+        });
     }
 
     private gotCallFeedsForInvite(callFeeds: CallFeed[], requestScreenshareFeed = false): void {
