@@ -845,7 +845,6 @@ describe("MatrixClient syncing", function() {
                         expect(room.getTimelineNeedsRefresh()).toEqual(true);
                         // Make sure `RoomEvent.HistoryImportedWithinTimeline` was emitted
                         expect(emitCount).toEqual(1);
-                        expect(room.getLastMarkerEventIdProcessed()).toEqual(markerEventId);
                     });
 
                     // Mimic a marker event being sent far back in the scroll back but since our last sync

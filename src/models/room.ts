@@ -223,7 +223,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     // any filtered timeline sets we're maintaining for this room
     private readonly filteredTimelineSets: Record<string, EventTimelineSet> = {}; // filter_id: timelineSet
     private timelineNeedsRefresh = false;
-    private lastMarkerEventIdProcessed: string = null;
     private readonly pendingEventList?: MatrixEvent[];
     // read by megolm via getter; boolean value - null indicates "use global value"
     private blacklistUnverifiedDevices: boolean = null;
@@ -1139,25 +1138,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     public getTimelineNeedsRefresh(): boolean {
         return this.timelineNeedsRefresh;
-    }
-
-    /**
-     * Get the last marker event ID proccessed
-     *
-     * @return {String} the last marker event ID proccessed or null if none have
-     * been processed
-     */
-    public getLastMarkerEventIdProcessed(): string | null {
-        return this.lastMarkerEventIdProcessed;
-    }
-
-    /**
-     * Set the last marker event ID proccessed
-     *
-     * @param {String} eventId The marker event ID to set
-     */
-    public setLastMarkerEventIdProcessed(eventId: string): void {
-        this.lastMarkerEventIdProcessed = eventId;
     }
 
     /**

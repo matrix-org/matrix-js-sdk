@@ -332,18 +332,6 @@ export class SyncApi {
             );
         }
 
-        // Don't process a marker event multiple times; we only need to
-        // throw the timeline away once, when we see a marker. All of the
-        // historical content will be in the `/messsages` responses from
-        // here on out.
-        const markerAlreadyProcessed = markerEvent.getId() === room.getLastMarkerEventIdProcessed();
-        if (markerAlreadyProcessed) {
-            logger.debug(
-                `MarkerState: Ignoring markerEventId=${markerEvent.getId()} in roomId=${room.roomId} because ` +
-                `it has already been processed.`,
-            );
-        }
-
         // It would be nice if we could also specifically tell whether the
         // historical messages actually affected the locally cached client
         // timeline or not. The problem is we can't see the prev_events of
@@ -356,10 +344,7 @@ export class SyncApi {
         // are likely to encounter the historical messages affecting their
         // current timeline (think someone signing up for Beeper and
         // importing their Whatsapp history).
-        if (
-            isValidMsc2716Event &&
-            !markerAlreadyProcessed
-        ) {
+        if (isValidMsc2716Event) {
             // Saw new marker event, let's let the clients know they should
             // refresh the timeline.
             logger.debug(
@@ -368,7 +353,6 @@ export class SyncApi {
             );
             room.setTimelineNeedsRefresh(true);
             room.emit(RoomEvent.HistoryImportedWithinTimeline, markerEvent, room);
-            room.setLastMarkerEventIdProcessed(markerEvent.getId());
         }
     }
 
