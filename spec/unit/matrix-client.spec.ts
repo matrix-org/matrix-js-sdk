@@ -209,6 +209,7 @@ describe("MatrixClient", function() {
         client.http.authedRequest.mockImplementation(function() {
             return new Promise(() => {});
         });
+        client.stopClient();
     });
 
     it("should create (unstable) file trees", async () => {
