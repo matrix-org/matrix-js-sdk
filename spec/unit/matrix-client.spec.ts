@@ -118,6 +118,7 @@ describe("MatrixClient", function() {
                 method: method,
                 path: path,
             };
+            pendingLookup.promise.abort = () => {}; // to make it a valid IAbortablePromise
             return pendingLookup.promise;
         }
         if (next.path === path && next.method === method) {

@@ -46,7 +46,7 @@ describe("eventMapperFor", function() {
 
     afterEach(() => {
         client.stopClient();
-    })
+    });
 
     it("should de-duplicate MatrixEvent instances by means of findEventById on the room object", async () => {
         const roomId = "!room:example.org";
