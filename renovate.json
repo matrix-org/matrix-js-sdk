@@ -1,0 +1,13 @@
+{
+    "extends": [
+        "config:base",
+        ":dependencyDashboardApproval"
+    ],
+    "labels": ["T-Task", "Dependencies"],
+    "lockFileMaintenance": { "enabled": true },
+    "groupName": "all",
+    "packageRules": [{
+        "matchFiles": ["package.json"],
+        "rangeStrategy": "update-lockfile"
+    }]
+}

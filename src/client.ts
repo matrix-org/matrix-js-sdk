@@ -61,6 +61,7 @@ import {
     PREFIX_R0,
     PREFIX_UNSTABLE,
     PREFIX_V1,
+    PREFIX_V3,
     retryNetworkOperation,
     UploadContentResponseType,
 } from "./http-api";
@@ -7576,16 +7577,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param {string} roomId
-     * @param {module:client.callback} callback Optional.
+     * Gets the local aliases for the room. Note: this includes all local aliases, unlike the
+     * curated list from the m.room.canonical_alias state event.
+     * @param {string} roomId The room ID to get local aliases for.
      * @return {Promise} Resolves: an object with an `aliases` property, containing an array of local aliases
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public unstableGetLocalAliases(roomId: string, callback?: Callback): Promise<{ aliases: string[] }> {
-        const path = utils.encodeUri("/rooms/$roomId/aliases",
-            { $roomId: roomId });
-        const prefix = PREFIX_UNSTABLE + "/org.matrix.msc2432";
-        return this.http.authedRequest(callback, Method.Get, path, null, null, { prefix });
+    public getLocalAliases(roomId: string): Promise<{ aliases: string[] }> {
+        const path = utils.encodeUri("/rooms/$roomId/aliases", { $roomId: roomId });
+        const prefix = PREFIX_V3;
+        return this.http.authedRequest(undefined, Method.Get, path, null, null, { prefix });
     }
 
     /**
