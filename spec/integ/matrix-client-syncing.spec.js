@@ -1025,7 +1025,9 @@ describe("MatrixClient syncing", function() {
                 expect(stateEventEmitCount).toEqual(1);
 
                 const eventsInRoom = syncData.rooms.join[roomOne].timeline.events;
-                httpBackend.when("GET", `/rooms/${encodeURIComponent(roomOne)}/context/${encodeURIComponent(eventsInRoom[0].event_id)}`)
+                const contextUrl = `/rooms/${encodeURIComponent(roomOne)}/context/` +
+                    `${encodeURIComponent(eventsInRoom[0].event_id)}`;
+                httpBackend.when("GET", contextUrl)
                     .respond(200, function() {
                         return {
                             start: "start_token",
