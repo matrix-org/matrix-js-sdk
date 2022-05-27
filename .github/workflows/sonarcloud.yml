@@ -53,9 +53,9 @@ jobs:
 
       # Fetch base branch from the upstream repo so that Sonar can identify new code in PR builds
       - name: "📕 Fetch upstream base branch"
-        # workflow_call retains the github context of the caller, so `repository` & `repositoryUrl` will be upstream
-        # always due to it running on `workflow_run` which is called from the context of the target repo and not the fork.
-        if: inputs.base_branch && github.repository != inputs.repo
+        # workflow_call retains the github context of the caller, so `repositoryUrl` will be upstream always due
+        # to it running on `workflow_run` which is called from the context of the target repo and not the fork.
+        if: inputs.base_branch
         run: |
           git remote add upstream ${{ github.repositoryUrl }}
           git rev-parse HEAD
