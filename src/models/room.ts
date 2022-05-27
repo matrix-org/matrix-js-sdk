@@ -1928,23 +1928,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @fires module:client~MatrixClient#event:"Room.timeline"
      * @private
      */
-    private addLiveEvent(event: MatrixEvent, duplicateStrategy: DuplicateStrategy, fromCache?): void;
-    private addLiveEvent(event: MatrixEvent, addLiveEventOptions: IAddLiveEventOptions): void;
-    private addLiveEvent(
-        event: MatrixEvent,
-        duplicateStrategyOrOpts: DuplicateStrategy | IAddLiveEventOptions,
-        fromCache = false,
-    ): void {
-        let duplicateStrategy = duplicateStrategyOrOpts as DuplicateStrategy;
-        let timelineWasEmpty: boolean;
-        if (typeof (duplicateStrategyOrOpts) === 'object') {
-            ({
-                duplicateStrategy = DuplicateStrategy.Ignore,
-                fromCache = false,
-                /* roomState, (not used here) */
-                timelineWasEmpty,
-            } = duplicateStrategyOrOpts);
-        }
+    private addLiveEvent(event: MatrixEvent, addLiveEventOptions: IAddLiveEventOptions): void {
+        const { duplicateStrategy, timelineWasEmpty, fromCache } = addLiveEventOptions;
 
         // add to our timeline sets
         for (let i = 0; i < this.timelineSets.length; i++) {
