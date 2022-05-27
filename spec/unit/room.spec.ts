@@ -552,20 +552,20 @@ describe("Room", function() {
             room.addLiveEvents([events[0], events[1]]);
             expect(room.timeline.length).toEqual(2);
 
-            const currentStateBeforeRunningReset = room.currentState;
-            let currentStateUpdateEmitCount = 0;
-            room.on(RoomEvent.CurrentStateUpdated, function(room, previousCurrentState, currentState) {
-                expect(previousCurrentState).toBe(currentStateBeforeRunningReset);
-                expect(currentState).toBe(room.currentState);
-                currentStateUpdateEmitCount += 1;
-            });
-
             const oldStateBeforeRunningReset = room.oldState;
             let oldStateUpdateEmitCount = 0;
             room.on(RoomEvent.OldStateUpdated, function(room, previousOldState, oldState) {
                 expect(previousOldState).toBe(oldStateBeforeRunningReset);
                 expect(oldState).toBe(room.oldState);
                 oldStateUpdateEmitCount += 1;
+            });
+
+            const currentStateBeforeRunningReset = room.currentState;
+            let currentStateUpdateEmitCount = 0;
+            room.on(RoomEvent.CurrentStateUpdated, function(room, previousCurrentState, currentState) {
+                expect(previousCurrentState).toBe(currentStateBeforeRunningReset);
+                expect(currentState).toBe(room.currentState);
+                currentStateUpdateEmitCount += 1;
             });
 
             room.resetLiveTimeline('sometoken', 'someothertoken');
@@ -577,10 +577,11 @@ describe("Room", function() {
                 newLiveTimeline.getState(EventTimeline.BACKWARDS));
             expect(room.currentState).toEqual(
                 newLiveTimeline.getState(EventTimeline.FORWARDS));
-            // Make sure `RoomEvent.CurrentStateUpdated` was emitted
-            expect(currentStateUpdateEmitCount).toEqual(1);
             // Make sure `RoomEvent.OldStateUpdated` was emitted
             expect(oldStateUpdateEmitCount).toEqual(1);
+            // `RoomEvent.CurrentStateUpdated` wasn't emitted because it has the
+            // same reference (timeline didn't change)
+            expect(currentStateUpdateEmitCount).toEqual(0);
         });
 
         it("should emit Room.timelineReset event and set the correct " +
