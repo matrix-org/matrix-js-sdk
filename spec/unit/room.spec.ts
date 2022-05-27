@@ -579,9 +579,8 @@ describe("Room", function() {
                 newLiveTimeline.getState(EventTimeline.FORWARDS));
             // Make sure `RoomEvent.OldStateUpdated` was emitted
             expect(oldStateUpdateEmitCount).toEqual(1);
-            // `RoomEvent.CurrentStateUpdated` wasn't emitted because it has the
-            // same reference (timeline didn't change)
-            expect(currentStateUpdateEmitCount).toEqual(0);
+            // Make sure `RoomEvent.OldStateUpdated` was emitted if necessary
+            expect(currentStateUpdateEmitCount).toEqual(timelineSupport ? 1 : 0);
         });
 
         it("should emit Room.timelineReset event and set the correct " +
