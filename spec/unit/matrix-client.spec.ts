@@ -930,6 +930,7 @@ describe("MatrixClient", function() {
             };
             client.crypto = { // mock crypto
                 encryptEvent: (event, room) => new Promise(() => {}),
+                stop: jest.fn(),
             };
         });
 

@@ -1029,6 +1029,7 @@ describe("megolm", function() {
             });
             return event.attemptDecryption(testClient.client.crypto, true).then(() => {
                 expect(event.isKeySourceUntrusted()).toBeFalsy();
+                testClient.stop();
             });
         });
     });

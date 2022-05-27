@@ -1220,6 +1220,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * clean shutdown.
      */
     public stopClient() {
+        this.crypto?.stop(); // crypto might have been initialised even if the client wasn't fully started
+
         if (!this.clientRunning) return; // already stopped
 
         logger.log('stopping MatrixClient');
@@ -1229,7 +1231,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.syncApi?.stop();
         this.syncApi = null;
 
-        this.crypto?.stop();
         this.peekSync?.stopPeeking();
 
         this.callEventHandler?.stop();
