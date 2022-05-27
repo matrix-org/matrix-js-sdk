@@ -116,6 +116,7 @@
     "collectCoverageFrom": [
       "<rootDir>/src/**/*.{js,ts}"
     ],
+    "reporters": ["default","github-actions"],
     "coverageReporters": [
       "text-summary",
       "lcov"
