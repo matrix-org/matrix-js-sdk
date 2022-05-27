@@ -18,7 +18,7 @@ limitations under the License.
  * @module models/room
  */
 
-import { EventTimelineSet, DuplicateStrategy } from "./event-timeline-set";
+import { EventTimelineSet, DuplicateStrategy, IAddLiveEventOptions } from "./event-timeline-set";
 import { Direction, EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
@@ -49,7 +49,6 @@ import {
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { ReceiptType } from "../@types/read_receipts";
 import { IStateEventWithRoomId } from "../@types/search";
-import { IAddLiveEventOptions } from "./event-timeline-set";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be

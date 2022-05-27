@@ -51,11 +51,10 @@ import { MatrixError, Method } from "./http-api";
 import { ISavedSync } from "./store";
 import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
-import { RoomState, RoomStateEvent } from "./models/room-state";
+import { RoomState, RoomStateEvent, IMarkerFoundOptions } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
 import { BeaconEvent } from "./models/beacon";
 import { IEventsResponse } from "./@types/requests";
-import { IMarkerFoundOptions } from "./models/room-state";
 
 const DEBUG = true;
 
