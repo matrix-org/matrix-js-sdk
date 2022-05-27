@@ -128,6 +128,7 @@ describe('DeviceList', function() {
         return prom1.then(() => {
             const storedKeys = dl.getRawStoredDevicesForUser('@test1:sw1v.org');
             expect(Object.keys(storedKeys)).toEqual(['HGKAWHRVJQ']);
+            dl.stop();
         });
     });
 
@@ -170,6 +171,7 @@ describe('DeviceList', function() {
 
             const prom3 = dl2.refreshOutdatedDeviceLists();
             expect(downloadSpy).toHaveBeenCalledWith(['@test1:sw1v.org'], {});
+            dl2.stop();
 
             queryDefer3.resolve(utils.deepCopy(signedDeviceList));
 
@@ -178,6 +180,7 @@ describe('DeviceList', function() {
         }).then(() => {
             const storedKeys = dl.getRawStoredDevicesForUser('@test1:sw1v.org');
             expect(Object.keys(storedKeys)).toEqual(['HGKAWHRVJQ']);
+            dl.stop();
         });
     });
 
@@ -204,6 +207,7 @@ describe('DeviceList', function() {
             expect(Object.keys(storedKeys1)).toEqual(['HGKAWHRVJQ']);
             const storedKeys2 = dl.getRawStoredDevicesForUser('@test2:sw1v.org');
             expect(Object.keys(storedKeys2)).toEqual(['QJVRHWAKGH']);
+            dl.stop();
         });
     });
 });

@@ -78,5 +78,8 @@ describe("verification request integration tests with crypto layer", function() 
 
         // XXX: Private function access (but it's a test, so we're okay)
         aliceVerifier.endTimer();
+
+        alice.stop();
+        bob.stop();
     });
 });
