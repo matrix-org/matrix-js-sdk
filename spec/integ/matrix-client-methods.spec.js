@@ -42,7 +42,7 @@ describe("MatrixClient", function() {
     });
 
     describe("uploadContent", function() {
-        const buf = new Buffer('hello world');
+        const buf = Buffer.from('hello world');
         it("should upload the file", function() {
             httpBackend.when(
                 "POST", "/_matrix/media/r0/upload",
