@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventTimeline, MatrixEvent, RoomEvent } from "../../src";
+import { EventTimeline, MatrixEvent, RoomEvent, RoomStateEvent, RoomMemberEvent } from "../../src";
 import { UNSTABLE_MSC2716_MARKER } from "../../src/@types/event";
 import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
@@ -77,7 +77,7 @@ describe("MatrixClient syncing", function() {
             });
         });
 
-        it("should emit Room.myMembership for invite->leave->invite cycles", async () => {
+        it("should emit RoomEvent.MyMembership for invite->leave->invite cycles", async () => {
             const roomId = "!cycles:example.org";
 
             // First sync: an invite
@@ -299,7 +299,7 @@ describe("MatrixClient syncing", function() {
             httpBackend.when("GET", "/sync").respond(200, syncData);
 
             let latestFiredName = null;
-            client.on("RoomMember.name", function(event, m) {
+            client.on(RoomMemberEvent.Name, function(event, m) {
                 if (m.userId === userC && m.roomId === roomOne) {
                     latestFiredName = m.name;
                 }
@@ -888,6 +888,170 @@ describe("MatrixClient syncing", function() {
                 });
             });
         });
+
+        // Make sure the state listeners work and events are re-emitted properly from
+        // the client regardless if we reset and refresh the timeline.
+        describe('state listeners and re-registered when RoomEvent.CurrentStateUpdated is fired', () => {
+            const EVENTS = [
+                utils.mkMessage({
+                    room: roomOne, user: userA, msg: "we",
+                }),
+                utils.mkMessage({
+                    room: roomOne, user: userA, msg: "could",
+                }),
+                utils.mkMessage({
+                    room: roomOne, user: userA, msg: "be",
+                }),
+                utils.mkMessage({
+                    room: roomOne, user: userA, msg: "heroes",
+                }),
+            ];
+
+            const SOME_STATE_EVENT = utils.mkEvent({
+                event: true,
+                type: 'org.matrix.test_state',
+                room: roomOne,
+                user: userA,
+                skey: "",
+                content: {
+                    "foo": "bar",
+                },
+            });
+
+            const USER_MEMBERSHIP_EVENT = utils.mkMembership({
+                room: roomOne, mship: "join", user: userA,
+            });
+
+            // This appears to work even if we comment out
+            // `RoomEvent.CurrentStateUpdated` part which triggers everything to
+            // re-listen after the `room.currentState` reference changes. I'm
+            // not sure how it's getting re-emitted.
+            it("should be able to listen to state events even after " +
+               "the timeline is reset during `limited` sync response", async () => {
+                // Create a room from the sync
+                httpBackend.when("GET", "/sync").respond(200, syncData);
+                client.startClient();
+                await Promise.all([
+                    httpBackend.flushAllExpected(),
+                    awaitSyncEvent(),
+                ]);
+
+                // Get the room after the first sync so the room is created
+                const room = client.getRoom(roomOne);
+                expect(room).toBeDefined();
+
+                let stateEventEmitCount = 0;
+                client.on(RoomStateEvent.Update, () => {
+                    stateEventEmitCount += 1;
+                });
+
+                // Cause `RoomStateEvent.Update` to be fired
+                room.currentState.setStateEvents([SOME_STATE_EVENT]);
+                // Make sure we can listen to the room state events before the reset
+                expect(stateEventEmitCount).toEqual(1);
+
+                // Make a `limited` sync which will cause a `room.resetLiveTimeline`
+                const limitedSyncData = {
+                    next_batch: "batch_token",
+                    rooms: {
+                        join: {},
+                    },
+                };
+                limitedSyncData.rooms.join[roomOne] = {
+                    timeline: {
+                        events: [
+                            utils.mkMessage({
+                                room: roomOne, user: otherUserId, msg: "world",
+                            }),
+                        ],
+                        // The important part, make the sync `limited`
+                        limited: true,
+                        prev_batch: "newerTok",
+                    },
+                };
+                httpBackend.when("GET", "/sync").respond(200, limitedSyncData);
+
+                await Promise.all([
+                    httpBackend.flushAllExpected(),
+                    awaitSyncEvent(),
+                ]);
+
+                // This got incremented again from processing the sync response
+                expect(stateEventEmitCount).toEqual(2);
+
+                // Cause `RoomStateEvent.Update` to be fired
+                room.currentState.setStateEvents([SOME_STATE_EVENT]);
+                // Make sure we can still listen to the room state events after the reset
+                expect(stateEventEmitCount).toEqual(3);
+            });
+
+            // Make sure it re-registers the state listeners after the
+            // `room.currentState` reference changes
+            it("should be able to listen to state events even after " +
+               "refreshing the timeline", async () => {
+                const testClientWithTimelineSupport = new TestClient(
+                    selfUserId,
+                    "DEVICE",
+                    selfAccessToken,
+                    undefined,
+                    { timelineSupport: true },
+                );
+                httpBackend = testClientWithTimelineSupport.httpBackend;
+                httpBackend.when("GET", "/versions").respond(200, {});
+                httpBackend.when("GET", "/pushrules").respond(200, {});
+                httpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+                client = testClientWithTimelineSupport.client;
+
+                // Create a room from the sync
+                httpBackend.when("GET", "/sync").respond(200, syncData);
+                client.startClient();
+                await Promise.all([
+                    httpBackend.flushAllExpected(),
+                    awaitSyncEvent(),
+                ]);
+
+                // Get the room after the first sync so the room is created
+                const room = client.getRoom(roomOne);
+                expect(room).toBeDefined();
+
+                let stateEventEmitCount = 0;
+                client.on(RoomStateEvent.Update, () => {
+                    stateEventEmitCount += 1;
+                });
+
+                // Cause `RoomStateEvent.Update` to be fired
+                room.currentState.setStateEvents([SOME_STATE_EVENT]);
+                // Make sure we can listen to the room state events before the reset
+                expect(stateEventEmitCount).toEqual(1);
+
+                const eventsInRoom = syncData.rooms.join[roomOne].timeline.events;
+                httpBackend.when("GET", `/rooms/${encodeURIComponent(roomOne)}/context/${encodeURIComponent(eventsInRoom[0].event_id)}`)
+                    .respond(200, function() {
+                        return {
+                            start: "start_token",
+                            events_before: [EVENTS[1], EVENTS[0]],
+                            event: EVENTS[2],
+                            events_after: [EVENTS[3]],
+                            state: [
+                                USER_MEMBERSHIP_EVENT,
+                            ],
+                            end: "end_token",
+                        };
+                    });
+
+                // Refresh the timeline. This will cause the `room.currentState`
+                // reference to change
+                await Promise.all([
+                    room.refreshLiveTimeline(),
+                    httpBackend.flushAllExpected(),
+                ]);
+
+                // Cause `RoomStateEvent.Update` to be fired
+                room.currentState.setStateEvents([SOME_STATE_EVENT]);
+                // Make sure we can still listen to the room state events after the reset
+                expect(stateEventEmitCount).toEqual(2);
+            });
+        });
     });
 
     describe("timeline", function() {
@@ -972,7 +1136,7 @@ describe("MatrixClient syncing", function() {
 
             let resetCallCount = 0;
             // the token should be set *before* timelineReset is emitted
-            client.on("Room.timelineReset", function(room) {
+            client.on(RoomEvent.TimelineReset, function(room) {
                 resetCallCount++;
 
                 const tl = room.getLiveTimeline();
