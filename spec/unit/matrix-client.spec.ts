@@ -729,18 +729,16 @@ describe("MatrixClient", function() {
     });
 
     describe("guest rooms", function() {
-        it("should only do /sync calls (without filter/pushrules)", function(done) {
+        it("should only do /sync calls (without filter/pushrules)", async function() {
             httpLookups = []; // no /pushrules or /filter
             httpLookups.push({
                 method: "GET",
                 path: "/sync",
                 data: SYNC_DATA,
-                thenCall: function() {
-                    done();
-                },
             });
             client.setGuest(true);
-            client.startClient();
+            await client.startClient();
+            expect(httpLookups.length).toBe(0);
         });
 
         xit("should be able to peek into a room using peekInRoom", function(done) {
