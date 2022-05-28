@@ -952,7 +952,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         // Get the main TimelineSet
         const timelineSet = this.getUnfilteredTimelineSet();
 
-        let newTimeline;
+        let newTimeline: EventTimeline;
         // If there isn't any event in the timeline, let's go fetch the latest
         // event and construct a timeline from it.
         //
