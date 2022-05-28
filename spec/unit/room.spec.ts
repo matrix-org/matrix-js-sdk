@@ -217,17 +217,10 @@ describe("Room", function() {
             }) as MatrixEvent,
         ];
 
-        it("should call RoomState.setTypingEvent on m.typing events", function() {
-            const typing = utils.mkEvent({
-                room: roomId,
-                type: EventType.Typing,
-                event: true,
-                content: {
-                    user_ids: [userA],
-                },
-            });
-            room.addEphemeralEvents([typing]);
-            expect(room.currentState.setTypingEvent).toHaveBeenCalledWith(typing);
+        it("Make sure legacy overload passing options directly as parameters still works", () => {
+            expect(() => room.addLiveEvents(events, DuplicateStrategy.Replace, false)).not.toThrow();
+            expect(() => room.addLiveEvents(events, DuplicateStrategy.Ignore, true)).not.toThrow();
+            expect(() => room.addLiveEvents(events, "shouldfailbecauseinvalidduplicatestrategy", false)).toThrow();
         });
 
         it("should throw if duplicateStrategy isn't 'replace' or 'ignore'", function() {
@@ -367,6 +360,21 @@ describe("Room", function() {
             expect(room.timeline.length).toEqual(1);
 
             expect(callCount).toEqual(2);
+        });
+    });
+
+    describe('addEphemeralEvents', () => {
+        it("should call RoomState.setTypingEvent on m.typing events", function() {
+            const typing = utils.mkEvent({
+                room: roomId,
+                type: EventType.Typing,
+                event: true,
+                content: {
+                    user_ids: [userA],
+                },
+            });
+            room.addEphemeralEvents([typing]);
+            expect(room.currentState.setTypingEvent).toHaveBeenCalledWith(typing);
         });
     });
 

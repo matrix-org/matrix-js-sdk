@@ -307,6 +307,11 @@ describe("EventTimeline", function() {
             expect(timeline.getState(EventTimeline.FORWARDS).setStateEvents).
                 not.toHaveBeenCalled();
         });
+
+        it("Make sure legacy overload passing options directly as parameters still works", () => {
+            expect(() => timeline.addEvent(events[0], { toStartOfTimeline: true })).not.toThrow();
+            expect(() => timeline.addEvent(events[0], { stateContext: new RoomState() })).not.toThrow();
+        });
     });
 
     describe("removeEvent", function() {
