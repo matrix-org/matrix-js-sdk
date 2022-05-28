@@ -323,13 +323,6 @@ export class SyncApi {
             // and "marker" events when they come from the room creator
             markerEvent.getSender() === room.getCreator();
 
-        if (!isValidMsc2716Event) {
-            logger.debug(
-                `MarkerState: Ignoring markerEventId=${markerEvent.getId()} in roomId=${room.roomId} because ` +
-                `MSC2716 is not supported in the room version or for any room version, the marker wasn't sent ` +
-                `by the room creator.`,
-            );
-        }
 
         // It would be nice if we could also specifically tell whether the
         // historical messages actually affected the locally cached client
@@ -352,6 +345,12 @@ export class SyncApi {
             );
             room.setTimelineNeedsRefresh(true);
             room.emit(RoomEvent.HistoryImportedWithinTimeline, markerEvent, room);
+        } else {
+            logger.debug(
+                `MarkerState: Ignoring markerEventId=${markerEvent.getId()} in roomId=${room.roomId} because ` +
+                `MSC2716 is not supported in the room version or for any room version, the marker wasn't sent ` +
+                `by the room creator.`,
+            );
         }
     }
 
