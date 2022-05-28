@@ -463,11 +463,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     public getCreator(): string | null {
         const createEvent = this.currentState.getStateEvents(EventType.RoomCreate, "");
-        if (!createEvent) {
-            return null;
-        }
-        const roomCreator = createEvent.getContent()['creator'];
-        return roomCreator;
+        return createEvent?.getContent()['creator'] ?? null;
     }
 
     /**
