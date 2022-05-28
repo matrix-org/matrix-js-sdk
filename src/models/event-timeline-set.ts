@@ -18,7 +18,7 @@ limitations under the License.
  * @module models/event-timeline-set
  */
 
-import { EventTimeline } from "./event-timeline";
+import { EventTimeline, IAddEventOptions } from "./event-timeline";
 import { EventStatus, MatrixEvent, MatrixEventEvent } from "./event";
 import { logger } from '../logger';
 import { Relations } from './relations';
@@ -55,7 +55,12 @@ export interface IRoomTimelineData {
     liveEvent?: boolean;
 }
 
-export interface IAddLiveEventOptions {
+export interface IAddEventToTimelineOptions extends IAddEventOptions {
+    /** Whether the sync response came from cache */
+    fromCache?: boolean;
+}
+
+export interface IAddLiveEventOptions extends Omit<IAddEventToTimelineOptions, 'toStartOfTimeline'> {
     /** Applies to events in the timeline only. If this is 'replace' then if a
      * duplicate is encountered, the event passed to this function will replace
      * the existing event in the timeline. If this is not specified, or is
@@ -63,33 +68,6 @@ export interface IAddLiveEventOptions {
      * entirely, preserving the existing event in the timeline. Events are
      * identical based on their event ID <b>only</b>. */
     duplicateStrategy?: DuplicateStrategy;
-    /** Whether the sync response came from cache */
-    fromCache?: boolean;
-    /** The state events to reconcile metadata from */
-    roomState?: RoomState;
-    /** Whether the timeline was empty before the marker arrived in
-     *  the room. This could be happen in a variety of cases:
-     *  1. From the initial sync
-     *  2. It's the first state we're seeing after joining the room
-     *  3. Or whether it's coming from `syncFromCache` */
-    timelineWasEmpty?: boolean;
-}
-
-export interface IAddEventToTimelineOptions {
-    /** Whether to insert the new event at the start of the timeline where the
-     * oldest events are (timeline is in chronological order, oldest to most
-     * recent) */
-    toStartOfTimeline: boolean;
-    /** Whether the sync response came from cache */
-    fromCache?: boolean;
-    /** The state events to reconcile metadata from */
-    roomState?: RoomState;
-    /** Whether the timeline was empty before the marker arrived in
-     *  the room. This could be happen in a variety of cases:
-     *  1. From the initial sync
-     *  2. It's the first state we're seeing after joining the room
-     *  3. Or whether it's coming from `syncFromCache` */
-    timelineWasEmpty?: boolean;
 }
 
 type EmittedEvents = RoomEvent.Timeline | RoomEvent.TimelineReset;

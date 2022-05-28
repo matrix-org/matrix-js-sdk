@@ -18,34 +18,27 @@ limitations under the License.
  * @module models/event-timeline
  */
 
-import { RoomState } from "./room-state";
+import { RoomState, IMarkerFoundOptions } from "./room-state";
 import { EventTimelineSet } from "./event-timeline-set";
 import { MatrixEvent } from "./event";
 import { Filter } from "../filter";
 import { EventType } from "../@types/event";
 
-export interface IInitialiseStateOptions {
-    /** Whether the timeline was empty before the marker arrived in
-     *  the room. This could be happen in a variety of cases:
-     *  1. From the initial sync
-     *  2. It's the first state we're seeing after joining the room
-     *  3. Or whether it's coming from `syncFromCache` */
-    timelineWasEmpty?: boolean;
+export interface IInitialiseStateOptions extends IMarkerFoundOptions {
+    // This is a separate interface without any extra stuff currently added on
+    // top of `IMarkerFoundOptions` just because it feels like they have
+    // different concerns. One shouldn't necessarily look to add to
+    // `IMarkerFoundOptions` just because they want to add an extra option to
+    // `initialiseState`.
 }
 
-export interface IAddEventOptions {
+export interface IAddEventOptions extends IMarkerFoundOptions {
     /** Whether to insert the new event at the start of the timeline where the
      * oldest events are (timeline is in chronological order, oldest to most
      * recent) */
     toStartOfTimeline: boolean;
     /** The state events to reconcile metadata from */
     roomState?: RoomState;
-    /** Whether the timeline was empty before the marker arrived in
-     *  the room. This could be happen in a variety of cases:
-     *  1. From the initial sync
-     *  2. It's the first state we're seeing after joining the room
-     *  3. Or whether it's coming from `syncFromCache` */
-    timelineWasEmpty?: boolean;
 }
 
 export enum Direction {
