@@ -323,7 +323,6 @@ export class SyncApi {
             // and "marker" events when they come from the room creator
             markerEvent.getSender() === room.getCreator();
 
-
         // It would be nice if we could also specifically tell whether the
         // historical messages actually affected the locally cached client
         // timeline or not. The problem is we can't see the prev_events of
