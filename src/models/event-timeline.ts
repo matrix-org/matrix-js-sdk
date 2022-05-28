@@ -24,7 +24,7 @@ import { MatrixEvent } from "./event";
 import { Filter } from "../filter";
 import { EventType } from "../@types/event";
 
-export interface IInitialiseStateOptions extends IMarkerFoundOptions {
+export interface IInitialiseStateOptions extends Pick<IMarkerFoundOptions, 'timelineWasEmpty'> {
     // This is a separate interface without any extra stuff currently added on
     // top of `IMarkerFoundOptions` just because it feels like they have
     // different concerns. One shouldn't necessarily look to add to
@@ -32,7 +32,7 @@ export interface IInitialiseStateOptions extends IMarkerFoundOptions {
     // `initialiseState`.
 }
 
-export interface IAddEventOptions extends IMarkerFoundOptions {
+export interface IAddEventOptions extends Pick<IMarkerFoundOptions, 'timelineWasEmpty'> {
     /** Whether to insert the new event at the start of the timeline where the
      * oldest events are (timeline is in chronological order, oldest to most
      * recent) */

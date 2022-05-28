@@ -55,12 +55,14 @@ export interface IRoomTimelineData {
     liveEvent?: boolean;
 }
 
-export interface IAddEventToTimelineOptions extends IAddEventOptions {
+export interface IAddEventToTimelineOptions
+    extends Pick<IAddEventOptions, 'toStartOfTimeline' | 'roomState' | 'timelineWasEmpty'> {
     /** Whether the sync response came from cache */
     fromCache?: boolean;
 }
 
-export interface IAddLiveEventOptions extends Omit<IAddEventToTimelineOptions, 'toStartOfTimeline'> {
+export interface IAddLiveEventOptions
+    extends Pick<IAddEventToTimelineOptions, 'fromCache' | 'roomState' | 'timelineWasEmpty'> {
     /** Applies to events in the timeline only. If this is 'replace' then if a
      * duplicate is encountered, the event passed to this function will replace
      * the existing event in the timeline. If this is not specified, or is
