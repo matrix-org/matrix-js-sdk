@@ -242,6 +242,11 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         ) {
             this.fetchEditsWhereNeeded(event);
             this.addEventToTimeline(event, false);
+        } else if (event.isRelation(RelationType.Annotation) || event.isRelation(RelationType.Replace)) {
+            // Apply annotations and replace relations to the relations of the timeline only
+            this.timelineSet.relations.setRelationsTarget(event);
+            this.timelineSet.relations.aggregate(event, this.timelineSet);
+            return;
         }
 
         // If no thread support exists we want to count all thread relation
