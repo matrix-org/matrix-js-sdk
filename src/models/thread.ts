@@ -229,8 +229,8 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
 
         if ([RelationType.Annotation, RelationType.Replace].includes(event.getRelation()?.rel_type as RelationType)) {
             // Apply annotations and replace relations to the relations of the timeline only
-            this.timelineSet.setRelationsTarget(event);
-            this.timelineSet.aggregateRelations(event);
+            this.room.relations?.setRelationsTarget(event);
+            this.room.relations?.aggregateRelations(event, this.timelineSet);
             return;
         }
 

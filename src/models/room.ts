@@ -49,6 +49,7 @@ import {
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { ReceiptType } from "../@types/read_receipts";
 import { IStateEventWithRoomId } from "../@types/search";
+import { RelationsContainer } from "./relations-container";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -261,6 +262,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * prefer getLiveTimeline().getState(EventTimeline.FORWARDS).
      */
     public currentState: RoomState;
+    public readonly relations?: RelationsContainer;
 
     /**
      * @experimental
@@ -374,6 +376,10 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             this.membersPromise = Promise.resolve(false);
         } else {
             this.membersPromise = null;
+        }
+
+        if (this.opts.unstableClientRelationAggregation) {
+            this.relations = new RelationsContainer(this.client);
         }
     }
 
@@ -1657,8 +1663,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         toStartOfTimeline: boolean,
     ): Thread {
         if (rootEvent) {
-            const tl = this.getTimelineForEvent(rootEvent.getId());
-            const relatedEvents = tl?.getTimelineSet().getAllRelationsEventForEvent(rootEvent.getId());
+            const relatedEvents = this.relations?.getAllRelationsEventForEvent(rootEvent.getId());
             if (relatedEvents?.length) {
                 // Include all relations of the root event, given it'll be visible in both timelines,
                 // except `m.replace` as that will already be applied atop the event using `MatrixEvent::makeReplaced`
@@ -1934,24 +1939,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @param {module:models/event.MatrixEvent} event the relation event that needs to be aggregated.
      */
     private aggregateNonLiveRelation(event: MatrixEvent): void {
-        const { shouldLiveInRoom, threadId } = this.eventShouldLiveIn(event);
-        const thread = this.getThread(threadId);
-        thread?.timelineSet.aggregateRelations(event);
-
-        if (shouldLiveInRoom) {
-            // TODO: We should consider whether this means it would be a better
-            // design to lift the relations handling up to the room instead.
-            for (let i = 0; i < this.timelineSets.length; i++) {
-                const timelineSet = this.timelineSets[i];
-                if (timelineSet.getFilter()) {
-                    if (timelineSet.getFilter().filterRoomTimeline([event]).length) {
-                        timelineSet.aggregateRelations(event);
-                    }
-                } else {
-                    timelineSet.aggregateRelations(event);
-                }
-            }
-        }
+        this.relations?.aggregateRelations(event);
     }
 
     public getEventForTxnId(txnId: string): MatrixEvent {
