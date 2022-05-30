@@ -96,12 +96,9 @@ describe("Relations", function() {
             },
         });
 
-        // Stub the room
-
-        const room = new Room("room123", null, null);
-
         // Add the target event first, then the relation event
         {
+            const room = new Room("room123", null, null);
             const relationsCreated = new Promise(resolve => {
                 targetEvent.once(MatrixEventEvent.RelationsCreated, resolve);
             });
@@ -115,6 +112,7 @@ describe("Relations", function() {
 
         // Add the relation event first, then the target event
         {
+            const room = new Room("room123", null, null);
             const relationsCreated = new Promise(resolve => {
                 targetEvent.once(MatrixEventEvent.RelationsCreated, resolve);
             });
