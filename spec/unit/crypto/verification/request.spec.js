@@ -40,7 +40,7 @@ describe("verification request integration tests with crypto layer", function() 
     });
 
     it("should request and accept a verification", async function() {
-        const [alice, bob] = await makeTestClients(
+        const [[alice, bob], clearTestClientTimeouts] = await makeTestClients(
             [
                 { userId: "@alice:example.com", deviceId: "Osborne2" },
                 { userId: "@bob:example.com", deviceId: "Dynabook" },
@@ -81,5 +81,6 @@ describe("verification request integration tests with crypto layer", function() 
 
         alice.stop();
         bob.stop();
+        clearTestClientTimeouts();
     });
 });
