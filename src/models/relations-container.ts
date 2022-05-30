@@ -29,7 +29,7 @@ export class RelationsContainer {
                 [eventType: EventType | string]: Relations;
             };
         };
-    };
+    } = {};
 
     constructor(private readonly client: MatrixClient) {
     }

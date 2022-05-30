@@ -107,7 +107,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * The filter object, if any, for this timelineSet.
      * @param {boolean} [opts.unstableClientRelationAggregation = false]
      * Optional. Set to true to enable client-side aggregation of event relations
-     * via `getRelationsForEvent`.
+     * via `getRelationsForEvent`. This requires a room or client to be passed.
      * This feature is currently unstable and the API may change without notice.
      * @param {MatrixClient} client the Matrix client which owns this EventTimelineSet,
      * can be omitted if room is specified.
