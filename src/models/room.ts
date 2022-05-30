@@ -261,7 +261,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * prefer getLiveTimeline().getState(EventTimeline.FORWARDS).
      */
     public currentState: RoomState;
-    public readonly relations?: RelationsContainer;
+    public readonly relations = new RelationsContainer(this.client);
 
     /**
      * @experimental
@@ -372,8 +372,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         } else {
             this.membersPromise = null;
         }
-
-        this.relations = new RelationsContainer(this.client);
     }
 
     private threadTimelineSetsPromise: Promise<[EventTimelineSet, EventTimelineSet]> | null = null;
