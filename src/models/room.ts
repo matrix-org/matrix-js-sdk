@@ -261,7 +261,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * prefer getLiveTimeline().getState(EventTimeline.FORWARDS).
      */
     public currentState: RoomState;
-    public readonly relations = new RelationsContainer(this.client);
+    public readonly relations = new RelationsContainer(this.client, this);
 
     /**
      * @experimental

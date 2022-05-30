@@ -19,6 +19,7 @@ import { EventType, RelationType } from "../@types/event";
 import { EventStatus, MatrixEvent, MatrixEventEvent } from "./event";
 import { EventTimelineSet } from "./event-timeline-set";
 import { MatrixClient } from "../client";
+import { Room } from "./room";
 
 export class RelationsContainer {
     // A tree of objects to access a set of relations for an event, as in:
@@ -31,7 +32,7 @@ export class RelationsContainer {
         };
     } = {};
 
-    constructor(private readonly client: MatrixClient) {
+    constructor(private readonly client: MatrixClient, private readonly room?: Room) {
     }
 
     /**
@@ -137,9 +138,11 @@ export class RelationsContainer {
                 eventType,
                 this.client,
             );
+
+            const room = this.room ?? timelineSet?.room;
             const relatesToEvent = timelineSet?.findEventById(relatesToEventId)
-                ?? timelineSet.room?.findEventById(relatesToEventId)
-                ?? timelineSet.room?.getPendingEvent(relatesToEventId);
+                ?? room?.findEventById(relatesToEventId)
+                ?? room?.getPendingEvent(relatesToEventId);
             if (relatesToEvent) {
                 relationsWithEventType.setTargetEvent(relatesToEvent);
             }
