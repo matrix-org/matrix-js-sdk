@@ -23,7 +23,7 @@ limitations under the License.
 import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
 
-import type NodeCrypto from "crypto";
+import type * as NodeCrypto from "crypto";
 import { MatrixEvent } from ".";
 import { M_TIMESTAMP } from "./@types/location";
 
