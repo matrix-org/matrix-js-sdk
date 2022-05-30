@@ -165,6 +165,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     private onEcho = (event: MatrixEvent) => {
         if (event.threadRootId !== this.id) return; // ignore echoes for other timelines
         if (this.lastEvent === event) return;
+        if (!event.isRelation(THREAD_RELATION_TYPE.name)) return;
 
         // There is a risk that the `localTimestamp` approximation will not be accurate
         // when threads are used over federation. That could result in the reply
@@ -226,13 +227,6 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             this._currentUserParticipated = true;
         }
 
-        if ([RelationType.Annotation, RelationType.Replace].includes(event.getRelation()?.rel_type as RelationType)) {
-            // Apply annotations and replace relations to the relations of the timeline only
-            this.room.relations.setRelationsTarget(event);
-            this.room.relations.aggregate(event, this.timelineSet);
-            return;
-        }
-
         // Add all incoming events to the thread's timeline set when there's  no server support
         if (!Thread.hasServerSideSupport) {
             // all the relevant membership info to hydrate events with a sender
@@ -290,6 +284,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     // XXX: Workaround for https://github.com/matrix-org/matrix-spec-proposals/pull/2676/files#r827240084
     private async fetchEditsWhereNeeded(...events: MatrixEvent[]): Promise<unknown> {
         return Promise.all(events.filter(e => e.isEncrypted()).map((event: MatrixEvent) => {
+            if (event.isRelation()) return; // skip - relations don't get edits
             return this.client.relations(this.roomId, event.getId(), RelationType.Replace, event.getType(), {
                 limit: 1,
             }).then(relations => {

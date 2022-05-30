@@ -92,7 +92,7 @@ export class RelationsContainer {
      * @param {MatrixEvent} event The new relation event to be aggregated.
      * @param {EventTimelineSet} timelineSet The event timeline set within which to search for the related event if any.
      */
-    public async aggregate(event: MatrixEvent, timelineSet?: EventTimelineSet): Promise<void> {
+    public aggregate(event: MatrixEvent, timelineSet?: EventTimelineSet): void {
         if (event.isRedacted() || event.status === EventStatus.CANCELLED) {
             return;
         }
@@ -100,7 +100,7 @@ export class RelationsContainer {
         const relation = event.getRelation();
         if (!relation) return;
 
-        const onEventDecrypted = (event: MatrixEvent) => {
+        const onEventDecrypted = () => {
             if (event.isDecryptionFailure()) {
                 // This could for example happen if the encryption keys are not yet available.
                 // The event may still be decrypted later. Register the listener again.
