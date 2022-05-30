@@ -118,6 +118,7 @@ describe("MatrixClient", function() {
                 method: method,
                 path: path,
             };
+            pendingLookup.promise.abort = () => {}; // to make it a valid IAbortablePromise
             return pendingLookup.promise;
         }
         if (next.path === path && next.method === method) {
@@ -209,6 +210,7 @@ describe("MatrixClient", function() {
         client.http.authedRequest.mockImplementation(function() {
             return new Promise(() => {});
         });
+        client.stopClient();
     });
 
     it("should create (unstable) file trees", async () => {
@@ -729,18 +731,16 @@ describe("MatrixClient", function() {
     });
 
     describe("guest rooms", function() {
-        it("should only do /sync calls (without filter/pushrules)", function(done) {
-            httpLookups = []; // no /pushrules or /filterw
+        it("should only do /sync calls (without filter/pushrules)", async function() {
+            httpLookups = []; // no /pushrules or /filter
             httpLookups.push({
                 method: "GET",
                 path: "/sync",
                 data: SYNC_DATA,
-                thenCall: function() {
-                    done();
-                },
             });
             client.setGuest(true);
-            client.startClient();
+            await client.startClient();
+            expect(httpLookups.length).toBe(0);
         });
 
         xit("should be able to peek into a room using peekInRoom", function(done) {
@@ -930,6 +930,7 @@ describe("MatrixClient", function() {
             };
             client.crypto = { // mock crypto
                 encryptEvent: (event, room) => new Promise(() => {}),
+                stop: jest.fn(),
             };
         });
 

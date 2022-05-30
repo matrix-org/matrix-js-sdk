@@ -377,6 +377,9 @@ describe("SAS verification", function() {
             .not.toHaveBeenCalled();
         expect(bob.client.setDeviceVerified)
             .not.toHaveBeenCalled();
+
+        alice.stop();
+        bob.stop();
     });
 
     describe("verification in DM", function() {
