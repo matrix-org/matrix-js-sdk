@@ -517,13 +517,6 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
     /**
      * @experimental
      */
-    public get isThreadRelation(): boolean {
-        return !!this.threadRootId && this.threadId !== this.getId();
-    }
-
-    /**
-     * @experimental
-     */
     public get isThreadRoot(): boolean {
         const threadDetails = this
             .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);

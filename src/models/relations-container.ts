@@ -137,7 +137,7 @@ export class RelationsContainer {
                 eventType,
                 this.client,
             );
-            const relatesToEvent = timelineSet.findEventById(relatesToEventId)
+            const relatesToEvent = timelineSet?.findEventById(relatesToEventId)
                 ?? timelineSet.room?.findEventById(relatesToEventId)
                 ?? timelineSet.room?.getPendingEvent(relatesToEventId);
             if (relatesToEvent) {

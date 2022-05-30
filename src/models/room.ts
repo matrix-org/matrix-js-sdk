@@ -1575,7 +1575,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
 
         // A thread relation is always only shown in a thread
-        if (event.isThreadRelation) {
+        if (event.isRelation(THREAD_RELATION_TYPE.name)) {
             return {
                 shouldLiveInRoom: false,
                 shouldLiveInThread: true,
@@ -2192,7 +2192,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     private findThreadRoots(events: MatrixEvent[]): Set<string> {
         const threadRoots = new Set<string>();
         for (const event of events) {
-            if (event.isThreadRelation) {
+            if (event.isRelation(THREAD_RELATION_TYPE.name)) {
                 threadRoots.add(event.relationEventId);
             }
         }
