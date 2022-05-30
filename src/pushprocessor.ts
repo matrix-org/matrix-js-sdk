@@ -84,9 +84,7 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
                 pattern: EventType.RoomServerAcl,
             },
         ],
-        actions: [
-            PushRuleActionName.DontNotify,
-        ],
+        actions: [],
     },
 ];
 

@@ -329,6 +329,7 @@ describe("MegolmBackup", function() {
                         );
                     }).then(() => {
                         expect(numCalls).toBe(1);
+                        client.stopClient();
                     });
                 });
         });
@@ -411,6 +412,7 @@ describe("MegolmBackup", function() {
                         );
                     }).then(() => {
                         expect(numCalls).toBe(1);
+                        client.stopClient();
                     });
                 });
         });
@@ -487,6 +489,7 @@ describe("MegolmBackup", function() {
                 }),
             ]);
             expect(numCalls).toBe(2);
+            client.stopClient();
         });
 
         it('retries when a backup fails', function() {
@@ -593,6 +596,7 @@ describe("MegolmBackup", function() {
                         );
                     }).then(() => {
                         expect(numCalls).toBe(2);
+                        client.stopClient();
                     });
                 });
         });

@@ -1,3 +1,4 @@
+# Must only be called from a workflow_run in the context of the upstream repo
 name: SonarCloud
 on:
   workflow_call:
@@ -35,13 +36,6 @@ on:
         type: string
         required: false
         description: The base branch of the PR if this workflow is being triggered due to one
-
-      # Org specific parameters
-      main_branch:
-        type: string
-        required: false
-        description: The default branch of the repository
-        default: "develop"
     secrets:
       SONAR_TOKEN:
         required: true
@@ -57,13 +51,20 @@ jobs:
           ref: ${{ inputs.head_branch }} # checkout commit that triggered this workflow
           fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
 
-      # Fetch develop so that Sonar can identify new issues in PR builds
-      - name: "📕 Fetch ${{ inputs.main_branch }}"
-        if: inputs.head_branch != inputs.main_branch
-        run: git rev-parse HEAD && git fetch origin ${{ inputs.main_branch }}:${{ inputs.main_branch }} && git status && git rev-parse HEAD
+      # Fetch base branch from the upstream repo so that Sonar can identify new code in PR builds
+      - name: "📕 Fetch upstream base branch"
+        # workflow_call retains the github context of the caller, so `repository` will be upstream always due
+        # to it running on `workflow_run` which is called from the context of the target repo and not the fork.
+        if: inputs.base_branch
+        run: |
+          git remote add upstream https://github.com/${{ github.repository }}
+          git rev-parse HEAD
+          git fetch upstream ${{ inputs.base_branch }}:${{ inputs.base_branch }}
+          git status
+          git rev-parse HEAD
 
       # There's a 'download artifact' action, but it hasn't been updated for the workflow_run action
-      # (https://github.com/actions/download-artifact/issues/60) so instead we get this mess:
+      # (https://github.com/actions/download-artifact/issues/60) so instead we get this alternative:
       - name: "📥 Download Coverage Report"
         uses: dawidd6/action-download-artifact@v2
         if: inputs.coverage_workflow_name

@@ -136,6 +136,7 @@ describe("Secrets", function() {
         expect(await secretStorage.get("foo")).toBe("bar");
 
         expect(getKey).toHaveBeenCalled();
+        alice.stopClient();
     });
 
     it("should throw if given a key that doesn't exist", async function() {
@@ -150,6 +151,7 @@ describe("Secrets", function() {
             expect(true).toBeFalsy();
         } catch (e) {
         }
+        alice.stopClient();
     });
 
     it("should refuse to encrypt with zero keys", async function() {
@@ -162,6 +164,7 @@ describe("Secrets", function() {
             expect(true).toBeFalsy();
         } catch (e) {
         }
+        alice.stopClient();
     });
 
     it("should encrypt with default key if keys is null", async function() {
@@ -203,6 +206,7 @@ describe("Secrets", function() {
 
         const accountData = alice.getAccountData('foo');
         expect(accountData.getContent().encrypted).toBeTruthy();
+        alice.stopClient();
     });
 
     it("should refuse to encrypt if no keys given and no default key", async function() {
@@ -215,6 +219,7 @@ describe("Secrets", function() {
             expect(true).toBeFalsy();
         } catch (e) {
         }
+        alice.stopClient();
     });
 
     it("should request secrets from other clients", async function() {
@@ -273,6 +278,8 @@ describe("Secrets", function() {
         const secret = await request.promise;
 
         expect(secret).toBe("bar");
+        osborne2.stop();
+        vax.stop();
     });
 
     describe("bootstrap", function() {
@@ -340,6 +347,7 @@ describe("Secrets", function() {
             expect(await crossSigning.isStoredInSecretStorage(secretStorage))
                 .toBeTruthy();
             expect(await secretStorage.hasKey()).toBeTruthy();
+            bob.stopClient();
         });
 
         it("bootstraps when cross-signing keys in secret storage", async function() {
@@ -406,6 +414,7 @@ describe("Secrets", function() {
             expect(await crossSigning.isStoredInSecretStorage(secretStorage))
                 .toBeTruthy();
             expect(await secretStorage.hasKey()).toBeTruthy();
+            bob.stopClient();
         });
 
         it("adds passphrase checking if it's lacking", async function() {
@@ -538,6 +547,7 @@ describe("Secrets", function() {
             expect(keyInfo).toHaveProperty("mac");
             expect(alice.checkSecretStorageKey(secretStorageKeys.key_id, keyInfo))
                 .toBeTruthy();
+            alice.stopClient();
         });
         it("fixes backup keys in the wrong format", async function() {
             let crossSigningKeys = {
@@ -668,6 +678,7 @@ describe("Secrets", function() {
             expect(backupKey.encrypted).toHaveProperty("key_id");
             expect(await alice.getSecret("m.megolm_backup.v1"))
                 .toEqual("ey0GB1kB6jhOWgwiBUMIWg==");
+            alice.stopClient();
         });
     });
 });

@@ -3,7 +3,7 @@ on:
   pull_request_target:
     types: [ opened, edited, labeled, unlabeled, synchronize ]
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref }}
   cancel-in-progress: true
 jobs:
   changelog:
@@ -21,7 +21,7 @@ jobs:
     permissions:
       pull-requests: read
     steps:
-      - uses: yogevbd/enforce-label-action@2.1.0
+      - uses: yogevbd/enforce-label-action@2.2.2
         with:
           REQUIRED_LABELS_ANY: "T-Defect,T-Deprecation,T-Enhancement,T-Task"
           BANNED_LABELS: "X-Blocked"

@@ -1,3 +1,21 @@
+Changes in [18.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v18.0.0) (2022-05-24)
+==================================================================================================
+
+## 🚨 BREAKING CHANGES (to experimental methods)
+ * Implement changes to MSC2285 (private read receipts) ([\#2221](https://github.com/matrix-org/matrix-js-sdk/pull/2221)).
+
+## ✨ Features
+ * Add support for HTML renderings of room topics ([\#2272](https://github.com/matrix-org/matrix-js-sdk/pull/2272)).
+ * Add stopClient parameter to MatrixClient::logout ([\#2367](https://github.com/matrix-org/matrix-js-sdk/pull/2367)).
+ * registration: add function to re-request email token ([\#2357](https://github.com/matrix-org/matrix-js-sdk/pull/2357)).
+ * Remove hacky custom status feature ([\#2350](https://github.com/matrix-org/matrix-js-sdk/pull/2350)).
+
+## 🐛 Bug Fixes
+ * Remove default push rule override for MSC1930 ([\#2376](https://github.com/matrix-org/matrix-js-sdk/pull/2376)). Fixes vector-im/element-web#15439.
+ * Tweak thread creation & event adding to fix bugs around relations ([\#2369](https://github.com/matrix-org/matrix-js-sdk/pull/2369)). Fixes vector-im/element-web#22162 and vector-im/element-web#22180.
+ * Prune both clear & wire content on redaction ([\#2346](https://github.com/matrix-org/matrix-js-sdk/pull/2346)). Fixes vector-im/element-web#21929.
+ * MSC3786: Add a default push rule to ignore `m.room.server_acl` events ([\#2333](https://github.com/matrix-org/matrix-js-sdk/pull/2333)). Fixes vector-im/element-web#20788.
+
 Changes in [17.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v17.2.0) (2022-05-10)
 ==================================================================================================
 

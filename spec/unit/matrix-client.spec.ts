@@ -118,6 +118,7 @@ describe("MatrixClient", function() {
                 method: method,
                 path: path,
             };
+            pendingLookup.promise.abort = () => {}; // to make it a valid IAbortablePromise
             return pendingLookup.promise;
         }
         if (next.path === path && next.method === method) {
@@ -150,6 +151,10 @@ describe("MatrixClient", function() {
             }
             return Promise.resolve(next.data);
         }
+        // Jest doesn't let us have custom expectation errors, so if you're seeing this then
+        // you forgot to handle at least 1 pending request. Check your tests to ensure your
+        // number of expectations lines up with your number of requests made, and that those
+        // requests match your expectations.
         expect(true).toBe(false);
         return new Promise(() => {});
     }
@@ -205,6 +210,7 @@ describe("MatrixClient", function() {
         client.http.authedRequest.mockImplementation(function() {
             return new Promise(() => {});
         });
+        client.stopClient();
     });
 
     it("should create (unstable) file trees", async () => {
@@ -725,18 +731,16 @@ describe("MatrixClient", function() {
     });
 
     describe("guest rooms", function() {
-        it("should only do /sync calls (without filter/pushrules)", function(done) {
-            httpLookups = []; // no /pushrules or /filterw
+        it("should only do /sync calls (without filter/pushrules)", async function() {
+            httpLookups = []; // no /pushrules or /filter
             httpLookups.push({
                 method: "GET",
                 path: "/sync",
                 data: SYNC_DATA,
-                thenCall: function() {
-                    done();
-                },
             });
             client.setGuest(true);
-            client.startClient();
+            await client.startClient();
+            expect(httpLookups.length).toBe(0);
         });
 
         xit("should be able to peek into a room using peekInRoom", function(done) {
@@ -926,6 +930,7 @@ describe("MatrixClient", function() {
             };
             client.crypto = { // mock crypto
                 encryptEvent: (event, room) => new Promise(() => {}),
+                stop: jest.fn(),
             };
         });
 
@@ -1189,6 +1194,28 @@ describe("MatrixClient", function() {
         it("overload logoutDevices=false + callback", async () => {
             await client.setPassword(auth, newPassword, false, callback);
             passwordTest({ auth, new_password: newPassword, logout_devices: false }, callback);
+        });
+    });
+
+    describe("getLocalAliases", () => {
+        it("should call the right endpoint", async () => {
+            const response = {
+                aliases: ["#woop:example.org", "#another:example.org"],
+            };
+            client.http.authedRequest.mockClear().mockResolvedValue(response);
+
+            const roomId = "!whatever:example.org";
+            const result = await client.getLocalAliases(roomId);
+
+            // Current version of the endpoint we support is v3
+            const [callback, method, path, queryParams, data, opts] = client.http.authedRequest.mock.calls[0];
+            expect(callback).toBeFalsy();
+            expect(data).toBeFalsy();
+            expect(method).toBe('GET');
+            expect(path).toEqual(`/rooms/${encodeURIComponent(roomId)}/aliases`);
+            expect(opts).toMatchObject({ prefix: "/_matrix/client/v3" });
+            expect(queryParams).toBeFalsy();
+            expect(result!.aliases).toEqual(response.aliases);
         });
     });
 });
