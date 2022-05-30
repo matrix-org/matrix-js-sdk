@@ -129,7 +129,8 @@ describe("Relations", function() {
         const room = new Room("room123", null, null);
         const timelineSet1 = new EventTimelineSet(room);
         const timelineSet2 = new EventTimelineSet(room);
-        expect(timelineSet1.relations).toBe(timelineSet2.relations);
+        expect(room.relations).toBe(timelineSet1.relations);
+        expect(room.relations).toBe(timelineSet2.relations);
     });
 
     it("should ignore m.replace for state events", async () => {
