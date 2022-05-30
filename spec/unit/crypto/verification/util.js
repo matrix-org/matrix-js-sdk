@@ -107,9 +107,8 @@ export async function makeTestClients(userInfos, options) {
     await Promise.all(clients.map((testClient) => testClient.client.initCrypto()));
 
     const destroy = () => {
-        console.log('HHHHHHHHHHH', timeouts);
         timeouts.forEach((t) => clearTimeout(t));
-    }
+    };
 
     return [clients, destroy];
 }
