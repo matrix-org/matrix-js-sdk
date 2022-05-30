@@ -60,7 +60,7 @@ export class RelationsContainer {
     }
 
     public getAllRelationsEventForEvent(eventId: string): MatrixEvent[] {
-        const relationsForEvent = this.relations?.[eventId] ?? {};
+        const relationsForEvent = this.relations[eventId] ?? {};
         const events: MatrixEvent[] = [];
         for (const relationsRecord of Object.values(relationsForEvent)) {
             for (const relations of Object.values(relationsRecord)) {
@@ -92,10 +92,13 @@ export class RelationsContainer {
      * @param {MatrixEvent} event The new relation event to be aggregated.
      * @param {EventTimelineSet} timelineSet The event timeline set within which to search for the related event if any.
      */
-    public async aggregateRelations(event: MatrixEvent, timelineSet?: EventTimelineSet): Promise<void> {
+    public async aggregate(event: MatrixEvent, timelineSet?: EventTimelineSet): Promise<void> {
         if (event.isRedacted() || event.status === EventStatus.CANCELLED) {
             return;
         }
+
+        const relation = event.getRelation();
+        if (!relation) return;
 
         const onEventDecrypted = (event: MatrixEvent) => {
             if (event.isDecryptionFailure()) {
@@ -105,7 +108,7 @@ export class RelationsContainer {
                 return;
             }
 
-            this.aggregateRelations(event, timelineSet);
+            this.aggregate(event, timelineSet);
         };
 
         // If the event is currently encrypted, wait until it has been decrypted.
@@ -114,11 +117,7 @@ export class RelationsContainer {
             return;
         }
 
-        const relation = event.getRelation();
-        if (!relation) return;
-
-        const relatesToEventId = relation.event_id;
-        const relationType = relation.rel_type;
+        const { event_id: relatesToEventId, rel_type: relationType } = relation;
         const eventType = event.getType();
 
         let relationsForEvent = this.relations[relatesToEventId];
@@ -142,10 +141,10 @@ export class RelationsContainer {
                 ?? timelineSet.room?.findEventById(relatesToEventId)
                 ?? timelineSet.room?.getPendingEvent(relatesToEventId);
             if (relatesToEvent) {
-                await relationsWithEventType.setTargetEvent(relatesToEvent);
+                relationsWithEventType.setTargetEvent(relatesToEvent);
             }
         }
 
-        await relationsWithEventType.addEvent(event);
+        relationsWithEventType.addEvent(event);
     }
 }

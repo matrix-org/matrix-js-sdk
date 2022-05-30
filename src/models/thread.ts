@@ -88,7 +88,6 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         this.room = opts.room;
         this.client = opts.client;
         this.timelineSet = new EventTimelineSet(this.room, {
-            unstableClientRelationAggregation: true,
             timelineSupport: true,
             pendingEvents: true,
         });
@@ -229,8 +228,8 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
 
         if ([RelationType.Annotation, RelationType.Replace].includes(event.getRelation()?.rel_type as RelationType)) {
             // Apply annotations and replace relations to the relations of the timeline only
-            this.room.relations?.setRelationsTarget(event);
-            this.room.relations?.aggregateRelations(event, this.timelineSet);
+            this.room.relations.setRelationsTarget(event);
+            this.room.relations.aggregate(event, this.timelineSet);
             return;
         }
 

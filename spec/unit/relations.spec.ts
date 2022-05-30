@@ -106,9 +106,7 @@ describe("Relations", function() {
                 targetEvent.once(MatrixEventEvent.RelationsCreated, resolve);
             });
 
-            const timelineSet = new EventTimelineSet(room, {
-                unstableClientRelationAggregation: true,
-            });
+            const timelineSet = new EventTimelineSet(room);
             timelineSet.addLiveEvent(targetEvent);
             timelineSet.addLiveEvent(relationEvent);
 
@@ -121,9 +119,7 @@ describe("Relations", function() {
                 targetEvent.once(MatrixEventEvent.RelationsCreated, resolve);
             });
 
-            const timelineSet = new EventTimelineSet(room, {
-                unstableClientRelationAggregation: true,
-            });
+            const timelineSet = new EventTimelineSet(room);
             timelineSet.addLiveEvent(relationEvent);
             timelineSet.addLiveEvent(targetEvent);
 

@@ -21,10 +21,8 @@ limitations under the License.
 import { EventTimeline } from "./event-timeline";
 import { MatrixEvent } from "./event";
 import { logger } from '../logger';
-import { Relations } from './relations';
 import { Room, RoomEvent } from "./room";
 import { Filter } from "../filter";
-import { EventType, RelationType } from "../@types/event";
 import { RoomState } from "./room-state";
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { RelationsContainer } from "./relations-container";
@@ -43,7 +41,6 @@ if (DEBUG) {
 interface IOpts {
     timelineSupport?: boolean;
     filter?: Filter;
-    unstableClientRelationAggregation?: boolean;
     pendingEvents?: boolean;
 }
 
@@ -105,16 +102,12 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * Set to true to enable improved timeline support.
      * @param {Object} [opts.filter = null]
      * The filter object, if any, for this timelineSet.
-     * @param {boolean} [opts.unstableClientRelationAggregation = false]
-     * Optional. Set to true to enable client-side aggregation of event relations
-     * via `getRelationsForEvent`. This requires a room or client to be passed.
-     * This feature is currently unstable and the API may change without notice.
      * @param {MatrixClient} client the Matrix client which owns this EventTimelineSet,
      * can be omitted if room is specified.
      */
     constructor(
         public readonly room: Room | undefined,
-        opts: IOpts,
+        opts: IOpts = {},
         client?: MatrixClient,
     ) {
         super();
@@ -129,9 +122,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
         this.filter = opts.filter;
 
-        if (opts.unstableClientRelationAggregation) {
-            this.relations = this.room?.relations ?? new RelationsContainer(room?.client ?? client);
-        }
+        this.relations = this.room?.relations ?? new RelationsContainer(room?.client ?? client);
     }
 
     /**
@@ -546,8 +537,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         const timeline = this._eventIdToTimeline[event.getId()];
         if (timeline) {
             if (duplicateStrategy === DuplicateStrategy.Replace) {
-                debuglog("EventTimelineSet.addLiveEvent: replacing duplicate event " +
-                    event.getId());
+                debuglog("EventTimelineSet.addLiveEvent: replacing duplicate event " + event.getId());
                 const tlEvents = timeline.getEvents();
                 for (let j = 0; j < tlEvents.length; j++) {
                     if (tlEvents[j].getId() === event.getId()) {
@@ -567,8 +557,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
                     }
                 }
             } else {
-                debuglog("EventTimelineSet.addLiveEvent: ignoring duplicate event " +
-                    event.getId());
+                debuglog("EventTimelineSet.addLiveEvent: ignoring duplicate event " + event.getId());
             }
             return;
         }
@@ -600,10 +589,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         timeline.addEvent(event, toStartOfTimeline, roomState);
         this._eventIdToTimeline[eventId] = timeline;
 
-        if (this.relations) {
-            this.relations.setRelationsTarget(event);
-            this.relations.aggregateRelations(event, this);
-        }
+        this.relations.setRelationsTarget(event);
+        this.relations.aggregate(event, this);
 
         const data: IRoomTimelineData = {
             timeline: timeline,
@@ -740,65 +727,6 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
         // the timelines are not contiguous.
         return null;
-    }
-
-    /**
-     * Get a collection of relations to a given event in this timeline set.
-     *
-     * @param {String} eventId
-     * The ID of the event that you'd like to access relation events for.
-     * For example, with annotations, this would be the ID of the event being annotated.
-     * @param {String} relationType
-     * The type of relation involved, such as "m.annotation", "m.reference", "m.replace", etc.
-     * @param {String} eventType
-     * The relation event's type, such as "m.reaction", etc.
-     * @throws If <code>eventId</code>, <code>relationType</code> or <code>eventType</code>
-     * are not valid.
-     *
-     * @returns {?Relations}
-     * A container for relation events or undefined if there are no relation events for
-     * the relationType.
-     * @deprecated use `.relations.getRelationsForEvent` instead.
-     */
-    public getRelationsForEvent(
-        eventId: string,
-        relationType: RelationType | string,
-        eventType: EventType | string,
-    ): Relations | undefined {
-        if (!this.relations) {
-            throw new Error("Client-side relation aggregation is disabled");
-        }
-
-        return this.relations?.getRelationsForEvent(eventId, relationType, eventType);
-    }
-
-    /**
-     * @deprecated use `.relations.getAllRelationsEventForEvent` instead.
-     */
-    public getAllRelationsEventForEvent(eventId: string): MatrixEvent[] | undefined {
-        return this.relations?.getAllRelationsEventForEvent(eventId);
-    }
-
-    /**
-     * Set an event as the target event if any Relations exist for it already
-     *
-     * @param {MatrixEvent} event
-     * The event to check as relation target.
-     * @deprecated use `.relations.setRelationsTarget` instead.
-     */
-    public setRelationsTarget(event: MatrixEvent): void {
-        this.relations?.setRelationsTarget(event);
-    }
-
-    /**
-     * Add relation events to the relevant relation collection.
-     *
-     * @param {MatrixEvent} event
-     * The new relation event to be aggregated.
-     * @deprecated use `.relations.aggregateRelations` instead.
-     */
-    public aggregateRelations(event: MatrixEvent): void {
-        this.relations?.aggregateRelations(event, this);
     }
 }
 

@@ -39,8 +39,8 @@ describe('EventTimelineSet', () => {
 
     const itShouldReturnTheRelatedEvents = () => {
         it('should return the related events', () => {
-            eventTimelineSet.aggregateRelations(messageEvent);
-            const relations = eventTimelineSet.getRelationsForEvent(
+            eventTimelineSet.relations.aggregate(messageEvent);
+            const relations = eventTimelineSet.relations.getRelationsForEvent(
                 messageEvent.getId(),
                 "m.in_reply_to",
                 EventType.RoomMessage,
@@ -54,9 +54,7 @@ describe('EventTimelineSet', () => {
     beforeEach(() => {
         client = utils.mock(MatrixClient, 'MatrixClient');
         room = new Room(roomId, client, userA);
-        eventTimelineSet = new EventTimelineSet(room, {
-            unstableClientRelationAggregation: true,
-        });
+        eventTimelineSet = new EventTimelineSet(room);
         eventTimeline = new EventTimeline(eventTimelineSet);
         messageEvent = utils.mkMessage({
             room: roomId,
@@ -118,8 +116,8 @@ describe('EventTimelineSet', () => {
             });
 
             it('should not return the related events', () => {
-                eventTimelineSet.aggregateRelations(messageEvent);
-                const relations = eventTimelineSet.getRelationsForEvent(
+                eventTimelineSet.relations.aggregate(messageEvent);
+                const relations = eventTimelineSet.relations.getRelationsForEvent(
                     messageEvent.getId(),
                     "m.in_reply_to",
                     EventType.RoomMessage,

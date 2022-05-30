@@ -81,7 +81,6 @@ interface IOpts {
     storageToken?: string;
     pendingEventOrdering?: PendingEventOrdering;
     timelineSupport?: boolean;
-    unstableClientRelationAggregation?: boolean;
     lazyLoadMembers?: boolean;
 }
 
@@ -324,10 +323,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * "chronological".
      * @param {boolean} [opts.timelineSupport = false] Set to true to enable improved
      * timeline support.
-     * @param {boolean} [opts.unstableClientRelationAggregation = false]
-     * Optional. Set to true to enable client-side aggregation of event relations
-     * via `EventTimelineSet#getRelationsForEvent`.
-     * This feature is currently unstable and the API may change without notice.
      */
     constructor(
         public readonly roomId: string,
@@ -378,9 +373,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             this.membersPromise = null;
         }
 
-        if (this.opts.unstableClientRelationAggregation) {
-            this.relations = new RelationsContainer(this.client);
-        }
+        this.relations = new RelationsContainer(this.client);
     }
 
     private threadTimelineSetsPromise: Promise<[EventTimelineSet, EventTimelineSet]> | null = null;
@@ -1663,7 +1656,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         toStartOfTimeline: boolean,
     ): Thread {
         if (rootEvent) {
-            const relatedEvents = this.relations?.getAllRelationsEventForEvent(rootEvent.getId());
+            const relatedEvents = this.relations.getAllRelationsEventForEvent(rootEvent.getId());
             if (relatedEvents?.length) {
                 // Include all relations of the root event, given it'll be visible in both timelines,
                 // except `m.replace` as that will already be applied atop the event using `MatrixEvent::makeReplaced`
@@ -1939,7 +1932,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @param {module:models/event.MatrixEvent} event the relation event that needs to be aggregated.
      */
     private aggregateNonLiveRelation(event: MatrixEvent): void {
-        this.relations?.aggregateRelations(event);
+        this.relations.aggregate(event);
     }
 
     public getEventForTxnId(txnId: string): MatrixEvent {
