@@ -223,7 +223,7 @@ describe("Secrets", function() {
     });
 
     it("should request secrets from other clients", async function() {
-        const [osborne2, vax] = await makeTestClients(
+        const [[osborne2, vax], clearTestClientTimeouts] = await makeTestClients(
             [
                 { userId: "@alice:example.com", deviceId: "Osborne2" },
                 { userId: "@alice:example.com", deviceId: "VAX" },
@@ -280,6 +280,7 @@ describe("Secrets", function() {
         expect(secret).toBe("bar");
         osborne2.stop();
         vax.stop();
+        clearTestClientTimeouts();
     });
 
     describe("bootstrap", function() {
