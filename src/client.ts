@@ -1326,6 +1326,8 @@ export class MatrixClient extends EventEmitter {
         intent: GroupCallIntent,
         dataChannelsEnabled?: boolean,
         dataChannelOptions?: IGroupCallDataChannelOptions,
+        localSfu?: string,
+        localSfuDeviceId?: string,
     ): Promise<GroupCall> {
         if (this.getGroupCallForRoom(roomId)) {
             throw new Error(`${roomId} already has an existing group call`);
@@ -1346,6 +1348,8 @@ export class MatrixClient extends EventEmitter {
             undefined,
             dataChannelsEnabled,
             dataChannelOptions,
+            localSfu,
+            localSfuDeviceId,
         ).create();
     }
 

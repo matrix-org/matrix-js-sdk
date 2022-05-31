@@ -328,7 +328,7 @@ export class MatrixCall extends EventEmitter {
     private opponentDeviceId: string;
     private opponentSessionId: string;
     public groupCallId: string;
-    private dataChannel: DataChannel;
+    public dataChannel: RTCDataChannel;
 
     constructor(opts: CallOpts) {
         super();

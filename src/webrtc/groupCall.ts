@@ -72,25 +72,34 @@ export interface IGroupCallDataChannelOptions {
     protocol: string;
 }
 
-export interface IGroupCallRoomMemberFeed {
+export interface IGroupCallMemberTrack {
+    id: string;
+    kind: string; // TODO: use an enum
+    label: string;
+    settings: MediaTrackSettings;
+}
+
+export interface IGroupCallMemberFeed {
+    id: string;
     purpose: SDPStreamMetadataPurpose;
+    tracks: IGroupCallMemberTrack[];
     // TODO: Sources for adaptive bitrate
 }
 
-export interface IGroupCallRoomMemberDevice {
+export interface IGroupCallMemberDevice {
     "device_id": string;
     "session_id": string;
-    "feeds": IGroupCallRoomMemberFeed[];
+    "feeds": IGroupCallMemberFeed[];
 }
 
-export interface IGroupCallRoomMemberCallState {
+export interface IGroupCallMemberCallState {
     "m.call_id": string;
     "m.foci"?: string[];
-    "m.devices": IGroupCallRoomMemberDevice[];
+    "m.devices": IGroupCallMemberDevice[];
 }
 
-export interface IGroupCallRoomMemberState {
-    "m.calls": IGroupCallRoomMemberCallState[];
+export interface IGroupCallMemberState {
+    "m.calls": IGroupCallMemberCallState[];
 }
 
 export enum GroupCallState {
@@ -144,11 +153,11 @@ export class GroupCall extends EventEmitter {
         public type: GroupCallType,
         public isPtt: boolean,
         public intent: GroupCallIntent,
-        public localSfu?: string,
-        public localSfuDeviceId?: string,
         groupCallId?: string,
         private dataChannelsEnabled?: boolean,
         private dataChannelOptions?: IGroupCallDataChannelOptions,
+        private localSfu?: string,
+        private localSfuDeviceId?: string,
     ) {
         super();
         this.reEmitter = new ReEmitter(this);
@@ -607,7 +616,9 @@ export class GroupCall extends EventEmitter {
                         "id": feed.stream.id,
                         "tracks": feed.stream.getTracks().map((track) => ({
                             "id": track.id,
-                            "settings": track.settings,
+                            "kind": track.kind,
+                            "label": track.label,
+                            "settings": track.getSettings(),
                         })),
                     })),
                     // TODO: Add data channels
@@ -621,13 +632,13 @@ export class GroupCall extends EventEmitter {
         return this.updateMemberCallState(undefined);
     }
 
-    private async updateMemberCallState(memberCallState?: IGroupCallRoomMemberCallState): Promise<ISendEventResponse> {
+    private async updateMemberCallState(memberCallState?: IGroupCallMemberCallState): Promise<ISendEventResponse> {
         const localUserId = this.client.getUserId();
 
         const currentStateEvent = this.room.currentState.getStateEvents(EventType.GroupCallMemberPrefix, localUserId);
-        const memberStateEvent = currentStateEvent?.getContent<IGroupCallRoomMemberState>();
+        const memberStateEvent = currentStateEvent?.getContent<IGroupCallMemberState>();
 
-        let calls: IGroupCallRoomMemberCallState[] = [];
+        let calls: IGroupCallMemberCallState[] = [];
 
         // Sanitize existing member state event
         if (memberStateEvent && Array.isArray(memberStateEvent["m.calls"])) {
@@ -665,7 +676,7 @@ export class GroupCall extends EventEmitter {
             return;
         }
 
-        let callsState = event.getContent<IGroupCallRoomMemberState>()["m.calls"];
+        let callsState = event.getContent<IGroupCallMemberState>()["m.calls"];
 
         if (Array.isArray(callsState)) {
             callsState = callsState.filter((call) => !!call);
@@ -707,7 +718,7 @@ export class GroupCall extends EventEmitter {
             return;
         }
 
-        let opponentDevice: IGroupCallRoomMemberDevice;
+        let opponentDevice: IGroupCallMemberDevice;
         let peerUserId: string;
         let existingCall: MatrixCall;
 
@@ -748,15 +759,16 @@ export class GroupCall extends EventEmitter {
         else {
             peerUserId = this.localSfu;
             opponentDevice = {
-                "device_id": this.localSfuDeviceId;
-                "session_id": ""; // we can use a blank session_id, as the SFU is stateless
-                "feeds": [];
+                "device_id": this.localSfuDeviceId,
+                "session_id": "", // we can use a blank session_id, as the SFU is stateless
+                "feeds": [],
             }
             existingCall = this.getCallByUserId(peerUserId);
         }
 
+        let newCall: MatrixCall;
         if (!this.localSfu || !existingCall) {
-            const newCall = createNewMatrixCall(
+            newCall = createNewMatrixCall(
                 this.client,
                 this.room.roomId,
                 {
@@ -786,14 +798,14 @@ export class GroupCall extends EventEmitter {
 
         if (this.localSfu) {
             // TODO: only subscribe to the streams you care about
-            remoteDevice = this.getDeviceForMember(member.userId);
+            const remoteDevice = this.getDeviceForMember(member.userId);
             // subscribe if we have a call established to the SFU
             // if not, we'll trigger a subscription when the call sets up.
             this.subscribeStream(existingCall || newCall, member.userId, remoteDevice);
         }
     };
 
-    private subscribeStream(call: MatrixCall, userId: string, device: IGroupCallRoomMemberDevice, streamId?: string) {
+    private subscribeStream(call: MatrixCall, userId: string, device: IGroupCallMemberDevice, streamId?: string) {
         // Asks the SFU to subscribe to the given streams originating from a given device.
         // if streamId is undefined, subscribe to all of them.
 
@@ -821,14 +833,14 @@ export class GroupCall extends EventEmitter {
         }));
     }
 
-    public getDeviceForMember(userId: string): IGroupCallRoomMemberDevice {
+    public getDeviceForMember(userId: string): IGroupCallMemberDevice {
         const memberStateEvent = this.room.currentState.getStateEvents(EventType.GroupCallMemberPrefix, userId);
 
         if (!memberStateEvent) {
             return undefined;
         }
 
-        const memberState = memberStateEvent.getContent<IGroupCallRoomMemberState>();
+        const memberState = memberStateEvent.getContent<IGroupCallMemberState>();
         const memberGroupCallState = memberState["m.calls"]?.find(
             (call) => call && call["m.call_id"] === this.groupCallId);
 
