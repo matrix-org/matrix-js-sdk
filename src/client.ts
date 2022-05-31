@@ -533,6 +533,7 @@ export interface IClientWellKnown {
     [key: string]: any;
     "m.homeserver"?: IWellKnownConfig;
     "m.identity_server"?: IWellKnownConfig;
+    "m.authentication"?: IDelegatedAuthConfig;
 }
 
 export interface IWellKnownConfig {
@@ -542,6 +543,13 @@ export interface IWellKnownConfig {
     error?: Error | string;
     // eslint-disable-next-line
     base_url?: string | null;
+}
+
+export interface IDelegatedAuthConfig {
+    /** The OIDC Provider/issuer the client should use */
+    issuer: string;
+    /** The optional URL of the web UI where the user can manage their account */
+    account?: string;
 }
 
 interface IKeyBackupPath {
