@@ -144,6 +144,8 @@ export class GroupCall extends EventEmitter {
         public type: GroupCallType,
         public isPtt: boolean,
         public intent: GroupCallIntent,
+        public localSfu?: string,
+        public localSfuDeviceId?: string,
         groupCallId?: string,
         private dataChannelsEnabled?: boolean,
         private dataChannelOptions?: IGroupCallDataChannelOptions,
@@ -151,6 +153,11 @@ export class GroupCall extends EventEmitter {
         super();
         this.reEmitter = new ReEmitter(this);
         this.groupCallId = groupCallId || genCallID();
+
+        if (this.localSfu) {
+            // we have to use DCs to talk to the SFU
+            this.dataChannelsEnabled = true;
+        }
 
         const roomState = this.room.currentState;
         const memberStateEvents = roomState.getStateEvents(EventType.GroupCallMemberPrefix);
@@ -596,7 +603,12 @@ export class GroupCall extends EventEmitter {
                     "device_id": deviceId,
                     "session_id": this.client.getSessionId(),
                     "feeds": this.getLocalFeeds().map((feed) => ({
-                        purpose: feed.purpose,
+                        "purpose": feed.purpose,
+                        "id": feed.stream.id,
+                        "tracks": feed.stream.getTracks().map((track) => ({
+                            "id": track.id,
+                            "settings": track.settings,
+                        })),
                     })),
                     // TODO: Add data channels
                 },
@@ -695,63 +707,119 @@ export class GroupCall extends EventEmitter {
             return;
         }
 
-        // Only initiate a call with a user who has a userId that is lexicographically
-        // less than your own. Otherwise, that user will call you.
-        if (member.userId < localUserId) {
-            logger.log(`Waiting for ${member.userId} to send call invite.`);
-            return;
+        let opponentDevice: IGroupCallRoomMemberDevice;
+        let peerUserId: string;
+        let existingCall: MatrixCall;
+
+        if (!this.localSfu) {
+            // Only initiate a call with a user who has a userId that is lexicographically
+            // less than your own. Otherwise, that user will call you.
+            if (member.userId < localUserId) {
+                logger.log(`Waiting for ${member.userId} to send call invite.`);
+                return;
+            }
+
+            opponentDevice = this.getDeviceForMember(member.userId);
+
+            if (!opponentDevice) {
+                logger.warn(`No opponent device found for ${member.userId}, ignoring.`);
+                this.emit(
+                    GroupCallEvent.Error,
+                    new GroupCallError(
+                        GroupCallErrorCode.UnknownDevice,
+                        `Outgoing Call: No opponent device found for ${member.userId}, ignoring.`,
+                    ),
+                );
+                return;
+            }
+
+            peerUserId = member.userId;
+            existingCall = this.getCallByUserId(peerUserId);
+
+            // if we already have an existing call to the same session on the other side, then
+            // use it - it must have already called us first.
+            if (
+                existingCall &&
+                existingCall.getOpponentSessionId() === opponentDevice.session_id
+            ) {
+                return;
+            }
+        }
+        else {
+            peerUserId = this.localSfu;
+            opponentDevice = {
+                "device_id": this.localSfuDeviceId;
+                "session_id": ""; // we can use a blank session_id, as the SFU is stateless
+                "feeds": [];
+            }
+            existingCall = this.getCallByUserId(peerUserId);
         }
 
-        const opponentDevice = this.getDeviceForMember(member.userId);
-
-        if (!opponentDevice) {
-            logger.warn(`No opponent device found for ${member.userId}, ignoring.`);
-            this.emit(
-                GroupCallEvent.Error,
-                new GroupCallError(
-                    GroupCallErrorCode.UnknownDevice,
-                    `Outgoing Call: No opponent device found for ${member.userId}, ignoring.`,
-                ),
+        if (!this.localSfu || !existingCall) {
+            const newCall = createNewMatrixCall(
+                this.client,
+                this.room.roomId,
+                {
+                    invitee: peerUserId,
+                    opponentDeviceId: opponentDevice.device_id,
+                    opponentSessionId: opponentDevice.session_id,
+                    groupCallId: this.groupCallId,
+                },
             );
-            return;
+
+            const requestScreenshareFeed = opponentDevice.feeds.some(
+                (feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
+
+            // Safari can't send a MediaStream to multiple sources, so clone it
+            newCall.placeCallWithCallFeeds(this.getLocalFeeds().map(feed => feed.clone()), requestScreenshareFeed);
+
+            if (this.dataChannelsEnabled) {
+                newCall.createDataChannel("datachannel", this.dataChannelOptions);
+            }
+
+            if (existingCall) {
+                this.replaceCall(existingCall, newCall, CallErrorCode.NewSession);
+            } else {
+                this.addCall(newCall);
+            }
         }
 
-        const existingCall = this.getCallByUserId(member.userId);
-
-        if (
-            existingCall &&
-            existingCall.getOpponentSessionId() === opponentDevice.session_id
-        ) {
-            return;
-        }
-
-        const newCall = createNewMatrixCall(
-            this.client,
-            this.room.roomId,
-            {
-                invitee: member.userId,
-                opponentDeviceId: opponentDevice.device_id,
-                opponentSessionId: opponentDevice.session_id,
-                groupCallId: this.groupCallId,
-            },
-        );
-
-        const requestScreenshareFeed = opponentDevice.feeds.some(
-            (feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
-
-        // Safari can't send a MediaStream to multiple sources, so clone it
-        newCall.placeCallWithCallFeeds(this.getLocalFeeds().map(feed => feed.clone()), requestScreenshareFeed);
-
-        if (this.dataChannelsEnabled) {
-            newCall.createDataChannel("datachannel", this.dataChannelOptions);
-        }
-
-        if (existingCall) {
-            this.replaceCall(existingCall, newCall, CallErrorCode.NewSession);
-        } else {
-            this.addCall(newCall);
+        if (this.localSfu) {
+            // TODO: only subscribe to the streams you care about
+            remoteDevice = this.getDeviceForMember(member.userId);
+            // subscribe if we have a call established to the SFU
+            // if not, we'll trigger a subscription when the call sets up.
+            this.subscribeStream(existingCall || newCall, member.userId, remoteDevice);
         }
     };
+
+    private subscribeStream(call: MatrixCall, userId: string, device: IGroupCallRoomMemberDevice, streamId?: string) {
+        // Asks the SFU to subscribe to the given streams originating from a given device.
+        // if streamId is undefined, subscribe to all of them.
+
+        const streams = [];
+        for (const feed of device.feeds) {
+            if (streamId && feed.id !== streamId) continue;
+            for (const track of feed.tracks) {
+                streams.push({
+                    "stream_id": feed.id,
+                    "track_id": track.id
+                });
+            }
+        }
+
+        if (streams.length == 0) {
+            logger.warn("Failed to find any streams to subscribe to");
+            return;
+        }
+
+        // FIXME: actually wait until dataChannel has fired onopen
+        call.dataChannel.send(JSON.stringify({
+            "op": "select",
+            "conf_id": this.groupCallId,
+            "start": streams
+        }));
+    }
 
     public getDeviceForMember(userId: string): IGroupCallRoomMemberDevice {
         const memberStateEvent = this.room.currentState.getStateEvents(EventType.GroupCallMemberPrefix, userId);
@@ -968,6 +1036,17 @@ export class GroupCall extends EventEmitter {
 
         if (state === CallState.Connected) {
             this.retryCallCounts.delete(getCallUserId(call));
+
+            // if we're calling an SFU, subscribe to its feeds
+            // XXX: check that datachannel is open first?
+            if (this.localSfu) {
+                const memberStateEvents = this.room.currentState.getStateEvents(EventType.GroupCallMemberPrefix);
+                for (const stateEvent of memberStateEvents) {
+                    const userId = stateEvent.getStateKey();
+                    const device = this.getDeviceForMember(userId);
+                    this.subscribeStream(call, userId, device);
+                }
+            }
         }
     };
 

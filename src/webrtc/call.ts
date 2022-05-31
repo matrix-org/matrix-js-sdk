@@ -328,6 +328,7 @@ export class MatrixCall extends EventEmitter {
     private opponentDeviceId: string;
     private opponentSessionId: string;
     public groupCallId: string;
+    private dataChannel: DataChannel;
 
     constructor(opts: CallOpts) {
         super();
@@ -339,6 +340,7 @@ export class MatrixCall extends EventEmitter {
         this.opponentDeviceId = opts.opponentDeviceId;
         this.opponentSessionId = opts.opponentSessionId;
         this.groupCallId = opts.groupCallId;
+
         // Array of Objects with urls, username, credential keys
         this.turnServers = opts.turnServers || [];
         if (this.turnServers.length === 0 && this.client.isFallbackICEServerAllowed()) {
@@ -376,6 +378,7 @@ export class MatrixCall extends EventEmitter {
     public createDataChannel(label: string, options: RTCDataChannelInit) {
         const dataChannel = this.peerConn.createDataChannel(label, options);
         this.emit(CallEvent.DataChannel, dataChannel);
+        this.dataChannel = dataChannel;
         return dataChannel;
     }
 
