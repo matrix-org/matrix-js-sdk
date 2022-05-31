@@ -83,7 +83,6 @@ export interface IGroupCallMemberFeed {
     id: string;
     purpose: SDPStreamMetadataPurpose;
     tracks: IGroupCallMemberTrack[];
-    // TODO: Sources for adaptive bitrate
 }
 
 export interface IGroupCallMemberDevice {
@@ -755,14 +754,13 @@ export class GroupCall extends EventEmitter {
             ) {
                 return;
             }
-        }
-        else {
+        } else {
             peerUserId = this.localSfu;
             opponentDevice = {
                 "device_id": this.localSfuDeviceId,
                 "session_id": "", // we can use a blank session_id, as the SFU is stateless
                 "feeds": [],
-            }
+            };
             existingCall = this.getCallByUserId(peerUserId);
         }
 
@@ -815,7 +813,7 @@ export class GroupCall extends EventEmitter {
             for (const track of feed.tracks) {
                 streams.push({
                     "stream_id": feed.id,
-                    "track_id": track.id
+                    "track_id": track.id,
                 });
             }
         }
@@ -829,7 +827,7 @@ export class GroupCall extends EventEmitter {
         call.dataChannel.send(JSON.stringify({
             "op": "select",
             "conf_id": this.groupCallId,
-            "start": streams
+            "start": streams,
         }));
     }
 
