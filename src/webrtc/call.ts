@@ -292,6 +292,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     public peerConn?: RTCPeerConnection;
     public toDeviceSeq = 0;
 
+    // whether this call should have push-to-talk semantics
+    // This should be set by the consumer on incoming & outgoing calls.
+    public isPtt = false;
+
     private client: MatrixClient;
     private forceTURN: boolean;
     private turnServers: Array<TurnServer>;
@@ -1876,9 +1880,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         logger.debug(
             "Call ID " + this.callId + ": ICE connection state changed to: " + this.peerConn.iceConnectionState,
         );
+
         // ideally we'd consider the call to be connected when we get media but
         // chrome doesn't implement any of the 'onstarted' events yet
-        if (this.peerConn.iceConnectionState == 'connected') {
+        if (["connected", "completed"].includes(this.peerConn.iceConnectionState)) {
             clearTimeout(this.iceDisconnectedTimeout);
             this.setState(CallState.Connected);
 
@@ -1899,6 +1904,17 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.iceDisconnectedTimeout = setTimeout(() => {
                 this.hangup(CallErrorCode.IceFailed, false);
             }, 30 * 1000);
+        }
+
+        // In PTT mode, override feed status to muted when we lose connection to
+        // the peer, since we don't want to block the line if they're not saying anything.
+        // Experimenting in Chrome, this happens after 5 or 6 seconds, which is probably
+        // fast enough.
+        if (this.isPtt && !["connected", "completed"].includes(this.peerConn.iceConnectionState)) {
+            for (const feed of this.getRemoteFeeds()) {
+                feed.setAudioMuted(true);
+                feed.setVideoMuted(true);
+            }
         }
     };
 
