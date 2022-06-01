@@ -302,6 +302,7 @@ describe('NotificationService', function() {
             type: EventType.RoomServerAcl,
             room: testRoomId,
             user: "@alfred:localhost",
+            skey: "",
             event: true,
             content: {},
         });
