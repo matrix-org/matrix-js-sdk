@@ -15,17 +15,19 @@ limitations under the License.
 */
 
 import { ISigned } from "../@types/signed";
+import { IEncryptedPayload } from "./aes";
+
+export interface Curve25519SessionData {
+    ciphertext: string;
+    ephemeral: string;
+    mac: string;
+}
 
 export interface IKeyBackupSession {
     first_message_index: number; // eslint-disable-line camelcase
     forwarded_count: number; // eslint-disable-line camelcase
     is_verified: boolean; // eslint-disable-line camelcase
-    session_data: { // eslint-disable-line camelcase
-        ciphertext: string;
-        ephemeral: string;
-        mac: string;
-        iv: string;
-    };
+    session_data: Curve25519SessionData | IEncryptedPayload; // eslint-disable-line camelcase
 }
 
 export interface IKeyBackupRoomSessions {

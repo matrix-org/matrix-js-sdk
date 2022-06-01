@@ -161,7 +161,7 @@ function aliDownloadsKeys() {
     return Promise.all([p1, p2]).then(() => {
         return aliTestClient.client.crypto.deviceList.saveIfDirty();
     }).then(() => {
-        aliTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
+        aliTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
             const devices = data.devices[bobUserId];
             expect(devices[bobDeviceId].keys).toEqual(bobTestClient.deviceKeys.keys);
             expect(devices[bobDeviceId].verified).
