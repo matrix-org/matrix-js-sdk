@@ -2939,6 +2939,21 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
         event.applyVisibilityEvent(visibilityChange);
     }
+
+    /**
+     * Determines whether the given room is a sip room.
+     * @returns {boolean} True if the given the given room is a sip room.
+     */
+    public isSip(): boolean {
+        for (const member of this.getMembers()) {
+            if(member.userId != this.client.getUserId()){
+                if(member.userId.startsWith("@_sip_")){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 }
 
 /**
