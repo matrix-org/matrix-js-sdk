@@ -815,6 +815,7 @@ type RoomEvents = RoomEvent.Name
     | RoomEvent.Receipt
     | RoomEvent.Tags
     | RoomEvent.LocalEchoUpdated
+    | RoomEvent.HistoryImportedWithinTimeline
     | RoomEvent.AccountData
     | RoomEvent.MyMembership
     | RoomEvent.Timeline
@@ -824,6 +825,7 @@ type RoomStateEvents = RoomStateEvent.Events
     | RoomStateEvent.Members
     | RoomStateEvent.NewMember
     | RoomStateEvent.Update
+    | RoomStateEvent.Marker
     ;
 
 type CryptoEvents = CryptoEvent.KeySignatureUploadFailure
@@ -5309,7 +5311,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const mapper = this.getEventMapper();
         const event = mapper(res.event);
         const events = [
-            // we start with the last event, since that's the point at which we have known state.
+            // Order events from most recent to oldest (reverse-chronological).
+            // We start with the last event, since that's the point at which we have known state.
             // events_after is already backwards; events_before is forwards.
             ...res.events_after.reverse().map(mapper),
             event,
@@ -5372,6 +5375,45 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return timelineSet.getTimelineForEvent(eventId)
             ?? timelineSet.room.findThreadForEvent(event)?.liveTimeline // for Threads degraded support
             ?? timeline;
+    }
+
+    /**
+     * Get an EventTimeline for the latest events in the room. This will just
+     * call `/messages` to get the latest message in the room, then use
+     * `client.getEventTimeline(...)` to construct a new timeline from it.
+     *
+     * @param {EventTimelineSet} timelineSet  The timelineSet to find or add the timeline to
+     *
+     * @return {Promise} Resolves:
+     *    {@link module:models/event-timeline~EventTimeline} timeline with the latest events in the room
+     */
+    public async getLatestTimeline(timelineSet: EventTimelineSet): Promise<EventTimeline> {
+        // don't allow any timeline support unless it's been enabled.
+        if (!this.timelineSupport) {
+            throw new Error("timeline support is disabled. Set the 'timelineSupport'" +
+                " parameter to true when creating MatrixClient to enable it.");
+        }
+
+        const messagesPath = utils.encodeUri(
+            "/rooms/$roomId/messages", {
+                $roomId: timelineSet.room.roomId,
+            },
+        );
+
+        const params: Record<string, string | string[]> = {
+            dir: 'b',
+        };
+        if (this.clientOpts.lazyLoadMembers) {
+            params.filter = JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER);
+        }
+
+        const res = await this.http.authedRequest<IMessagesResponse>(undefined, Method.Get, messagesPath, params);
+        const event = res.chunk?.[0];
+        if (!event) {
+            throw new Error("No message returned from /messages when trying to construct getLatestTimeline");
+        }
+
+        return this.getEventTimeline(timelineSet, event.event_id);
     }
 
     /**
