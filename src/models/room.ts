@@ -942,7 +942,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         const eventsBefore = liveTimelineBefore.getEvents();
         const mostRecentEventInTimeline = eventsBefore[eventsBefore.length - 1];
         logger.log(
-            `[refreshLiveTimeline] for room ${this.roomId} at ` +
+            `[refreshLiveTimeline for ${this.roomId}] at ` +
             `mostRecentEventInTimeline=${mostRecentEventInTimeline && mostRecentEventInTimeline.getId()} ` +
             `liveTimelineBefore=${liveTimelineBefore.toString()} ` +
             `forwardPaginationToken=${forwardPaginationToken} ` +
@@ -986,18 +986,35 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             newTimeline = await this.client.getEventTimeline(timelineSet, mostRecentEventInTimeline.getId());
         }
 
-        // Set the pagination token back to the live sync token (`null`) instead
-        // of using the `/context` historical token (ex. `t12-13_0_0_0_0_0_0_0_0`)
-        // so that it matches the next response from `/sync` and we can properly
-        // continue the timeline.
-        newTimeline.setPaginationToken(forwardPaginationToken, EventTimeline.FORWARDS);
+        // If a racing `/sync` beat us to creating a new timeline, use that
+        // instead because it's the latest in the room and any new messages in
+        // the scrollback will include the history.
+        const liveTimeline = timelineSet.getLiveTimeline();
+        if (!liveTimeline || (
+            liveTimeline.getPaginationToken(Direction.Forward) === null &&
+            liveTimeline.getPaginationToken(Direction.Backward) === null &&
+            liveTimeline.getEvents().length === 0
+        )) {
+            logger.log(`[refreshLiveTimeline for ${this.roomId}] using our new live timeline`);
+            // Set the pagination token back to the live sync token (`null`) instead
+            // of using the `/context` historical token (ex. `t12-13_0_0_0_0_0_0_0_0`)
+            // so that it matches the next response from `/sync` and we can properly
+            // continue the timeline.
+            newTimeline.setPaginationToken(forwardPaginationToken, EventTimeline.FORWARDS);
 
-        // Set our new fresh timeline as the live timeline to continue syncing
-        // forwards and back paginating from.
-        timelineSet.setLiveTimeline(newTimeline);
-        // Fixup `this.oldstate` so that `scrollback` has the pagination tokens
-        // available
-        this.fixUpLegacyTimelineFields();
+            // Set our new fresh timeline as the live timeline to continue syncing
+            // forwards and back paginating from.
+            timelineSet.setLiveTimeline(newTimeline);
+            // Fixup `this.oldstate` so that `scrollback` has the pagination tokens
+            // available
+            this.fixUpLegacyTimelineFields();
+        } else {
+            logger.log(
+                `[refreshLiveTimeline for ${this.roomId}] \`/sync\` or some other request beat us to creating a new ` +
+                `live timeline after we reset it. We'll use that instead since any events in the scrollback from this ` + 
+                `timeline will include the history.`,
+            );
+        }
 
         // The timeline has now been refreshed ✅
         this.setTimelineNeedsRefresh(false);

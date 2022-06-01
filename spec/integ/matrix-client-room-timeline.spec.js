@@ -617,6 +617,19 @@ describe("MatrixClient room timelines", function() {
             utils.mkMessage({ user: userId, room: roomId }),
         ];
 
+        const contextUrl = `/rooms/${encodeURIComponent(roomId)}/context/` +
+        `${encodeURIComponent(initialSyncEventData[2].event_id)}`;
+        const contextResponse = {
+            start: "start_token",
+            events_before: [initialSyncEventData[1], initialSyncEventData[0]],
+            event: initialSyncEventData[2],
+            events_after: [],
+            state: [
+                USER_MEMBERSHIP_EVENT,
+            ],
+            end: "end_token",
+        };
+
         let room;
         beforeEach(async () => {
             setNextSyncData(initialSyncEventData);
@@ -635,23 +648,12 @@ describe("MatrixClient room timelines", function() {
         it('should clear and refresh messages in timeline', async () => {
             // `/context` request for `refreshLiveTimeline()` -> `getEventTimeline()`
             // to construct a new timeline from.
-            const contextUrl = `/rooms/${encodeURIComponent(roomId)}/context/` +
-                `${encodeURIComponent(initialSyncEventData[2].event_id)}`;
             httpBackend.when("GET", contextUrl)
                 .respond(200, function() {
                     // The timeline should be cleared at this point in the refresh
                     expect(room.timeline.length).toEqual(0);
 
-                    return {
-                        start: "start_token",
-                        events_before: [initialSyncEventData[1], initialSyncEventData[0]],
-                        event: initialSyncEventData[2],
-                        events_after: [],
-                        state: [
-                            USER_MEMBERSHIP_EVENT,
-                        ],
-                        end: "end_token",
-                    };
+                    return contextResponse;
                 });
 
             // Refresh the timeline.
@@ -661,13 +663,16 @@ describe("MatrixClient room timelines", function() {
             ]);
 
             // Make sure the message are visible
-            expect(room.timeline.length).toEqual(3);
-            expect(room.timeline[0].event).toEqual(initialSyncEventData[0]);
-            expect(room.timeline[1].event).toEqual(initialSyncEventData[1]);
-            expect(room.timeline[2].event).toEqual(initialSyncEventData[2]);
+            const resultantEventsInTimeline = room.getUnfilteredTimelineSet().getLiveTimeline().getEvents();
+            const resultantEventIdsInTimeline = resultantEventsInTimeline.map((event) => event.getId());
+            expect(resultantEventIdsInTimeline).toEqual([
+                initialSyncEventData[0].event_id,
+                initialSyncEventData[1].event_id,
+                initialSyncEventData[2].event_id,
+            ]);
         });
 
-        it.only('Perfectly merges timelines if a sync finishes while refreshing the timeline', async () => {
+        it('Perfectly merges timelines if a sync finishes while refreshing the timeline', async () => {
             // `/context` request for `refreshLiveTimeline()` ->
             // `getEventTimeline()` to construct a new timeline from.
             //
@@ -676,21 +681,10 @@ describe("MatrixClient room timelines", function() {
             // middle of all of this refresh timeline logic. We want to make
             // sure the sync pagination still works as expected after messing
             // the refresh timline logic messes with the pagination tokens.
-            const contextUrl = `/rooms/${encodeURIComponent(roomId)}/context/` +
-                `${encodeURIComponent(initialSyncEventData[2].event_id)}`;
             httpBackend.when("GET", contextUrl)
                 .respond(200, () => {
                     // Now finally return and make the `/context` request respond
-                    return {
-                        start: "start_token",
-                        events_before: [initialSyncEventData[1], initialSyncEventData[0]],
-                        event: initialSyncEventData[2],
-                        events_after: [],
-                        state: [
-                            USER_MEMBERSHIP_EVENT,
-                        ],
-                        end: "end_token",
-                    };
+                    return contextResponse;
                 });
 
             // Wait for the timeline to reset(when it goes blank) which means
@@ -780,14 +774,14 @@ describe("MatrixClient room timelines", function() {
                 utils.syncPromise(client, 1),
             ]);
 
-            // Make sure the timeline includes the the events from the refresh
-            // and the `/sync` that raced us in the middle of everything.
+            // Make sure the timeline includes the the events from the `/sync`
+            // that raced and beat us in the middle of everything and the
+            // `/sync` after the refresh. Since the `/sync` beat us to create
+            // the timeline, `initialSyncEventData` won't be visible unless we
+            // paginate backwards with `/messages`.
             const resultantEventsInTimeline = room.getUnfilteredTimelineSet().getLiveTimeline().getEvents();
             const resultantEventIdsInTimeline = resultantEventsInTimeline.map((event) => event.getId());
             expect(resultantEventIdsInTimeline).toEqual([
-                initialSyncEventData[0].event_id,
-                initialSyncEventData[1].event_id,
-                initialSyncEventData[2].event_id,
                 racingSyncEventData[0].event_id,
                 afterRefreshEventData[0].event_id,
             ]);
@@ -796,8 +790,6 @@ describe("MatrixClient room timelines", function() {
         it('Timeline recovers after `/context` request to generate new timeline fails', async () => {
             // `/context` request for `refreshLiveTimeline()` -> `getEventTimeline()`
             // to construct a new timeline from.
-            const contextUrl = `/rooms/${encodeURIComponent(roomId)}/context/` +
-                `${encodeURIComponent(initialSyncEventData[2].event_id)}`;
             httpBackend.when("GET", contextUrl)
                 .respond(500, function() {
                     // The timeline should be cleared at this point in the refresh
@@ -846,16 +838,7 @@ describe("MatrixClient room timelines", function() {
                     // The timeline should be cleared at this point in the refresh
                     expect(room.timeline.length).toEqual(0);
 
-                    return {
-                        start: "start_token",
-                        events_before: [initialSyncEventData[1], initialSyncEventData[0]],
-                        event: initialSyncEventData[2],
-                        events_after: [],
-                        state: [
-                            USER_MEMBERSHIP_EVENT,
-                        ],
-                        end: "end_token",
-                    };
+                    return contextResponse;
                 });
 
             // Refresh the timeline again but this time it should pass
@@ -879,11 +862,14 @@ describe("MatrixClient room timelines", function() {
             ]);
 
             // Make sure the message are visible
-            expect(room.timeline.length).toEqual(4);
-            expect(room.timeline[0].event).toEqual(initialSyncEventData[0]);
-            expect(room.timeline[1].event).toEqual(initialSyncEventData[1]);
-            expect(room.timeline[2].event).toEqual(initialSyncEventData[2]);
-            expect(room.timeline[3].event).toEqual(afterRefreshEventData[0]);
+            const resultantEventsInTimeline = room.getUnfilteredTimelineSet().getLiveTimeline().getEvents();
+            const resultantEventIdsInTimeline = resultantEventsInTimeline.map((event) => event.getId());
+            expect(resultantEventIdsInTimeline).toEqual([
+                initialSyncEventData[0].event_id,
+                initialSyncEventData[1].event_id,
+                initialSyncEventData[2].event_id,
+                afterRefreshEventData[0].event_id,
+            ]);
         });
     });
 });
