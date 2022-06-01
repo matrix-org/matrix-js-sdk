@@ -938,7 +938,7 @@ describe("MatrixClient syncing", function() {
 
                 // Get the room after the first sync so the room is created
                 const room = client.getRoom(roomOne);
-                expect(room).toBeDefined();
+                expect(room).toBeTruthy();
 
                 let stateEventEmitCount = 0;
                 client.on(RoomStateEvent.Update, () => {
@@ -1012,7 +1012,7 @@ describe("MatrixClient syncing", function() {
 
                 // Get the room after the first sync so the room is created
                 const room = client.getRoom(roomOne);
-                expect(room).toBeDefined();
+                expect(room).toBeTruthy();
 
                 let stateEventEmitCount = 0;
                 client.on(RoomStateEvent.Update, () => {
@@ -1109,7 +1109,7 @@ describe("MatrixClient syncing", function() {
                 awaitSyncEvent(),
             ]).then(function() {
                 const room = client.getRoom(roomTwo);
-                expect(room).toBeDefined();
+                expect(room).toBeTruthy();
                 const tok = room.getLiveTimeline()
                     .getPaginationToken(EventTimeline.BACKWARDS);
                 expect(tok).toEqual("roomtwotok");
