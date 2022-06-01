@@ -18,6 +18,7 @@ limitations under the License.
  * @module models/event-timeline
  */
 
+import { logger } from '../logger';
 import { RoomState, IMarkerFoundOptions } from "./room-state";
 import { EventTimelineSet } from "./event-timeline-set";
 import { MatrixEvent } from "./event";
@@ -370,16 +371,19 @@ export class EventTimeline {
      */
     public addEvent(
         event: MatrixEvent,
-        toStartOfTimeline: boolean,
-        roomState?: RoomState
-    ): void;
-    public addEvent(
-        event: MatrixEvent,
         {
             toStartOfTimeline,
             roomState,
             timelineWasEmpty,
         }: IAddEventOptions,
+    ): void;
+    /**
+     * @deprecated In favor of the overload with `IAddEventOptions`
+     */
+    public addEvent(
+        event: MatrixEvent,
+        toStartOfTimeline: boolean,
+        roomState?: RoomState
     ): void;
     public addEvent(
         event: MatrixEvent,
@@ -390,6 +394,14 @@ export class EventTimeline {
         let timelineWasEmpty: boolean;
         if (typeof (toStartOfTimelineOrOpts) === 'object') {
             ({ toStartOfTimeline, roomState, timelineWasEmpty } = toStartOfTimelineOrOpts);
+        } else if (toStartOfTimelineOrOpts !== undefined) {
+            // Deprecation warning
+            // FIXME: Remove after 2023-06-01 (technical debt)
+            logger.warn(
+                'Overload deprecated: ' +
+                '`EventTimeline.addEvent(event, toStartOfTimeline, roomState?)` ' +
+                'is deprecated in favor of the overload with `EventTimeline.addEvent(event, IAddEventOptions)`',
+            );
         }
 
         if (!roomState) {

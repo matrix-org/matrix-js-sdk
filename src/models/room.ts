@@ -2267,8 +2267,11 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @param {IAddLiveEventOptions} options addLiveEvent options
      * @throws If <code>duplicateStrategy</code> is not falsey, 'replace' or 'ignore'.
      */
-    public addLiveEvents(events: MatrixEvent[], duplicateStrategy?: DuplicateStrategy, fromCache?: boolean): void;
     public addLiveEvents(events: MatrixEvent[], addLiveEventOptions?: IAddLiveEventOptions): void;
+    /**
+     * @deprecated In favor of the overload with `IAddLiveEventOptions`
+     */
+    public addLiveEvents(events: MatrixEvent[], duplicateStrategy?: DuplicateStrategy, fromCache?: boolean): void;
     public addLiveEvents(
         events: MatrixEvent[],
         duplicateStrategyOrOpts?: DuplicateStrategy | IAddLiveEventOptions,
@@ -2283,6 +2286,14 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 /* roomState, (not used here) */
                 timelineWasEmpty,
             } = duplicateStrategyOrOpts);
+        } else if (duplicateStrategyOrOpts !== undefined) {
+            // Deprecation warning
+            // FIXME: Remove after 2023-06-01 (technical debt)
+            logger.warn(
+                'Overload deprecated: ' +
+                '`Room.addLiveEvents(events, duplicateStrategy?, fromCache?)` ' +
+                'is deprecated in favor of the overload with `Room.addLiveEvents(events, IAddLiveEventOptions)`',
+            );
         }
 
         if (duplicateStrategy && ["replace", "ignore"].indexOf(duplicateStrategy) === -1) {

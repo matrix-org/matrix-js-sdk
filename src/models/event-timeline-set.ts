@@ -551,14 +551,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      *
      * @param {MatrixEvent} event Event to be added
      * @param {IAddLiveEventOptions} options addLiveEvent options
-     * @param roomState the state events to reconcile metadata from
      */
-    public addLiveEvent(
-        event: MatrixEvent,
-        duplicateStrategy?: DuplicateStrategy,
-        fromCache?: boolean,
-        roomState?: RoomState,
-    ): void;
     public addLiveEvent(
         event: MatrixEvent,
         {
@@ -567,6 +560,15 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             roomState,
             timelineWasEmpty,
         }: IAddLiveEventOptions,
+    ): void;
+    /**
+     * @deprecated In favor of the overload with `IAddLiveEventOptions`
+     */
+    public addLiveEvent(
+        event: MatrixEvent,
+        duplicateStrategy?: DuplicateStrategy,
+        fromCache?: boolean,
+        roomState?: RoomState,
     ): void;
     public addLiveEvent(
         event: MatrixEvent,
@@ -579,9 +581,19 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         if (typeof (duplicateStrategyOrOpts) === 'object') {
             ({
                 duplicateStrategy = DuplicateStrategy.Ignore,
-                fromCache = false, roomState,
+                fromCache = false,
+                roomState,
                 timelineWasEmpty,
             } = duplicateStrategyOrOpts);
+        } else if (duplicateStrategyOrOpts !== undefined) {
+            // Deprecation warning
+            // FIXME: Remove after 2023-06-01 (technical debt)
+            logger.warn(
+                'Overload deprecated: ' +
+                '`EventTimelineSet.addLiveEvent(event, duplicateStrategy?, fromCache?, roomState?)` ' +
+                'is deprecated in favor of the overload with ' +
+                '`EventTimelineSet.addLiveEvent(event, IAddLiveEventOptions)`',
+            );
         }
 
         if (this.filter) {
@@ -644,19 +656,22 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     public addEventToTimeline(
         event: MatrixEvent,
         timeline: EventTimeline,
-        toStartOfTimeline: boolean,
-        fromCache?: boolean,
-        roomState?: RoomState,
-    ): void;
-    public addEventToTimeline(
-        event: MatrixEvent,
-        timeline: EventTimeline,
         {
             toStartOfTimeline,
             fromCache,
             roomState,
             timelineWasEmpty,
         }: IAddEventToTimelineOptions,
+    ): void;
+    /**
+     * @deprecated In favor of the overload with `IAddEventToTimelineOptions`
+     */
+    public addEventToTimeline(
+        event: MatrixEvent,
+        timeline: EventTimeline,
+        toStartOfTimeline: boolean,
+        fromCache?: boolean,
+        roomState?: RoomState,
     ): void;
     public addEventToTimeline(
         event: MatrixEvent,
@@ -669,6 +684,15 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         let timelineWasEmpty: boolean;
         if (typeof (toStartOfTimelineOrOpts) === 'object') {
             ({ toStartOfTimeline, fromCache = false, roomState, timelineWasEmpty } = toStartOfTimelineOrOpts);
+        } else if (toStartOfTimelineOrOpts !== undefined) {
+            // Deprecation warning
+            // FIXME: Remove after 2023-06-01 (technical debt)
+            logger.warn(
+                'Overload deprecated: ' +
+                '`EventTimelineSet.addEventToTimeline(event, timeline, toStartOfTimeline, fromCache?, roomState?)` ' +
+                'is deprecated in favor of the overload with ' +
+                '`EventTimelineSet.addEventToTimeline(event, timeline, IAddEventToTimelineOptions)`',
+            );
         }
 
         const eventId = event.getId();
