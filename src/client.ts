@@ -5387,8 +5387,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} eventId  The ID of the event to look for
      *
      * @return {Promise} Resolves:
-     *    {@link module:models/event-timeline~EventTimeline} including the given
-     *    event
+     *    {@link module:models/event-timeline~EventTimeline} timeline with the latest events in the room
      */
     public async getLatestTimeline(timelineSet: EventTimelineSet): Promise<EventTimeline> {
         // don't allow any timeline support unless it's been enabled.
