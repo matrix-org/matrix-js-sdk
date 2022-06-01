@@ -596,6 +596,8 @@ describe("MegolmDecryption", function() {
         });
         await aliceClient.crypto.encryptEvent(event, aliceRoom);
         await sendPromise;
+        aliceClient.stopClient();
+        bobClient.stopClient();
     });
 
     it("throws an error describing why it doesn't have a key", async function() {
@@ -666,6 +668,8 @@ describe("MegolmDecryption", function() {
                 session_id: "session_id2",
             },
         }))).rejects.toThrow("The sender has blocked you.");
+        aliceClient.stopClient();
+        bobClient.stopClient();
     });
 
     it("throws an error describing the lack of an olm session", async function() {
@@ -749,6 +753,8 @@ describe("MegolmDecryption", function() {
             },
             origin_server_ts: now,
         }))).rejects.toThrow("The sender was unable to establish a secure channel.");
+        aliceClient.stopClient();
+        bobClient.stopClient();
     });
 
     it("throws an error to indicate a wedged olm session", async function() {
@@ -799,5 +805,7 @@ describe("MegolmDecryption", function() {
             },
             origin_server_ts: now,
         }))).rejects.toThrow("The secure channel with the sender was corrupted.");
+        aliceClient.stopClient();
+        bobClient.stopClient();
     });
 });

@@ -1222,6 +1222,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * clean shutdown.
      */
     public stopClient() {
+        this.crypto?.stop(); // crypto might have been initialised even if the client wasn't fully started
+
         if (!this.clientRunning) return; // already stopped
 
         logger.log('stopping MatrixClient');
@@ -1231,7 +1233,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.syncApi?.stop();
         this.syncApi = null;
 
-        this.crypto?.stop();
         this.peekSync?.stopPeeking();
 
         this.callEventHandler?.stop();
@@ -3099,6 +3100,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("Couldn't get key");
         }
         return this.restoreKeyBackup(privKey, targetRoomId, targetSessionId, backupInfo, opts);
+    }
+
+    public async restoreKeyBackupWithBackupManager(
+        targetRoomId: string | undefined,
+        targetSessionId: string | undefined,
+        backupInfo: IKeyBackupInfo,
+        opts: IKeyBackupRestoreOpts,
+    ): Promise<IKeyBackupRestoreResult> {
+        const privKey = await this.crypto.backupManager.getKey();
+        return this.restoreKeyBackup(
+            privKey, targetRoomId, targetSessionId, backupInfo, opts,
+        );
     }
 
     private async restoreKeyBackup(

@@ -1298,7 +1298,9 @@ class MegolmDecryption extends DecryptionAlgorithm {
 
         if (res === null) {
             // We've got a message for a session we don't have.
-            //
+            // try and get the missing key from the backup first
+            this.crypto.backupManager.queryKeyBackupRateLimited(event.getRoomId(), content.session_id).catch(() => {});
+
             // (XXX: We might actually have received this key since we started
             // decrypting, in which case we'll have scheduled a retry, and this
             // request will be redundant. We could probably check to see if the

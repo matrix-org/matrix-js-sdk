@@ -55,6 +55,7 @@ import { RoomState, RoomStateEvent, IMarkerFoundOptions } from "./models/room-st
 import { RoomMemberEvent } from "./models/room-member";
 import { BeaconEvent } from "./models/beacon";
 import { IEventsResponse } from "./@types/requests";
+import { IAbortablePromise } from "./@types/partials";
 
 const DEBUG = true;
 
@@ -139,11 +140,6 @@ interface ISyncParams {
     _cacheBuster?: string | number; // not part of the API itself
 }
 
-// http-api mangles an abort method onto its promises
-interface IRequestPromise<T> extends Promise<T> {
-    abort(): void;
-}
-
 type WrappedRoom<T> = T & {
     room: Room;
     isBrandNewRoom: boolean;
@@ -166,7 +162,7 @@ type WrappedRoom<T> = T & {
  */
 export class SyncApi {
     private _peekRoom: Room = null;
-    private currentSyncRequest: IRequestPromise<ISyncResponse> = null;
+    private currentSyncRequest: IAbortablePromise<ISyncResponse> = null;
     private syncState: SyncState = null;
     private syncStateData: ISyncStateData = null; // additional data (eg. error object for failed sync)
     private catchingUp = false;
@@ -801,9 +797,7 @@ export class SyncApi {
             global.window.removeEventListener("online", this.onOnline, false);
         }
         this.running = false;
-        if (this.currentSyncRequest) {
-            this.currentSyncRequest.abort();
-        }
+        this.currentSyncRequest?.abort();
         if (this.keepAliveTimer) {
             clearTimeout(this.keepAliveTimer);
             this.keepAliveTimer = null;
@@ -971,7 +965,7 @@ export class SyncApi {
         this.doSync(syncOptions);
     }
 
-    private doSyncRequest(syncOptions: ISyncOptions, syncToken: string): IRequestPromise<ISyncResponse> {
+    private doSyncRequest(syncOptions: ISyncOptions, syncToken: string): IAbortablePromise<ISyncResponse> {
         const qps = this.getSyncParams(syncOptions, syncToken);
         return this.client.http.authedRequest<ISyncResponse>(
             undefined, Method.Get, "/sync", qps as any, undefined,
