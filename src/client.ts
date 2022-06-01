@@ -5382,9 +5382,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * call `/messages` to get the latest message in the room, then use
      * `client.getEventTimeline(...)` to construct a new timeline from it.
      *
-     * @param {EventTimelineSet} timelineSet  The timelineSet to look for the
-     * event in
-     * @param {string} eventId  The ID of the event to look for
+     * @param {EventTimelineSet} timelineSet  The timelineSet to find or add the timeline to
      *
      * @return {Promise} Resolves:
      *    {@link module:models/event-timeline~EventTimeline} timeline with the latest events in the room
