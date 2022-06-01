@@ -590,13 +590,9 @@ export interface IRequestMsisdnTokenResponse extends IRequestTokenResponse {
     intl_fmt: string;
 }
 
-interface IUploadKeysRequest {
+export interface IUploadKeysRequest {
     device_keys?: Required<IDeviceKeys>;
-    one_time_keys?: {
-        [userId: string]: {
-            [deviceId: string]: number;
-        };
-    };
+    one_time_keys?: Record<string, IOneTimeKey>;
     "org.matrix.msc2732.fallback_keys"?: Record<string, IOneTimeKey>;
 }
 
