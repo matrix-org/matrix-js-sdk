@@ -610,7 +610,7 @@ describe("MatrixClient room timelines", function() {
         });
     });
 
-    describe.only('Refresh live timeline', () => {
+    describe('Refresh live timeline', () => {
         const initialSyncEventData = [
             utils.mkMessage({ user: userId, room: roomId }),
             utils.mkMessage({ user: userId, room: roomId }),
@@ -707,11 +707,11 @@ describe("MatrixClient room timelines", function() {
                     if (eventFired) {
                         reject(new Error(
                             'TestError: `RoomEvent.TimelineReset` fired but we timed out trying to make' +
-                            'a `/sync` happen in time.'
+                            'a `/sync` happen in time.',
                         ));
                     } else {
                         reject(new Error(
-                            'TestError: Timed out while waiting for `RoomEvent.TimelineReset` to fire.'
+                            'TestError: Timed out while waiting for `RoomEvent.TimelineReset` to fire.',
                         ));
                     }
                 }, 4000 /* FIXME: Is there a way to reference the current timeout of this test in Jest? */);
@@ -734,15 +734,19 @@ describe("MatrixClient room timelines", function() {
                             utils.syncPromise(client, 1),
                         ]);
                         // Make sure the timeline has the racey sync data
-                        const afterRaceySyncTimelineEvents = room.getUnfilteredTimelineSet().getLiveTimeline().getEvents();
-                        const afterRaceySyncTimelineEventIds = afterRaceySyncTimelineEvents.map((event) => event.getId());
+                        const afterRaceySyncTimelineEvents = room
+                            .getUnfilteredTimelineSet()
+                            .getLiveTimeline()
+                            .getEvents();
+                        const afterRaceySyncTimelineEventIds = afterRaceySyncTimelineEvents
+                            .map((event) => event.getId());
                         expect(afterRaceySyncTimelineEventIds).toEqual([
                             racingSyncEventData[0].event_id,
                         ]);
 
                         clearTimeout(failTimeout);
                         resolve();
-                    } catch(err) {
+                    } catch (err) {
                         reject(err);
                     }
                 });

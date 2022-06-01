@@ -1011,8 +1011,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         } else {
             logger.log(
                 `[refreshLiveTimeline for ${this.roomId}] \`/sync\` or some other request beat us to creating a new ` +
-                `live timeline after we reset it. We'll use that instead since any events in the scrollback from this ` + 
-                `timeline will include the history.`,
+                `live timeline after we reset it. We'll use that instead since any events in the scrollback from ` +
+                `this timeline will include the history.`,
             );
         }
 
