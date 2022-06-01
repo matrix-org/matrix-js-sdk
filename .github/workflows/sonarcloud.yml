@@ -10,23 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.workflow_run.conclusion == 'success'
     steps:
-      - name: "🧮 Checkout code"
-        uses: actions/checkout@v3
+      - name: "🩻 SonarCloud Scan"
+        uses: matrix-org/sonarcloud-workflow-action@v2.1
         with:
           repository: ${{ github.event.workflow_run.head_repository.full_name }}
-          ref: ${{ github.event.workflow_run.head_branch }} # checkout commit that triggered this workflow
-          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
-
-      - name: "🔍 Read package.json version"
-        id: version
-        uses: martinbeentjes/npm-get-version-action@main
-
-      - name: "🩻 SonarCloud Scan"
-        uses: matrix-org/sonarcloud-workflow-action@v1
-        with:
           is_pr: ${{ github.event.workflow_run.event == 'pull_request' }}
-          owner: ${{ github.event.workflow_run.head_repository.owner.login }}
-          version: ${{ steps.version.outputs.current-version }}
+          version_cmd: 'cat package.json | jq -r .version'
           branch: ${{ github.event.workflow_run.head_branch }}
           revision: ${{ github.event.workflow_run.head_sha }}
           token: ${{ secrets.SONAR_TOKEN }}
