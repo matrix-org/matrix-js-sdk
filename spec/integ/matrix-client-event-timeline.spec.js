@@ -575,7 +575,7 @@ describe("MatrixClient event timelines", function() {
                 client.getLatestTimeline(timelineSet).then(function(tl) {
                     // Instead of this assertion logic, we could just add a spy
                     // for `getEventTimeline` and make sure it's called with the
-                    // correct parameters. This doesn't feel to bad to make sure
+                    // correct parameters. This doesn't feel too bad to make sure
                     // `getLatestTimeline` is doing the right thing though.
                     expect(tl.getEvents().length).toEqual(4);
                     for (let i = 0; i < 4; i++) {

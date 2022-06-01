@@ -258,7 +258,7 @@ describe("RoomState", function() {
             );
         });
 
-        it("should emit 'RoomStateEvent.Marker' for each marker event", function() {
+        it("should emit `RoomStateEvent.Marker` for each marker event", function() {
             const events = [
                 utils.mkEvent({
                     event: true,
