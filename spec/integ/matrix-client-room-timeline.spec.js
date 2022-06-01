@@ -579,7 +579,7 @@ describe("MatrixClient room timelines", function() {
             });
         });
 
-        it("should emit a 'Room.timelineReset' event", function() {
+        it("should emit a `RoomEvent.TimelineReset` event when the sync response is `limited`", function() {
             const eventData = [
                 utils.mkMessage({ user: userId, room: roomId }),
             ];
