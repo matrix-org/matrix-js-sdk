@@ -23,18 +23,24 @@ Things that should go into your PR description:
  * A changelog entry in the `Notes` section (see below)
  * References to any bugs fixed by the change (in GitHub's `Fixes` notation)
  * Describe the why and what is changing in the PR description so it's easy for
-   onlookers and reviewers to onboard and context switch.
+   onlookers and reviewers to onboard and context switch. This information is
+   also helpful when we come to look at this in 6 months and ask "why did we do
+   it like that?" we have a chance of finding out.
+      * Why is the change necessary? What problem does it solve? Why didn't it
+        work before? Why does it work now? What use cases does it unlock?
+      * If you find yourself adding information on how the code works or why you
+        chose to do it the way you did, make sure this information is also
+        written as comments in the code itself.
+      * Sometimes a PR can change considerably as it is developed. In this case,
+        the description should be updated to reflect the most recent state of
+        the PR. (It can be helpful to retain the old content under a suitable
+        heading, for additional context.)
  * Include both **before** and **after** screenshots to easily compare and discuss
    what's changing.
  * Include a step-by-step testing strategy so that a reviewer can check out the
    code locally and easily get to the point of testing your change.
  * Add comments to the diff for the reviewer that might help them to understand
    why the change is necessary or how they might better understand and review it.
-
-Things that should *not* go into your PR description:
- * Any information on how the code works or why you chose to do it the way
-   you did. If this isn't obvious from your code, you haven't written enough
-   comments.
 
 We rely on information in pull request to populate the information that goes
 into the changelogs our users see, both for the JS SDK itself and also for some
@@ -243,6 +249,12 @@ on Git 2.17+ you can mass signoff using rebase:
 ```
 git rebase --signoff origin/develop
 ```
+
+Review expectations
+===================
+
+See https://github.com/vector-im/element-meta/wiki/Review-process
+
 
 Merge Strategy
 ==============
