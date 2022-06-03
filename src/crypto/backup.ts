@@ -301,7 +301,7 @@ export class BackupManager {
                 || now - this.sessionLastCheckAttemptedTime[targetSessionId] > KEY_BACKUP_CHECK_RATE_LIMIT
         ) {
             this.sessionLastCheckAttemptedTime[targetSessionId] = now;
-            await this.baseApis.restoreKeyBackupWithBackupManager(targetRoomId, targetSessionId, this.backupInfo, {});
+            await this.baseApis.restoreKeyBackupWithCache(targetRoomId, targetSessionId, this.backupInfo, {});
         }
     }
 
