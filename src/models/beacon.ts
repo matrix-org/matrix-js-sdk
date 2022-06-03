@@ -37,11 +37,19 @@ export type BeaconEventHandlerMap = {
     [BeaconEvent.Destroy]: (beaconIdentifier: string) => void;
 };
 
+const ONE_MINUTE = 60000;
+// small deviations in system clocks can cause the beacon to not be recognised as live
+// when the sender's clock is ahead of the recipient's
+// the beacon's start timestamp can be in the future, causing the beacon to be treated as not live
+// this will be fixed in a better way in the future,
+// but for a quick fix, just add 2 minutes of ease at the start of the duration
+const isCloseEnoughToStarted = (timestamp, startTimestamp) => timestamp >= (startTimestamp - ONE_MINUTE * 2);
+
 export const isTimestampInDuration = (
     startTimestamp: number,
     durationMs: number,
     timestamp: number,
-): boolean => timestamp >= startTimestamp && startTimestamp + durationMs >= timestamp;
+): boolean => isCloseEnoughToStarted(timestamp, startTimestamp) && startTimestamp + durationMs >= timestamp;
 
 // beacon info events are uniquely identified by
 // `<roomId>_<state_key>`
