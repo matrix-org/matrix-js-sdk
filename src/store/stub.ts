@@ -20,14 +20,14 @@ limitations under the License.
  */
 
 import { EventType } from "../@types/event";
-import { Group } from "../models/group";
 import { Room } from "../models/room";
 import { User } from "../models/user";
-import { IEvent, MatrixEvent } from "../models/event";
+import { MatrixEvent } from "../models/event";
 import { Filter } from "../filter";
 import { ISavedSync, IStore } from "./index";
 import { RoomSummary } from "../models/room-summary";
 import { ISyncResponse } from "../sync-accumulator";
+import { IStateEventWithRoomId } from "../@types/search";
 
 /**
  * Construct a stub store. This does no-ops on most store methods.
@@ -56,32 +56,6 @@ export class StubStore implements IStore {
      */
     public setSyncToken(token: string) {
         this.fromToken = token;
-    }
-
-    /**
-     * No-op.
-     * @param {Group} group
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public storeGroup(group: Group) {}
-
-    /**
-     * No-op.
-     * @param {string} groupId
-     * @return {null}
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public getGroup(groupId: string): Group | null {
-        return null;
-    }
-
-    /**
-     * No-op.
-     * @return {Array} An empty array.
-     * @deprecated groups/communities never made it to the spec and support for them is being discontinued.
-     */
-    public getGroups(): Group[] {
-        return [];
     }
 
     /**
@@ -149,7 +123,7 @@ export class StubStore implements IStore {
     /**
      * No-op.
      * @param {Room} room
-     * @param {integer} limit
+     * @param {number} limit
      * @return {Array}
      */
     public scrollback(room: Room, limit: number): MatrixEvent[] {
@@ -269,11 +243,11 @@ export class StubStore implements IStore {
         return Promise.resolve();
     }
 
-    public getOutOfBandMembers(): Promise<IEvent[]> {
+    public getOutOfBandMembers(): Promise<IStateEventWithRoomId[]> {
         return Promise.resolve(null);
     }
 
-    public setOutOfBandMembers(roomId: string, membershipEvents: IEvent[]): Promise<void> {
+    public setOutOfBandMembers(roomId: string, membershipEvents: IStateEventWithRoomId[]): Promise<void> {
         return Promise.resolve();
     }
 

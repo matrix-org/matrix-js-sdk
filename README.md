@@ -1,3 +1,11 @@
+[![npm](https://img.shields.io/npm/v/matrix-js-sdk)](https://www.npmjs.com/package/matrix-js-sdk)
+![Tests](https://github.com/matrix-org/matrix-js-sdk/actions/workflows/tests.yml/badge.svg)
+![Static Analysis](https://github.com/matrix-org/matrix-js-sdk/actions/workflows/static_analysis.yml/badge.svg)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=matrix-js-sdk&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=matrix-js-sdk)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=matrix-js-sdk&metric=coverage)](https://sonarcloud.io/summary/new_code?id=matrix-js-sdk)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=matrix-js-sdk&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=matrix-js-sdk)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=matrix-js-sdk&metric=bugs)](https://sonarcloud.io/summary/new_code?id=matrix-js-sdk)
+
 Matrix Javascript SDK
 =====================
 
@@ -16,7 +24,7 @@ attached to ``window`` through which you can access the SDK. See below for how t
 include libolm to enable end-to-end-encryption.
 
 The browser bundle supports recent versions of browsers. Typically this is ES2015
-or `> 0.5%, last 2 versions, Firefox ESR, not dead` if using 
+or `> 0.5%, last 2 versions, Firefox ESR, not dead` if using
 [browserlists](https://github.com/browserslist/browserslist).
 
 Please check [the working browser example](examples/browser) for more information.
@@ -26,11 +34,11 @@ In Node.js
 
 Ensure you have the latest LTS version of Node.js installed.
 
-This SDK targets Node 10 for compatibility, which translates to ES6. If you're using
+This SDK targets Node 12 for compatibility, which translates to ES6. If you're using
 a bundler like webpack you'll likely have to transpile dependencies, including this
 SDK, to match your target browsers.
 
-Using `yarn` instead of `npm` is recommended. Please see the Yarn [install guide](https://classic.yarnpkg.com/en/docs/install) 
+Using `yarn` instead of `npm` is recommended. Please see the Yarn [install guide](https://classic.yarnpkg.com/en/docs/install)
 if you do not have it already.
 
 ``yarn add matrix-js-sdk``

@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import EventEmitter from "events";
 import { SDPStreamMetadataPurpose } from "./callEventTypes";
 import { MatrixClient } from "../client";
 import { RoomMember } from "../models/room-member";
 import { logger } from "../logger";
+import { TypedEventEmitter } from "../models/typed-event-emitter";
 
 const POLLING_INTERVAL = 200; // ms
 export const SPEAKING_THRESHOLD = -60; // dB
@@ -30,7 +30,13 @@ export interface ICallFeedOpts {
     userId: string;
     stream: MediaStream;
     purpose: SDPStreamMetadataPurpose;
+    /**
+     * Whether or not the remote SDPStreamMetadata says audio is muted
+     */
     audioMuted: boolean;
+    /**
+     * Whether or not the remote SDPStreamMetadata says video is muted
+     */
     videoMuted: boolean;
 }
 
@@ -41,7 +47,14 @@ export enum CallFeedEvent {
     Speaking = "speaking",
 }
 
-export class CallFeed extends EventEmitter {
+type EventHandlerMap = {
+    [CallFeedEvent.NewStream]: (stream: MediaStream) => void;
+    [CallFeedEvent.MuteStateChanged]: (audioMuted: boolean, videoMuted: boolean) => void;
+    [CallFeedEvent.VolumeChanged]: (volume: number) => void;
+    [CallFeedEvent.Speaking]: (speaking: boolean) => void;
+};
+
+export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> {
     public stream: MediaStream;
     public sdpMetadataStreamId: string;
     public userId: string;
@@ -58,7 +71,7 @@ export class CallFeed extends EventEmitter {
     private frequencyBinCount: Float32Array;
     private speakingThreshold = SPEAKING_THRESHOLD;
     private speaking = false;
-    private volumeLooperTimeout: number;
+    private volumeLooperTimeout: ReturnType<typeof setTimeout>;
 
     constructor(opts: ICallFeedOpts) {
         super();

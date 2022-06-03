@@ -16,8 +16,6 @@ limitations under the License.
 
 /* eslint-disable @babel/no-invalid-this */
 
-import { EventEmitter } from 'events';
-
 import { MemoryStore, IOpts as IBaseOpts } from "./memory";
 import { LocalIndexedDBStoreBackend } from "./indexeddb-local-backend";
 import { RemoteIndexedDBStoreBackend } from "./indexeddb-remote-backend";
@@ -27,6 +25,8 @@ import { logger } from '../logger';
 import { ISavedSync } from "./index";
 import { IIndexedDBBackend } from "./indexeddb-backend";
 import { ISyncResponse } from "../sync-accumulator";
+import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { IStateEventWithRoomId } from "../@types/search";
 
 /**
  * This is an internal module. See {@link IndexedDBStore} for the public class.
@@ -46,6 +46,10 @@ interface IOpts extends IBaseOpts {
     workerFactory?: () => Worker;
 }
 
+type EventHandlerMap = {
+    "degraded": (e: Error) => void;
+};
+
 export class IndexedDBStore extends MemoryStore {
     static exists(indexedDB: IDBFactory, dbName: string): Promise<boolean> {
         return LocalIndexedDBStoreBackend.exists(indexedDB, dbName);
@@ -59,7 +63,7 @@ export class IndexedDBStore extends MemoryStore {
     // the database, such that we can derive the set if users that have been
     // modified since we last saved.
     private userModifiedMap: Record<string, number> = {}; // user_id : timestamp
-    private emitter = new EventEmitter();
+    private emitter = new TypedEventEmitter<keyof EventHandlerMap, EventHandlerMap>();
 
     /**
      * Construct a new Indexed Database store, which extends MemoryStore.
@@ -239,7 +243,7 @@ export class IndexedDBStore extends MemoryStore {
      * @returns {event[]} the events, potentially an empty array if OOB loading didn't yield any new members
      * @returns {null} in case the members for this room haven't been stored yet
      */
-    public getOutOfBandMembers = this.degradable((roomId: string): Promise<IEvent[]> => {
+    public getOutOfBandMembers = this.degradable((roomId: string): Promise<IStateEventWithRoomId[]> => {
         return this.backend.getOutOfBandMembers(roomId);
     }, "getOutOfBandMembers");
 
@@ -251,10 +255,13 @@ export class IndexedDBStore extends MemoryStore {
      * @param {event[]} membershipEvents the membership events to store
      * @returns {Promise} when all members have been stored
      */
-    public setOutOfBandMembers = this.degradable((roomId: string, membershipEvents: IEvent[]): Promise<void> => {
-        super.setOutOfBandMembers(roomId, membershipEvents);
-        return this.backend.setOutOfBandMembers(roomId, membershipEvents);
-    }, "setOutOfBandMembers");
+    public setOutOfBandMembers = this.degradable(
+        (roomId: string, membershipEvents: IStateEventWithRoomId[]): Promise<void> => {
+            super.setOutOfBandMembers(roomId, membershipEvents);
+            return this.backend.setOutOfBandMembers(roomId, membershipEvents);
+        },
+        "setOutOfBandMembers",
+    );
 
     public clearOutOfBandMembers = this.degradable((roomId: string) => {
         super.clearOutOfBandMembers(roomId);

@@ -26,6 +26,7 @@ import { IVerificationChannel } from "./Channel";
 import { EventType } from "../../../@types/event";
 import { MatrixClient } from "../../../client";
 import { MatrixEvent } from "../../../models/event";
+import { IRequestsMap } from "../..";
 
 const MESSAGE_TYPE = EventType.RoomMessage;
 const M_REFERENCE = "m.reference";
@@ -36,7 +37,7 @@ const M_RELATES_TO = "m.relates_to";
  * Uses the event id of the initial m.key.verification.request event as a transaction id.
  */
 export class InRoomChannel implements IVerificationChannel {
-    private requestEventId = null;
+    private requestEventId: string = null;
 
     /**
      * @param {MatrixClient} client the matrix client, to send messages with and get current user & device from.
@@ -183,7 +184,7 @@ export class InRoomChannel implements IVerificationChannel {
      * @param {boolean} isLiveEvent whether this is an even received through sync or not
      * @returns {Promise} a promise that resolves when any requests as an answer to the passed-in event are sent.
      */
-    public async handleEvent(event: MatrixEvent, request: VerificationRequest, isLiveEvent = false): Promise<void> {
+    public handleEvent(event: MatrixEvent, request: VerificationRequest, isLiveEvent = false): Promise<void> {
         // prevent processing the same event multiple times, as under
         // some circumstances Room.timeline can get emitted twice for the same event
         if (request.hasEventId(event.getId())) {
@@ -220,8 +221,7 @@ export class InRoomChannel implements IVerificationChannel {
         const isRemoteEcho = !!event.getUnsigned().transaction_id;
         const isSentByUs = event.getSender() === this.client.getUserId();
 
-        return await request.handleEvent(
-            type, event, isLiveEvent, isRemoteEcho, isSentByUs);
+        return request.handleEvent(type, event, isLiveEvent, isRemoteEcho, isSentByUs);
     }
 
     /**
@@ -304,7 +304,7 @@ export class InRoomChannel implements IVerificationChannel {
     }
 }
 
-export class InRoomRequests {
+export class InRoomRequests implements IRequestsMap {
     private requestsByRoomId = new Map<string, Map<string, VerificationRequest>>();
 
     public getRequest(event: MatrixEvent): VerificationRequest {
@@ -328,7 +328,7 @@ export class InRoomRequests {
         this.doSetRequest(event.getRoomId(), InRoomChannel.getTransactionId(event), request);
     }
 
-    public setRequestByChannel(channel: InRoomChannel, request: VerificationRequest): void {
+    public setRequestByChannel(channel: IVerificationChannel, request: VerificationRequest): void {
         this.doSetRequest(channel.roomId, channel.transactionId, request);
     }
 

@@ -244,8 +244,7 @@ describe("MSC3089Branch", () => {
 
     it('should create new versions of itself', async () => {
         const canaryName = "canary";
-        const fileContents = "contents go here";
-        const canaryContents = Uint8Array.from(Array.from(fileContents).map((_, i) => fileContents.charCodeAt(i)));
+        const canaryContents = "contents go here";
         const canaryFile = {} as IEncryptedFile;
         const canaryAddl = { canary: true };
         indexEvent.getContent = () => ({ active: true, retained: true });
@@ -313,7 +312,7 @@ describe("MSC3089Branch", () => {
         } as MatrixEvent);
 
         const events = [await branch.getFileEvent(), await branch2.getFileEvent(), {
-            replacingEventId: () => null,
+            replacingEventId: (): string => null,
             getId: () => "$unknown",
         }];
         staticRoom.getLiveTimeline = () => ({ getEvents: () => events }) as EventTimeline;

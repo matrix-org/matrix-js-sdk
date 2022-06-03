@@ -18,11 +18,9 @@ limitations under the License.
 
 /** @module interactive-auth */
 
-import * as utils from "./utils";
 import { logger } from './logger';
 import { MatrixClient } from "./client";
 import { defer, IDeferred } from "./utils";
-import { MatrixError } from "./http-api";
 
 const EMAIL_STAGE_TYPE = "m.login.email.identity";
 const MSISDN_STAGE_TYPE = "m.login.msisdn";
@@ -35,6 +33,7 @@ export interface IInputs {
     emailAddress?: string;
     phoneCountry?: string;
     phoneNumber?: string;
+    registrationToken?: string;
 }
 
 export interface IStageStatus {
@@ -49,7 +48,7 @@ export interface IAuthData {
     flows?: IFlow[];
     params?: Record<string, Record<string, any>>;
     errcode?: string;
-    error?: MatrixError;
+    error?: string;
 }
 
 export enum AuthType {
@@ -61,13 +60,17 @@ export enum AuthType {
     Sso = "m.login.sso",
     SsoUnstable = "org.matrix.login.sso",
     Dummy = "m.login.dummy",
-    RegistrationToken = "org.matrix.msc3231.login.registration_token",
+    RegistrationToken = "m.login.registration_token",
+    // For backwards compatability with servers that have not yet updated to
+    // use the stable "m.login.registration_token" type.
+    // The authentication flow is the same in both cases.
+    UnstableRegistrationToken = "org.matrix.msc3231.login.registration_token",
 }
 
 export interface IAuthDict {
     // [key: string]: any;
     type?: string;
-    // session?: string; // TODO
+    session?: string;
     // TODO: Remove `user` once servers support proper UIA
     // See https://github.com/vector-im/element-web/issues/10312
     user?: string;
@@ -80,6 +83,8 @@ export interface IAuthDict {
     // eslint-disable-next-line camelcase
     threepid_creds?: any;
     threepidCreds?: any;
+    // For m.login.registration_token type
+    token?: string;
 }
 
 class NoAuthFlowFoundError extends Error {
@@ -358,12 +363,12 @@ export class InteractiveAuth {
         }
 
         // use the sessionid from the last request, if one is present.
-        let auth;
+        let auth: IAuthDict;
         if (this.data.session) {
             auth = {
                 session: this.data.session,
             };
-            utils.extend(auth, authData);
+            Object.assign(auth, authData);
         } else {
             auth = authData;
         }

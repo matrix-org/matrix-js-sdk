@@ -1,5 +1,5 @@
 import { User } from "../../src/models/user";
-import * as utils from "../test-utils";
+import * as utils from "../test-utils/test-utils";
 
 describe("User", function() {
     const userId = "@alice:bar";

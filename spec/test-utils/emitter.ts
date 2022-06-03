@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Matrix.org Foundation C.I.C.
+Copyright 2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,14 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export class MockBlob {
-    private contents: number[] = [];
-
-    public constructor(private parts: ArrayLike<number>[]) {
-        parts.forEach(p => Array.from(p).forEach(e => this.contents.push(e)));
-    }
-
-    public get size(): number {
-        return this.contents.length;
-    }
-}
+/**
+ * Filter emitter.emit mock calls to find relevant events
+ * eg:
+ * ```
+ * const emitSpy = jest.spyOn(state, 'emit');
+ * << actions >>
+ * const beaconLivenessEmits = emitCallsByEventType(BeaconEvent.New, emitSpy);
+ * expect(beaconLivenessEmits.length).toBe(1);
+ * ```
+ */
+export const filterEmitCallsByEventType = (eventType: string, spy: jest.SpyInstance<any, unknown[]>) =>
+    spy.mock.calls.filter((args) => args[0] === eventType);

@@ -341,7 +341,7 @@ function printLine(event) {
 
     var maxNameWidth = 15;
     if (name.length > maxNameWidth) {
-        name = name.substr(0, maxNameWidth-1) + "\u2026";
+        name = name.slice(0, maxNameWidth-1) + "\u2026";
     }
 
     if (event.getType() === "m.room.message") {
@@ -398,7 +398,7 @@ function print(str, formatter) {
 
 function fixWidth(str, len) {
     if (str.length > len) {
-        return str.substr(0, len-2) + "\u2026";
+        return str.substring(0, len-2) + "\u2026";
     }
     else if (str.length < len) {
         return str + new Array(len - str.length).join(" ");

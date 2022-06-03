@@ -1,4 +1,4 @@
-import EventEmitter from "events";
+import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { CallFeed, SPEAKING_THRESHOLD } from "./callFeed";
 import { MatrixClient } from "../client";
 import { CallErrorCode, CallEvent, CallState, genCallID, MatrixCall, setTracksEnabled } from "./call";
@@ -11,6 +11,9 @@ import { createNewMatrixCall } from "./call";
 import { ISendEventResponse } from "../@types/requests";
 import { MatrixEvent } from "../models/event";
 import { EventType } from "../@types/event";
+import { CallEventHandlerEvent } from "./callEventHandler";
+import { RoomStateEvent } from "../matrix";
+import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -39,9 +42,24 @@ export enum GroupCallEvent {
     Error = "error"
 }
 
+export type GroupCallEventHandlerMap = {
+    [GroupCallEvent.GroupCallStateChanged]: (newState: GroupCallState, oldState: GroupCallState) => void;
+    [GroupCallEvent.ActiveSpeakerChanged]: (activeSpeaker: string) => void;
+    [GroupCallEvent.CallsChanged]: (calls: MatrixCall[]) => void;
+    [GroupCallEvent.UserMediaFeedsChanged]: (feeds: CallFeed[]) => void;
+    [GroupCallEvent.ScreenshareFeedsChanged]: (feeds: CallFeed[]) => void;
+    [GroupCallEvent.LocalScreenshareStateChanged]: (
+        isScreensharing: boolean, feed: CallFeed, sourceId: string,
+    ) => void;
+    [GroupCallEvent.LocalMuteStateChanged]: (audioMuted: boolean, videoMuted: boolean) => void;
+    [GroupCallEvent.ParticipantsChanged]: (participants: RoomMember[]) => void;
+    [GroupCallEvent.Error]: (error: GroupCallError) => void;
+};
+
 export enum GroupCallErrorCode {
     NoUserMedia = "no_user_media",
-    UnknownDevice = "unknown_device"
+    UnknownDevice = "unknown_device",
+    PlaceCallFailed = "place_call_failed"
 }
 
 export class GroupCallError extends Error {
@@ -121,7 +139,7 @@ function getCallUserId(call: MatrixCall): string | null {
     return call.getOpponentMember()?.userId || call.invitee || null;
 }
 
-export class GroupCall extends EventEmitter {
+export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventHandlerMap> {
     // Config
     public activeSpeakerInterval = 1000;
     public retryCallInterval = 5000;
@@ -140,11 +158,11 @@ export class GroupCall extends EventEmitter {
     public groupCallId: string;
 
     private callHandlers: Map<string, ICallHandlers> = new Map();
-    private activeSpeakerLoopTimeout?: number;
-    private retryCallLoopTimeout?: number;
+    private activeSpeakerLoopTimeout?: ReturnType<typeof setTimeout>;
+    private retryCallLoopTimeout?: ReturnType<typeof setTimeout>;
     private retryCallCounts: Map<string, number> = new Map();
     private reEmitter: ReEmitter;
-    private transmitTimer: number | null = null;
+    private transmitTimer: ReturnType<typeof setTimeout> | null = null;
 
     constructor(
         private client: MatrixClient,
@@ -293,7 +311,7 @@ export class GroupCall extends EventEmitter {
 
         logger.log(`Entered group call ${this.groupCallId}`);
 
-        this.client.on("Call.incoming", this.onIncomingCall);
+        this.client.on(CallEventHandlerEvent.Incoming, this.onIncomingCall);
 
         const calls = this.client.callEventHandler.calls.values();
 
@@ -353,7 +371,7 @@ export class GroupCall extends EventEmitter {
             this.transmitTimer = null;
         }
 
-        this.client.removeListener("Call.incoming", this.onIncomingCall);
+        this.client.removeListener(CallEventHandlerEvent.Incoming, this.onIncomingCall);
     }
 
     public leave() {
@@ -376,7 +394,7 @@ export class GroupCall extends EventEmitter {
 
         this.participants = [];
         this.client.removeListener(
-            "RoomState.members",
+            RoomStateEvent.Members,
             this.onMemberStateChanged,
         );
 
@@ -398,7 +416,7 @@ export class GroupCall extends EventEmitter {
             );
         }
 
-        this.client.emit("GroupCall.ended", this);
+        this.client.emit(GroupCallEventHandlerEvent.Ended, this);
         this.setState(GroupCallState.Ended);
     }
 
@@ -427,13 +445,10 @@ export class GroupCall extends EventEmitter {
             return false;
         }
 
+        const sendUpdatesBefore = !muted && this.isPtt;
+
         // set a timer for the maximum transmit time on PTT calls
         if (this.isPtt) {
-            // if anoher user is currently unmuted, we can't unmute
-            if (!muted && this.userMediaFeeds.some(f => !f.isAudioMuted())) {
-                throw new OtherUserSpeakingError();
-            }
-
             // Set or clear the max transmit timer
             if (!muted && this.isMicrophoneMuted()) {
                 this.transmitTimer = setTimeout(() => {
@@ -445,15 +460,39 @@ export class GroupCall extends EventEmitter {
             }
         }
 
+        for (const call of this.calls) {
+            call.localUsermediaFeed.setAudioMuted(muted);
+        }
+
+        if (sendUpdatesBefore) {
+            try {
+                await Promise.all(this.calls.map(c => c.sendMetadataUpdate()));
+            } catch (e) {
+                logger.info("Failed to send one or more metadata updates", e);
+            }
+        }
+
         if (this.localCallFeed) {
             logger.log(`groupCall ${this.groupCallId} setMicrophoneMuted stream ${
                 this.localCallFeed.stream.id} muted ${muted}`);
             this.localCallFeed.setAudioMuted(muted);
+            // I don't believe its actually necessary to enable these tracks: they
+            // are the one on the groupcall's own CallFeed and are cloned before being
+            // given to any of the actual calls, so these tracks don't actually go
+            // anywhere. Let's do it anyway to avoid confusion.
             setTracksEnabled(this.localCallFeed.stream.getAudioTracks(), !muted);
         }
 
         for (const call of this.calls) {
-            call.setMicrophoneMuted(muted);
+            setTracksEnabled(call.localUsermediaFeed.stream.getAudioTracks(), !muted);
+        }
+
+        if (!sendUpdatesBefore) {
+            try {
+                await Promise.all(this.calls.map(c => c.sendMetadataUpdate()));
+            } catch (e) {
+                logger.info("Failed to send one or more metadata updates", e);
+            }
         }
 
         this.emit(GroupCallEvent.LocalMuteStateChanged, muted, this.isLocalVideoMuted());
@@ -586,6 +625,9 @@ export class GroupCall extends EventEmitter {
 
         logger.log(`GroupCall: incoming call from: ${opponentMemberId}`);
 
+        // we are handlng this call as a PTT call, so enable PTT semantics
+        newCall.isPtt = true;
+
         // Check if the user calling has an existing call and use this call instead.
         if (existingCall) {
             this.replaceCall(existingCall, newCall);
@@ -663,7 +705,7 @@ export class GroupCall extends EventEmitter {
         return this.client.sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, content, localUserId);
     }
 
-    public onMemberStateChanged = (event: MatrixEvent) => {
+    public onMemberStateChanged = async (event: MatrixEvent) => {
         // The member events may be received for another room, which we will ignore.
         if (event.getRoomId() !== this.room.roomId) {
             return;
@@ -777,11 +819,28 @@ export class GroupCall extends EventEmitter {
                 },
             );
 
+            newCall.isPtt = true;
+
             const requestScreenshareFeed = opponentDevice.feeds.some(
                 (feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
 
-            // Safari can't send a MediaStream to multiple sources, so clone it
-            newCall.placeCallWithCallFeeds(this.getLocalFeeds().map(feed => feed.clone()), requestScreenshareFeed);
+            try {
+                // Safari can't send a MediaStream to multiple sources, so clone it
+                await newCall.placeCallWithCallFeeds(
+                    this.getLocalFeeds().map(feed => feed.clone()),
+                    requestScreenshareFeed,
+                );
+            } catch (e) {
+                logger.warn(`Failed to place call to ${member.userId}!`, e);
+                this.emit(
+                    GroupCallEvent.Error,
+                    new GroupCallError(
+                        GroupCallErrorCode.PlaceCallFailed,
+                        `Failed to place call to ${member.userId}.`,
+                    ),
+                );
+                return;
+            }
 
             if (this.dataChannelsEnabled) {
                 newCall.createDataChannel("datachannel", this.dataChannelOptions);
@@ -1203,7 +1262,7 @@ export class GroupCall extends EventEmitter {
         this.participants.push(member);
 
         this.emit(GroupCallEvent.ParticipantsChanged, this.participants);
-        this.client.emit("GroupCall.participants", this.participants, this);
+        this.client.emit(GroupCallEventHandlerEvent.Participants, this.participants, this);
     }
 
     private removeParticipant(member: RoomMember) {
@@ -1216,6 +1275,6 @@ export class GroupCall extends EventEmitter {
         this.participants.splice(index, 1);
 
         this.emit(GroupCallEvent.ParticipantsChanged, this.participants);
-        this.client.emit("GroupCall.participants", this.participants, this);
+        this.client.emit(GroupCallEventHandlerEvent.Participants, this.participants, this);
     }
 }

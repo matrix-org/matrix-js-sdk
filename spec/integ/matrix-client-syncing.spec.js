@@ -1,6 +1,6 @@
 import { MatrixEvent } from "../../src/models/event";
 import { EventTimeline } from "../../src/models/event-timeline";
-import * as utils from "../test-utils";
+import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 
 describe("MatrixClient syncing", function() {
@@ -19,6 +19,7 @@ describe("MatrixClient syncing", function() {
         const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
         httpBackend = testClient.httpBackend;
         client = testClient.client;
+        httpBackend.when("GET", "/versions").respond(200, {});
         httpBackend.when("GET", "/pushrules").respond(200, {});
         httpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
     });
@@ -734,8 +735,7 @@ describe("MatrixClient syncing", function() {
                     expect(tok).toEqual("pagTok");
                 }),
 
-                // first flush the filter request; this will make syncLeftRooms
-                // make its /sync call
+                // first flush the filter request; this will make syncLeftRooms make its /sync call
                 httpBackend.flush("/filter").then(function() {
                     return httpBackend.flushAllExpected();
                 }),

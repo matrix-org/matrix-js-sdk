@@ -1,16 +1,17 @@
 console.log("Loading browser sdk");
-var BASE_URL = "https://matrix.org";
-var TOKEN = "accesstokengoeshere";
-var USER_ID = "@username:localhost";
-var ROOM_ID = "!room:id";
+const BASE_URL = "https://matrix.org";
+const TOKEN = "accesstokengoeshere";
+const USER_ID = "@username:localhost";
+const ROOM_ID = "!room:id";
+const DEVICE_ID = "some_device_id";
 
-
-var client = matrixcs.createClient({
+const client = matrixcs.createClient({
     baseUrl: BASE_URL,
     accessToken: TOKEN,
-    userId: USER_ID
+    userId: USER_ID,
+    deviceId: DEVICE_ID
 });
-var call;
+let call;
 
 function disableButtons(place, answer, hangup) {
     document.getElementById("hangup").disabled = hangup;
@@ -19,7 +20,7 @@ function disableButtons(place, answer, hangup) {
 }
 
 function addListeners(call) {
-    var lastError = "";
+    let lastError = "";
     call.on("hangup", function() {
         disableButtons(false, true, true);
         document.getElementById("result").innerHTML = (

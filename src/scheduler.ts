@@ -70,7 +70,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
         }
         // we ship with browser-request which returns { cors: rejected } when trying
         // with no connection, so if we match that, give up since they have no conn.
-        if (err.cors === "rejected") {
+        if (err["cors"] === "rejected") {
             return -1;
         }
 
@@ -284,7 +284,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
     }
 }
 
-function debuglog(...args) {
+function debuglog(...args: any[]) {
     if (DEBUG) {
         logger.log(...args);
     }

@@ -147,12 +147,12 @@ export interface IPusher {
     app_display_name: string;
     app_id: string;
     data: {
-        format?: string; // TODO: Types
+        format?: string;
         url?: string; // TODO: Required if kind==http
-        brand?: string; // TODO: For email notifications only?
+        brand?: string; // TODO: For email notifications only? Unspecced field
     };
     device_display_name: string;
-    kind: string; // TODO: Types
+    kind: "http" | string;
     lang: string;
     profile_tag?: string;
     pushkey: string;

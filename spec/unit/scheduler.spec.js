@@ -4,7 +4,7 @@
 import { defer } from '../../src/utils';
 import { MatrixError } from "../../src/http-api";
 import { MatrixScheduler } from "../../src/scheduler";
-import * as utils from "../test-utils";
+import * as utils from "../test-utils/test-utils";
 
 jest.useFakeTimers();
 
