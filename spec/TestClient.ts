@@ -31,6 +31,8 @@ import { MockStorageApi } from "./MockStorageApi";
 import { encodeUri } from "../src/utils";
 import { IDeviceKeys, IOneTimeKey } from "../src/crypto/dehydration";
 import { IKeyBackupSession } from "../src/crypto/keybackup";
+import { IHttpOpts } from "../src/http-api";
+import { IKeysUploadResponse, IUploadKeysRequest } from '../src/client';
 
 /**
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient
@@ -61,7 +63,7 @@ export class TestClient {
             accessToken: accessToken,
             deviceId: deviceId,
             sessionStore: sessionStore,
-            request: this.httpBackend.requestFn,
+            request: this.httpBackend.requestFn as IHttpOpts["request"],
             ...options,
         };
         if (!fullOptions.cryptoStore) {
@@ -109,26 +111,27 @@ export class TestClient {
      * stop the client
      * @return {Promise} Resolves once the mock http backend has finished all pending flushes
      */
-    public stop(): Promise<void> {
+    public async stop(): Promise<void> {
         this.client.stopClient();
-        return this.httpBackend.stop();
+        await this.httpBackend.stop();
     }
 
     /**
      * Set up expectations that the client will upload device keys.
      */
     public expectDeviceKeyUpload() {
-        this.httpBackend.when("POST", "/keys/upload").respond(200, (path, content) => {
-            expect(content.one_time_keys).toBe(undefined);
-            expect(content.device_keys).toBeTruthy();
+        this.httpBackend.when("POST", "/keys/upload")
+            .respond<IKeysUploadResponse, IUploadKeysRequest>(200, (_path, content) => {
+                expect(content.one_time_keys).toBe(undefined);
+                expect(content.device_keys).toBeTruthy();
 
-            logger.log(this + ': received device keys');
-            // we expect this to happen before any one-time keys are uploaded.
-            expect(Object.keys(this.oneTimeKeys).length).toEqual(0);
+                logger.log(this + ': received device keys');
+                // we expect this to happen before any one-time keys are uploaded.
+                expect(Object.keys(this.oneTimeKeys).length).toEqual(0);
 
-            this.deviceKeys = content.device_keys;
-            return { one_time_key_counts: { signed_curve25519: 0 } };
-        });
+                this.deviceKeys = content.device_keys;
+                return { one_time_key_counts: { signed_curve25519: 0 } };
+            });
     }
 
     /**
@@ -145,7 +148,7 @@ export class TestClient {
         }
 
         this.httpBackend.when("POST", "/keys/upload")
-            .respond(200, (path, content) => {
+            .respond<IKeysUploadResponse, IUploadKeysRequest>(200, (_path, content: IUploadKeysRequest) => {
                 expect(content.device_keys).toBe(undefined);
                 expect(content.one_time_keys).toBe(undefined);
                 return { one_time_key_counts: {
@@ -154,7 +157,7 @@ export class TestClient {
             });
 
         this.httpBackend.when("POST", "/keys/upload")
-            .respond(200, (path, content) => {
+            .respond<IKeysUploadResponse, IUploadKeysRequest>(200, (_path, content: IUploadKeysRequest) => {
                 expect(content.device_keys).toBe(undefined);
                 expect(content.one_time_keys).toBeTruthy();
                 expect(content.one_time_keys).not.toEqual({});
@@ -181,8 +184,8 @@ export class TestClient {
      * @param {Object} response   response to the query.
      */
     public expectKeyQuery(response: IDownloadKeyResult) {
-        this.httpBackend.when('POST', '/keys/query').respond(
-            200, (path, content) => {
+        this.httpBackend.when('POST', '/keys/query').respond<IDownloadKeyResult>(
+            200, (_path, content) => {
                 Object.keys(response.device_keys).forEach((userId) => {
                     expect(content.device_keys[userId]).toEqual([]);
                 });
