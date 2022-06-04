@@ -93,7 +93,7 @@ export interface IGroupCallDataChannelOptions {
 export interface IGroupCallMemberTrack {
     id: string;
     kind: string; // TODO: use an enum
-    label: string;
+    // label: string; // removing as too privacy invasive
     settings: MediaTrackSettings;
 }
 
