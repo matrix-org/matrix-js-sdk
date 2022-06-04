@@ -139,6 +139,23 @@ function getCallUserId(call: MatrixCall): string | null {
     return call.getOpponentMember()?.userId || call.invitee || null;
 }
 
+function defloat(json: Object): Object {
+    for (const key of Object.keys(json)) {
+        if (isFloat(json[key])) {
+            json[key] = "" + json[key];
+        }
+    }
+    return json;
+}
+
+function isFloat(value) {
+    return (
+        typeof value === 'number' &&
+        !Number.isNaN(value) &&
+        !Number.isInteger(value)
+    );
+}
+
 export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventHandlerMap> {
     // Config
     public activeSpeakerInterval = 1000;
@@ -658,8 +675,8 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
                         "tracks": feed.stream.getTracks().map((track) => ({
                             "id": track.id,
                             "kind": track.kind,
-                            "label": track.label,
-                            "settings": track.getSettings(),
+                            // "label": track.label, // feels a bit invasive
+                            "settings": defloat(track.getSettings()),
                         })),
                     })),
                     // TODO: Add data channels
