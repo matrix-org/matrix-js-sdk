@@ -608,13 +608,16 @@ class MegolmEncryption extends EncryptionAlgorithm {
             const deviceId = deviceInfo.deviceId;
 
             // Assign to temp value to make type-checking happy
-            const userIdDeviceInfo = deviceInfoByUserIdAndDeviceId.get(userId);
+            let userIdDeviceInfo = deviceInfoByUserIdAndDeviceId.get(userId);
+
             if (userIdDeviceInfo === undefined) {
-                deviceInfoByUserIdAndDeviceId.set(userId, new Map<string, DeviceInfo>());
-            } else {
-                // We hold by reference, this updates deviceInfoByUserIdAndDeviceId[userId]
-                userIdDeviceInfo.set(deviceId, deviceInfo);
+                userIdDeviceInfo = new Map<string, DeviceInfo>();
+
+                deviceInfoByUserIdAndDeviceId.set(userId, userIdDeviceInfo);
             }
+
+            // We hold by reference, this updates deviceInfoByUserIdAndDeviceId[userId]
+            userIdDeviceInfo.set(deviceId, deviceInfo);
 
             if (!contentMap[userId]) {
                 contentMap[userId] = {};
