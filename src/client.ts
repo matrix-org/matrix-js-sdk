@@ -61,6 +61,7 @@ import {
     PREFIX_R0,
     PREFIX_UNSTABLE,
     PREFIX_V1,
+    PREFIX_V3,
     retryNetworkOperation,
     UploadContentResponseType,
 } from "./http-api";
@@ -589,13 +590,9 @@ export interface IRequestMsisdnTokenResponse extends IRequestTokenResponse {
     intl_fmt: string;
 }
 
-interface IUploadKeysRequest {
+export interface IUploadKeysRequest {
     device_keys?: Required<IDeviceKeys>;
-    one_time_keys?: {
-        [userId: string]: {
-            [deviceId: string]: number;
-        };
-    };
+    one_time_keys?: Record<string, IOneTimeKey>;
     "org.matrix.msc2732.fallback_keys"?: Record<string, IOneTimeKey>;
 }
 
@@ -631,6 +628,19 @@ interface IJoinedMembersResponse {
             avatar_url: string;
         };
     };
+}
+
+export interface IRegisterRequestParams {
+    auth?: IAuthData;
+    username?: string;
+    password?: string;
+    refresh_token?: boolean;
+    guest_access_token?: string;
+    x_show_msisdn?: boolean;
+    bind_msisdn?: boolean;
+    bind_email?: boolean;
+    inhibit_login?: boolean;
+    initial_device_display_name?: string;
 }
 
 export interface IPublicRoomsChunkRoom {
@@ -801,6 +811,7 @@ type RoomEvents = RoomEvent.Name
     | RoomEvent.Receipt
     | RoomEvent.Tags
     | RoomEvent.LocalEchoUpdated
+    | RoomEvent.HistoryImportedWithinTimeline
     | RoomEvent.AccountData
     | RoomEvent.MyMembership
     | RoomEvent.Timeline
@@ -810,6 +821,7 @@ type RoomStateEvents = RoomStateEvent.Events
     | RoomStateEvent.Members
     | RoomStateEvent.NewMember
     | RoomStateEvent.Update
+    | RoomStateEvent.Marker
     ;
 
 type CryptoEvents = CryptoEvent.KeySignatureUploadFailure
@@ -1206,6 +1218,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * clean shutdown.
      */
     public stopClient() {
+        this.crypto?.stop(); // crypto might have been initialised even if the client wasn't fully started
+
         if (!this.clientRunning) return; // already stopped
 
         logger.log('stopping MatrixClient');
@@ -1215,7 +1229,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.syncApi?.stop();
         this.syncApi = null;
 
-        this.crypto?.stop();
         this.peekSync?.stopPeeking();
 
         this.callEventHandler?.stop();
@@ -3557,12 +3570,31 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * @param {string} roomId
      * @param {string} topic
+     * @param {string} htmlTopic Optional.
      * @param {module:client.callback} callback Optional.
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setRoomTopic(roomId: string, topic: string, callback?: Callback): Promise<ISendEventResponse> {
-        return this.sendStateEvent(roomId, EventType.RoomTopic, { topic: topic }, undefined, callback);
+    public setRoomTopic(
+        roomId: string,
+        topic: string,
+        htmlTopic?: string,
+    ): Promise<ISendEventResponse>;
+    public setRoomTopic(
+        roomId: string,
+        topic: string,
+        callback?: Callback,
+    ): Promise<ISendEventResponse>;
+    public setRoomTopic(
+        roomId: string,
+        topic: string,
+        htmlTopicOrCallback?: string | Callback,
+    ): Promise<ISendEventResponse> {
+        const isCallback = typeof htmlTopicOrCallback === 'function';
+        const htmlTopic = isCallback ? undefined : htmlTopicOrCallback;
+        const callback = isCallback ? htmlTopicOrCallback : undefined;
+        const content = ContentHelpers.makeTopicContent(topic, htmlTopic);
+        return this.sendStateEvent(roomId, EventType.RoomTopic, content, undefined, callback);
     }
 
     /**
@@ -5263,7 +5295,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const mapper = this.getEventMapper();
         const event = mapper(res.event);
         const events = [
-            // we start with the last event, since that's the point at which we have known state.
+            // Order events from most recent to oldest (reverse-chronological).
+            // We start with the last event, since that's the point at which we have known state.
             // events_after is already backwards; events_before is forwards.
             ...res.events_after.reverse().map(mapper),
             event,
@@ -5326,6 +5359,45 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return timelineSet.getTimelineForEvent(eventId)
             ?? timelineSet.room.findThreadForEvent(event)?.liveTimeline // for Threads degraded support
             ?? timeline;
+    }
+
+    /**
+     * Get an EventTimeline for the latest events in the room. This will just
+     * call `/messages` to get the latest message in the room, then use
+     * `client.getEventTimeline(...)` to construct a new timeline from it.
+     *
+     * @param {EventTimelineSet} timelineSet  The timelineSet to find or add the timeline to
+     *
+     * @return {Promise} Resolves:
+     *    {@link module:models/event-timeline~EventTimeline} timeline with the latest events in the room
+     */
+    public async getLatestTimeline(timelineSet: EventTimelineSet): Promise<EventTimeline> {
+        // don't allow any timeline support unless it's been enabled.
+        if (!this.timelineSupport) {
+            throw new Error("timeline support is disabled. Set the 'timelineSupport'" +
+                " parameter to true when creating MatrixClient to enable it.");
+        }
+
+        const messagesPath = utils.encodeUri(
+            "/rooms/$roomId/messages", {
+                $roomId: timelineSet.room.roomId,
+            },
+        );
+
+        const params: Record<string, string | string[]> = {
+            dir: 'b',
+        };
+        if (this.clientOpts.lazyLoadMembers) {
+            params.filter = JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER);
+        }
+
+        const res = await this.http.authedRequest<IMessagesResponse>(undefined, Method.Get, messagesPath, params);
+        const event = res.chunk?.[0];
+        if (!event) {
+            throw new Error("No message returned from /messages when trying to construct getLatestTimeline");
+        }
+
+        return this.getEventTimeline(timelineSet, event.event_id);
     }
 
     /**
@@ -6827,7 +6899,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         guestAccessToken?: string,
         inhibitLogin?: boolean,
         callback?: Callback,
-    ): Promise<any> { // TODO: Types (many)
+    ): Promise<IAuthData> {
         // backwards compat
         if (bindThreepids === true) {
             bindThreepids = { email: true };
@@ -6843,7 +6915,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             auth.session = sessionId;
         }
 
-        const params: any = {
+        const params: IRegisterRequestParams = {
             auth: auth,
             refresh_token: true, // always ask for a refresh token - does nothing if unsupported
         };
@@ -6914,8 +6986,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {Promise} Resolves: to the /register response
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public registerRequest(data: any, kind?: string, callback?: Callback): Promise<any> { // TODO: Types
-        const params: any = {};
+    public registerRequest(data: IRegisterRequestParams, kind?: string, callback?: Callback): Promise<IAuthData> {
+        const params: { kind?: string } = {};
         if (kind) {
             params.kind = kind;
         }
@@ -7499,16 +7571,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param {string} roomId
-     * @param {module:client.callback} callback Optional.
+     * Gets the local aliases for the room. Note: this includes all local aliases, unlike the
+     * curated list from the m.room.canonical_alias state event.
+     * @param {string} roomId The room ID to get local aliases for.
      * @return {Promise} Resolves: an object with an `aliases` property, containing an array of local aliases
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public unstableGetLocalAliases(roomId: string, callback?: Callback): Promise<{ aliases: string[] }> {
-        const path = utils.encodeUri("/rooms/$roomId/aliases",
-            { $roomId: roomId });
-        const prefix = PREFIX_UNSTABLE + "/org.matrix.msc2432";
-        return this.http.authedRequest(callback, Method.Get, path, null, null, { prefix });
+    public getLocalAliases(roomId: string): Promise<{ aliases: string[] }> {
+        const path = utils.encodeUri("/rooms/$roomId/aliases", { $roomId: roomId });
+        const prefix = PREFIX_V3;
+        return this.http.authedRequest(undefined, Method.Get, path, null, null, { prefix });
     }
 
     /**

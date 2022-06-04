@@ -8,7 +8,6 @@ import { MatrixError } from "../../src/http-api";
 
 describe("MatrixClient opts", function() {
     const baseUrl = "http://localhost.or.something";
-    let client = null;
     let httpBackend = null;
     const userId = "@alice:localhost";
     const userB = "@bob:localhost";
@@ -65,6 +64,7 @@ describe("MatrixClient opts", function() {
     });
 
     describe("without opts.store", function() {
+        let client;
         beforeEach(function() {
             client = new MatrixClient({
                 request: httpBackend.requestFn,
@@ -124,6 +124,7 @@ describe("MatrixClient opts", function() {
     });
 
     describe("without opts.scheduler", function() {
+        let client;
         beforeEach(function() {
             client = new MatrixClient({
                 request: httpBackend.requestFn,
@@ -133,6 +134,10 @@ describe("MatrixClient opts", function() {
                 accessToken: accessToken,
                 scheduler: undefined,
             });
+        });
+
+        afterEach(function() {
+            client.stopClient();
         });
 
         it("shouldn't retry sending events", function(done) {

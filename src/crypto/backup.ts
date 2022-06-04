@@ -35,6 +35,7 @@ import { UnstableValue } from "../NamespacedValue";
 import { CryptoEvent, IMegolmSessionData } from "./index";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
+const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
 
 type AuthData = IKeyBackupInfo["auth_data"];
 
@@ -111,6 +112,8 @@ export class BackupManager {
     public backupInfo: IKeyBackupInfo | undefined; // The info dict from /room_keys/version
     public checkedForBackup: boolean; // Have we checked the server for a backup we can use?
     private sendingBackups: boolean; // Are we currently sending backups?
+    private sessionLastCheckAttemptedTime: Record<string, number> = {}; // When did we last try to check the server for a given session id?
+
     constructor(private readonly baseApis: MatrixClient, public readonly getKey: GetKey) {
         this.checkedForBackup = false;
         this.sendingBackups = false;
@@ -280,6 +283,26 @@ export class BackupManager {
     public async checkKeyBackup(): Promise<IKeyBackupCheck> {
         this.checkedForBackup = false;
         return this.checkAndStart();
+    }
+
+    /**
+     * Attempts to retrieve a session from a key backup, if enough time
+     * has elapsed since the last check for this session id.
+     */
+    public async queryKeyBackupRateLimited(
+        targetRoomId: string | undefined,
+        targetSessionId: string | undefined,
+    ): Promise<void> {
+        if (!this.backupInfo) { return; }
+
+        const now = new Date().getTime();
+        if (
+            !this.sessionLastCheckAttemptedTime[targetSessionId]
+                || now - this.sessionLastCheckAttemptedTime[targetSessionId] > KEY_BACKUP_CHECK_RATE_LIMIT
+        ) {
+            this.sessionLastCheckAttemptedTime[targetSessionId] = now;
+            await this.baseApis.restoreKeyBackupWithCache(targetRoomId, targetSessionId, this.backupInfo, {});
+        }
     }
 
     /**

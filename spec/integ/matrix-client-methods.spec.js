@@ -42,7 +42,7 @@ describe("MatrixClient", function() {
     });
 
     describe("uploadContent", function() {
-        const buf = new Buffer('hello world');
+        const buf = Buffer.from('hello world');
         it("should upload the file", function() {
             httpBackend.when(
                 "POST", "/_matrix/media/r0/upload",
@@ -472,6 +472,10 @@ describe("MatrixClient", function() {
 
         beforeEach(function() {
             return client.initCrypto();
+        });
+
+        afterEach(() => {
+            client.stopClient();
         });
 
         it("should do an HTTP request and then store the keys", function() {

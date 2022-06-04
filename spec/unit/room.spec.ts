@@ -133,6 +133,27 @@ describe("Room", function() {
         room.currentState = room.getLiveTimeline().endState = utils.mock(RoomState, "currentState");
     });
 
+    describe('getCreator', () => {
+        it("should return the creator from m.room.create", function() {
+            room.currentState.getStateEvents.mockImplementation(function(type, key) {
+                if (type === EventType.RoomCreate && key === "") {
+                    return utils.mkEvent({
+                        event: true,
+                        type: EventType.RoomCreate,
+                        skey: "",
+                        room: roomId,
+                        user: userA,
+                        content: {
+                            creator: userA,
+                        },
+                    });
+                }
+            });
+            const roomCreator = room.getCreator();
+            expect(roomCreator).toStrictEqual(userA);
+        });
+    });
+
     describe("getAvatarUrl", function() {
         const hsUrl = "https://my.home.server";
 
@@ -196,22 +217,17 @@ describe("Room", function() {
             }) as MatrixEvent,
         ];
 
-        it("should call RoomState.setTypingEvent on m.typing events", function() {
-            const typing = utils.mkEvent({
-                room: roomId,
-                type: EventType.Typing,
-                event: true,
-                content: {
-                    user_ids: [userA],
-                },
-            });
-            room.addEphemeralEvents([typing]);
-            expect(room.currentState.setTypingEvent).toHaveBeenCalledWith(typing);
+        it("Make sure legacy overload passing options directly as parameters still works", () => {
+            expect(() => room.addLiveEvents(events, DuplicateStrategy.Replace, false)).not.toThrow();
+            expect(() => room.addLiveEvents(events, DuplicateStrategy.Ignore, true)).not.toThrow();
+            expect(() => room.addLiveEvents(events, "shouldfailbecauseinvalidduplicatestrategy", false)).toThrow();
         });
 
         it("should throw if duplicateStrategy isn't 'replace' or 'ignore'", function() {
             expect(function() {
-                room.addLiveEvents(events, "foo");
+                room.addLiveEvents(events, {
+                    duplicateStrategy: "foo",
+                });
             }).toThrow();
         });
 
@@ -223,7 +239,9 @@ describe("Room", function() {
             dupe.event.event_id = events[0].getId();
             room.addLiveEvents(events);
             expect(room.timeline[0]).toEqual(events[0]);
-            room.addLiveEvents([dupe], DuplicateStrategy.Replace);
+            room.addLiveEvents([dupe], {
+                duplicateStrategy: DuplicateStrategy.Replace,
+            });
             expect(room.timeline[0]).toEqual(dupe);
         });
 
@@ -235,7 +253,9 @@ describe("Room", function() {
             dupe.event.event_id = events[0].getId();
             room.addLiveEvents(events);
             expect(room.timeline[0]).toEqual(events[0]);
-            room.addLiveEvents([dupe], "ignore");
+            room.addLiveEvents([dupe], {
+                duplicateStrategy: "ignore",
+            });
             expect(room.timeline[0]).toEqual(events[0]);
         });
 
@@ -268,9 +288,11 @@ describe("Room", function() {
                 room.addLiveEvents(events);
                 expect(room.currentState.setStateEvents).toHaveBeenCalledWith(
                     [events[0]],
+                    { timelineWasEmpty: undefined },
                 );
                 expect(room.currentState.setStateEvents).toHaveBeenCalledWith(
                     [events[1]],
+                    { timelineWasEmpty: undefined },
                 );
                 expect(events[0].forwardLooking).toBe(true);
                 expect(events[1].forwardLooking).toBe(true);
@@ -338,6 +360,21 @@ describe("Room", function() {
             expect(room.timeline.length).toEqual(1);
 
             expect(callCount).toEqual(2);
+        });
+    });
+
+    describe('addEphemeralEvents', () => {
+        it("should call RoomState.setTypingEvent on m.typing events", function() {
+            const typing = utils.mkEvent({
+                room: roomId,
+                type: EventType.Typing,
+                event: true,
+                content: {
+                    user_ids: [userA],
+                },
+            });
+            room.addEphemeralEvents([typing]);
+            expect(room.currentState.setTypingEvent).toHaveBeenCalledWith(typing);
         });
     });
 
@@ -472,9 +509,11 @@ describe("Room", function() {
             room.addEventsToTimeline(events, true, room.getLiveTimeline());
             expect(room.oldState.setStateEvents).toHaveBeenCalledWith(
                 [events[0]],
+                { timelineWasEmpty: undefined },
             );
             expect(room.oldState.setStateEvents).toHaveBeenCalledWith(
                 [events[1]],
+                { timelineWasEmpty: undefined },
             );
             expect(events[0].forwardLooking).toBe(false);
             expect(events[1].forwardLooking).toBe(false);
@@ -520,6 +559,23 @@ describe("Room", function() {
         it("should reset the legacy timeline fields", function() {
             room.addLiveEvents([events[0], events[1]]);
             expect(room.timeline.length).toEqual(2);
+
+            const oldStateBeforeRunningReset = room.oldState;
+            let oldStateUpdateEmitCount = 0;
+            room.on(RoomEvent.OldStateUpdated, function(room, previousOldState, oldState) {
+                expect(previousOldState).toBe(oldStateBeforeRunningReset);
+                expect(oldState).toBe(room.oldState);
+                oldStateUpdateEmitCount += 1;
+            });
+
+            const currentStateBeforeRunningReset = room.currentState;
+            let currentStateUpdateEmitCount = 0;
+            room.on(RoomEvent.CurrentStateUpdated, function(room, previousCurrentState, currentState) {
+                expect(previousCurrentState).toBe(currentStateBeforeRunningReset);
+                expect(currentState).toBe(room.currentState);
+                currentStateUpdateEmitCount += 1;
+            });
+
             room.resetLiveTimeline('sometoken', 'someothertoken');
 
             room.addLiveEvents([events[2]]);
@@ -529,6 +585,10 @@ describe("Room", function() {
                 newLiveTimeline.getState(EventTimeline.BACKWARDS));
             expect(room.currentState).toEqual(
                 newLiveTimeline.getState(EventTimeline.FORWARDS));
+            // Make sure `RoomEvent.OldStateUpdated` was emitted
+            expect(oldStateUpdateEmitCount).toEqual(1);
+            // Make sure `RoomEvent.OldStateUpdated` was emitted if necessary
+            expect(currentStateUpdateEmitCount).toEqual(timelineSupport ? 1 : 0);
         });
 
         it("should emit Room.timelineReset event and set the correct " +
@@ -1937,6 +1997,15 @@ describe("Room", function() {
             expect(() => room.createThread(rootEvent.getId(), rootEvent, [])).not.toThrow();
         });
 
+        it("creating thread from edited event should not conflate old versions of the event", () => {
+            const message = mkMessage();
+            const edit = mkEdit(message);
+            message.makeReplaced(edit);
+
+            const thread = room.createThread("$000", message, [], true);
+            expect(thread).toHaveLength(0);
+        });
+
         it("Edits update the lastReply event", async () => {
             room.client.supportsExperimentalThreads = () => true;
 
@@ -2036,17 +2105,15 @@ describe("Room", function() {
                 },
             });
 
-            let prom = emitPromise(room, ThreadEvent.New);
+            const prom = emitPromise(room, ThreadEvent.New);
             room.addLiveEvents([threadRoot, threadResponse1, threadResponse2, threadResponse2Reaction]);
             const thread = await prom;
 
             expect(thread).toHaveLength(2);
             expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
 
-            prom = emitPromise(thread, ThreadEvent.Update);
             const threadResponse2ReactionRedaction = mkRedaction(threadResponse2Reaction);
             room.addLiveEvents([threadResponse2ReactionRedaction]);
-            await prom;
             expect(thread).toHaveLength(2);
             expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
         });

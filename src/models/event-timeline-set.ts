@@ -18,7 +18,7 @@ limitations under the License.
  * @module models/event-timeline-set
  */
 
-import { EventTimeline } from "./event-timeline";
+import { EventTimeline, IAddEventOptions } from "./event-timeline";
 import { EventStatus, MatrixEvent, MatrixEventEvent } from "./event";
 import { logger } from '../logger';
 import { Relations } from './relations';
@@ -53,6 +53,23 @@ export enum DuplicateStrategy {
 export interface IRoomTimelineData {
     timeline: EventTimeline;
     liveEvent?: boolean;
+}
+
+export interface IAddEventToTimelineOptions
+    extends Pick<IAddEventOptions, 'toStartOfTimeline' | 'roomState' | 'timelineWasEmpty'> {
+    /** Whether the sync response came from cache */
+    fromCache?: boolean;
+}
+
+export interface IAddLiveEventOptions
+    extends Pick<IAddEventToTimelineOptions, 'fromCache' | 'roomState' | 'timelineWasEmpty'> {
+    /** Applies to events in the timeline only. If this is 'replace' then if a
+     * duplicate is encountered, the event passed to this function will replace
+     * the existing event in the timeline. If this is not specified, or is
+     * 'ignore', then the event passed to this function will be ignored
+     * entirely, preserving the existing event in the timeline. Events are
+     * identical based on their event ID <b>only</b>. */
+    duplicateStrategy?: DuplicateStrategy;
 }
 
 type EmittedEvents = RoomEvent.Timeline | RoomEvent.TimelineReset;
@@ -178,6 +195,15 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      */
     public getLiveTimeline(): EventTimeline {
         return this.liveTimeline;
+    }
+
+    /**
+     * Set the live timeline for this room.
+     *
+     * @return {module:models/event-timeline~EventTimeline} live timeline
+     */
+    public setLiveTimeline(timeline: EventTimeline): void {
+        this.liveTimeline = timeline;
     }
 
     /**
@@ -430,7 +456,9 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
             if (!existingTimeline) {
                 // we don't know about this event yet. Just add it to the timeline.
-                this.addEventToTimeline(event, timeline, toStartOfTimeline);
+                this.addEventToTimeline(event, timeline, {
+                    toStartOfTimeline,
+                });
                 lastEventWasNew = true;
                 didUpdate = true;
                 continue;
@@ -522,16 +550,52 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * Add an event to the end of this live timeline.
      *
      * @param {MatrixEvent} event Event to be added
-     * @param {string?} duplicateStrategy 'ignore' or 'replace'
-     * @param {boolean} fromCache whether the sync response came from cache
-     * @param roomState the state events to reconcile metadata from
+     * @param {IAddLiveEventOptions} options addLiveEvent options
      */
     public addLiveEvent(
         event: MatrixEvent,
-        duplicateStrategy: DuplicateStrategy = DuplicateStrategy.Ignore,
+        {
+            duplicateStrategy,
+            fromCache,
+            roomState,
+            timelineWasEmpty,
+        }: IAddLiveEventOptions,
+    ): void;
+    /**
+     * @deprecated In favor of the overload with `IAddLiveEventOptions`
+     */
+    public addLiveEvent(
+        event: MatrixEvent,
+        duplicateStrategy?: DuplicateStrategy,
+        fromCache?: boolean,
+        roomState?: RoomState,
+    ): void;
+    public addLiveEvent(
+        event: MatrixEvent,
+        duplicateStrategyOrOpts?: DuplicateStrategy | IAddLiveEventOptions,
         fromCache = false,
         roomState?: RoomState,
     ): void {
+        let duplicateStrategy = duplicateStrategyOrOpts as DuplicateStrategy || DuplicateStrategy.Ignore;
+        let timelineWasEmpty: boolean;
+        if (typeof (duplicateStrategyOrOpts) === 'object') {
+            ({
+                duplicateStrategy = DuplicateStrategy.Ignore,
+                fromCache = false,
+                roomState,
+                timelineWasEmpty,
+            } = duplicateStrategyOrOpts);
+        } else if (duplicateStrategyOrOpts !== undefined) {
+            // Deprecation warning
+            // FIXME: Remove after 2023-06-01 (technical debt)
+            logger.warn(
+                'Overload deprecated: ' +
+                '`EventTimelineSet.addLiveEvent(event, duplicateStrategy?, fromCache?, roomState?)` ' +
+                'is deprecated in favor of the overload with ' +
+                '`EventTimelineSet.addLiveEvent(event, IAddLiveEventOptions)`',
+            );
+        }
+
         if (this.filter) {
             const events = this.filter.filterRoomTimeline([event]);
             if (!events.length) {
@@ -569,7 +633,12 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             return;
         }
 
-        this.addEventToTimeline(event, this.liveTimeline, false, fromCache, roomState);
+        this.addEventToTimeline(event, this.liveTimeline, {
+            toStartOfTimeline: false,
+            fromCache,
+            roomState,
+            timelineWasEmpty,
+        });
     }
 
     /**
@@ -580,20 +649,58 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      *
      * @param {MatrixEvent} event
      * @param {EventTimeline} timeline
-     * @param {boolean} toStartOfTimeline
-     * @param {boolean} fromCache whether the sync response came from cache
+     * @param {IAddEventToTimelineOptions} options addEventToTimeline options
      *
      * @fires module:client~MatrixClient#event:"Room.timeline"
      */
     public addEventToTimeline(
         event: MatrixEvent,
         timeline: EventTimeline,
+        {
+            toStartOfTimeline,
+            fromCache,
+            roomState,
+            timelineWasEmpty,
+        }: IAddEventToTimelineOptions,
+    ): void;
+    /**
+     * @deprecated In favor of the overload with `IAddEventToTimelineOptions`
+     */
+    public addEventToTimeline(
+        event: MatrixEvent,
+        timeline: EventTimeline,
         toStartOfTimeline: boolean,
+        fromCache?: boolean,
+        roomState?: RoomState,
+    ): void;
+    public addEventToTimeline(
+        event: MatrixEvent,
+        timeline: EventTimeline,
+        toStartOfTimelineOrOpts: boolean | IAddEventToTimelineOptions,
         fromCache = false,
         roomState?: RoomState,
-    ) {
+    ): void {
+        let toStartOfTimeline = !!toStartOfTimelineOrOpts;
+        let timelineWasEmpty: boolean;
+        if (typeof (toStartOfTimelineOrOpts) === 'object') {
+            ({ toStartOfTimeline, fromCache = false, roomState, timelineWasEmpty } = toStartOfTimelineOrOpts);
+        } else if (toStartOfTimelineOrOpts !== undefined) {
+            // Deprecation warning
+            // FIXME: Remove after 2023-06-01 (technical debt)
+            logger.warn(
+                'Overload deprecated: ' +
+                '`EventTimelineSet.addEventToTimeline(event, timeline, toStartOfTimeline, fromCache?, roomState?)` ' +
+                'is deprecated in favor of the overload with ' +
+                '`EventTimelineSet.addEventToTimeline(event, timeline, IAddEventToTimelineOptions)`',
+            );
+        }
+
         const eventId = event.getId();
-        timeline.addEvent(event, toStartOfTimeline, roomState);
+        timeline.addEvent(event, {
+            toStartOfTimeline,
+            roomState,
+            timelineWasEmpty,
+        });
         this._eventIdToTimeline[eventId] = timeline;
 
         this.setRelationsTarget(event);
@@ -629,10 +736,14 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         } else {
             if (this.filter) {
                 if (this.filter.filterRoomTimeline([localEvent]).length) {
-                    this.addEventToTimeline(localEvent, this.liveTimeline, false);
+                    this.addEventToTimeline(localEvent, this.liveTimeline, {
+                        toStartOfTimeline: false,
+                    });
                 }
             } else {
-                this.addEventToTimeline(localEvent, this.liveTimeline, false);
+                this.addEventToTimeline(localEvent, this.liveTimeline, {
+                    toStartOfTimeline: false,
+                });
             }
         }
     }
@@ -822,11 +933,20 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             return;
         }
 
+        const onEventDecrypted = (event: MatrixEvent) => {
+            if (event.isDecryptionFailure()) {
+                // This could for example happen if the encryption keys are not yet available.
+                // The event may still be decrypted later. Register the listener again.
+                event.once(MatrixEventEvent.Decrypted, onEventDecrypted);
+                return;
+            }
+
+            this.aggregateRelations(event);
+        };
+
         // If the event is currently encrypted, wait until it has been decrypted.
         if (event.isBeingDecrypted() || event.shouldAttemptDecryption()) {
-            event.once(MatrixEventEvent.Decrypted, () => {
-                this.aggregateRelations(event);
-            });
+            event.once(MatrixEventEvent.Decrypted, onEventDecrypted);
             return;
         }
 

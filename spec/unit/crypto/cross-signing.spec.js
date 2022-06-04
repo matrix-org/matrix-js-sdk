@@ -100,6 +100,7 @@ describe("Cross Signing", function() {
             authUploadDeviceSigningKeys: async func => await func({}),
         });
         expect(alice.uploadDeviceSigningKeys).toHaveBeenCalled();
+        alice.stopClient();
     });
 
     it("should abort bootstrap if device signing auth fails", async function() {
@@ -151,6 +152,7 @@ describe("Cross Signing", function() {
             }
         }
         expect(bootstrapDidThrow).toBeTruthy();
+        alice.stopClient();
     });
 
     it("should upload a signature when a user is verified", async function() {
@@ -182,6 +184,7 @@ describe("Cross Signing", function() {
         await alice.setDeviceVerified("@bob:example.com", "bobs+master+pubkey", true);
         // Alice should send a signature of Bob's key to the server
         await promise;
+        alice.stopClient();
     });
 
     it.skip("should get cross-signing keys from sync", async function() {
@@ -353,6 +356,7 @@ describe("Cross Signing", function() {
         expect(aliceDeviceTrust.isLocallyVerified()).toBeTruthy();
         expect(aliceDeviceTrust.isTofu()).toBeTruthy();
         expect(aliceDeviceTrust.isVerified()).toBeTruthy();
+        alice.stopClient();
     });
 
     it("should use trust chain to determine device verification", async function() {
@@ -437,6 +441,7 @@ describe("Cross Signing", function() {
         expect(bobDeviceTrust2.isCrossSigningVerified()).toBeTruthy();
         expect(bobDeviceTrust2.isLocallyVerified()).toBeFalsy();
         expect(bobDeviceTrust2.isTofu()).toBeTruthy();
+        alice.stopClient();
     });
 
     it.skip("should trust signatures received from other devices", async function() {
@@ -600,6 +605,7 @@ describe("Cross Signing", function() {
         expect(bobDeviceTrust.isCrossSigningVerified()).toBeTruthy();
         expect(bobDeviceTrust.isLocallyVerified()).toBeFalsy();
         expect(bobDeviceTrust.isTofu()).toBeTruthy();
+        alice.stopClient();
     });
 
     it("should dis-trust an unsigned device", async function() {
@@ -669,6 +675,7 @@ describe("Cross Signing", function() {
         const bobDeviceTrust2 = alice.checkDeviceTrust("@bob:example.com", "Dynabook");
         expect(bobDeviceTrust2.isVerified()).toBeFalsy();
         expect(bobDeviceTrust2.isTofu()).toBeFalsy();
+        alice.stopClient();
     });
 
     it("should dis-trust a user when their ssk changes", async function() {
@@ -805,6 +812,7 @@ describe("Cross Signing", function() {
 
         const bobDeviceTrust4 = alice.checkDeviceTrust("@bob:example.com", "Dynabook");
         expect(bobDeviceTrust4.isCrossSigningVerified()).toBeTruthy();
+        alice.stopClient();
     });
 
     it("should offer to upgrade device verifications to cross-signing", async function() {
@@ -882,6 +890,8 @@ describe("Cross Signing", function() {
         const bobTrust3 = alice.checkUserTrust("@bob:example.com");
         expect(bobTrust3.isCrossSigningVerified()).toBeTruthy();
         expect(bobTrust3.isTofu()).toBeTruthy();
+        alice.stopClient();
+        bob.stopClient();
     });
 
     it(
@@ -954,6 +964,7 @@ describe("Cross Signing", function() {
             expect(alice.checkDeviceTrust(aliceCrossSignedDevice.device_id).isCrossSigningVerified()).toBeFalsy();
             // ... but we do acknowledge that the device is signed by them
             expect(alice.checkIfOwnDeviceCrossSigned(aliceCrossSignedDevice.device_id)).toBeTruthy();
+            alice.stopClient();
         },
     );
 
@@ -1016,5 +1027,6 @@ describe("Cross Signing", function() {
         });
 
         expect(alice.checkIfOwnDeviceCrossSigned(aliceNotCrossSignedDevice.device_id)).toBeFalsy();
+        alice.stopClient();
     });
 });

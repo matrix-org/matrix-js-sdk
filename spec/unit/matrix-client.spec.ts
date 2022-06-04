@@ -33,7 +33,7 @@ import { ReceiptType } from "../../src/@types/read_receipts";
 import * as testUtils from "../test-utils/test-utils";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
-import { Room } from "../../src";
+import { ContentHelpers, Room } from "../../src";
 import { makeBeaconEvent } from "../test-utils/beacon";
 
 jest.useFakeTimers();
@@ -118,6 +118,7 @@ describe("MatrixClient", function() {
                 method: method,
                 path: path,
             };
+            pendingLookup.promise.abort = () => {}; // to make it a valid IAbortablePromise
             return pendingLookup.promise;
         }
         if (next.path === path && next.method === method) {
@@ -150,6 +151,10 @@ describe("MatrixClient", function() {
             }
             return Promise.resolve(next.data);
         }
+        // Jest doesn't let us have custom expectation errors, so if you're seeing this then
+        // you forgot to handle at least 1 pending request. Check your tests to ensure your
+        // number of expectations lines up with your number of requests made, and that those
+        // requests match your expectations.
         expect(true).toBe(false);
         return new Promise(() => {});
     }
@@ -205,6 +210,7 @@ describe("MatrixClient", function() {
         client.http.authedRequest.mockImplementation(function() {
             return new Promise(() => {});
         });
+        client.stopClient();
     });
 
     it("should create (unstable) file trees", async () => {
@@ -725,18 +731,16 @@ describe("MatrixClient", function() {
     });
 
     describe("guest rooms", function() {
-        it("should only do /sync calls (without filter/pushrules)", function(done) {
-            httpLookups = []; // no /pushrules or /filterw
+        it("should only do /sync calls (without filter/pushrules)", async function() {
+            httpLookups = []; // no /pushrules or /filter
             httpLookups.push({
                 method: "GET",
                 path: "/sync",
                 data: SYNC_DATA,
-                thenCall: function() {
-                    done();
-                },
             });
             client.setGuest(true);
-            client.startClient();
+            await client.startClient();
+            expect(httpLookups.length).toBe(0);
         });
 
         xit("should be able to peek into a room using peekInRoom", function(done) {
@@ -926,6 +930,7 @@ describe("MatrixClient", function() {
             };
             client.crypto = { // mock crypto
                 encryptEvent: (event, room) => new Promise(() => {}),
+                stop: jest.fn(),
             };
         });
 
@@ -1104,6 +1109,41 @@ describe("MatrixClient", function() {
         });
     });
 
+    describe("setRoomTopic", () => {
+        const roomId = "!foofoofoofoofoofoo:matrix.org";
+        const createSendStateEventMock = (topic: string, htmlTopic?: string) => {
+            return jest.fn()
+                .mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
+                    expect(roomId).toEqual(roomId);
+                    expect(eventType).toEqual(EventType.RoomTopic);
+                    expect(content).toMatchObject(ContentHelpers.makeTopicContent(topic, htmlTopic));
+                    expect(stateKey).toBeUndefined();
+                    return Promise.resolve();
+                });
+        };
+
+        it("is called with plain text topic and sends state event", async () => {
+            const sendStateEvent = createSendStateEventMock("pizza");
+            client.sendStateEvent = sendStateEvent;
+            await client.setRoomTopic(roomId, "pizza");
+            expect(sendStateEvent).toHaveBeenCalledTimes(1);
+        });
+
+        it("is called with plain text topic and callback and sends state event", async () => {
+            const sendStateEvent = createSendStateEventMock("pizza");
+            client.sendStateEvent = sendStateEvent;
+            await client.setRoomTopic(roomId, "pizza", () => {});
+            expect(sendStateEvent).toHaveBeenCalledTimes(1);
+        });
+
+        it("is called with plain text and HTML topic and sends state event", async () => {
+            const sendStateEvent = createSendStateEventMock("pizza", "<b>pizza</b>");
+            client.sendStateEvent = sendStateEvent;
+            await client.setRoomTopic(roomId, "pizza", "<b>pizza</b>");
+            expect(sendStateEvent).toHaveBeenCalledTimes(1);
+        });
+    });
+
     describe("setPassword", () => {
         const auth = { session: 'abcdef', type: 'foo' };
         const newPassword = 'newpassword';
@@ -1154,6 +1194,28 @@ describe("MatrixClient", function() {
         it("overload logoutDevices=false + callback", async () => {
             await client.setPassword(auth, newPassword, false, callback);
             passwordTest({ auth, new_password: newPassword, logout_devices: false }, callback);
+        });
+    });
+
+    describe("getLocalAliases", () => {
+        it("should call the right endpoint", async () => {
+            const response = {
+                aliases: ["#woop:example.org", "#another:example.org"],
+            };
+            client.http.authedRequest.mockClear().mockResolvedValue(response);
+
+            const roomId = "!whatever:example.org";
+            const result = await client.getLocalAliases(roomId);
+
+            // Current version of the endpoint we support is v3
+            const [callback, method, path, queryParams, data, opts] = client.http.authedRequest.mock.calls[0];
+            expect(callback).toBeFalsy();
+            expect(data).toBeFalsy();
+            expect(method).toBe('GET');
+            expect(path).toEqual(`/rooms/${encodeURIComponent(roomId)}/aliases`);
+            expect(opts).toMatchObject({ prefix: "/_matrix/client/v3" });
+            expect(queryParams).toBeFalsy();
+            expect(result!.aliases).toEqual(response.aliases);
         });
     });
 });

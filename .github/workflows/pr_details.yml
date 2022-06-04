@@ -1,8 +1,4 @@
 # Find details about the PR associated with this ref
-# Outputs:
-#  prnumber: the ID number of the associated PR
-#  headref: the name of the head branch of the PR
-#  baseref: the name of the base branch of the PR
 name: PR Details
 on:
   workflow_call:
@@ -18,13 +14,16 @@ on:
     outputs:
       pr_id:
         description: The ID of the PR found
-        value: ${{ jobs.prdetails.outputs.pr_id }}
+        value: ${{ fromJSON(jobs.prdetails.outputs.result).number }}
       head_branch:
         description: The head branch of the PR found
-        value: ${{ jobs.prdetails.outputs.head_branch }}
+        value: ${{ fromJSON(jobs.prdetails.outputs.result).head.ref }}
       base_branch:
         description: The base branch of the PR found
-        value: ${{ jobs.prdetails.outputs.base_branch }}
+        value: ${{ fromJSON(jobs.prdetails.outputs.result).base.ref }}
+      data:
+        description: The JSON data of the pull request API object
+        value: ${{ jobs.prdetails.outputs.result }})
 
 jobs:
   prdetails:
@@ -33,27 +32,18 @@ jobs:
     steps:
       - name: "🔍 Read PR details"
         id: details
-        # We need to find the PR number that corresponds to the branch, which we do by searching the GH API
-        # The workflow_run event includes a list of pull requests, but it doesn't get populated for
-        # forked PRs: https://docs.github.com/en/rest/reference/checks#create-a-check-run
-        run: |
-          head_branch='${{ inputs.owner }}:${{ inputs.branch }}'
-          echo "Head branch: $head_branch"
-          pulls_uri="https://api.github.com/repos/${{ github.repository }}/pulls?head=$(jq -Rr '@uri' <<<$head_branch)"
-          pr_data=$(curl -s -H 'Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}' "$pulls_uri")
-
-          pr_number=$(jq -r '.[] | .number' <<< "$pr_data")
-          echo "PR number: $pr_number"
-          echo "::set-output name=prnumber::$pr_number"
-
-          head_ref=$(jq -r '.[] | .head.ref' <<< "$pr_data")
-          echo "Head ref: $head_ref"
-          echo "::set-output name=headref::$head_ref"
-
-          base_ref=$(jq -r '.[] | .base.ref' <<< "$pr_data")
-          echo "Base ref: $base_ref"
-          echo "::set-output name=baseref::$base_ref"
+        uses: actions/github-script@v5
+        with:
+          # We need to find the PR number that corresponds to the branch, which we do by searching the GH API
+          # The workflow_run event includes a list of pull requests, but it doesn't get populated for
+          # forked PRs: https://docs.github.com/en/rest/reference/checks#create-a-check-run
+          script: |
+            const [owner, repo] = "${{ github.repository }}".split("/");
+            const response = await github.rest.pulls.list({
+              head: "${{ inputs.owner }}:${{ inputs.branch }}",
+              owner,
+              repo,
+            });
+            return response.data[0];
     outputs:
-      pr_id: ${{ steps.details.outputs.prnumber }}
-      head_branch: ${{ steps.details.outputs.headref }}
-      base_branch: ${{ steps.details.outputs.baseref }}
+      result: ${{ steps.details.outputs.result }}

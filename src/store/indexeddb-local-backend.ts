@@ -127,6 +127,8 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     private db: IDBDatabase = null;
     private disconnected = true;
     private _isNewlyCreated = false;
+    private isPersisting = false;
+    private pendingUserPresenceData: UserTuple[] = [];
 
     /**
      * Does the actual reading from and writing to the indexeddb
@@ -266,7 +268,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
                 reject(err);
             };
         }).then((events) => {
-            logger.log(`LL: got ${events && events.length} membershipEvents from storage for room ${roomId} ...`);
+            logger.log(`LL: got ${events?.length} membershipEvents from storage for room ${roomId} ...`);
             return events;
         });
     }
@@ -401,11 +403,24 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     public async syncToDatabase(userTuples: UserTuple[]): Promise<void> {
         const syncData = this.syncAccumulator.getJSON(true);
 
-        await Promise.all([
-            this.persistUserPresenceEvents(userTuples),
-            this.persistAccountData(syncData.accountData),
-            this.persistSyncData(syncData.nextBatch, syncData.roomsData),
-        ]);
+        if (this.isPersisting) {
+            logger.warn("Skipping syncToDatabase() as persist already in flight");
+            this.pendingUserPresenceData.push(...userTuples);
+            return;
+        } else {
+            userTuples.unshift(...this.pendingUserPresenceData);
+            this.isPersisting = true;
+        }
+
+        try {
+            await Promise.all([
+                this.persistUserPresenceEvents(userTuples),
+                this.persistAccountData(syncData.accountData),
+                this.persistSyncData(syncData.nextBatch, syncData.roomsData),
+            ]);
+        } finally {
+            this.isPersisting = false;
+        }
     }
 
     /**
@@ -427,7 +442,9 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
                 nextBatch,
                 roomsData,
             }); // put == UPSERT
-            return txnAsPromise(txn).then();
+            return txnAsPromise(txn).then(() => {
+                logger.log("Persisted sync data up to", nextBatch);
+            });
         });
     }
 
