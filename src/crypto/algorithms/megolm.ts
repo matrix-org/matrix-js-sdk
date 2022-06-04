@@ -592,7 +592,8 @@ class MegolmEncryption extends EncryptionAlgorithm {
         payload: IPayload,
     ): Promise<void> {
         const contentMap: Record<string, Record<string, IEncryptedContent>> = {};
-        const deviceInfoByDeviceId = new Map<string, Map<string, DeviceInfo>>();
+        // Map from userId to a map of deviceId to deviceInfo
+        const deviceInfoByUserIdAndDeviceId = new Map<string, Map<string, DeviceInfo>>();
 
         const promises: Promise<unknown>[] = [];
         for (let i = 0; i < userDeviceMap.length; i++) {
@@ -605,10 +606,15 @@ class MegolmEncryption extends EncryptionAlgorithm {
             const userId = val.userId;
             const deviceInfo = val.deviceInfo;
             const deviceId = deviceInfo.deviceId;
-            if (deviceInfoByDeviceId.get(userId) === undefined) {
-                deviceInfoByDeviceId.set(userId, new Map<string, DeviceInfo>());
+
+            // Assign to temp value to make type-checking happy
+            const userIdDeviceInfo = deviceInfoByUserIdAndDeviceId.get(userId);
+            if (userIdDeviceInfo === undefined) {
+                deviceInfoByUserIdAndDeviceId.set(userId, new Map<string, DeviceInfo>());
+            } else {
+                // We hold by reference, this updates deviceInfoByUserIdAndDeviceId[userId]
+                userIdDeviceInfo.set(deviceId, deviceInfo);
             }
-            deviceInfoByDeviceId.get(userId).set(deviceId, deviceInfo);
 
             if (!contentMap[userId]) {
                 contentMap[userId] = {};
@@ -663,7 +669,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
                         session.markSharedWithDevice(
                             userId,
                             deviceId,
-                            deviceInfoByDeviceId.get(userId).get(deviceId).getIdentityKey(),
+                            deviceInfoByUserIdAndDeviceId.get(userId).get(deviceId).getIdentityKey(),
                             chainIndex,
                         );
                     }
