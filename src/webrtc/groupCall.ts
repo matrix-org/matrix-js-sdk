@@ -190,14 +190,12 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
         groupCallId?: string,
         private dataChannelsEnabled?: boolean,
         private dataChannelOptions?: IGroupCallDataChannelOptions,
-        private localSfu?: string,
-        private localSfuDeviceId?: string,
     ) {
         super();
         this.reEmitter = new ReEmitter(this);
         this.groupCallId = groupCallId || genCallID();
 
-        if (this.localSfu) {
+        if (this.client.localSfu) {
             // we have to use DCs to talk to the SFU
             this.dataChannelsEnabled = true;
         }
@@ -780,7 +778,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
         let peerUserId: string;
         let existingCall: MatrixCall;
 
-        if (!this.localSfu) {
+        if (!this.client.localSfu) {
             // Only initiate a call with a user who has a userId that is lexicographically
             // less than your own. Otherwise, that user will call you.
             if (member.userId < localUserId) {
@@ -814,9 +812,9 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
                 return;
             }
         } else {
-            peerUserId = this.localSfu;
+            peerUserId = this.client.localSfu;
             opponentDevice = {
-                "device_id": this.localSfuDeviceId,
+                "device_id": this.client.localSfuDeviceId,
                 "session_id": "", // we can use a blank session_id, as the SFU is stateless
                 "feeds": [],
             };
@@ -824,7 +822,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
         }
 
         let newCall: MatrixCall;
-        if (!this.localSfu || !existingCall) {
+        if (!this.client.localSfu || !existingCall) {
             newCall = createNewMatrixCall(
                 this.client,
                 this.room.roomId,
@@ -870,7 +868,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
             }
         }
 
-        if (this.localSfu) {
+        if (this.client.localSfu) {
             // TODO: only subscribe to the streams you care about
             const remoteDevice = this.getDeviceForMember(member.userId);
             // subscribe if we have a call established to the SFU
@@ -1125,7 +1123,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
 
             // if we're calling an SFU, subscribe to its feeds
             // XXX: check that datachannel is open first?
-            if (this.localSfu) {
+            if (this.client.localSfu) {
                 const memberStateEvents = this.room.currentState.getStateEvents(EventType.GroupCallMemberPrefix);
                 for (const stateEvent of memberStateEvents) {
                     const userId = stateEvent.getStateKey();

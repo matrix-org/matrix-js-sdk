@@ -352,6 +352,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private opponentSessionId: string;
     public groupCallId: string;
     public dataChannel: RTCDataChannel;
+    private encrypted: boolean;
 
     constructor(opts: CallOpts) {
         super();
@@ -363,9 +364,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.opponentDeviceId = opts.opponentDeviceId;
         this.opponentSessionId = opts.opponentSessionId;
         this.groupCallId = opts.groupCallId;
-
         // Array of Objects with urls, username, credential keys
         this.turnServers = opts.turnServers || [];
+        this.encrypted = opts.client.encryptedCalls !== undefined ? opts.client.encryptedCalls : true;
         if (this.turnServers.length === 0 && this.client.isFallbackICEServerAllowed()) {
             this.turnServers.push({
                 urls: [FALLBACK_ICE_SERVER],
@@ -2062,7 +2063,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             conf_id: this.groupCallId,
         });
 
-        if (this.opponentDeviceId) {
+        if (this.opponentDeviceId && this.encrypted) {
             const toDeviceSeq = this.toDeviceSeq++;
 
             this.emit(CallEvent.SendVoipEvent, {

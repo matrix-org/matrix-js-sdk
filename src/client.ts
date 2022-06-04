@@ -355,6 +355,21 @@ export interface ICreateClientOpts {
     fallbackICEServerAllowed?: boolean;
 
     cryptoCallbacks?: ICryptoCallbacks;
+
+    /**
+     * The user ID for the local SFU to use for group calling, if any
+     */
+    localSfu?: string;
+
+    /**
+     * The device ID for the local SFU to use for group calling, if any
+     */
+    localSfuDeviceId?: string;
+
+    /**
+     * False to disable E2EE for to-device calls. Default true.
+     */
+    encryptedCalls?: boolean;
 }
 
 export interface IMatrixClientCreateOpts extends ICreateClientOpts {
@@ -953,6 +968,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected sessionId: string;
     protected pendingEventEncryption = new Map<string, Promise<void>>();
 
+    public localSfu: string;
+    public localSfuDeviceId: string;
+    public encryptedCalls: boolean;
+
     constructor(opts: IMatrixClientCreateOpts) {
         super();
 
@@ -1021,6 +1040,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 return res;
             });
         }
+
+        this.encryptedCalls = opts.encryptedCalls;
+        this.localSfu = opts.localSfu;
+        this.localSfuDeviceId = opts.localSfuDeviceId;
 
         // try constructing a MatrixCall to see if we are running in an environment
         // which has WebRTC. If we are, listen for and handle m.call.* events.
@@ -1547,8 +1570,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             undefined,
             dataChannelsEnabled,
             dataChannelOptions,
-            localSfu,
-            localSfuDeviceId,
         ).create();
     }
 
