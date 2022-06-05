@@ -99,7 +99,7 @@ export interface IGroupCallMemberTrack {
 }
 
 export interface IGroupCallMemberFeed {
-    id: string;
+    // id: string; // pc.getLocalStreams() is deprecated so we can't get a stream ID any more...
     purpose: SDPStreamMetadataPurpose;
     tracks: IGroupCallMemberTrack[];
 }
@@ -677,22 +677,48 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
     private sendMemberStateEvent(): Promise<ISendEventResponse> {
         const deviceId = this.client.getDeviceId();
 
+        let feeds;
+        if (this.client.localSfu) {
+            if (this.calls.length != 0) {
+                logger.warn("Can't publish accurate m.call.member event as SFU call not set up yet");
+                // placeholder feed content
+                feeds = this.getLocalFeeds().map((feed) => ({
+                            "purpose": feed.purpose,
+                        }));
+            } else {
+                feeds = this.getLocalFeeds().map((feed) => ({
+                    "purpose": SDPStreamMetadataPurpose.Usermedia, // FIXME - track
+
+                    // we have to advertise the actual tracks we're sending to the SFU from the PC
+                    // we can't use the feeds' mediaStream IDs, as they are local rather than the copy
+                    // sent over WebRTC
+                    //
+                    // TODO: correctly track which rtpSenders are associated with which feed
+                    // rather than assuming that all our senders are from this feed.
+                    "tracks": this.calls[0].peerConn.getSenders().map((rtpSender) => ({
+                        "id": rtpSender.track.id,
+                        "kind": rtpSender.track.kind,
+                        "settings": defloat(rtpSender.track.getSettings()),
+                    })),
+                }));
+            }
+        }
+        else {
+            feeds = this.getLocalFeeds().map((feed) => ({
+                "purpose": feed.purpose,
+                // don't bother publishing feed details
+                // if we're not using an SFU, given each
+                // call will have a different ID.
+            }));
+        }
+
         return this.updateMemberCallState({
             "m.call_id": this.groupCallId,
             "m.devices": [
                 {
                     "device_id": deviceId,
                     "session_id": this.client.getSessionId(),
-                    "feeds": this.getLocalFeeds().map((feed) => ({
-                        "purpose": feed.purpose,
-                        "id": feed.stream.id,
-                        "tracks": feed.stream.getTracks().map((track) => ({
-                            "id": track.id,
-                            "kind": track.kind,
-                            // "label": track.label, // feels a bit invasive
-                            "settings": defloat(track.getSettings()),
-                        })),
-                    })),
+                    "feeds": feeds,
                     // TODO: Add data channels
                 },
             ],
@@ -902,16 +928,14 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
         }
     };
 
-    private async subscribeStream(call: MatrixCall, userId: string, device: IGroupCallMemberDevice, streamId?: string) {
-        // Asks the SFU to subscribe to the given streams originating from a given device.
-        // if streamId is undefined, subscribe to all of them.
+    private async subscribeStream(call: MatrixCall, userId: string, device: IGroupCallMemberDevice) {
+        // Asks the SFU to subscribe to the tracks originating from a given device.
 
         const streams: ISfuTrackDesc[] = [];
         for (const feed of device.feeds) {
-            if (streamId && feed.id !== streamId) continue;
             for (const track of feed.tracks) {
                 streams.push({
-                    "stream_id": feed.id,
+                    "stream_id": "unknown",
                     "track_id": track.id,
                 });
             }
