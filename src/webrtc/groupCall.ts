@@ -679,7 +679,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
 
         let feeds;
         if (this.client.localSfu) {
-            if (this.calls.length != 0) {
+            if (this.calls.length == 0) {
                 logger.warn("Can't publish accurate m.call.member event as SFU call not set up yet");
                 // placeholder feed content
                 feeds = this.getLocalFeeds().map((feed) => ({
@@ -805,7 +805,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
 
         this.addParticipant(member);
 
-        // Don't process your own member.
+        // Don't process your own member. 😱
         const localUserId = this.client.getUserId();
 
         if (member.userId === localUserId) {
@@ -912,6 +912,9 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
             } else {
                 this.addCall(newCall);
             }
+
+            // actually publish our new feed IDs
+            await this.sendMemberStateEvent();
 
             if (this.client.localSfu) {
                 // TODO: play nice with application layer DC listeners
