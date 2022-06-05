@@ -14,6 +14,7 @@ import { EventType } from "../@types/event";
 import { CallEventHandlerEvent } from "./callEventHandler";
 import { RoomStateEvent } from "../matrix";
 import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
+import { randomString } from "../randomstring";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -195,7 +196,6 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
     private retryCallCounts: Map<string, number> = new Map();
     private reEmitter: ReEmitter;
     private transmitTimer: ReturnType<typeof setTimeout> | null = null;
-    private dcTid: number;
 
     constructor(
         private client: MatrixClient,
@@ -831,7 +831,11 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
             peerUserId = this.client.localSfu;
             opponentDevice = {
                 "device_id": this.client.localSfuDeviceId,
-                "session_id": "", // we can use a blank session_id, as the SFU is stateless
+                // XXX: the SFU might need to specify a session_id so that if it restarts and
+                // starts sending invites to us, we know that it's forgotten
+                // who we were?  But then we need a way to communicate the session_id to the
+                // clients, which is tough if the SFU is not in the right room.
+                "session_id": "sfu",
                 "feeds": [],
             };
             existingCall = this.getCallByUserId(peerUserId);
@@ -938,7 +942,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
         const msg: ISfuDataChannelMessage = {
             "op": "select",
             "conf_id": this.groupCallId,
-            "id": "" + (this.dcTid++),
+            "id": Date.now() + randomString(5),
             "start": streams,
             "sdp": call.peerConn.localDescription.sdp,
         };
