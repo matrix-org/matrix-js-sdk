@@ -2095,7 +2095,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             } else {
                 return this.client.sendToDevice(eventType, {
                     [this.invitee || this.getOpponentMember().userId]: {
-                        [this.opponentDeviceId]: toDeviceContent
+                        [this.opponentDeviceId]: toDeviceContent,
                     },
                 });
             }

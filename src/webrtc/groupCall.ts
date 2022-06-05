@@ -119,6 +119,21 @@ export interface IGroupCallMemberState {
     "m.calls": IGroupCallMemberCallState[];
 }
 
+export interface ISfuTrackDesc {
+    "stream_id": string;
+    "track_id": string;
+}
+
+export interface ISfuDataChannelMessage {
+    "op": string;
+    "id": string;
+    "conf_id"?: string;
+    "sdp"?: string;
+    "message"?: string;
+    "start"?: ISfuTrackDesc[];
+    "stop"?: ISfuTrackDesc[];
+}
+
 export enum GroupCallState {
     LocalCallFeedUninitialized = "local_call_feed_uninitialized",
     InitializingLocalCallFeed = "initializing_local_call_feed",
@@ -180,6 +195,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
     private retryCallCounts: Map<string, number> = new Map();
     private reEmitter: ReEmitter;
     private transmitTimer: ReturnType<typeof setTimeout> | null = null;
+    private dcTid: number;
 
     constructor(
         private client: MatrixClient,
@@ -821,9 +837,9 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
             existingCall = this.getCallByUserId(peerUserId);
         }
 
-        let newCall: MatrixCall;
-        if (!this.client.localSfu || !existingCall) {
-            newCall = createNewMatrixCall(
+        if (!this.client.localSfu ||
+            (this.client.localSfu && !existingCall)) {
+            const newCall = createNewMatrixCall(
                 this.client,
                 this.room.roomId,
                 {
@@ -866,22 +882,27 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
             } else {
                 this.addCall(newCall);
             }
+
+            if (this.client.localSfu) {
+                // TODO: play nice with application layer DC listeners
+                newCall.dataChannel.onmessage = this.onDataChannelMessage.bind(this, newCall);
+            }
         }
 
-        if (this.client.localSfu) {
-            // TODO: only subscribe to the streams you care about
+        if (this.client.localSfu && existingCall) {
+            // subscribe if we already had an existing call (otherwise
+            // we'll subscribe on the new call being set up)
             const remoteDevice = this.getDeviceForMember(member.userId);
-            // subscribe if we have a call established to the SFU
-            // if not, we'll trigger a subscription when the call sets up.
-            this.subscribeStream(existingCall || newCall, member.userId, remoteDevice);
+            // TODO: only subscribe to the streams you care about
+            this.subscribeStream(existingCall, member.userId, remoteDevice);
         }
     };
 
-    private subscribeStream(call: MatrixCall, userId: string, device: IGroupCallMemberDevice, streamId?: string) {
+    private async subscribeStream(call: MatrixCall, userId: string, device: IGroupCallMemberDevice, streamId?: string) {
         // Asks the SFU to subscribe to the given streams originating from a given device.
         // if streamId is undefined, subscribe to all of them.
 
-        const streams = [];
+        const streams: ISfuTrackDesc[] = [];
         for (const feed of device.feeds) {
             if (streamId && feed.id !== streamId) continue;
             for (const track of feed.tracks) {
@@ -897,12 +918,65 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
             return;
         }
 
-        // FIXME: actually wait until dataChannel has fired onopen
-        call.dataChannel.send(JSON.stringify({
+        if (call.dataChannel.readyState === 'connecting') {
+            const p: Promise<void> = new Promise(resolve => {});
+            call.dataChannel.onopen = () => {
+                Promise.resolve(p);
+            };
+            await p;
+        }
+        if (call.dataChannel.readyState !== 'open') {
+            logger.warn("Can't sent to DC in state", call.dataChannel.readyState);
+        }
+
+        // FIXME: play nice with application-layer use of the DC
+        //
+        // TODO: rather than gutwrenching into our MatrixCall's peerConnection,
+        // should this be handled inside MatrixCall instead?
+        //
+        // FIXME: RPC reliability over DC
+        const msg: ISfuDataChannelMessage = {
             "op": "select",
             "conf_id": this.groupCallId,
+            "id": "" + (this.dcTid++),
             "start": streams,
-        }));
+            "sdp": call.peerConn.localDescription.sdp,
+        };
+
+        call.dataChannel.send(JSON.stringify(msg));
+    }
+
+    private async onDataChannelMessage(call: MatrixCall, event: MessageEvent) {
+        // FIXME: this feels like it should be on MatrixCall rather than gutwrenching
+        let json: ISfuDataChannelMessage;
+        try {
+            json = JSON.parse(event.data);
+        } catch (e) {
+            logger.warn("Ignoring non-JSON DC event");
+            return;
+        }
+
+        if (!json.op) {
+            logger.warn("Ignoring unrecognised DC event");
+            return;
+        }
+
+        if (json.op !== "answer") {
+            logger.warn("Ignoring unrecognised DC event op ", json.op);
+            return;
+        }
+
+        try {
+            await call.peerConn.setRemoteDescription({
+                "type": "answer",
+                "sdp": json.sdp,
+            });
+        } catch (e) {
+            logger.debug(`Call ${call.callId} Failed to set remote description`, e);
+            // fixme: terminate is private
+            //call.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
+            return;
+        }
     }
 
     public getDeviceForMember(userId: string): IGroupCallMemberDevice {
