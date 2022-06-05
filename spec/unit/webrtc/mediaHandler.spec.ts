@@ -79,6 +79,23 @@ describe('Media Handler', function() {
         }));
     });
 
+    it("sets audio settings", async () => {
+        await mediaHandler.setAudioSettings({
+            autoGainControl: false,
+            echoCancellation: true,
+            noiseSuppression: false,
+        });
+
+        await mediaHandler.getUserMediaStream(true, false);
+        expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(expect.objectContaining({
+            audio: expect.objectContaining({
+                autoGainControl: { ideal: false },
+                echoCancellation: { ideal: true },
+                noiseSuppression: { ideal: false },
+            }),
+        }));
+    });
+
     it("sets video device ID", async () => {
         await mediaHandler.setVideoInput(FAKE_VIDEO_INPUT_ID);
 
