@@ -977,8 +977,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
         for (const feed of device.feeds) {
             if (!feed.tracks) {
                 logger.warn(`missing feeds for ${userId}`);
-            }
-            else {
+            } else {
                 for (const track of feed.tracks) {
                     streams.push({
                         "stream_id": "unknown",
@@ -991,8 +990,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
         if (streams.length == 0) {
             logger.warn("Failed to find any streams to subscribe to");
             return;
-        }
-        else {
+        } else {
             logger.info("Subscribing to ", streams, userId);
         }
 
