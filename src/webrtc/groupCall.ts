@@ -743,7 +743,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
                         "settings": defloat(transceiver.sender.track.getSettings()),
                     })),
                 }));
-                console.warn("calculated SFU feeds as", feeds);
+                logger.warn("calculated SFU feeds as", feeds);
             }
         } else {
             feeds = this.getLocalFeeds().map((feed) => ({
