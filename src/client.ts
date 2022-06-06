@@ -3772,13 +3772,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // If we expect that an event is part of a thread but is missing the relation
         // we need to add it manually, as well as the reply fallback
         if (threadId && !content["m.relates_to"]?.rel_type) {
+            const isReply = !!content["m.relates_to"]?.["m.in_reply_to"];
             content["m.relates_to"] = {
                 ...content["m.relates_to"],
                 "rel_type": THREAD_RELATION_TYPE.name,
                 "event_id": threadId,
+                // Set is_falling_back to true unless this is actually intended to be a reply
+                "is_falling_back": !isReply,
             };
             const thread = this.getRoom(roomId)?.getThread(threadId);
-            if (thread) {
+            if (thread && !isReply) {
                 content["m.relates_to"]["m.in_reply_to"] = {
                     "event_id": thread.lastReply((ev: MatrixEvent) => {
                         return ev.isRelation(THREAD_RELATION_TYPE.name) && !ev.status;
@@ -4031,7 +4034,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $txnId: txnId,
         };
 
-        let path;
+        let path: string;
 
         if (event.isState()) {
             let pathTemplate = "/rooms/$roomId/state/$eventType";
