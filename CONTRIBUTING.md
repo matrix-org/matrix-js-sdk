@@ -135,7 +135,7 @@ an istanbul magic comment as [documented here][1]. See example:
 ```javascript
 /* istanbul ignore if */
 if (process.env.NODE_ENV !== "test") {
-    logger.error("Log line that we want is noisy enough in tests to skip");
+    logger.error("Log line that is noisy enough in tests to want to skip");
 }
 ```
 
