@@ -167,7 +167,7 @@ describe("DeviceList management:", function() {
                 aliceTestClient.client.crypto.deviceList.saveIfDirty(),
             ]);
         }).then(() => {
-            aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
+            aliceTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
                 expect(data.syncToken).toEqual(1);
             });
 
@@ -203,7 +203,7 @@ describe("DeviceList management:", function() {
             expect(flushed).toEqual(0);
             return aliceTestClient.client.crypto.deviceList.saveIfDirty();
         }).then(() => {
-            aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
+            aliceTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
                 const bobStat = data.trackingStatus['@bob:xyz'];
                 if (bobStat != 1 && bobStat != 2) {
                     throw new Error('Unexpected status for bob: wanted 1 or 2, got ' +
@@ -236,7 +236,7 @@ describe("DeviceList management:", function() {
         }).then(() => {
             return aliceTestClient.client.crypto.deviceList.saveIfDirty();
         }).then(() => {
-            aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
+            aliceTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
                 const bobStat = data.trackingStatus['@bob:xyz'];
                 expect(bobStat).toEqual(3);
                 const chrisStat = data.trackingStatus['@chris:abc'];
@@ -257,7 +257,7 @@ describe("DeviceList management:", function() {
         }).then(() => {
             return aliceTestClient.client.crypto.deviceList.saveIfDirty();
         }).then(() => {
-            aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
+            aliceTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
                 const bobStat = data.trackingStatus['@bob:xyz'];
                 const chrisStat = data.trackingStatus['@bob:xyz'];
 
@@ -287,7 +287,7 @@ describe("DeviceList management:", function() {
             await aliceTestClient.httpBackend.flush('/keys/query', 1);
             await aliceTestClient.client.crypto.deviceList.saveIfDirty();
 
-            aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
+            aliceTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
                 const bobStat = data.trackingStatus['@bob:xyz'];
 
                 expect(bobStat).toBeGreaterThan(
@@ -323,7 +323,7 @@ describe("DeviceList management:", function() {
             await aliceTestClient.flushSync();
             await aliceTestClient.client.crypto.deviceList.saveIfDirty();
 
-            aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
+            aliceTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
                 const bobStat = data.trackingStatus['@bob:xyz'];
 
                 expect(bobStat).toEqual(
@@ -359,7 +359,7 @@ describe("DeviceList management:", function() {
             await aliceTestClient.flushSync();
             await aliceTestClient.client.crypto.deviceList.saveIfDirty();
 
-            aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
+            aliceTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
                 const bobStat = data.trackingStatus['@bob:xyz'];
 
                 expect(bobStat).toEqual(
@@ -380,7 +380,7 @@ describe("DeviceList management:", function() {
                 await anotherTestClient.flushSync();
                 await anotherTestClient.client.crypto.deviceList.saveIfDirty();
 
-                anotherTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
+                anotherTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
                     const bobStat = data.trackingStatus['@bob:xyz'];
 
                     expect(bobStat).toEqual(

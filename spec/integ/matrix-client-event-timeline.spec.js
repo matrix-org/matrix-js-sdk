@@ -540,6 +540,77 @@ describe("MatrixClient event timelines", function() {
         });
     });
 
+    describe("getLatestTimeline", function() {
+        it("should create a new timeline for new events", function() {
+            const room = client.getRoom(roomId);
+            const timelineSet = room.getTimelineSets()[0];
+
+            const latestMessageId = 'event1:bar';
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/messages")
+                .respond(200, function() {
+                    return {
+                        chunk: [{
+                            event_id: latestMessageId,
+                        }],
+                    };
+                });
+
+            httpBackend.when("GET", `/rooms/!foo%3Abar/context/${encodeURIComponent(latestMessageId)}`)
+                .respond(200, function() {
+                    return {
+                        start: "start_token",
+                        events_before: [EVENTS[1], EVENTS[0]],
+                        event: EVENTS[2],
+                        events_after: [EVENTS[3]],
+                        state: [
+                            ROOM_NAME_EVENT,
+                            USER_MEMBERSHIP_EVENT,
+                        ],
+                        end: "end_token",
+                    };
+                });
+
+            return Promise.all([
+                client.getLatestTimeline(timelineSet).then(function(tl) {
+                    // Instead of this assertion logic, we could just add a spy
+                    // for `getEventTimeline` and make sure it's called with the
+                    // correct parameters. This doesn't feel too bad to make sure
+                    // `getLatestTimeline` is doing the right thing though.
+                    expect(tl.getEvents().length).toEqual(4);
+                    for (let i = 0; i < 4; i++) {
+                        expect(tl.getEvents()[i].event).toEqual(EVENTS[i]);
+                        expect(tl.getEvents()[i].sender.name).toEqual(userName);
+                    }
+                    expect(tl.getPaginationToken(EventTimeline.BACKWARDS))
+                        .toEqual("start_token");
+                    expect(tl.getPaginationToken(EventTimeline.FORWARDS))
+                        .toEqual("end_token");
+                }),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+
+        it("should throw error when /messages does not return a message", () => {
+            const room = client.getRoom(roomId);
+            const timelineSet = room.getTimelineSets()[0];
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/messages")
+                .respond(200, () => {
+                    return {
+                        chunk: [
+                            // No messages to return
+                        ],
+                    };
+                });
+
+            return Promise.all([
+                expect(client.getLatestTimeline(timelineSet)).rejects.toThrow(),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+    });
+
     describe("paginateEventTimeline", function() {
         it("should allow you to paginate backwards", function() {
             const room = client.getRoom(roomId);

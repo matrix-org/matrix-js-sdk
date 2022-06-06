@@ -18,7 +18,7 @@ limitations under the License.
  * @module models/room
  */
 
-import { EventTimelineSet, DuplicateStrategy } from "./event-timeline-set";
+import { EventTimelineSet, DuplicateStrategy, IAddLiveEventOptions } from "./event-timeline-set";
 import { Direction, EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
@@ -165,6 +165,10 @@ export enum RoomEvent {
     LocalEchoUpdated = "Room.localEchoUpdated",
     Timeline = "Room.timeline",
     TimelineReset = "Room.timelineReset",
+    TimelineRefresh = "Room.TimelineRefresh",
+    OldStateUpdated = "Room.OldStateUpdated",
+    CurrentStateUpdated = "Room.CurrentStateUpdated",
+    HistoryImportedWithinTimeline = "Room.historyImportedWithinTimeline",
 }
 
 type EmittedEvents = RoomEvent
@@ -173,6 +177,10 @@ type EmittedEvents = RoomEvent
     | ThreadEvent.NewReply
     | RoomEvent.Timeline
     | RoomEvent.TimelineReset
+    | RoomEvent.TimelineRefresh
+    | RoomEvent.HistoryImportedWithinTimeline
+    | RoomEvent.OldStateUpdated
+    | RoomEvent.CurrentStateUpdated
     | MatrixEventEvent.BeforeRedaction;
 
 export type RoomEventHandlerMap = {
@@ -189,6 +197,13 @@ export type RoomEventHandlerMap = {
         oldEventId?: string,
         oldStatus?: EventStatus,
     ) => void;
+    [RoomEvent.OldStateUpdated]: (room: Room, previousRoomState: RoomState, roomState: RoomState) => void;
+    [RoomEvent.CurrentStateUpdated]: (room: Room, previousRoomState: RoomState, roomState: RoomState) => void;
+    [RoomEvent.HistoryImportedWithinTimeline]: (
+        markerEvent: MatrixEvent,
+        room: Room,
+    ) => void;
+    [RoomEvent.TimelineRefresh]: (room: Room, eventTimelineSet: EventTimelineSet) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
 } & ThreadHandlerMap & MatrixEventHandlerMap;
 
@@ -206,6 +221,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
     private readonly filteredTimelineSets: Record<string, EventTimelineSet> = {}; // filter_id: timelineSet
+    private timelineNeedsRefresh = false;
     private readonly pendingEventList?: MatrixEvent[];
     // read by megolm via getter; boolean value - null indicates "use global value"
     private blacklistUnverifiedDevices: boolean = null;
@@ -436,6 +452,15 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             .map(event => event.attemptDecryption(this.client.crypto, { isRetry: true }));
 
         return Promise.allSettled(decryptionPromises) as unknown as Promise<void>;
+    }
+
+    /**
+     * Gets the creator of the room
+     * @returns {string} The creator of the room, or null if it could not be determined
+     */
+    public getCreator(): string | null {
+        const createEvent = this.currentState.getStateEvents(EventType.RoomCreate, "");
+        return createEvent?.getContent()['creator'] ?? null;
     }
 
     /**
@@ -895,6 +920,108 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     }
 
     /**
+     * Empty out the current live timeline and re-request it. This is used when
+     * historical messages are imported into the room via MSC2716 `/batch_send
+     * because the client may already have that section of the timeline loaded.
+     * We need to force the client to throw away their current timeline so that
+     * when they back paginate over the area again with the historical messages
+     * in between, it grabs the newly imported messages. We can listen for
+     * `UNSTABLE_MSC2716_MARKER`, in order to tell when historical messages are ready
+     * to be discovered in the room and the timeline needs a refresh. The SDK
+     * emits a `RoomEvent.HistoryImportedWithinTimeline` event when we detect a
+     * valid marker and can check the needs refresh status via
+     * `room.getTimelineNeedsRefresh()`.
+     */
+    public async refreshLiveTimeline(): Promise<void> {
+        const liveTimelineBefore = this.getLiveTimeline();
+        const forwardPaginationToken = liveTimelineBefore.getPaginationToken(EventTimeline.FORWARDS);
+        const backwardPaginationToken = liveTimelineBefore.getPaginationToken(EventTimeline.BACKWARDS);
+        const eventsBefore = liveTimelineBefore.getEvents();
+        const mostRecentEventInTimeline = eventsBefore[eventsBefore.length - 1];
+        logger.log(
+            `[refreshLiveTimeline for ${this.roomId}] at ` +
+            `mostRecentEventInTimeline=${mostRecentEventInTimeline && mostRecentEventInTimeline.getId()} ` +
+            `liveTimelineBefore=${liveTimelineBefore.toString()} ` +
+            `forwardPaginationToken=${forwardPaginationToken} ` +
+            `backwardPaginationToken=${backwardPaginationToken}`,
+        );
+
+        // Get the main TimelineSet
+        const timelineSet = this.getUnfilteredTimelineSet();
+
+        let newTimeline: EventTimeline;
+        // If there isn't any event in the timeline, let's go fetch the latest
+        // event and construct a timeline from it.
+        //
+        // This should only really happen if the user ran into an error
+        // with refreshing the timeline before which left them in a blank
+        // timeline from `resetLiveTimeline`.
+        if (!mostRecentEventInTimeline) {
+            newTimeline = await this.client.getLatestTimeline(timelineSet);
+        } else {
+            // Empty out all of `this.timelineSets`. But we also need to keep the
+            // same `timelineSet` references around so the React code updates
+            // properly and doesn't ignore the room events we emit because it checks
+            // that the `timelineSet` references are the same. We need the
+            // `timelineSet` empty so that the `client.getEventTimeline(...)` call
+            // later, will call `/context` and create a new timeline instead of
+            // returning the same one.
+            this.resetLiveTimeline(null, null);
+
+            // Make the UI timeline show the new blank live timeline we just
+            // reset so that if the network fails below it's showing the
+            // accurate state of what we're working with instead of the
+            // disconnected one in the TimelineWindow which is just hanging
+            // around by reference.
+            this.emit(RoomEvent.TimelineRefresh, this, timelineSet);
+
+            // Use `client.getEventTimeline(...)` to construct a new timeline from a
+            // `/context` response state and events for the most recent event before
+            // we reset everything. The `timelineSet` we pass in needs to be empty
+            // in order for this function to call `/context` and generate a new
+            // timeline.
+            newTimeline = await this.client.getEventTimeline(timelineSet, mostRecentEventInTimeline.getId());
+        }
+
+        // If a racing `/sync` beat us to creating a new timeline, use that
+        // instead because it's the latest in the room and any new messages in
+        // the scrollback will include the history.
+        const liveTimeline = timelineSet.getLiveTimeline();
+        if (!liveTimeline || (
+            liveTimeline.getPaginationToken(Direction.Forward) === null &&
+            liveTimeline.getPaginationToken(Direction.Backward) === null &&
+            liveTimeline.getEvents().length === 0
+        )) {
+            logger.log(`[refreshLiveTimeline for ${this.roomId}] using our new live timeline`);
+            // Set the pagination token back to the live sync token (`null`) instead
+            // of using the `/context` historical token (ex. `t12-13_0_0_0_0_0_0_0_0`)
+            // so that it matches the next response from `/sync` and we can properly
+            // continue the timeline.
+            newTimeline.setPaginationToken(forwardPaginationToken, EventTimeline.FORWARDS);
+
+            // Set our new fresh timeline as the live timeline to continue syncing
+            // forwards and back paginating from.
+            timelineSet.setLiveTimeline(newTimeline);
+            // Fixup `this.oldstate` so that `scrollback` has the pagination tokens
+            // available
+            this.fixUpLegacyTimelineFields();
+        } else {
+            logger.log(
+                `[refreshLiveTimeline for ${this.roomId}] \`/sync\` or some other request beat us to creating a new ` +
+                `live timeline after we reset it. We'll use that instead since any events in the scrollback from ` +
+                `this timeline will include the history.`,
+            );
+        }
+
+        // The timeline has now been refreshed ✅
+        this.setTimelineNeedsRefresh(false);
+
+        // Emit an event which clients can react to and re-load the timeline
+        // from the SDK
+        this.emit(RoomEvent.TimelineRefresh, this, timelineSet);
+    }
+
+    /**
      * Reset the live timeline of all timelineSets, and start new ones.
      *
      * <p>This is used when /sync returns a 'limited' timeline.
@@ -921,6 +1048,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @private
      */
     private fixUpLegacyTimelineFields(): void {
+        const previousOldState = this.oldState;
+        const previousCurrentState = this.currentState;
+
         // maintain this.timeline as a reference to the live timeline,
         // and this.oldState and this.currentState as references to the
         // state at the start and end of that timeline. These are more
@@ -930,6 +1060,17 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             .getState(EventTimeline.BACKWARDS);
         this.currentState = this.getLiveTimeline()
             .getState(EventTimeline.FORWARDS);
+
+        // Let people know to register new listeners for the new state
+        // references. The reference won't necessarily change every time so only
+        // emit when we see a change.
+        if (previousOldState !== this.oldState) {
+            this.emit(RoomEvent.OldStateUpdated, this, previousOldState, this.oldState);
+        }
+
+        if (previousCurrentState !== this.currentState) {
+            this.emit(RoomEvent.CurrentStateUpdated, this, previousCurrentState, this.currentState);
+        }
     }
 
     /**
@@ -995,6 +1136,24 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     public addTimeline(): EventTimeline {
         return this.getUnfilteredTimelineSet().addTimeline();
+    }
+
+    /**
+     * Whether the timeline needs to be refreshed in order to pull in new
+     * historical messages that were imported.
+     * @param {Boolean} value The value to set
+     */
+    public setTimelineNeedsRefresh(value: boolean): void {
+        this.timelineNeedsRefresh = value;
+    }
+
+    /**
+     * Whether the timeline needs to be refreshed in order to pull in new
+     * historical messages that were imported.
+     * @return {Boolean} .
+     */
+    public getTimelineNeedsRefresh(): boolean {
+        return this.timelineNeedsRefresh;
     }
 
     /**
@@ -1451,7 +1610,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                         return event.getSender() === this.client.getUserId();
                     });
                     if (filterType !== ThreadFilterType.My || currentUserParticipated) {
-                        timelineSet.getLiveTimeline().addEvent(thread.rootEvent, false);
+                        timelineSet.getLiveTimeline().addEvent(thread.rootEvent, {
+                            toStartOfTimeline: false,
+                        });
                     }
                 });
         }
@@ -1498,22 +1659,20 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         let latestMyThreadsRootEvent: MatrixEvent;
         const roomState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
         for (const rootEvent of threadRoots) {
-            this.threadsTimelineSets[0].addLiveEvent(
-                rootEvent,
-                DuplicateStrategy.Ignore,
-                false,
+            this.threadsTimelineSets[0].addLiveEvent(rootEvent, {
+                duplicateStrategy: DuplicateStrategy.Ignore,
+                fromCache: false,
                 roomState,
-            );
+            });
 
             const threadRelationship = rootEvent
                 .getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
             if (threadRelationship.current_user_participated) {
-                this.threadsTimelineSets[1].addLiveEvent(
-                    rootEvent,
-                    DuplicateStrategy.Ignore,
-                    false,
+                this.threadsTimelineSets[1].addLiveEvent(rootEvent, {
+                    duplicateStrategy: DuplicateStrategy.Ignore,
+                    fromCache: false,
                     roomState,
-                );
+                });
                 latestMyThreadsRootEvent = rootEvent;
             }
 
@@ -1774,15 +1933,20 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * "Room.timeline".
      *
      * @param {MatrixEvent} event Event to be added
-     * @param {string?} duplicateStrategy 'ignore' or 'replace'
-     * @param {boolean} fromCache whether the sync response came from cache
+     * @param {IAddLiveEventOptions} options addLiveEvent options
      * @fires module:client~MatrixClient#event:"Room.timeline"
      * @private
      */
-    private addLiveEvent(event: MatrixEvent, duplicateStrategy: DuplicateStrategy, fromCache = false): void {
+    private addLiveEvent(event: MatrixEvent, addLiveEventOptions: IAddLiveEventOptions): void {
+        const { duplicateStrategy, timelineWasEmpty, fromCache } = addLiveEventOptions;
+
         // add to our timeline sets
         for (let i = 0; i < this.timelineSets.length; i++) {
-            this.timelineSets[i].addLiveEvent(event, duplicateStrategy, fromCache);
+            this.timelineSets[i].addLiveEvent(event, {
+                duplicateStrategy,
+                fromCache,
+                timelineWasEmpty,
+            });
         }
 
         // synthesize and inject implicit read receipts
@@ -1868,11 +2032,15 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 if (timelineSet.getFilter()) {
                     if (timelineSet.getFilter().filterRoomTimeline([event]).length) {
                         timelineSet.addEventToTimeline(event,
-                            timelineSet.getLiveTimeline(), false);
+                            timelineSet.getLiveTimeline(), {
+                                toStartOfTimeline: false,
+                            });
                     }
                 } else {
                     timelineSet.addEventToTimeline(event,
-                        timelineSet.getLiveTimeline(), false);
+                        timelineSet.getLiveTimeline(), {
+                            toStartOfTimeline: false,
+                        });
                 }
             }
         }
@@ -2092,18 +2260,38 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * they will go to the end of the timeline.
      *
      * @param {MatrixEvent[]} events A list of events to add.
-     *
-     * @param {string} duplicateStrategy Optional. Applies to events in the
-     * timeline only. If this is 'replace' then if a duplicate is encountered, the
-     * event passed to this function will replace the existing event in the
-     * timeline. If this is not specified, or is 'ignore', then the event passed to
-     * this function will be ignored entirely, preserving the existing event in the
-     * timeline. Events are identical based on their event ID <b>only</b>.
-     *
-     * @param {boolean} fromCache whether the sync response came from cache
+     * @param {IAddLiveEventOptions} options addLiveEvent options
      * @throws If <code>duplicateStrategy</code> is not falsey, 'replace' or 'ignore'.
      */
-    public addLiveEvents(events: MatrixEvent[], duplicateStrategy?: DuplicateStrategy, fromCache = false): void {
+    public addLiveEvents(events: MatrixEvent[], addLiveEventOptions?: IAddLiveEventOptions): void;
+    /**
+     * @deprecated In favor of the overload with `IAddLiveEventOptions`
+     */
+    public addLiveEvents(events: MatrixEvent[], duplicateStrategy?: DuplicateStrategy, fromCache?: boolean): void;
+    public addLiveEvents(
+        events: MatrixEvent[],
+        duplicateStrategyOrOpts?: DuplicateStrategy | IAddLiveEventOptions,
+        fromCache = false,
+    ): void {
+        let duplicateStrategy = duplicateStrategyOrOpts as DuplicateStrategy;
+        let timelineWasEmpty: boolean;
+        if (typeof (duplicateStrategyOrOpts) === 'object') {
+            ({
+                duplicateStrategy,
+                fromCache = false,
+                /* roomState, (not used here) */
+                timelineWasEmpty,
+            } = duplicateStrategyOrOpts);
+        } else if (duplicateStrategyOrOpts !== undefined) {
+            // Deprecation warning
+            // FIXME: Remove after 2023-06-01 (technical debt)
+            logger.warn(
+                'Overload deprecated: ' +
+                '`Room.addLiveEvents(events, duplicateStrategy?, fromCache?)` ' +
+                'is deprecated in favor of the overload with `Room.addLiveEvents(events, IAddLiveEventOptions)`',
+            );
+        }
+
         if (duplicateStrategy && ["replace", "ignore"].indexOf(duplicateStrategy) === -1) {
             throw new Error("duplicateStrategy MUST be either 'replace' or 'ignore'");
         }
@@ -2141,7 +2329,11 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             eventsByThread[threadId]?.push(event);
 
             if (shouldLiveInRoom) {
-                this.addLiveEvent(event, duplicateStrategy, fromCache);
+                this.addLiveEvent(event, {
+                    duplicateStrategy,
+                    fromCache,
+                    timelineWasEmpty,
+                });
             }
         }
 

@@ -15,7 +15,16 @@ limitations under the License.
 */
 
 import { TestClient } from '../../TestClient';
-import { ClientEvent, EventType, MatrixEvent, RoomEvent } from "../../../src";
+import {
+    ClientEvent,
+    EventTimeline,
+    EventTimelineSet,
+    EventType,
+    IRoomTimelineData,
+    MatrixEvent,
+    Room,
+    RoomEvent,
+} from "../../../src";
 import { CallEventHandler, CallEventHandlerEvent } from "../../../src/webrtc/callEventHandler";
 import { SyncState } from "../../../src/sync";
 
@@ -23,6 +32,8 @@ describe("callEventHandler", () => {
     it("should ignore a call if invite & hangup come within a single sync", () => {
         const testClient = new TestClient();
         const client = testClient.client;
+        const room = new Room("!room:id", client, "@user:id");
+        const timelineData: IRoomTimelineData = { timeline: new EventTimeline(new EventTimelineSet(room, {})) };
         client.callEventHandler = new CallEventHandler(client);
         client.callEventHandler.start();
 
@@ -33,7 +44,7 @@ describe("callEventHandler", () => {
                 call_id: "123",
             },
         });
-        client.emit(RoomEvent.Timeline, callInvite);
+        client.emit(RoomEvent.Timeline, callInvite, room, false, false, timelineData);
 
         const callHangup = new MatrixEvent({
             type: EventType.CallHangup,
@@ -41,13 +52,13 @@ describe("callEventHandler", () => {
                 call_id: "123",
             },
         });
-        client.emit(RoomEvent.Timeline, callHangup);
+        client.emit(RoomEvent.Timeline, callHangup, room, false, false, timelineData);
 
         const incomingCallEmitted = jest.fn();
         client.on(CallEventHandlerEvent.Incoming, incomingCallEmitted);
 
         client.getSyncState = jest.fn().mockReturnValue(SyncState.Syncing);
-        client.emit(ClientEvent.Sync);
+        client.emit(ClientEvent.Sync, SyncState.Syncing);
 
         expect(incomingCallEmitted).not.toHaveBeenCalled();
     });

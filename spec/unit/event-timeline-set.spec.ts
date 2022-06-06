@@ -23,6 +23,7 @@ import {
     MatrixEvent,
     MatrixEventEvent,
     Room,
+    DuplicateStrategy,
 } from '../../src';
 
 describe('EventTimelineSet', () => {
@@ -69,6 +70,76 @@ describe('EventTimelineSet', () => {
             event: true,
             replyToMessage: messageEvent,
         }) as MatrixEvent;
+    });
+
+    describe('addLiveEvent', () => {
+        it("Adds event to the live timeline in the timeline set", () => {
+            const liveTimeline = eventTimelineSet.getLiveTimeline();
+            expect(liveTimeline.getEvents().length).toStrictEqual(0);
+            eventTimelineSet.addLiveEvent(messageEvent);
+            expect(liveTimeline.getEvents().length).toStrictEqual(1);
+        });
+
+        it("should replace a timeline event if dupe strategy is 'replace'", () => {
+            const liveTimeline = eventTimelineSet.getLiveTimeline();
+            expect(liveTimeline.getEvents().length).toStrictEqual(0);
+            eventTimelineSet.addLiveEvent(messageEvent, {
+                duplicateStrategy: DuplicateStrategy.Replace,
+            });
+            expect(liveTimeline.getEvents().length).toStrictEqual(1);
+
+            // make a duplicate
+            const duplicateMessageEvent = utils.mkMessage({
+                room: roomId, user: userA, msg: "dupe", event: true,
+            }) as MatrixEvent;
+            duplicateMessageEvent.event.event_id = messageEvent.getId();
+
+            // Adding the duplicate event should replace the `messageEvent`
+            // because it has the same `event_id` and duplicate strategy is
+            // replace.
+            eventTimelineSet.addLiveEvent(duplicateMessageEvent, {
+                duplicateStrategy: DuplicateStrategy.Replace,
+            });
+
+            const eventsInLiveTimeline = liveTimeline.getEvents();
+            expect(eventsInLiveTimeline.length).toStrictEqual(1);
+            expect(eventsInLiveTimeline[0]).toStrictEqual(duplicateMessageEvent);
+        });
+
+        it("Make sure legacy overload passing options directly as parameters still works", () => {
+            expect(() => eventTimelineSet.addLiveEvent(messageEvent, DuplicateStrategy.Replace, false)).not.toThrow();
+            expect(() => eventTimelineSet.addLiveEvent(messageEvent, DuplicateStrategy.Ignore, true)).not.toThrow();
+        });
+    });
+
+    describe('addEventToTimeline', () => {
+        it("Adds event to timeline", () => {
+            const liveTimeline = eventTimelineSet.getLiveTimeline();
+            expect(liveTimeline.getEvents().length).toStrictEqual(0);
+            eventTimelineSet.addEventToTimeline(messageEvent, liveTimeline, {
+                toStartOfTimeline: true,
+            });
+            expect(liveTimeline.getEvents().length).toStrictEqual(1);
+        });
+
+        it("Make sure legacy overload passing options directly as parameters still works", () => {
+            const liveTimeline = eventTimelineSet.getLiveTimeline();
+            expect(() => {
+                eventTimelineSet.addEventToTimeline(
+                    messageEvent,
+                    liveTimeline,
+                    true,
+                );
+            }).not.toThrow();
+            expect(() => {
+                eventTimelineSet.addEventToTimeline(
+                    messageEvent,
+                    liveTimeline,
+                    true,
+                    false,
+                );
+            }).not.toThrow();
+        });
     });
 
     describe('aggregateRelations', () => {

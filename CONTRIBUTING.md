@@ -129,6 +129,16 @@ When writing unit tests, please aim for a high level of test coverage
 for new code - 80% or greater. If you cannot achieve that, please document
 why it's not possible in your PR.
 
+Some sections of code are not sensible to add coverage for, such as those
+which explicitly inhibit noisy logging for tests. Which can be hidden using
+an istanbul magic comment as [documented here][1]. See example:
+```javascript
+/* istanbul ignore if */
+if (process.env.NODE_ENV !== "test") {
+    logger.error("Log line that is noisy enough in tests to want to skip");
+}
+```
+
 Tests validate that your change works as intended and also document
 concisely what is being changed. Ideally, your new tests fail
 prior to your change, and succeed once it has been applied. You may
@@ -258,3 +268,5 @@ When stacking pull requests, you may wish to do the following:
 2. Branch from your base branch (branch1) to your work branch (branch2), push commits and open a pull request configuring the base to be branch1, saying in the description that it is based on your other PR.
 3. Merge the first PR using a merge commit otherwise your stacked PR will need a rebase. Github will automatically adjust the base branch of your other PR to be develop.
 
+
+[1]: https://github.com/gotwarlost/istanbul/blob/master/ignoring-code-for-coverage.md

@@ -9,5 +9,8 @@
     "packageRules": [{
         "matchFiles": ["package.json"],
         "rangeStrategy": "update-lockfile"
-    }]
+    }],
+    "platformAutomerge": true,
+    "automerge": true,
+    "automergeType": "pr"
 }
