@@ -40,8 +40,8 @@ describe('EventTimelineSet', () => {
 
     const itShouldReturnTheRelatedEvents = () => {
         it('should return the related events', () => {
-            eventTimelineSet.relations.aggregate(messageEvent);
-            const relations = eventTimelineSet.relations.getRelationsForEvent(
+            eventTimelineSet.relations.aggregateChildEvent(messageEvent);
+            const relations = eventTimelineSet.relations.getChildEventsForEvent(
                 messageEvent.getId(),
                 "m.in_reply_to",
                 EventType.RoomMessage,
@@ -187,8 +187,8 @@ describe('EventTimelineSet', () => {
             });
 
             it('should not return the related events', () => {
-                eventTimelineSet.relations.aggregate(messageEvent);
-                const relations = eventTimelineSet.relations.getRelationsForEvent(
+                eventTimelineSet.relations.aggregateChildEvent(messageEvent);
+                const relations = eventTimelineSet.relations.getChildEventsForEvent(
                     messageEvent.getId(),
                     "m.in_reply_to",
                     EventType.RoomMessage,

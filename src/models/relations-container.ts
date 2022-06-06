@@ -22,10 +22,10 @@ import { MatrixClient } from "../client";
 import { Room } from "./room";
 
 export class RelationsContainer {
-    // A tree of objects to access a set of relations for an event, as in:
-    // this.relations[relatesToEventId][relationType][relationEventType]
+    // A tree of objects to access a set of related children for an event, as in:
+    // this.relations[parentEventId][relationType][relationEventType]
     private relations: {
-        [relatesToEventId: string]: {
+        [parentEventId: string]: {
             [relationType: RelationType | string]: {
                 [eventType: EventType | string]: Relations;
             };
@@ -36,13 +36,13 @@ export class RelationsContainer {
     }
 
     /**
-     * Get a collection of relations to a given event in this timeline set.
+     * Get a collection of child events to a given event in this timeline set.
      *
      * @param {String} eventId
-     * The ID of the event that you'd like to access relation events for.
+     * The ID of the event that you'd like to access child events for.
      * For example, with annotations, this would be the ID of the event being annotated.
      * @param {String} relationType
-     * The type of relation involved, such as "m.annotation", "m.reference", "m.replace", etc.
+     * The type of relationship involved, such as "m.annotation", "m.reference", "m.replace", etc.
      * @param {String} eventType
      * The relation event's type, such as "m.reaction", etc.
      * @throws If <code>eventId</code>, <code>relationType</code> or <code>eventType</code>
@@ -52,7 +52,7 @@ export class RelationsContainer {
      * A container for relation events or undefined if there are no relation events for
      * the relationType.
      */
-    public getRelationsForEvent(
+    public getChildEventsForEvent(
         eventId: string,
         relationType: RelationType | string,
         eventType: EventType | string,
@@ -60,8 +60,8 @@ export class RelationsContainer {
         return this.relations[eventId]?.[relationType]?.[eventType];
     }
 
-    public getAllRelationsEventsForEvent(eventId: string): MatrixEvent[] {
-        const relationsForEvent = this.relations[eventId] ?? {};
+    public getAllChildEventsForEvent(parentEventId: string): MatrixEvent[] {
+        const relationsForEvent = this.relations[parentEventId] ?? {};
         const events: MatrixEvent[] = [];
         for (const relationsRecord of Object.values(relationsForEvent)) {
             for (const relations of Object.values(relationsRecord)) {
@@ -72,11 +72,13 @@ export class RelationsContainer {
     }
 
     /**
-     * Set an event as the target event if any Relations exist for it already
+     * Set an event as the target event if any Relations exist for it already.
+     * Child events can point to other child events as their parent, so this method may be
+     * called for events which are also logically child events.
      *
      * @param {MatrixEvent} event The event to check as relation target.
      */
-    public setRelationsTarget(event: MatrixEvent): void {
+    public aggregateParentEvent(event: MatrixEvent): void {
         const relationsForEvent = this.relations[event.getId()];
         if (!relationsForEvent) return;
 
@@ -90,10 +92,10 @@ export class RelationsContainer {
     /**
      * Add relation events to the relevant relation collection.
      *
-     * @param {MatrixEvent} event The new relation event to be aggregated.
+     * @param {MatrixEvent} event The new child event to be aggregated.
      * @param {EventTimelineSet} timelineSet The event timeline set within which to search for the related event if any.
      */
-    public aggregate(event: MatrixEvent, timelineSet?: EventTimelineSet): void {
+    public aggregateChildEvent(event: MatrixEvent, timelineSet?: EventTimelineSet): void {
         if (event.isRedacted() || event.status === EventStatus.CANCELLED) {
             return;
         }
@@ -109,7 +111,7 @@ export class RelationsContainer {
                 return;
             }
 
-            this.aggregate(event, timelineSet);
+            this.aggregateChildEvent(event, timelineSet);
         };
 
         // If the event is currently encrypted, wait until it has been decrypted.

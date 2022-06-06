@@ -1813,7 +1813,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         toStartOfTimeline: boolean,
     ): Thread {
         if (rootEvent) {
-            const relatedEvents = this.relations.getAllRelationsEventsForEvent(rootEvent.getId());
+            const relatedEvents = this.relations.getAllChildEventsForEvent(rootEvent.getId());
             if (relatedEvents?.length) {
                 // Include all relations of the root event, given it'll be visible in both timelines,
                 // except `m.replace` as that will already be applied atop the event using `MatrixEvent::makeReplaced`
@@ -2098,7 +2098,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @param {module:models/event.MatrixEvent} event the relation event that needs to be aggregated.
      */
     private aggregateNonLiveRelation(event: MatrixEvent): void {
-        this.relations.aggregate(event);
+        this.relations.aggregateChildEvent(event);
     }
 
     public getEventForTxnId(txnId: string): MatrixEvent {

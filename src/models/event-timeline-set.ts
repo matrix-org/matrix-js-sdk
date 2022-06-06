@@ -696,8 +696,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         });
         this._eventIdToTimeline[eventId] = timeline;
 
-        this.relations.setRelationsTarget(event);
-        this.relations.aggregate(event, this);
+        this.relations.aggregateParentEvent(event);
+        this.relations.aggregateChildEvent(event, this);
 
         const data: IRoomTimelineData = {
             timeline: timeline,
