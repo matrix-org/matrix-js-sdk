@@ -133,9 +133,9 @@ Some sections of code are not sensible to add coverage for, such as those
 which explicitly inhibit noisy logging for tests. Which can be hidden using
 an istanbul magic comment as [documented here][1]. See example:
 ```javascript
-/* istanbul ignore if */ // Adds a lot of noise to test runs, so disable logging there.
+/* istanbul ignore if */
 if (process.env.NODE_ENV !== "test") {
-    logger.error("WebRTC is not supported in this browser / environment");
+    logger.error("Log line that we want is noisy enough in tests to skip");
 }
 ```
 
