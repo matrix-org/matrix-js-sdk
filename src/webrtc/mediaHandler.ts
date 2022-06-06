@@ -71,7 +71,7 @@ export class MediaHandler extends TypedEventEmitter<
      * undefined treated as unset
      */
     public async setAudioInput(deviceId: string): Promise<void> {
-        logger.info("LOG setting audio input to", deviceId);
+        logger.info("Setting audio input to", deviceId);
 
         if (this.audioInput === deviceId) return;
 
@@ -84,7 +84,7 @@ export class MediaHandler extends TypedEventEmitter<
      * @param {AudioSettings} opts audio options to set
      */
     public async setAudioSettings(opts: AudioSettings): Promise<void> {
-        logger.info("LOG setting audio settings to", opts);
+        logger.info("Setting audio settings to", opts);
 
         this.audioSettings = Object.assign({}, opts) as AudioSettings;
         await this.updateLocalUsermediaStreams();
@@ -96,7 +96,7 @@ export class MediaHandler extends TypedEventEmitter<
      * undefined treated as unset
      */
     public async setVideoInput(deviceId: string): Promise<void> {
-        logger.info("LOG setting video input to", deviceId);
+        logger.info("Setting video input to", deviceId);
 
         if (this.videoInput === deviceId) return;
 
