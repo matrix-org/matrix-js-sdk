@@ -1007,6 +1007,10 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
             logger.warn("Can't sent to DC in state", call.dataChannel.readyState);
         }
 
+        // we have to create a new offer first so we can answer it
+        const offer = await call.peerConn.createOffer();
+        call.peerConn.setLocalDescription(offer);
+
         // FIXME: play nice with application-layer use of the DC
         //
         // TODO: rather than gutwrenching into our MatrixCall's peerConnection,
