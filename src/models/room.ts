@@ -1654,7 +1654,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         toStartOfTimeline: boolean,
     ): Thread {
         if (rootEvent) {
-            const relatedEvents = this.relations.getAllRelationsEventForEvent(rootEvent.getId());
+            const relatedEvents = this.relations.getAllRelationsEventsForEvent(rootEvent.getId());
             if (relatedEvents?.length) {
                 // Include all relations of the root event, given it'll be visible in both timelines,
                 // except `m.replace` as that will already be applied atop the event using `MatrixEvent::makeReplaced`

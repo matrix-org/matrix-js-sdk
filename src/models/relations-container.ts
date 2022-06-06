@@ -60,7 +60,7 @@ export class RelationsContainer {
         return this.relations[eventId]?.[relationType]?.[eventType];
     }
 
-    public getAllRelationsEventForEvent(eventId: string): MatrixEvent[] {
+    public getAllRelationsEventsForEvent(eventId: string): MatrixEvent[] {
         const relationsForEvent = this.relations[eventId] ?? {};
         const events: MatrixEvent[] = [];
         for (const relationsRecord of Object.values(relationsForEvent)) {
