@@ -1285,8 +1285,10 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
                 this.sendMemberStateEvent();
 
                 const memberStateEvents = this.room.currentState.getStateEvents(EventType.GroupCallMemberPrefix);
+                const localUserId = this.client.getUserId();
                 for (const stateEvent of memberStateEvents) {
                     const userId = stateEvent.getStateKey();
+                    if (userId === localUserId) continue;
                     const device = this.getDeviceForMember(userId);
                     this.subscribeStream(call, userId, device);
                 }

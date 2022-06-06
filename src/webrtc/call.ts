@@ -2463,6 +2463,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
         this.opponentCaps = msg.capabilities || {} as CallCapabilities;
         this.opponentMember = this.client.getRoom(this.roomId).getMember(ev.getSender());
+        if (!this.opponentMember && this.client.localSfu) {
+            // XXX: call.ts is obsessed about there only being one person it's talking to
+            // but in an SFU world, there can be many.
+            logger.warn("choosing ourselves as an opponent for the SFU call for now");
+            this.opponentMember = this.client.getRoom(this.roomId).getMember(this.client.getUserId());
+        }
     }
 
     private async addBufferedIceCandidates(): Promise<void> {
