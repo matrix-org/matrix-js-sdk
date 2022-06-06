@@ -24,12 +24,12 @@ Things that should go into your PR description:
  * References to any bugs fixed by the change (in GitHub's `Fixes` notation)
  * Describe the why and what is changing in the PR description so it's easy for
    onlookers and reviewers to onboard and context switch. This information is
-   also helpful when we come to look at this in 6 months and ask "why did we do
-   it like that?" we have a chance of finding out.
-      * Why is the change necessary? What problem does it solve? Why didn't it
-        work before? Why does it work now? What use cases does it unlock?
+   also helpful when we come back to look at this in 6 months and ask "why did
+   we do it like that?" we have a chance of finding out.
+      * Why didn't it work before? Why does it work now? What use cases does it
+        unlock?
       * If you find yourself adding information on how the code works or why you
-        chose to do it the way you did, make sure this information is also
+        chose to do it the way you did, make sure this information is instead
         written as comments in the code itself.
       * Sometimes a PR can change considerably as it is developed. In this case,
         the description should be updated to reflect the most recent state of
