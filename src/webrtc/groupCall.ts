@@ -172,6 +172,48 @@ function isFloat(value) {
     );
 }
 
+interface IMediaBlock {
+    mid?: string;
+    trackDesc?: ISfuTrackDesc;
+}
+
+function getTrackDesc(sdp: string, mid: string): ISfuTrackDesc | undefined {
+    // sdp mangling to grab the a=msid: line out of SDP for a given mid
+    if (!sdp) return;
+
+    const mediaByMids: Map<string, IMediaBlock> = new Map();
+    let mediaBlock: IMediaBlock = {};
+    let matches;
+    for (const line of sdp.split(/\r?\n/)) {
+        if (line.match(/^m=/)) {
+            if (mediaBlock.mid !== undefined) {
+                mediaByMids.set(mediaBlock.mid, mediaBlock);
+            }
+            mediaBlock = {};
+        }
+        matches = line.match(/^a=mid:(.*?)$/);
+        if (matches) {
+            mediaBlock.mid = matches[1];
+        }
+        matches = line.match(/^a=msid:(.*?) (.*?)$/);
+        if (matches) {
+            mediaBlock.trackDesc = {
+                stream_id: matches[1],
+                track_id: matches[2],
+            };
+        }
+    }
+    if (mediaBlock.mid) {
+        mediaByMids.set(mediaBlock.mid, mediaBlock);
+    }
+
+    if (mediaByMids.get(mid)) {
+        return mediaByMids.get(mid).trackDesc;
+    } else {
+        return;
+    }
+}
+
 export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventHandlerMap> {
     // Config
     public activeSpeakerInterval = 1000;
@@ -683,8 +725,8 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
                 logger.warn("Can't publish accurate m.call.member event as SFU call not set up yet");
                 // placeholder feed content
                 feeds = this.getLocalFeeds().map((feed) => ({
-                            "purpose": feed.purpose,
-                        }));
+                    "purpose": feed.purpose,
+                }));
             } else {
                 feeds = this.getLocalFeeds().map((feed) => ({
                     "purpose": SDPStreamMetadataPurpose.Usermedia, // FIXME - track
@@ -695,15 +737,15 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
                     //
                     // TODO: correctly track which rtpSenders are associated with which feed
                     // rather than assuming that all our senders are from this feed.
-                    "tracks": this.calls[0].peerConn.getSenders().map((rtpSender) => ({
-                        "id": rtpSender.track.id,
-                        "kind": rtpSender.track.kind,
-                        "settings": defloat(rtpSender.track.getSettings()),
+                    "tracks": this.calls[0].peerConn.getTransceivers().map(transceiver => ({
+                        "id": getTrackDesc(this.calls[0].peerConn.localDescription?.sdp, transceiver.mid)?.track_id,
+                        "kind": transceiver.sender.track.kind,
+                        "settings": defloat(transceiver.sender.track.getSettings()),
                     })),
                 }));
+                console.warn("calculated SFU feeds as", feeds);
             }
-        }
-        else {
+        } else {
             feeds = this.getLocalFeeds().map((feed) => ({
                 "purpose": feed.purpose,
                 // don't bother publishing feed details
@@ -913,9 +955,6 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
                 this.addCall(newCall);
             }
 
-            // actually publish our new feed IDs
-            await this.sendMemberStateEvent();
-
             if (this.client.localSfu) {
                 // TODO: play nice with application layer DC listeners
                 newCall.dataChannel.onmessage = this.onDataChannelMessage.bind(this, newCall);
@@ -936,17 +975,25 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
 
         const streams: ISfuTrackDesc[] = [];
         for (const feed of device.feeds) {
-            for (const track of feed.tracks) {
-                streams.push({
-                    "stream_id": "unknown",
-                    "track_id": track.id,
-                });
+            if (!feed.tracks) {
+                logger.warn(`missing feeds for ${userId}`);
+            }
+            else {
+                for (const track of feed.tracks) {
+                    streams.push({
+                        "stream_id": "unknown",
+                        "track_id": track.id,
+                    });
+                }
             }
         }
 
         if (streams.length == 0) {
             logger.warn("Failed to find any streams to subscribe to");
             return;
+        }
+        else {
+            logger.info("Subscribing to ", streams, userId);
         }
 
         if (call.dataChannel.readyState === 'connecting') {
@@ -1229,6 +1276,10 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
             // if we're calling an SFU, subscribe to its feeds
             // XXX: check that datachannel is open first?
             if (this.client.localSfu) {
+                // now we know what our feed IDs are, we can publish them
+                // so others can subscribe to us...
+                this.sendMemberStateEvent();
+
                 const memberStateEvents = this.room.currentState.getStateEvents(EventType.GroupCallMemberPrefix);
                 for (const stateEvent of memberStateEvents) {
                     const userId = stateEvent.getStateKey();
