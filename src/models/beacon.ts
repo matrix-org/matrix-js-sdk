@@ -135,6 +135,13 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
                     expiryInMs,
                 );
             }
+        } else if (this._beaconInfo?.timestamp > Date.now()) {
+            // beacon start timestamp is in the future
+            // check liveness again then
+            this.livenessWatchInterval = setInterval(
+                () => { this.monitorLiveness(); },
+                this.beaconInfo?.timestamp - Date.now(),
+            );
         }
     }
 
