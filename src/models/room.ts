@@ -49,6 +49,7 @@ import {
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { ReceiptType } from "../@types/read_receipts";
 import { IStateEventWithRoomId } from "../@types/search";
+import { RelationsContainer } from "./relations-container";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -80,7 +81,6 @@ interface IOpts {
     storageToken?: string;
     pendingEventOrdering?: PendingEventOrdering;
     timelineSupport?: boolean;
-    unstableClientRelationAggregation?: boolean;
     lazyLoadMembers?: boolean;
 }
 
@@ -277,6 +277,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * prefer getLiveTimeline().getState(EventTimeline.FORWARDS).
      */
     public currentState: RoomState;
+    public readonly relations = new RelationsContainer(this.client, this);
 
     /**
      * @experimental
@@ -338,10 +339,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * "chronological".
      * @param {boolean} [opts.timelineSupport = false] Set to true to enable improved
      * timeline support.
-     * @param {boolean} [opts.unstableClientRelationAggregation = false]
-     * Optional. Set to true to enable client-side aggregation of event relations
-     * via `EventTimelineSet#getRelationsForEvent`.
-     * This feature is currently unstable and the API may change without notice.
      */
     constructor(
         public readonly roomId: string,
@@ -1737,7 +1734,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
 
         // A thread relation is always only shown in a thread
-        if (event.isThreadRelation) {
+        if (event.isRelation(THREAD_RELATION_TYPE.name)) {
             return {
                 shouldLiveInRoom: false,
                 shouldLiveInThread: true,
@@ -1816,8 +1813,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         toStartOfTimeline: boolean,
     ): Thread {
         if (rootEvent) {
-            const tl = this.getTimelineForEvent(rootEvent.getId());
-            const relatedEvents = tl?.getTimelineSet().getAllRelationsEventForEvent(rootEvent.getId());
+            const relatedEvents = this.relations.getAllChildEventsForEvent(rootEvent.getId());
             if (relatedEvents?.length) {
                 // Include all relations of the root event, given it'll be visible in both timelines,
                 // except `m.replace` as that will already be applied atop the event using `MatrixEvent::makeReplaced`
@@ -2102,24 +2098,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @param {module:models/event.MatrixEvent} event the relation event that needs to be aggregated.
      */
     private aggregateNonLiveRelation(event: MatrixEvent): void {
-        const { shouldLiveInRoom, threadId } = this.eventShouldLiveIn(event);
-        const thread = this.getThread(threadId);
-        thread?.timelineSet.aggregateRelations(event);
-
-        if (shouldLiveInRoom) {
-            // TODO: We should consider whether this means it would be a better
-            // design to lift the relations handling up to the room instead.
-            for (let i = 0; i < this.timelineSets.length; i++) {
-                const timelineSet = this.timelineSets[i];
-                if (timelineSet.getFilter()) {
-                    if (timelineSet.getFilter().filterRoomTimeline([event]).length) {
-                        timelineSet.aggregateRelations(event);
-                    }
-                } else {
-                    timelineSet.aggregateRelations(event);
-                }
-            }
-        }
+        this.relations.aggregateChildEvent(event);
     }
 
     public getEventForTxnId(txnId: string): MatrixEvent {
@@ -2405,7 +2384,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     private findThreadRoots(events: MatrixEvent[]): Set<string> {
         const threadRoots = new Set<string>();
         for (const event of events) {
-            if (event.isThreadRelation) {
+            if (event.isRelation(THREAD_RELATION_TYPE.name)) {
                 threadRoots.add(event.relationEventId);
             }
         }

@@ -2334,7 +2334,7 @@ describe("Room", function() {
             const thread = threadRoot.getThread();
             expect(thread.rootEvent).toBe(threadRoot);
 
-            const rootRelations = thread.timelineSet.getRelationsForEvent(
+            const rootRelations = thread.timelineSet.relations.getChildEventsForEvent(
                 threadRoot.getId(),
                 RelationType.Annotation,
                 EventType.Reaction,
@@ -2344,7 +2344,7 @@ describe("Room", function() {
             expect(rootRelations[0][1].size).toEqual(1);
             expect(rootRelations[0][1].has(rootReaction)).toBeTruthy();
 
-            const responseRelations = thread.timelineSet.getRelationsForEvent(
+            const responseRelations = thread.timelineSet.relations.getChildEventsForEvent(
                 threadResponse.getId(),
                 RelationType.Annotation,
                 EventType.Reaction,

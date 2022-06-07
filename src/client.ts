@@ -323,13 +323,6 @@ export interface ICreateClientOpts {
      */
     sessionStore?: SessionStore;
 
-    /**
-     * Set to true to enable client-side aggregation of event relations
-     * via `EventTimelineSet#getRelationsForEvent`.
-     * This feature is currently unstable and the API may change without notice.
-     */
-    unstableClientRelationAggregation?: boolean;
-
     verificationMethods?: Array<VerificationMethod>;
 
     /**
@@ -903,7 +896,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public clientRunning = false;
     public timelineSupport = false;
     public urlPreviewCache: { [key: string]: Promise<IPreviewUrlResponse> } = {};
-    public unstableClientRelationAggregation = false;
     public identityServer: IIdentityServerProvider;
     public sessionStore: SessionStore; // XXX: Intended private, used in code.
     public http: MatrixHttpApi; // XXX: Intended private, used in code.
@@ -1035,7 +1027,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         this.timelineSupport = Boolean(opts.timelineSupport);
-        this.unstableClientRelationAggregation = !!opts.unstableClientRelationAggregation;
 
         this.cryptoStore = opts.cryptoStore;
         this.sessionStore = opts.sessionStore;

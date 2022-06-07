@@ -202,13 +202,11 @@ export class SyncApi {
         const client = this.client;
         const {
             timelineSupport,
-            unstableClientRelationAggregation,
         } = client;
         const room = new Room(roomId, client, client.getUserId(), {
             lazyLoadMembers: this.opts.lazyLoadMembers,
             pendingEventOrdering: this.opts.pendingEventOrdering,
             timelineSupport,
-            unstableClientRelationAggregation,
         });
         client.reEmitter.reEmit(room, [
             RoomEvent.Name,
