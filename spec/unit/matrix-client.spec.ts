@@ -777,7 +777,7 @@ describe("MatrixClient", function() {
                 expectBody: content,
             }];
 
-            await client.sendEvent(roomId, EventType.RoomMessage, content, txnId);
+            await client.sendEvent(roomId, EventType.RoomMessage, { ...content }, txnId);
         });
 
         it("overload with null threadId works", async () => {
@@ -790,20 +790,28 @@ describe("MatrixClient", function() {
                 expectBody: content,
             }];
 
-            await client.sendEvent(roomId, null, EventType.RoomMessage, content, txnId);
+            await client.sendEvent(roomId, null, EventType.RoomMessage, { ...content }, txnId);
         });
 
         it("overload with threadId works", async () => {
             const eventId = "$eventId:example.org";
             const txnId = client.makeTxnId();
+            const threadId = "$threadId:server";
             httpLookups = [{
                 method: "PUT",
                 path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
                 data: { event_id: eventId },
-                expectBody: content,
+                expectBody: {
+                    ...content,
+                    "m.relates_to": {
+                        "event_id": threadId,
+                        "is_falling_back": true,
+                        "rel_type": "m.thread",
+                    },
+                },
             }];
 
-            await client.sendEvent(roomId, "$threadId:server", EventType.RoomMessage, content, txnId);
+            await client.sendEvent(roomId, threadId, EventType.RoomMessage, { ...content }, txnId);
         });
 
         it("should add thread relation if threadId is passed and the relation is missing", async () => {
@@ -834,7 +842,7 @@ describe("MatrixClient", function() {
                 },
             }];
 
-            await client.sendEvent(roomId, threadId, EventType.RoomMessage, content, txnId);
+            await client.sendEvent(roomId, threadId, EventType.RoomMessage, { ...content }, txnId);
         });
 
         it("should add thread relation if threadId is passed and the relation is missing with reply", async () => {
@@ -874,7 +882,7 @@ describe("MatrixClient", function() {
                 },
             }];
 
-            await client.sendEvent(roomId, threadId, EventType.RoomMessage, content, txnId);
+            await client.sendEvent(roomId, threadId, EventType.RoomMessage, { ...content }, txnId);
         });
     });
 
