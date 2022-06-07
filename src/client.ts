@@ -3785,7 +3785,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 content["m.relates_to"]["m.in_reply_to"] = {
                     "event_id": thread.lastReply((ev: MatrixEvent) => {
                         return ev.isRelation(THREAD_RELATION_TYPE.name) && !ev.status;
-                    })?.getId(),
+                    })?.getId() ?? threadId,
                 };
             }
         }

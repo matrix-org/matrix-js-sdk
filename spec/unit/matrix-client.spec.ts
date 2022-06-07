@@ -812,10 +812,10 @@ describe("MatrixClient", function() {
             const txnId = client.makeTxnId();
 
             const room = new Room(roomId, client, userId);
-            store.storeRoom(room);
+            store.getRoom.mockReturnValue(room);
 
             const rootEvent = new MatrixEvent({ event_id: threadId });
-            room.createThread(threadId, rootEvent, [], false);
+            room.createThread(threadId, rootEvent, [rootEvent], false);
 
             httpLookups = [{
                 method: "PUT",
@@ -824,9 +824,12 @@ describe("MatrixClient", function() {
                 expectBody: {
                     ...content,
                     "m.relates_to": {
-                        event_id: threadId,
-                        is_falling_back: true,
-                        rel_type: "m.thread",
+                        "m.in_reply_to": {
+                            event_id: threadId,
+                        },
+                        "event_id": threadId,
+                        "is_falling_back": true,
+                        "rel_type": "m.thread",
                     },
                 },
             }];
@@ -849,10 +852,10 @@ describe("MatrixClient", function() {
             };
 
             const room = new Room(roomId, client, userId);
-            store.storeRoom(room);
+            store.getRoom.mockReturnValue(room);
 
             const rootEvent = new MatrixEvent({ event_id: threadId });
-            room.createThread(threadId, rootEvent, [], false);
+            room.createThread(threadId, rootEvent, [rootEvent], false);
 
             httpLookups = [{
                 method: "PUT",
