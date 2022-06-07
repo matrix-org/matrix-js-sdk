@@ -1,5 +1,5 @@
-Changes in [18.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v18.1.0-rc.1) (2022-05-31)
-============================================================================================================
+Changes in [18.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v18.1.0) (2022-06-07)
+==================================================================================================
 
 ## ✨ Features
  * Convert `getLocalAliases` to a stable API call ([\#2402](https://github.com/matrix-org/matrix-js-sdk/pull/2402)).
