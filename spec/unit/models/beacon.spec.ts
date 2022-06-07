@@ -224,7 +224,7 @@ describe('Beacon', () => {
                 beacon.monitorLiveness();
 
                 // @ts-ignore
-                expect(beacon.livenessWatchInterval).toBeFalsy();
+                expect(beacon.livenessWatchTimeout).toBeFalsy();
                 advanceDateAndTime(HOUR_MS * 2 + 1);
 
                 // no emit
@@ -289,12 +289,12 @@ describe('Beacon', () => {
 
                 beacon.monitorLiveness();
                 // @ts-ignore
-                const oldMonitor = beacon.livenessWatchInterval;
+                const oldMonitor = beacon.livenessWatchTimeout;
 
                 beacon.monitorLiveness();
 
                 // @ts-ignore
-                expect(beacon.livenessWatchInterval).not.toEqual(oldMonitor);
+                expect(beacon.livenessWatchTimeout).not.toEqual(oldMonitor);
             });
 
             it('destroy kills liveness monitor and emits', () => {
