@@ -57,7 +57,7 @@ jobs:
         with:
           username: ${{ github.event.pull_request.user.login }}
           organization: matrix-org
-          team: core-team
+          team: Core Team
           GITHUB_TOKEN: ${{ secrets.ELEMENT_BOT_TOKEN }}
 
       - name: Add label
