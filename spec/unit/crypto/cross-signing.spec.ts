@@ -24,6 +24,7 @@ import { resetCrossSigningKeys } from "./crypto-utils";
 import { MatrixError } from '../../../src/http-api';
 import { logger } from '../../../src/logger';
 import { ICreateClientOpts } from '../../../src';
+import { CryptoEvent } from '../../../src/crypto';
 
 const PUSH_RULES_RESPONSE = {
     method: "GET",
@@ -221,7 +222,7 @@ describe("Cross Signing", function() {
         );
 
         const keyChangePromise = new Promise((resolve, reject) => {
-            alice.once("crossSigning.keysChanged", async (e) => {
+            alice.once(CryptoEvent.KeysChanged, async (e) => {
                 resolve(e);
                 await alice.checkOwnCrossSigningTrust({
                     allowPrivateKeyRequests: true,
@@ -230,7 +231,7 @@ describe("Cross Signing", function() {
         });
 
         const uploadSigsPromise = new Promise((resolve, reject) => {
-            alice.uploadKeySignatures = jest.fn(async (content) => {
+            alice.uploadKeySignatures = jest.fn().mockImplementation(async (content) => {
                 try {
                     await olmlib.verifySignature(
                         alice.crypto.olmDevice,
@@ -470,7 +471,7 @@ describe("Cross Signing", function() {
         ]);
 
         const keyChangePromise = new Promise((resolve, reject) => {
-            alice.crypto.deviceList.once("userCrossSigningUpdated", (userId) => {
+            alice.crypto.deviceList.once(CryptoEvent.UserCrossSigningUpdated, (userId) => {
                 if (userId === "@bob:example.com") {
                     resolve();
                 }
@@ -885,9 +886,9 @@ describe("Cross Signing", function() {
         upgradePromise = new Promise((resolve) => {
             upgradeResolveFunc = resolve;
         });
-        alice.crypto.deviceList.emit("userCrossSigningUpdated", "@bob:example.com");
+        alice.crypto.deviceList.emit(CryptoEvent.UserCrossSigningUpdated, "@bob:example.com");
         await new Promise((resolve) => {
-            alice.crypto.on("userTrustStatusChanged", resolve);
+            alice.crypto.on(CryptoEvent.UserTrustStatusChanged, resolve);
         });
         await upgradePromise;
 
