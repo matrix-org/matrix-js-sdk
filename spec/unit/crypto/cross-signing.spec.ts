@@ -23,7 +23,7 @@ import { TestClient } from '../../TestClient';
 import { resetCrossSigningKeys } from "./crypto-utils";
 import { MatrixError } from '../../../src/http-api';
 import { logger } from '../../../src/logger';
-import { ICreateClientOpts } from '../../../src';
+import { ICrossSigningKey, ICreateClientOpts } from '../../../src/client';
 import { CryptoEvent } from '../../../src/crypto';
 
 const PUSH_RULES_RESPONSE = {
@@ -177,6 +177,8 @@ describe("Cross Signing", function() {
                     },
                 },
             },
+            firstUse: false,
+            crossSigningVerifiedBefore: false,
         });
         // Alice verifies Bob's key
         const promise = new Promise((resolve, reject) => {
@@ -230,7 +232,7 @@ describe("Cross Signing", function() {
             });
         });
 
-        const uploadSigsPromise = new Promise((resolve, reject) => {
+        const uploadSigsPromise = new Promise<void>((resolve, reject) => {
             alice.uploadKeySignatures = jest.fn().mockImplementation(async (content) => {
                 try {
                     await olmlib.verifySignature(
@@ -253,14 +255,15 @@ describe("Cross Signing", function() {
             });
         });
 
+        // @ts-ignore private property
         const deviceInfo = alice.crypto.deviceList.devices["@alice:example.com"]
             .Osborne2;
         const aliceDevice = {
             user_id: "@alice:example.com",
             device_id: "Osborne2",
+            keys: deviceInfo.keys,
+            algorithms: deviceInfo.algorithms,
         };
-        aliceDevice.keys = deviceInfo.keys;
-        aliceDevice.algorithms = deviceInfo.algorithms;
         await alice.crypto.signObject(aliceDevice);
         olmlib.pkSign(aliceDevice, selfSigningKey, "@alice:example.com", '');
 
@@ -378,7 +381,7 @@ describe("Cross Signing", function() {
         const bobSigning = new global.Olm.PkSigning();
         const bobPrivkey = bobSigning.generate_seed();
         const bobPubkey = bobSigning.init_with_seed(bobPrivkey);
-        const bobSSK = {
+        const bobSSK: ICrossSigningKey = {
             user_id: "@bob:example.com",
             usage: ["self_signing"],
             keys: {
@@ -470,7 +473,7 @@ describe("Cross Signing", function() {
             0x34, 0xf2, 0x4b, 0x64, 0x9b, 0x52, 0xf8, 0x5f,
         ]);
 
-        const keyChangePromise = new Promise((resolve, reject) => {
+        const keyChangePromise = new Promise<void>((resolve, reject) => {
             alice.crypto.deviceList.once(CryptoEvent.UserCrossSigningUpdated, (userId) => {
                 if (userId === "@bob:example.com") {
                     resolve();
@@ -478,14 +481,15 @@ describe("Cross Signing", function() {
             });
         });
 
+        // @ts-ignore private property
         const deviceInfo = alice.crypto.deviceList.devices["@alice:example.com"]
             .Osborne2;
         const aliceDevice = {
             user_id: "@alice:example.com",
             device_id: "Osborne2",
+            keys: deviceInfo.keys,
+            algorithms: deviceInfo.algorithms,
         };
-        aliceDevice.keys = deviceInfo.keys;
-        aliceDevice.algorithms = deviceInfo.algorithms;
         await alice.crypto.signObject(aliceDevice);
 
         const bobOlmAccount = new global.Olm.Account();
@@ -628,7 +632,7 @@ describe("Cross Signing", function() {
         const bobSigning = new global.Olm.PkSigning();
         const bobPrivkey = bobSigning.generate_seed();
         const bobPubkey = bobSigning.init_with_seed(bobPrivkey);
-        const bobSSK = {
+        const bobSSK: ICrossSigningKey = {
             user_id: "@bob:example.com",
             usage: ["self_signing"],
             keys: {
@@ -696,7 +700,7 @@ describe("Cross Signing", function() {
         const bobSigning = new global.Olm.PkSigning();
         const bobPrivkey = bobSigning.generate_seed();
         const bobPubkey = bobSigning.init_with_seed(bobPrivkey);
-        const bobSSK = {
+        const bobSSK: ICrossSigningKey = {
             user_id: "@bob:example.com",
             usage: ["self_signing"],
             keys: {
@@ -756,7 +760,7 @@ describe("Cross Signing", function() {
         const bobSigning2 = new global.Olm.PkSigning();
         const bobPrivkey2 = bobSigning2.generate_seed();
         const bobPubkey2 = bobSigning2.init_with_seed(bobPrivkey2);
-        const bobSSK2 = {
+        const bobSSK2: ICrossSigningKey = {
             user_id: "@bob:example.com",
             usage: ["self_signing"],
             keys: {
@@ -826,7 +830,7 @@ describe("Cross Signing", function() {
             { userId: "@alice:example.com", deviceId: "Osborne2" },
             {
                 cryptoCallbacks: {
-                    shouldUpgradeDeviceVerifications: (verifs) => {
+                    shouldUpgradeDeviceVerifications: async (verifs) => {
                         expect(verifs.users["@bob:example.com"]).toBeDefined();
                         upgradeResolveFunc();
                         return ["@bob:example.com"];
@@ -915,7 +919,7 @@ describe("Cross Signing", function() {
             const aliceSigning = new global.Olm.PkSigning();
             const alicePrivkey = aliceSigning.generate_seed();
             const alicePubkey = aliceSigning.init_with_seed(alicePrivkey);
-            const aliceSSK = {
+            const aliceSSK: ICrossSigningKey = {
                 user_id: "@alice:example.com",
                 usage: ["self_signing"],
                 keys: {
@@ -989,7 +993,7 @@ describe("Cross Signing", function() {
         const aliceSigning = new global.Olm.PkSigning();
         const alicePrivkey = aliceSigning.generate_seed();
         const alicePubkey = aliceSigning.init_with_seed(alicePrivkey);
-        const aliceSSK = {
+        const aliceSSK: ICrossSigningKey = {
             user_id: "@alice:example.com",
             usage: ["self_signing"],
             keys: {
