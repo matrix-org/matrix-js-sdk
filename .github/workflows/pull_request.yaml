@@ -9,6 +9,9 @@ on:
         default: "T-Defect,T-Deprecation,T-Enhancement,T-Task"
         required: true
         description: "One of these provided labels must be present"
+    secrets:
+      ELEMENT_BOT_TOKEN:
+        required: true
 concurrency: ${{ github.workflow }}-${{ github.event.pull_request.head.ref }}
 jobs:
   changelog:
