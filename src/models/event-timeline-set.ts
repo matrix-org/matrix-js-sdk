@@ -27,6 +27,7 @@ import { RoomState } from "./room-state";
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { RelationsContainer } from "./relations-container";
 import { MatrixClient } from "../client";
+import { Thread } from "./thread";
 
 const DEBUG = true;
 
@@ -110,7 +111,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * map from event_id to timeline and index.
      *
      * @constructor
-     * @param {?Room} room
+     * @param {Room=} room
      * Room for this timelineSet. May be null for non-room cases, such as the
      * notification timeline.
      * @param {Object} opts Options inherited from Room.
@@ -119,13 +120,15 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * Set to true to enable improved timeline support.
      * @param {Object} [opts.filter = null]
      * The filter object, if any, for this timelineSet.
-     * @param {MatrixClient} client the Matrix client which owns this EventTimelineSet,
+     * @param {MatrixClient=} client the Matrix client which owns this EventTimelineSet,
      * can be omitted if room is specified.
+     * @param {Thread=} thread the thread to which this timeline set relates.
      */
     constructor(
         public readonly room: Room | undefined,
         opts: IOpts = {},
         client?: MatrixClient,
+        public readonly thread?: Thread,
     ) {
         super();
 

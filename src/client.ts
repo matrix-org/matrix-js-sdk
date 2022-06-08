@@ -5245,6 +5245,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * <p>If the EventTimelineSet object already has the given event in its store, the
      * corresponding timeline will be returned. Otherwise, a /context request is
      * made, and used to construct an EventTimeline.
+     * If the event does not belong to this EventTimelineSet then undefined will be returned.
      *
      * @param {EventTimelineSet} timelineSet  The timelineSet to look for the event in
      * @param {string} eventId  The ID of the event to look for
@@ -5252,7 +5253,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {Promise} Resolves:
      *    {@link module:models/event-timeline~EventTimeline} including the given event
      */
-    public async getEventTimeline(timelineSet: EventTimelineSet, eventId: string): Promise<EventTimeline> {
+    public async getEventTimeline(timelineSet: EventTimelineSet, eventId: string): Promise<EventTimeline | undefined> {
         // don't allow any timeline support unless it's been enabled.
         if (!this.timelineSupport) {
             throw new Error("timeline support is disabled. Set the 'timelineSupport'" +
@@ -5297,38 +5298,47 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             ...res.events_before.map(mapper),
         ];
 
-        // Where the event is a thread reply (not a root) and running in MSC-enabled mode the Thread timeline only
-        // functions contiguously, so we have to jump through some hoops to get our target event in it.
-        // XXX: workaround for https://github.com/vector-im/element-meta/issues/150
-        if (Thread.hasServerSideSupport &&
-            this.supportsExperimentalThreads() &&
-            event.isRelation(THREAD_RELATION_TYPE.name)
-        ) {
-            const [, threadedEvents] = timelineSet.room.partitionThreadedEvents(events);
-            let thread = timelineSet.room.getThread(event.threadRootId);
-            if (!thread) {
-                thread = timelineSet.room.createThread(event.threadRootId, undefined, threadedEvents, true);
+        if (this.supportsExperimentalThreads()) {
+            const {
+                threadId = event.threadRootId,
+                shouldLiveInRoom = !!event.isThreadRoot || !event.threadRootId,
+            } = timelineSet.room?.eventShouldLiveIn(event) ?? {};
+
+            if (timelineSet.thread?.id != threadId) {
+                // Event does not belong in this timelineSet
+                return undefined;
             }
 
-            const opts: IRelationsRequestOpts = {
-                direction: Direction.Backward,
-                limit: 50,
-            };
+            if (!timelineSet.thread && !shouldLiveInRoom) {
+                // Thread response does not belong in this timelineSet
+                return undefined;
+            }
 
-            await thread.fetchInitialEvents();
-            let nextBatch = thread.liveTimeline.getPaginationToken(Direction.Backward);
+            // Where the event is a thread reply (not a root) and running in MSC-enabled mode the Thread timeline only
+            // functions contiguously, so we have to jump through some hoops to get our target event in it.
+            // XXX: workaround for https://github.com/vector-im/element-meta/issues/150
+            if (Thread.hasServerSideSupport && timelineSet.thread) {
+                const thread = timelineSet.thread;
+                const opts: IRelationsRequestOpts = {
+                    direction: Direction.Backward,
+                    limit: 50,
+                };
 
-            // Fetch events until we find the one we were asked for, or we run out of pages
-            while (!thread.findEventById(eventId)) {
-                if (nextBatch) {
-                    opts.from = nextBatch;
+                await thread.fetchInitialEvents();
+                let nextBatch = thread.liveTimeline.getPaginationToken(Direction.Backward);
+
+                // Fetch events until we find the one we were asked for, or we run out of pages
+                while (!thread.findEventById(eventId)) {
+                    if (nextBatch) {
+                        opts.from = nextBatch;
+                    }
+
+                    ({ nextBatch } = await thread.fetchEvents(opts));
+                    if (!nextBatch) break;
                 }
 
-                ({ nextBatch } = await thread.fetchEvents(opts));
-                if (!nextBatch) break;
+                return thread.liveTimeline;
             }
-
-            return thread.liveTimeline;
         }
 
         // Here we handle non-thread timelines only, but still process any thread events to populate thread summaries.

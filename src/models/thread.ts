@@ -90,7 +90,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         this.timelineSet = new EventTimelineSet(this.room, {
             timelineSupport: true,
             pendingEvents: true,
-        });
+        }, this.client, this);
         this.reEmitter = new TypedReEmitter(this);
 
         this.reEmitter.reEmit(this.timelineSet, [
