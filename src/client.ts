@@ -5306,7 +5306,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 return undefined;
             }
 
-            if (timelineSet.thread?.id != threadId) {
+            if (timelineSet.thread?.id !== threadId) {
                 // Event does not belong in this timelineSet
                 return undefined;
             }

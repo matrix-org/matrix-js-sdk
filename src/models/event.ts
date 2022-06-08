@@ -537,7 +537,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
         return mRelatesTo?.['m.in_reply_to']?.event_id;
     }
 
-    public get relationEventId(): string {
+    public get relationEventId(): string | undefined {
         return this.getWireContent()
             ?.["m.relates_to"]
             ?.event_id;
