@@ -5304,13 +5304,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 shouldLiveInRoom = !!event.isThreadRoot || !event.threadRootId,
             } = timelineSet.room?.eventShouldLiveIn(event) ?? {};
 
-            if (timelineSet.thread?.id != threadId) {
-                // Event does not belong in this timelineSet
+            if (!timelineSet.thread && !shouldLiveInRoom) {
+                // Thread response does not belong in this timelineSet
                 return undefined;
             }
 
-            if (!timelineSet.thread && !shouldLiveInRoom) {
-                // Thread response does not belong in this timelineSet
+            if (timelineSet.thread?.id != threadId) {
+                // Event does not belong in this timelineSet
                 return undefined;
             }
 

@@ -1,5 +1,5 @@
 import * as utils from "../test-utils/test-utils";
-import { EventTimeline, MatrixEvent } from "../../src/matrix";
+import { EventTimeline, Filter, MatrixEvent } from "../../src/matrix";
 import { logger } from "../../src/logger";
 import { TestClient } from "../TestClient";
 import { Thread, THREAD_RELATION_TYPE } from "../../src/models/thread";
@@ -597,6 +597,33 @@ describe("MatrixClient event timelines", function() {
 
             const timeline = await timelinePromise;
             expect(timeline).toBeUndefined();
+        });
+
+        it("should should add lazy loading filter when requested", async () => {
+            client.clientOpts.lazyLoadMembers = true;
+            client.stopClient(); // we don't need the client to be syncing at this time
+            const room = client.getRoom(roomId);
+            const timelineSet = room.getTimelineSets()[0];
+
+            const req = httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(EVENTS[0].event_id));
+            req.respond(200, function() {
+                return {
+                    start: "start_token0",
+                    events_before: [],
+                    event: EVENTS[0],
+                    events_after: [],
+                    end: "end_token0",
+                    state: [],
+                };
+            });
+            req.check((request) => {
+                expect(request.opts.qs.filter).toEqual(JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER));
+            });
+
+            await Promise.all([
+                client.getEventTimeline(timelineSet, EVENTS[0].event_id),
+                httpBackend.flushAllExpected(),
+            ]);
         });
     });
 
