@@ -1,5 +1,5 @@
 #!/bin/bash
-#
+
 # Script to perform a release of matrix-js-sdk and downstream projects.
 #
 # Requires:
