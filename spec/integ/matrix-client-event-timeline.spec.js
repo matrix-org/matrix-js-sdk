@@ -1,5 +1,5 @@
 import * as utils from "../test-utils/test-utils";
-import { EventTimeline } from "../../src/matrix";
+import { EventTimeline, MatrixEvent } from "../../src/matrix";
 import { logger } from "../../src/logger";
 import { TestClient } from "../TestClient";
 import { Thread, THREAD_RELATION_TYPE } from "../../src/models/thread";
@@ -500,7 +500,8 @@ describe("MatrixClient event timelines", function() {
             Thread.setServerSideSupport(true);
             client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId);
-            const timelineSet = room.getTimelineSets()[0];
+            const thread = room.createThread(THREAD_ROOT.event_id, undefined, [], false);
+            const timelineSet = thread.timelineSet;
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_REPLY.event_id))
                 .respond(200, function() {
@@ -537,6 +538,39 @@ describe("MatrixClient event timelines", function() {
 
             expect(timeline.getEvents().find(e => e.getId() === THREAD_ROOT.event_id)).toBeTruthy();
             expect(timeline.getEvents().find(e => e.getId() === THREAD_REPLY.event_id)).toBeTruthy();
+        });
+
+        it("should return undefined when event is not within a thread but timelineSet is", async () => {
+            client.clientOpts.experimentalThreadSupport = true;
+            Thread.setServerSideSupport(true);
+            client.stopClient(); // we don't need the client to be syncing at this time
+            const room = client.getRoom(roomId);
+            const threadRoot = new MatrixEvent(THREAD_ROOT);
+            const thread = room.createThread(THREAD_ROOT.event_id, threadRoot, [threadRoot], false);
+            const timelineSet = thread.timelineSet;
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id))
+                .respond(200, function() {
+                    return THREAD_ROOT;
+                });
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(EVENTS[0].event_id))
+                .respond(200, function() {
+                    return {
+                        start: "start_token0",
+                        events_before: [],
+                        event: THREAD_ROOT,
+                        events_after: [],
+                        end: "end_token0",
+                        state: [],
+                    };
+                });
+
+            const timelinePromise = client.getEventTimeline(timelineSet, EVENTS[0].event_id);
+            await httpBackend.flushAllExpected();
+
+            const timeline = await timelinePromise;
+            expect(timeline).toBeUndefined();
         });
     });
 
