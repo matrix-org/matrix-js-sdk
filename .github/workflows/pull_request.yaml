@@ -66,7 +66,7 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              name: ['Z-Community-PR']
+              labels: ['Z-Community-PR']
             });
 
   close-if-fork-develop:
@@ -85,7 +85,7 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: "Thanks for opening a pull request, unfortunately we do not accept contributions from the main " +
+              body: "Thanks for opening this pull request, unfortunately we do not accept contributions from the main" +
                 " branch of your fork, please re-open once you switch to an alternative branch for everyone's sanity." +
                 " See https://github.com/matrix-org/matrix-js-sdk/blob/develop/CONTRIBUTING.md",
             });
