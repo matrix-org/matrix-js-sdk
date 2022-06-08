@@ -1057,10 +1057,10 @@ describe("Cross Signing", function() {
             crossSigningVerifiedBefore: false,
         });
 
-        // Alice has a second device that's also not cross-signed
-        const aliceNotCrossSignedDevice = {
-            user_id: "@alice:example.com",
-            device_id: "Dynabook",
+        const deviceId = "Dynabook";
+        const aliceNotCrossSignedDevice: IDevice = {
+            verified: 0,
+            known: false,
             algorithms: ["m.olm.curve25519-aes-sha256", "m.megolm.v1.aes-sha"],
             keys: {
                 "curve25519:Dynabook": "somePubkey",
@@ -1068,10 +1068,10 @@ describe("Cross Signing", function() {
             },
         };
         alice.crypto.deviceList.storeDevicesForUser("@alice:example.com", {
-            Dynabook: aliceNotCrossSignedDevice as unknown as IDevice,
+            [deviceId]: aliceNotCrossSignedDevice,
         });
 
-        expect(alice.checkIfOwnDeviceCrossSigned(aliceNotCrossSignedDevice.device_id)).toBeFalsy();
+        expect(alice.checkIfOwnDeviceCrossSigned(deviceId)).toBeFalsy();
         alice.stopClient();
     });
 });
