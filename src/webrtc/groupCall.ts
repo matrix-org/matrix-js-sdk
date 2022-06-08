@@ -611,7 +611,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
         logger.log(`GroupCall: incoming call from: ${opponentMemberId}`);
 
         // we are handlng this call as a PTT call, so enable PTT semantics
-        newCall.isPtt = true;
+        newCall.isPtt = this.isPtt;
 
         // Check if the user calling has an existing call and use this call instead.
         if (existingCall) {
@@ -778,7 +778,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
             },
         );
 
-        newCall.isPtt = true;
+        newCall.isPtt = this.isPtt;
 
         const requestScreenshareFeed = opponentDevice.feeds.some(
             (feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
