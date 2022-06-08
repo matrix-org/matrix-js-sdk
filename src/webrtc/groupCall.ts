@@ -12,7 +12,6 @@ import { ISendEventResponse } from "../@types/requests";
 import { MatrixEvent } from "../models/event";
 import { EventType } from "../@types/event";
 import { CallEventHandlerEvent } from "./callEventHandler";
-import { RoomStateEvent } from "../matrix";
 import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
 
 export enum GroupCallIntent {
@@ -136,7 +135,7 @@ const callMemberStateIsExpired = (event: MatrixEvent): boolean => {
     const expiresAt = typeof content["m.expires_ts"] === "number" ? content["m.expires_ts"] : -Infinity;
     // The event is expired if the expiration date has passed, or if it's unreasonably far in the future
     return expiresAt <= now || expiresAt > now + CALL_MEMBER_STATE_TIMEOUT * 5 / 4;
-}
+};
 
 function getCallUserId(call: MatrixCall): string | null {
     return call.getOpponentMember()?.userId || call.invitee || null;
@@ -630,10 +629,10 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
      * Room Member State
      */
 
-    private getMemberStateEvents: () => MatrixEvent[];
-    private getMemberStateEvents: (userId: string) => MatrixEvent | null;
-    private getMemberStateEvents = (userId?: string) => {
-        if (userId) {
+    private getMemberStateEvents(): MatrixEvent[];
+    private getMemberStateEvents(userId: string): MatrixEvent | null;
+    private getMemberStateEvents(userId?: string): MatrixEvent[] | MatrixEvent | null {
+        if (userId != null) {
             const event = this.room.currentState.getStateEvents(EventType.GroupCallMemberPrefix, userId);
             return callMemberStateIsExpired(event) ? null : event;
         } else {
@@ -722,7 +721,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
         };
 
         const content = event.getContent<IGroupCallRoomMemberState>();
-        let callsState = !callMemberStateIsExpired(event) && Array.isArray(content["m.calls"])
+        const callsState = !callMemberStateIsExpired(event) && Array.isArray(content["m.calls"])
             ? content["m.calls"].filter((call) => call)
             : []; // Ignore expired device data
 
