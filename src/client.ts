@@ -5247,7 +5247,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * made, and used to construct an EventTimeline.
      * If the event does not belong to this EventTimelineSet then undefined will be returned.
      *
-     * @param {EventTimelineSet} timelineSet  The timelineSet to look for the event in
+     * @param {EventTimelineSet} timelineSet  The timelineSet to look for the event in, must be bound to a room
      * @param {string} eventId  The ID of the event to look for
      *
      * @return {Promise} Resolves:
@@ -5299,10 +5299,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         ];
 
         if (this.supportsExperimentalThreads()) {
-            const {
-                threadId = event.threadRootId,
-                shouldLiveInRoom = !!event.isThreadRoot || !event.threadRootId,
-            } = timelineSet.room?.eventShouldLiveIn(event) ?? {};
+            const { threadId, shouldLiveInRoom } = timelineSet.room.eventShouldLiveIn(event);
 
             if (!timelineSet.thread && !shouldLiveInRoom) {
                 // Thread response does not belong in this timelineSet
