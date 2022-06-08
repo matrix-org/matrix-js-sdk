@@ -559,7 +559,7 @@ describe("MatrixClient event timelines", function() {
                     return {
                         start: "start_token0",
                         events_before: [],
-                        event: THREAD_ROOT,
+                        event: EVENTS[0],
                         events_after: [],
                         end: "end_token0",
                         state: [],
@@ -567,6 +567,32 @@ describe("MatrixClient event timelines", function() {
                 });
 
             const timelinePromise = client.getEventTimeline(timelineSet, EVENTS[0].event_id);
+            await httpBackend.flushAllExpected();
+
+            const timeline = await timelinePromise;
+            expect(timeline).toBeUndefined();
+        });
+
+        it("should return undefined when event is within a thread but timelineSet is not", async () => {
+            client.clientOpts.experimentalThreadSupport = true;
+            Thread.setServerSideSupport(true);
+            client.stopClient(); // we don't need the client to be syncing at this time
+            const room = client.getRoom(roomId);
+            const timelineSet = room.getTimelineSets()[0];
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_REPLY.event_id))
+                .respond(200, function() {
+                    return {
+                        start: "start_token0",
+                        events_before: [],
+                        event: THREAD_REPLY,
+                        events_after: [],
+                        end: "end_token0",
+                        state: [],
+                    };
+                });
+
+            const timelinePromise = client.getEventTimeline(timelineSet, THREAD_REPLY.event_id);
             await httpBackend.flushAllExpected();
 
             const timeline = await timelinePromise;
