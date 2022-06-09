@@ -48,6 +48,7 @@ import { MatrixClient } from "../client";
 import { ISendEventResponse } from "../@types/requests";
 import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter";
 import { DeviceInfo } from '../crypto/deviceinfo';
+import { GroupCallUnknownDeviceError } from './groupCall';
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
@@ -521,7 +522,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const deviceInfoMap = await this.client.crypto.deviceList.downloadKeys([userId], false);
         this.opponentDeviceInfo = deviceInfoMap[userId][this.opponentDeviceId];
         if (this.opponentDeviceInfo === undefined) {
-            throw new Error(`No keys found for opponent device ${this.opponentDeviceId}!`);
+            throw new GroupCallUnknownDeviceError(userId);
         }
     }
 

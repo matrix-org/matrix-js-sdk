@@ -39,7 +39,7 @@ export enum GroupCallEvent {
     LocalScreenshareStateChanged = "local_screenshare_state_changed",
     LocalMuteStateChanged = "local_mute_state_changed",
     ParticipantsChanged = "participants_changed",
-    Error = "error"
+    Error = "error",
 }
 
 export type GroupCallEventHandlerMap = {
@@ -74,6 +74,12 @@ export class GroupCallError extends Error {
         }
 
         this.code = code;
+    }
+}
+
+export class GroupCallUnknownDeviceError extends GroupCallError {
+    constructor(public userId: string) {
+        super(GroupCallErrorCode.UnknownDevice, "No device found for " + userId);
     }
 }
 
@@ -750,10 +756,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
             logger.warn(`No opponent device found for ${member.userId}, ignoring.`);
             this.emit(
                 GroupCallEvent.Error,
-                new GroupCallError(
-                    GroupCallErrorCode.UnknownDevice,
-                    `Outgoing Call: No opponent device found for ${member.userId}, ignoring.`,
-                ),
+                new GroupCallUnknownDeviceError(member.userId),
             );
             return;
         }
@@ -791,13 +794,17 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
             );
         } catch (e) {
             logger.warn(`Failed to place call to ${member.userId}!`, e);
-            this.emit(
-                GroupCallEvent.Error,
-                new GroupCallError(
-                    GroupCallErrorCode.PlaceCallFailed,
-                    `Failed to place call to ${member.userId}.`,
-                ),
-            );
+            if (e.code === GroupCallErrorCode.UnknownDevice) {
+                this.emit(GroupCallEvent.Error, e);
+            } else {
+                this.emit(
+                    GroupCallEvent.Error,
+                    new GroupCallError(
+                        GroupCallErrorCode.PlaceCallFailed,
+                        `Failed to place call to ${member.userId}.`,
+                    ),
+                );
+            }
             return;
         }
 
