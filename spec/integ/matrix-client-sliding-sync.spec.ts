@@ -56,7 +56,7 @@ describe("SlidingSync", () => {
         afterAll(teardownClient);
         let slidingSync: SlidingSync;
 
-        it("should start the sync loop upon calling start()", async (done) => {
+        it("should start the sync loop upon calling start()", async () => {
             slidingSync = new SlidingSync(proxyBaseUrl, [], {}, client, 1);
             const fakeResp = {
                 pos: "a",
@@ -75,13 +75,11 @@ describe("SlidingSync", () => {
             slidingSync.start();
             await httpBackend.flushAllExpected();
             await p;
-            done();
         });
 
-        it("should stop the sync loop upon calling stop()", async (done) => {
+        it("should stop the sync loop upon calling stop()", () => {
             slidingSync.stop();
             httpBackend.verifyNoOutstandingExpectation();
-            done();
         });
     });
 
@@ -105,7 +103,7 @@ describe("SlidingSync", () => {
 
         let slidingSync: SlidingSync;
 
-        it("should be able to subscribe to a room", async (done) => {
+        it("should be able to subscribe to a room", async () => {
             // add the subscription
             slidingSync = new SlidingSync(proxyBaseUrl, [], roomSubInfo, client, 1);
             slidingSync.modifyRoomSubscriptions(new Set([roomId]));
@@ -132,10 +130,9 @@ describe("SlidingSync", () => {
             slidingSync.start();
             await httpBackend.flushAllExpected();
             await p;
-            done();
         });
 
-        it("should be possible to adjust room subscription info whilst syncing", async (done) => {
+        it("should be possible to adjust room subscription info whilst syncing", async () => {
             // listen for updated request
             const newSubInfo = {
                 timeline_limit: 100,
@@ -169,10 +166,9 @@ describe("SlidingSync", () => {
             await p;
             // need to set what the new subscription info is for subsequent tests
             roomSubInfo = newSubInfo;
-            done();
         });
 
-        it("should be possible to add room subscriptions whilst syncing", async (done) => {
+        it("should be possible to add room subscriptions whilst syncing", async () => {
             // listen for updated request
             const anotherRoomData = {
                 name: "foo bar 2",
@@ -208,10 +204,9 @@ describe("SlidingSync", () => {
             slidingSync.modifyRoomSubscriptions(subs);
             await httpBackend.flushAllExpected();
             await p;
-            done();
         });
 
-        it("should be able to unsubscribe from a room", async (done) => {
+        it("should be able to unsubscribe from a room", async () => {
             httpBackend.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.log("unsub request", body);
@@ -234,7 +229,6 @@ describe("SlidingSync", () => {
             await p;
 
             slidingSync.stop();
-            done();
         });
     });
 
@@ -268,7 +262,7 @@ describe("SlidingSync", () => {
         const newRanges = [[0, 2], [3, 5]];
 
         let slidingSync: SlidingSync;
-        it("should be possible to subscribe to a list", async (done) => {
+        it("should be possible to subscribe to a list", async () => {
             // request first 3 rooms
             const listReq = {
                 ranges: [[0, 2]],
@@ -314,10 +308,9 @@ describe("SlidingSync", () => {
             expect(listenerData[roomB]).toEqual(rooms[1]);
             expect(listenerData[roomC]).toEqual(rooms[2]);
             slidingSync.off(SlidingSyncEvent.RoomData, dataListener);
-            done();
         });
 
-        it("should be possible to adjust list ranges", async (done) => {
+        it("should be possible to adjust list ranges", async () => {
             // modify the list ranges
             httpBackend.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
@@ -344,10 +337,9 @@ describe("SlidingSync", () => {
             slidingSync.setListRanges(0, newRanges);
             await httpBackend.flushAllExpected();
             await responseProcessed;
-            done();
         });
 
-        it("should be possible to add an extra list", async (done) => {
+        it("should be possible to add an extra list", async () => {
             // add extra list
             const extraListReq = {
                 ranges: [[0, 100]],
@@ -391,10 +383,9 @@ describe("SlidingSync", () => {
             slidingSync.setList(1, extraListReq);
             await httpBackend.flushAllExpected();
             await responseProcessed;
-            done();
         });
 
-        it("should be possible to get list UPDATEs", async (done) => {
+        it("should be possible to get list UPDATEs", async () => {
             rooms[0].name = "New Room Name!";
             httpBackend.when("POST", syncUrl).respond(200, {
                 pos: "d",
@@ -423,10 +414,9 @@ describe("SlidingSync", () => {
             await httpBackend.flushAllExpected();
             await responseProcessed;
             await listPromise;
-            done();
         });
 
-        it("should be possible to get list DELETE/INSERTs", async (done) => {
+        it("should be possible to get list DELETE/INSERTs", async () => {
             // move C (2) to A (0)
             httpBackend.when("POST", syncUrl).respond(200, {
                 pos: "e",
@@ -460,7 +450,6 @@ describe("SlidingSync", () => {
             await responseProcessed;
             await listPromise;
             slidingSync.stop();
-            done();
         });
     });
 
@@ -487,7 +476,7 @@ describe("SlidingSync", () => {
             when: () => ExtensionState.PreProcess,
         };
 
-        it("should be able to register an extension", async (done) => {
+        it("should be able to register an extension", async () => {
             slidingSync = new SlidingSync(proxyBaseUrl, [], {}, client, 1);
             slidingSync.registerExtension(ext);
 
@@ -521,10 +510,9 @@ describe("SlidingSync", () => {
             await httpBackend.flushAllExpected();
             await p;
             expect(extensionOnResponseCalled).toBe(true);
-            done();
         });
 
-        it("should be able to send nothing in an extension request/response", async (done) => {
+        it("should be able to send nothing in an extension request/response", async () => {
             onExtensionRequest = () => {
                 return undefined;
             };
@@ -555,7 +543,6 @@ describe("SlidingSync", () => {
             expect(responseCalled).toBe(false);
 
             slidingSync.stop();
-            done();
         });
     });
 });
