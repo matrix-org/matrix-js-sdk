@@ -14,30 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { User, UserEvent } from "./models/user";
 import { NotificationCountType, Room, RoomEvent } from "./models/room";
 import { ConnectionManagement } from "./conn-management";
 import { logger } from './logger';
 import * as utils from "./utils";
 import { EventTimeline } from "./models/event-timeline";
 import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
-import { ISyncStateData } from "./sync";
+import { ISyncStateData, SyncState } from "./sync";
 import { MatrixEvent } from "./models/event";
 import { Crypto } from "./crypto";
-import {
-    IMinimalEvent,
-    IRoomEvent,
-    IStateEvent,
-    IStrippedState,
-} from "./sync-accumulator";
+import { IMinimalEvent, IRoomEvent, IStateEvent, IStrippedState } from "./sync-accumulator";
 import { MatrixError } from "./http-api";
 import { RoomStateEvent } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
-import { SyncState } from "./sync";
 import {
-    Extension, ExtensionState,
-    MSC3575RoomData, MSC3575SlidingSyncResponse, SlidingSync,
-    SlidingSyncEvent, SlidingSyncState,
+    Extension,
+    ExtensionState,
+    MSC3575RoomData,
+    MSC3575SlidingSyncResponse,
+    SlidingSync,
+    SlidingSyncEvent,
+    SlidingSyncState,
 } from "./sliding-sync";
 import { EventType, IPushRules } from "./matrix";
 import { PushProcessor } from "./pushprocessor";
@@ -541,20 +538,10 @@ export class SlidingSyncSdk {
         // we'll purge this once we've fully processed the sync response
         this.addNotifications(timelineEvents);
 
-        const processRoomEvent = async (e) => {
+        const processRoomEvent = async (e: MatrixEvent) => {
             client.emit(ClientEvent.Event, e);
-            if (e.isState() && e.getType() == "m.room.encryption" && this.opts.crypto) {
+            if (e.isState() && e.getType() == EventType.RoomEncryption && this.opts.crypto) {
                 await this.opts.crypto.onCryptoEvent(e);
-            }
-            if (e.isState() && e.getType() === "im.vector.user_status") {
-                let user = client.store.getUser(e.getStateKey());
-                if (user) {
-                    user.unstable_updateStatusMessage(e);
-                } else {
-                    user = createNewUser(client, e.getStateKey());
-                    user.unstable_updateStatusMessage(e);
-                    client.store.storeUser(user);
-                }
             }
         };
 
@@ -782,7 +769,7 @@ function ensureNameEvent(client: MatrixClient, roomData: MSC3575RoomData): MSC35
         return roomData;
     }
     for (let i = 0; i < roomData.required_state.length; i++) {
-        if (roomData.required_state[i].type === "m.room.name" && roomData.required_state[i].state_key === "") {
+        if (roomData.required_state[i].type === EventType.RoomName && roomData.required_state[i].state_key === "") {
             roomData.required_state[i].content = {
                 name: roomData.name,
             };
@@ -792,7 +779,7 @@ function ensureNameEvent(client: MatrixClient, roomData: MSC3575RoomData): MSC35
     roomData.required_state.push({
         event_id: "$fake-sliding-sync-name-event-" + roomData.room_id,
         state_key: "",
-        type: "m.room.name",
+        type: EventType.RoomName,
         content: {
             name: roomData.name,
         },
@@ -805,28 +792,12 @@ function ensureNameEvent(client: MatrixClient, roomData: MSC3575RoomData): MSC35
 // Helper functions which set up JS SDK structs are below and are identical to the sync v2 counterparts,
 // just outside the class.
 
-function createNewUser(client: MatrixClient, userId: string): User {
-    const user = new User(userId);
-    client.reEmitter.reEmit(user, [
-        UserEvent.AvatarUrl,
-        UserEvent.DisplayName,
-        UserEvent.Presence,
-        UserEvent.CurrentlyActive,
-        UserEvent.LastPresenceTs,
-    ]);
-    return user;
-}
-
 function createRoom(client: MatrixClient, roomId: string, opts: Partial<IStoredClientOpts>): Room { // XXX cargoculted from sync.ts
-    const {
-        timelineSupport,
-        unstableClientRelationAggregation,
-    } = client;
+    const { timelineSupport } = client;
     const room = new Room(roomId, client, client.getUserId(), {
         lazyLoadMembers: opts.lazyLoadMembers,
         pendingEventOrdering: opts.pendingEventOrdering,
         timelineSupport,
-        unstableClientRelationAggregation,
     });
     client.reEmitter.reEmit(room, [
         RoomEvent.Name,

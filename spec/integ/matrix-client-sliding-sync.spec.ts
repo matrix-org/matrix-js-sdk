@@ -1,6 +1,28 @@
-import { SlidingSync, SlidingSyncState, ExtensionState } from "../../src/sliding-sync";
+/*
+Copyright 2022 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// eslint-disable-next-line no-restricted-imports
+import EventEmitter from "events";
+import MockHttpBackend from "matrix-mock-request";
+
+import { SlidingSync, SlidingSyncState, ExtensionState, SlidingSyncEvent } from "../../src/sliding-sync";
 import { TestClient } from "../TestClient";
-import { logger } from '../../src/logger';
+import { logger } from "../../src/logger";
+import { MatrixClient } from "../../src";
+import { sleep } from "../../src/utils";
 
 /**
  * Tests for sliding sync. These tests are broken down into sub-tests which are reliant upon one another.
@@ -8,8 +30,8 @@ import { logger } from '../../src/logger';
  * Each test will call different functions on SlidingSync which may depend on state from previous tests.
  */
 describe("SlidingSync", () => {
-    let client = null;
-    let httpBackend = null;
+    let client: MatrixClient = null;
+    let httpBackend: MockHttpBackend = null;
     const selfUserId = "@alice:localhost";
     const selfAccessToken = "aseukfgwef";
     const proxyBaseUrl = "http://localhost:8008";
@@ -32,7 +54,7 @@ describe("SlidingSync", () => {
     describe("start/stop", () => {
         beforeAll(setupClient);
         afterAll(teardownClient);
-        let slidingSync;
+        let slidingSync: SlidingSync;
 
         it("should start the sync loop upon calling start()", async (done) => {
             slidingSync = new SlidingSync(proxyBaseUrl, [], {}, client, 1);
@@ -81,7 +103,7 @@ describe("SlidingSync", () => {
             timeline: [],
         };
 
-        let slidingSync;
+        let slidingSync: SlidingSync;
 
         it("should be able to subscribe to a room", async (done) => {
             // add the subscription
@@ -257,7 +279,7 @@ describe("SlidingSync", () => {
         ];
         const newRanges = [[0, 2], [3, 5]];
 
-        let slidingSync;
+        let slidingSync: SlidingSync;
         it("should be possible to subscribe to a list", async (done) => {
             // request first 3 rooms
             const listReq = {
@@ -295,7 +317,7 @@ describe("SlidingSync", () => {
                 expect(listenerData[roomId]).toBeFalsy();
                 listenerData[roomId] = roomData;
             };
-            slidingSync.on("SlidingSync.RoomData", dataListener);
+            slidingSync.on(SlidingSyncEvent.RoomData, dataListener);
             const responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
                 return state === SlidingSyncState.Complete;
             });
@@ -306,7 +328,7 @@ describe("SlidingSync", () => {
             expect(listenerData[roomA]).toEqual(rooms[0]);
             expect(listenerData[roomB]).toEqual(rooms[1]);
             expect(listenerData[roomC]).toEqual(rooms[2]);
-            slidingSync.off("SlidingSync.RoomData", dataListener);
+            slidingSync.off(SlidingSyncEvent.RoomData, dataListener);
             done();
         });
 
@@ -406,16 +428,16 @@ describe("SlidingSync", () => {
                 counts: [500, 50],
             });
             const listPromise = listenUntil(slidingSync, "SlidingSync.List",
-            (listIndex, joinedCount, roomIndexToRoomId) => {
-                expect(listIndex).toEqual(0);
-                expect(joinedCount).toEqual(500);
-                expect(roomIndexToRoomId).toEqual({
-                    0: roomA,
-                    1: roomB,
-                    2: roomC,
+                (listIndex, joinedCount, roomIndexToRoomId) => {
+                    expect(listIndex).toEqual(0);
+                    expect(joinedCount).toEqual(500);
+                    expect(roomIndexToRoomId).toEqual({
+                        0: roomA,
+                        1: roomB,
+                        2: roomC,
+                    });
+                    return true;
                 });
-                return true;
-            });
             const responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
                 return state === SlidingSyncState.Complete;
             });
@@ -442,16 +464,16 @@ describe("SlidingSync", () => {
                 counts: [500, 50],
             });
             const listPromise = listenUntil(slidingSync, "SlidingSync.List",
-            (listIndex, joinedCount, roomIndexToRoomId) => {
-                expect(listIndex).toEqual(0);
-                expect(joinedCount).toEqual(500);
-                expect(roomIndexToRoomId).toEqual({
-                    0: roomC,
-                    1: roomA,
-                    2: roomB,
+                (listIndex, joinedCount, roomIndexToRoomId) => {
+                    expect(listIndex).toEqual(0);
+                    expect(joinedCount).toEqual(500);
+                    expect(roomIndexToRoomId).toEqual({
+                        0: roomC,
+                        1: roomA,
+                        2: roomB,
+                    });
+                    return true;
                 });
-                return true;
-            });
             const responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
                 return state === SlidingSyncState.Complete;
             });
@@ -466,7 +488,7 @@ describe("SlidingSync", () => {
     describe("extensions", () => {
         beforeAll(setupClient);
         afterAll(teardownClient);
-        let slidingSync;
+        let slidingSync: SlidingSync;
 
         const extName = "foobar";
         const extReq = {
@@ -565,12 +587,9 @@ describe("SlidingSync", () => {
     });
 });
 
-function timeout(delayMs, reason) {
-    return new Promise((resolve, reject) => {
-        setTimeout(() => {
-            reject(`timeout: ${delayMs}ms - ${reason}`);
-        }, delayMs);
-    });
+async function timeout(delayMs: number, reason: string): Promise<never> {
+    await sleep(delayMs);
+    throw new Error(`timeout: ${delayMs}ms - ${reason}`);
 }
 
 /**
@@ -582,12 +601,14 @@ function timeout(delayMs, reason) {
  * @returns {Promise} A promise which will be resolved when the callback returns data. If the callback throws or the timeout is reached,
  * the promise is rejected.
  */
-function listenUntil(emitter, eventName, callback, timeoutMs) {
-    if (!timeoutMs) {
-        timeoutMs = 500;
-    }
+function listenUntil<T>(
+    emitter: EventEmitter,
+    eventName: string,
+    callback: (...args: any[]) => T,
+    timeoutMs = 500,
+): Promise<T> {
     const trace = new Error().stack.split(`\n`)[2];
-    return Promise.race([new Promise((resolve, reject) => {
+    return Promise.race([new Promise<T>((resolve, reject) => {
         const wrapper = (...args) => {
             try {
                 const data = callback(...args);
