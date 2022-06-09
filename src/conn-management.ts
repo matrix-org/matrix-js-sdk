@@ -21,6 +21,8 @@ import { ISyncStateData } from "./sync";
 import { Method } from "./http-api";
 import { SyncState } from "./sync";
 
+export type Callback = (newState: SyncState, data?: ISyncStateData) => void;
+
 /**
  * ConnectionManagement is a class which handles keep-alives and invokes a callback when the connection
  * is alive/dead. Uses /versions as a keep-alive endpoint.
@@ -28,13 +30,8 @@ import { SyncState } from "./sync";
 export class ConnectionManagement {
     private keepAliveTimer: number = null;
     private connectionReturnedDefer: IDeferred<boolean> = null;
-    private client: MatrixClient;
-    private callback: (newState: SyncState, data?: ISyncStateData) => void;
 
-    constructor(client, callback) {
-        this.client = client;
-        this.callback = callback;
-    }
+    constructor(private readonly client: MatrixClient, private readonly callback: Callback) {}
 
     /**
      * Retry a backed off syncing request immediately. This should only be used when
@@ -60,9 +57,7 @@ export class ConnectionManagement {
         // global.window AND global.window.removeEventListener.
         // Some platforms (e.g. React Native) register global.window,
         // but do not have global.window.removeEventListener.
-        if (global.window && global.window.removeEventListener) {
-            global.window.removeEventListener("online", this.onOnline, false);
-        }
+        global.window?.removeEventListener?.("online", this.onOnline, false);
 
         if (this.keepAliveTimer) {
             clearTimeout(this.keepAliveTimer);
@@ -79,7 +74,7 @@ export class ConnectionManagement {
      *
      * @param {boolean} connDidFail True if a connectivity failure has been detected. Optional.
      */
-    private async pokeKeepAlive(connDidFail = false) {
+    private async pokeKeepAlive(connDidFail = false): Promise<void> {
         const success = () => {
             clearTimeout(this.keepAliveTimer);
             if (this.connectionReturnedDefer) {

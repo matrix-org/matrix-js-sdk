@@ -19,6 +19,7 @@ import { IAbortablePromise } from "./@types/partials";
 import { MatrixClient } from "./client";
 import { IRoomEvent, IStateEvent } from "./sync-accumulator";
 import { TypedEventEmitter } from "./models//typed-event-emitter";
+import { sleep } from "./utils";
 
 const DEBUG = true;
 
@@ -93,12 +94,46 @@ export interface MSC3575RoomData {
     room_id: string;
 }
 
+interface BaseOperation {
+    list: number;
+}
+
+interface DeleteOperation extends BaseOperation {
+    op: "DELETE";
+    index: number;
+}
+
+interface InsertOperation extends BaseOperation {
+    op: "INSERT";
+    index: number;
+    room: MSC3575RoomData;
+}
+
+interface InvalidateOperation extends BaseOperation {
+    op: "INVALIDATE";
+    range: [number, number];
+}
+
+interface SyncOperation extends BaseOperation {
+    op: "SYNC";
+    range: [number, number];
+    rooms: MSC3575RoomData[];
+}
+
+interface UpdateOperation extends BaseOperation {
+    op: "UPDATE";
+    index: number;
+    room: MSC3575RoomData;
+}
+
+type Operation = DeleteOperation | InsertOperation | InvalidateOperation | SyncOperation | UpdateOperation;
+
 /**
  * A complete Sliding Sync response
  */
 export interface MSC3575SlidingSyncResponse {
     pos: string;
-    ops: object[];
+    ops: Operation[];
     counts: number[];
     room_subscriptions: Record<string, MSC3575RoomData>;
     extensions: object;
@@ -125,8 +160,8 @@ class SlidingList {
     private isModified: boolean;
 
     // returned data
-    roomIndexToRoomId: Record<number, string>;
-    joinedCount: number;
+    public roomIndexToRoomId: Record<number, string>;
+    public joinedCount: number;
 
     /**
      * Construct a new sliding list.
@@ -141,7 +176,7 @@ class SlidingList {
      * This is useful for the first time the list is sent, or if the list has changed in some way.
      * @param modified True to mark this list as modified so all sticky parameters will be re-sent.
      */
-    setModified(modified: boolean) {
+    public setModified(modified: boolean): void {
         this.isModified = modified;
     }
 
@@ -149,7 +184,7 @@ class SlidingList {
      * Update the list range for this list. Does not affect modified status as list ranges are non-sticky.
      * @param newRanges The new ranges for the list
      */
-    updateListRange(newRanges: number[][]) {
+    public updateListRange(newRanges: number[][]): void {
         this.list.ranges = JSON.parse(JSON.stringify(newRanges));
     }
 
@@ -157,17 +192,17 @@ class SlidingList {
      * Replace list parameters. All fields will be replaced with the new list parameters.
      * @param list The new list parameters
      */
-    replaceList(list: MSC3575List) {
+    public replaceList(list: MSC3575List): void {
         list.filters = list.filters || {};
         list.ranges = list.ranges || [];
         this.list = JSON.parse(JSON.stringify(list));
         this.isModified = true;
 
         // reset values as the join count may be very different (if filters changed) including the rooms
-        // (e.g sort orders or sliding window ranges changed)
+        // (e.g. sort orders or sliding window ranges changed)
 
         // the constantly changing sliding window ranges. Not an array for performance reasons
-        // E.g tracking ranges 0-99, 500-599, we don't want to have a 600 element array
+        // E.g. tracking ranges 0-99, 500-599, we don't want to have a 600 element array
         this.roomIndexToRoomId = {};
         // the total number of joined rooms according to the server, always >= len(roomIndexToRoomId)
         this.joinedCount = 0;
@@ -179,7 +214,7 @@ class SlidingList {
      * hasn't been modified. Callers may want to do this if they are modifying the list prior to calling
      * updateList.
      */
-    getList(forceIncludeAllParams: boolean): MSC3575List {
+    public getList(forceIncludeAllParams: boolean): MSC3575List {
         let list = {
             ranges: JSON.parse(JSON.stringify(this.list.ranges)),
         };
@@ -200,7 +235,7 @@ class SlidingList {
      * @param i The index to check
      * @returns True if the index is within a sliding window
      */
-    isIndexInRange(i: number): boolean {
+    public isIndexInRange(i: number): boolean {
         for (const r of this.list.ranges) {
             if (r[0] <= i && i <= r[1]) {
                 return true;
@@ -215,12 +250,12 @@ class SlidingList {
  */
 export enum ExtensionState {
     // Call onResponse before processing the response body. This is useful when your extension is
-    // preparing the ground for the response body e.g processing to-device messages before the
+    // preparing the ground for the response body e.g. processing to-device messages before the
     // encrypted event arrives.
     PreProcess = "ExtState.PreProcess",
     // Call onResponse after processing the response body. This is useful when your extension is
-    // decorating data from the client and you rely on MatrixClient.getRoom returning the Room object
-    // e.g room account data.
+    // decorating data from the client, and you rely on MatrixClient.getRoom returning the Room object
+    // e.g. room account data.
     PostProcess = "ExtState.PostProcess",
 }
 
@@ -297,25 +332,21 @@ export type SlidingSyncEventHandlerMap = {
 
 /**
  * SlidingSync is a high-level data structure which controls the majority of sliding sync.
- * It has no hooks into JS SDK with the exception of needing a MatrixClient to perform the HTTP request.
+ * It has no hooks into JS SDK except for needing a MatrixClient to perform the HTTP request.
  * This means this class (and everything it uses) can be used in isolation from JS SDK if needed.
  * To hook this up with the JS SDK, you need to use SlidingSyncSdk.
  */
 export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSyncEventHandlerMap> {
-    private proxyBaseUrl: string;
     private lists: SlidingList[];
-    private listModifiedCount: number;
-    private client: MatrixClient;
-    private timeoutMS: number;
-    private terminated: boolean;
+    private listModifiedCount = 0;
+    private terminated = false;
     // flag set when resend() is called because we cannot rely on detecting AbortError in JS SDK :(
-    private needsResend: boolean;
+    private needsResend = false;
     // map of extension name to req/resp handler
-    private extensions: Record<string, Extension>;
+    private extensions: Record<string, Extension> = {};
 
-    private roomSubscriptionInfo: MSC3575RoomSubscription;
-    private desiredRoomSubscriptions: Set<string>; // the *desired* room subscriptions
-    private confirmedRoomSubscriptions: Set<string>;
+    private desiredRoomSubscriptions = new Set<string>(); // the *desired* room subscriptions
+    private confirmedRoomSubscriptions = new Set<string>();
 
     private pendingReq?: IAbortablePromise<MSC3575SlidingSyncResponse>;
 
@@ -323,34 +354,26 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * Create a new sliding sync instance
      * @param {string} proxyBaseUrl The base URL of the sliding sync proxy
      * @param {MSC3575List[]} lists The lists to use for sliding sync.
-     * @param {MSC3575RoomSubscription} subInfo The params to use for room subscriptions.
+     * @param {MSC3575RoomSubscription} roomSubscriptionInfo The params to use for room subscriptions.
      * @param {MatrixClient} client The client to use for /sync calls.
      * @param {number} timeoutMS The number of milliseconds to wait for a response.
      */
     constructor(
-        proxyBaseUrl: string, lists: MSC3575List[], subInfo: MSC3575RoomSubscription,
-        client: MatrixClient, timeoutMS: number,
+        private readonly proxyBaseUrl: string,
+        lists: MSC3575List[],
+        private roomSubscriptionInfo: MSC3575RoomSubscription,
+        private readonly client: MatrixClient,
+        private readonly timeoutMS: number,
     ) {
         super();
-        this.proxyBaseUrl = proxyBaseUrl;
-        this.timeoutMS = timeoutMS;
-        this.lists = lists.map((l) => { return new SlidingList(l); });
-        this.client = client;
-        this.roomSubscriptionInfo = subInfo;
-        this.terminated = false;
-        this.desiredRoomSubscriptions = new Set();
-        this.confirmedRoomSubscriptions = new Set();
-        this.pendingReq = null;
-        this.listModifiedCount = 0;
-        this.needsResend = false;
-        this.extensions = {};
+        this.lists = lists.map((l) => new SlidingList(l));
     }
 
     /**
      * Get the length of the sliding lists.
      * @returns The number of lists in the sync request
      */
-    listLength(): number {
+    public listLength(): number {
         return this.lists.length;
     }
 
@@ -359,7 +382,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param index The list index
      * @returns The list data which contains the rooms in this list
      */
-    getListData(index: number): {joinedCount: number, roomIndexToRoomId: Record<number, string>} {
+    public getListData(index: number): {joinedCount: number, roomIndexToRoomId: Record<number, string>} {
         if (!this.lists[index]) {
             return null;
         }
@@ -375,7 +398,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param index The list index to get the list for.
      * @returns A copy of the list or undefined.
      */
-    getList(index: number): MSC3575List {
+    public getList(index: number): MSC3575List {
         if (!this.lists[index]) {
             return null;
         }
@@ -389,7 +412,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param index The list index to modify
      * @param ranges The new ranges to apply.
      */
-    setListRanges(index: number, ranges: number[][]) {
+    public setListRanges(index: number, ranges: number[][]): void {
         this.lists[index].updateListRange(ranges);
         this.resend();
     }
@@ -400,7 +423,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param index The index to modify
      * @param list The new list parameters.
      */
-    setList(index: number, list: MSC3575List) {
+    public setList(index: number, list: MSC3575List): void {
         if (this.lists[index]) {
             this.lists[index].replaceList(list);
         } else {
@@ -414,7 +437,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * Get the room subscriptions for the sync API.
      * @returns A copy of the desired room subscriptions.
      */
-    getRoomSubscriptions(): Set<string> {
+    public getRoomSubscriptions(): Set<string> {
         return new Set(Array.from(this.desiredRoomSubscriptions));
     }
 
@@ -424,7 +447,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * prepare the room subscriptions for when start() is called.
      * @param s The new desired room subscriptions.
      */
-    modifyRoomSubscriptions(s: Set<string>) {
+    public modifyRoomSubscriptions(s: Set<string>) {
         this.desiredRoomSubscriptions = s;
         this.resend();
     }
@@ -434,7 +457,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * such that they will be sent up afresh.
      * @param rs The new room subscription fields to fetch.
      */
-    modifyRoomSubscriptionInfo(rs: MSC3575RoomSubscription) {
+    public modifyRoomSubscriptionInfo(rs: MSC3575RoomSubscription): void {
         this.roomSubscriptionInfo = rs;
         this.confirmedRoomSubscriptions = new Set<string>();
         this.resend();
@@ -444,7 +467,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * Register an extension to send with the /sync request.
      * @param ext The extension to register.
      */
-    registerExtension(ext: Extension) {
+    public registerExtension(ext: Extension): void {
         if (this.extensions[ext.name()]) {
             throw new Error(`registerExtension: ${ext.name()} already exists as an extension`);
         }
@@ -459,7 +482,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         return ext;
     }
 
-    private onPreExtensionsResponse(ext: object) {
+    private onPreExtensionsResponse(ext: object): void {
         Object.keys(ext).forEach((extName) => {
             if (this.extensions[extName].when() == ExtensionState.PreProcess) {
                 this.extensions[extName].onResponse(ext[extName]);
@@ -467,7 +490,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         });
     }
 
-    private onPostExtensionsResponse(ext: object) {
+    private onPostExtensionsResponse(ext: object): void {
         Object.keys(ext).forEach((extName) => {
             if (this.extensions[extName].when() == ExtensionState.PostProcess) {
                 this.extensions[extName].onResponse(ext[extName]);
@@ -480,7 +503,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param {string} roomId The room which received some data.
      * @param {object} roomData The raw sliding sync response JSON.
      */
-    private invokeRoomDataListeners(roomId: string, roomData: MSC3575RoomData) {
+    private invokeRoomDataListeners(roomId: string, roomData: MSC3575RoomData): void {
         if (!roomData.required_state) { roomData.required_state = []; }
         if (!roomData.timeline) { roomData.timeline = []; }
         if (!roomData.room_id) { roomData.room_id = roomId; }
@@ -491,30 +514,26 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * Invoke all attached lifecycle listeners.
      * @param {SlidingSyncState} state The Lifecycle state
      * @param {object} resp The raw sync response JSON
-     * @param {Error?} err Any error that occurred when making the request e.g network errors.
+     * @param {Error?} err Any error that occurred when making the request e.g. network errors.
      */
-    private invokeLifecycleListeners(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err?: Error) {
+    private invokeLifecycleListeners(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err?: Error): void {
         this.emit(SlidingSyncEvent.Lifecycle, state, resp, err);
     }
 
     /**
      * Resend a Sliding Sync request. Used when something has changed in the request.
      */
-    resend(): void {
+    public resend(): void {
         this.needsResend = true;
-        if (this.pendingReq) {
-            this.pendingReq.abort();
-        }
+        this.pendingReq?.abort();
     }
 
     /**
      * Stop syncing with the server.
      */
-    stop(): void {
+    public stop(): void {
         this.terminated = true;
-        if (this.pendingReq) {
-            this.pendingReq.abort();
-        }
+        this.pendingReq?.abort();
         // remove all listeners so things can be GC'd
         this.removeAllListeners(SlidingSyncEvent.Lifecycle);
         this.removeAllListeners(SlidingSyncEvent.List);
@@ -524,12 +543,12 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     /**
      * Start syncing with the server. Blocks until stopped.
      */
-    async start() {
-        let currentPos;
+    public async start() {
+        let currentPos: string;
         while (!this.terminated) {
             this.needsResend = false;
             let doNotUpdateList = false;
-            let resp;
+            let resp: MSC3575SlidingSyncResponse;
             try {
                 const listModifiedCount = this.listModifiedCount;
                 const reqBody: MSC3575SlidingSyncRequest = {
@@ -625,7 +644,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
 
             const listIndexesWithUpdates: Set<number> = new Set();
             // TODO: clear gapIndex immediately after next op to avoid a genuine DELETE shifting incorrectly e.g leaving a room
-            const gapIndexes = {};
+            const gapIndexes: Record<number, number> = {};
             resp.counts.forEach((count, index) => {
                 gapIndexes[index] = -1;
             });
@@ -756,13 +775,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
 }
 
 const difference = (setA: Set<string>, setB: Set<string>): Set<string> => {
-    const _difference = new Set(setA);
+    const diff = new Set(setA);
     for (const elem of setB) {
-        _difference.delete(elem);
+        diff.delete(elem);
     }
-    return _difference;
-};
-
-const sleep = (ms: number) => {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return diff;
 };

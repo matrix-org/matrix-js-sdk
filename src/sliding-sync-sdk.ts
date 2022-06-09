@@ -57,19 +57,17 @@ function debuglog(...params) {
 }
 
 class ExtensionE2EE implements Extension {
-    crypto: Crypto;
+    constructor(private readonly crypto: Crypto) {}
 
-    constructor(crypto: Crypto) {
-        this.crypto = crypto;
-    }
-
-    name(): string {
+    public name(): string {
         return "e2ee";
     }
-    when(): ExtensionState {
+
+    public when(): ExtensionState {
         return ExtensionState.PreProcess;
     }
-    onRequest(isInitial: boolean): object {
+
+    public onRequest(isInitial: boolean): object {
         if (!isInitial) {
             return undefined;
         }
@@ -77,7 +75,8 @@ class ExtensionE2EE implements Extension {
             enabled: true, // this is sticky so only send it on the initial request
         };
     }
-    async onResponse(data: object) {
+
+    public async onResponse(data: object): Promise<void> {
         // Handle device list updates
         if (data["device_lists"]) {
             await this.crypto.handleDeviceListChanges({
@@ -106,21 +105,19 @@ class ExtensionE2EE implements Extension {
 }
 
 class ExtensionToDevice implements Extension {
-    client: MatrixClient;
-    nextBatch?: string;
+    private nextBatch?: string = null;
 
-    constructor(client: MatrixClient) {
-        this.client = client;
-        this.nextBatch = null;
-    }
+    constructor(private readonly client: MatrixClient) {}
 
-    name(): string {
+    public name(): string {
         return "to_device";
     }
-    when(): ExtensionState {
+
+    public when(): ExtensionState {
         return ExtensionState.PreProcess;
     }
-    onRequest(isInitial: boolean): object {
+
+    public onRequest(isInitial: boolean): object {
         const extReq = {
             since: this.nextBatch !== null ? this.nextBatch : undefined,
         };
@@ -130,7 +127,8 @@ class ExtensionToDevice implements Extension {
         }
         return extReq;
     }
-    async onResponse(data: object) {
+
+    public async onResponse(data: object): Promise<void> {
         const cancelledKeyVerificationTxns = [];
         data["events"] = data["events"] || [];
         data["events"]
@@ -184,19 +182,17 @@ class ExtensionToDevice implements Extension {
 }
 
 class ExtensionAccountData implements Extension {
-    client: MatrixClient;
+    constructor(private readonly client: MatrixClient) {}
 
-    constructor(client: MatrixClient) {
-        this.client = client;
-    }
-
-    name(): string {
+    public name(): string {
         return "account_data";
     }
-    when(): ExtensionState {
+
+    public when(): ExtensionState {
         return ExtensionState.PostProcess;
     }
-    onRequest(isInitial: boolean): object {
+
+    public onRequest(isInitial: boolean): object {
         if (!isInitial) {
             return undefined;
         }
@@ -204,7 +200,8 @@ class ExtensionAccountData implements Extension {
             enabled: true,
         };
     }
-    onResponse(data: {global: object[], rooms: Record<string, object[]>}) {
+
+    public onResponse(data: {global: object[], rooms: Record<string, object[]>}): void {
         if (data.global && data.global.length > 0) {
             this.processGlobalAccountData(data.global);
         }
@@ -223,7 +220,7 @@ class ExtensionAccountData implements Extension {
         }
     }
 
-    processGlobalAccountData(globalAccountData: object[]) {
+    private processGlobalAccountData(globalAccountData: object[]): void {
         const events = mapEvents(this.client, undefined, globalAccountData);
         const prevEventsMap = events.reduce((m, c) => {
             m[c.getId()] = this.client.store.getAccountData(c.getType());
@@ -255,14 +252,14 @@ class ExtensionAccountData implements Extension {
 export class SlidingSyncSdk {
     private syncState: SyncState = null;
     private syncStateData: ISyncStateData;
-    private slidingSync: SlidingSync;
     private connManagement: ConnectionManagement;
-    private lastPos: string;
-    private failCount: number;
+    private lastPos: string = null;
+    private failCount = 0;
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
 
     constructor(
-        slidingSync: SlidingSync, private readonly client: MatrixClient,
+        private readonly slidingSync: SlidingSync,
+        private readonly client: MatrixClient,
         private readonly opts: Partial<IStoredClientOpts> = {},
     ) {
         this.opts.initialSyncLimit = this.opts.initialSyncLimit ?? 8;
@@ -283,12 +280,8 @@ export class SlidingSyncSdk {
                 RoomEvent.TimelineReset,
             ]);
         }
-        this.client = client;
         this.connManagement = new ConnectionManagement(client, this.updateSyncState.bind(this));
-        this.lastPos = null;
-        this.failCount = 0;
 
-        this.slidingSync = slidingSync;
         this.slidingSync.on(SlidingSyncEvent.Lifecycle, this.onLifecycle.bind(this));
         this.slidingSync.on(SlidingSyncEvent.RoomData, this.onRoomData.bind(this));
         const extensions: Extension[] = [
@@ -305,7 +298,7 @@ export class SlidingSyncSdk {
         });
     }
 
-    private onRoomData(roomId: string, roomData: MSC3575RoomData) {
+    private onRoomData(roomId: string, roomData: MSC3575RoomData): void {
         let room: Room;
         if (roomData.initial) {
             room = createRoom(this.client, roomData.room_id, this.opts);
@@ -319,7 +312,7 @@ export class SlidingSyncSdk {
         this.processRoomData(this.client, room, roomData);
     }
 
-    private onLifecycle(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err?: Error) {
+    private onLifecycle(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err?: Error): void {
         if (err) {
             debuglog("onLifecycle", state, err);
         }
