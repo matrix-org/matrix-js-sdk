@@ -21,16 +21,30 @@ limitations under the License.
 import { RoomMember } from "./room-member";
 import { logger } from '../logger';
 import * as utils from "../utils";
-import { EventType } from "../@types/event";
-import { MatrixEvent } from "./event";
+import { EventType, UNSTABLE_MSC2716_MARKER } from "../@types/event";
+import { MatrixEvent, MatrixEventEvent } from "./event";
 import { MatrixClient } from "../client";
 import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
 import { TypedEventEmitter } from "./typed-event-emitter";
-import { Beacon, BeaconEvent, BeaconEventHandlerMap } from "./beacon";
+import { Beacon, BeaconEvent, BeaconEventHandlerMap, getBeaconInfoIdentifier, BeaconIdentifier } from "./beacon";
 import { TypedReEmitter } from "../ReEmitter";
-import { M_BEACON_INFO } from "../@types/beacon";
-import { getBeaconInfoIdentifier } from "./beacon";
-import { BeaconIdentifier } from "..";
+import { M_BEACON, M_BEACON_INFO } from "../@types/beacon";
+
+export interface IMarkerFoundOptions {
+    /** Whether the timeline was empty before the marker event arrived in the
+     *  room. This could be happen in a variety of cases:
+     *  1. From the initial sync
+     *  2. It's the first state we're seeing after joining the room
+     *  3. Or whether it's coming from `syncFromCache`
+     *
+     * A marker event refers to `UNSTABLE_MSC2716_MARKER` and indicates that
+     * history was imported somewhere back in time. It specifically points to an
+     * MSC2716 insertion event where the history was imported at. Marker events
+     * are sent as state events so they are easily discoverable by clients and
+     * homeservers and don't get lost in timeline gaps.
+     */
+    timelineWasEmpty?: boolean;
+}
 
 // possible statuses for out-of-band member loading
 enum OobStatus {
@@ -45,6 +59,7 @@ export enum RoomStateEvent {
     NewMember = "RoomState.newMember",
     Update = "RoomState.update", // signals batches of updates without specificity
     BeaconLiveness = "RoomState.BeaconLiveness",
+    Marker = "RoomState.Marker",
 }
 
 export type RoomStateEventHandlerMap = {
@@ -53,6 +68,7 @@ export type RoomStateEventHandlerMap = {
     [RoomStateEvent.NewMember]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
     [RoomStateEvent.Update]: (state: RoomState) => void;
     [RoomStateEvent.BeaconLiveness]: (state: RoomState, hasLiveBeacons: boolean) => void;
+    [RoomStateEvent.Marker]: (event: MatrixEvent, setStateOptions: IMarkerFoundOptions) => void;
     [BeaconEvent.New]: (event: MatrixEvent, beacon: Beacon) => void;
 };
 
@@ -316,16 +332,19 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     }
 
     /**
-     * Add an array of one or more state MatrixEvents, overwriting
-     * any existing state with the same {type, stateKey} tuple. Will fire
-     * "RoomState.events" for every event added. May fire "RoomState.members"
-     * if there are <code>m.room.member</code> events.
+     * Add an array of one or more state MatrixEvents, overwriting any existing
+     * state with the same {type, stateKey} tuple. Will fire "RoomState.events"
+     * for every event added. May fire "RoomState.members" if there are
+     * <code>m.room.member</code> events. May fire "RoomStateEvent.Marker" if there are
+     * <code>UNSTABLE_MSC2716_MARKER</code> events.
      * @param {MatrixEvent[]} stateEvents a list of state events for this room.
+     * @param {IMarkerFoundOptions} markerFoundOptions
      * @fires module:client~MatrixClient#event:"RoomState.members"
      * @fires module:client~MatrixClient#event:"RoomState.newMember"
      * @fires module:client~MatrixClient#event:"RoomState.events"
+     * @fires module:client~MatrixClient#event:"RoomStateEvent.Marker"
      */
-    public setStateEvents(stateEvents: MatrixEvent[]) {
+    public setStateEvents(stateEvents: MatrixEvent[], markerFoundOptions?: IMarkerFoundOptions) {
         this.updateModifiedTime();
 
         // update the core event dict
@@ -405,13 +424,15 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
                 // assume all our sentinels are now out-of-date
                 this.sentinels = {};
+            } else if (UNSTABLE_MSC2716_MARKER.matches(event.getType())) {
+                this.emit(RoomStateEvent.Marker, event, markerFoundOptions);
             }
         });
 
         this.emit(RoomStateEvent.Update, this);
     }
 
-    public processBeaconEvents(events: MatrixEvent[]): void {
+    public processBeaconEvents(events: MatrixEvent[], matrixClient: MatrixClient): void {
         if (
             !events.length ||
             // discard locations if we have no beacons
@@ -420,24 +441,38 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             return;
         }
 
-        // names are confusing here
-        // a Beacon is the parent event, but event type is 'm.beacon_info'
-        // a location is the 'child' related to the Beacon, but the event type is 'm.beacon'
-        // group locations by beaconInfo event id
-        const locationEventsByBeaconEventId = events.reduce<Record<string, MatrixEvent[]>>((acc, event) => {
-            const beaconInfoEventId = event.getRelation()?.event_id;
-            if (!acc[beaconInfoEventId]) {
-                acc[beaconInfoEventId] = [];
-            }
-            acc[beaconInfoEventId].push(event);
-            return acc;
-        }, {});
+        const beaconByEventIdDict: Record<string, Beacon> =
+            [...this.beacons.values()].reduce((dict, beacon) => ({ ...dict, [beacon.beaconInfoId]: beacon }), {});
 
-        Object.entries(locationEventsByBeaconEventId).forEach(([beaconInfoEventId, events]) => {
-            const beacon = [...this.beacons.values()].find(beacon => beacon.beaconInfoId === beaconInfoEventId);
+        const processBeaconRelation = (beaconInfoEventId: string, event: MatrixEvent): void => {
+            if (!M_BEACON.matches(event.getType())) {
+                return;
+            }
+
+            const beacon = beaconByEventIdDict[beaconInfoEventId];
 
             if (beacon) {
-                beacon.addLocations(events);
+                beacon.addLocations([event]);
+            }
+        };
+
+        events.forEach((event: MatrixEvent) => {
+            const relatedToEventId = event.getRelation()?.event_id;
+            // not related to a beacon we know about
+            // discard
+            if (!beaconByEventIdDict[relatedToEventId]) {
+                return;
+            }
+
+            matrixClient.decryptEventIfNeeded(event);
+
+            if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
+                // add an event listener for once the event is decrypted.
+                event.once(MatrixEventEvent.Decrypted, async () => {
+                    processBeaconRelation(relatedToEventId, event);
+                });
+            } else {
+                processBeaconRelation(relatedToEventId, event);
             }
         });
     }

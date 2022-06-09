@@ -96,19 +96,14 @@ describe("Relations", function() {
             },
         });
 
-        // Stub the room
-
-        const room = new Room("room123", null, null);
-
         // Add the target event first, then the relation event
         {
+            const room = new Room("room123", null, null);
             const relationsCreated = new Promise(resolve => {
                 targetEvent.once(MatrixEventEvent.RelationsCreated, resolve);
             });
 
-            const timelineSet = new EventTimelineSet(room, {
-                unstableClientRelationAggregation: true,
-            });
+            const timelineSet = new EventTimelineSet(room);
             timelineSet.addLiveEvent(targetEvent);
             timelineSet.addLiveEvent(relationEvent);
 
@@ -117,17 +112,71 @@ describe("Relations", function() {
 
         // Add the relation event first, then the target event
         {
+            const room = new Room("room123", null, null);
             const relationsCreated = new Promise(resolve => {
                 targetEvent.once(MatrixEventEvent.RelationsCreated, resolve);
             });
 
-            const timelineSet = new EventTimelineSet(room, {
-                unstableClientRelationAggregation: true,
-            });
+            const timelineSet = new EventTimelineSet(room);
             timelineSet.addLiveEvent(relationEvent);
             timelineSet.addLiveEvent(targetEvent);
 
             await relationsCreated;
         }
+    });
+
+    it("should re-use Relations between all timeline sets in a room", async () => {
+        const room = new Room("room123", null, null);
+        const timelineSet1 = new EventTimelineSet(room);
+        const timelineSet2 = new EventTimelineSet(room);
+        expect(room.relations).toBe(timelineSet1.relations);
+        expect(room.relations).toBe(timelineSet2.relations);
+    });
+
+    it("should ignore m.replace for state events", async () => {
+        const userId = "@bob:example.com";
+        const room = new Room("room123", null, userId);
+        const relations = new Relations("m.replace", "m.room.topic", room);
+
+        // Create an instance of a state event with rel_type m.replace
+        const originalTopic = new MatrixEvent({
+            "sender": userId,
+            "type": "m.room.topic",
+            "event_id": "$orig",
+            "room_id": room.roomId,
+            "content": {
+                "topic": "orig",
+            },
+            "state_key": "",
+        });
+        const badlyEditedTopic = new MatrixEvent({
+            "sender": userId,
+            "type": "m.room.topic",
+            "event_id": "$orig",
+            "room_id": room.roomId,
+            "content": {
+                "topic": "topic",
+                "m.new_content": {
+                    "topic": "edit",
+                },
+                "m.relates_to": {
+                    "event_id": "$orig",
+                    "rel_type": "m.replace",
+                },
+            },
+            "state_key": "",
+        });
+
+        await relations.setTargetEvent(originalTopic);
+        expect(originalTopic.replacingEvent()).toBe(null);
+        expect(originalTopic.getContent().topic).toBe("orig");
+        expect(badlyEditedTopic.isRelation()).toBe(false);
+        expect(badlyEditedTopic.isRelation("m.replace")).toBe(false);
+
+        await relations.addEvent(badlyEditedTopic);
+        expect(originalTopic.replacingEvent()).toBe(null);
+        expect(originalTopic.getContent().topic).toBe("orig");
+        expect(badlyEditedTopic.replacingEvent()).toBe(null);
+        expect(badlyEditedTopic.getContent().topic).toBe("topic");
     });
 });

@@ -29,10 +29,11 @@ import {
 import { MEGOLM_ALGORITHM } from "../../src/crypto/olmlib";
 import { EventStatus, MatrixEvent } from "../../src/models/event";
 import { Preset } from "../../src/@types/partials";
+import { ReceiptType } from "../../src/@types/read_receipts";
 import * as testUtils from "../test-utils/test-utils";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
-import { Room } from "../../src";
+import { ContentHelpers, Room } from "../../src";
 import { makeBeaconEvent } from "../test-utils/beacon";
 
 jest.useFakeTimers();
@@ -86,11 +87,16 @@ describe("MatrixClient", function() {
         // }
         // items are popped off when processed and block if no items left.
     ];
-    let acceptKeepalives;
+    let acceptKeepalives: boolean;
     let pendingLookup = null;
     function httpReq(cb, method, path, qp, data, prefix) {
         if (path === KEEP_ALIVE_PATH && acceptKeepalives) {
-            return Promise.resolve();
+            return Promise.resolve({
+                unstable_features: {
+                    "org.matrix.msc3440.stable": true,
+                },
+                versions: ["r0.6.0", "r0.6.1"],
+            });
         }
         const next = httpLookups.shift();
         const logLine = (
@@ -112,6 +118,7 @@ describe("MatrixClient", function() {
                 method: method,
                 path: path,
             };
+            pendingLookup.promise.abort = () => {}; // to make it a valid IAbortablePromise
             return pendingLookup.promise;
         }
         if (next.path === path && next.method === method) {
@@ -120,7 +127,7 @@ describe("MatrixClient", function() {
                 (next.error ? "BAD" : "GOOD") + " response",
             );
             if (next.expectBody) {
-                expect(next.expectBody).toEqual(data);
+                expect(data).toEqual(next.expectBody);
             }
             if (next.expectQueryParams) {
                 Object.keys(next.expectQueryParams).forEach(function(k) {
@@ -144,6 +151,10 @@ describe("MatrixClient", function() {
             }
             return Promise.resolve(next.data);
         }
+        // Jest doesn't let us have custom expectation errors, so if you're seeing this then
+        // you forgot to handle at least 1 pending request. Check your tests to ensure your
+        // number of expectations lines up with your number of requests made, and that those
+        // requests match your expectations.
         expect(true).toBe(false);
         return new Promise(() => {});
     }
@@ -199,6 +210,7 @@ describe("MatrixClient", function() {
         client.http.authedRequest.mockImplementation(function() {
             return new Promise(() => {});
         });
+        client.stopClient();
     });
 
     it("should create (unstable) file trees", async () => {
@@ -719,18 +731,16 @@ describe("MatrixClient", function() {
     });
 
     describe("guest rooms", function() {
-        it("should only do /sync calls (without filter/pushrules)", function(done) {
-            httpLookups = []; // no /pushrules or /filterw
+        it("should only do /sync calls (without filter/pushrules)", async function() {
+            httpLookups = []; // no /pushrules or /filter
             httpLookups.push({
                 method: "GET",
                 path: "/sync",
                 data: SYNC_DATA,
-                thenCall: function() {
-                    done();
-                },
             });
             client.setGuest(true);
-            client.startClient();
+            await client.startClient();
+            expect(httpLookups.length).toBe(0);
         });
 
         xit("should be able to peek into a room using peekInRoom", function(done) {
@@ -767,7 +777,7 @@ describe("MatrixClient", function() {
                 expectBody: content,
             }];
 
-            await client.sendEvent(roomId, EventType.RoomMessage, content, txnId);
+            await client.sendEvent(roomId, EventType.RoomMessage, { ...content }, txnId);
         });
 
         it("overload with null threadId works", async () => {
@@ -780,20 +790,99 @@ describe("MatrixClient", function() {
                 expectBody: content,
             }];
 
-            await client.sendEvent(roomId, null, EventType.RoomMessage, content, txnId);
+            await client.sendEvent(roomId, null, EventType.RoomMessage, { ...content }, txnId);
         });
 
         it("overload with threadId works", async () => {
             const eventId = "$eventId:example.org";
             const txnId = client.makeTxnId();
+            const threadId = "$threadId:server";
             httpLookups = [{
                 method: "PUT",
                 path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
                 data: { event_id: eventId },
-                expectBody: content,
+                expectBody: {
+                    ...content,
+                    "m.relates_to": {
+                        "event_id": threadId,
+                        "is_falling_back": true,
+                        "rel_type": "m.thread",
+                    },
+                },
             }];
 
-            await client.sendEvent(roomId, "$threadId:server", EventType.RoomMessage, content, txnId);
+            await client.sendEvent(roomId, threadId, EventType.RoomMessage, { ...content }, txnId);
+        });
+
+        it("should add thread relation if threadId is passed and the relation is missing", async () => {
+            const eventId = "$eventId:example.org";
+            const threadId = "$threadId:server";
+            const txnId = client.makeTxnId();
+
+            const room = new Room(roomId, client, userId);
+            store.getRoom.mockReturnValue(room);
+
+            const rootEvent = new MatrixEvent({ event_id: threadId });
+            room.createThread(threadId, rootEvent, [rootEvent], false);
+
+            httpLookups = [{
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                data: { event_id: eventId },
+                expectBody: {
+                    ...content,
+                    "m.relates_to": {
+                        "m.in_reply_to": {
+                            event_id: threadId,
+                        },
+                        "event_id": threadId,
+                        "is_falling_back": true,
+                        "rel_type": "m.thread",
+                    },
+                },
+            }];
+
+            await client.sendEvent(roomId, threadId, EventType.RoomMessage, { ...content }, txnId);
+        });
+
+        it("should add thread relation if threadId is passed and the relation is missing with reply", async () => {
+            const eventId = "$eventId:example.org";
+            const threadId = "$threadId:server";
+            const txnId = client.makeTxnId();
+
+            const content = {
+                body,
+                "m.relates_to": {
+                    "m.in_reply_to": {
+                        event_id: "$other:event",
+                    },
+                },
+            };
+
+            const room = new Room(roomId, client, userId);
+            store.getRoom.mockReturnValue(room);
+
+            const rootEvent = new MatrixEvent({ event_id: threadId });
+            room.createThread(threadId, rootEvent, [rootEvent], false);
+
+            httpLookups = [{
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                data: { event_id: eventId },
+                expectBody: {
+                    ...content,
+                    "m.relates_to": {
+                        "m.in_reply_to": {
+                            event_id: "$other:event",
+                        },
+                        "event_id": threadId,
+                        "is_falling_back": false,
+                        "rel_type": "m.thread",
+                    },
+                },
+            }];
+
+            await client.sendEvent(roomId, threadId, EventType.RoomMessage, { ...content }, txnId);
         });
     });
 
@@ -811,9 +900,7 @@ describe("MatrixClient", function() {
                     }
                 },
             },
-            threads: {
-                get: jest.fn(),
-            },
+            getThread: jest.fn(),
             addPendingEvent: jest.fn(),
             updatePendingEvent: jest.fn(),
             reEmitter: {
@@ -922,6 +1009,7 @@ describe("MatrixClient", function() {
             };
             client.crypto = { // mock crypto
                 encryptEvent: (event, room) => new Promise(() => {}),
+                stop: jest.fn(),
             };
         });
 
@@ -994,6 +1082,46 @@ describe("MatrixClient", function() {
         });
     });
 
+    describe("read-markers and read-receipts", () => {
+        it("setRoomReadMarkers", () => {
+            client.setRoomReadMarkersHttpRequest = jest.fn();
+            const room = {
+                hasPendingEvent: jest.fn().mockReturnValue(false),
+                addLocalEchoReceipt: jest.fn(),
+            };
+            const rrEvent = new MatrixEvent({ event_id: "read_event_id" });
+            const rpEvent = new MatrixEvent({ event_id: "read_private_event_id" });
+            client.getRoom = () => room;
+
+            client.setRoomReadMarkers(
+                "room_id",
+                "read_marker_event_id",
+                rrEvent,
+                rpEvent,
+            );
+
+            expect(client.setRoomReadMarkersHttpRequest).toHaveBeenCalledWith(
+                "room_id",
+                "read_marker_event_id",
+                "read_event_id",
+                "read_private_event_id",
+            );
+            expect(room.addLocalEchoReceipt).toHaveBeenCalledTimes(2);
+            expect(room.addLocalEchoReceipt).toHaveBeenNthCalledWith(
+                1,
+                client.credentials.userId,
+                rrEvent,
+                ReceiptType.Read,
+            );
+            expect(room.addLocalEchoReceipt).toHaveBeenNthCalledWith(
+                2,
+                client.credentials.userId,
+                rpEvent,
+                ReceiptType.ReadPrivate,
+            );
+        });
+    });
+
     describe("beacons", () => {
         const roomId = '!room:server.org';
         const content = makeBeaconInfoContent(100, true);
@@ -1047,7 +1175,7 @@ describe("MatrixClient", function() {
                 expect(roomStateProcessSpy).not.toHaveBeenCalled();
             });
 
-            it('calls room states processBeaconEvents with m.beacon events', () => {
+            it('calls room states processBeaconEvents with events', () => {
                 const room = new Room(roomId, client, userId);
                 const roomStateProcessSpy = jest.spyOn(room.currentState, 'processBeaconEvents');
 
@@ -1055,8 +1183,43 @@ describe("MatrixClient", function() {
                 const beaconEvent = makeBeaconEvent(userId);
 
                 client.processBeaconEvents(room, [messageEvent, beaconEvent]);
-                expect(roomStateProcessSpy).toHaveBeenCalledWith([beaconEvent]);
+                expect(roomStateProcessSpy).toHaveBeenCalledWith([messageEvent, beaconEvent], client);
             });
+        });
+    });
+
+    describe("setRoomTopic", () => {
+        const roomId = "!foofoofoofoofoofoo:matrix.org";
+        const createSendStateEventMock = (topic: string, htmlTopic?: string) => {
+            return jest.fn()
+                .mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
+                    expect(roomId).toEqual(roomId);
+                    expect(eventType).toEqual(EventType.RoomTopic);
+                    expect(content).toMatchObject(ContentHelpers.makeTopicContent(topic, htmlTopic));
+                    expect(stateKey).toBeUndefined();
+                    return Promise.resolve();
+                });
+        };
+
+        it("is called with plain text topic and sends state event", async () => {
+            const sendStateEvent = createSendStateEventMock("pizza");
+            client.sendStateEvent = sendStateEvent;
+            await client.setRoomTopic(roomId, "pizza");
+            expect(sendStateEvent).toHaveBeenCalledTimes(1);
+        });
+
+        it("is called with plain text topic and callback and sends state event", async () => {
+            const sendStateEvent = createSendStateEventMock("pizza");
+            client.sendStateEvent = sendStateEvent;
+            await client.setRoomTopic(roomId, "pizza", () => {});
+            expect(sendStateEvent).toHaveBeenCalledTimes(1);
+        });
+
+        it("is called with plain text and HTML topic and sends state event", async () => {
+            const sendStateEvent = createSendStateEventMock("pizza", "<b>pizza</b>");
+            client.sendStateEvent = sendStateEvent;
+            await client.setRoomTopic(roomId, "pizza", "<b>pizza</b>");
+            expect(sendStateEvent).toHaveBeenCalledTimes(1);
         });
     });
 
@@ -1110,6 +1273,28 @@ describe("MatrixClient", function() {
         it("overload logoutDevices=false + callback", async () => {
             await client.setPassword(auth, newPassword, false, callback);
             passwordTest({ auth, new_password: newPassword, logout_devices: false }, callback);
+        });
+    });
+
+    describe("getLocalAliases", () => {
+        it("should call the right endpoint", async () => {
+            const response = {
+                aliases: ["#woop:example.org", "#another:example.org"],
+            };
+            client.http.authedRequest.mockClear().mockResolvedValue(response);
+
+            const roomId = "!whatever:example.org";
+            const result = await client.getLocalAliases(roomId);
+
+            // Current version of the endpoint we support is v3
+            const [callback, method, path, queryParams, data, opts] = client.http.authedRequest.mock.calls[0];
+            expect(callback).toBeFalsy();
+            expect(data).toBeFalsy();
+            expect(method).toBe('GET');
+            expect(path).toEqual(`/rooms/${encodeURIComponent(roomId)}/aliases`);
+            expect(opts).toMatchObject({ prefix: "/_matrix/client/v3" });
+            expect(queryParams).toBeFalsy();
+            expect(result!.aliases).toEqual(response.aliases);
         });
     });
 });

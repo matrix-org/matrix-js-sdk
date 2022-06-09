@@ -418,8 +418,8 @@ export class MemoryCryptoStore implements CryptoStore {
             // (hence 43 characters long).
 
             func({
-                senderKey: key.substr(0, 43),
-                sessionId: key.substr(44),
+                senderKey: key.slice(0, 43),
+                sessionId: key.slice(44),
                 sessionData: this.inboundGroupSessions[key],
             });
         }
@@ -482,8 +482,8 @@ export class MemoryCryptoStore implements CryptoStore {
         for (const session in this.sessionsNeedingBackup) {
             if (this.inboundGroupSessions[session]) {
                 sessions.push({
-                    senderKey: session.substr(0, 43),
-                    sessionId: session.substr(44),
+                    senderKey: session.slice(0, 43),
+                    sessionId: session.slice(44),
                     sessionData: this.inboundGroupSessions[session],
                 });
                 if (limit && session.length >= limit) {

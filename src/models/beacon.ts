@@ -54,7 +54,7 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
     public readonly roomId: string;
     private _beaconInfo: BeaconInfoState;
     private _isLive: boolean;
-    private livenessWatchInterval: number;
+    private livenessWatchTimeout: ReturnType<typeof setTimeout>;
     private _latestLocationState: BeaconLocationState | undefined;
 
     constructor(
@@ -109,8 +109,8 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
     }
 
     public destroy(): void {
-        if (this.livenessWatchInterval) {
-            clearInterval(this.livenessWatchInterval);
+        if (this.livenessWatchTimeout) {
+            clearTimeout(this.livenessWatchTimeout);
         }
 
         this._isLive = false;
@@ -122,19 +122,26 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
      * Emits BeaconEvent.LivenessChange when beacon expires
      */
     public monitorLiveness(): void {
-        if (this.livenessWatchInterval) {
-            clearInterval(this.livenessWatchInterval);
+        if (this.livenessWatchTimeout) {
+            clearTimeout(this.livenessWatchTimeout);
         }
 
         this.checkLiveness();
         if (this.isLive) {
             const expiryInMs = (this._beaconInfo?.timestamp + this._beaconInfo?.timeout) - Date.now();
             if (expiryInMs > 1) {
-                this.livenessWatchInterval = setInterval(
+                this.livenessWatchTimeout = setTimeout(
                     () => { this.monitorLiveness(); },
                     expiryInMs,
                 );
             }
+        } else if (this._beaconInfo?.timestamp > Date.now()) {
+            // beacon start timestamp is in the future
+            // check liveness again then
+            this.livenessWatchTimeout = setTimeout(
+                () => { this.monitorLiveness(); },
+                this.beaconInfo?.timestamp - Date.now(),
+            );
         }
     }
 

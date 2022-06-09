@@ -35,6 +35,7 @@ import { UnstableValue } from "../NamespacedValue";
 import { CryptoEvent, IMegolmSessionData } from "./index";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
+const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
 
 type AuthData = IKeyBackupInfo["auth_data"];
 
@@ -111,6 +112,8 @@ export class BackupManager {
     public backupInfo: IKeyBackupInfo | undefined; // The info dict from /room_keys/version
     public checkedForBackup: boolean; // Have we checked the server for a backup we can use?
     private sendingBackups: boolean; // Are we currently sending backups?
+    private sessionLastCheckAttemptedTime: Record<string, number> = {}; // When did we last try to check the server for a given session id?
+
     constructor(private readonly baseApis: MatrixClient, public readonly getKey: GetKey) {
         this.checkedForBackup = false;
         this.sendingBackups = false;
@@ -132,18 +135,18 @@ export class BackupManager {
         if (!Algorithm) {
             throw new Error("Unknown backup algorithm: " + info.algorithm);
         }
-        if (!(typeof info.auth_data === "object")) {
+        if (typeof info.auth_data !== "object") {
             throw new Error("Invalid backup data returned");
         }
         return Algorithm.checkBackupVersion(info);
     }
 
-    public static async makeAlgorithm(info: IKeyBackupInfo, getKey: GetKey): Promise<BackupAlgorithm> {
+    public static makeAlgorithm(info: IKeyBackupInfo, getKey: GetKey): Promise<BackupAlgorithm> {
         const Algorithm = algorithmsByName[info.algorithm];
         if (!Algorithm) {
             throw new Error("Unknown backup algorithm");
         }
-        return await Algorithm.init(info.auth_data, getKey);
+        return Algorithm.init(info.auth_data, getKey);
     }
 
     public async enableKeyBackup(info: IKeyBackupInfo): Promise<void> {
@@ -283,6 +286,26 @@ export class BackupManager {
     }
 
     /**
+     * Attempts to retrieve a session from a key backup, if enough time
+     * has elapsed since the last check for this session id.
+     */
+    public async queryKeyBackupRateLimited(
+        targetRoomId: string | undefined,
+        targetSessionId: string | undefined,
+    ): Promise<void> {
+        if (!this.backupInfo) { return; }
+
+        const now = new Date().getTime();
+        if (
+            !this.sessionLastCheckAttemptedTime[targetSessionId]
+                || now - this.sessionLastCheckAttemptedTime[targetSessionId] > KEY_BACKUP_CHECK_RATE_LIMIT
+        ) {
+            this.sessionLastCheckAttemptedTime[targetSessionId] = now;
+            await this.baseApis.restoreKeyBackupWithCache(targetRoomId, targetSessionId, this.backupInfo, {});
+        }
+    }
+
+    /**
      * Check if the given backup info is trusted.
      *
      * @param {IKeyBackupInfo} backupInfo key backup info dict from /room_keys/version
@@ -375,9 +398,7 @@ export class BackupManager {
             );
             if (device) {
                 sigInfo.device = device;
-                sigInfo.deviceTrust = await this.baseApis.checkDeviceTrust(
-                    this.baseApis.getUserId(), sigInfo.deviceId,
-                );
+                sigInfo.deviceTrust = this.baseApis.checkDeviceTrust(this.baseApis.getUserId(), sigInfo.deviceId);
                 try {
                     await verifySignature(
                         this.baseApis.crypto.olmDevice,
@@ -430,7 +451,7 @@ export class BackupManager {
             // requests from different clients hitting the server all at
             // the same time when a new key is sent
             const delay = Math.random() * maxDelay;
-            await sleep(delay, undefined);
+            await sleep(delay);
             let numFailures = 0; // number of consecutive failures
             for (;;) {
                 if (!this.algorithm) {
@@ -464,7 +485,7 @@ export class BackupManager {
                 }
                 if (numFailures) {
                     // exponential backoff if we have failures
-                    await sleep(1000 * Math.pow(2, Math.min(numFailures - 1, 4)), undefined);
+                    await sleep(1000 * Math.pow(2, Math.min(numFailures - 1, 4)));
                 }
             }
         } finally {
@@ -476,8 +497,8 @@ export class BackupManager {
      * Take some e2e keys waiting to be backed up and send them
      * to the backup.
      *
-     * @param {integer} limit Maximum number of keys to back up
-     * @returns {integer} Number of sessions backed up
+     * @param {number} limit Maximum number of keys to back up
+     * @returns {number} Number of sessions backed up
      */
     public async backupPendingKeys(limit: number): Promise<number> {
         const sessions = await this.baseApis.crypto.cryptoStore.getSessionsNeedingBackup(limit);
@@ -495,7 +516,7 @@ export class BackupManager {
                 rooms[roomId] = { sessions: {} };
             }
 
-            const sessionData = await this.baseApis.crypto.olmDevice.exportInboundGroupSession(
+            const sessionData = this.baseApis.crypto.olmDevice.exportInboundGroupSession(
                 session.senderKey, session.sessionId, session.sessionData,
             );
             sessionData.algorithm = MEGOLM_ALGORITHM;
@@ -779,15 +800,15 @@ export class Aes256 implements BackupAlgorithm {
 
     public get untrusted() { return false; }
 
-    async encryptSession(data: Record<string, any>): Promise<any> {
+    public encryptSession(data: Record<string, any>): Promise<any> {
         const plainText: Record<string, any> = Object.assign({}, data);
         delete plainText.session_id;
         delete plainText.room_id;
         delete plainText.first_known_index;
-        return await encryptAES(JSON.stringify(plainText), this.key, data.session_id);
+        return encryptAES(JSON.stringify(plainText), this.key, data.session_id);
     }
 
-    async decryptSessions(sessions: Record<string, IKeyBackupSession>): Promise<IMegolmSessionData[]> {
+    public async decryptSessions(sessions: Record<string, IKeyBackupSession>): Promise<IMegolmSessionData[]> {
         const keys: IMegolmSessionData[] = [];
 
         for (const [sessionId, sessionData] of Object.entries(sessions)) {
@@ -802,7 +823,7 @@ export class Aes256 implements BackupAlgorithm {
         return keys;
     }
 
-    async keyMatches(key: Uint8Array): Promise<boolean> {
+    public async keyMatches(key: Uint8Array): Promise<boolean> {
         if (this.authData.mac) {
             const { mac } = await calculateKeyCheck(key, this.authData.iv);
             return this.authData.mac.replace(/=+$/g, '') === mac.replace(/=+/g, '');

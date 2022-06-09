@@ -517,13 +517,6 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
     /**
      * @experimental
      */
-    public get isThreadRelation(): boolean {
-        return !!this.threadRootId && this.threadId !== this.getId();
-    }
-
-    /**
-     * @experimental
-     */
     public get isThreadRoot(): boolean {
         const threadDetails = this
             .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
@@ -544,7 +537,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
         return mRelatesTo?.['m.in_reply_to']?.event_id;
     }
 
-    public get relationEventId(): string {
+    public get relationEventId(): string | undefined {
         return this.getWireContent()
             ?.["m.relates_to"]
             ?.event_id;
@@ -1043,7 +1036,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
      *   caused a change in the actual visibility of this event, either by making it
      *   visible (if it was hidden), by making it hidden (if it was visible) or by
      *   changing the reason (if it was hidden).
-     * @param visibilityEvent event holding a hide/unhide payload, or nothing
+     * @param visibilityChange event holding a hide/unhide payload, or nothing
      *   if the event is being reset to its original visibility (presumably
      *   by a visibility event being redacted).
      */
@@ -1065,9 +1058,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
                     reason: reason,
                 });
             }
-            if (change) {
-                this.emit(MatrixEventEvent.VisibilityChange, this, visible);
-            }
+            this.emit(MatrixEventEvent.VisibilityChange, this, visible);
         }
     }
 
@@ -1112,23 +1103,21 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
         }
         this.event.unsigned.redacted_because = redactionEvent.event as IEvent;
 
-        let key;
-        for (key in this.event) {
-            if (!this.event.hasOwnProperty(key)) {
-                continue;
-            }
-            if (!REDACT_KEEP_KEYS.has(key)) {
+        for (const key in this.event) {
+            if (this.event.hasOwnProperty(key) && !REDACT_KEEP_KEYS.has(key)) {
                 delete this.event[key];
             }
         }
 
+        // If the event is encrypted prune the decrypted bits
+        if (this.isEncrypted()) {
+            this.clearEvent = null;
+        }
+
         const keeps = REDACT_KEEP_CONTENT_MAP[this.getType()] || {};
         const content = this.getContent();
-        for (key in content) {
-            if (!content.hasOwnProperty(key)) {
-                continue;
-            }
-            if (!keeps[key]) {
+        for (const key in content) {
+            if (content.hasOwnProperty(key) && !keeps[key]) {
                 delete content[key];
             }
         }
@@ -1294,7 +1283,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
 
     /**
      * Get whether the event is a relation event, and of a given type if
-     * `relType` is passed in.
+     * `relType` is passed in. State events cannot be relation events
      *
      * @param {string?} relType if given, checks that the relation is of the
      * given type
@@ -1303,10 +1292,12 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
     public isRelation(relType: string = undefined): boolean {
         // Relation info is lifted out of the encrypted content when sent to
         // encrypted rooms, so we have to check `getWireContent` for this.
-        const content = this.getWireContent();
-        const relation = content && content["m.relates_to"];
-        return relation && relation.rel_type && relation.event_id &&
-            ((relType && relation.rel_type === relType) || !relType);
+        const relation = this.getWireContent()?.["m.relates_to"];
+        if (this.isState() && relation?.rel_type === RelationType.Replace) {
+            // State events cannot be m.replace relations
+            return false;
+        }
+        return relation?.rel_type && relation.event_id && (relType ? relation.rel_type === relType : true);
     }
 
     /**
@@ -1334,6 +1325,10 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
         // as with local redaction, the replacing event might get
         // cancelled, which should be reflected on the target event.
         if (this.isRedacted() && newEvent) {
+            return;
+        }
+        // don't allow state events to be replaced using this mechanism as per MSC2676
+        if (this.isState()) {
             return;
         }
         if (this._replacingEvent !== newEvent) {
@@ -1586,7 +1581,7 @@ const REDACT_KEEP_KEYS = new Set([
     'content', 'unsigned', 'origin_server_ts',
 ]);
 
-// a map from event type to the .content keys we keep when an event is redacted
+// a map from state event type to the .content keys we keep when an event is redacted
 const REDACT_KEEP_CONTENT_MAP = {
     [EventType.RoomMember]: { 'membership': 1 },
     [EventType.RoomCreate]: { 'creator': 1 },

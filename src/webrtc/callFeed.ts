@@ -69,7 +69,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     private frequencyBinCount: Float32Array;
     private speakingThreshold = SPEAKING_THRESHOLD;
     private speaking = false;
-    private volumeLooperTimeout: number;
+    private volumeLooperTimeout: ReturnType<typeof setTimeout>;
 
     constructor(opts: ICallFeedOpts) {
         super();

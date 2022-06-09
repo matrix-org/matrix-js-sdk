@@ -250,7 +250,7 @@ async function deriveKeysBrowser(key: Uint8Array, name: string): Promise<[Crypto
         ['sign', 'verify'],
     );
 
-    return await Promise.all([aesProm, hmacProm]);
+    return Promise.all([aesProm, hmacProm]);
 }
 
 export function encryptAES(data: string, key: Uint8Array, name: string, ivStr?: string): Promise<IEncryptedPayload> {
