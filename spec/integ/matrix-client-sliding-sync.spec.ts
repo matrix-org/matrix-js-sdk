@@ -110,10 +110,7 @@ describe("SlidingSync", () => {
             slidingSync = new SlidingSync(proxyBaseUrl, [], roomSubInfo, client, 1);
             slidingSync.modifyRoomSubscriptions(new Set([roomId]));
             httpBackend.when("POST", syncUrl).check(function(req) {
-                let body = req.data;
-                if (!body) {
-                    body = JSON.parse(req.opts.body);
-                }
+                const body = req.data;
                 logger.log("room sub", body);
                 expect(body.room_subscriptions).toBeTruthy();
                 expect(body.room_subscriptions[roomId]).toEqual(roomSubInfo);
@@ -147,10 +144,7 @@ describe("SlidingSync", () => {
                 ],
             };
             httpBackend.when("POST", syncUrl).check(function(req) {
-                let body = req.data;
-                if (!body) {
-                    body = JSON.parse(req.opts.body);
-                }
+                const body = req.data;
                 logger.log("adjusted sub", body);
                 expect(body.room_subscriptions).toBeTruthy();
                 expect(body.room_subscriptions[roomId]).toEqual(newSubInfo);
@@ -187,10 +181,7 @@ describe("SlidingSync", () => {
                 timeline: [],
             };
             httpBackend.when("POST", syncUrl).check(function(req) {
-                let body = req.data;
-                if (!body) {
-                    body = JSON.parse(req.opts.body);
-                }
+                const body = req.data;
                 logger.log("new subs", body);
                 expect(body.room_subscriptions).toBeTruthy();
                 // only the new room is sent, the other is sticky
@@ -222,10 +213,7 @@ describe("SlidingSync", () => {
 
         it("should be able to unsubscribe from a room", async (done) => {
             httpBackend.when("POST", syncUrl).check(function(req) {
-                let body = req.data;
-                if (!body) {
-                    body = JSON.parse(req.opts.body);
-                }
+                const body = req.data;
                 logger.log("unsub request", body);
                 expect(body.room_subscriptions).toBeFalsy();
                 expect(body.unsubscribe_rooms).toEqual([roomId]);
@@ -295,10 +283,7 @@ describe("SlidingSync", () => {
             };
             slidingSync = new SlidingSync(proxyBaseUrl, [listReq], {}, client, 1);
             httpBackend.when("POST", syncUrl).check(function(req) {
-                let body = req.data;
-                if (!body) {
-                    body = JSON.parse(req.opts.body);
-                }
+                const body = req.data;
                 logger.log("list", body);
                 expect(body.lists).toBeTruthy();
                 expect(body.lists[0]).toEqual(listReq);
@@ -335,10 +320,7 @@ describe("SlidingSync", () => {
         it("should be possible to adjust list ranges", async (done) => {
             // modify the list ranges
             httpBackend.when("POST", syncUrl).check(function(req) {
-                let body = req.data;
-                if (!body) {
-                    body = JSON.parse(req.opts.body);
-                }
+                const body = req.data;
                 logger.log("next ranges", body.lists[0].ranges);
                 expect(body.lists).toBeTruthy();
                 expect(body.lists[0]).toEqual({
@@ -375,10 +357,7 @@ describe("SlidingSync", () => {
                 },
             };
             httpBackend.when("POST", syncUrl).check(function(req) {
-                let body = req.data;
-                if (!body) {
-                    body = JSON.parse(req.opts.body);
-                }
+                const body = req.data;
                 logger.log("extra list", body);
                 expect(body.lists).toBeTruthy();
                 expect(body.lists[0]).toEqual({
@@ -522,10 +501,7 @@ describe("SlidingSync", () => {
             };
 
             httpBackend.when("POST", syncUrl).check(function(req) {
-                let body = req.data;
-                if (!body) {
-                    body = JSON.parse(req.opts.body);
-                }
+                const body = req.data;
                 logger.log("ext req", body);
                 expect(body.extensions).toBeTruthy();
                 expect(body.extensions[extName]).toEqual(extReq);
@@ -557,10 +533,7 @@ describe("SlidingSync", () => {
                 responseCalled = true;
             };
             httpBackend.when("POST", syncUrl).check(function(req) {
-                let body = req.data;
-                if (!body) {
-                    body = JSON.parse(req.opts.body);
-                }
+                const body = req.data;
                 logger.log("ext req nothing", body);
                 expect(body.extensions).toBeTruthy();
                 expect(body.extensions[extName]).toBeUndefined();
