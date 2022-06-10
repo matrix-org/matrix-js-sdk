@@ -71,7 +71,7 @@ describe('Beacon', () => {
 
         const advanceDateAndTime = (ms: number) => {
             // bc liveness check uses Date.now we have to advance this mock
-            jest.spyOn(global.Date, 'now').mockReturnValue(now + ms);
+            jest.spyOn(global.Date, 'now').mockReturnValue(Date.now() + ms);
             // then advance time for the interval by the same amount
             jest.advanceTimersByTime(ms);
         };
@@ -224,11 +224,47 @@ describe('Beacon', () => {
                 beacon.monitorLiveness();
 
                 // @ts-ignore
-                expect(beacon.livenessWatchInterval).toBeFalsy();
+                expect(beacon.livenessWatchTimeout).toBeFalsy();
                 advanceDateAndTime(HOUR_MS * 2 + 1);
 
                 // no emit
                 expect(emitSpy).not.toHaveBeenCalled();
+            });
+
+            it('checks liveness of beacon at expected start time', () => {
+                // go forward in time to make beacon with timestamp in future
+                jest.spyOn(global.Date, 'now').mockReturnValue(now + HOUR_MS);
+                const futureBeaconEvent = makeBeaconInfoEvent(
+                    userId,
+                    roomId,
+                    {
+                        timeout: HOUR_MS * 3,
+                        isLive: true,
+                    },
+                    '$live123',
+                );
+                // go back to now
+                jest.spyOn(global.Date, 'now').mockReturnValue(now);
+
+                const beacon = new Beacon(futureBeaconEvent);
+                expect(beacon.isLive).toBeFalsy();
+                const emitSpy = jest.spyOn(beacon, 'emit');
+
+                beacon.monitorLiveness();
+
+                // advance to the start timestamp of the beacon
+                advanceDateAndTime(HOUR_MS + 1);
+
+                // beacon is in live period now
+                expect(emitSpy).toHaveBeenCalledTimes(1);
+                expect(emitSpy).toHaveBeenCalledWith(BeaconEvent.LivenessChange, true, beacon);
+
+                // check the expiry monitor is still setup ok
+                // advance to the expiry
+                advanceDateAndTime(HOUR_MS * 3 + 100);
+
+                expect(emitSpy).toHaveBeenCalledTimes(2);
+                expect(emitSpy).toHaveBeenCalledWith(BeaconEvent.LivenessChange, false, beacon);
             });
 
             it('checks liveness of beacon at expected expiry time', () => {
@@ -253,12 +289,12 @@ describe('Beacon', () => {
 
                 beacon.monitorLiveness();
                 // @ts-ignore
-                const oldMonitor = beacon.livenessWatchInterval;
+                const oldMonitor = beacon.livenessWatchTimeout;
 
                 beacon.monitorLiveness();
 
                 // @ts-ignore
-                expect(beacon.livenessWatchInterval).not.toEqual(oldMonitor);
+                expect(beacon.livenessWatchTimeout).not.toEqual(oldMonitor);
             });
 
             it('destroy kills liveness monitor and emits', () => {

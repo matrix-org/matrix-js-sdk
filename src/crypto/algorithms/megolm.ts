@@ -610,7 +610,8 @@ class MegolmEncryption extends EncryptionAlgorithm {
         payload: IPayload,
     ): Promise<void> {
         const contentMap: Record<string, Record<string, IEncryptedContent>> = {};
-        const deviceInfoByDeviceId = new Map<string, DeviceInfo>();
+        // Map from userId to a map of deviceId to deviceInfo
+        const deviceInfoByUserIdAndDeviceId = new Map<string, Map<string, DeviceInfo>>();
 
         const promises: Promise<unknown>[] = [];
         for (let i = 0; i < userDeviceMap.length; i++) {
@@ -623,7 +624,18 @@ class MegolmEncryption extends EncryptionAlgorithm {
             const userId = val.userId;
             const deviceInfo = val.deviceInfo;
             const deviceId = deviceInfo.deviceId;
-            deviceInfoByDeviceId.set(deviceId, deviceInfo);
+
+            // Assign to temp value to make type-checking happy
+            let userIdDeviceInfo = deviceInfoByUserIdAndDeviceId.get(userId);
+
+            if (userIdDeviceInfo === undefined) {
+                userIdDeviceInfo = new Map<string, DeviceInfo>();
+
+                deviceInfoByUserIdAndDeviceId.set(userId, userIdDeviceInfo);
+            }
+
+            // We hold by reference, this updates deviceInfoByUserIdAndDeviceId[userId]
+            userIdDeviceInfo.set(deviceId, deviceInfo);
 
             if (!contentMap[userId]) {
                 contentMap[userId] = {};
@@ -678,7 +690,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
                         session.markSharedWithDevice(
                             userId,
                             deviceId,
-                            deviceInfoByDeviceId.get(deviceId).getIdentityKey(),
+                            deviceInfoByUserIdAndDeviceId.get(userId).get(deviceId).getIdentityKey(),
                             chainIndex,
                         );
                     }
@@ -1315,7 +1327,9 @@ class MegolmDecryption extends DecryptionAlgorithm {
 
         if (res === null) {
             // We've got a message for a session we don't have.
-            //
+            // try and get the missing key from the backup first
+            this.crypto.backupManager.queryKeyBackupRateLimited(event.getRoomId(), content.session_id).catch(() => {});
+
             // (XXX: We might actually have received this key since we started
             // decrypting, in which case we'll have scheduled a retry, and this
             // request will be redundant. We could probably check to see if the

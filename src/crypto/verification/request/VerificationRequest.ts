@@ -841,11 +841,11 @@ export class VerificationRequest<
         }
 
         const isUnexpectedRequest = type === REQUEST_TYPE && this.phase !== PHASE_UNSENT;
-        const isUnexpectedReady = type === READY_TYPE && this.phase !== PHASE_REQUESTED;
+        const isUnexpectedReady = type === READY_TYPE && this.phase !== PHASE_REQUESTED && this.phase !== PHASE_STARTED;
         // only if phase has passed from PHASE_UNSENT should we cancel, because events
         // are allowed to come in in any order (at least with InRoomChannel). So we only know
-        // we're dealing with a valid request we should participate in once we've moved to PHASE_REQUESTED
-        // before that, we could be looking at somebody elses verification request and we just
+        // we're dealing with a valid request we should participate in once we've moved to PHASE_REQUESTED.
+        // Before that, we could be looking at somebody else's verification request and we just
         // happen to be in the room
         if (this.phase !== PHASE_UNSENT && (isUnexpectedRequest || isUnexpectedReady)) {
             logger.warn(`Cancelling, unexpected ${type} verification ` +

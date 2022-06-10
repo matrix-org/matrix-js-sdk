@@ -268,7 +268,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
                 reject(err);
             };
         }).then((events) => {
-            logger.log(`LL: got ${events && events.length} membershipEvents from storage for room ${roomId} ...`);
+            logger.log(`LL: got ${events?.length} membershipEvents from storage for room ${roomId} ...`);
             return events;
         });
     }

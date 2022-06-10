@@ -6,7 +6,7 @@ import '../olm-loader';
 
 import { logger } from '../../src/logger';
 import { IContent, IEvent, IUnsigned, MatrixEvent, MatrixEventEvent } from "../../src/models/event";
-import { ClientEvent, EventType, MatrixClient } from "../../src";
+import { ClientEvent, EventType, MatrixClient, MsgType } from "../../src";
 import { SyncState } from "../../src/sync";
 import { eventMapperFor } from "../../src/event-mapper";
 
@@ -225,8 +225,47 @@ export function mkMessage(opts: IMessageOpts, client?: MatrixClient): object | M
         ...opts,
         type: EventType.RoomMessage,
         content: {
-            msgtype: "m.text",
+            msgtype: MsgType.Text,
             body: opts.msg,
+        },
+    };
+
+    if (!eventOpts.content.body) {
+        eventOpts.content.body = "Random->" + Math.random();
+    }
+    return mkEvent(eventOpts, client);
+}
+
+interface IReplyMessageOpts extends IMessageOpts {
+    replyToMessage: MatrixEvent;
+}
+
+/**
+ * Create a reply message.
+ *
+ * @param {Object} opts Values for the message
+ * @param {string} opts.room The room ID for the event.
+ * @param {string} opts.user The user ID for the event.
+ * @param {string} opts.msg Optional. The content.body for the event.
+ * @param {MatrixEvent} opts.replyToMessage The replied message
+ * @param {boolean} opts.event True to make a MatrixEvent.
+ * @param {MatrixClient} client If passed along with opts.event=true will be used to set up re-emitters.
+ * @return {Object|MatrixEvent} The event
+ */
+export function mkReplyMessage(opts: IReplyMessageOpts, client?: MatrixClient): object | MatrixEvent {
+    const eventOpts: IEventOpts = {
+        ...opts,
+        type: EventType.RoomMessage,
+        content: {
+            "msgtype": MsgType.Text,
+            "body": opts.msg,
+            "m.relates_to": {
+                "rel_type": "m.in_reply_to",
+                "event_id": opts.replyToMessage.getId(),
+                "m.in_reply_to": {
+                    "event_id": opts.replyToMessage.getId(),
+                },
+            },
         },
     };
 

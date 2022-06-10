@@ -83,10 +83,13 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
                 key: "type",
                 pattern: EventType.RoomServerAcl,
             },
+            {
+                kind: ConditionKind.EventMatch,
+                key: "state_key",
+                pattern: "",
+            },
         ],
-        actions: [
-            PushRuleActionName.DontNotify,
-        ],
+        actions: [],
     },
 ];
 

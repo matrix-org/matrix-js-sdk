@@ -23,18 +23,24 @@ Things that should go into your PR description:
  * A changelog entry in the `Notes` section (see below)
  * References to any bugs fixed by the change (in GitHub's `Fixes` notation)
  * Describe the why and what is changing in the PR description so it's easy for
-   onlookers and reviewers to onboard and context switch.
+   onlookers and reviewers to onboard and context switch. This information is
+   also helpful when we come back to look at this in 6 months and ask "why did
+   we do it like that?" we have a chance of finding out.
+      * Why didn't it work before? Why does it work now? What use cases does it
+        unlock?
+      * If you find yourself adding information on how the code works or why you
+        chose to do it the way you did, make sure this information is instead
+        written as comments in the code itself.
+      * Sometimes a PR can change considerably as it is developed. In this case,
+        the description should be updated to reflect the most recent state of
+        the PR. (It can be helpful to retain the old content under a suitable
+        heading, for additional context.)
  * Include both **before** and **after** screenshots to easily compare and discuss
    what's changing.
  * Include a step-by-step testing strategy so that a reviewer can check out the
    code locally and easily get to the point of testing your change.
  * Add comments to the diff for the reviewer that might help them to understand
    why the change is necessary or how they might better understand and review it.
-
-Things that should *not* go into your PR description:
- * Any information on how the code works or why you chose to do it the way
-   you did. If this isn't obvious from your code, you haven't written enough
-   comments.
 
 We rely on information in pull request to populate the information that goes
 into the changelogs our users see, both for the JS SDK itself and also for some
@@ -128,6 +134,16 @@ These are located in `/spec/`.
 When writing unit tests, please aim for a high level of test coverage
 for new code - 80% or greater. If you cannot achieve that, please document
 why it's not possible in your PR.
+
+Some sections of code are not sensible to add coverage for, such as those
+which explicitly inhibit noisy logging for tests. Which can be hidden using
+an istanbul magic comment as [documented here][1]. See example:
+```javascript
+/* istanbul ignore if */
+if (process.env.NODE_ENV !== "test") {
+    logger.error("Log line that is noisy enough in tests to want to skip");
+}
+```
 
 Tests validate that your change works as intended and also document
 concisely what is being changed. Ideally, your new tests fail
@@ -244,6 +260,12 @@ on Git 2.17+ you can mass signoff using rebase:
 git rebase --signoff origin/develop
 ```
 
+Review expectations
+===================
+
+See https://github.com/vector-im/element-meta/wiki/Review-process
+
+
 Merge Strategy
 ==============
 
@@ -258,3 +280,5 @@ When stacking pull requests, you may wish to do the following:
 2. Branch from your base branch (branch1) to your work branch (branch2), push commits and open a pull request configuring the base to be branch1, saying in the description that it is based on your other PR.
 3. Merge the first PR using a merge commit otherwise your stacked PR will need a rebase. Github will automatically adjust the base branch of your other PR to be develop.
 
+
+[1]: https://github.com/gotwarlost/istanbul/blob/master/ignoring-code-for-coverage.md
