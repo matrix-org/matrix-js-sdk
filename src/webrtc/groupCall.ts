@@ -137,6 +137,33 @@ function getCallUserId(call: MatrixCall): string | null {
     return call.getOpponentMember()?.userId || call.invitee || null;
 }
 
+/**
+ * Returns a call feed for passing to a new call in the group call. The media
+ * This could be either return the passed feed as-is or a clone, depending on the
+ * platform.
+ * @returns CallFeed
+ */
+function feedForNewCallFromFeed(feed: CallFeed): CallFeed {
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+    // Safari can't send a MediaStream to multiple sources, so we clone it,
+    // however cloning mediastreams on Chrome appears to cause the audio renderer
+    // to become unstable and hang: https://github.com/vector-im/element-call/issues/267
+    // It's a bit arbitrary what we do for other browsers: I've made Safari the special
+    // case on a somewhat arbitrary basis.
+    // To retest later to see if this hack is still necessary:
+    //  * In Safari, you should be able to have a group call with 2 other people and both
+    //    of them see your video stream (either desktop or mobile Safari)
+    //  * In Chrome, you should be able to enter a call and then go to youtube and play
+    //    a video (both desktop & Android Chrome, although in Android you may have to
+    //    open YouTube in incognito mode to avoid being redirected to the app.)
+    if (isSafari) {
+        return feed.clone();
+    }
+
+    return feed;
+}
+
 export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventHandlerMap> {
     // Config
     public activeSpeakerInterval = 1000;
@@ -552,7 +579,9 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
                 );
 
                 // TODO: handle errors
-                await Promise.all(this.calls.map(call => call.pushLocalFeed(this.localScreenshareFeed.clone())));
+                await Promise.all(this.calls.map(call => call.pushLocalFeed(
+                    feedForNewCallFromFeed(this.localScreenshareFeed),
+                )));
 
                 await this.sendMemberStateEvent();
 
@@ -626,8 +655,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
             this.addCall(newCall);
         }
 
-        // Safari can't send a MediaStream to multiple sources, so clone it
-        newCall.answerWithCallFeeds(this.getLocalFeeds().map((feed) => feed.clone()));
+        newCall.answerWithCallFeeds(this.getLocalFeeds().map((feed) => feedForNewCallFromFeed(feed)));
     };
 
     /**
@@ -787,9 +815,8 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
             (feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
 
         try {
-            // Safari can't send a MediaStream to multiple sources, so clone it
             await newCall.placeCallWithCallFeeds(
-                this.getLocalFeeds().map(feed => feed.clone()),
+                this.getLocalFeeds().map(feed => feedForNewCallFromFeed(feed)),
                 requestScreenshareFeed,
             );
         } catch (e) {
