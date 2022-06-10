@@ -29,8 +29,8 @@ async function keyshareEventForEvent(client, event, index) {
     const roomId = event.getRoomId();
     const eventContent = event.getWireContent();
     const key = await client.crypto.olmDevice.getInboundGroupSessionKey(
-        roomId, 
-        eventContent.sender_key, 
+        roomId,
+        eventContent.sender_key,
         eventContent.session_id,
         index,
     );
