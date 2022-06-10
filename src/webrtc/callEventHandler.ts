@@ -20,7 +20,7 @@ import { CallDirection, CallErrorCode, CallState, createNewMatrixCall, MatrixCal
 import { EventType } from '../@types/event';
 import { ClientEvent, MatrixClient } from '../client';
 import { MCallAnswer, MCallHangupReject } from "./callEventTypes";
-import { GroupCallErrorCode, GroupCallEvent, GroupCallUnknownDeviceError } from './groupCall';
+import { GroupCall, GroupCallErrorCode, GroupCallEvent, GroupCallUnknownDeviceError } from './groupCall';
 import { RoomEvent } from "../models/room";
 
 // Don't ring unless we'd be ringing for at least 3 seconds: the user needs some
@@ -210,7 +210,7 @@ export class CallEventHandler {
 
         let opponentDeviceId: string | undefined;
 
-        let groupCall;
+        let groupCall: GroupCall;
         if (groupCallId) {
             groupCall = this.client.groupCallEventHandler.getGroupCallById(groupCallId);
 
