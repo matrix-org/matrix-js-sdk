@@ -120,11 +120,7 @@ class OlmEncryption extends EncryptionAlgorithm {
 
         for (let i = 0; i < users.length; ++i) {
             const userId = users[i];
-            const devices = this.crypto.getStoredDevicesForUser(userId);
-
-            if (devices == null) {
-                continue;
-            }
+            const devices = this.crypto.getStoredDevicesForUser(userId) || [];
 
             for (let j = 0; j < devices.length; ++j) {
                 const deviceInfo = devices[j];

@@ -2590,7 +2590,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // because it first stores in memory. We should await the promise only
         // after all the in-memory state (roomEncryptors and _roomList) has been updated
         // to avoid races when calling this method multiple times. Hence keep a hold of the promise.
-        let storeConfigPromise = null;
+        let storeConfigPromise: Promise<void> = null;
         if (!existingConfig) {
             storeConfigPromise = this.roomList.setRoomEncryption(roomId, config);
         }
