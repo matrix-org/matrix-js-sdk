@@ -257,7 +257,7 @@ describe("MegolmDecryption", function() {
         });
 
         describe("session reuse and key reshares", () => {
-            const rotationPeriodMs = 999 * 24 * 60 * 60 * 1000;
+            const rotationPeriodMs = 999 * 24 * 60 * 60 * 1000; // 999 days, so we don't have to deal with it
 
             let megolmEncryption;
             let aliceDeviceInfo;
