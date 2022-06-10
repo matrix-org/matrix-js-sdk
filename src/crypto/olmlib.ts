@@ -323,7 +323,7 @@ export async function ensureOlmSessionsForDevices(
     }
 
     const oneTimeKeyAlgorithm = "signed_curve25519";
-    let res;
+    let res: IClaimOTKsResult;
     let taskDetail = `one-time keys for ${devicesWithoutSession.length} devices`;
     try {
         log.debug(`Claiming ${taskDetail}`);

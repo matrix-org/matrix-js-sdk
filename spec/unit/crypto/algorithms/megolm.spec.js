@@ -329,6 +329,18 @@ describe("MegolmDecryption", function() {
                 };
             });
 
+            it("should use larger otkTimeout when preparing to encrypt room", async () => {
+                megolmEncryption.prepareToEncrypt(mockRoom);
+                await megolmEncryption.encryptMessage(mockRoom, "a.fake.type", {
+                    body: "Some text",
+                });
+                expect(mockRoom.getEncryptionTargetMembers).toHaveBeenCalled();
+
+                expect(mockBaseApis.claimOneTimeKeys).toHaveBeenCalledWith(
+                    [['@alice:home.server', 'aliceDevice']], 'signed_curve25519', 10000,
+                );
+            });
+
             it("re-uses sessions for sequential messages", async function() {
                 const ct1 = await megolmEncryption.encryptMessage(mockRoom, "a.fake.type", {
                     body: "Some text",

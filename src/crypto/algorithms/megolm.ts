@@ -1461,7 +1461,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
         let senderKey = event.getSenderKey();
         let forwardingKeyChain: string[] = [];
         let exportFormat = false;
-        let keysClaimed;
+        let keysClaimed: ReturnType<MatrixEvent["getKeysClaimed"]>;
 
         if (!content.room_id ||
             !content.session_key ||

@@ -25,6 +25,34 @@ function awaitEvent(emitter, event) {
     });
 }
 
+async function keyshareEventForEvent(client, event, index) {
+    const roomId = event.getRoomId();
+    const eventContent = event.getWireContent();
+    const key = await client.crypto.olmDevice
+        .getInboundGroupSessionKey(
+            roomId, eventContent.sender_key, eventContent.session_id,
+            index,
+        );
+    const ksEvent = new MatrixEvent({
+        type: "m.forwarded_room_key",
+        sender: "@alice:example.com",
+        content: {
+            algorithm: olmlib.MEGOLM_ALGORITHM,
+            room_id: roomId,
+            sender_key: eventContent.sender_key,
+            sender_claimed_ed25519_key: key.sender_claimed_ed25519_key,
+            session_id: eventContent.session_id,
+            session_key: key.key,
+            chain_index: key.chain_index,
+            forwarding_curve25519_key_chain:
+            key.forwarding_curve_key_chain,
+        },
+    });
+    // make onRoomKeyEvent think this was an encrypted event
+    ksEvent.senderCurve25519Key = "akey";
+    return ksEvent;
+}
+
 describe("Crypto", function() {
     if (!CRYPTO_ENABLED) {
         return;
@@ -212,33 +240,6 @@ describe("Crypto", function() {
         });
 
         it("does not cancel keyshare requests if some messages are not decrypted", async function() {
-            async function keyshareEventForEvent(event, index) {
-                const eventContent = event.getWireContent();
-                const key = await aliceClient.crypto.olmDevice
-                    .getInboundGroupSessionKey(
-                        roomId, eventContent.sender_key, eventContent.session_id,
-                        index,
-                    );
-                const ksEvent = new MatrixEvent({
-                    type: "m.forwarded_room_key",
-                    sender: "@alice:example.com",
-                    content: {
-                        algorithm: olmlib.MEGOLM_ALGORITHM,
-                        room_id: roomId,
-                        sender_key: eventContent.sender_key,
-                        sender_claimed_ed25519_key: key.sender_claimed_ed25519_key,
-                        session_id: eventContent.session_id,
-                        session_key: key.key,
-                        chain_index: key.chain_index,
-                        forwarding_curve25519_key_chain:
-                        key.forwarding_curve_key_chain,
-                    },
-                });
-                // make onRoomKeyEvent think this was an encrypted event
-                ksEvent.senderCurve25519Key = "akey";
-                return ksEvent;
-            }
-
             const encryptionCfg = {
                 "algorithm": "m.megolm.v1.aes-sha2",
             };
@@ -297,7 +298,7 @@ describe("Crypto", function() {
             // keyshare the session key starting at the second message, so
             // the first message can't be decrypted yet, but the second one
             // can
-            let ksEvent = await keyshareEventForEvent(events[1], 1);
+            let ksEvent = await keyshareEventForEvent(aliceClient, events[1], 1);
             await bobDecryptor.onRoomKeyEvent(ksEvent);
             await eventPromise;
             expect(events[0].getContent().msgtype).toBe("m.bad.encrypted");
@@ -320,13 +321,58 @@ describe("Crypto", function() {
             // keyshare the session key starting at the first message, so
             // that it can now be decrypted
             eventPromise = awaitEvent(events[0], "Event.decrypted");
-            ksEvent = await keyshareEventForEvent(events[0], 0);
+            ksEvent = await keyshareEventForEvent(aliceClient, events[0], 0);
             await bobDecryptor.onRoomKeyEvent(ksEvent);
             await eventPromise;
             expect(events[0].getContent().msgtype).not.toBe("m.bad.encrypted");
             await sleep(1);
             // the room key request should be gone since we've now decrypted everything
             expect(await cryptoStore.getOutgoingRoomKeyRequest(roomKeyRequestBody)).toBeFalsy();
+        });
+
+        it("should error if a forwarded room key lacks a content.sender_key", async function() {
+            const encryptionCfg = {
+                "algorithm": "m.megolm.v1.aes-sha2",
+            };
+            const roomId = "!someroom";
+            const aliceRoom = new Room(roomId, aliceClient, "@alice:example.com", {});
+            const bobRoom = new Room(roomId, bobClient, "@bob:example.com", {});
+            aliceClient.store.storeRoom(aliceRoom);
+            bobClient.store.storeRoom(bobRoom);
+            await aliceClient.setRoomEncryption(roomId, encryptionCfg);
+            await bobClient.setRoomEncryption(roomId, encryptionCfg);
+            const event = new MatrixEvent({
+                type: "m.room.message",
+                sender: "@alice:example.com",
+                room_id: roomId,
+                event_id: "$1",
+                content: {
+                    msgtype: "m.text",
+                    body: "1",
+                },
+            });
+            // alice encrypts each event, and then bob tries to decrypt
+            // them without any keys, so that they'll be in pending
+            await aliceClient.crypto.encryptEvent(event, aliceRoom);
+            event.clearEvent = undefined;
+            event.senderCurve25519Key = null;
+            event.claimedEd25519Key = null;
+            try {
+                await bobClient.crypto.decryptEvent(event);
+            } catch (e) {
+                // we expect this to fail because we don't have the
+                // decryption keys yet
+            }
+
+            const bobDecryptor = bobClient.crypto.getRoomDecryptor(
+                roomId, olmlib.MEGOLM_ALGORITHM,
+            );
+
+            const ksEvent = await keyshareEventForEvent(aliceClient, event, 1);
+            ksEvent.getContent().sender_key = undefined; // test
+            bobClient.crypto.addInboundGroupSession = jest.fn();
+            await bobDecryptor.onRoomKeyEvent(ksEvent);
+            expect(bobClient.crypto.addInboundGroupSession).not.toHaveBeenCalled();
         });
 
         it("creates a new keyshare request if we request a keyshare", async function() {
