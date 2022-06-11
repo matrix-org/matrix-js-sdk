@@ -11,7 +11,7 @@ jobs:
     if: github.event.workflow_run.conclusion == 'success'
     steps:
       - name: "🩻 SonarCloud Scan"
-        uses: matrix-org/sonarcloud-workflow-action@v2.1
+        uses: matrix-org/sonarcloud-workflow-action@v2.2
         with:
           repository: ${{ github.event.workflow_run.head_repository.full_name }}
           is_pr: ${{ github.event.workflow_run.event == 'pull_request' }}
