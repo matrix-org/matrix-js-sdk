@@ -18,7 +18,7 @@ import { IMinimalEvent, IRoomEvent, ISyncData, ISyncResponse, SyncAccumulator } 
 import * as utils from "../utils";
 import * as IndexedDBHelpers from "../indexeddb-helpers";
 import { logger } from '../logger';
-import { IStartClientOpts, IStateEventWithRoomId } from "..";
+import { IStartClientOpts, IStateEventWithRoomId, IEvent } from "..";
 import { ISavedSync } from "./index";
 import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend";
 

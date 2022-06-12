@@ -26,6 +26,7 @@ import {
     EventTimelineSet,
     EventType,
     JoinRule,
+    MatrixClient,
     MatrixEvent,
     PendingEventOrdering,
     RelationType,
@@ -37,7 +38,8 @@ import { RoomState } from "../../src/models/room-state";
 import {
     UNSTABLE_ELEMENT_FUNCTIONAL_USERS,
     UNSTABLE_MSC2228_SELF_DESTRUCT_AFTER,
-} from "../../src/@types/event";import { TestClient } from "../TestClient";
+} from "../../src/@types/event";
+import { TestClient } from "../TestClient";
 import { emitPromise } from "../test-utils/test-utils";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import { Thread, ThreadEvent } from "../../src/models/thread";
@@ -2387,28 +2389,30 @@ describe("Room", function() {
 
     describe("MSC2228_selfDestructAfter", function() {
         it("should redact an event with a `self_destruct_after` value in the past immediately", function() {
-            const client = {
+            const client: MatrixClient = {
                 store: {
                     replaceEvent: jest.fn(() => Promise.resolve()),
                     save: jest.fn(() => Promise.resolve()),
                 },
-            };
+                supportsExperimentalThreads: () => false
+            } as any;
             const room = new Room(roomId, client, userA);
             let callCount = 0;
-            room.on("Room.redaction", function(redactionEvent, room) {
+            room.on(RoomEvent.Redaction, function(redactionEvent, room) {
                 callCount += 1;
                 expect(redactionEvent.getType()).toBe("m.room.redaction");
             });
             room.addLiveEvents([
                 utils.mkEvent({
-                    type: "m.room.message",
-                    room: roomId, event: true,
+                    type: EventType.RoomMessage,
+                    room: roomId,
+                    event: true,
                     content: {
                         msgtype: "m.text",
                         body: "TOPSECRET",
                         [UNSTABLE_MSC2228_SELF_DESTRUCT_AFTER.name]: Date.now()-1000,
                     },
-                }),
+                }) as MatrixEvent,
             ]);
             const event = room.timeline[0];
             expect(event.isRedacted()).toBeTruthy();
@@ -2417,23 +2421,24 @@ describe("Room", function() {
             expect(callCount).toBe(1);
         });
         it("should redact an event with a future `self_destruct_after` value after that time", function(done) {
-            const client = {
+            const client: MatrixClient = {
                 store: {
                     replaceEvent: jest.fn(() => Promise.resolve()),
                     save: jest.fn(() => Promise.resolve()),
                 },
-            };
+                supportsExperimentalThreads: () => false
+            } as any;
             const room = new Room(roomId, client, userA);
             room.addLiveEvents([
                 utils.mkEvent({
-                    type: "m.room.message",
+                    type: EventType.RoomMessage,
                     room: roomId, event: true,
                     content: {
                         msgtype: "m.text",
                         body: "TOPSECRET",
                         [UNSTABLE_MSC2228_SELF_DESTRUCT_AFTER.name]: Date.now()+10000,
                     },
-                }),
+                }) as MatrixEvent,
             ]);
 
             // not deleted yet
@@ -2442,7 +2447,7 @@ describe("Room", function() {
             expect(event.getContent().body).toBe("TOPSECRET");
 
             // deleted soon
-            room.on("Room.redaction", function(redactionEvent, room) {
+            room.on(RoomEvent.Redaction, function(redactionEvent, room) {
                 expect(redactionEvent.getType()).toBe("m.room.redaction");
                 expect(event.getContent().body).toBeFalsy();
                 expect(client.store.replaceEvent).toBeCalled();
