@@ -2024,7 +2024,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             logger.error(`error while redacting event from store: ${err.message}`);
         });
 
-        this.emit("Room.redaction", redactionEvent, this);
+        this.emit(RoomEvent.Redaction, redactionEvent, this);
     }
 
     /**
