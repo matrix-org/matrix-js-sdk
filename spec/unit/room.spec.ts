@@ -2394,7 +2394,7 @@ describe("Room", function() {
                     replaceEvent: jest.fn(() => Promise.resolve()),
                     save: jest.fn(() => Promise.resolve()),
                 },
-                supportsExperimentalThreads: () => false
+                supportsExperimentalThreads: () => false,
             } as any;
             const room = new Room(roomId, client, userA);
             let callCount = 0;
@@ -2426,7 +2426,7 @@ describe("Room", function() {
                     replaceEvent: jest.fn(() => Promise.resolve()),
                     save: jest.fn(() => Promise.resolve()),
                 },
-                supportsExperimentalThreads: () => false
+                supportsExperimentalThreads: () => false,
             } as any;
             const room = new Room(roomId, client, userA);
             room.addLiveEvents([
