@@ -925,8 +925,10 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
         if (this.event.type !== EventType.RoomMessageEncrypted) return false;
 
         // an encrypted event can never have an empty content, in such a case
-        // it is probably a redacted event and we can treat it as unencrypted
-        // (see MSC2228)
+        // it is probably an event redacted by the current ephemeral message
+        // implementation and we can treat it as unencrypted to avoid decryption
+        // errors being thrown
+        // https://github.com/matrix-org/synapse/pull/6409
         if (!this.event.content || Object.entries(this.event.content).length === 0) {
             return false;
         }
