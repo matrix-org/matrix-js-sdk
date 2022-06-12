@@ -2446,7 +2446,7 @@ describe("Room", function() {
             expect(event.isRedacted()).toBeFalsy();
             expect(event.getContent().body).toBe("TOPSECRET");
 
-            // deleted soon
+            // deleted soon after the self destruct time elapses
             room.on(RoomEvent.Redaction, function(redactionEvent, room) {
                 expect(redactionEvent.getType()).toBe("m.room.redaction");
                 expect(event.getContent().body).toBeFalsy();
