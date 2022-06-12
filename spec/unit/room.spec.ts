@@ -42,6 +42,8 @@ import { emitPromise } from "../test-utils/test-utils";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import { Thread, ThreadEvent } from "../../src/models/thread";
 
+jest.useFakeTimers();
+
 describe("Room", function() {
     const roomId = "!foo:bar";
     const userA = "@alice:bar";
@@ -2429,7 +2431,7 @@ describe("Room", function() {
                     content: {
                         msgtype: "m.text",
                         body: "TOPSECRET",
-                        [UNSTABLE_MSC2228_SELF_DESTRUCT_AFTER.name]: Date.now()+50,
+                        [UNSTABLE_MSC2228_SELF_DESTRUCT_AFTER.name]: Date.now()+10000,
                     },
                 }),
             ]);
@@ -2446,6 +2448,8 @@ describe("Room", function() {
                 expect(client.store.replaceEvent).toBeCalled();
                 done();
             });
+
+            jest.runAllTimers();
         });
     });
 });
