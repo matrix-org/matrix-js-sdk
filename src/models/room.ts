@@ -368,19 +368,16 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
 
         if (this.opts.pendingEventOrdering === PendingEventOrdering.Detached) {
             this.pendingEventList = [];
-            // TODO abstract this
-            const serializedPendingEventList = global.localStorage.getItem(pendingEventsKey(this.roomId));
-            if (serializedPendingEventList) {
-                JSON.parse(serializedPendingEventList)
-                    .forEach(async (serializedEvent: Partial<IEvent>) => {
-                        const event = new MatrixEvent(serializedEvent);
-                        if (event.getType() === EventType.RoomMessageEncrypted) {
-                            await event.attemptDecryption(this.client.crypto);
-                        }
-                        event.setStatus(EventStatus.NOT_SENT);
-                        this.addPendingEvent(event, event.getTxnId());
-                    });
-            }
+            this.client.store.getPendingEvents(this.roomId).then(events => {
+                events.forEach(async (serializedEvent: Partial<IEvent>) => {
+                    const event = new MatrixEvent(serializedEvent);
+                    if (event.getType() === EventType.RoomMessageEncrypted) {
+                        await event.attemptDecryption(this.client.crypto);
+                    }
+                    event.setStatus(EventStatus.NOT_SENT);
+                    this.addPendingEvent(event, event.getTxnId());
+                });
+            });
         }
 
         // awaited by getEncryptionTargetMembers while room members are loading
@@ -2076,16 +2073,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 return isEventEncrypted || !isRoomEncrypted;
             });
 
-            if (this.pendingEventList.length > 0) {
-                // TODO abstract this
-                global.localStorage.setItem(
-                    pendingEventsKey(this.roomId),
-                    JSON.stringify(pendingEvents),
-                );
-            } else {
-                // TODO abstract this
-                global.localStorage.removeItem(pendingEventsKey(this.roomId));
-            }
+            this.client.store.setPendingEvents(this.roomId, pendingEvents);
         }
     }
 
@@ -3112,14 +3100,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
         event.applyVisibilityEvent(visibilityChange);
     }
-}
-
-/**
- * @param {string} roomId ID of the current room
- * @returns {string} Storage key to retrieve pending events
- */
-function pendingEventsKey(roomId: string): string {
-    return `mx_pending_events_${roomId}`;
 }
 
 // a map from current event status to a list of allowed next statuses
