@@ -540,7 +540,7 @@ describe("MatrixClient event timelines", function() {
             expect(timeline.getEvents().find(e => e.getId() === THREAD_REPLY.event_id)).toBeTruthy();
         });
 
-        it("should return undefined when event is not within a thread but timelineSet is", async () => {
+        it("should return undefined when event is not in the thread that the given timelineSet is representing", () => {
             client.clientOpts.experimentalThreadSupport = true;
             Thread.setServerSideSupport(true);
             client.stopClient(); // we don't need the client to be syncing at this time
@@ -566,14 +566,13 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            const timelinePromise = client.getEventTimeline(timelineSet, EVENTS[0].event_id);
-            await httpBackend.flushAllExpected();
-
-            const timeline = await timelinePromise;
-            expect(timeline).toBeUndefined();
+            return Promise.all([
+                expect(client.getEventTimeline(timelineSet, EVENTS[0].event_id)).resolves.toBeUndefined(),
+                httpBackend.flushAllExpected(),
+            ]);
         });
 
-        it("should return undefined when event is within a thread but timelineSet is not", async () => {
+        it("should return undefined when event is within a thread but timelineSet is not", () => {
             client.clientOpts.experimentalThreadSupport = true;
             Thread.setServerSideSupport(true);
             client.stopClient(); // we don't need the client to be syncing at this time
@@ -592,11 +591,10 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            const timelinePromise = client.getEventTimeline(timelineSet, THREAD_REPLY.event_id);
-            await httpBackend.flushAllExpected();
-
-            const timeline = await timelinePromise;
-            expect(timeline).toBeUndefined();
+            return Promise.all([
+                expect(client.getEventTimeline(timelineSet, THREAD_REPLY.event_id)).resolves.toBeUndefined(),
+                httpBackend.flushAllExpected(),
+            ]);
         });
 
         it("should should add lazy loading filter when requested", async () => {
