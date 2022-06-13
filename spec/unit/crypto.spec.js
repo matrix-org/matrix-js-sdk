@@ -36,7 +36,7 @@ async function keyshareEventForEvent(client, event, index) {
     );
     const ksEvent = new MatrixEvent({
         type: "m.forwarded_room_key",
-        sender: "@alice:example.com",
+        sender: client.getUserId(),
         content: {
             algorithm: olmlib.MEGOLM_ALGORITHM,
             room_id: roomId,
