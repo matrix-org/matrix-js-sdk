@@ -1705,7 +1705,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             if (this.isPtt) {
                 // In PTT mode, it's more important that only one person is speaking at a time, so we
                 // actively disable the output of any streams where we believe the user is muted.
-                feed.stream.getAudioTracks().map(t => t.enabled = metadata ? !metadata.audio_muted : true);
+                feed.stream.getAudioTracks().forEach(t => t.enabled = metadata ? !metadata.audio_muted : true);
             }
         }
     }
