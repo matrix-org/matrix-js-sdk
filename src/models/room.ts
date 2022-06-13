@@ -368,7 +368,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
 
         if (this.opts.pendingEventOrdering === PendingEventOrdering.Detached) {
             this.pendingEventList = [];
-            const serializedPendingEventList = client.sessionStore.store.getItem(pendingEventsKey(this.roomId));
+            // TODO abstract this
+            const serializedPendingEventList = global.localStorage.getItem(pendingEventsKey(this.roomId));
             if (serializedPendingEventList) {
                 JSON.parse(serializedPendingEventList)
                     .forEach(async (serializedEvent: Partial<IEvent>) => {
@@ -2075,14 +2076,15 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 return isEventEncrypted || !isRoomEncrypted;
             });
 
-            const { store } = this.client.sessionStore;
             if (this.pendingEventList.length > 0) {
-                store.setItem(
+                // TODO abstract this
+                global.localStorage.setItem(
                     pendingEventsKey(this.roomId),
                     JSON.stringify(pendingEvents),
                 );
             } else {
-                store.removeItem(pendingEventsKey(this.roomId));
+                // TODO abstract this
+                global.localStorage.removeItem(pendingEventsKey(this.roomId));
             }
         }
     }

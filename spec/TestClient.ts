@@ -23,7 +23,6 @@ import MockHttpBackend from 'matrix-mock-request';
 
 import { LocalStorageCryptoStore } from '../src/crypto/store/localStorage-crypto-store';
 import { logger } from '../src/logger';
-import { WebStorageSessionStore } from "../src/store/session/webstorage";
 import { syncPromise } from "./test-utils/test-utils";
 import { createClient } from "../src/matrix";
 import { ICreateClientOpts, IDownloadKeyResult, MatrixClient, PendingEventOrdering } from "../src/client";
@@ -53,7 +52,6 @@ export class TestClient {
         if (sessionStoreBackend === undefined) {
             sessionStoreBackend = new MockStorageApi();
         }
-        const sessionStore = new WebStorageSessionStore(sessionStoreBackend);
 
         this.httpBackend = new MockHttpBackend();
 
@@ -62,7 +60,6 @@ export class TestClient {
             userId: userId,
             accessToken: accessToken,
             deviceId: deviceId,
-            sessionStore: sessionStore,
             request: this.httpBackend.requestFn as IHttpOpts["request"],
             ...options,
         };

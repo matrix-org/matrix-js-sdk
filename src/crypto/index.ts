@@ -75,7 +75,6 @@ import {
     ISignedKey,
     IUploadKeySignaturesResponse,
     MatrixClient,
-    SessionStore,
 } from "../client";
 import type { IRoomEncryption, RoomList } from "./RoomList";
 import { IKeyBackupInfo } from "./keybackup";
@@ -323,9 +322,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param {MatrixClient} baseApis base matrix api interface
      *
-     * @param {module:store/session/webstorage~WebStorageSessionStore} sessionStore
-     *    Store to be used for end-to-end crypto session data
-     *
      * @param {string} userId The user ID for the local user
      *
      * @param {string} deviceId The identifier for this device.
@@ -343,7 +339,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     constructor(
         public readonly baseApis: MatrixClient,
-        public readonly sessionStore: SessionStore,
         public readonly userId: string,
         private readonly deviceId: string,
         private readonly clientStore: IStore,
@@ -1723,13 +1718,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             }
         }
         logger.info(`Finished device verification upgrade for ${userId}`);
-    }
-
-    public async setTrustedBackupPubKey(trustedPubKey: string): Promise<void> {
-        // This should be redundant post cross-signing is a thing, so just
-        // plonk it in localStorage for now.
-        this.sessionStore.setLocalTrustedBackupPubKey(trustedPubKey);
-        await this.backupManager.checkKeyBackup();
     }
 
     /**
