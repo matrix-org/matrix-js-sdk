@@ -30,7 +30,7 @@ import type { Request as _Request, CoreOptions } from "request";
 import * as callbacks from "./realtime-callbacks";
 import { IUploadOpts } from "./@types/requests";
 import { IAbortablePromise, IUsageLimit } from "./@types/partials";
-import { IDeferred } from "./utils";
+import { IDeferred, sleep } from "./utils";
 import { Callback } from "./client";
 import * as utils from "./utils";
 import { logger } from './logger';
@@ -48,9 +48,14 @@ TODO:
 export const PREFIX_R0 = "/_matrix/client/r0";
 
 /**
- * A constant representing the URI path for release v1 of the Client-Server HTTP API.
+ * A constant representing the URI path for the legacy release v1 of the Client-Server HTTP API.
  */
 export const PREFIX_V1 = "/_matrix/client/v1";
+
+/**
+ * A constant representing the URI path for Client-Server API endpoints versioned at v3.
+ */
+export const PREFIX_V3 = "/_matrix/client/v3";
 
 /**
  * A constant representing the URI path for as-yet unspecified Client-Server HTTP APIs.
@@ -403,7 +408,7 @@ export class MatrixHttpApi {
                                 resp = bodyParser(resp);
                             }
                         } catch (err) {
-                            err.http_status = xhr.status;
+                            err.httpStatus = xhr.status;
                             cb(err);
                             return;
                         }
@@ -1055,7 +1060,7 @@ interface IErrorJson extends Partial<IUsageLimit> {
  * @prop {string} name Same as MatrixError.errcode but with a default unknown string.
  * @prop {string} message The Matrix 'error' value, e.g. "Missing token."
  * @prop {Object} data The raw Matrix error JSON used to construct this object.
- * @prop {integer} httpStatus The numeric HTTP status code given
+ * @prop {number} httpStatus The numeric HTTP status code given
  */
 export class MatrixError extends Error {
     public readonly errcode: string;
@@ -1105,7 +1110,7 @@ export class AbortError extends Error {
  * @return {any} the result of the network operation
  * @throws {ConnectionError} If after maxAttempts the callback still throws ConnectionError
  */
-export async function retryNetworkOperation<T>(maxAttempts: number, callback: () => T): Promise<T> {
+export async function retryNetworkOperation<T>(maxAttempts: number, callback: () => Promise<T>): Promise<T> {
     let attempts = 0;
     let lastConnectionError = null;
     while (attempts < maxAttempts) {
@@ -1114,9 +1119,9 @@ export async function retryNetworkOperation<T>(maxAttempts: number, callback: ()
                 const timeout = 1000 * Math.pow(2, attempts);
                 logger.log(`network operation failed ${attempts} times,` +
                     ` retrying in ${timeout}ms...`);
-                await new Promise(r => setTimeout(r, timeout));
+                await sleep(timeout);
             }
-            return await callback();
+            return callback();
         } catch (err) {
             if (err instanceof ConnectionError) {
                 attempts += 1;

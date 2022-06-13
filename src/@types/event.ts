@@ -152,6 +152,14 @@ export const UNSTABLE_MSC3089_LEAF = new UnstableValue("m.leaf", "org.matrix.msc
 export const UNSTABLE_MSC3089_BRANCH = new UnstableValue("m.branch", "org.matrix.msc3089.branch");
 
 /**
+ * Marker event type to point back at imported historical content in a room. See
+ * [MSC2716](https://github.com/matrix-org/matrix-spec-proposals/pull/2716).
+ * Note that this reference is UNSTABLE and subject to breaking changes,
+ * including its eventual removal.
+ */
+export const UNSTABLE_MSC2716_MARKER = new UnstableValue("m.room.marker", "org.matrix.msc2716.marker");
+
+/**
  * Functional members type for declaring a purpose of room members (e.g. helpful bots).
  * Note that this reference is UNSTABLE and subject to breaking changes, including its
  * eventual removal.

@@ -24,6 +24,7 @@ import { deepCopy } from "./utils";
 import { IContent, IUnsigned } from "./models/event";
 import { IRoomSummary } from "./models/room-summary";
 import { EventType } from "./@types/event";
+import { ReceiptType } from "./@types/read_receipts";
 
 interface IOpts {
     maxTimelineEntries?: number;
@@ -49,7 +50,6 @@ export interface IRoomEvent extends IMinimalEvent {
     event_id: string;
     sender: string;
     origin_server_ts: number;
-    unsigned?: IUnsigned;
     /** @deprecated - legacy field */
     age?: number;
 }
@@ -157,6 +157,7 @@ interface IRoom {
     _readReceipts: {
         [userId: string]: {
             data: IMinimalEvent;
+            type: ReceiptType;
             eventId: string;
         };
     };
@@ -416,16 +417,31 @@ export class SyncAccumulator {
                 // of a hassle to work with. We'll inflate this back out when
                 // getJSON() is called.
                 Object.keys(e.content).forEach((eventId) => {
-                    if (!e.content[eventId]["m.read"]) {
+                    if (!e.content[eventId][ReceiptType.Read] && !e.content[eventId][ReceiptType.ReadPrivate]) {
                         return;
                     }
-                    Object.keys(e.content[eventId]["m.read"]).forEach((userId) => {
-                        // clobber on user ID
-                        currentData._readReceipts[userId] = {
-                            data: e.content[eventId]["m.read"][userId],
-                            eventId: eventId,
-                        };
-                    });
+                    const read = e.content[eventId][ReceiptType.Read];
+                    if (read) {
+                        Object.keys(read).forEach((userId) => {
+                            // clobber on user ID
+                            currentData._readReceipts[userId] = {
+                                data: e.content[eventId][ReceiptType.Read][userId],
+                                type: ReceiptType.Read,
+                                eventId: eventId,
+                            };
+                        });
+                    }
+                    const readPrivate = e.content[eventId][ReceiptType.ReadPrivate];
+                    if (readPrivate) {
+                        Object.keys(readPrivate).forEach((userId) => {
+                            // clobber on user ID
+                            currentData._readReceipts[userId] = {
+                                data: e.content[eventId][ReceiptType.ReadPrivate][userId],
+                                type: ReceiptType.ReadPrivate,
+                                eventId: eventId,
+                            };
+                        });
+                    }
                 });
             });
         }
@@ -552,11 +568,12 @@ export class SyncAccumulator {
             Object.keys(roomData._readReceipts).forEach((userId) => {
                 const receiptData = roomData._readReceipts[userId];
                 if (!receiptEvent.content[receiptData.eventId]) {
-                    receiptEvent.content[receiptData.eventId] = {
-                        "m.read": {},
-                    };
+                    receiptEvent.content[receiptData.eventId] = {};
                 }
-                receiptEvent.content[receiptData.eventId]["m.read"][userId] = (
+                if (!receiptEvent.content[receiptData.eventId][receiptData.type]) {
+                    receiptEvent.content[receiptData.eventId][receiptData.type] = {};
+                }
+                receiptEvent.content[receiptData.eventId][receiptData.type][userId] = (
                     receiptData.data
                 );
             });

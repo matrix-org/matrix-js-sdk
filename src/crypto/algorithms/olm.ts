@@ -32,6 +32,7 @@ import {
 import { Room } from '../../models/room';
 import { MatrixEvent } from "../..";
 import { IEventDecryptionResult } from "../index";
+import { IInboundSession } from "../OlmDevice";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -70,7 +71,7 @@ class OlmEncryption extends EncryptionAlgorithm {
             return Promise.resolve();
         }
 
-        this.prepPromise = this.crypto.downloadKeys(roomMembers).then((res) => {
+        this.prepPromise = this.crypto.downloadKeys(roomMembers).then(() => {
             return this.crypto.ensureOlmSessionsForUsers(roomMembers);
         }).then(() => {
             this.sessionPrepared = true;
@@ -144,7 +145,7 @@ class OlmEncryption extends EncryptionAlgorithm {
             }
         }
 
-        return await Promise.all(promises).then(() => encryptedContent);
+        return Promise.all(promises).then(() => encryptedContent);
     }
 }
 
@@ -261,7 +262,7 @@ class OlmDecryption extends DecryptionAlgorithm {
      *
      * @return {string} payload, if decrypted successfully.
      */
-    private async decryptMessage(theirDeviceIdentityKey: string, message: IMessage): Promise<string> {
+    private decryptMessage(theirDeviceIdentityKey: string, message: IMessage): Promise<string> {
         // This is a wrapper that serialises decryptions of prekey messages, because
         // otherwise we race between deciding we have no active sessions for the message
         // and creating a new one, which we can only do once because it removes the OTK.
@@ -274,7 +275,7 @@ class OlmDecryption extends DecryptionAlgorithm {
             });
             // we want the error, but don't propagate it to the next decryption
             this.olmDevice.olmPrekeyPromise = myPromise.catch(() => {});
-            return await myPromise;
+            return myPromise;
         }
     }
 
@@ -331,7 +332,7 @@ class OlmDecryption extends DecryptionAlgorithm {
         // prekey message which doesn't match any existing sessions: make a new
         // session.
 
-        let res;
+        let res: IInboundSession;
         try {
             res = await this.olmDevice.createInboundSession(
                 theirDeviceIdentityKey, message.type, message.body,

@@ -95,7 +95,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
     // The time the save is scheduled for
     private savePromiseTime: number = null;
     // The timer used to delay the save
-    private saveTimer: number = null;
+    private saveTimer: ReturnType<typeof setTimeout> = null;
     // True if we have fetched data from the server or loaded a non-empty
     // set of device data from the store
     private hasFetched: boolean = null;
@@ -122,7 +122,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
             'readonly', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
                 this.cryptoStore.getEndToEndDeviceData(txn, (deviceData) => {
                     this.hasFetched = Boolean(deviceData && deviceData.devices);
-                    this.devices = deviceData ? deviceData.devices : {},
+                    this.devices = deviceData ? deviceData.devices : {};
                     this.crossSigningInfo = deviceData ?
                         deviceData.crossSigningInfo || {} : {};
                     this.deviceTrackingStatus = deviceData ?
@@ -190,7 +190,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
 
         let savePromise = this.savePromise;
         if (savePromise === null) {
-            savePromise = new Promise((resolve, reject) => {
+            savePromise = new Promise((resolve) => {
                 this.resolveSavePromise = resolve;
             });
             this.savePromise = savePromise;
@@ -309,10 +309,10 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      */
     private getDevicesFromStore(userIds: string[]): DeviceInfoMap {
         const stored: DeviceInfoMap = {};
-        userIds.map((u) => {
+        userIds.forEach((u) => {
             stored[u] = {};
             const devices = this.getStoredDevicesForUser(u) || [];
-            devices.map(function(dev) {
+            devices.forEach(function(dev) {
                 stored[u][dev.deviceId] = dev;
             });
         });
@@ -942,7 +942,7 @@ async function updateStoredDeviceKeysForUser(
 async function storeDeviceKeys(
     olmDevice: OlmDevice,
     userStore: Record<string, DeviceInfo>,
-    deviceResult: any, // TODO types
+    deviceResult: IDownloadKeyResult["device_keys"]["user_id"]["device_id"],
 ): Promise<boolean> {
     if (!deviceResult.keys) {
         // no keys?

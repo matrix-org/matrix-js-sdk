@@ -423,6 +423,7 @@ describe("Crypto", function() {
             await client.crypto.bootstrapSecretStorage({
                 createSecretStorageKey,
             });
+            client.stopClient();
         });
     });
 });

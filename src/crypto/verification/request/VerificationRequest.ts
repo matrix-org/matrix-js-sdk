@@ -95,7 +95,7 @@ export class VerificationRequest<
     private eventsByUs = new Map<string, MatrixEvent>();
     private eventsByThem = new Map<string, MatrixEvent>();
     private _observeOnly = false;
-    private timeoutTimer: number = null;
+    private timeoutTimer: ReturnType<typeof setTimeout> = null;
     private _accepting = false;
     private _declining = false;
     private verifierHasFinished = false;
@@ -796,8 +796,7 @@ export class VerificationRequest<
     }
 
     private setupTimeout(phase: Phase): void {
-        const shouldTimeout = !this.timeoutTimer && !this.observeOnly &&
-            phase === PHASE_REQUESTED;
+        const shouldTimeout = !this.timeoutTimer && !this.observeOnly && phase === PHASE_REQUESTED;
 
         if (shouldTimeout) {
             this.timeoutTimer = setTimeout(this.cancelOnTimeout, this.timeout);
@@ -814,15 +813,15 @@ export class VerificationRequest<
         }
     }
 
-    private cancelOnTimeout = () => {
+    private cancelOnTimeout = async () => {
         try {
             if (this.initiatedByMe) {
-                this.cancel({
+                await this.cancel({
                     reason: "Other party didn't accept in time",
                     code: "m.timeout",
                 });
             } else {
-                this.cancel({
+                await this.cancel({
                     reason: "User didn't accept in time",
                     code: "m.timeout",
                 });
@@ -842,11 +841,11 @@ export class VerificationRequest<
         }
 
         const isUnexpectedRequest = type === REQUEST_TYPE && this.phase !== PHASE_UNSENT;
-        const isUnexpectedReady = type === READY_TYPE && this.phase !== PHASE_REQUESTED;
+        const isUnexpectedReady = type === READY_TYPE && this.phase !== PHASE_REQUESTED && this.phase !== PHASE_STARTED;
         // only if phase has passed from PHASE_UNSENT should we cancel, because events
         // are allowed to come in in any order (at least with InRoomChannel). So we only know
-        // we're dealing with a valid request we should participate in once we've moved to PHASE_REQUESTED
-        // before that, we could be looking at somebody elses verification request and we just
+        // we're dealing with a valid request we should participate in once we've moved to PHASE_REQUESTED.
+        // Before that, we could be looking at somebody else's verification request and we just
         // happen to be in the room
         if (this.phase !== PHASE_UNSENT && (isUnexpectedRequest || isUnexpectedReady)) {
             logger.warn(`Cancelling, unexpected ${type} verification ` +

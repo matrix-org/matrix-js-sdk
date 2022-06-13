@@ -38,7 +38,7 @@ interface IKey {
     iterations: number;
 }
 
-export async function keyFromAuthData(authData: IAuthData, password: string): Promise<Uint8Array> {
+export function keyFromAuthData(authData: IAuthData, password: string): Promise<Uint8Array> {
     if (!global.Olm) {
         throw new Error("Olm is not available");
     }
@@ -50,7 +50,7 @@ export async function keyFromAuthData(authData: IAuthData, password: string): Pr
         );
     }
 
-    return await deriveKey(
+    return deriveKey(
         password, authData.private_key_salt,
         authData.private_key_iterations,
         authData.private_key_bits || DEFAULT_BITSIZE,

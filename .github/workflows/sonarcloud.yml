@@ -1,0 +1,24 @@
+# Must only be called from a workflow_run in the context of the upstream repo
+name: SonarCloud
+on:
+  workflow_call:
+    secrets:
+      SONAR_TOKEN:
+        required: true
+jobs:
+  sonarqube:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: "🩻 SonarCloud Scan"
+        uses: matrix-org/sonarcloud-workflow-action@v2.2
+        with:
+          repository: ${{ github.event.workflow_run.head_repository.full_name }}
+          is_pr: ${{ github.event.workflow_run.event == 'pull_request' }}
+          version_cmd: 'cat package.json | jq -r .version'
+          branch: ${{ github.event.workflow_run.head_branch }}
+          revision: ${{ github.event.workflow_run.head_sha }}
+          token: ${{ secrets.SONAR_TOKEN }}
+          coverage_run_id: ${{ github.event.workflow_run.id }}
+          coverage_workflow_name: tests.yml
+          coverage_extract_path: coverage
