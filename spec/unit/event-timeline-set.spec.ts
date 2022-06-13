@@ -62,14 +62,14 @@ describe('EventTimelineSet', () => {
             user: userA,
             msg: 'Hi!',
             event: true,
-        }) as MatrixEvent;
+        });
         replyEvent = utils.mkReplyMessage({
             room: roomId,
             user: userA,
             msg: 'Hoo!',
             event: true,
             replyToMessage: messageEvent,
-        }) as MatrixEvent;
+        });
     });
 
     describe('addLiveEvent', () => {
@@ -91,7 +91,7 @@ describe('EventTimelineSet', () => {
             // make a duplicate
             const duplicateMessageEvent = utils.mkMessage({
                 room: roomId, user: userA, msg: "dupe", event: true,
-            }) as MatrixEvent;
+            });
             duplicateMessageEvent.event.event_id = messageEvent.getId();
 
             // Adding the duplicate event should replace the `messageEvent`
