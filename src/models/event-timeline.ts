@@ -437,7 +437,7 @@ export class EventTimeline {
             }
         }
 
-        let insertIndex;
+        let insertIndex: number;
 
         if (toStartOfTimeline) {
             insertIndex = 0;

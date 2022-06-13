@@ -540,6 +540,42 @@ describe("MatrixClient event timelines", function() {
             expect(timeline.getEvents().find(e => e.getId() === THREAD_REPLY.event_id)).toBeTruthy();
         });
 
+        it("should return relevant timeline from non-thread timelineSet when asking for the thread root", async () => {
+            client.clientOpts.experimentalThreadSupport = true;
+            Thread.setServerSideSupport(true);
+            client.stopClient(); // we don't need the client to be syncing at this time
+            const room = client.getRoom(roomId);
+            const threadRoot = new MatrixEvent(THREAD_ROOT);
+            const thread = room.createThread(THREAD_ROOT.event_id, threadRoot, [threadRoot], false);
+            const timelineSet = room.getTimelineSets()[0];
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id))
+                .respond(200, function() {
+                    return THREAD_ROOT;
+                });
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_ROOT.event_id))
+                .respond(200, function() {
+                    return {
+                        start: "start_token0",
+                        events_before: [],
+                        event: THREAD_ROOT,
+                        events_after: [],
+                        end: "end_token0",
+                        state: [],
+                    };
+                });
+
+            const [timeline] = await Promise.all([
+                client.getEventTimeline(timelineSet, THREAD_ROOT.event_id),
+                httpBackend.flushAllExpected(),
+            ]);
+
+            expect(timeline).not.toBe(thread.liveTimeline);
+            expect(timelineSet.getTimelines()).toContain(timeline);
+            expect(timeline.getEvents().find(e => e.getId() === THREAD_ROOT.event_id)).toBeTruthy();
+        });
+
         it("should return undefined when event is not in the thread that the given timelineSet is representing", () => {
             client.clientOpts.experimentalThreadSupport = true;
             Thread.setServerSideSupport(true);
