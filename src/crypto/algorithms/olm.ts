@@ -32,6 +32,7 @@ import {
 import { Room } from '../../models/room';
 import { MatrixEvent } from "../..";
 import { IEventDecryptionResult } from "../index";
+import { IInboundSession } from "../OlmDevice";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -331,7 +332,7 @@ class OlmDecryption extends DecryptionAlgorithm {
         // prekey message which doesn't match any existing sessions: make a new
         // session.
 
-        let res;
+        let res: IInboundSession;
         try {
             res = await this.olmDevice.createInboundSession(
                 theirDeviceIdentityKey, message.type, message.body,

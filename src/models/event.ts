@@ -823,18 +823,13 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
                 //
                 if (this.retryDecryption) {
                     // decryption error, but we have a retry queued.
-                    logger.log(
-                        `Got error decrypting event (id=${this.getId()}: ` +
-                        `${e}), but retrying`,
-                    );
+                    logger.log(`Got error decrypting event (id=${this.getId()}: ${e.detailedString}), but retrying`, e);
                     continue;
                 }
 
                 // decryption error, no retries queued. Warn about the error and
                 // set it to m.bad.encrypted.
-                logger.warn(
-                    `Error decrypting event (id=${this.getId()}): ${e.detailedString}`,
-                );
+                logger.warn(`Got error decrypting event (id=${this.getId()}: ${e.detailedString})`, e);
 
                 res = this.badEncryptedMessage(e.message);
             }

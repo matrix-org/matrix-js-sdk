@@ -30,7 +30,7 @@ import {
     registerAlgorithm,
     UnknownDeviceError,
 } from "./base";
-import { WITHHELD_MESSAGES } from '../OlmDevice';
+import { IDecryptedGroupMessage, WITHHELD_MESSAGES } from '../OlmDevice';
 import { Room } from '../../models/room';
 import { DeviceInfo } from "../deviceinfo";
 import { IOlmSessionResult } from "../olmlib";
@@ -1280,7 +1280,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
         // (fixes https://github.com/vector-im/element-web/issues/5001)
         this.addEventToPendingList(event);
 
-        let res;
+        let res: IDecryptedGroupMessage;
         try {
             res = await this.olmDevice.decryptGroupMessage(
                 event.getRoomId(), content.sender_key, content.session_id, content.ciphertext,
