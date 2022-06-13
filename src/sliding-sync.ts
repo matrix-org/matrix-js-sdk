@@ -21,20 +21,11 @@ import { IRoomEvent, IStateEvent } from "./sync-accumulator";
 import { TypedEventEmitter } from "./models//typed-event-emitter";
 import { sleep } from "./utils";
 
-const DEBUG = true;
-
 // /sync requests allow you to set a timeout= but the request may continue
 // beyond that and wedge forever, so we need to track how long we are willing
 // to keep open the connection. This constant is *ADDED* to the timeout= value
 // to determine the max time we're willing to wait.
 const BUFFER_PERIOD_MS = 10 * 1000;
-
-function debuglog(...params) {
-    if (!DEBUG) {
-        return;
-    }
-    logger.log(...params);
-}
 
 /**
  * Represents a subscription to a room or set of rooms. Controls which events are returned.
@@ -574,7 +565,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 }
                 this.pendingReq = this.client.slidingSync(reqBody, this.proxyBaseUrl);
                 resp = await this.pendingReq;
-                debuglog(resp);
+                logger.debug(resp);
                 currentPos = resp.pos;
                 // update what we think we're subscribed to.
                 for (const roomId of newSubscriptions) {
@@ -587,7 +578,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     // the lists have been modified whilst we were waiting for 'await' to return, but the abort()
                     // call did nothing. It is NOT SAFE to modify the list array now. We'll process the response but
                     // not update list pointers.
-                    debuglog("list modified during await call, not updating list");
+                    logger.debug("list modified during await call, not updating list");
                     doNotUpdateList = true;
                 }
                 // mark all these lists as having been sent as sticky so we don't keep sending sticky params
@@ -626,7 +617,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     // we get warnings about not exiting fast enough.
                     continue;
                 } else {
-                    debuglog(err);
+                    logger.error(err);
                     await sleep(3000);
                 }
             }
@@ -654,11 +645,11 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                         listIndexesWithUpdates.add(op.list);
                     }
                     if (op.op === "DELETE") {
-                        debuglog("DELETE", op.list, op.index, ";");
+                        logger.debug("DELETE", op.list, op.index, ";");
                         delete this.lists[op.list].roomIndexToRoomId[op.index];
                         gapIndexes[op.list] = op.index;
                     } else if (op.op === "INSERT") {
-                        debuglog(
+                        logger.debug(
                             "INSERT",
                             op.list,
                             op.index,
@@ -669,7 +660,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                             const gapIndex = gapIndexes[op.list];
                             // something is in this space, shift items out of the way
                             if (gapIndex < 0) {
-                                debuglog(
+                                logger.debug(
                                     "cannot work out where gap is, INSERT without previous DELETE! List: ",
                                     op.list,
                                 );
@@ -715,7 +706,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                             op.room.room_id;
                         this.invokeRoomDataListeners(op.room.room_id, op.room);
                     } else if (op.op === "UPDATE") {
-                        debuglog(
+                        logger.debug(
                             "UPDATE",
                             op.list,
                             op.index,
@@ -735,7 +726,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                             syncRooms.push(r.room_id);
                             this.invokeRoomDataListeners(r.room_id, r);
                         }
-                        debuglog(
+                        logger.debug(
                             "SYNC",
                             op.list,
                             op.range[0],
@@ -752,7 +743,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                             );
                             delete this.lists[op.list].roomIndexToRoomId[i];
                         }
-                        debuglog(
+                        logger.debug(
                             "INVALIDATE",
                             op.list,
                             op.range[0],

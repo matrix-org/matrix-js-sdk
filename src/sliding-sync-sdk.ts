@@ -39,19 +39,10 @@ import {
 import { EventType, IPushRules } from "./matrix";
 import { PushProcessor } from "./pushprocessor";
 
-const DEBUG = true;
-
 // Number of consecutive failed syncs that will lead to a syncState of ERROR as opposed
 // to RECONNECTING. This is needed to inform the client of server issues when the
 // keepAlive is successful but the server /sync fails.
 const FAILED_SYNC_ERROR_THRESHOLD = 3;
-
-function debuglog(...params) {
-    if (!DEBUG) {
-        return;
-    }
-    logger.log(...params);
-}
 
 class ExtensionE2EE implements Extension {
     constructor(private readonly crypto: Crypto) {}
@@ -302,7 +293,7 @@ export class SlidingSyncSdk {
         } else {
             room = this.client.store.getRoom(roomData.room_id);
             if (!room) {
-                debuglog("initial flag not set but no stored room exists for room ", roomData.room_id, roomData);
+                logger.debug("initial flag not set but no stored room exists for room ", roomData.room_id, roomData);
                 return;
             }
         }
@@ -311,7 +302,7 @@ export class SlidingSyncSdk {
 
     private onLifecycle(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err?: Error): void {
         if (err) {
-            debuglog("onLifecycle", state, err);
+            logger.debug("onLifecycle", state, err);
         }
         switch (state) {
             case SlidingSyncState.Complete:
@@ -486,7 +477,7 @@ export class SlidingSyncSdk {
             for (let i = timelineEvents.length - 1; i >= 0; i--) {
                 const eventId = timelineEvents[i].getId();
                 if (room.getTimelineForEvent(eventId)) {
-                    debuglog("Already have event " + eventId + " in limited " +
+                    logger.debug("Already have event " + eventId + " in limited " +
                         "sync - not resetting");
                     limited = false;
 
@@ -677,15 +668,15 @@ export class SlidingSyncSdk {
      */
     public async sync() {
         this.connManagement.start();
-        debuglog("Sliding sync init loop");
+        logger.debug("Sliding sync init loop");
 
         //   1) We need to get push rules so we can check if events should bing as we get
         //      them from /sync.
         while (!this.client.isGuest()) {
             try {
-                debuglog("Getting push rules...");
+                logger.debug("Getting push rules...");
                 const result = await this.client.getPushRules();
-                debuglog("Got push rules");
+                logger.debug("Got push rules");
                 this.client.pushRules = result;
                 break;
             } catch (err) {
@@ -704,7 +695,7 @@ export class SlidingSyncSdk {
      * Stops the sync object from syncing.
      */
     public stop(): void {
-        debuglog("SyncApi.stop");
+        logger.debug("SyncApi.stop");
         this.slidingSync.stop();
         this.connManagement.stop();
     }
