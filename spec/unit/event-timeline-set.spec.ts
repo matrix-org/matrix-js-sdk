@@ -25,6 +25,8 @@ import {
     Room,
     DuplicateStrategy,
 } from '../../src';
+import { Thread } from "../../src/models/thread";
+import { ReEmitter } from "../../src/ReEmitter";
 
 describe('EventTimelineSet', () => {
     const roomId = '!foo:bar';
@@ -54,6 +56,7 @@ describe('EventTimelineSet', () => {
 
     beforeEach(() => {
         client = utils.mock(MatrixClient, 'MatrixClient');
+        client.reEmitter = utils.mock(ReEmitter, 'ReEmitter');
         room = new Room(roomId, client, userA);
         eventTimelineSet = new EventTimelineSet(room);
         eventTimeline = new EventTimeline(eventTimelineSet);
@@ -218,6 +221,74 @@ describe('EventTimelineSet', () => {
 
                 itShouldReturnTheRelatedEvents();
             });
+        });
+    });
+
+    describe("eventBelongs", () => {
+        const mkThreadResponse = (root: MatrixEvent) => utils.mkEvent({
+            event: true,
+            type: EventType.RoomMessage,
+            user: userA,
+            room: roomId,
+            content: {
+                "body": "Thread response :: " + Math.random(),
+                "m.relates_to": {
+                    "event_id": root.getId(),
+                    "m.in_reply_to": {
+                        "event_id": root.getId(),
+                    },
+                    "rel_type": "m.thread",
+                },
+            },
+        }, room.client);
+
+        let thread: Thread;
+
+        beforeEach(() => {
+            (client.supportsExperimentalThreads as jest.Mock).mockReturnValue(true);
+            thread = new Thread("!thread_id:server", messageEvent, { room, client });
+        });
+
+        it("should throw if timeline set has no room", () => {
+            const eventTimelineSet = new EventTimelineSet(undefined, {}, client);
+            expect(() => eventTimelineSet.eventBelongs(messageEvent)).toThrowError();
+        });
+
+        it("should return false if timeline set is for thread but event is not threaded", () => {
+            const eventTimelineSet = new EventTimelineSet(room, {}, client, thread);
+            expect(eventTimelineSet.eventBelongs(replyEvent)).toBeFalsy();
+        });
+
+        it("should return false if timeline set it for thread but event it for a different thread", () => {
+            const eventTimelineSet = new EventTimelineSet(room, {}, client, thread);
+            const event = mkThreadResponse(replyEvent);
+            expect(eventTimelineSet.eventBelongs(event)).toBeFalsy();
+        });
+
+        it("should return false if timeline set is not for a thread but event is a thread response", () => {
+            const eventTimelineSet = new EventTimelineSet(room, {}, client);
+            const event = mkThreadResponse(replyEvent);
+            expect(eventTimelineSet.eventBelongs(event)).toBeFalsy();
+        });
+
+        it("should return true if the timeline set is not for a thread and the event is a thread root", () => {
+            const eventTimelineSet = new EventTimelineSet(room, {}, client);
+            expect(eventTimelineSet.eventBelongs(messageEvent)).toBeTruthy();
+        });
+
+        it("should return true if the timeline set is for a thread and the event is its thread root", () => {
+            const thread = new Thread(messageEvent.getId(), messageEvent, { room, client });
+            const eventTimelineSet = new EventTimelineSet(room, {}, client, thread);
+            messageEvent.setThread(thread);
+            expect(eventTimelineSet.eventBelongs(messageEvent)).toBeTruthy();
+        });
+
+        it("should return true if the timeline set is for a thread and the event is a response to it", () => {
+            const thread = new Thread(messageEvent.getId(), messageEvent, { room, client });
+            const eventTimelineSet = new EventTimelineSet(room, {}, client, thread);
+            messageEvent.setThread(thread);
+            const event = mkThreadResponse(messageEvent);
+            expect(eventTimelineSet.eventBelongs(event)).toBeTruthy();
         });
     });
 });
