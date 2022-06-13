@@ -70,10 +70,23 @@ const EVENTS = [
     }),
 ];
 
-const THREAD_ROOT = utils.mkMessage({
+const THREAD_ROOT = utils.mkEvent({
     room: roomId,
     user: userId,
-    msg: "thread root",
+    type: "m.room.message",
+    content: {
+        "body": "thread root",
+        "msgtype": "m.text",
+    },
+    unsigned: {
+        "m.relations": {
+            "io.element.thread": {
+                "latest_event": undefined,
+                "count": 1,
+                "current_user_participated": true,
+            },
+        },
+    },
 });
 
 const THREAD_REPLY = utils.mkEvent({
@@ -90,6 +103,8 @@ const THREAD_REPLY = utils.mkEvent({
         },
     },
 });
+
+THREAD_ROOT.unsigned["m.relations"]["io.element.thread"].latest_event = THREAD_REPLY;
 
 // start the client, and wait for it to initialise
 function startClient(httpBackend, client) {
@@ -549,11 +564,6 @@ describe("MatrixClient event timelines", function() {
             const thread = room.createThread(THREAD_ROOT.event_id, threadRoot, [threadRoot], false);
             const timelineSet = room.getTimelineSets()[0];
 
-            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id))
-                .respond(200, function() {
-                    return THREAD_ROOT;
-                });
-
             httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_ROOT.event_id))
                 .respond(200, function() {
                     return {
@@ -584,11 +594,6 @@ describe("MatrixClient event timelines", function() {
             const threadRoot = new MatrixEvent(THREAD_ROOT);
             const thread = room.createThread(THREAD_ROOT.event_id, threadRoot, [threadRoot], false);
             const timelineSet = thread.timelineSet;
-
-            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id))
-                .respond(200, function() {
-                    return THREAD_ROOT;
-                });
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(EVENTS[0].event_id))
                 .respond(200, function() {
