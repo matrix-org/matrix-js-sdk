@@ -101,6 +101,7 @@ describe("IndexedDBStore", () => {
             localStorage,
         });
 
+        await expect(store.getPendingEvents(roomId)).resolves.toEqual([]);
         const events = [{ type: "test" }];
         await store.setPendingEvents(roomId, events);
         expect(MemoryStore.prototype.setPendingEvents).not.toHaveBeenCalled();
