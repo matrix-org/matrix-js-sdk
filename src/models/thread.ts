@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { Optional } from "matrix-events-sdk";
+
 import { MatrixClient, MatrixEventEvent, RelationType, RoomEvent } from "../matrix";
 import { TypedReEmitter } from "../ReEmitter";
 import { IRelationsRequestOpts } from "../@types/requests";
@@ -328,15 +330,16 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     }
 
     /**
-     * Return last reply to the thread
+     * Return last reply to the thread, if known.
      */
-    public lastReply(matches: (ev: MatrixEvent) => boolean = () => true): MatrixEvent {
+    public lastReply(matches: (ev: MatrixEvent) => boolean = () => true): Optional<MatrixEvent> {
         for (let i = this.events.length - 1; i >= 0; i--) {
             const event = this.events[i];
             if (matches(event)) {
                 return event;
             }
         }
+        return null;
     }
 
     public get roomId(): string {
@@ -353,9 +356,9 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     }
 
     /**
-     * A getter for the last event added to the thread
+     * A getter for the last event added to the thread, if known.
      */
-    public get replyToEvent(): MatrixEvent {
+    public get replyToEvent(): Optional<MatrixEvent> {
         return this.lastEvent ?? this.lastReply();
     }
 
