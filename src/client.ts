@@ -168,7 +168,6 @@ import {
 import { IAbortablePromise, IdServerUnbindResult, IImageInfo, Preset, Visibility } from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
 import { randomString } from "./randomstring";
-import { WebStorageSessionStore } from "./store/session/webstorage";
 import { BackupManager, IKeyBackup, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE, MSC3089TreeSpace } from "./models/MSC3089TreeSpace";
 import { ISignatures } from "./@types/signed";
@@ -195,7 +194,6 @@ import { Thread, THREAD_RELATION_TYPE } from "./models/thread";
 import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
 
 export type Store = IStore;
-export type SessionStore = WebStorageSessionStore;
 
 export type Callback<T = any> = (err: Error | any | null, data?: T) => void;
 export type ResetTimelineCallback = (roomId: string) => boolean;
@@ -314,14 +312,6 @@ export interface ICreateClientOpts {
      * Key used to pickle olm objects or other sensitive data.
      */
     pickleKey?: string;
-
-    /**
-     * A store to be used for end-to-end crypto session data. Most data has been
-     * migrated out of here to `cryptoStore` instead. If not specified,
-     * end-to-end crypto will be disabled. The `createClient` helper
-     * _will not_ create this store at the moment.
-     */
-    sessionStore?: SessionStore;
 
     verificationMethods?: Array<VerificationMethod>;
 
@@ -897,7 +887,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public timelineSupport = false;
     public urlPreviewCache: { [key: string]: Promise<IPreviewUrlResponse> } = {};
     public identityServer: IIdentityServerProvider;
-    public sessionStore: SessionStore; // XXX: Intended private, used in code.
     public http: MatrixHttpApi; // XXX: Intended private, used in code.
     public crypto: Crypto; // XXX: Intended private, used in code.
     public cryptoCallbacks: ICryptoCallbacks; // XXX: Intended private, used in code.
@@ -1029,7 +1018,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.timelineSupport = Boolean(opts.timelineSupport);
 
         this.cryptoStore = opts.cryptoStore;
-        this.sessionStore = opts.sessionStore;
         this.verificationMethods = opts.verificationMethods;
         this.cryptoCallbacks = opts.cryptoCallbacks || {};
 
@@ -1654,10 +1642,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return;
         }
 
-        if (!this.sessionStore) {
-            // this is temporary, the sessionstore is supposed to be going away
-            throw new Error(`Cannot enable encryption: no sessionStore provided`);
-        }
         if (!this.cryptoStore) {
             // the cryptostore is provided by sdk.createClient, so this shouldn't happen
             throw new Error(`Cannot enable encryption: no cryptoStore provided`);
@@ -1686,8 +1670,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const crypto = new Crypto(
             this,
-            this.sessionStore,
-            userId, this.deviceId,
+            userId,
+            this.deviceId,
             this.store,
             this.cryptoStore,
             this.roomList,

@@ -157,7 +157,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
             }
         }).then(backend => {
             this.backend = backend;
-            return backend as CryptoStore;
+            return backend;
         });
 
         return this.backendPromise;

@@ -3,7 +3,6 @@ import '../olm-loader';
 import { EventEmitter } from "events";
 
 import { Crypto } from "../../src/crypto";
-import { WebStorageSessionStore } from "../../src/store/session/webstorage";
 import { MemoryCryptoStore } from "../../src/crypto/store/memory-crypto-store";
 import { MockStorageApi } from "../MockStorageApi";
 import { TestClient } from "../TestClient";
@@ -14,6 +13,7 @@ import { sleep } from "../../src/utils";
 import { CRYPTO_ENABLED } from "../../src/client";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
 import { logger } from '../../src/logger';
+import { MemoryStore } from "../../src";
 
 const Olm = global.Olm;
 
@@ -153,7 +153,7 @@ describe("Crypto", function() {
 
         beforeEach(async function() {
             const mockStorage = new MockStorageApi();
-            const sessionStore = new WebStorageSessionStore(mockStorage);
+            const clientStore = new MemoryStore({ localStorage: mockStorage });
             const cryptoStore = new MemoryCryptoStore(mockStorage);
 
             cryptoStore.storeEndToEndDeviceData({
@@ -180,10 +180,9 @@ describe("Crypto", function() {
 
             crypto = new Crypto(
                 mockBaseApis,
-                sessionStore,
                 "@alice:home.server",
                 "FLIBBLE",
-                sessionStore,
+                clientStore,
                 cryptoStore,
                 mockRoomList,
             );
