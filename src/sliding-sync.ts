@@ -53,6 +53,7 @@ export interface MSC3575List extends MSC3575RoomSubscription {
     ranges: number[][];
     sort?: string[];
     filters?: MSC3575Filter;
+    slow_get_all_rooms?: boolean;
 }
 
 /**
@@ -82,11 +83,15 @@ export interface MSC3575RoomData {
     limited?: boolean;
     is_dm?: boolean;
     prev_batch?: string;
-    room_id: string;
+}
+
+interface ListResponse {
+    count: number;
+    ops: Operation[];
 }
 
 interface BaseOperation {
-    list: number;
+    op: string;
 }
 
 interface DeleteOperation extends BaseOperation {
@@ -97,7 +102,7 @@ interface DeleteOperation extends BaseOperation {
 interface InsertOperation extends BaseOperation {
     op: "INSERT";
     index: number;
-    room: MSC3575RoomData;
+    room_id: string;
 }
 
 interface InvalidateOperation extends BaseOperation {
@@ -108,25 +113,18 @@ interface InvalidateOperation extends BaseOperation {
 interface SyncOperation extends BaseOperation {
     op: "SYNC";
     range: [number, number];
-    rooms: MSC3575RoomData[];
+    room_ids: string[];
 }
 
-interface UpdateOperation extends BaseOperation {
-    op: "UPDATE";
-    index: number;
-    room: MSC3575RoomData;
-}
-
-type Operation = DeleteOperation | InsertOperation | InvalidateOperation | SyncOperation | UpdateOperation;
+type Operation = DeleteOperation | InsertOperation | InvalidateOperation | SyncOperation;
 
 /**
  * A complete Sliding Sync response
  */
 export interface MSC3575SlidingSyncResponse {
     pos: string;
-    ops: Operation[];
-    counts: number[];
-    room_subscriptions: Record<string, MSC3575RoomData>;
+    lists: ListResponse[];
+    rooms: Record<string, MSC3575RoomData>;
     extensions: object;
 }
 
@@ -497,7 +495,6 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     private invokeRoomDataListeners(roomId: string, roomData: MSC3575RoomData): void {
         if (!roomData.required_state) { roomData.required_state = []; }
         if (!roomData.timeline) { roomData.timeline = []; }
-        if (!roomData.room_id) { roomData.room_id = roomId; }
         this.emit(SlidingSyncEvent.RoomData, roomId, roomData);
     }
 
@@ -509,6 +506,113 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      */
     private invokeLifecycleListeners(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err?: Error): void {
         this.emit(SlidingSyncEvent.Lifecycle, state, resp, err);
+    }
+
+    private processListOps(list: ListResponse, listIndex: number): void {
+        let gapIndex = -1;
+        list.ops.forEach((op: Operation) => {
+            switch (op.op) {
+                case "DELETE": {
+                    logger.debug("DELETE", listIndex, op.index, ";");
+                    delete this.lists[listIndex].roomIndexToRoomId[op.index];
+                    gapIndex = op.index;
+                    break;
+                }
+                case "INSERT": {
+                    logger.debug(
+                        "INSERT",
+                        listIndex,
+                        op.index,
+                        op.room_id,
+                        ";",
+                    );
+                    if (this.lists[listIndex].roomIndexToRoomId[op.index]) {
+                        // something is in this space, shift items out of the way
+                        if (gapIndex < 0) {
+                            logger.debug(
+                                "cannot work out where gap is, INSERT without previous DELETE! List: ",
+                                listIndex,
+                            );
+                            return;
+                        }
+                        //  0,1,2,3  index
+                        // [A,B,C,D]
+                        //   DEL 3
+                        // [A,B,C,_]
+                        //   INSERT E 0
+                        // [E,A,B,C]
+                        // gapIndex=3, op.index=0
+                        if (gapIndex > op.index) {
+                            // the gap is further down the list, shift every element to the right
+                            // starting at the gap so we can just shift each element in turn:
+                            // [A,B,C,_] gapIndex=3, op.index=0
+                            // [A,B,C,C] i=3
+                            // [A,B,B,C] i=2
+                            // [A,A,B,C] i=1
+                            // Terminate. We'll assign into op.index next.
+                            for (let i = gapIndex; i > op.index; i--) {
+                                if (this.lists[listIndex].isIndexInRange(i)) {
+                                    this.lists[listIndex].roomIndexToRoomId[i] =
+                                        this.lists[listIndex].roomIndexToRoomId[
+                                            i - 1
+                                        ];
+                                }
+                            }
+                        } else if (gapIndex < op.index) {
+                            // the gap is further up the list, shift every element to the left
+                            // starting at the gap so we can just shift each element in turn
+                            for (let i = gapIndex; i < op.index; i++) {
+                                if (this.lists[listIndex].isIndexInRange(i)) {
+                                    this.lists[listIndex].roomIndexToRoomId[i] =
+                                        this.lists[listIndex].roomIndexToRoomId[
+                                            i + 1
+                                        ];
+                                }
+                            }
+                        }
+                    }
+                    this.lists[listIndex].roomIndexToRoomId[op.index] = op.room_id;
+                    break;
+                }
+                case "INVALIDATE": {
+                    const invalidRooms = [];
+                    const startIndex = op.range[0];
+                    for (let i = startIndex; i <= op.range[1]; i++) {
+                        invalidRooms.push(
+                            this.lists[listIndex].roomIndexToRoomId[i],
+                        );
+                        delete this.lists[listIndex].roomIndexToRoomId[i];
+                    }
+                    logger.debug(
+                        "INVALIDATE",
+                        listIndex,
+                        op.range[0],
+                        op.range[1],
+                        ";",
+                    );
+                    break;
+                }
+                case "SYNC": {
+                    const startIndex = op.range[0];
+                    for (let i = startIndex; i <= op.range[1]; i++) {
+                        const roomId = op.room_ids[i - startIndex];
+                        if (!roomId) {
+                            break; // we are at the end of list
+                        }
+                        this.lists[listIndex].roomIndexToRoomId[i] = roomId;
+                    }
+                    logger.debug(
+                        "SYNC",
+                        listIndex,
+                        op.range[0],
+                        op.range[1],
+                        op.room_ids.join(" "),
+                        ";",
+                    );
+                    break;
+                }
+            }
+        });
     }
 
     /**
@@ -585,20 +689,13 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 this.lists.forEach((l) => {
                     l.setModified(false);
                 });
-                if (!resp.ops) {
-                    resp.ops = [];
-                }
-                if (!resp.room_subscriptions) {
-                    resp.room_subscriptions = {};
-                }
-                if (!resp.extensions) {
-                    resp.extensions = {};
-                }
-                if (resp.counts) {
-                    resp.counts.forEach((count, index) => {
-                        this.lists[index].joinedCount = count;
-                    });
-                }
+                // set default empty values so we don't need to null check
+                resp.lists = resp.lists || [];
+                resp.rooms = resp.rooms || {};
+                resp.extensions = resp.extensions || {};
+                resp.lists.forEach((val, i) => {
+                    this.lists[i].joinedCount = val.count;
+                });
                 this.invokeLifecycleListeners(
                     SlidingSyncState.RequestFinished,
                     resp,
@@ -626,131 +723,21 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             }
             this.onPreExtensionsResponse(resp.extensions);
 
-            Object.keys(resp.room_subscriptions).forEach((roomId) => {
+            Object.keys(resp.rooms).forEach((roomId) => {
                 this.invokeRoomDataListeners(
                     roomId,
-                    resp.room_subscriptions[roomId],
+                    resp.rooms[roomId],
                 );
             });
 
             const listIndexesWithUpdates: Set<number> = new Set();
-            // TODO: clear gapIndex immediately after next op to avoid a genuine DELETE shifting incorrectly e.g leaving a room
-            const gapIndexes: Record<number, number> = {};
-            resp.counts.forEach((count, index) => {
-                gapIndexes[index] = -1;
-            });
             if (!doNotUpdateList) {
-                resp.ops.forEach((op) => {
-                    if (op.list != null) {
-                        listIndexesWithUpdates.add(op.list);
+                resp.lists.forEach((list, listIndex) => {
+                    list.ops = list.ops || [];
+                    if (list.ops.length > 0) {
+                        listIndexesWithUpdates.add(listIndex);
                     }
-                    if (op.op === "DELETE") {
-                        logger.debug("DELETE", op.list, op.index, ";");
-                        delete this.lists[op.list].roomIndexToRoomId[op.index];
-                        gapIndexes[op.list] = op.index;
-                    } else if (op.op === "INSERT") {
-                        logger.debug(
-                            "INSERT",
-                            op.list,
-                            op.index,
-                            op.room.room_id,
-                            ";",
-                        );
-                        if (this.lists[op.list].roomIndexToRoomId[op.index]) {
-                            const gapIndex = gapIndexes[op.list];
-                            // something is in this space, shift items out of the way
-                            if (gapIndex < 0) {
-                                logger.debug(
-                                    "cannot work out where gap is, INSERT without previous DELETE! List: ",
-                                    op.list,
-                                );
-                                return;
-                            }
-                            //  0,1,2,3  index
-                            // [A,B,C,D]
-                            //   DEL 3
-                            // [A,B,C,_]
-                            //   INSERT E 0
-                            // [E,A,B,C]
-                            // gapIndex=3, op.index=0
-                            if (gapIndex > op.index) {
-                                // the gap is further down the list, shift every element to the right
-                                // starting at the gap so we can just shift each element in turn:
-                                // [A,B,C,_] gapIndex=3, op.index=0
-                                // [A,B,C,C] i=3
-                                // [A,B,B,C] i=2
-                                // [A,A,B,C] i=1
-                                // Terminate. We'll assign into op.index next.
-                                for (let i = gapIndex; i > op.index; i--) {
-                                    if (this.lists[op.list].isIndexInRange(i)) {
-                                        this.lists[op.list].roomIndexToRoomId[i] =
-                                            this.lists[op.list].roomIndexToRoomId[
-                                                i - 1
-                                            ];
-                                    }
-                                }
-                            } else if (gapIndex < op.index) {
-                                // the gap is further up the list, shift every element to the left
-                                // starting at the gap so we can just shift each element in turn
-                                for (let i = gapIndex; i < op.index; i++) {
-                                    if (this.lists[op.list].isIndexInRange(i)) {
-                                        this.lists[op.list].roomIndexToRoomId[i] =
-                                            this.lists[op.list].roomIndexToRoomId[
-                                                i + 1
-                                            ];
-                                    }
-                                }
-                            }
-                        }
-                        this.lists[op.list].roomIndexToRoomId[op.index] =
-                            op.room.room_id;
-                        this.invokeRoomDataListeners(op.room.room_id, op.room);
-                    } else if (op.op === "UPDATE") {
-                        logger.debug(
-                            "UPDATE",
-                            op.list,
-                            op.index,
-                            op.room.room_id,
-                            ";",
-                        );
-                        this.invokeRoomDataListeners(op.room.room_id, op.room);
-                    } else if (op.op === "SYNC") {
-                        const syncRooms = [];
-                        const startIndex = op.range[0];
-                        for (let i = startIndex; i <= op.range[1]; i++) {
-                            const r = op.rooms[i - startIndex];
-                            if (!r) {
-                                break; // we are at the end of list
-                            }
-                            this.lists[op.list].roomIndexToRoomId[i] = r.room_id;
-                            syncRooms.push(r.room_id);
-                            this.invokeRoomDataListeners(r.room_id, r);
-                        }
-                        logger.debug(
-                            "SYNC",
-                            op.list,
-                            op.range[0],
-                            op.range[1],
-                            syncRooms.join(" "),
-                            ";",
-                        );
-                    } else if (op.op === "INVALIDATE") {
-                        const invalidRooms = [];
-                        const startIndex = op.range[0];
-                        for (let i = startIndex; i <= op.range[1]; i++) {
-                            invalidRooms.push(
-                                this.lists[op.list].roomIndexToRoomId[i],
-                            );
-                            delete this.lists[op.list].roomIndexToRoomId[i];
-                        }
-                        logger.debug(
-                            "INVALIDATE",
-                            op.list,
-                            op.range[0],
-                            op.range[1],
-                            ";",
-                        );
-                    }
+                    this.processListOps(list, listIndex);
                 });
             }
             this.invokeLifecycleListeners(SlidingSyncState.Complete, resp);

@@ -289,11 +289,11 @@ export class SlidingSyncSdk {
     private onRoomData(roomId: string, roomData: MSC3575RoomData): void {
         let room: Room;
         if (roomData.initial) {
-            room = createRoom(this.client, roomData.room_id, this.opts);
+            room = createRoom(this.client, roomId, this.opts);
         } else {
-            room = this.client.store.getRoom(roomData.room_id);
+            room = this.client.store.getRoom(roomId);
             if (!room) {
-                logger.debug("initial flag not set but no stored room exists for room ", roomData.room_id, roomData);
+                logger.debug("initial flag not set but no stored room exists for room ", roomId, roomData);
                 return;
             }
         }
@@ -406,7 +406,7 @@ export class SlidingSyncSdk {
     }
 
     private async processRoomData(client: MatrixClient, room: Room, roomData: MSC3575RoomData) {
-        roomData = ensureNameEvent(client, roomData);
+        roomData = ensureNameEvent(client, room.roomId, roomData);
         const stateEvents = mapEvents(this.client, room.roomId, roomData.required_state);
         // Prevent events from being decrypted ahead of time
         // this helps large account to speed up faster
@@ -752,7 +752,7 @@ export class SlidingSyncSdk {
     }
 }
 
-function ensureNameEvent(client: MatrixClient, roomData: MSC3575RoomData): MSC3575RoomData {
+function ensureNameEvent(client: MatrixClient, roomId: string, roomData: MSC3575RoomData): MSC3575RoomData {
     // make sure m.room.name is in required_state if there is a name, replacing anything previously
     // there if need be. This ensures clients transparently 'calculate' the right room name. Native
     // sliding sync clients should just read the "name" field.
@@ -768,7 +768,7 @@ function ensureNameEvent(client: MatrixClient, roomData: MSC3575RoomData): MSC35
         }
     }
     roomData.required_state.push({
-        event_id: "$fake-sliding-sync-name-event-" + roomData.room_id,
+        event_id: "$fake-sliding-sync-name-event-" + roomId,
         state_key: "",
         type: EventType.RoomName,
         content: {
