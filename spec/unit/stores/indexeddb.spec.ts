@@ -27,7 +27,7 @@ describe("IndexedDBStore", () => {
         const store = new IndexedDBStore({
             indexedDB: indexedDB,
             dbName: "database",
-            localStorage,
+            localStorage: global.localStorage,
         });
         await store.startup();
 
@@ -94,7 +94,7 @@ describe("IndexedDBStore", () => {
         const store = new IndexedDBStore({
             indexedDB: indexedDB,
             dbName: "database",
-            localStorage,
+            localStorage: global.localStorage,
         });
 
         const events = [{ type: "test" }];
