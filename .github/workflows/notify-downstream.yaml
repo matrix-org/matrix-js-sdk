@@ -5,6 +5,8 @@ on:
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 jobs:
   notify-downstream:
+    # Only respect triggers from our develop branch, ignore that of forks
+    if: github.repository == 'matrix-org/matrix-js-sdk'
     continue-on-error: true
     strategy:
       fail-fast: false
