@@ -22,12 +22,16 @@ import { emitPromise } from "../../test-utils/test-utils";
 import { LocalIndexedDBStoreBackend } from "../../../src/store/indexeddb-local-backend";
 
 describe("IndexedDBStore", () => {
+    afterEach(() => {
+        jest.clearAllMocks();
+    });
+
     const roomId = "!room:id";
     it("should degrade to MemoryStore on IDB errors", async () => {
         const store = new IndexedDBStore({
             indexedDB: indexedDB,
             dbName: "database",
-            localStorage: global.localStorage,
+            localStorage,
         });
         await store.startup();
 
@@ -94,7 +98,7 @@ describe("IndexedDBStore", () => {
         const store = new IndexedDBStore({
             indexedDB: indexedDB,
             dbName: "database",
-            localStorage: global.localStorage,
+            localStorage,
         });
 
         const events = [{ type: "test" }];
