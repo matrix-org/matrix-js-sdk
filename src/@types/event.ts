@@ -160,6 +160,16 @@ export const UNSTABLE_MSC3089_BRANCH = new UnstableValue("m.branch", "org.matrix
 export const UNSTABLE_MSC2716_MARKER = new UnstableValue("m.room.marker", "org.matrix.msc2716.marker");
 
 /**
+ * Timestamp after which the event should be redacted for self-destruction
+ * [MSC2228](https://github.com/matrix-org/matrix-doc/pull/2228). Note that this reference is
+ * UNSTABLE and subject to breaking changes, including its eventual removal.
+ */
+export const UNSTABLE_MSC2228_SELF_DESTRUCT_AFTER = new UnstableValue(
+    "m.self_destruct_after",
+    "org.matrix.self_destruct_after",
+);
+
+/**
  * Functional members type for declaring a purpose of room members (e.g. helpful bots).
  * Note that this reference is UNSTABLE and subject to breaking changes, including its
  * eventual removal.

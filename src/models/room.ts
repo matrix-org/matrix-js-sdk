@@ -33,6 +33,7 @@ import {
     EventType, RoomCreateTypeField, RoomType, UNSTABLE_ELEMENT_FUNCTIONAL_USERS,
     EVENT_VISIBILITY_CHANGE_TYPE,
     RelationType,
+    UNSTABLE_MSC2228_SELF_DESTRUCT_AFTER,
 } from "../@types/event";
 import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
 import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
@@ -1919,6 +1920,29 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         // If any pending visibility change is waiting for this (older) event,
         this.applyPendingVisibilityEvents(event);
 
+        // MSC2228: is a self destruction time defined?
+        // https://github.com/matrix-org/matrix-doc/pull/2228)
+        if (
+            (
+                event.getType() === EventType.RoomMessage ||
+                event.getType() === EventType.RoomMessageEncrypted
+            ) &&
+            event.getWireContent()[UNSTABLE_MSC2228_SELF_DESTRUCT_AFTER.name] &&
+            !event.isSending() &&
+            !event.isRedacted()
+        ) {
+            // create a synthetic m.redaction event as soon as the time expires
+            const remainingTime = event.getWireContent()[UNSTABLE_MSC2228_SELF_DESTRUCT_AFTER.name] - Date.now();
+            if (remainingTime > 0) {
+                setTimeout(() => {
+                    this.unstable_selfDestructEvent(event);
+                }, remainingTime);
+            } else {
+                // time already expired, redact immediately
+                this.unstable_selfDestructEvent(event);
+            }
+        }
+
         if (event.getUnsigned().transaction_id) {
             const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id];
             if (existingEvent) {
@@ -1965,6 +1989,42 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             // they are no longer currently active anyway. So don't bother to
             // reset the lastActiveAgo and lastPresenceTs from the RoomState's user.
         }
+    }
+    /**
+     * marks an event locally as redacted, triggered by an expiration timestamp.
+     * see [MSC2228](https://github.com/matrix-org/matrix-doc/pull/2228)
+     * @param {module:models/event.MatrixEvent} event The event to destruct
+     */
+    // eslint-disable-next-line
+    private unstable_selfDestructEvent(event: MatrixEvent): Promise<void> {
+        // maybe the server has already sent a m.redaction event or
+        // it got redacted manually by a client?
+        if (event.isRedacted()) return;
+
+        // generate a local redaction event
+        const redactionEvent = new MatrixEvent({
+            event_id: '$was-'+event.getId(),
+            type: 'm.room.redaction',
+            redacts: event.getId(),
+            origin_server_ts: event.getWireContent()['org.matrix.self_destruct_after'],
+            content: {
+                'm.synthetic': true,
+            },
+            room_id: event.getRoomId(),
+        });
+
+        // mark event as redacted
+        event.markLocallyRedacted(redactionEvent);
+        event.makeRedacted(redactionEvent);
+
+        // redact also stored event
+        this.client.store.replaceEvent(event).then(() => {
+            return this.client.store.save(true);
+        }).catch((err) => {
+            logger.error(`error while redacting event from store: ${err.message}`);
+        });
+
+        this.emit(RoomEvent.Redaction, redactionEvent, this);
     }
 
     /**

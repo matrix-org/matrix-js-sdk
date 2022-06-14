@@ -18,7 +18,7 @@ import { logger } from "../logger";
 import { defer, IDeferred } from "../utils";
 import { ISavedSync } from "./index";
 import { IStartClientOpts } from "../client";
-import { IStateEventWithRoomId, ISyncResponse } from "..";
+import { IStateEventWithRoomId, ISyncResponse, IEvent } from "..";
 import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend";
 
 export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
@@ -123,6 +123,16 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
 
     public storeClientOptions(options: IStartClientOpts): Promise<void> {
         return this.doCmd('storeClientOptions', [options]);
+    }
+
+    /**
+     * Replaces an event
+     * This is currently only used for redacting events from the stored state.
+     * see [MSC2228](https://github.com/matrix-org/matrix-doc/pull/2228)
+     * @param {event} event the new event
+     */
+    public async replaceEvent(event: IEvent): Promise<void> {
+        return this.doCmd('replaceEvent', [event]);
     }
 
     /**

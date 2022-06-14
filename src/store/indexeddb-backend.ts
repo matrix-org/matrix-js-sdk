@@ -31,6 +31,7 @@ export interface IIndexedDBBackend {
     getUserPresenceEvents(): Promise<UserTuple[]>;
     getClientOptions(): Promise<IStartClientOpts>;
     storeClientOptions(options: IStartClientOpts): Promise<void>;
+    replaceEvent(event: IEvent): Promise<void>;
 }
 
 export type UserTuple = [userId: string, presenceEvent: Partial<IEvent>];

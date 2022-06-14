@@ -669,6 +669,23 @@ export class SyncAccumulator {
     public getNextBatchToken(): string {
         return this.nextBatch;
     }
+
+    /**
+     * Replaces an event
+     * This is currently only used for redacting events from the stored state.
+     * see [MSC2228](https://github.com/matrix-org/matrix-doc/pull/2228)
+     * @param roomId the containing room
+     * @param event new event object
+     */
+    public replaceEvent(roomId: string, event: IRoomEvent) {
+        const currentData = this.joinRooms[roomId];
+
+        for (const e of currentData._timeline) {
+            if (e.event.event_id !== event.event_id) continue;
+            e.event = event;
+            return;
+        }
+    }
 }
 
 function setState(eventMap: Record<string, Record<string, IStateEvent>>, event: IRoomEvent | IStateEvent): void {
