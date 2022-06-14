@@ -107,5 +107,7 @@ describe("IndexedDBStore", () => {
         await expect(store.getPendingEvents(roomId)).resolves.toEqual(events);
         expect(MemoryStore.prototype.getPendingEvents).not.toHaveBeenCalled();
         expect(localStorage.getItem("mx_pending_events_" + roomId)).toBe(JSON.stringify(events));
+        await store.setPendingEvents(roomId, []);
+        expect(localStorage.getItem("mx_pending_events_" + roomId)).toBeNull();
     });
 });
