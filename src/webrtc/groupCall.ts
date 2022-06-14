@@ -458,8 +458,11 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
         return true;
     }
 
-    public async setMicrophoneMuted(muted) {
-        if (!await this.client.getMediaHandler().hasAudioDevice()) {
+    public async setMicrophoneMuted(muted: boolean): Promise<boolean | null> {
+        // hasAudioDevice can block indefinitely if the window has lost focus,
+        // and it doesn't make much sense to keep a device from being muted, so
+        // we always allow muted = true changes to go through
+        if (!muted && !await this.client.getMediaHandler().hasAudioDevice()) {
             return false;
         }
 
@@ -516,8 +519,8 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
         this.emit(GroupCallEvent.LocalMuteStateChanged, muted, this.isLocalVideoMuted());
     }
 
-    public async setLocalVideoMuted(muted) {
-        if (!await this.client.getMediaHandler().hasVideoDevice()) {
+    public async setLocalVideoMuted(muted: boolean): Promise<boolean | null> {
+        if (!muted && !await this.client.getMediaHandler().hasVideoDevice()) {
             return false;
         }
 
