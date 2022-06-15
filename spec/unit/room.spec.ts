@@ -1555,6 +1555,8 @@ describe("Room", function() {
                         return Promise.resolve();
                     },
                     getSyncToken: () => "sync_token",
+                    getPendingEvents: jest.fn().mockResolvedValue([]),
+                    setPendingEvents: jest.fn().mockResolvedValue(undefined),
                 },
             };
         }

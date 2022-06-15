@@ -257,6 +257,8 @@ describe("MegolmDecryption", function() {
         });
 
         describe("session reuse and key reshares", () => {
+            const rotationPeriodMs = 999 * 24 * 60 * 60 * 1000; // 999 days, so we don't have to deal with it
+
             let megolmEncryption;
             let aliceDeviceInfo;
             let mockRoom;
@@ -318,7 +320,7 @@ describe("MegolmDecryption", function() {
                     baseApis: mockBaseApis,
                     roomId: ROOM_ID,
                     config: {
-                        rotation_period_ms: 9999999999999,
+                        rotation_period_ms: rotationPeriodMs,
                     },
                 });
                 mockRoom = {
@@ -327,6 +329,31 @@ describe("MegolmDecryption", function() {
                     ),
                     getBlacklistUnverifiedDevices: jest.fn().mockReturnValue(false),
                 };
+            });
+
+            it("should use larger otkTimeout when preparing to encrypt room", async () => {
+                megolmEncryption.prepareToEncrypt(mockRoom);
+                await megolmEncryption.encryptMessage(mockRoom, "a.fake.type", {
+                    body: "Some text",
+                });
+                expect(mockRoom.getEncryptionTargetMembers).toHaveBeenCalled();
+
+                expect(mockBaseApis.claimOneTimeKeys).toHaveBeenCalledWith(
+                    [['@alice:home.server', 'aliceDevice']], 'signed_curve25519', 10000,
+                );
+            });
+
+            it("should generate a new session if this one needs rotation", async () => {
+                const session = await megolmEncryption.prepareNewSession(false);
+                session.creationTime -= rotationPeriodMs + 10000; // a smidge over the rotation time
+                // Inject expired session which needs rotation
+                megolmEncryption.setupPromise = Promise.resolve(session);
+
+                const prepareNewSessionSpy = jest.spyOn(megolmEncryption, "prepareNewSession");
+                await megolmEncryption.encryptMessage(mockRoom, "a.fake.type", {
+                    body: "Some text",
+                });
+                expect(prepareNewSessionSpy).toHaveBeenCalledTimes(1);
             });
 
             it("re-uses sessions for sequential messages", async function() {

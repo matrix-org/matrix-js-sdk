@@ -92,12 +92,17 @@ export interface InboundGroupSessionData {
     sharedHistory?: boolean;
 }
 
-interface IDecryptedGroupMessage {
+export interface IDecryptedGroupMessage {
     result: string;
     keysClaimed: Record<string, string>;
     senderKey: string;
     forwardingCurve25519KeyChain: string[];
     untrusted: boolean;
+}
+
+export interface IInboundSession {
+    payload: string;
+    session_id: string;
 }
 
 export interface IExportedDevice {
@@ -620,7 +625,7 @@ export class OlmDevice {
         theirDeviceIdentityKey: string,
         messageType: number,
         ciphertext: string,
-    ): Promise<{ payload: string, session_id: string }> { // eslint-disable-line camelcase
+    ): Promise<IInboundSession> {
         if (messageType !== 0) {
             throw new Error("Need messageType == 0 to create inbound session");
         }

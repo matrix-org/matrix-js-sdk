@@ -22,7 +22,7 @@ limitations under the License.
 import { EventType } from "../@types/event";
 import { Room } from "../models/room";
 import { User } from "../models/user";
-import { MatrixEvent } from "../models/event";
+import { IEvent, MatrixEvent } from "../models/event";
 import { Filter } from "../filter";
 import { ISavedSync, IStore } from "./index";
 import { RoomSummary } from "../models/room-summary";
@@ -260,6 +260,14 @@ export class StubStore implements IStore {
     }
 
     public storeClientOptions(options: object): Promise<void> {
+        return Promise.resolve();
+    }
+
+    public async getPendingEvents(roomId: string): Promise<Partial<IEvent>[]> {
+        return [];
+    }
+
+    public setPendingEvents(roomId: string, events: Partial<IEvent>[]): Promise<void> {
         return Promise.resolve();
     }
 }

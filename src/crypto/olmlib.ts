@@ -76,7 +76,7 @@ export interface IOlmSessionResult {
 export async function encryptMessageForDevice(
     resultsObject: Record<string, string>,
     ourUserId: string,
-    ourDeviceId: string,
+    ourDeviceId: string | undefined,
     olmDevice: OlmDevice,
     recipientUserId: string,
     recipientDevice: DeviceInfo,
@@ -323,7 +323,7 @@ export async function ensureOlmSessionsForDevices(
     }
 
     const oneTimeKeyAlgorithm = "signed_curve25519";
-    let res;
+    let res: IClaimOTKsResult;
     let taskDetail = `one-time keys for ${devicesWithoutSession.length} devices`;
     try {
         log.debug(`Claiming ${taskDetail}`);

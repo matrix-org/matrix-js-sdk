@@ -3,7 +3,6 @@ import '../olm-loader';
 import { EventEmitter } from "events";
 
 import { Crypto } from "../../src/crypto";
-import { WebStorageSessionStore } from "../../src/store/session/webstorage";
 import { MemoryCryptoStore } from "../../src/crypto/store/memory-crypto-store";
 import { MockStorageApi } from "../MockStorageApi";
 import { TestClient } from "../TestClient";
@@ -14,8 +13,46 @@ import { sleep } from "../../src/utils";
 import { CRYPTO_ENABLED } from "../../src/client";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
 import { logger } from '../../src/logger';
+import { MemoryStore } from "../../src";
 
 const Olm = global.Olm;
+
+function awaitEvent(emitter, event) {
+    return new Promise((resolve, reject) => {
+        emitter.once(event, (result) => {
+            resolve(result);
+        });
+    });
+}
+
+async function keyshareEventForEvent(client, event, index) {
+    const roomId = event.getRoomId();
+    const eventContent = event.getWireContent();
+    const key = await client.crypto.olmDevice.getInboundGroupSessionKey(
+        roomId,
+        eventContent.sender_key,
+        eventContent.session_id,
+        index,
+    );
+    const ksEvent = new MatrixEvent({
+        type: "m.forwarded_room_key",
+        sender: client.getUserId(),
+        content: {
+            algorithm: olmlib.MEGOLM_ALGORITHM,
+            room_id: roomId,
+            sender_key: eventContent.sender_key,
+            sender_claimed_ed25519_key: key.sender_claimed_ed25519_key,
+            session_id: eventContent.session_id,
+            session_key: key.key,
+            chain_index: key.chain_index,
+            forwarding_curve25519_key_chain:
+            key.forwarding_curve_key_chain,
+        },
+    });
+    // make onRoomKeyEvent think this was an encrypted event
+    ksEvent.senderCurve25519Key = "akey";
+    return ksEvent;
+}
 
 describe("Crypto", function() {
     if (!CRYPTO_ENABLED) {
@@ -116,7 +153,7 @@ describe("Crypto", function() {
 
         beforeEach(async function() {
             const mockStorage = new MockStorageApi();
-            const sessionStore = new WebStorageSessionStore(mockStorage);
+            const clientStore = new MemoryStore({ localStorage: mockStorage });
             const cryptoStore = new MemoryCryptoStore(mockStorage);
 
             cryptoStore.storeEndToEndDeviceData({
@@ -143,10 +180,9 @@ describe("Crypto", function() {
 
             crypto = new Crypto(
                 mockBaseApis,
-                sessionStore,
                 "@alice:home.server",
                 "FLIBBLE",
-                sessionStore,
+                clientStore,
                 cryptoStore,
                 mockRoomList,
             );
@@ -203,136 +239,141 @@ describe("Crypto", function() {
             bobClient.stopClient();
         });
 
-        it(
-            "does not cancel keyshare requests if some messages are not decrypted",
-            async function() {
-                function awaitEvent(emitter, event) {
-                    return new Promise((resolve, reject) => {
-                        emitter.once(event, (result) => {
-                            resolve(result);
-                        });
-                    });
-                }
-
-                async function keyshareEventForEvent(event, index) {
-                    const eventContent = event.getWireContent();
-                    const key = await aliceClient.crypto.olmDevice
-                        .getInboundGroupSessionKey(
-                            roomId, eventContent.sender_key, eventContent.session_id,
-                            index,
-                        );
-                    const ksEvent = new MatrixEvent({
-                        type: "m.forwarded_room_key",
-                        sender: "@alice:example.com",
-                        content: {
-                            algorithm: olmlib.MEGOLM_ALGORITHM,
-                            room_id: roomId,
-                            sender_key: eventContent.sender_key,
-                            sender_claimed_ed25519_key: key.sender_claimed_ed25519_key,
-                            session_id: eventContent.session_id,
-                            session_key: key.key,
-                            chain_index: key.chain_index,
-                            forwarding_curve25519_key_chain:
-                            key.forwarding_curve_key_chain,
-                        },
-                    });
-                    // make onRoomKeyEvent think this was an encrypted event
-                    ksEvent.senderCurve25519Key = "akey";
-                    return ksEvent;
-                }
-
-                const encryptionCfg = {
-                    "algorithm": "m.megolm.v1.aes-sha2",
-                };
-                const roomId = "!someroom";
-                const aliceRoom = new Room(roomId, aliceClient, "@alice:example.com", {});
-                const bobRoom = new Room(roomId, bobClient, "@bob:example.com", {});
-                aliceClient.store.storeRoom(aliceRoom);
-                bobClient.store.storeRoom(bobRoom);
-                await aliceClient.setRoomEncryption(roomId, encryptionCfg);
-                await bobClient.setRoomEncryption(roomId, encryptionCfg);
-                const events = [
-                    new MatrixEvent({
-                        type: "m.room.message",
-                        sender: "@alice:example.com",
-                        room_id: roomId,
-                        event_id: "$1",
-                        content: {
-                            msgtype: "m.text",
-                            body: "1",
-                        },
-                    }),
-                    new MatrixEvent({
-                        type: "m.room.message",
-                        sender: "@alice:example.com",
-                        room_id: roomId,
-                        event_id: "$2",
-                        content: {
-                            msgtype: "m.text",
-                            body: "2",
-                        },
-                    }),
-                ];
-                await Promise.all(events.map(async (event) => {
-                    // alice encrypts each event, and then bob tries to decrypt
-                    // them without any keys, so that they'll be in pending
-                    await aliceClient.crypto.encryptEvent(event, aliceRoom);
-                    event.clearEvent = undefined;
-                    event.senderCurve25519Key = null;
-                    event.claimedEd25519Key = null;
-                    try {
-                        await bobClient.crypto.decryptEvent(event);
-                    } catch (e) {
-                        // we expect this to fail because we don't have the
-                        // decryption keys yet
-                    }
-                }));
-
-                const bobDecryptor = bobClient.crypto.getRoomDecryptor(
-                    roomId, olmlib.MEGOLM_ALGORITHM,
-                );
-
-                let eventPromise = Promise.all(events.map((ev) => {
-                    return awaitEvent(ev, "Event.decrypted");
-                }));
-
-                // keyshare the session key starting at the second message, so
-                // the first message can't be decrypted yet, but the second one
-                // can
-                let ksEvent = await keyshareEventForEvent(events[1], 1);
-                await bobDecryptor.onRoomKeyEvent(ksEvent);
-                await eventPromise;
-                expect(events[0].getContent().msgtype).toBe("m.bad.encrypted");
-                expect(events[1].getContent().msgtype).not.toBe("m.bad.encrypted");
-
-                const cryptoStore = bobClient.cryptoStore;
-                const eventContent = events[0].getWireContent();
-                const senderKey = eventContent.sender_key;
-                const sessionId = eventContent.session_id;
-                const roomKeyRequestBody = {
-                    algorithm: olmlib.MEGOLM_ALGORITHM,
+        it("does not cancel keyshare requests if some messages are not decrypted", async function() {
+            const encryptionCfg = {
+                "algorithm": "m.megolm.v1.aes-sha2",
+            };
+            const roomId = "!someroom";
+            const aliceRoom = new Room(roomId, aliceClient, "@alice:example.com", {});
+            const bobRoom = new Room(roomId, bobClient, "@bob:example.com", {});
+            aliceClient.store.storeRoom(aliceRoom);
+            bobClient.store.storeRoom(bobRoom);
+            await aliceClient.setRoomEncryption(roomId, encryptionCfg);
+            await bobClient.setRoomEncryption(roomId, encryptionCfg);
+            const events = [
+                new MatrixEvent({
+                    type: "m.room.message",
+                    sender: "@alice:example.com",
                     room_id: roomId,
-                    sender_key: senderKey,
-                    session_id: sessionId,
-                };
-                // the room key request should still be there, since we haven't
-                // decrypted everything
-                expect(await cryptoStore.getOutgoingRoomKeyRequest(roomKeyRequestBody))
-                    .toBeDefined();
+                    event_id: "$1",
+                    content: {
+                        msgtype: "m.text",
+                        body: "1",
+                    },
+                }),
+                new MatrixEvent({
+                    type: "m.room.message",
+                    sender: "@alice:example.com",
+                    room_id: roomId,
+                    event_id: "$2",
+                    content: {
+                        msgtype: "m.text",
+                        body: "2",
+                    },
+                }),
+            ];
+            await Promise.all(events.map(async (event) => {
+                // alice encrypts each event, and then bob tries to decrypt
+                // them without any keys, so that they'll be in pending
+                await aliceClient.crypto.encryptEvent(event, aliceRoom);
+                event.clearEvent = undefined;
+                event.senderCurve25519Key = null;
+                event.claimedEd25519Key = null;
+                try {
+                    await bobClient.crypto.decryptEvent(event);
+                } catch (e) {
+                    // we expect this to fail because we don't have the
+                    // decryption keys yet
+                }
+            }));
 
-                // keyshare the session key starting at the first message, so
-                // that it can now be decrypted
-                eventPromise = awaitEvent(events[0], "Event.decrypted");
-                ksEvent = await keyshareEventForEvent(events[0], 0);
-                await bobDecryptor.onRoomKeyEvent(ksEvent);
-                await eventPromise;
-                expect(events[0].getContent().msgtype).not.toBe("m.bad.encrypted");
-                await sleep(1);
-                // the room key request should be gone since we've now decrypted everything
-                expect(await cryptoStore.getOutgoingRoomKeyRequest(roomKeyRequestBody))
-                    .toBeFalsy();
-            },
-        );
+            const bobDecryptor = bobClient.crypto.getRoomDecryptor(
+                roomId, olmlib.MEGOLM_ALGORITHM,
+            );
+
+            let eventPromise = Promise.all(events.map((ev) => {
+                return awaitEvent(ev, "Event.decrypted");
+            }));
+
+            // keyshare the session key starting at the second message, so
+            // the first message can't be decrypted yet, but the second one
+            // can
+            let ksEvent = await keyshareEventForEvent(aliceClient, events[1], 1);
+            await bobDecryptor.onRoomKeyEvent(ksEvent);
+            await eventPromise;
+            expect(events[0].getContent().msgtype).toBe("m.bad.encrypted");
+            expect(events[1].getContent().msgtype).not.toBe("m.bad.encrypted");
+
+            const cryptoStore = bobClient.cryptoStore;
+            const eventContent = events[0].getWireContent();
+            const senderKey = eventContent.sender_key;
+            const sessionId = eventContent.session_id;
+            const roomKeyRequestBody = {
+                algorithm: olmlib.MEGOLM_ALGORITHM,
+                room_id: roomId,
+                sender_key: senderKey,
+                session_id: sessionId,
+            };
+            // the room key request should still be there, since we haven't
+            // decrypted everything
+            expect(await cryptoStore.getOutgoingRoomKeyRequest(roomKeyRequestBody)).toBeDefined();
+
+            // keyshare the session key starting at the first message, so
+            // that it can now be decrypted
+            eventPromise = awaitEvent(events[0], "Event.decrypted");
+            ksEvent = await keyshareEventForEvent(aliceClient, events[0], 0);
+            await bobDecryptor.onRoomKeyEvent(ksEvent);
+            await eventPromise;
+            expect(events[0].getContent().msgtype).not.toBe("m.bad.encrypted");
+            await sleep(1);
+            // the room key request should be gone since we've now decrypted everything
+            expect(await cryptoStore.getOutgoingRoomKeyRequest(roomKeyRequestBody)).toBeFalsy();
+        });
+
+        it("should error if a forwarded room key lacks a content.sender_key", async function() {
+            const encryptionCfg = {
+                "algorithm": "m.megolm.v1.aes-sha2",
+            };
+            const roomId = "!someroom";
+            const aliceRoom = new Room(roomId, aliceClient, "@alice:example.com", {});
+            const bobRoom = new Room(roomId, bobClient, "@bob:example.com", {});
+            aliceClient.store.storeRoom(aliceRoom);
+            bobClient.store.storeRoom(bobRoom);
+            await aliceClient.setRoomEncryption(roomId, encryptionCfg);
+            await bobClient.setRoomEncryption(roomId, encryptionCfg);
+            const event = new MatrixEvent({
+                type: "m.room.message",
+                sender: "@alice:example.com",
+                room_id: roomId,
+                event_id: "$1",
+                content: {
+                    msgtype: "m.text",
+                    body: "1",
+                },
+            });
+            // alice encrypts each event, and then bob tries to decrypt
+            // them without any keys, so that they'll be in pending
+            await aliceClient.crypto.encryptEvent(event, aliceRoom);
+            event.clearEvent = undefined;
+            event.senderCurve25519Key = null;
+            event.claimedEd25519Key = null;
+            try {
+                await bobClient.crypto.decryptEvent(event);
+            } catch (e) {
+                // we expect this to fail because we don't have the
+                // decryption keys yet
+            }
+
+            const bobDecryptor = bobClient.crypto.getRoomDecryptor(
+                roomId, olmlib.MEGOLM_ALGORITHM,
+            );
+
+            const ksEvent = await keyshareEventForEvent(aliceClient, event, 1);
+            ksEvent.getContent().sender_key = undefined; // test
+            bobClient.crypto.addInboundGroupSession = jest.fn();
+            await bobDecryptor.onRoomKeyEvent(ksEvent);
+            expect(bobClient.crypto.addInboundGroupSession).not.toHaveBeenCalled();
+        });
 
         it("creates a new keyshare request if we request a keyshare", async function() {
             // make sure that cancelAndResend... creates a new keyshare request
