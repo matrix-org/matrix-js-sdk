@@ -620,7 +620,7 @@ export class SlidingSyncSdk {
         // if the timeline has any state events in it.
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
-        room.addLiveEvents(timelineEventList || [], null, fromCache);
+        room.addLiveEvents(timelineEventList || [], undefined, fromCache);
     }
 
     private resolveInvites(room: Room): void {
