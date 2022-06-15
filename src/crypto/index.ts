@@ -3284,7 +3284,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                     event.on(MatrixEventEvent.Status, statusListener);
                 });
             } catch (err) {
-                logger.error("error while waiting for the verification event to be sent: " + err.message);
+                logger.error("error while waiting for the verification event to be sent: ", err);
                 return;
             } finally {
                 event.removeListener(MatrixEventEvent.LocalEventIdReplaced, eventIdListener);
@@ -3308,7 +3308,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         try {
             await request.channel.handleEvent(event, request, isLiveEvent);
         } catch (err) {
-            logger.error("error while handling verification event: " + err.message);
+            logger.error("error while handling verification event", err);
         }
         const shouldEmit = isNewRequest &&
             !request.initiatedByMe &&
