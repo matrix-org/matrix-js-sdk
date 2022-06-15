@@ -5283,15 +5283,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         ];
 
         if (this.supportsExperimentalThreads()) {
-            const { threadId, shouldLiveInRoom } = timelineSet.room.eventShouldLiveIn(event);
-
-            if (!timelineSet.thread && !shouldLiveInRoom) {
-                // Thread response does not belong in this timelineSet
-                return undefined;
-            }
-
-            if (timelineSet.thread?.id !== threadId) {
-                // Event does not belong in this timelineSet
+            if (!timelineSet.canContain(event)) {
                 return undefined;
             }
 
