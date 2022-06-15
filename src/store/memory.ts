@@ -22,7 +22,7 @@ limitations under the License.
 import { EventType } from "../@types/event";
 import { Room } from "../models/room";
 import { User } from "../models/user";
-import { MatrixEvent } from "../models/event";
+import { IEvent, MatrixEvent } from "../models/event";
 import { RoomState, RoomStateEvent } from "../models/room-state";
 import { RoomMember } from "../models/room-member";
 import { Filter } from "../filter";
@@ -48,7 +48,7 @@ export interface IOpts {
  * Construct a new in-memory data store for the Matrix Client.
  * @constructor
  * @param {Object=} opts Config options
- * @param {LocalStorage} opts.localStorage The local storage instance to persist
+ * @param {Storage} opts.localStorage The local storage instance to persist
  * some forms of data such as tokens. Rooms will NOT be stored.
  */
 export class MemoryStore implements IStore {
@@ -60,8 +60,9 @@ export class MemoryStore implements IStore {
     // }
     private filters: Record<string, Record<string, Filter>> = {};
     public accountData: Record<string, MatrixEvent> = {}; // type : content
-    private readonly localStorage: Storage;
+    protected readonly localStorage: Storage;
     private oobMembers: Record<string, IStateEventWithRoomId[]> = {}; // roomId: [member events]
+    private pendingEvents: { [roomId: string]: Partial<IEvent>[] } = {};
     private clientOptions = {};
 
     constructor(opts: IOpts = {}) {
@@ -419,5 +420,13 @@ export class MemoryStore implements IStore {
     public storeClientOptions(options: object): Promise<void> {
         this.clientOptions = Object.assign({}, options);
         return Promise.resolve();
+    }
+
+    public async getPendingEvents(roomId: string): Promise<Partial<IEvent>[]> {
+        return this.pendingEvents[roomId] ?? [];
+    }
+
+    public async setPendingEvents(roomId: string, events: Partial<IEvent>[]): Promise<void> {
+        this.pendingEvents[roomId] = events;
     }
 }
