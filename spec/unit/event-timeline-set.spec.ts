@@ -224,7 +224,7 @@ describe('EventTimelineSet', () => {
         });
     });
 
-    describe("eventBelongs", () => {
+    describe("canContain", () => {
         const mkThreadResponse = (root: MatrixEvent) => utils.mkEvent({
             event: true,
             type: EventType.RoomMessage,
@@ -251,36 +251,36 @@ describe('EventTimelineSet', () => {
 
         it("should throw if timeline set has no room", () => {
             const eventTimelineSet = new EventTimelineSet(undefined, {}, client);
-            expect(() => eventTimelineSet.eventBelongs(messageEvent)).toThrowError();
+            expect(() => eventTimelineSet.canContain(messageEvent)).toThrowError();
         });
 
         it("should return false if timeline set is for thread but event is not threaded", () => {
             const eventTimelineSet = new EventTimelineSet(room, {}, client, thread);
-            expect(eventTimelineSet.eventBelongs(replyEvent)).toBeFalsy();
+            expect(eventTimelineSet.canContain(replyEvent)).toBeFalsy();
         });
 
         it("should return false if timeline set it for thread but event it for a different thread", () => {
             const eventTimelineSet = new EventTimelineSet(room, {}, client, thread);
             const event = mkThreadResponse(replyEvent);
-            expect(eventTimelineSet.eventBelongs(event)).toBeFalsy();
+            expect(eventTimelineSet.canContain(event)).toBeFalsy();
         });
 
         it("should return false if timeline set is not for a thread but event is a thread response", () => {
             const eventTimelineSet = new EventTimelineSet(room, {}, client);
             const event = mkThreadResponse(replyEvent);
-            expect(eventTimelineSet.eventBelongs(event)).toBeFalsy();
+            expect(eventTimelineSet.canContain(event)).toBeFalsy();
         });
 
         it("should return true if the timeline set is not for a thread and the event is a thread root", () => {
             const eventTimelineSet = new EventTimelineSet(room, {}, client);
-            expect(eventTimelineSet.eventBelongs(messageEvent)).toBeTruthy();
+            expect(eventTimelineSet.canContain(messageEvent)).toBeTruthy();
         });
 
         it("should return true if the timeline set is for a thread and the event is its thread root", () => {
             const thread = new Thread(messageEvent.getId(), messageEvent, { room, client });
             const eventTimelineSet = new EventTimelineSet(room, {}, client, thread);
             messageEvent.setThread(thread);
-            expect(eventTimelineSet.eventBelongs(messageEvent)).toBeTruthy();
+            expect(eventTimelineSet.canContain(messageEvent)).toBeTruthy();
         });
 
         it("should return true if the timeline set is for a thread and the event is a response to it", () => {
@@ -288,7 +288,7 @@ describe('EventTimelineSet', () => {
             const eventTimelineSet = new EventTimelineSet(room, {}, client, thread);
             messageEvent.setThread(thread);
             const event = mkThreadResponse(messageEvent);
-            expect(eventTimelineSet.eventBelongs(event)).toBeTruthy();
+            expect(eventTimelineSet.canContain(event)).toBeTruthy();
         });
     });
 });

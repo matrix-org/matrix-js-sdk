@@ -5299,7 +5299,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         ];
 
         if (this.supportsExperimentalThreads()) {
-            if (!timelineSet.eventBelongs(event)) {
+            if (!timelineSet.canContain(event)) {
                 return undefined;
             }
 

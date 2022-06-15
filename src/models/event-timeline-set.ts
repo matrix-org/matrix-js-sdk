@@ -854,9 +854,9 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @throws {Error} if `room` was not set when constructing this timeline set.
      * @return {boolean} whether the event belongs to this timeline set.
      */
-    public eventBelongs(event: MatrixEvent): boolean {
+    public canContain(event: MatrixEvent): boolean {
         if (!this.room) {
-            throw new Error("Cannot call `EventTimelineSet::eventBelongs without a `room` set. " +
+            throw new Error("Cannot call `EventTimelineSet::canContain without a `room` set. " +
                 "Set the room when creating the EventTimelineSet to call this method.");
         }
 
