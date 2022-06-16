@@ -165,6 +165,55 @@ describe('Beacon', () => {
                 expect(beacon.isLive).toEqual(false);
             });
 
+            it('returns true when beacon timestamp is one minute in the future', () => {
+                const beaconStartsInOneMin = makeBeaconInfoEvent(
+                    userId2,
+                    roomId,
+                    {
+                        timeout: HOUR_MS,
+                        isLive: true,
+                        timestamp: now + 60000,
+                    },
+                    '$user2live123',
+                );
+                const beacon = new Beacon(beaconStartsInOneMin);
+                expect(beacon.isLive).toEqual(true);
+            });
+
+            it('returns true when beacon timestamp is one minute before expiry', () => {
+                // this test case is to check the start time leniency doesn't affect
+                // strict expiry time checks
+                const expiresInOneMin = makeBeaconInfoEvent(
+                    userId2,
+                    roomId,
+                    {
+                        timeout: HOUR_MS,
+                        isLive: true,
+                        timestamp: now - HOUR_MS + 60000,
+                    },
+                    '$user2live123',
+                );
+                const beacon = new Beacon(expiresInOneMin);
+                expect(beacon.isLive).toEqual(true);
+            });
+
+            it('returns false when beacon timestamp is one minute after expiry', () => {
+                // this test case is to check the start time leniency doesn't affect
+                // strict expiry time checks
+                const expiredOneMinAgo = makeBeaconInfoEvent(
+                    userId2,
+                    roomId,
+                    {
+                        timeout: HOUR_MS,
+                        isLive: true,
+                        timestamp: now - HOUR_MS - 60000,
+                    },
+                    '$user2live123',
+                );
+                const beacon = new Beacon(expiredOneMinAgo);
+                expect(beacon.isLive).toEqual(false);
+            });
+
             it('returns true when beacon was created in past and not yet expired', () => {
                 // liveBeaconEvent was created 1 hour ago
                 const beacon = new Beacon(liveBeaconEvent);
@@ -362,6 +411,58 @@ describe('Beacon', () => {
                 expect(beacon.latestLocationState).toBeFalsy();
                 expect(emitSpy).not.toHaveBeenCalled();
             });
+
+            describe('when beacon is live with a start timestamp is in the future', () => {
+                it('ignores locations before the beacon start timestamp', () => {
+                    const startTimestamp = now + 60000;
+                    const beacon = new Beacon(makeBeaconInfoEvent(
+                        userId,
+                        roomId,
+                        { isLive: true, timeout: 60000, timestamp: startTimestamp },
+                    ));
+                    const emitSpy = jest.spyOn(beacon, 'emit');
+    
+                    beacon.addLocations([
+                        // beacon has now + 60000 live period
+                        makeBeaconEvent(
+                            userId,
+                            {
+                                beaconInfoId: beacon.beaconInfoId,
+                                // now < location timestamp < beacon timestamp
+                                timestamp: now + 10,
+                            },
+                        ),
+                    ]);
+    
+                    expect(beacon.latestLocationState).toBeFalsy();
+                    expect(emitSpy).not.toHaveBeenCalled();
+                });
+                it('sets latest location when location timestamp is after startTimestamp', () => {
+                    const startTimestamp = now + 60000;
+                    const beacon = new Beacon(makeBeaconInfoEvent(
+                        userId,
+                        roomId,
+                        { isLive: true, timeout: 60000, timestamp: startTimestamp },
+                    ));
+                    const emitSpy = jest.spyOn(beacon, 'emit');
+    
+                    beacon.addLocations([
+                        // beacon has now + 60000 live period
+                        makeBeaconEvent(
+                            userId,
+                            {
+                                beaconInfoId: beacon.beaconInfoId,
+                                // now < beacon timestamp < location timestamp
+                                timestamp: startTimestamp + 10,
+                            },
+                        ),
+                    ]);
+    
+                    expect(beacon.latestLocationState).toBeTruthy();
+                    expect(emitSpy).toHaveBeenCalled();
+                });
+            });
+
 
             it('sets latest location state to most recent location', () => {
                 const beacon = new Beacon(makeBeaconInfoEvent(userId, roomId, { isLive: true, timeout: 60000 }));
