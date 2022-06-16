@@ -139,8 +139,7 @@ const callMemberStateIsExpired = (event: MatrixEvent): boolean => {
     const now = Date.now();
     const content = event?.getContent<IGroupCallRoomMemberState>() ?? {};
     const expiresAt = typeof content["m.expires_ts"] === "number" ? content["m.expires_ts"] : -Infinity;
-    // The event is expired if the expiration date has passed, or if it's unreasonably far in the future
-    return expiresAt <= now || expiresAt > now + CALL_MEMBER_STATE_TIMEOUT * 5 / 4;
+    return expiresAt <= now;
 };
 
 function getCallUserId(call: MatrixCall): string | null {
