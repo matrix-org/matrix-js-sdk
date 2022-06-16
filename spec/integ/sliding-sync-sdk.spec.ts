@@ -15,18 +15,13 @@ limitations under the License.
 */
 
 // eslint-disable-next-line no-restricted-imports
-import EventEmitter from "events";
 import MockHttpBackend from "matrix-mock-request";
 
-import { SlidingSync, SlidingSyncState, ExtensionState, SlidingSyncEvent, Extension, MSC3575List, MSC3575RoomData } from "../../src/sliding-sync";
+import { SlidingSync, SlidingSyncEvent, MSC3575RoomData } from "../../src/sliding-sync";
 import { TestClient } from "../TestClient";
 import { IRoomEvent, IStateEvent } from "../../src/sync-accumulator";
-import { logger } from "../../src/logger";
 import { MatrixClient, MatrixEvent, NotificationCountType, JoinRule } from "../../src";
-import { sleep } from "../../src/utils";
 import { SlidingSyncSdk } from "../../src/sliding-sync-sdk";
-import { time } from "console";
-
 
 describe("SlidingSyncSdk", () => {
     let client: MatrixClient = null;
@@ -37,7 +32,7 @@ describe("SlidingSyncSdk", () => {
     const selfAccessToken = "aseukfgwef";
 
     const mockifySlidingSync = (s: SlidingSync): SlidingSync => {
-        s.getList = jest.fn()
+        s.getList = jest.fn();
         s.getListData = jest.fn();
         s.getRoomSubscriptions = jest.fn();
         s.listLength = jest.fn();
@@ -50,7 +45,7 @@ describe("SlidingSyncSdk", () => {
         s.stop = jest.fn();
         s.resend = jest.fn();
         return s;
-    }
+    };
 
     // shorthand way to make events without filling in all the fields
     let eventIdCounter = 0;
@@ -62,8 +57,8 @@ describe("SlidingSyncSdk", () => {
             sender: selfUserId,
             origin_server_ts: Date.now(),
             event_id: "$" + eventIdCounter,
-        }
-    }
+        };
+    };
     const mkOwnStateEvent = (evType: string, content: object, stateKey?: string): IStateEvent => {
         eventIdCounter++;
         return {
@@ -73,8 +68,8 @@ describe("SlidingSyncSdk", () => {
             sender: selfUserId,
             origin_server_ts: Date.now(),
             event_id: "$" + eventIdCounter,
-        }
-    }
+        };
+    };
     const assertTimelineEvents = (got: MatrixEvent[], want: IRoomEvent[]): void => {
         expect(got.length).toEqual(want.length);
         got.forEach((m, i) => {
@@ -91,7 +86,7 @@ describe("SlidingSyncSdk", () => {
                 expect(m.getStateKey()).toEqual(maybeStateEvent.state_key);
             }
         });
-    }
+    };
 
     // assign client/httpBackend globals
     const setupClient = () => {
@@ -113,7 +108,7 @@ describe("SlidingSyncSdk", () => {
         beforeAll(setupClient);
         afterAll(teardownClient);
         it("can sync()", async () => {
-            let hasSynced = sdk.sync();
+            const hasSynced = sdk.sync();
             await httpBackend.flushAllExpected();
             await hasSynced;
             expect(mockSlidingSync.start).toBeCalled();
@@ -141,7 +136,7 @@ describe("SlidingSyncSdk", () => {
             const roomC = "!c_with_highlight_count:localhost";
             const roomD = "!d_with_notif_count:localhost";
             const roomE = "!e_with_invite:localhost";
-            const data: Record<string,MSC3575RoomData> = {
+            const data: Record<string, MSC3575RoomData> = {
                 [roomA]: {
                     name: "A",
                     required_state: [
@@ -217,12 +212,12 @@ describe("SlidingSyncSdk", () => {
                         },
                     ],
                     initial: true,
-                }
-            }
+                },
+            };
 
             it("can be created with required_state and timeline", () => {
                 mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomA, data[roomA]);
-                let gotRoom = client.getRoom(roomA);
+                const gotRoom = client.getRoom(roomA);
                 expect(gotRoom).toBeDefined();
                 expect(gotRoom.name).toEqual(data[roomA].name);
                 expect(gotRoom.getMyMembership()).toEqual("join");
@@ -231,7 +226,7 @@ describe("SlidingSyncSdk", () => {
 
             it("can be created with timeline only", () => {
                 mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomB, data[roomB]);
-                let gotRoom = client.getRoom(roomB);
+                const gotRoom = client.getRoom(roomB);
                 expect(gotRoom).toBeDefined();
                 expect(gotRoom.name).toEqual(data[roomB].name);
                 expect(gotRoom.getMyMembership()).toEqual("join");
@@ -240,21 +235,25 @@ describe("SlidingSyncSdk", () => {
 
             it("can be created with a highlight_count", () => {
                 mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomC, data[roomC]);
-                let gotRoom = client.getRoom(roomC);
+                const gotRoom = client.getRoom(roomC);
                 expect(gotRoom).toBeDefined();
-                expect(gotRoom.getUnreadNotificationCount(NotificationCountType.Highlight)).toEqual(data[roomC].highlight_count);
+                expect(
+                    gotRoom.getUnreadNotificationCount(NotificationCountType.Highlight),
+                ).toEqual(data[roomC].highlight_count);
             });
 
             it("can be created with a notification_count", () => {
                 mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomD, data[roomD]);
-                let gotRoom = client.getRoom(roomD);
+                const gotRoom = client.getRoom(roomD);
                 expect(gotRoom).toBeDefined();
-                expect(gotRoom.getUnreadNotificationCount(NotificationCountType.Total)).toEqual(data[roomD].notification_count);
+                expect(
+                    gotRoom.getUnreadNotificationCount(NotificationCountType.Total),
+                ).toEqual(data[roomD].notification_count);
             });
 
             it("can be created with invite_state", () => {
                 mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomE, data[roomE]);
-                let gotRoom = client.getRoom(roomE);
+                const gotRoom = client.getRoom(roomE);
                 expect(gotRoom).toBeDefined();
                 expect(gotRoom.getMyMembership()).toEqual("invite");
                 expect(gotRoom.currentState.getJoinRule()).toEqual(JoinRule.Invite);
@@ -265,7 +264,6 @@ describe("SlidingSyncSdk", () => {
 
         });
     });
-
 
     describe("ExtensionE2EE", () => {
     });

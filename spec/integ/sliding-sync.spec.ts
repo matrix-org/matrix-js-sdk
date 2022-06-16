@@ -18,12 +18,11 @@ limitations under the License.
 import EventEmitter from "events";
 import MockHttpBackend from "matrix-mock-request";
 
-import { SlidingSync, SlidingSyncState, ExtensionState, SlidingSyncEvent, Extension } from "../../src/sliding-sync";
+import { SlidingSync, SlidingSyncState, ExtensionState, SlidingSyncEvent } from "../../src/sliding-sync";
 import { TestClient } from "../TestClient";
 import { logger } from "../../src/logger";
 import { MatrixClient } from "../../src";
 import { sleep } from "../../src/utils";
-import { SlidingSyncSdk } from "../../src/sliding-sync-sdk";
 
 /**
  * Tests for sliding sync. These tests are broken down into sub-tests which are reliant upon one another.
