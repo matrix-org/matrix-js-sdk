@@ -412,7 +412,6 @@ export class SlidingSyncSdk {
         // required for a client to function properly
         const timelineEvents = mapEvents(this.client, room.roomId, roomData.timeline, false); // this.mapSyncEventsFormat(joinObj.timeline, room, false);
         const ephemeralEvents = []; // TODO this.mapSyncEventsFormat(joinObj.ephemeral);
-        const accountDataEvents = []; // TODO this.mapSyncEventsFormat(joinObj.account_data);
 
         const encrypted = this.client.isRoomEncrypted(room.roomId);
         // we do this first so it's correct when any of the events fire
@@ -514,9 +513,6 @@ export class SlidingSyncSdk {
         // we deliberately don't add ephemeral events to the timeline
         room.addEphemeralEvents(ephemeralEvents);
 
-        // we deliberately don't add accountData to the timeline
-        room.addAccountData(accountDataEvents);
-
         room.recalculate();
         if (roomData.initial) {
             client.store.storeRoom(room);
@@ -537,9 +533,6 @@ export class SlidingSyncSdk {
         await utils.promiseMapSeries(stateEvents, processRoomEvent);
         await utils.promiseMapSeries(timelineEvents, processRoomEvent);
         ephemeralEvents.forEach(function(e) {
-            client.emit(ClientEvent.Event, e);
-        });
-        accountDataEvents.forEach(function(e) {
             client.emit(ClientEvent.Event, e);
         });
 
