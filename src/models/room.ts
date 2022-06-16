@@ -1922,15 +1922,15 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         // to check the event ID against the list of pending events if there is no transaction ID
         // field. Only do this for events sent by us though as it's potentially expensive to loop
         // the pending events map.
-        let txnId = event.getUnsigned().transaction_id;
+        const txnId = event.getUnsigned().transaction_id;
         if (!txnId && event.getSender() === this.myUserId) {
             // check the txn map for a matching event ID
-            for (let tid in this.txnToEvent) {
+            for (const tid in this.txnToEvent) {
                 const localEvent = this.txnToEvent[tid];
                 if (localEvent.getId() === event.getId()) {
                     logger.debug("processLiveEvent: found sent event without txn ID: ", tid, event.getId());
                     // update the unsigned field so we can re-use the same codepaths
-                    let unsigned = event.getUnsigned();
+                    const unsigned = event.getUnsigned();
                     unsigned.transaction_id = tid;
                     event.setUnsigned(unsigned);
                     break;
