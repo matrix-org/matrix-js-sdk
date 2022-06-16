@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { MatrixEvent } from "../../../src";
 import {
     isTimestampInDuration,
     Beacon,
@@ -65,9 +66,9 @@ describe('Beacon', () => {
         // beacon_info events
         // created 'an hour ago'
         // without timeout of 3 hours
-        let liveBeaconEvent;
-        let notLiveBeaconEvent;
-        let user2BeaconEvent;
+        let liveBeaconEvent: MatrixEvent;
+        let notLiveBeaconEvent: MatrixEvent;
+        let user2BeaconEvent: MatrixEvent;
 
         const advanceDateAndTime = (ms: number) => {
             // bc liveness check uses Date.now we have to advance this mock
@@ -77,21 +78,24 @@ describe('Beacon', () => {
         };
 
         beforeEach(() => {
-            // go back in time to create the beacon
-            jest.spyOn(global.Date, 'now').mockReturnValue(now - HOUR_MS);
             liveBeaconEvent = makeBeaconInfoEvent(
                 userId,
                 roomId,
                 {
                     timeout: HOUR_MS * 3,
                     isLive: true,
+                    timestamp: now - HOUR_MS,
                 },
                 '$live123',
             );
             notLiveBeaconEvent = makeBeaconInfoEvent(
                 userId,
                 roomId,
-                { timeout: HOUR_MS * 3, isLive: false },
+                {
+                    timeout: HOUR_MS * 3,
+                    isLive: false,
+                    timestamp: now - HOUR_MS,
+                },
                 '$dead123',
             );
             user2BeaconEvent = makeBeaconInfoEvent(
@@ -100,11 +104,12 @@ describe('Beacon', () => {
                 {
                     timeout: HOUR_MS * 3,
                     isLive: true,
+                    timestamp: now - HOUR_MS,
                 },
                 '$user2live123',
             );
 
-            // back to now
+            // back to 'now'
             jest.spyOn(global.Date, 'now').mockReturnValue(now);
         });
 
@@ -131,17 +136,32 @@ describe('Beacon', () => {
             });
 
             it('returns false when beacon is expired', () => {
-                // time travel to beacon creation + 3 hours
-                jest.spyOn(global.Date, 'now').mockReturnValue(now - 3 * HOUR_MS);
-                const beacon = new Beacon(liveBeaconEvent);
+                const expiredBeaconEvent = makeBeaconInfoEvent(
+                    userId2,
+                    roomId,
+                    {
+                        timeout: HOUR_MS,
+                        isLive: true,
+                        timestamp: now - HOUR_MS * 2,
+                    },
+                    '$user2live123',
+                );
+                const beacon = new Beacon(expiredBeaconEvent);
                 expect(beacon.isLive).toEqual(false);
             });
 
-            it('returns false when beacon timestamp is in future', () => {
-                // time travel to before beacon events timestamp
-                // event was created now - 1 hour
-                jest.spyOn(global.Date, 'now').mockReturnValue(now - HOUR_MS - HOUR_MS);
-                const beacon = new Beacon(liveBeaconEvent);
+            it('returns false when beacon timestamp is in future by an hour', () => {
+                const beaconStartsInHour = makeBeaconInfoEvent(
+                    userId2,
+                    roomId,
+                    {
+                        timeout: HOUR_MS,
+                        isLive: true,
+                        timestamp: now + HOUR_MS,
+                    },
+                    '$user2live123',
+                );
+                const beacon = new Beacon(beaconStartsInHour);
                 expect(beacon.isLive).toEqual(false);
             });
 
@@ -232,19 +252,17 @@ describe('Beacon', () => {
             });
 
             it('checks liveness of beacon at expected start time', () => {
-                // go forward in time to make beacon with timestamp in future
-                jest.spyOn(global.Date, 'now').mockReturnValue(now + HOUR_MS);
                 const futureBeaconEvent = makeBeaconInfoEvent(
                     userId,
                     roomId,
                     {
                         timeout: HOUR_MS * 3,
                         isLive: true,
+                        // start timestamp hour in future
+                        timestamp: now + HOUR_MS,
                     },
                     '$live123',
                 );
-                // go back to now
-                jest.spyOn(global.Date, 'now').mockReturnValue(now);
 
                 const beacon = new Beacon(futureBeaconEvent);
                 expect(beacon.isLive).toBeFalsy();
