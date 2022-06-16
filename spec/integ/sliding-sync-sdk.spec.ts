@@ -382,7 +382,7 @@ describe("SlidingSyncSdk", () => {
             await hasSynced;
         });
         it("processes account_data extension", async () => {
-            
+
         });
     });
     describe("ExtensionToDevice", () => {
