@@ -362,17 +362,28 @@ describe("SlidingSyncSdk", () => {
         });
 
         it("emits SyncState.Error immediately when receiving M_UNKNOWN_TOKEN and stops syncing", async () => {
+            expect(mockSlidingSync.stop).not.toBeCalled();
             mockSlidingSync.emit(SlidingSyncEvent.Lifecycle, SlidingSyncState.RequestFinished, null, new MatrixError({
                 errcode: "M_UNKNOWN_TOKEN",
                 message: "Oh no your access token is no longer valid",
             }));
             expect(sdk.getSyncState()).toEqual(SyncState.Error);
+            expect(mockSlidingSync.stop).toBeCalled();
         });
     });
 
     describe("ExtensionE2EE", () => {
     });
     describe("ExtensionAccountData", () => {
+        beforeAll(async () => {
+            setupClient();
+            const hasSynced = sdk.sync();
+            await httpBackend.flushAllExpected();
+            await hasSynced;
+        });
+        it("processes account_data extension", async () => {
+            
+        });
     });
     describe("ExtensionToDevice", () => {
     });

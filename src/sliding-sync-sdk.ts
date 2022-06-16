@@ -333,6 +333,9 @@ export class SlidingSyncSdk {
                             error: new MatrixError(err),
                         },
                     );
+                    if (this.shouldAbortSync(new MatrixError(err))) {
+                        return; // shouldAbortSync actually stops syncing too so we don't need to do anything.
+                    }
                 } else {
                     this.failCount = 0;
                 }
