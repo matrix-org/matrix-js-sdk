@@ -421,7 +421,7 @@ describe('Beacon', () => {
                         { isLive: true, timeout: 60000, timestamp: startTimestamp },
                     ));
                     const emitSpy = jest.spyOn(beacon, 'emit');
-    
+
                     beacon.addLocations([
                         // beacon has now + 60000 live period
                         makeBeaconEvent(
@@ -433,7 +433,7 @@ describe('Beacon', () => {
                             },
                         ),
                     ]);
-    
+
                     expect(beacon.latestLocationState).toBeFalsy();
                     expect(emitSpy).not.toHaveBeenCalled();
                 });
@@ -442,12 +442,12 @@ describe('Beacon', () => {
                     const beacon = new Beacon(makeBeaconInfoEvent(
                         userId,
                         roomId,
-                        { isLive: true, timeout: 60000, timestamp: startTimestamp },
+                        { isLive: true, timeout: 600000, timestamp: startTimestamp },
                     ));
                     const emitSpy = jest.spyOn(beacon, 'emit');
-    
+
                     beacon.addLocations([
-                        // beacon has now + 60000 live period
+                        // beacon has now + 600000 live period
                         makeBeaconEvent(
                             userId,
                             {
@@ -457,12 +457,11 @@ describe('Beacon', () => {
                             },
                         ),
                     ]);
-    
+
                     expect(beacon.latestLocationState).toBeTruthy();
                     expect(emitSpy).toHaveBeenCalled();
                 });
             });
-
 
             it('sets latest location state to most recent location', () => {
                 const beacon = new Beacon(makeBeaconInfoEvent(userId, roomId, { isLive: true, timeout: 60000 }));
