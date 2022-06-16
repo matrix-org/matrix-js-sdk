@@ -169,6 +169,13 @@ describe("SlidingSync", () => {
             const anotherRoomData = {
                 name: "foo bar 2",
                 room_id: anotherRoomID,
+                // we should not fall over if fields are missing.
+                // required_state: [],
+                // timeline: [],
+            };
+            const anotherRoomDataFixed = {
+                name: anotherRoomData.name,
+                room_id: anotherRoomID,
                 required_state: [],
                 timeline: [],
             };
@@ -190,7 +197,7 @@ describe("SlidingSync", () => {
 
             const p = listenUntil(slidingSync, "SlidingSync.RoomData", (gotRoomId, gotRoomData) => {
                 expect(gotRoomId).toEqual(anotherRoomID);
-                expect(gotRoomData).toEqual(anotherRoomData);
+                expect(gotRoomData).toEqual(anotherRoomDataFixed);
                 return true;
             });
 
@@ -300,7 +307,22 @@ describe("SlidingSync", () => {
             expect(listenerData[roomA]).toEqual(rooms[roomA]);
             expect(listenerData[roomB]).toEqual(rooms[roomB]);
             expect(listenerData[roomC]).toEqual(rooms[roomC]);
+
+            expect(slidingSync.listLength()).toEqual(1);
             slidingSync.off(SlidingSyncEvent.RoomData, dataListener);
+        });
+
+        it("should be possible to retrieve list data", () => {
+            expect(slidingSync.getList(0)).toBeDefined();
+            expect(slidingSync.getList(5)).toBeNull();
+            expect(slidingSync.getListData(5)).toBeNull();
+            const syncData = slidingSync.getListData(0);
+            expect(syncData.joinedCount).toEqual(500); // from previous test
+            expect(syncData.roomIndexToRoomId).toEqual({
+                0: roomA,
+                1: roomB,
+                2: roomC,
+            });
         });
 
         it("should be possible to adjust list ranges", async () => {
@@ -421,6 +443,52 @@ describe("SlidingSync", () => {
             await httpBackend.flushAllExpected();
             await responseProcessed;
             await listPromise;
+        });
+
+        it("should be possible to update a list", async () => {
+            httpBackend.when("POST", syncUrl).respond(200, {
+                pos: "g",
+                lists: [{
+                    count: 42,
+                    ops: [
+                        {
+                            op: "INVALIDATE",
+                            range: [0, 2],
+                        },
+                        {
+                            op: "SYNC",
+                            range: [0, 1],
+                            room_ids: [roomB, roomC],
+                        },
+                    ],
+                },
+                {
+                    count: 50,
+                }],
+            });
+            // update the list with a new filter
+            slidingSync.setList(0, {
+                filters: {
+                    is_encrypted: true,
+                },
+                ranges: [[0, 100]],
+            });
+            const listPromise = listenUntil(slidingSync, "SlidingSync.List",
+                (listIndex, joinedCount, roomIndexToRoomId) => {
+                    expect(listIndex).toEqual(0);
+                    expect(joinedCount).toEqual(42);
+                    expect(roomIndexToRoomId).toEqual({
+                        0: roomB,
+                        1: roomC,
+                    });
+                    return true;
+                });
+            const responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+                return state === SlidingSyncState.Complete;
+            });
+            await httpBackend.flushAllExpected();
+            await responseProcessed;
+            await listPromise;
             slidingSync.stop();
         });
     });
@@ -429,8 +497,6 @@ describe("SlidingSync", () => {
         beforeAll(setupClient);
         afterAll(teardownClient);
         let slidingSync: SlidingSync;
-
-        const extName = "foobar";
         const extReq = {
             foo: "bar",
         };
@@ -438,26 +504,41 @@ describe("SlidingSync", () => {
             baz: "quuz",
         };
 
-        let onExtensionRequest;
-        let onExtensionResponse;
+        // Pre-extensions get called BEFORE processing the sync response
+        const preExtName = "foobar";
+        let onPreExtensionRequest;
+        let onPreExtensionResponse;
 
-        const ext = {
-            name: () => extName,
-            onRequest: (initial) => { return onExtensionRequest(initial); },
-            onResponse: (res) => { return onExtensionResponse(res); },
+        // Post-extensions get called AFTER processing the sync response
+        const postExtName = "foobar2";
+        let onPostExtensionRequest;
+        let onPostExtensionResponse;
+
+        const extPre = {
+            name: () => preExtName,
+            onRequest: (initial) => { return onPreExtensionRequest(initial); },
+            onResponse: (res) => { return onPreExtensionResponse(res); },
             when: () => ExtensionState.PreProcess,
+        };
+        const extPost = {
+            name: () => postExtName,
+            onRequest: (initial) => { return onPostExtensionRequest(initial); },
+            onResponse: (res) => { return onPostExtensionResponse(res); },
+            when: () => ExtensionState.PostProcess,
         };
 
         it("should be able to register an extension", async () => {
             slidingSync = new SlidingSync(proxyBaseUrl, [], {}, client, 1);
-            slidingSync.registerExtension(ext);
+            slidingSync.registerExtension(extPre);
 
+            const callbackOrder = [];
             let extensionOnResponseCalled = false;
-            onExtensionRequest = () => {
+            onPreExtensionRequest = () => {
                 return extReq;
             };
-            onExtensionResponse = (resp) => {
+            onPreExtensionResponse = (resp) => {
                 extensionOnResponseCalled = true;
+                callbackOrder.push("onPreExtensionResponse");
                 expect(resp).toEqual(extResp);
             };
 
@@ -465,38 +546,42 @@ describe("SlidingSync", () => {
                 const body = req.data;
                 logger.log("ext req", body);
                 expect(body.extensions).toBeTruthy();
-                expect(body.extensions[extName]).toEqual(extReq);
+                expect(body.extensions[preExtName]).toEqual(extReq);
             }).respond(200, {
                 pos: "a",
                 ops: [],
                 counts: [],
                 extensions: {
-                    [extName]: extResp,
+                    [preExtName]: extResp,
                 },
             });
 
             const p = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state, resp, err) => {
-                return state === SlidingSyncState.Complete;
+                if (state === SlidingSyncState.Complete) {
+                    callbackOrder.push("Lifecycle");
+                    return true;
+                }
             });
             slidingSync.start();
             await httpBackend.flushAllExpected();
             await p;
             expect(extensionOnResponseCalled).toBe(true);
+            expect(callbackOrder).toEqual(["onPreExtensionResponse", "Lifecycle"]);
         });
 
         it("should be able to send nothing in an extension request/response", async () => {
-            onExtensionRequest = () => {
+            onPreExtensionRequest = () => {
                 return undefined;
             };
             let responseCalled = false;
-            onExtensionResponse = (resp) => {
+            onPreExtensionResponse = (resp) => {
                 responseCalled = true;
             };
             httpBackend.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.log("ext req nothing", body);
                 expect(body.extensions).toBeTruthy();
-                expect(body.extensions[extName]).toBeUndefined();
+                expect(body.extensions[preExtName]).toBeUndefined();
             }).respond(200, {
                 pos: "a",
                 ops: [],
@@ -513,8 +598,55 @@ describe("SlidingSync", () => {
             await httpBackend.flushAllExpected();
             await p;
             expect(responseCalled).toBe(false);
+        });
 
+        it("is possible to register extensions after start() has been called", async () => {
+            slidingSync.registerExtension(extPost);
+            onPostExtensionRequest = () => {
+                return extReq;
+            };
+            let responseCalled = false;
+            const callbackOrder = [];
+            onPostExtensionResponse = (resp) => {
+                expect(resp).toEqual(extResp);
+                responseCalled = true;
+                callbackOrder.push("onPostExtensionResponse");
+            };
+            httpBackend.when("POST", syncUrl).check(function(req) {
+                const body = req.data;
+                logger.log("ext req after start", body);
+                expect(body.extensions).toBeTruthy();
+                expect(body.extensions[preExtName]).toBeUndefined(); // from the earlier test
+                expect(body.extensions[postExtName]).toEqual(extReq);
+            }).respond(200, {
+                pos: "c",
+                ops: [],
+                counts: [],
+                extensions: {
+                    [postExtName]: extResp,
+                },
+            });
+            // we need to resend as sliding sync will already have a buffered request with the old
+            // extension values from the previous test.
+            slidingSync.resend();
+
+            const p = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state, resp, err) => {
+                if (state === SlidingSyncState.Complete) {
+                    callbackOrder.push("Lifecycle");
+                    return true;
+                }
+            });
+            await httpBackend.flushAllExpected();
+            await p;
+            expect(responseCalled).toBe(true);
+            expect(callbackOrder).toEqual(["Lifecycle", "onPostExtensionResponse"]);
             slidingSync.stop();
+        });
+
+        it("is not possible to register the same extension name twice", async () => {
+            slidingSync = new SlidingSync(proxyBaseUrl, [], {}, client, 1);
+            slidingSync.registerExtension(extPre);
+            expect(() => { slidingSync.registerExtension(extPre); }).toThrow();
         });
     });
 });
