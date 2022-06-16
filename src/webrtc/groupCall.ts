@@ -703,10 +703,9 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
     }
 
     private async removeMemberStateEvent(): Promise<ISendEventResponse> {
-        const res = await this.updateMemberCallState(undefined);
         clearInterval(this.resendMemberStateTimer);
         this.resendMemberStateTimer = null;
-        return res;
+        return await this.updateMemberCallState(undefined);
     }
 
     private async updateMemberCallState(memberCallState?: IGroupCallRoomMemberCallState): Promise<ISendEventResponse> {
