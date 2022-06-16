@@ -48,6 +48,7 @@ import { MatrixClient } from "../client";
 import { ISendEventResponse } from "../@types/requests";
 import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter";
 import { DeviceInfo } from '../crypto/deviceinfo';
+import { GroupCallUnknownDeviceError } from './groupCall';
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
@@ -521,7 +522,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const deviceInfoMap = await this.client.crypto.deviceList.downloadKeys([userId], false);
         this.opponentDeviceInfo = deviceInfoMap[userId][this.opponentDeviceId];
         if (this.opponentDeviceInfo === undefined) {
-            throw new Error(`No keys found for opponent device ${this.opponentDeviceId}!`);
+            throw new GroupCallUnknownDeviceError(userId);
         }
     }
 
@@ -1695,9 +1696,17 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.remoteSDPStreamMetadata = utils.recursivelyAssign(this.remoteSDPStreamMetadata || {}, metadata, true);
         for (const feed of this.getRemoteFeeds()) {
             const streamId = feed.stream.id;
-            feed.setAudioMuted(this.remoteSDPStreamMetadata[streamId]?.audio_muted);
-            feed.setVideoMuted(this.remoteSDPStreamMetadata[streamId]?.video_muted);
+            const metadata = this.remoteSDPStreamMetadata[streamId];
+
+            feed.setAudioMuted(metadata?.audio_muted);
+            feed.setVideoMuted(metadata?.video_muted);
             feed.purpose = this.remoteSDPStreamMetadata[streamId]?.purpose;
+
+            if (this.isPtt) {
+                // In PTT mode, it's more important that only one person is speaking at a time, so we
+                // actively disable the output of any streams where we believe the user is muted.
+                feed.stream.getAudioTracks().forEach(t => t.enabled = metadata ? !metadata.audio_muted : true);
+            }
         }
     }
 

@@ -38,7 +38,7 @@ export enum GroupCallEvent {
     LocalScreenshareStateChanged = "local_screenshare_state_changed",
     LocalMuteStateChanged = "local_mute_state_changed",
     ParticipantsChanged = "participants_changed",
-    Error = "error"
+    Error = "error",
 }
 
 export type GroupCallEventHandlerMap = {
@@ -73,6 +73,12 @@ export class GroupCallError extends Error {
         }
 
         this.code = code;
+    }
+}
+
+export class GroupCallUnknownDeviceError extends GroupCallError {
+    constructor(public userId: string) {
+        super(GroupCallErrorCode.UnknownDevice, "No device found for " + userId);
     }
 }
 
@@ -139,6 +145,33 @@ const callMemberStateIsExpired = (event: MatrixEvent): boolean => {
 
 function getCallUserId(call: MatrixCall): string | null {
     return call.getOpponentMember()?.userId || call.invitee || null;
+}
+
+/**
+ * Returns a call feed for passing to a new call in the group call. The media
+ * This could be either return the passed feed as-is or a clone, depending on the
+ * platform.
+ * @returns CallFeed
+ */
+function feedForNewCallFromFeed(feed: CallFeed): CallFeed {
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+    // Safari can't send a MediaStream to multiple sources, so we clone it,
+    // however cloning mediastreams on Chrome appears to cause the audio renderer
+    // to become unstable and hang: https://github.com/vector-im/element-call/issues/267
+    // It's a bit arbitrary what we do for other browsers: I've made Safari the special
+    // case on a somewhat arbitrary basis.
+    // To retest later to see if this hack is still necessary:
+    //  * In Safari, you should be able to have a group call with 2 other people and both
+    //    of them see your video stream (either desktop or mobile Safari)
+    //  * In Chrome, you should be able to enter a call and then go to youtube and play
+    //    a video (both desktop & Android Chrome, although in Android you may have to
+    //    open YouTube in incognito mode to avoid being redirected to the app.)
+    if (isSafari) {
+        return feed.clone();
+    }
+
+    return feed;
 }
 
 export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventHandlerMap> {
@@ -547,7 +580,9 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
                 );
 
                 // TODO: handle errors
-                await Promise.all(this.calls.map(call => call.pushLocalFeed(this.localScreenshareFeed.clone())));
+                await Promise.all(this.calls.map(call => call.pushLocalFeed(
+                    feedForNewCallFromFeed(this.localScreenshareFeed),
+                )));
 
                 await this.sendMemberStateEvent();
 
@@ -612,7 +647,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
         logger.log(`GroupCall: incoming call from: ${opponentMemberId}`);
 
         // we are handlng this call as a PTT call, so enable PTT semantics
-        newCall.isPtt = true;
+        newCall.isPtt = this.isPtt;
 
         // Check if the user calling has an existing call and use this call instead.
         if (existingCall) {
@@ -621,8 +656,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
             this.addCall(newCall);
         }
 
-        // Safari can't send a MediaStream to multiple sources, so clone it
-        newCall.answerWithCallFeeds(this.getLocalFeeds().map((feed) => feed.clone()));
+        newCall.answerWithCallFeeds(this.getLocalFeeds().map((feed) => feedForNewCallFromFeed(feed)));
     };
 
     /**
@@ -779,10 +813,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
             logger.warn(`No opponent device found for ${member.userId}, ignoring.`);
             this.emit(
                 GroupCallEvent.Error,
-                new GroupCallError(
-                    GroupCallErrorCode.UnknownDevice,
-                    `Outgoing Call: No opponent device found for ${member.userId}, ignoring.`,
-                ),
+                new GroupCallUnknownDeviceError(member.userId),
             );
             return;
         }
@@ -807,26 +838,29 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
             },
         );
 
-        newCall.isPtt = true;
+        newCall.isPtt = this.isPtt;
 
         const requestScreenshareFeed = opponentDevice.feeds.some(
             (feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
 
         try {
-            // Safari can't send a MediaStream to multiple sources, so clone it
             await newCall.placeCallWithCallFeeds(
-                this.getLocalFeeds().map(feed => feed.clone()),
+                this.getLocalFeeds().map(feed => feedForNewCallFromFeed(feed)),
                 requestScreenshareFeed,
             );
         } catch (e) {
             logger.warn(`Failed to place call to ${member.userId}!`, e);
-            this.emit(
-                GroupCallEvent.Error,
-                new GroupCallError(
-                    GroupCallErrorCode.PlaceCallFailed,
-                    `Failed to place call to ${member.userId}.`,
-                ),
-            );
+            if (e.code === GroupCallErrorCode.UnknownDevice) {
+                this.emit(GroupCallEvent.Error, e);
+            } else {
+                this.emit(
+                    GroupCallEvent.Error,
+                    new GroupCallError(
+                        GroupCallErrorCode.PlaceCallFailed,
+                        `Failed to place call to ${member.userId}.`,
+                    ),
+                );
+            }
             return;
         }
 

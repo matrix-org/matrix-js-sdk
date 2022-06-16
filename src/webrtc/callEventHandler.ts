@@ -20,7 +20,7 @@ import { CallDirection, CallErrorCode, CallState, createNewMatrixCall, MatrixCal
 import { EventType } from '../@types/event';
 import { ClientEvent, MatrixClient } from '../client';
 import { MCallAnswer, MCallHangupReject } from "./callEventTypes";
-import { GroupCallError, GroupCallErrorCode, GroupCallEvent } from './groupCall';
+import { GroupCall, GroupCallErrorCode, GroupCallEvent, GroupCallUnknownDeviceError } from './groupCall';
 import { RoomEvent } from "../models/room";
 
 // Don't ring unless we'd be ringing for at least 3 seconds: the user needs some
@@ -210,8 +210,9 @@ export class CallEventHandler {
 
         let opponentDeviceId: string | undefined;
 
+        let groupCall: GroupCall;
         if (groupCallId) {
-            const groupCall = this.client.groupCallEventHandler.getGroupCallById(groupCallId);
+            groupCall = this.client.groupCallEventHandler.getGroupCallById(groupCallId);
 
             if (!groupCall) {
                 logger.warn(`Cannot find a group call ${groupCallId} for event ${type}. Ignoring event.`);
@@ -224,10 +225,7 @@ export class CallEventHandler {
                 logger.warn(`Cannot find a device id for ${senderId}. Ignoring event.`);
                 groupCall.emit(
                     GroupCallEvent.Error,
-                    new GroupCallError(
-                        GroupCallErrorCode.UnknownDevice,
-                        `Incoming Call: No opponent device found for ${senderId}, ignoring.`,
-                    ),
+                    new GroupCallUnknownDeviceError(senderId),
                 );
                 return;
             }
@@ -282,7 +280,13 @@ export class CallEventHandler {
             }
 
             call.callId = content.call_id;
-            await call.initWithInvite(event);
+            try {
+                await call.initWithInvite(event);
+            } catch (e) {
+                if (e.code === GroupCallErrorCode.UnknownDevice) {
+                    groupCall?.emit(GroupCallEvent.Error, e);
+                }
+            }
             this.calls.set(call.callId, call);
 
             // if we stashed candidate events for that call ID, play them back now
