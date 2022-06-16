@@ -287,15 +287,13 @@ export class SlidingSyncSdk {
     }
 
     private onRoomData(roomId: string, roomData: MSC3575RoomData): void {
-        let room: Room;
-        if (roomData.initial) {
-            room = createRoom(this.client, roomId, this.opts);
-        } else {
-            room = this.client.store.getRoom(roomId);
-            if (!room) {
+        let room = this.client.store.getRoom(roomId);
+        if (!room) {
+            if (!roomData.initial) {
                 logger.debug("initial flag not set but no stored room exists for room ", roomId, roomData);
                 return;
             }
+            room = createRoom(this.client, roomId, this.opts);
         }
         this.processRoomData(this.client, room, roomData);
     }
@@ -567,6 +565,9 @@ export class SlidingSyncSdk {
         timelineEventList?: MatrixEvent[],
         fromCache = false,
     ): void {
+        timelineEventList = timelineEventList || [];
+        stateEventList = stateEventList || [];
+
         // If there are no events in the timeline yet, initialise it with
         // the given state events
         const liveTimeline = room.getLiveTimeline();
@@ -613,14 +614,16 @@ export class SlidingSyncSdk {
             // XXX: As above, don't do this...
             //room.addLiveEvents(stateEventList || []);
             // Do this instead...
-            room.oldState.setStateEvents(stateEventList || []);
-            room.currentState.setStateEvents(stateEventList || []);
+            room.oldState.setStateEvents(stateEventList);
+            room.currentState.setStateEvents(stateEventList);
         }
         // execute the timeline events. This will continue to diverge the current state
         // if the timeline has any state events in it.
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
-        room.addLiveEvents(timelineEventList || [], undefined, fromCache);
+        room.addLiveEvents(timelineEventList, {
+            fromCache: fromCache,
+        });
     }
 
     private resolveInvites(room: Room): void {
