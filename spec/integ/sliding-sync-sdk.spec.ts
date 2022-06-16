@@ -17,11 +17,12 @@ limitations under the License.
 // eslint-disable-next-line no-restricted-imports
 import MockHttpBackend from "matrix-mock-request";
 
-import { SlidingSync, SlidingSyncEvent, MSC3575RoomData } from "../../src/sliding-sync";
+import { SlidingSync, SlidingSyncEvent, MSC3575RoomData, SlidingSyncState } from "../../src/sliding-sync";
 import { TestClient } from "../TestClient";
 import { IRoomEvent, IStateEvent } from "../../src/sync-accumulator";
-import { MatrixClient, MatrixEvent, NotificationCountType, JoinRule } from "../../src";
+import { MatrixClient, MatrixEvent, NotificationCountType, JoinRule, MatrixError } from "../../src";
 import { SlidingSyncSdk } from "../../src/sliding-sync-sdk";
+import { SyncState } from "../../src/sync";
 
 describe("SlidingSyncSdk", () => {
     let client: MatrixClient = null;
@@ -143,6 +144,7 @@ describe("SlidingSyncSdk", () => {
                         mkOwnStateEvent("m.room.create", { creator: selfUserId }, ""),
                         mkOwnStateEvent("m.room.member", { membership: "join" }, selfUserId),
                         mkOwnStateEvent("m.room.power_levels", { users: { [selfUserId]: 100 } }, ""),
+                        mkOwnStateEvent("m.room.name", { name: "A" }, ""),
                     ],
                     timeline: [
                         mkOwnEvent("m.room.message", { body: "hello A" }),
@@ -258,10 +260,113 @@ describe("SlidingSyncSdk", () => {
                 expect(gotRoom.getMyMembership()).toEqual("invite");
                 expect(gotRoom.currentState.getJoinRule()).toEqual(JoinRule.Invite);
             });
+
+            describe("updating", () => {
+                it("can update with a new timeline event", async () => {
+                    const newEvent = mkOwnEvent("m.room.message", { body: "new event A" });
+                    mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomA, {
+                        timeline: [newEvent],
+                        required_state: [],
+                        name: data[roomA].name,
+                    });
+                    const gotRoom = client.getRoom(roomA);
+                    expect(gotRoom).toBeDefined();
+                    const newTimeline = data[roomA].timeline;
+                    newTimeline.push(newEvent);
+                    assertTimelineEvents(gotRoom.getLiveTimeline().getEvents().slice(-3), newTimeline);
+                });
+
+                it("can update with a new required_state event", async () => {
+                    let gotRoom = client.getRoom(roomB);
+                    expect(gotRoom.getJoinRule()).toEqual(JoinRule.Invite); // default
+                    mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomB, {
+                        required_state: [
+                            mkOwnStateEvent("m.room.join_rules", { join_rule: "restricted" }, ""),
+                        ],
+                        timeline: [],
+                        name: data[roomB].name,
+                    });
+                    gotRoom = client.getRoom(roomB);
+                    expect(gotRoom).toBeDefined();
+                    expect(gotRoom.getJoinRule()).toEqual(JoinRule.Restricted);
+                });
+
+                it("can update with a new highlight_count", async () => {
+                    mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomC, {
+                        name: data[roomC].name,
+                        required_state: [],
+                        timeline: [],
+                        highlight_count: 1,
+                    });
+                    const gotRoom = client.getRoom(roomC);
+                    expect(gotRoom).toBeDefined();
+                    expect(
+                        gotRoom.getUnreadNotificationCount(NotificationCountType.Highlight),
+                    ).toEqual(1);
+                });
+
+                it("can update with a new notification_count", async () => {
+                    mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomD, {
+                        name: data[roomD].name,
+                        required_state: [],
+                        timeline: [],
+                        notification_count: 1,
+                    });
+                    const gotRoom = client.getRoom(roomD);
+                    expect(gotRoom).toBeDefined();
+                    expect(
+                        gotRoom.getUnreadNotificationCount(NotificationCountType.Total),
+                    ).toEqual(1);
+                });
+            });
+        });
+    });
+
+    describe("lifecycle", () => {
+        beforeAll(async () => {
+            setupClient();
+            const hasSynced = sdk.sync();
+            await httpBackend.flushAllExpected();
+            await hasSynced;
+        });
+        const FAILED_SYNC_ERROR_THRESHOLD = 3; // would be nice to export the const in the actual class...
+
+        it("emits SyncState.Reconnecting when < FAILED_SYNC_ERROR_THRESHOLD & SyncState.Error when over", async () => {
+            mockSlidingSync.emit(
+                SlidingSyncEvent.Lifecycle, SlidingSyncState.Complete,
+                { pos: "h", lists: [], rooms: {}, extensions: {} }, null,
+            );
+            expect(sdk.getSyncState()).toEqual(SyncState.Syncing);
+
+            mockSlidingSync.emit(
+                SlidingSyncEvent.Lifecycle, SlidingSyncState.RequestFinished, null, new Error("generic"),
+            );
+            expect(sdk.getSyncState()).toEqual(SyncState.Reconnecting);
+
+            for (let i = 0; i < FAILED_SYNC_ERROR_THRESHOLD; i++) {
+                mockSlidingSync.emit(
+                    SlidingSyncEvent.Lifecycle, SlidingSyncState.RequestFinished, null, new Error("generic"),
+                );
+            }
+            expect(sdk.getSyncState()).toEqual(SyncState.Error);
         });
 
-        it("can update existing rooms", async () => {
+        it("emits SyncState.Syncing after a previous SyncState.Error", async () => {
+            mockSlidingSync.emit(
+                SlidingSyncEvent.Lifecycle,
+                SlidingSyncState.Complete,
+                { pos: "i", lists: [], rooms: {}, extensions: {} },
+                null,
+            );
+            expect(sdk.getSyncState()).toEqual(SyncState.Syncing);
+        });
 
+        it("emits SyncState.Error immediately when receiving M_UNKNOWN_TOKEN and stops syncing", async () => {
+            mockSlidingSync.emit(SlidingSyncEvent.Lifecycle, SlidingSyncState.RequestFinished, null, new MatrixError({
+                errcode: "M_UNKNOWN_TOKEN",
+                message: "Oh no your access token is no longer valid",
+            }));
+            expect(sdk.getSyncState()).toEqual(SyncState.Error);
         });
     });
 
