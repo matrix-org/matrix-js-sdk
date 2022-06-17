@@ -55,7 +55,7 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
     private _beaconInfo: BeaconInfoState;
     private _isLive: boolean;
     private livenessWatchTimeout: ReturnType<typeof setTimeout>;
-    private _latestLocationState: BeaconLocationState | undefined;
+    private _latestLocationEvent: MatrixEvent | undefined;
 
     constructor(
         private rootEvent: MatrixEvent,
@@ -90,7 +90,11 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
     }
 
     public get latestLocationState(): BeaconLocationState | undefined {
-        return this._latestLocationState;
+        return this._latestLocationEvent && parseBeaconContent(this._latestLocationEvent.getContent());
+    }
+
+    public get latestLocationEvent(): MatrixEvent | undefined {
+        return this._latestLocationEvent;
     }
 
     public update(beaconInfoEvent: MatrixEvent): void {
@@ -168,13 +172,13 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
         const latestLocationEvent = validLocationEvents.sort(sortEventsByLatestContentTimestamp)?.[0];
 
         if (latestLocationEvent) {
-            this._latestLocationState = parseBeaconContent(latestLocationEvent.getContent());
+            this._latestLocationEvent = latestLocationEvent;
             this.emit(BeaconEvent.LocationUpdate, this.latestLocationState);
         }
     }
 
     private clearLatestLocation = () => {
-        this._latestLocationState = undefined;
+        this._latestLocationEvent = undefined;
         this.emit(BeaconEvent.LocationUpdate, this.latestLocationState);
     };
 
