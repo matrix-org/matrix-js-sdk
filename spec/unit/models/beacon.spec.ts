@@ -492,6 +492,7 @@ describe('Beacon', () => {
 
                 // the newest valid location
                 expect(beacon.latestLocationState).toEqual(expectedLatestLocation);
+                expect(beacon.latestLocationEvent).toEqual(locations[1]);
                 expect(emitSpy).toHaveBeenCalledWith(BeaconEvent.LocationUpdate, expectedLatestLocation);
             });
 
@@ -510,6 +511,7 @@ describe('Beacon', () => {
                 expect(beacon.latestLocationState).toEqual(expect.objectContaining({
                     uri: 'geo:bar',
                 }));
+                expect(beacon.latestLocationEvent).toEqual(newerLocation);
 
                 const emitSpy = jest.spyOn(beacon, 'emit').mockClear();
 
