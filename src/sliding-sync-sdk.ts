@@ -459,7 +459,11 @@ export class SlidingSyncSdk {
             // events so that clients can start back-paginating.
             room.getLiveTimeline().setPaginationToken(
                 roomData.prev_batch, EventTimeline.BACKWARDS);
-        } else if (roomData.limited) {
+        }
+
+        /* TODO
+        else if (roomData.limited) {
+
             let limited = true;
 
             // we've got a limited sync, so we *probably* have a gap in the
@@ -509,7 +513,7 @@ export class SlidingSyncSdk {
                 this.client.resetNotifTimelineSet();
                 registerStateListeners(this.client, room);
             }
-        }
+        } */
 
         this.processRoomEvents(room, stateEvents, timelineEvents, false);
 
@@ -826,12 +830,13 @@ function registerStateListeners(client: MatrixClient, room: Room): void { // XXX
     });
 }
 
+/*
 function deregisterStateListeners(room: Room): void { // XXX cargoculted from sync.ts
     // could do with a better way of achieving this.
     room.currentState.removeAllListeners(RoomStateEvent.Events);
     room.currentState.removeAllListeners(RoomStateEvent.Members);
     room.currentState.removeAllListeners(RoomStateEvent.NewMember);
-}
+} */
 
 function mapEvents(client: MatrixClient, roomId: string, events: object[], decrypt = true): MatrixEvent[] {
     const mapper = client.getEventMapper({ decrypt });

@@ -16,6 +16,7 @@ limitations under the License.
 
 // eslint-disable-next-line no-restricted-imports
 import MockHttpBackend from "matrix-mock-request";
+import { fail } from "assert";
 
 import { SlidingSync, SlidingSyncEvent, MSC3575RoomData, SlidingSyncState, Extension } from "../../src/sliding-sync";
 import { TestClient } from "../TestClient";
@@ -93,13 +94,19 @@ describe("SlidingSyncSdk", () => {
     };
 
     // assign client/httpBackend globals
-    const setupClient = () => {
+    const setupClient = async (withCrypto = false) => {
         const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
         httpBackend = testClient.httpBackend;
-        httpBackend.when("GET", "/_matrix/client/r0/pushrules").respond(200, {});
         client = testClient.client;
         mockSlidingSync = mockifySlidingSync(new SlidingSync("", [], {}, client, 0));
-        sdk = new SlidingSyncSdk(mockSlidingSync, client, {});
+        const opts: any = {};
+        if (withCrypto) {
+            httpBackend.when("GET", "/room_keys/version").respond(404, {});
+            await client.initCrypto();
+            opts.crypto = client.crypto;
+        }
+        httpBackend.when("GET", "/_matrix/client/r0/pushrules").respond(200, {});
+        sdk = new SlidingSyncSdk(mockSlidingSync, client, opts);
     };
 
     // tear down client/httpBackend globals
@@ -341,7 +348,7 @@ describe("SlidingSyncSdk", () => {
 
     describe("lifecycle", () => {
         beforeAll(async () => {
-            setupClient();
+            await setupClient();
             const hasSynced = sdk.sync();
             await httpBackend.flushAllExpected();
             await hasSynced;
@@ -390,11 +397,66 @@ describe("SlidingSyncSdk", () => {
     });
 
     describe("ExtensionE2EE", () => {
+        let ext: Extension;
+        beforeAll(async () => {
+            await setupClient(true);
+            const hasSynced = sdk.sync();
+            await httpBackend.flushAllExpected();
+            await hasSynced;
+            ext = findExtension("e2ee");
+        });
+        afterAll(async () => {
+            // needed else we do some async operations in the background which can cause Jest to whine:
+            // "Cannot log after tests are done. Did you forget to wait for something async in your test?"
+            // Attempted to log "Saving device tracking data null"."
+            client.crypto.stop();
+        });
+        it("gets enabled on the initial request only", () => {
+            expect(ext.onRequest(true)).toEqual({
+                enabled: true,
+            });
+            expect(ext.onRequest(false)).toEqual(undefined);
+        });
+        it("can update device lists", () => {
+            ext.onResponse({
+                device_lists: {
+                    changed: ["@alice:localhost"],
+                    left: ["@bob:localhost"],
+                },
+            });
+            // TODO: more assertions?
+        });
+        it("can update OTK counts", () => {
+            client.crypto.updateOneTimeKeyCount = jest.fn();
+            ext.onResponse({
+                device_one_time_keys_count: {
+                    signed_curve25519: 42,
+                },
+            });
+            expect(client.crypto.updateOneTimeKeyCount).toHaveBeenCalledWith(42);
+            ext.onResponse({
+                device_one_time_keys_count: {
+                    not_signed_curve25519: 42,
+                    // missing field -> default to 0
+                },
+            });
+            expect(client.crypto.updateOneTimeKeyCount).toHaveBeenCalledWith(0);
+        });
+        it("can update fallback keys", () => {
+            ext.onResponse({
+                device_unused_fallback_key_types: ["signed_curve25519"],
+            });
+            expect(client.crypto.getNeedsNewFallback()).toEqual(false);
+            ext.onResponse({
+                device_unused_fallback_key_types: ["not_signed_curve25519"],
+            });
+            expect(client.crypto.getNeedsNewFallback()).toEqual(true);
+        });
     });
     describe("ExtensionAccountData", () => {
         let ext: Extension;
         beforeAll(async () => {
-            setupClient();
+            await setupClient();
             const hasSynced = sdk.sync();
             await httpBackend.flushAllExpected();
             await hasSynced;
@@ -513,7 +575,7 @@ describe("SlidingSyncSdk", () => {
     describe("ExtensionToDevice", () => {
         let ext: Extension;
         beforeAll(async () => {
-            setupClient();
+            await setupClient();
             const hasSynced = sdk.sync();
             await httpBackend.flushAllExpected();
             await hasSynced;
