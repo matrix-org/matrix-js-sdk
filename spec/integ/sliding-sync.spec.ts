@@ -426,7 +426,7 @@ describe("SlidingSync", () => {
                     count: 50,
                 }],
             });
-            const listPromise = listenUntil(slidingSync, "SlidingSync.List",
+            let listPromise = listenUntil(slidingSync, "SlidingSync.List",
                 (listIndex, joinedCount, roomIndexToRoomId) => {
                     expect(listIndex).toEqual(0);
                     expect(joinedCount).toEqual(500);
@@ -434,6 +434,75 @@ describe("SlidingSync", () => {
                         0: roomC,
                         1: roomA,
                         2: roomB,
+                    });
+                    return true;
+                });
+            let responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+                return state === SlidingSyncState.Complete;
+            });
+            await httpBackend.flushAllExpected();
+            await responseProcessed;
+            await listPromise;
+
+            // move C (0) back to A (2)
+            httpBackend.when("POST", syncUrl).respond(200, {
+                pos: "f",
+                lists: [{
+                    count: 500,
+                    ops: [{
+                        op: "DELETE",
+                        index: 0,
+                    }, {
+                        op: "INSERT",
+                        index: 2,
+                        room_id: roomC,
+                    }],
+                },
+                {
+                    count: 50,
+                }],
+            });
+            listPromise = listenUntil(slidingSync, "SlidingSync.List",
+                (listIndex, joinedCount, roomIndexToRoomId) => {
+                    expect(listIndex).toEqual(0);
+                    expect(joinedCount).toEqual(500);
+                    expect(roomIndexToRoomId).toEqual({
+                        0: roomA,
+                        1: roomB,
+                        2: roomC,
+                    });
+                    return true;
+                });
+            responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+                return state === SlidingSyncState.Complete;
+            });
+            await httpBackend.flushAllExpected();
+            await responseProcessed;
+            await listPromise;
+        });
+
+        it("should ignore invalid list indexes", async () => {
+            httpBackend.when("POST", syncUrl).respond(200, {
+                pos: "e",
+                lists: [{
+                    count: 500,
+                    ops: [{
+                        op: "DELETE",
+                        index: 2324324,
+                    }],
+                },
+                {
+                    count: 50,
+                }],
+            });
+            const listPromise = listenUntil(slidingSync, "SlidingSync.List",
+                (listIndex, joinedCount, roomIndexToRoomId) => {
+                    expect(listIndex).toEqual(0);
+                    expect(joinedCount).toEqual(500);
+                    expect(roomIndexToRoomId).toEqual({
+                        0: roomA,
+                        1: roomB,
+                        2: roomC,
                     });
                     return true;
                 });
