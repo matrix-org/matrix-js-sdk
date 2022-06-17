@@ -587,19 +587,6 @@ export class SlidingSyncSdk {
             liveTimeline.initialiseState(stateEventList);
         }
 
-        this.resolveInvites(room);
-
-        // recalculate the room name at this point as adding events to the timeline
-        // may make notifications appear which should have the right name.
-        // XXX: This looks suspect: we'll end up recalculating the room once here
-        // and then again after adding events (processSyncResponse calls it after
-        // calling us) even if no state events were added. It also means that if
-        // one of the room events in timelineEventList is something that needs
-        // a recalculation (like m.room.name) we won't recalculate until we've
-        // finished adding all the events, which will cause the notification to have
-        // the old room name rather than the new one.
-        room.recalculate();
-
         // If the timeline wasn't empty, we process the state events here: they're
         // defined as updates to the state before the start of the timeline, so this
         // starts to roll the state forward.
@@ -617,6 +604,7 @@ export class SlidingSyncSdk {
             room.oldState.setStateEvents(stateEventList);
             room.currentState.setStateEvents(stateEventList);
         }
+
         // execute the timeline events. This will continue to diverge the current state
         // if the timeline has any state events in it.
         // This also needs to be done before running push rules on the events as they need
@@ -624,6 +612,11 @@ export class SlidingSyncSdk {
         room.addLiveEvents(timelineEventList, {
             fromCache: fromCache,
         });
+
+        room.recalculate();
+
+        // resolve invites now we have set the latest state
+        this.resolveInvites(room);
     }
 
     private resolveInvites(room: Room): void {

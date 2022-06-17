@@ -27,6 +27,7 @@ import {
 } from "../../src";
 import { SlidingSyncSdk } from "../../src/sliding-sync-sdk";
 import { SyncState } from "../../src/sync";
+import { IStoredClientOpts } from "../../src/client";
 
 describe("SlidingSyncSdk", () => {
     let client: MatrixClient = null;
@@ -94,19 +95,19 @@ describe("SlidingSyncSdk", () => {
     };
 
     // assign client/httpBackend globals
-    const setupClient = async (withCrypto = false) => {
+    const setupClient = async (testOpts?: Partial<IStoredClientOpts&{withCrypto: boolean}>) => {
+        testOpts = testOpts || {};
         const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
         httpBackend = testClient.httpBackend;
         client = testClient.client;
         mockSlidingSync = mockifySlidingSync(new SlidingSync("", [], {}, client, 0));
-        const opts: any = {};
-        if (withCrypto) {
+        if (testOpts.withCrypto) {
             httpBackend.when("GET", "/room_keys/version").respond(404, {});
             await client.initCrypto();
-            opts.crypto = client.crypto;
+            testOpts.crypto = client.crypto;
         }
         httpBackend.when("GET", "/_matrix/client/r0/pushrules").respond(200, {});
-        sdk = new SlidingSyncSdk(mockSlidingSync, client, opts);
+        sdk = new SlidingSyncSdk(mockSlidingSync, client, testOpts);
     };
 
     // tear down client/httpBackend globals
@@ -130,7 +131,9 @@ describe("SlidingSyncSdk", () => {
     };
 
     describe("sync/stop", () => {
-        beforeAll(setupClient);
+        beforeAll(async () => {
+            await setupClient();
+        });
         afterAll(teardownClient);
         it("can sync()", async () => {
             const hasSynced = sdk.sync();
@@ -145,7 +148,9 @@ describe("SlidingSyncSdk", () => {
     });
 
     describe("rooms", () => {
-        beforeAll(setupClient);
+        beforeAll(async () => {
+            await setupClient();
+        });
         afterAll(teardownClient);
 
         describe("initial", () => {
@@ -421,10 +426,46 @@ describe("SlidingSyncSdk", () => {
         });
     });
 
+    describe("opts", () => {
+        afterEach(teardownClient);
+        it("can resolveProfilesToInvites", async () => {
+            await setupClient({
+                resolveInvitesToProfiles: true,
+            });
+            const roomId = "!resolveProfilesToInvites:localhost";
+            const invitee = "@invitee:localhost";
+            const inviteeProfile = {
+                avatar_url: "mxc://foobar",
+                displayname: "The Invitee",
+            };
+            httpBackend.when("GET", "/profile").respond(200, inviteeProfile);
+            mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomId, {
+                initial: true,
+                name: "Room with Invite",
+                required_state: [],
+                timeline: [
+                    mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                    mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                    mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                    mkOwnStateEvent(EventType.RoomMember, { membership: "invite" }, invitee),
+                ],
+            });
+            await httpBackend.flush("/profile", 1, 1000);
+            const room = client.getRoom(roomId);
+            expect(room).toBeDefined();
+            const inviteeMember = room.getMember(invitee);
+            expect(inviteeMember).toBeDefined();
+            expect(inviteeMember.getMxcAvatarUrl()).toEqual(inviteeProfile.avatar_url);
+            expect(inviteeMember.name).toEqual(inviteeProfile.displayname);
+        });
+    });
+
     describe("ExtensionE2EE", () => {
         let ext: Extension;
         beforeAll(async () => {
-            await setupClient(true);
+            await setupClient({
+                withCrypto: true,
+            });
             const hasSynced = sdk.sync();
             await httpBackend.flushAllExpected();
             await hasSynced;
