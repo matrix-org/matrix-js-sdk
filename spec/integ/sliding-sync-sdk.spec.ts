@@ -22,7 +22,7 @@ import { TestClient } from "../TestClient";
 import { IRoomEvent, IStateEvent } from "../../src/sync-accumulator";
 import {
     MatrixClient, MatrixEvent, NotificationCountType, JoinRule, MatrixError,
-    EventType, IPushRules, PushRuleKind, TweakName,
+    EventType, IPushRules, PushRuleKind, TweakName, ClientEvent,
 } from "../../src";
 import { SlidingSyncSdk } from "../../src/sliding-sync-sdk";
 import { SyncState } from "../../src/sync";
@@ -526,19 +526,79 @@ describe("SlidingSyncSdk", () => {
             expect(reqJson.since).toBeUndefined();
         });
         it("updates the since value", async () => {
-
+            ext.onResponse({
+                next_batch: "12345",
+                events: [],
+            });
+            expect(ext.onRequest(false)).toEqual({
+                since: "12345",
+            });
         });
         it("can handle missing fields", async () => {
-
+            ext.onResponse({
+                next_batch: "23456",
+                // no events array
+            });
         });
         it("emits to-device events on the client", async () => {
-
+            const toDeviceType = "custom_test";
+            const toDeviceContent = {
+                foo: "bar",
+            };
+            let called = false;
+            client.once(ClientEvent.ToDeviceEvent, (ev) => {
+                expect(ev.getContent()).toEqual(toDeviceContent);
+                expect(ev.getType()).toEqual(toDeviceType);
+                called = true;
+            });
+            ext.onResponse({
+                next_batch: "34567",
+                events: [
+                    {
+                        type: toDeviceType,
+                        content: toDeviceContent,
+                    },
+                ],
+            });
+            expect(called).toBe(true);
         });
         it("can cancel key verification requests", async () => {
-
-        });
-        it("ignores undecryptable messages", async () => {
-
+            const seen: Record<string, boolean> = {};
+            client.on(ClientEvent.ToDeviceEvent, (ev) => {
+                const evType = ev.getType();
+                expect(seen[evType]).toBeFalsy();
+                seen[evType] = true;
+                if (evType === "m.key.verification.start" || evType === "m.key.verification.request") {
+                    expect(ev.isCancelled()).toEqual(true);
+                } else {
+                    expect(ev.isCancelled()).toEqual(false);
+                }
+            });
+            ext.onResponse({
+                next_batch: "45678",
+                events: [
+                    // someone tries to verify keys
+                    {
+                        type: "m.key.verification.start",
+                        content: {
+                            transaction_id: "a",
+                        },
+                    },
+                    {
+                        type: "m.key.verification.request",
+                        content: {
+                            transaction_id: "a",
+                        },
+                    },
+                    // then gives up
+                    {
+                        type: "m.key.verification.cancel",
+                        content: {
+                            transaction_id: "a",
+                        },
+                    },
+                ],
+            });
         });
     });
 });
