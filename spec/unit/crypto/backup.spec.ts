@@ -535,7 +535,6 @@ describe("MegolmBackup", function() {
             });
             let numCalls = 0;
 
-            // expect(authedRequestSpy).toHaveBeenCalledTimes(2);
             await new Promise<void>((resolve, reject) => {
                 client.http.authedRequest = function(
                     callback, method, path, queryParams, data, opts,
