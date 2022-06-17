@@ -474,7 +474,7 @@ describe("MegolmBackup", function() {
             client.stopClient();
         });
 
-        fit('retries when a backup fails', async function() {
+        it('retries when a backup fails', async function() {
             const groupSession = new Olm.OutboundGroupSession();
             groupSession.create();
             const ibGroupSession = new Olm.InboundGroupSession();
