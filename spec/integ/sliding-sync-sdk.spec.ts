@@ -161,6 +161,7 @@ describe("SlidingSyncSdk", () => {
             const roomC = "!c_with_highlight_count:localhost";
             const roomD = "!d_with_notif_count:localhost";
             const roomE = "!e_with_invite:localhost";
+            const roomF = "!f_calc_room_name:localhost";
             const data: Record<string, MSC3575RoomData> = {
                 [roomA]: {
                     name: "A",
@@ -239,6 +240,21 @@ describe("SlidingSyncSdk", () => {
                     ],
                     initial: true,
                 },
+                [roomF]: {
+                    name: "#foo:localhost",
+                    required_state: [
+                        mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                        mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                        mkOwnStateEvent(EventType.RoomCanonicalAlias, { alias: "#foo:localhost" }, ""),
+                        mkOwnStateEvent(EventType.RoomName, { name: "This should be ignored" }, ""),
+                    ],
+                    timeline: [
+                        mkOwnEvent(EventType.RoomMessage, { body: "hello A" }),
+                        mkOwnEvent(EventType.RoomMessage, { body: "world A" }),
+                    ],
+                    initial: true,
+                },
             };
 
             it("can be created with required_state and timeline", () => {
@@ -283,6 +299,15 @@ describe("SlidingSyncSdk", () => {
                 expect(gotRoom).toBeDefined();
                 expect(gotRoom.getMyMembership()).toEqual("invite");
                 expect(gotRoom.currentState.getJoinRule()).toEqual(JoinRule.Invite);
+            });
+
+            it("uses the 'name' field to caluclate the room name", () => {
+                mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomF, data[roomF]);
+                const gotRoom = client.getRoom(roomF);
+                expect(gotRoom).toBeDefined();
+                expect(
+                    gotRoom.name,
+                ).toEqual(data[roomF].name);
             });
 
             describe("updating", () => {

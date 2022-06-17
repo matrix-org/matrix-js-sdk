@@ -17,9 +17,8 @@ limitations under the License.
 import * as utils from "./utils";
 import { IDeferred } from "./utils";
 import { MatrixClient } from "./client";
-import { ISyncStateData } from "./sync";
+import { ISyncStateData, SyncState } from "./sync";
 import { Method } from "./http-api";
-import { SyncState } from "./sync";
 
 export type Callback = (newState: SyncState, data?: ISyncStateData) => void;
 

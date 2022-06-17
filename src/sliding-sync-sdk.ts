@@ -257,7 +257,7 @@ export class SlidingSyncSdk {
         this.opts.experimentalThreadSupport = this.opts.experimentalThreadSupport === true;
 
         if (!opts.canResetEntireTimeline) {
-            opts.canResetEntireTimeline = (roomId: string) => {
+            opts.canResetEntireTimeline = (_roomId: string) => {
                 return false;
             };
         }
@@ -358,7 +358,7 @@ export class SlidingSyncSdk {
      * @return {Promise} A promise which resolves once the room has been added to the
      * store.
      */
-    public async peek(roomId: string): Promise<Room> {
+    public async peek(_roomId: string): Promise<Room> {
         return null; // TODO
     }
 
@@ -413,7 +413,7 @@ export class SlidingSyncSdk {
         // this helps large account to speed up faster
         // room::decryptCriticalEvent is in charge of decrypting all the events
         // required for a client to function properly
-        const timelineEvents = mapEvents(this.client, room.roomId, roomData.timeline, false); // this.mapSyncEventsFormat(joinObj.timeline, room, false);
+        const timelineEvents = mapEvents(this.client, room.roomId, roomData.timeline, false);
         const ephemeralEvents = []; // TODO this.mapSyncEventsFormat(joinObj.ephemeral);
 
         const encrypted = this.client.isRoomEncrypted(room.roomId);
@@ -660,7 +660,7 @@ export class SlidingSyncSdk {
                 inviteEvent.getContent().displayname = info.displayname;
                 // fire listeners
                 member.setMembershipEvent(inviteEvent, room.currentState);
-            }, function(err) {
+            }, function(_err) {
                 // OH WELL.
             });
         });
@@ -728,11 +728,11 @@ export class SlidingSyncSdk {
         if (!this.client.getNotifTimelineSet()) {
             return;
         }
-        for (let i = 0; i < timelineEventList.length; i++) {
-            const pushActions = this.client.getPushActionsForEvent(timelineEventList[i]);
+        for (const timelineEvent of timelineEventList) {
+            const pushActions = this.client.getPushActionsForEvent(timelineEvent);
             if (pushActions && pushActions.notify &&
                 pushActions.tweaks && pushActions.tweaks.highlight) {
-                this.notifEvents.push(timelineEventList[i]);
+                this.notifEvents.push(timelineEvent);
             }
         }
     }
@@ -762,9 +762,9 @@ function ensureNameEvent(client: MatrixClient, roomId: string, roomData: MSC3575
     if (!roomData.name) {
         return roomData;
     }
-    for (let i = 0; i < roomData.required_state.length; i++) {
-        if (roomData.required_state[i].type === EventType.RoomName && roomData.required_state[i].state_key === "") {
-            roomData.required_state[i].content = {
+    for (const stateEvent of roomData.required_state) {
+        if (stateEvent.type === EventType.RoomName && stateEvent.state_key === "") {
+            stateEvent.content = {
                 name: roomData.name,
             };
             return roomData;

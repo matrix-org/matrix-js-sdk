@@ -575,12 +575,8 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     break;
                 }
                 case "INVALIDATE": {
-                    const invalidRooms = [];
                     const startIndex = op.range[0];
                     for (let i = startIndex; i <= op.range[1]; i++) {
-                        invalidRooms.push(
-                            this.lists[listIndex].roomIndexToRoomId[i],
-                        );
                         delete this.lists[listIndex].roomIndexToRoomId[i];
                     }
                     logger.debug(
