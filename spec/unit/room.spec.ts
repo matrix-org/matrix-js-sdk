@@ -361,6 +361,23 @@ describe("Room", function() {
 
             expect(callCount).toEqual(2);
         });
+
+        it("should be able to update local echo without a txn ID", function() {
+            const eventJson = utils.mkMessage({
+                room: roomId, user: userA, event: false,
+            }) as object;
+            const localEvent = new MatrixEvent(eventJson);
+            localEvent.status = EventStatus.SENDING;
+
+            // first add the local echo
+            room.addPendingEvent(localEvent, "TXN_ID");
+            expect(room.timeline.length).toEqual(1);
+
+            // then the remoteEvent, it should de-dupe based on the event ID.
+            const remoteEvent = new MatrixEvent(eventJson);
+            room.addLiveEvents([remoteEvent]);
+            expect(room.timeline.length).toEqual(1);
+        });
     });
 
     describe('addEphemeralEvents', () => {
