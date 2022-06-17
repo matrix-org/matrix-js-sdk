@@ -17,10 +17,13 @@ limitations under the License.
 // eslint-disable-next-line no-restricted-imports
 import MockHttpBackend from "matrix-mock-request";
 
-import { SlidingSync, SlidingSyncEvent, MSC3575RoomData, SlidingSyncState } from "../../src/sliding-sync";
+import { SlidingSync, SlidingSyncEvent, MSC3575RoomData, SlidingSyncState, Extension } from "../../src/sliding-sync";
 import { TestClient } from "../TestClient";
 import { IRoomEvent, IStateEvent } from "../../src/sync-accumulator";
-import { MatrixClient, MatrixEvent, NotificationCountType, JoinRule, MatrixError } from "../../src";
+import {
+    MatrixClient, MatrixEvent, NotificationCountType, JoinRule, MatrixError,
+    EventType, IPushRules, PushRuleKind, TweakName,
+} from "../../src";
 import { SlidingSyncSdk } from "../../src/sliding-sync-sdk";
 import { SyncState } from "../../src/sync";
 
@@ -105,6 +108,20 @@ describe("SlidingSyncSdk", () => {
         return httpBackend.stop();
     };
 
+    // find an extension on a SlidingSyncSdk instance
+    const findExtension = (name: string): Extension => {
+        expect(mockSlidingSync.registerExtension).toHaveBeenCalled();
+        const mockFn = mockSlidingSync.registerExtension as jest.Mock;
+        // find the extension
+        for (let i = 0; i < mockFn.mock.calls.length; i++) {
+            const calledExtension = mockFn.mock.calls[i][0] as Extension;
+            if (calledExtension && calledExtension.name() === name) {
+                return calledExtension;
+            }
+        }
+        fail("cannot find extension " + name);
+    };
+
     describe("sync/stop", () => {
         beforeAll(setupClient);
         afterAll(teardownClient);
@@ -141,14 +158,14 @@ describe("SlidingSyncSdk", () => {
                 [roomA]: {
                     name: "A",
                     required_state: [
-                        mkOwnStateEvent("m.room.create", { creator: selfUserId }, ""),
-                        mkOwnStateEvent("m.room.member", { membership: "join" }, selfUserId),
-                        mkOwnStateEvent("m.room.power_levels", { users: { [selfUserId]: 100 } }, ""),
-                        mkOwnStateEvent("m.room.name", { name: "A" }, ""),
+                        mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                        mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                        mkOwnStateEvent(EventType.RoomName, { name: "A" }, ""),
                     ],
                     timeline: [
-                        mkOwnEvent("m.room.message", { body: "hello A" }),
-                        mkOwnEvent("m.room.message", { body: "world A" }),
+                        mkOwnEvent(EventType.RoomMessage, { body: "hello A" }),
+                        mkOwnEvent(EventType.RoomMessage, { body: "world A" }),
                     ],
                     initial: true,
                 },
@@ -156,11 +173,11 @@ describe("SlidingSyncSdk", () => {
                     name: "B",
                     required_state: [],
                     timeline: [
-                        mkOwnStateEvent("m.room.create", { creator: selfUserId }, ""),
-                        mkOwnStateEvent("m.room.member", { membership: "join" }, selfUserId),
-                        mkOwnStateEvent("m.room.power_levels", { users: { [selfUserId]: 100 } }, ""),
-                        mkOwnEvent("m.room.message", { body: "hello B" }),
-                        mkOwnEvent("m.room.message", { body: "world B" }),
+                        mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                        mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                        mkOwnEvent(EventType.RoomMessage, { body: "hello B" }),
+                        mkOwnEvent(EventType.RoomMessage, { body: "world B" }),
 
                     ],
                     initial: true,
@@ -169,11 +186,11 @@ describe("SlidingSyncSdk", () => {
                     name: "C",
                     required_state: [],
                     timeline: [
-                        mkOwnStateEvent("m.room.create", { creator: selfUserId }, ""),
-                        mkOwnStateEvent("m.room.member", { membership: "join" }, selfUserId),
-                        mkOwnStateEvent("m.room.power_levels", { users: { [selfUserId]: 100 } }, ""),
-                        mkOwnEvent("m.room.message", { body: "hello C" }),
-                        mkOwnEvent("m.room.message", { body: "world C" }),
+                        mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                        mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                        mkOwnEvent(EventType.RoomMessage, { body: "hello C" }),
+                        mkOwnEvent(EventType.RoomMessage, { body: "world C" }),
                     ],
                     highlight_count: 5,
                     initial: true,
@@ -182,11 +199,11 @@ describe("SlidingSyncSdk", () => {
                     name: "D",
                     required_state: [],
                     timeline: [
-                        mkOwnStateEvent("m.room.create", { creator: selfUserId }, ""),
-                        mkOwnStateEvent("m.room.member", { membership: "join" }, selfUserId),
-                        mkOwnStateEvent("m.room.power_levels", { users: { [selfUserId]: 100 } }, ""),
-                        mkOwnEvent("m.room.message", { body: "hello D" }),
-                        mkOwnEvent("m.room.message", { body: "world D" }),
+                        mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                        mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                        mkOwnEvent(EventType.RoomMessage, { body: "hello D" }),
+                        mkOwnEvent(EventType.RoomMessage, { body: "world D" }),
                     ],
                     notification_count: 5,
                     initial: true,
@@ -197,7 +214,7 @@ describe("SlidingSyncSdk", () => {
                     timeline: [],
                     invite_state: [
                         {
-                            type: "m.room.member",
+                            type: EventType.RoomMember,
                             content: { membership: "invite" },
                             state_key: selfUserId,
                             sender: "@bob:localhost",
@@ -263,7 +280,7 @@ describe("SlidingSyncSdk", () => {
 
             describe("updating", () => {
                 it("can update with a new timeline event", async () => {
-                    const newEvent = mkOwnEvent("m.room.message", { body: "new event A" });
+                    const newEvent = mkOwnEvent(EventType.RoomMessage, { body: "new event A" });
                     mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomA, {
                         timeline: [newEvent],
                         required_state: [],
@@ -375,16 +392,153 @@ describe("SlidingSyncSdk", () => {
     describe("ExtensionE2EE", () => {
     });
     describe("ExtensionAccountData", () => {
+        let ext: Extension;
         beforeAll(async () => {
             setupClient();
             const hasSynced = sdk.sync();
             await httpBackend.flushAllExpected();
             await hasSynced;
+            ext = findExtension("account_data");
         });
-        it("processes account_data extension", async () => {
+        it("gets enabled on the initial request only", () => {
+            expect(ext.onRequest(true)).toEqual({
+                enabled: true,
+            });
+            expect(ext.onRequest(false)).toEqual(undefined);
+        });
+        it("processes global account data", async () => {
+            const globalType = "global_test";
+            const globalContent = {
+                info: "here",
+            };
+            let globalData = client.getAccountData(globalType);
+            expect(globalData).toBeUndefined();
+            ext.onResponse({
+                global: [
+                    {
+                        type: globalType,
+                        content: globalContent,
+                    },
+                ],
+            });
+            globalData = client.getAccountData(globalType);
+            expect(globalData).toBeDefined();
+            expect(globalData.getContent()).toEqual(globalContent);
+        });
+        it("processes rooms account data", async () => {
+            const roomId = "!room:id";
+            mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomId, {
+                name: "Room with account data",
+                required_state: [],
+                timeline: [
+                    mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                    mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                    mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                    mkOwnEvent(EventType.RoomMessage, { body: "hello" }),
 
+                ],
+                initial: true,
+            });
+            const roomContent = {
+                foo: "bar",
+            };
+            const roomType = "test";
+            ext.onResponse({
+                rooms: {
+                    [roomId]: [
+                        {
+                            type: roomType,
+                            content: roomContent,
+                        },
+                    ],
+                },
+            });
+            const room = client.getRoom(roomId);
+            expect(room).toBeDefined();
+            const event = room.getAccountData(roomType);
+            expect(event).toBeDefined();
+            expect(event.getContent()).toEqual(roomContent);
+        });
+        it("doesn't crash for unknown room account data", async () => {
+            const unknownRoomId = "!unknown:id";
+            const roomType = "tester";
+            ext.onResponse({
+                rooms: {
+                    [unknownRoomId]: [
+                        {
+                            type: roomType,
+                            content: {
+                                foo: "Bar",
+                            },
+                        },
+                    ],
+                },
+            });
+            const room = client.getRoom(unknownRoomId);
+            expect(room).toBeNull();
+            expect(client.getAccountData(roomType)).toBeUndefined();
+        });
+        it("can update push rules via account data", async () => {
+            const roomId = "!foo:bar";
+            const pushRulesContent: IPushRules = {
+                global: {
+                    [PushRuleKind.RoomSpecific]: [{
+                        enabled: true,
+                        default: true,
+                        pattern: "monkey",
+                        actions: [
+                            {
+                                set_tweak: TweakName.Sound,
+                                value: "default",
+                            },
+                        ],
+                        rule_id: roomId,
+                    }],
+                },
+            };
+            let pushRule = client.getRoomPushRule("global", roomId);
+            expect(pushRule).toBeUndefined();
+            ext.onResponse({
+                global: [
+                    {
+                        type: EventType.PushRules,
+                        content: pushRulesContent,
+                    },
+                ],
+            });
+            pushRule = client.getRoomPushRule("global", roomId);
+            expect(pushRule).toEqual(pushRulesContent.global[PushRuleKind.RoomSpecific][0]);
         });
     });
     describe("ExtensionToDevice", () => {
+        let ext: Extension;
+        beforeAll(async () => {
+            setupClient();
+            const hasSynced = sdk.sync();
+            await httpBackend.flushAllExpected();
+            await hasSynced;
+            ext = findExtension("to_device");
+        });
+        it("gets enabled with a limit on the initial request only", () => {
+            const reqJson: any = ext.onRequest(true);
+            expect(reqJson.enabled).toEqual(true);
+            expect(reqJson.limit).toBeGreaterThan(0);
+            expect(reqJson.since).toBeUndefined();
+        });
+        it("updates the since value", async () => {
+
+        });
+        it("can handle missing fields", async () => {
+
+        });
+        it("emits to-device events on the client", async () => {
+
+        });
+        it("can cancel key verification requests", async () => {
+
+        });
+        it("ignores undecryptable messages", async () => {
+
+        });
     });
 });

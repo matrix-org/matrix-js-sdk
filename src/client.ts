@@ -5899,6 +5899,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // There can be only room-kind push rule per room
         // and its id is the room id.
         if (this.pushRules) {
+            if (!this.pushRules[scope] || !this.pushRules[scope].room) {
+                return;
+            }
             for (let i = 0; i < this.pushRules[scope].room.length; i++) {
                 const rule = this.pushRules[scope].room[i];
                 if (rule.rule_id === roomId) {
