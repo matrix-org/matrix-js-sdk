@@ -113,7 +113,7 @@ export interface IRoomDirectoryOptions {
     since?: string;
     filter?: {
         generic_search_term?: string;
-        room_types?: Set<RoomType | null>;
+        "org.matrix.msc3827.room_types"?: Set<RoomType | null>;
     };
     include_all_networks?: boolean;
     third_party_instance_id?: string;
