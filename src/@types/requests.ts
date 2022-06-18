@@ -113,7 +113,7 @@ export interface IRoomDirectoryOptions {
     since?: string;
     filter?: {
         generic_search_term?: string;
-        room_type?: Set<RoomType | null>;
+        room_types?: Set<RoomType | null>;
     };
     include_all_networks?: boolean;
     third_party_instance_id?: string;
