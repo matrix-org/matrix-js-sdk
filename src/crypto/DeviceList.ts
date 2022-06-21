@@ -942,7 +942,7 @@ async function updateStoredDeviceKeysForUser(
 async function storeDeviceKeys(
     olmDevice: OlmDevice,
     userStore: Record<string, DeviceInfo>,
-    deviceResult: any, // TODO types
+    deviceResult: IDownloadKeyResult["device_keys"]["user_id"]["device_id"],
 ): Promise<boolean> {
     if (!deviceResult.keys) {
         // no keys?

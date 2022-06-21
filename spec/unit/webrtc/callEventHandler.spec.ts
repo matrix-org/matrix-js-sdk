@@ -1,22 +1,52 @@
+/*
+Copyright 2022 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 import { TestClient } from '../../TestClient';
-import { CallEventHandler } from '../../../src/webrtc/callEventHandler';
-import { MatrixEvent } from '../../../src/models/event';
-import { EventType } from '../../../src/@types/event';
+import {
+    ClientEvent,
+    EventTimeline,
+    EventTimelineSet,
+    EventType,
+    IRoomTimelineData,
+    MatrixEvent,
+    Room,
+    RoomEvent,
+} from "../../../src";
+import { MatrixClient } from "../../../src/client";
+import { CallEventHandler, CallEventHandlerEvent } from "../../../src/webrtc/callEventHandler";
+import { GroupCallEventHandler } from "../../../src/webrtc/groupCallEventHandler";
+import { SyncState } from "../../../src/sync";
 
-describe('CallEventHandler', function() {
-    let client;
-
-    beforeEach(function() {
-        client = new TestClient("@alice:foo", "somedevice", "token", undefined, {});
+describe("CallEventHandler", () => {
+    let client: MatrixClient;
+    beforeEach(() => {
+        client = new TestClient("@alice:foo", "somedevice", "token", undefined, {}).client;
+        client.callEventHandler = new CallEventHandler(client);
+        client.callEventHandler.start();
+        client.groupCallEventHandler = new GroupCallEventHandler(client);
+        client.groupCallEventHandler.start();
     });
 
-    afterEach(function() {
-        client.stop();
+    afterEach(() => {
+        client.callEventHandler.stop();
+        client.groupCallEventHandler.stop();
     });
 
-    it('should enforce inbound toDevice message ordering', async function() {
-        const callEventHandler = new CallEventHandler(client);
-
+    it("should enforce inbound toDevice message ordering", async () => {
+        const callEventHandler = client.callEventHandler;
         const event1 = new MatrixEvent({
             type: EventType.CallInvite,
             content: {
@@ -79,5 +109,35 @@ describe('CallEventHandler', function() {
         expect(callEventHandler.callEventBuffer.length).toBe(5);
         expect(callEventHandler.nextSeqByCall.get("123")).toBe(5);
         expect(callEventHandler.toDeviceEventBuffers.get("123").length).toBe(0);
+    });
+
+    it("should ignore a call if invite & hangup come within a single sync", () => {
+        const room = new Room("!room:id", client, "@user:id");
+        const timelineData: IRoomTimelineData = { timeline: new EventTimeline(new EventTimelineSet(room, {})) };
+
+        // Fire off call invite then hangup within a single sync
+        const callInvite = new MatrixEvent({
+            type: EventType.CallInvite,
+            content: {
+                call_id: "123",
+            },
+        });
+        client.emit(RoomEvent.Timeline, callInvite, room, false, false, timelineData);
+
+        const callHangup = new MatrixEvent({
+            type: EventType.CallHangup,
+            content: {
+                call_id: "123",
+            },
+        });
+        client.emit(RoomEvent.Timeline, callHangup, room, false, false, timelineData);
+
+        const incomingCallEmitted = jest.fn();
+        client.on(CallEventHandlerEvent.Incoming, incomingCallEmitted);
+
+        client.getSyncState = jest.fn().mockReturnValue(SyncState.Syncing);
+        client.emit(ClientEvent.Sync, SyncState.Syncing);
+
+        expect(incomingCallEmitted).not.toHaveBeenCalled();
     });
 });

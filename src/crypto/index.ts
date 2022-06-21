@@ -59,7 +59,7 @@ import { keyFromPassphrase } from './key_passphrase';
 import { decodeRecoveryKey, encodeRecoveryKey } from './recoverykey';
 import { VerificationRequest } from "./verification/request/VerificationRequest";
 import { InRoomChannel, InRoomRequests } from "./verification/request/InRoomChannel";
-import { ToDeviceChannel, ToDeviceRequests } from "./verification/request/ToDeviceChannel";
+import { ToDeviceChannel, ToDeviceRequests, Request } from "./verification/request/ToDeviceChannel";
 import { IllegalMethod } from "./verification/IllegalMethod";
 import { KeySignatureUploadError } from "../errors";
 import { calculateKeyCheck, decryptAES, encryptAES } from './aes';
@@ -76,7 +76,6 @@ import {
     ISignedKey,
     IUploadKeySignaturesResponse,
     MatrixClient,
-    SessionStore,
 } from "../client";
 import type { IRoomEncryption, RoomList } from "./RoomList";
 import { IKeyBackupInfo } from "./keybackup";
@@ -122,7 +121,7 @@ interface IInitOpts {
 
 export interface IBootstrapCrossSigningOpts {
     setupNewCrossSigning?: boolean;
-    authUploadDeviceSigningKeys?(makeRequest: (authData: any) => {}): Promise<void>;
+    authUploadDeviceSigningKeys?(makeRequest: (authData: any) => Promise<{}>): Promise<void>;
 }
 
 /* eslint-disable camelcase */
@@ -201,6 +200,19 @@ export interface IRequestsMap {
     getRequestByChannel(channel: IVerificationChannel): VerificationRequest;
     setRequest(event: MatrixEvent, request: VerificationRequest): void;
     setRequestByChannel(channel: IVerificationChannel, request: VerificationRequest): void;
+}
+
+/* eslint-disable camelcase */
+export interface IEncryptedContent {
+    algorithm: string;
+    sender_key: string;
+    ciphertext: Record<string, string>;
+}
+/* eslint-enable camelcase */
+
+interface IEncryptAndSendToDevicesResult {
+    contentMap: Record<string, Record<string, IEncryptedContent>>;
+    deviceInfoByUserIdAndDeviceId: Map<string, Map<string, DeviceInfo>>;
 }
 
 export enum CryptoEvent {
@@ -324,9 +336,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param {MatrixClient} baseApis base matrix api interface
      *
-     * @param {module:store/session/webstorage~WebStorageSessionStore} sessionStore
-     *    Store to be used for end-to-end crypto session data
-     *
      * @param {string} userId The user ID for the local user
      *
      * @param {string} deviceId The identifier for this device.
@@ -344,7 +353,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     constructor(
         public readonly baseApis: MatrixClient,
-        public readonly sessionStore: SessionStore,
         public readonly userId: string,
         private readonly deviceId: string,
         private readonly clientStore: IStore,
@@ -1077,11 +1085,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         return this.secretStorage.get(name);
     }
 
-    public isSecretStored(
-        name: string,
-        checkKey?: boolean,
-    ): Promise<Record<string, ISecretStorageKeyInfo> | null> {
-        return this.secretStorage.isStored(name, checkKey);
+    public isSecretStored(name: string): Promise<Record<string, ISecretStorageKeyInfo> | null> {
+        return this.secretStorage.isStored(name);
     }
 
     public requestSecret(name: string, devices: string[]): ISecretRequest {
@@ -1729,13 +1734,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         logger.info(`Finished device verification upgrade for ${userId}`);
     }
 
-    public async setTrustedBackupPubKey(trustedPubKey: string): Promise<void> {
-        // This should be redundant post cross-signing is a thing, so just
-        // plonk it in localStorage for now.
-        this.sessionStore.setLocalTrustedBackupPubKey(trustedPubKey);
-        await this.backupManager.checkKeyBackup();
-    }
-
     /**
      */
     public enableLazyLoading(): void {
@@ -2322,8 +2320,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         userId: string,
         deviceId: string,
         transactionId: string = null,
-    ): any { // TODO types
-        let request;
+    ): VerificationBase<any, any> {
+        let request: Request;
         if (transactionId) {
             request = this.toDeviceVerificationRequests.getRequestBySenderAndTxnId(userId, transactionId);
             if (!request) {
@@ -2594,7 +2592,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // because it first stores in memory. We should await the promise only
         // after all the in-memory state (roomEncryptors and _roomList) has been updated
         // to avoid races when calling this method multiple times. Hence keep a hold of the promise.
-        let storeConfigPromise = null;
+        let storeConfigPromise: Promise<void> = null;
         if (!existingConfig) {
             storeConfigPromise = this.roomList.setRoomEncryption(roomId, config);
         }
@@ -3131,36 +3129,40 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public encryptAndSendToDevices(
         userDeviceInfoArr: IOlmDevice<DeviceInfo>[],
         payload: object,
-    ): Promise<{contentMap, deviceInfoByDeviceId}> {
-        const contentMap = {};
-        const deviceInfoByDeviceId = new Map<string, DeviceInfo>();
+    ): Promise<IEncryptAndSendToDevicesResult> {
+        const contentMap: Record<string, Record<string, IEncryptedContent>> = {};
+        const deviceInfoByUserIdAndDeviceId = new Map<string, Map<string, DeviceInfo>>();
 
-        const promises = [];
-        for (let i = 0; i < userDeviceInfoArr.length; i++) {
-            const encryptedContent = {
+        const promises: Promise<unknown>[] = [];
+        for (const { userId, deviceInfo } of userDeviceInfoArr) {
+            const deviceId = deviceInfo.deviceId;
+            const encryptedContent: IEncryptedContent = {
                 algorithm: olmlib.OLM_ALGORITHM,
                 sender_key: this.olmDevice.deviceCurve25519Key,
                 ciphertext: {},
             };
-            const val = userDeviceInfoArr[i];
-            const userId = val.userId;
-            const deviceInfo = val.deviceInfo;
-            const deviceId = deviceInfo.deviceId;
-            deviceInfoByDeviceId.set(deviceId, deviceInfo);
+
+            // Assign to temp value to make type-checking happy
+            let userIdDeviceInfo = deviceInfoByUserIdAndDeviceId.get(userId);
+
+            if (userIdDeviceInfo === undefined) {
+                userIdDeviceInfo = new Map<string, DeviceInfo>();
+                deviceInfoByUserIdAndDeviceId.set(userId, userIdDeviceInfo);
+            }
+
+            // We hold by reference, this updates deviceInfoByUserIdAndDeviceId[userId]
+            userIdDeviceInfo.set(deviceId, deviceInfo);
 
             if (!contentMap[userId]) {
                 contentMap[userId] = {};
             }
             contentMap[userId][deviceId] = encryptedContent;
 
-            const devicesByUser = {};
-            devicesByUser[userId] = [deviceInfo];
-
             promises.push(
                 olmlib.ensureOlmSessionsForDevices(
                     this.olmDevice,
                     this.baseApis,
-                    devicesByUser,
+                    { [userId]: [deviceInfo] },
                 ).then(() =>
                     olmlib.encryptMessageForDevice(
                         encryptedContent.ciphertext,
@@ -3183,16 +3185,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             for (const userId of Object.keys(contentMap)) {
                 for (const deviceId of Object.keys(contentMap[userId])) {
                     if (Object.keys(contentMap[userId][deviceId].ciphertext).length === 0) {
-                        logger.log(
-                            "No ciphertext for device " +
-                            userId + ":" + deviceId + ": pruning",
-                        );
+                        logger.log(`No ciphertext for device ${userId}:${deviceId}: pruning`);
                         delete contentMap[userId][deviceId];
                     }
                 }
                 // No devices left for that user? Strip that too.
                 if (Object.keys(contentMap[userId]).length === 0) {
-                    logger.log("Pruned all devices for user " + userId);
+                    logger.log(`Pruned all devices for user ${userId}`);
                     delete contentMap[userId];
                 }
             }
@@ -3204,7 +3203,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             }
 
             return this.baseApis.sendToDevice("m.room.encrypted", contentMap).then(
-                (response) => ({ contentMap, deviceInfoByDeviceId }),
+                (response) => ({ contentMap, deviceInfoByUserIdAndDeviceId }),
             ).catch(error => {
                 logger.error("sendToDevice failed", error);
                 throw error;
@@ -3402,7 +3401,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                     event.on(MatrixEventEvent.Status, statusListener);
                 });
             } catch (err) {
-                logger.error("error while waiting for the verification event to be sent: " + err.message);
+                logger.error("error while waiting for the verification event to be sent: ", err);
                 return;
             } finally {
                 event.removeListener(MatrixEventEvent.LocalEventIdReplaced, eventIdListener);
@@ -3426,7 +3425,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         try {
             await request.channel.handleEvent(event, request, isLiveEvent);
         } catch (err) {
-            logger.error("error while handling verification event: " + err.message);
+            logger.error("error while handling verification event", err);
         }
         const shouldEmit = isNewRequest &&
             !request.initiatedByMe &&

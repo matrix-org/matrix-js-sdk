@@ -17,8 +17,6 @@ limitations under the License.
 
 /** @module auto-discovery */
 
-import { URL as NodeURL } from "url";
-
 import { IClientWellKnown, IWellKnownConfig } from "./client";
 import { logger } from './logger';
 
@@ -372,16 +370,11 @@ export class AutoDiscovery {
         if (!url) return false;
 
         try {
-            // We have to try and parse the URL using the NodeJS URL
-            // library if we're on NodeJS and use the browser's URL
-            // library when we're in a browser. To accomplish this, we
-            // try the NodeJS version first and fall back to the browser.
             let parsed = null;
             try {
-                if (NodeURL) parsed = new NodeURL(url);
-                else parsed = new URL(url);
-            } catch (e) {
                 parsed = new URL(url);
+            } catch (e) {
+                logger.error("Could not parse url", e);
             }
 
             if (!parsed || !parsed.hostname) return false;

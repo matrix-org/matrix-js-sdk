@@ -517,13 +517,6 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
     /**
      * @experimental
      */
-    public get isThreadRelation(): boolean {
-        return !!this.threadRootId && this.threadId !== this.getId();
-    }
-
-    /**
-     * @experimental
-     */
     public get isThreadRoot(): boolean {
         const threadDetails = this
             .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
@@ -544,7 +537,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
         return mRelatesTo?.['m.in_reply_to']?.event_id;
     }
 
-    public get relationEventId(): string {
+    public get relationEventId(): string | undefined {
         return this.getWireContent()
             ?.["m.relates_to"]
             ?.event_id;
@@ -830,18 +823,13 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
                 //
                 if (this.retryDecryption) {
                     // decryption error, but we have a retry queued.
-                    logger.log(
-                        `Got error decrypting event (id=${this.getId()}: ` +
-                        `${e}), but retrying`,
-                    );
+                    logger.log(`Got error decrypting event (id=${this.getId()}: ${e.detailedString}), but retrying`, e);
                     continue;
                 }
 
                 // decryption error, no retries queued. Warn about the error and
                 // set it to m.bad.encrypted.
-                logger.warn(
-                    `Error decrypting event (id=${this.getId()}): ${e.detailedString}`,
-                );
+                logger.warn(`Got error decrypting event (id=${this.getId()}: ${e.detailedString})`, e);
 
                 res = this.badEncryptedMessage(e.message);
             }
@@ -1043,7 +1031,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
      *   caused a change in the actual visibility of this event, either by making it
      *   visible (if it was hidden), by making it hidden (if it was visible) or by
      *   changing the reason (if it was hidden).
-     * @param visibilityEvent event holding a hide/unhide payload, or nothing
+     * @param visibilityChange event holding a hide/unhide payload, or nothing
      *   if the event is being reset to its original visibility (presumably
      *   by a visibility event being redacted).
      */
@@ -1065,9 +1053,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
                     reason: reason,
                 });
             }
-            if (change) {
-                this.emit(MatrixEventEvent.VisibilityChange, this, visible);
-            }
+            this.emit(MatrixEventEvent.VisibilityChange, this, visible);
         }
     }
 
@@ -1292,7 +1278,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
 
     /**
      * Get whether the event is a relation event, and of a given type if
-     * `relType` is passed in.
+     * `relType` is passed in. State events cannot be relation events
      *
      * @param {string?} relType if given, checks that the relation is of the
      * given type
@@ -1302,8 +1288,11 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
         // Relation info is lifted out of the encrypted content when sent to
         // encrypted rooms, so we have to check `getWireContent` for this.
         const relation = this.getWireContent()?.["m.relates_to"];
-        return relation && relation.rel_type && relation.event_id &&
-            ((relType && relation.rel_type === relType) || !relType);
+        if (this.isState() && relation?.rel_type === RelationType.Replace) {
+            // State events cannot be m.replace relations
+            return false;
+        }
+        return relation?.rel_type && relation.event_id && (relType ? relation.rel_type === relType : true);
     }
 
     /**

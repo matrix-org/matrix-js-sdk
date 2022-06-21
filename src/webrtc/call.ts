@@ -2509,6 +2509,37 @@ export function setTracksEnabled(tracks: Array<MediaStreamTrack>, enabled: boole
     }
 }
 
+export function supportsMatrixCall(): boolean {
+    // typeof prevents Node from erroring on an undefined reference
+    if (typeof(window) === 'undefined' || typeof(document) === 'undefined') {
+        // NB. We don't log here as apps try to create a call object as a test for
+        // whether calls are supported, so we shouldn't fill the logs up.
+        return false;
+    }
+
+    // Firefox throws on so little as accessing the RTCPeerConnection when operating in a secure mode.
+    // There's some information at https://bugzilla.mozilla.org/show_bug.cgi?id=1542616 though the concern
+    // is that the browser throwing a SecurityError will brick the client creation process.
+    try {
+        const supported = Boolean(
+            window.RTCPeerConnection || window.RTCSessionDescription ||
+            window.RTCIceCandidate || navigator.mediaDevices,
+        );
+        if (!supported) {
+            /* istanbul ignore if */ // Adds a lot of noise to test runs, so disable logging there.
+            if (process.env.NODE_ENV !== "test") {
+                logger.error("WebRTC is not supported in this browser / environment");
+            }
+            return false;
+        }
+    } catch (e) {
+        logger.error("Exception thrown when trying to access WebRTC", e);
+        return false;
+    }
+
+    return true;
+}
+
 /**
  * DEPRECATED
  * Use client.createCall()
@@ -2522,34 +2553,8 @@ export function setTracksEnabled(tracks: Array<MediaStreamTrack>, enabled: boole
  * since it's only possible to set this option on outbound calls.
  * @return {MatrixCall} the call or null if the browser doesn't support calling.
  */
-export function createNewMatrixCall(client: any, roomId: string, options?: CallOpts): MatrixCall {
-    // typeof prevents Node from erroring on an undefined reference
-    if (typeof(window) === 'undefined' || typeof(document) === 'undefined') {
-        // NB. We don't log here as apps try to create a call object as a test for
-        // whether calls are supported, so we shouldn't fill the logs up.
-        return null;
-    }
-
-    // Firefox throws on so little as accessing the RTCPeerConnection when operating in
-    // a secure mode. There's some information at https://bugzilla.mozilla.org/show_bug.cgi?id=1542616
-    // though the concern is that the browser throwing a SecurityError will brick the
-    // client creation process.
-    try {
-        const supported = Boolean(
-            window.RTCPeerConnection || window.RTCSessionDescription ||
-            window.RTCIceCandidate || navigator.mediaDevices,
-        );
-        if (!supported) {
-            // Adds a lot of noise to test runs, so disable logging there.
-            if (process.env.NODE_ENV !== "test") {
-                logger.error("WebRTC is not supported in this browser / environment");
-            }
-            return null;
-        }
-    } catch (e) {
-        logger.error("Exception thrown when trying to access WebRTC", e);
-        return null;
-    }
+export function createNewMatrixCall(client: any, roomId: string, options?: CallOpts): MatrixCall | null {
+    if (!supportsMatrixCall()) return null;
 
     const optionsForceTURN = options ? options.forceTURN : false;
 

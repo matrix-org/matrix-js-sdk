@@ -40,7 +40,7 @@ describe("verification request integration tests with crypto layer", function() 
     });
 
     it("should request and accept a verification", async function() {
-        const [alice, bob] = await makeTestClients(
+        const [[alice, bob], clearTestClientTimeouts] = await makeTestClients(
             [
                 { userId: "@alice:example.com", deviceId: "Osborne2" },
                 { userId: "@bob:example.com", deviceId: "Dynabook" },
@@ -78,5 +78,9 @@ describe("verification request integration tests with crypto layer", function() 
 
         // XXX: Private function access (but it's a test, so we're okay)
         aliceVerifier.endTimer();
+
+        alice.stop();
+        bob.stop();
+        clearTestClientTimeouts();
     });
 });

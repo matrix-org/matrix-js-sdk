@@ -50,7 +50,6 @@ export interface IRoomEvent extends IMinimalEvent {
     event_id: string;
     sender: string;
     origin_server_ts: number;
-    unsigned?: IUnsigned;
     /** @deprecated - legacy field */
     age?: number;
 }

@@ -16,7 +16,7 @@ limitations under the License.
 
 /** @module ContentHelpers */
 
-import { REFERENCE_RELATION } from "matrix-events-sdk";
+import { isProvided, REFERENCE_RELATION } from "matrix-events-sdk";
 
 import { MBeaconEventContent, MBeaconInfoContent, MBeaconInfoEventContent } from "./@types/beacon";
 import { MsgType } from "./@types/event";
@@ -32,6 +32,7 @@ import {
     MAssetContent,
     LegacyLocationEventContent,
 } from "./@types/location";
+import { MRoomTopicEventContent, MTopicContent, M_TOPIC } from "./@types/topic";
 
 /**
  * Generates the content for a HTML Message event
@@ -138,10 +139,10 @@ export const getTextForLocationEvent = (
 /**
  * Generates the content for a Location event
  * @param uri a geo:// uri for the location
- * @param ts the timestamp when the location was correct (milliseconds since
+ * @param timestamp the timestamp when the location was correct (milliseconds since
  *           the UNIX epoch)
  * @param description the (optional) label for this location on the map
- * @param asset_type the (optional) asset type of this location e.g. "m.self"
+ * @param assetType the (optional) asset type of this location e.g. "m.self"
  * @param text optional. A text for the location
  */
 export const makeLocationContent = (
@@ -188,6 +189,34 @@ export const parseLocationEvent = (wireEventContent: LocationEventWireContent): 
     const fallbackText = text ?? wireEventContent.body;
 
     return makeLocationContent(fallbackText, geoUri, timestamp, description, assetType);
+};
+
+/**
+ * Topic event helpers
+ */
+export type MakeTopicContent = (
+    topic: string,
+    htmlTopic?: string,
+) => MRoomTopicEventContent;
+
+export const makeTopicContent: MakeTopicContent = (topic, htmlTopic) => {
+    const renderings = [{ body: topic, mimetype: "text/plain" }];
+    if (isProvided(htmlTopic)) {
+        renderings.push({ body: htmlTopic, mimetype: "text/html" });
+    }
+    return { topic, [M_TOPIC.name]: renderings };
+};
+
+export type TopicState = {
+    text: string;
+    html?: string;
+};
+
+export const parseTopicContent = (content: MRoomTopicEventContent): TopicState => {
+    const mtopic = M_TOPIC.findIn<MTopicContent>(content);
+    const text = mtopic?.find(r => !isProvided(r.mimetype) || r.mimetype === "text/plain")?.body ?? content.topic;
+    const html = mtopic?.find(r => r.mimetype === "text/html")?.body;
+    return { text, html };
 };
 
 /**

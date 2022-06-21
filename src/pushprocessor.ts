@@ -57,31 +57,6 @@ const RULEKINDS_IN_ORDER = [
 //      and so we can put them here.
 const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
     {
-        // For homeservers which don't support MSC1930 yet
-        rule_id: ".m.rule.tombstone",
-        default: true,
-        enabled: true,
-        conditions: [
-            {
-                kind: ConditionKind.EventMatch,
-                key: "type",
-                pattern: "m.room.tombstone",
-            },
-            {
-                kind: ConditionKind.EventMatch,
-                key: "state_key",
-                pattern: "",
-            },
-        ],
-        actions: [
-            PushRuleActionName.Notify,
-            {
-                set_tweak: TweakName.Highlight,
-                value: true,
-            },
-        ],
-    },
-    {
         // For homeservers which don't support MSC2153 yet
         rule_id: ".m.rule.reaction",
         default: true,
@@ -108,10 +83,13 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
                 key: "type",
                 pattern: EventType.RoomServerAcl,
             },
+            {
+                kind: ConditionKind.EventMatch,
+                key: "state_key",
+                pattern: "",
+            },
         ],
-        actions: [
-            PushRuleActionName.DontNotify,
-        ],
+        actions: [],
     },
 ];
 

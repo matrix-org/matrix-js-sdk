@@ -17,7 +17,7 @@ limitations under the License.
 import { EventType } from "../@types/event";
 import { Room } from "../models/room";
 import { User } from "../models/user";
-import { MatrixEvent } from "../models/event";
+import { IEvent, MatrixEvent } from "../models/event";
 import { Filter } from "../filter";
 import { RoomSummary } from "../models/room-summary";
 import { IMinimalEvent, IRooms, ISyncResponse } from "../sync-accumulator";
@@ -218,4 +218,8 @@ export interface IStore {
     getClientOptions(): Promise<IStartClientOpts>;
 
     storeClientOptions(options: IStartClientOpts): Promise<void>;
+
+    getPendingEvents(roomId: string): Promise<Partial<IEvent>[]>;
+
+    setPendingEvents(roomId: string, events: Partial<IEvent>[]): Promise<void>;
 }

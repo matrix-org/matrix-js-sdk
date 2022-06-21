@@ -3,7 +3,7 @@ import { makeBeaconEvent, makeBeaconInfoEvent } from "../test-utils/beacon";
 import { filterEmitCallsByEventType } from "../test-utils/emitter";
 import { RoomState, RoomStateEvent } from "../../src/models/room-state";
 import { BeaconEvent, getBeaconInfoIdentifier } from "../../src/models/beacon";
-import { EventType, RelationType } from "../../src/@types/event";
+import { EventType, RelationType, UNSTABLE_MSC2716_MARKER } from "../../src/@types/event";
 import {
     MatrixEvent,
     MatrixEventEvent,
@@ -256,6 +256,29 @@ describe("RoomState", function() {
             expect(state.members[userB].setMembershipEvent).toHaveBeenCalledWith(
                 memberEvent, state,
             );
+        });
+
+        it("should emit `RoomStateEvent.Marker` for each marker event", function() {
+            const events = [
+                utils.mkEvent({
+                    event: true,
+                    type: UNSTABLE_MSC2716_MARKER.name,
+                    room: roomId,
+                    user: userA,
+                    skey: "",
+                    content: {
+                        "m.insertion_id": "$abc",
+                    },
+                }),
+            ];
+            let emitCount = 0;
+            state.on("RoomState.Marker", function(markerEvent, markerFoundOptions) {
+                expect(markerEvent).toEqual(events[emitCount]);
+                expect(markerFoundOptions).toEqual({ timelineWasEmpty: true });
+                emitCount += 1;
+            });
+            state.setStateEvents(events, { timelineWasEmpty: true });
+            expect(emitCount).toEqual(1);
         });
 
         describe('beacon events', () => {

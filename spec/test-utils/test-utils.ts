@@ -6,7 +6,7 @@ import '../olm-loader';
 
 import { logger } from '../../src/logger';
 import { IContent, IEvent, IUnsigned, MatrixEvent, MatrixEventEvent } from "../../src/models/event";
-import { ClientEvent, EventType, MatrixClient } from "../../src";
+import { ClientEvent, EventType, MatrixClient, MsgType } from "../../src";
 import { SyncState } from "../../src/sync";
 import { eventMapperFor } from "../../src/event-mapper";
 
@@ -74,7 +74,6 @@ interface IEventOpts {
     sender?: string;
     skey?: string;
     content: IContent;
-    event?: boolean;
     user?: string;
     unsigned?: IUnsigned;
     redacts?: string;
@@ -93,7 +92,9 @@ let testEventIndex = 1; // counter for events, easier for comparison of randomly
  * @param {MatrixClient} client If passed along with opts.event=true will be used to set up re-emitters.
  * @return {Object} a JSON object representing this event.
  */
-export function mkEvent(opts: IEventOpts, client?: MatrixClient): object | MatrixEvent {
+export function mkEvent(opts: IEventOpts & { event: true }, client?: MatrixClient): MatrixEvent;
+export function mkEvent(opts: IEventOpts & { event?: false }, client?: MatrixClient): object;
+export function mkEvent(opts: IEventOpts & { event?: boolean }, client?: MatrixClient): object | MatrixEvent {
     if (!opts.type || !opts.content) {
         throw new Error("Missing .type or .content =>" + JSON.stringify(opts));
     }
@@ -143,7 +144,9 @@ interface IPresenceOpts {
  * @param {Object} opts Values for the presence.
  * @return {Object|MatrixEvent} The event
  */
-export function mkPresence(opts: IPresenceOpts): object | MatrixEvent {
+export function mkPresence(opts: IPresenceOpts & { event: true }): MatrixEvent;
+export function mkPresence(opts: IPresenceOpts & { event?: false }): object;
+export function mkPresence(opts: IPresenceOpts & { event?: boolean }): object | MatrixEvent {
     const event = {
         event_id: "$" + Math.random() + "-" + Math.random(),
         type: "m.presence",
@@ -182,7 +185,9 @@ interface IMembershipOpts {
  * @param {boolean} opts.event True to make a MatrixEvent.
  * @return {Object|MatrixEvent} The event
  */
-export function mkMembership(opts: IMembershipOpts): object | MatrixEvent {
+export function mkMembership(opts: IMembershipOpts & { event: true }): MatrixEvent;
+export function mkMembership(opts: IMembershipOpts & { event?: false }): object;
+export function mkMembership(opts: IMembershipOpts & { event?: boolean }): object | MatrixEvent {
     const eventOpts: IEventOpts = {
         ...opts,
         type: EventType.RoomMember,
@@ -220,13 +225,59 @@ interface IMessageOpts {
  * @param {MatrixClient} client If passed along with opts.event=true will be used to set up re-emitters.
  * @return {Object|MatrixEvent} The event
  */
-export function mkMessage(opts: IMessageOpts, client?: MatrixClient): object | MatrixEvent {
+export function mkMessage(opts: IMessageOpts & { event: true }, client?: MatrixClient): MatrixEvent;
+export function mkMessage(opts: IMessageOpts & { event?: false }, client?: MatrixClient): object;
+export function mkMessage(opts: IMessageOpts & { event?: boolean }, client?: MatrixClient): object | MatrixEvent {
     const eventOpts: IEventOpts = {
         ...opts,
         type: EventType.RoomMessage,
         content: {
-            msgtype: "m.text",
+            msgtype: MsgType.Text,
             body: opts.msg,
+        },
+    };
+
+    if (!eventOpts.content.body) {
+        eventOpts.content.body = "Random->" + Math.random();
+    }
+    return mkEvent(eventOpts, client);
+}
+
+interface IReplyMessageOpts extends IMessageOpts {
+    replyToMessage: MatrixEvent;
+}
+
+/**
+ * Create a reply message.
+ *
+ * @param {Object} opts Values for the message
+ * @param {string} opts.room The room ID for the event.
+ * @param {string} opts.user The user ID for the event.
+ * @param {string} opts.msg Optional. The content.body for the event.
+ * @param {MatrixEvent} opts.replyToMessage The replied message
+ * @param {boolean} opts.event True to make a MatrixEvent.
+ * @param {MatrixClient} client If passed along with opts.event=true will be used to set up re-emitters.
+ * @return {Object|MatrixEvent} The event
+ */
+export function mkReplyMessage(opts: IReplyMessageOpts & { event: true }, client?: MatrixClient): MatrixEvent;
+export function mkReplyMessage(opts: IReplyMessageOpts & { event?: false }, client?: MatrixClient): object;
+export function mkReplyMessage(
+    opts: IReplyMessageOpts & { event?: boolean },
+    client?: MatrixClient,
+): object | MatrixEvent {
+    const eventOpts: IEventOpts = {
+        ...opts,
+        type: EventType.RoomMessage,
+        content: {
+            "msgtype": MsgType.Text,
+            "body": opts.msg,
+            "m.relates_to": {
+                "rel_type": "m.in_reply_to",
+                "event_id": opts.replyToMessage.getId(),
+                "m.in_reply_to": {
+                    "event_id": opts.replyToMessage.getId(),
+                },
+            },
         },
     };
 

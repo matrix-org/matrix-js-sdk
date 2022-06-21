@@ -4,62 +4,12 @@ on:
     workflows: [ "Tests" ]
     types:
       - completed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
 jobs:
   sonarqube:
-    name: SonarQube
-    runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'success'
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          repository: ${{ github.event.workflow_run.head_repository.full_name }}
-          ref: ${{ github.event.workflow_run.head_branch }} # checkout commit that triggered this workflow
-          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
-
-      # fetch develop so that Sonar can identify new issues in PR builds
-      - name: Fetch develop
-        if: "github.event.workflow_run.head_branch != 'develop'"
-        run: git rev-parse HEAD && git fetch origin develop:develop && git status && git rev-parse HEAD
-
-      # There's a 'download artifact' action, but it hasn't been updated for the workflow_run action
-      # (https://github.com/actions/download-artifact/issues/60) so instead we get this mess:
-      - name: Download Coverage Report
-        uses: actions/github-script@v3.1.0
-        with:
-          script: |
-            const artifacts = await github.actions.listWorkflowRunArtifacts({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                run_id: ${{ github.event.workflow_run.id }},
-            });
-            const matchArtifact = artifacts.data.artifacts.filter((artifact) => {
-                return artifact.name == "coverage"
-            })[0];
-            const download = await github.actions.downloadArtifact({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                artifact_id: matchArtifact.id,
-                archive_format: 'zip',
-            });
-            const fs = require('fs');
-            fs.writeFileSync('${{github.workspace}}/coverage.zip', Buffer.from(download.data));
-
-      - name: Extract Coverage Report
-        run: unzip -d coverage coverage.zip && rm coverage.zip
-
-      - name: Read version
-        id: version
-        uses: WyriHaximus/github-action-get-previous-tag@v1
-
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
-        with:
-          args: >
-            -Dsonar.projectVersion=${{ steps.version.outputs.tag }}
-            -Dsonar.scm.revision=${{ github.event.workflow_run.head_sha }}
-            -Dsonar.pullrequest.key=${{ github.event.workflow_run.pull_requests[0].number }}
-            -Dsonar.pullrequest.branch=${{ github.event.workflow_run.pull_requests[0].head.ref }}
-            -Dsonar.pullrequest.base=${{ github.event.workflow_run.pull_requests[0].base.ref }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    name: 🩻 SonarQube
+    uses: matrix-org/matrix-js-sdk/.github/workflows/sonarcloud.yml@develop
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

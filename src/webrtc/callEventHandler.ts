@@ -94,7 +94,7 @@ export class CallEventHandler {
             return eventType.startsWith("m.call.") || eventType.startsWith("org.matrix.call.");
         });
 
-        const ignoreCallIds = new Set<String>();
+        const ignoreCallIds = new Set<string>();
 
         // inspect the buffer and mark all calls which have been answered
         // or hung up before passing them to the call event handler.
@@ -297,7 +297,7 @@ export class CallEventHandler {
             }
 
             // Were we trying to call that user (room)?
-            let existingCall;
+            let existingCall: MatrixCall;
             for (const thisCall of this.calls.values()) {
                 const isCalling = [CallState.WaitLocalMedia, CallState.CreateOffer, CallState.InviteSent].includes(
                     thisCall.state,
@@ -384,7 +384,7 @@ export class CallEventHandler {
 
         // The following events need a call and a peer connection
         if (!call || !call.hasPeerConnection) {
-            logger.warn("Discarding an event, we don't have a call/peerConn", type);
+            logger.info(`Discarding possible call event ${event.getId()} as we don't have a call/peerConn`, type);
             return;
         }
         // Ignore remote echo
