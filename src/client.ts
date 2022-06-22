@@ -193,6 +193,7 @@ import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { ReceiptType } from "./@types/read_receipts";
 import { Thread, THREAD_RELATION_TYPE } from "./models/thread";
 import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
+import { UnstableValue } from "./NamespacedValue";
 
 export type Store = IStore;
 export type SessionStore = WebStorageSessionStore;
@@ -885,6 +886,8 @@ export type ClientEventHandlerMap = {
     & CallEventHandlerMap
     & HttpApiEventHandlerMap
     & BeaconEventHandlerMap;
+
+const UNSTABLE_MSC3824_ACTION_PARAM = new UnstableValue("action", "org.matrix.msc3824.action");
 
 /**
  * Represents a Matrix Client. Only directly construct this if you want to use
@@ -7077,7 +7080,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             url += "/" + idpId;
         }
 
-        return this.http.getUrl(url, { redirectUrl, action }, PREFIX_R0);
+        const params = { redirectUrl };
+        params[UNSTABLE_MSC3824_ACTION_PARAM.unstable] = action;
+
+        return this.http.getUrl(url, params, PREFIX_R0);
     }
 
     /**
