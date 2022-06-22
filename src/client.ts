@@ -168,7 +168,6 @@ import {
 import { IAbortablePromise, IdServerUnbindResult, IImageInfo, Preset, Visibility } from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
 import { randomString } from "./randomstring";
-import { WebStorageSessionStore } from "./store/session/webstorage";
 import { BackupManager, IKeyBackup, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE, MSC3089TreeSpace } from "./models/MSC3089TreeSpace";
 import { ISignatures } from "./@types/signed";
@@ -196,7 +195,6 @@ import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
 import { UnstableValue } from "./NamespacedValue";
 
 export type Store = IStore;
-export type SessionStore = WebStorageSessionStore;
 
 export type Callback<T = any> = (err: Error | any | null, data?: T) => void;
 export type ResetTimelineCallback = (roomId: string) => boolean;
@@ -315,21 +313,6 @@ export interface ICreateClientOpts {
      * Key used to pickle olm objects or other sensitive data.
      */
     pickleKey?: string;
-
-    /**
-     * A store to be used for end-to-end crypto session data. Most data has been
-     * migrated out of here to `cryptoStore` instead. If not specified,
-     * end-to-end crypto will be disabled. The `createClient` helper
-     * _will not_ create this store at the moment.
-     */
-    sessionStore?: SessionStore;
-
-    /**
-     * Set to true to enable client-side aggregation of event relations
-     * via `EventTimelineSet#getRelationsForEvent`.
-     * This feature is currently unstable and the API may change without notice.
-     */
-    unstableClientRelationAggregation?: boolean;
 
     verificationMethods?: Array<VerificationMethod>;
 
@@ -591,13 +574,9 @@ export interface IRequestMsisdnTokenResponse extends IRequestTokenResponse {
     intl_fmt: string;
 }
 
-interface IUploadKeysRequest {
+export interface IUploadKeysRequest {
     device_keys?: Required<IDeviceKeys>;
-    one_time_keys?: {
-        [userId: string]: {
-            [deviceId: string]: number;
-        };
-    };
+    one_time_keys?: Record<string, IOneTimeKey>;
     "org.matrix.msc2732.fallback_keys"?: Record<string, IOneTimeKey>;
 }
 
@@ -816,6 +795,7 @@ type RoomEvents = RoomEvent.Name
     | RoomEvent.Receipt
     | RoomEvent.Tags
     | RoomEvent.LocalEchoUpdated
+    | RoomEvent.HistoryImportedWithinTimeline
     | RoomEvent.AccountData
     | RoomEvent.MyMembership
     | RoomEvent.Timeline
@@ -825,6 +805,7 @@ type RoomStateEvents = RoomStateEvent.Events
     | RoomStateEvent.Members
     | RoomStateEvent.NewMember
     | RoomStateEvent.Update
+    | RoomStateEvent.Marker
     ;
 
 type CryptoEvents = CryptoEvent.KeySignatureUploadFailure
@@ -908,9 +889,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public clientRunning = false;
     public timelineSupport = false;
     public urlPreviewCache: { [key: string]: Promise<IPreviewUrlResponse> } = {};
-    public unstableClientRelationAggregation = false;
     public identityServer: IIdentityServerProvider;
-    public sessionStore: SessionStore; // XXX: Intended private, used in code.
     public http: MatrixHttpApi; // XXX: Intended private, used in code.
     public crypto: Crypto; // XXX: Intended private, used in code.
     public cryptoCallbacks: ICryptoCallbacks; // XXX: Intended private, used in code.
@@ -1040,10 +1019,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         this.timelineSupport = Boolean(opts.timelineSupport);
-        this.unstableClientRelationAggregation = !!opts.unstableClientRelationAggregation;
 
         this.cryptoStore = opts.cryptoStore;
-        this.sessionStore = opts.sessionStore;
         this.verificationMethods = opts.verificationMethods;
         this.cryptoCallbacks = opts.cryptoCallbacks || {};
 
@@ -1668,10 +1645,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return;
         }
 
-        if (!this.sessionStore) {
-            // this is temporary, the sessionstore is supposed to be going away
-            throw new Error(`Cannot enable encryption: no sessionStore provided`);
-        }
         if (!this.cryptoStore) {
             // the cryptostore is provided by sdk.createClient, so this shouldn't happen
             throw new Error(`Cannot enable encryption: no cryptoStore provided`);
@@ -1700,8 +1673,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const crypto = new Crypto(
             this,
-            this.sessionStore,
-            userId, this.deviceId,
+            userId,
+            this.deviceId,
             this.store,
             this.cryptoStore,
             this.roomList,
@@ -3777,17 +3750,20 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // If we expect that an event is part of a thread but is missing the relation
         // we need to add it manually, as well as the reply fallback
         if (threadId && !content["m.relates_to"]?.rel_type) {
+            const isReply = !!content["m.relates_to"]?.["m.in_reply_to"];
             content["m.relates_to"] = {
                 ...content["m.relates_to"],
                 "rel_type": THREAD_RELATION_TYPE.name,
                 "event_id": threadId,
+                // Set is_falling_back to true unless this is actually intended to be a reply
+                "is_falling_back": !isReply,
             };
             const thread = this.getRoom(roomId)?.getThread(threadId);
-            if (thread) {
+            if (thread && !isReply) {
                 content["m.relates_to"]["m.in_reply_to"] = {
                     "event_id": thread.lastReply((ev: MatrixEvent) => {
                         return ev.isRelation(THREAD_RELATION_TYPE.name) && !ev.status;
-                    })?.getId(),
+                    })?.getId() ?? threadId,
                 };
             }
         }
@@ -4036,7 +4012,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $txnId: txnId,
         };
 
-        let path;
+        let path: string;
 
         if (event.isState()) {
             let pathTemplate = "/rooms/$roomId/state/$eventType";
@@ -5256,14 +5232,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * <p>If the EventTimelineSet object already has the given event in its store, the
      * corresponding timeline will be returned. Otherwise, a /context request is
      * made, and used to construct an EventTimeline.
+     * If the event does not belong to this EventTimelineSet then undefined will be returned.
      *
-     * @param {EventTimelineSet} timelineSet  The timelineSet to look for the event in
+     * @param {EventTimelineSet} timelineSet  The timelineSet to look for the event in, must be bound to a room
      * @param {string} eventId  The ID of the event to look for
      *
      * @return {Promise} Resolves:
      *    {@link module:models/event-timeline~EventTimeline} including the given event
      */
-    public async getEventTimeline(timelineSet: EventTimelineSet, eventId: string): Promise<EventTimeline> {
+    public async getEventTimeline(timelineSet: EventTimelineSet, eventId: string): Promise<EventTimeline | undefined> {
         // don't allow any timeline support unless it's been enabled.
         if (!this.timelineSupport) {
             throw new Error("timeline support is disabled. Set the 'timelineSupport'" +
@@ -5300,45 +5277,44 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const mapper = this.getEventMapper();
         const event = mapper(res.event);
         const events = [
-            // we start with the last event, since that's the point at which we have known state.
+            // Order events from most recent to oldest (reverse-chronological).
+            // We start with the last event, since that's the point at which we have known state.
             // events_after is already backwards; events_before is forwards.
             ...res.events_after.reverse().map(mapper),
             event,
             ...res.events_before.map(mapper),
         ];
 
-        // Where the event is a thread reply (not a root) and running in MSC-enabled mode the Thread timeline only
-        // functions contiguously, so we have to jump through some hoops to get our target event in it.
-        // XXX: workaround for https://github.com/vector-im/element-meta/issues/150
-        if (Thread.hasServerSideSupport &&
-            this.supportsExperimentalThreads() &&
-            event.isRelation(THREAD_RELATION_TYPE.name)
-        ) {
-            const [, threadedEvents] = timelineSet.room.partitionThreadedEvents(events);
-            let thread = timelineSet.room.getThread(event.threadRootId);
-            if (!thread) {
-                thread = timelineSet.room.createThread(event.threadRootId, undefined, threadedEvents, true);
+        if (this.supportsExperimentalThreads()) {
+            if (!timelineSet.canContain(event)) {
+                return undefined;
             }
 
-            const opts: IRelationsRequestOpts = {
-                direction: Direction.Backward,
-                limit: 50,
-            };
+            // Where the event is a thread reply (not a root) and running in MSC-enabled mode the Thread timeline only
+            // functions contiguously, so we have to jump through some hoops to get our target event in it.
+            // XXX: workaround for https://github.com/vector-im/element-meta/issues/150
+            if (Thread.hasServerSideSupport && timelineSet.thread) {
+                const thread = timelineSet.thread;
+                const opts: IRelationsRequestOpts = {
+                    direction: Direction.Backward,
+                    limit: 50,
+                };
 
-            await thread.fetchInitialEvents();
-            let nextBatch = thread.liveTimeline.getPaginationToken(Direction.Backward);
+                await thread.fetchInitialEvents();
+                let nextBatch = thread.liveTimeline.getPaginationToken(Direction.Backward);
 
-            // Fetch events until we find the one we were asked for, or we run out of pages
-            while (!thread.findEventById(eventId)) {
-                if (nextBatch) {
-                    opts.from = nextBatch;
+                // Fetch events until we find the one we were asked for, or we run out of pages
+                while (!thread.findEventById(eventId)) {
+                    if (nextBatch) {
+                        opts.from = nextBatch;
+                    }
+
+                    ({ nextBatch } = await thread.fetchEvents(opts));
+                    if (!nextBatch) break;
                 }
 
-                ({ nextBatch } = await thread.fetchEvents(opts));
-                if (!nextBatch) break;
+                return thread.liveTimeline;
             }
-
-            return thread.liveTimeline;
         }
 
         // Here we handle non-thread timelines only, but still process any thread events to populate thread summaries.
@@ -5363,6 +5339,45 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return timelineSet.getTimelineForEvent(eventId)
             ?? timelineSet.room.findThreadForEvent(event)?.liveTimeline // for Threads degraded support
             ?? timeline;
+    }
+
+    /**
+     * Get an EventTimeline for the latest events in the room. This will just
+     * call `/messages` to get the latest message in the room, then use
+     * `client.getEventTimeline(...)` to construct a new timeline from it.
+     *
+     * @param {EventTimelineSet} timelineSet  The timelineSet to find or add the timeline to
+     *
+     * @return {Promise} Resolves:
+     *    {@link module:models/event-timeline~EventTimeline} timeline with the latest events in the room
+     */
+    public async getLatestTimeline(timelineSet: EventTimelineSet): Promise<EventTimeline> {
+        // don't allow any timeline support unless it's been enabled.
+        if (!this.timelineSupport) {
+            throw new Error("timeline support is disabled. Set the 'timelineSupport'" +
+                " parameter to true when creating MatrixClient to enable it.");
+        }
+
+        const messagesPath = utils.encodeUri(
+            "/rooms/$roomId/messages", {
+                $roomId: timelineSet.room.roomId,
+            },
+        );
+
+        const params: Record<string, string | string[]> = {
+            dir: 'b',
+        };
+        if (this.clientOpts.lazyLoadMembers) {
+            params.filter = JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER);
+        }
+
+        const res = await this.http.authedRequest<IMessagesResponse>(undefined, Method.Get, messagesPath, params);
+        const event = res.chunk?.[0];
+        if (!event) {
+            throw new Error("No message returned from /messages when trying to construct getLatestTimeline");
+        }
+
+        return this.getEventTimeline(timelineSet, event.event_id);
     }
 
     /**

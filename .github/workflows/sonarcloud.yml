@@ -2,91 +2,23 @@
 name: SonarCloud
 on:
   workflow_call:
-    inputs:
-      repo:
-        type: string
-        required: true
-        description: The full name of the repo in org/repo format
-      head_branch:
-        type: string
-        required: true
-        description: The name of the head branch
-      # We cannot use ${{ github.sha }} here as for pull requests it'll be a simulated merge commit instead
-      revision:
-        type: string
-        required: true
-        description: The git revision with which this sonar run should be associated
-
-      # Coverage specific parameters, assumes coverage reports live in a /coverage/ directory
-      coverage_workflow_name:
-        type: string
-        required: false
-        description: The name of the workflow which uploaded the `coverage` artifact, if any
-      coverage_run_id:
-        type: string
-        required: false
-        description: The run_id of the workflow which upload the coverage relevant to this run
-
-      # PR specific parameters
-      pr_id:
-        type: string
-        required: false
-        description: The ID number of the PR if this workflow is being triggered due to one
-      base_branch:
-        type: string
-        required: false
-        description: The base branch of the PR if this workflow is being triggered due to one
     secrets:
       SONAR_TOKEN:
         required: true
 jobs:
-  analysis:
-    name: Analysis
+  sonarqube:
     runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
     steps:
-      - name: "🧮 Checkout code"
-        uses: actions/checkout@v3
-        with:
-          repository: ${{ inputs.repo }}
-          ref: ${{ inputs.head_branch }} # checkout commit that triggered this workflow
-          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
-
-      # Fetch base branch from the upstream repo so that Sonar can identify new code in PR builds
-      - name: "📕 Fetch upstream base branch"
-        # workflow_call retains the github context of the caller, so `repository` will be upstream always due
-        # to it running on `workflow_run` which is called from the context of the target repo and not the fork.
-        if: inputs.base_branch
-        run: |
-          git remote add upstream https://github.com/${{ github.repository }}
-          git rev-parse HEAD
-          git fetch upstream ${{ inputs.base_branch }}:${{ inputs.base_branch }}
-          git status
-          git rev-parse HEAD
-
-      # There's a 'download artifact' action, but it hasn't been updated for the workflow_run action
-      # (https://github.com/actions/download-artifact/issues/60) so instead we get this alternative:
-      - name: "📥 Download Coverage Report"
-        uses: dawidd6/action-download-artifact@v2
-        if: inputs.coverage_workflow_name
-        with:
-          workflow: ${{ inputs.coverage_workflow_name }}
-          run_id: ${{ inputs.coverage_run_id }}
-          name: coverage
-          path: coverage
-
-      - name: "🔍 Read package.json version"
-        id: version
-        uses: martinbeentjes/npm-get-version-action@main
-
       - name: "🩻 SonarCloud Scan"
-        uses: SonarSource/sonarcloud-github-action@master
+        uses: matrix-org/sonarcloud-workflow-action@v2.2
         with:
-          args: >
-            -Dsonar.projectVersion=${{ steps.version.outputs.current-version }}
-            -Dsonar.scm.revision=${{ inputs.revision }}
-            -Dsonar.pullrequest.key=${{ inputs.pr_id }}
-            -Dsonar.pullrequest.branch=${{ inputs.pr_id && inputs.head_branch }}
-            -Dsonar.pullrequest.base=${{ inputs.pr_id && inputs.base_branch }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed to get PR information, if any
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          repository: ${{ github.event.workflow_run.head_repository.full_name }}
+          is_pr: ${{ github.event.workflow_run.event == 'pull_request' }}
+          version_cmd: 'cat package.json | jq -r .version'
+          branch: ${{ github.event.workflow_run.head_branch }}
+          revision: ${{ github.event.workflow_run.head_sha }}
+          token: ${{ secrets.SONAR_TOKEN }}
+          coverage_run_id: ${{ github.event.workflow_run.id }}
+          coverage_workflow_name: tests.yml
+          coverage_extract_path: coverage

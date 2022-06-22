@@ -17,13 +17,17 @@ limitations under the License.
 import 'fake-indexeddb/auto';
 import 'jest-localstorage-mock';
 
-import { IndexedDBStore, IStateEventWithRoomId } from "../../../src";
+import { IndexedDBStore, IStateEventWithRoomId, MemoryStore } from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";
 import { LocalIndexedDBStoreBackend } from "../../../src/store/indexeddb-local-backend";
 
 describe("IndexedDBStore", () => {
+    afterEach(() => {
+        jest.clearAllMocks();
+    });
+
+    const roomId = "!room:id";
     it("should degrade to MemoryStore on IDB errors", async () => {
-        const roomId = "!room:id";
         const store = new IndexedDBStore({
             indexedDB: indexedDB,
             dbName: "database",
@@ -68,5 +72,43 @@ describe("IndexedDBStore", () => {
             store.setOutOfBandMembers(roomId, [member1, member2]),
         ]);
         expect(await store.getOutOfBandMembers(roomId)).toHaveLength(2);
+    });
+
+    it("should use MemoryStore methods for pending events if no localStorage", async () => {
+        jest.spyOn(MemoryStore.prototype, "setPendingEvents");
+        jest.spyOn(MemoryStore.prototype, "getPendingEvents");
+
+        const store = new IndexedDBStore({
+            indexedDB: indexedDB,
+            dbName: "database",
+            localStorage: undefined,
+        });
+
+        const events = [{ type: "test" }];
+        await store.setPendingEvents(roomId, events);
+        expect(MemoryStore.prototype.setPendingEvents).toHaveBeenCalledWith(roomId, events);
+        await expect(store.getPendingEvents(roomId)).resolves.toEqual(events);
+        expect(MemoryStore.prototype.getPendingEvents).toHaveBeenCalledWith(roomId);
+    });
+
+    it("should persist pending events to localStorage if available", async () => {
+        jest.spyOn(MemoryStore.prototype, "setPendingEvents");
+        jest.spyOn(MemoryStore.prototype, "getPendingEvents");
+
+        const store = new IndexedDBStore({
+            indexedDB: indexedDB,
+            dbName: "database",
+            localStorage,
+        });
+
+        await expect(store.getPendingEvents(roomId)).resolves.toEqual([]);
+        const events = [{ type: "test" }];
+        await store.setPendingEvents(roomId, events);
+        expect(MemoryStore.prototype.setPendingEvents).not.toHaveBeenCalled();
+        await expect(store.getPendingEvents(roomId)).resolves.toEqual(events);
+        expect(MemoryStore.prototype.getPendingEvents).not.toHaveBeenCalled();
+        expect(localStorage.getItem("mx_pending_events_" + roomId)).toBe(JSON.stringify(events));
+        await store.setPendingEvents(roomId, []);
+        expect(localStorage.getItem("mx_pending_events_" + roomId)).toBeNull();
     });
 });

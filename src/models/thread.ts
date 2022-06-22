@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { Optional } from "matrix-events-sdk";
+
 import { MatrixClient, MatrixEventEvent, RelationType, RoomEvent } from "../matrix";
 import { TypedReEmitter } from "../ReEmitter";
 import { IRelationsRequestOpts } from "../@types/requests";
@@ -88,10 +90,9 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         this.room = opts.room;
         this.client = opts.client;
         this.timelineSet = new EventTimelineSet(this.room, {
-            unstableClientRelationAggregation: true,
             timelineSupport: true,
             pendingEvents: true,
-        });
+        }, this.client, this);
         this.reEmitter = new TypedReEmitter(this);
 
         this.reEmitter.reEmit(this.timelineSet, [
@@ -166,6 +167,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     private onEcho = (event: MatrixEvent) => {
         if (event.threadRootId !== this.id) return; // ignore echoes for other timelines
         if (this.lastEvent === event) return;
+        if (!event.isRelation(THREAD_RELATION_TYPE.name)) return;
 
         // There is a risk that the `localTimestamp` approximation will not be accurate
         // when threads are used over federation. That could result in the reply
@@ -199,9 +201,11 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             this.timelineSet.addEventToTimeline(
                 event,
                 this.liveTimeline,
-                toStartOfTimeline,
-                false,
-                this.roomState,
+                {
+                    toStartOfTimeline,
+                    fromCache: false,
+                    roomState: this.roomState,
+                },
             );
         }
     }
@@ -227,13 +231,6 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             this._currentUserParticipated = true;
         }
 
-        if ([RelationType.Annotation, RelationType.Replace].includes(event.getRelation()?.rel_type as RelationType)) {
-            // Apply annotations and replace relations to the relations of the timeline only
-            this.timelineSet.setRelationsTarget(event);
-            this.timelineSet.aggregateRelations(event);
-            return;
-        }
-
         // Add all incoming events to the thread's timeline set when there's  no server support
         if (!Thread.hasServerSideSupport) {
             // all the relevant membership info to hydrate events with a sender
@@ -249,6 +246,11 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         ) {
             this.fetchEditsWhereNeeded(event);
             this.addEventToTimeline(event, false);
+        } else if (event.isRelation(RelationType.Annotation) || event.isRelation(RelationType.Replace)) {
+            // Apply annotations and replace relations to the relations of the timeline only
+            this.timelineSet.relations.aggregateParentEvent(event);
+            this.timelineSet.relations.aggregateChildEvent(event, this.timelineSet);
+            return;
         }
 
         // If no thread support exists we want to count all thread relation
@@ -291,6 +293,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     // XXX: Workaround for https://github.com/matrix-org/matrix-spec-proposals/pull/2676/files#r827240084
     private async fetchEditsWhereNeeded(...events: MatrixEvent[]): Promise<unknown> {
         return Promise.all(events.filter(e => e.isEncrypted()).map((event: MatrixEvent) => {
+            if (event.isRelation()) return; // skip - relations don't get edits
             return this.client.relations(this.roomId, event.getId(), RelationType.Replace, event.getType(), {
                 limit: 1,
             }).then(relations => {
@@ -327,15 +330,16 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     }
 
     /**
-     * Return last reply to the thread
+     * Return last reply to the thread, if known.
      */
-    public lastReply(matches: (ev: MatrixEvent) => boolean = () => true): MatrixEvent {
+    public lastReply(matches: (ev: MatrixEvent) => boolean = () => true): Optional<MatrixEvent> {
         for (let i = this.events.length - 1; i >= 0; i--) {
             const event = this.events[i];
             if (matches(event)) {
                 return event;
             }
         }
+        return null;
     }
 
     public get roomId(): string {
@@ -352,9 +356,9 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     }
 
     /**
-     * A getter for the last event added to the thread
+     * A getter for the last event added to the thread, if known.
      */
-    public get replyToEvent(): MatrixEvent {
+    public get replyToEvent(): Optional<MatrixEvent> {
         return this.lastEvent ?? this.lastReply();
     }
 

@@ -21,7 +21,6 @@ import * as olmlib from "../../../src/crypto/olmlib";
 import { MatrixClient } from "../../../src/client";
 import { MatrixEvent } from "../../../src/models/event";
 import * as algorithms from "../../../src/crypto/algorithms";
-import { WebStorageSessionStore } from "../../../src/store/session/webstorage";
 import { MemoryCryptoStore } from "../../../src/crypto/store/memory-crypto-store";
 import { MockStorageApi } from "../../MockStorageApi";
 import * as testUtils from "../../test-utils/test-utils";
@@ -118,7 +117,7 @@ function saveCrossSigningKeys(k) {
     Object.assign(keys, k);
 }
 
-function makeTestClient(sessionStore, cryptoStore) {
+function makeTestClient(cryptoStore) {
     const scheduler = [
         "getQueueForEvent", "queueEvent", "removeEventFromQueue",
         "setProcessFunction",
@@ -141,7 +140,6 @@ function makeTestClient(sessionStore, cryptoStore) {
         scheduler: scheduler,
         userId: "@alice:bar",
         deviceId: "device",
-        sessionStore: sessionStore,
         cryptoStore: cryptoStore,
         cryptoCallbacks: { getCrossSigningKey, saveCrossSigningKeys },
     });
@@ -161,7 +159,6 @@ describe("MegolmBackup", function() {
     let mockOlmLib;
     let mockCrypto;
     let mockStorage;
-    let sessionStore;
     let cryptoStore;
     let megolmDecryption;
     beforeEach(async function() {
@@ -174,7 +171,6 @@ describe("MegolmBackup", function() {
         mockCrypto.backupInfo = CURVE25519_BACKUP_INFO;
 
         mockStorage = new MockStorageApi();
-        sessionStore = new WebStorageSessionStore(mockStorage);
         cryptoStore = new MemoryCryptoStore(mockStorage);
 
         olmDevice = new OlmDevice(cryptoStore);
@@ -261,7 +257,7 @@ describe("MegolmBackup", function() {
             const ibGroupSession = new Olm.InboundGroupSession();
             ibGroupSession.create(groupSession.session_key());
 
-            const client = makeTestClient(sessionStore, cryptoStore);
+            const client = makeTestClient(cryptoStore);
 
             megolmDecryption = new MegolmDecryption({
                 userId: '@user:id',
@@ -340,7 +336,7 @@ describe("MegolmBackup", function() {
             const ibGroupSession = new Olm.InboundGroupSession();
             ibGroupSession.create(groupSession.session_key());
 
-            const client = makeTestClient(sessionStore, cryptoStore);
+            const client = makeTestClient(cryptoStore);
 
             megolmDecryption = new MegolmDecryption({
                 userId: '@user:id',
@@ -423,7 +419,7 @@ describe("MegolmBackup", function() {
             const ibGroupSession = new Olm.InboundGroupSession();
             ibGroupSession.create(groupSession.session_key());
 
-            const client = makeTestClient(sessionStore, cryptoStore);
+            const client = makeTestClient(cryptoStore);
 
             megolmDecryption = new MegolmDecryption({
                 userId: '@user:id',
@@ -520,7 +516,6 @@ describe("MegolmBackup", function() {
                 scheduler: scheduler,
                 userId: "@alice:bar",
                 deviceId: "device",
-                sessionStore: sessionStore,
                 cryptoStore: cryptoStore,
             });
 
@@ -606,7 +601,7 @@ describe("MegolmBackup", function() {
         let client;
 
         beforeEach(function() {
-            client = makeTestClient(sessionStore, cryptoStore);
+            client = makeTestClient(cryptoStore);
 
             megolmDecryption = new MegolmDecryption({
                 userId: '@user:id',

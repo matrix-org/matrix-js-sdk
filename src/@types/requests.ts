@@ -22,6 +22,7 @@ import { IRoomEventFilter } from "../filter";
 import { Direction } from "../models/event-timeline";
 import { PushRuleAction } from "./PushRules";
 import { IRoomEvent } from "../sync-accumulator";
+import { RoomType } from "./event";
 
 // allow camelcase as these are things that go onto the wire
 /* eslint-disable camelcase */
@@ -111,7 +112,8 @@ export interface IRoomDirectoryOptions {
     limit?: number;
     since?: string;
     filter?: {
-        generic_search_term: string;
+        generic_search_term?: string;
+        "org.matrix.msc3827.room_types"?: Array<RoomType | null>;
     };
     include_all_networks?: boolean;
     third_party_instance_id?: string;

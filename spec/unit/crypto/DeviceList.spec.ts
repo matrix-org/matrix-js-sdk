@@ -1,7 +1,7 @@
 /*
 Copyright 2017 Vector Creations Ltd
 Copyright 2018, 2019 New Vector Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2019, 2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,8 +20,10 @@ import { logger } from "../../../src/logger";
 import * as utils from "../../../src/utils";
 import { MemoryCryptoStore } from "../../../src/crypto/store/memory-crypto-store";
 import { DeviceList } from "../../../src/crypto/DeviceList";
+import { IDownloadKeyResult, MatrixClient } from "../../../src";
+import { OlmDevice } from "../../../src/crypto/OlmDevice";
 
-const signedDeviceList = {
+const signedDeviceList: IDownloadKeyResult = {
     "failures": {},
     "device_keys": {
         "@test1:sw1v.org": {
@@ -45,13 +47,15 @@ const signedDeviceList = {
                     "m.megolm.v1.aes-sha2",
                 ],
                 "device_id": "HGKAWHRVJQ",
-                "unsigned": {},
+                "unsigned": {
+                    "device_display_name": "",
+                },
             },
         },
     },
 };
 
-const signedDeviceList2 = {
+const signedDeviceList2: IDownloadKeyResult = {
     "failures": {},
     "device_keys": {
         "@test2:sw1v.org": {
@@ -75,7 +79,9 @@ const signedDeviceList2 = {
                     "m.megolm.v1.aes-sha2",
                 ],
                 "device_id": "QJVRHWAKGH",
-                "unsigned": {},
+                "unsigned": {
+                    "device_display_name": "",
+                },
             },
         },
     },
@@ -104,10 +110,10 @@ describe('DeviceList', function() {
             downloadKeysForUsers: downloadSpy,
             getUserId: () => '@test1:sw1v.org',
             deviceId: 'HGKAWHRVJQ',
-        };
+        } as unknown as MatrixClient;
         const mockOlm = {
             verifySignature: function(key, message, signature) {},
-        };
+        } as unknown as OlmDevice;
         const dl = new DeviceList(baseApis, cryptoStore, mockOlm, keyDownloadChunkSize);
         deviceLists.push(dl);
         return dl;
@@ -118,7 +124,7 @@ describe('DeviceList', function() {
 
         dl.startTrackingDeviceList('@test1:sw1v.org');
 
-        const queryDefer1 = utils.defer();
+        const queryDefer1 = utils.defer<IDownloadKeyResult>();
         downloadSpy.mockReturnValue(queryDefer1.promise);
 
         const prom1 = dl.refreshOutdatedDeviceLists();
@@ -138,7 +144,7 @@ describe('DeviceList', function() {
 
         dl.startTrackingDeviceList('@test1:sw1v.org');
 
-        const queryDefer1 = utils.defer();
+        const queryDefer1 = utils.defer<IDownloadKeyResult>();
         downloadSpy.mockReturnValue(queryDefer1.promise);
 
         const prom1 = dl.refreshOutdatedDeviceLists();
@@ -155,6 +161,7 @@ describe('DeviceList', function() {
         dl.saveIfDirty().then(() => {
             // the first request completes
             queryDefer1.resolve({
+                failures: {},
                 device_keys: {
                     '@test1:sw1v.org': {},
                 },
@@ -166,7 +173,7 @@ describe('DeviceList', function() {
             logger.log("Creating new devicelist to simulate app reload");
             downloadSpy.mockReset();
             const dl2 = createTestDeviceList();
-            const queryDefer3 = utils.defer();
+            const queryDefer3 = utils.defer<IDownloadKeyResult>();
             downloadSpy.mockReturnValue(queryDefer3.promise);
 
             const prom3 = dl2.refreshOutdatedDeviceLists();
@@ -190,9 +197,9 @@ describe('DeviceList', function() {
         dl.startTrackingDeviceList('@test1:sw1v.org');
         dl.startTrackingDeviceList('@test2:sw1v.org');
 
-        const queryDefer1 = utils.defer();
+        const queryDefer1 = utils.defer<IDownloadKeyResult>();
         downloadSpy.mockReturnValueOnce(queryDefer1.promise);
-        const queryDefer2 = utils.defer();
+        const queryDefer2 = utils.defer<IDownloadKeyResult>();
         downloadSpy.mockReturnValueOnce(queryDefer2.promise);
 
         const prom1 = dl.refreshOutdatedDeviceLists();
