@@ -604,7 +604,10 @@ export class SyncApi {
     }
 
     private shouldAbortSync(error: MatrixError): boolean {
-        if (error.errcode === "M_UNKNOWN_TOKEN") {
+        if (!this.running) {
+            logger.info("No longer running - assuming logout");
+            return true;
+        } else if (error.errcode === "M_UNKNOWN_TOKEN") {
             // The logout already happened, we just need to stop.
             logger.warn("Token no longer valid - assuming logout");
             this.stop();
