@@ -218,7 +218,7 @@ export enum CallErrorCode {
 /**
  * The version field that we set in m.call.* events
  */
-const VOIP_PROTO_VERSION = 1;
+const VOIP_PROTO_VERSION = "1";
 
 /** The fallback ICE server to use for STUN or TURN protocols. */
 const FALLBACK_ICE_SERVER = 'stun:turn.matrix.org';
@@ -909,7 +909,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (this.state === CallState.WaitLocalMedia) return;
         const content = {};
         // Don't send UserHangup reason to older clients
-        if ((this.opponentVersion && this.opponentVersion >= 1) || reason !== CallErrorCode.UserHangup) {
+        if ((this.opponentVersion && this.opponentVersion !== 0) || reason !== CallErrorCode.UserHangup) {
             content["reason"] = reason;
         }
         this.sendVoipEvent(EventType.CallHangup, content);
@@ -925,7 +925,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             throw Error("Call must be in 'ringing' state to reject!");
         }
 
-        if (this.opponentVersion < 1) {
+        if (this.opponentVersion === 0) {
             logger.info(
                 `Opponent version is less than 1 (${this.opponentVersion}): sending hangup instead of reject`,
             );
