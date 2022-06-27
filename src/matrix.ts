@@ -14,10 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { WidgetApi } from "matrix-widget-api";
+
 import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store";
 import { MemoryStore } from "./store/memory";
 import { MatrixScheduler } from "./scheduler";
 import { MatrixClient, ICreateClientOpts } from "./client";
+import { RoomWidgetClient, IEventRequests } from "./embedded";
 import { DeviceTrustLevel } from "./crypto/CrossSigning";
 import { ISecretStorageKeyInfo } from "./crypto/api";
 
@@ -131,6 +134,19 @@ export interface ICryptoCallbacks {
     getBackupKey?: () => Promise<Uint8Array>;
 }
 
+function amendClientOpts(opts: ICreateClientOpts | string): ICreateClientOpts {
+    if (typeof opts === "string") opts = { baseUrl: opts };
+
+    opts.request = opts.request ?? requestInstance;
+    opts.store = opts.store ?? new MemoryStore({
+        localStorage: global.localStorage,
+    });
+    opts.scheduler = opts.scheduler ?? new MatrixScheduler();
+    opts.cryptoStore = opts.cryptoStore ?? cryptoStoreFactory();
+
+    return opts;
+}
+
 /**
  * Construct a Matrix Client. Similar to {@link module:client.MatrixClient}
  * except that the 'request', 'store' and 'scheduler' dependencies are satisfied.
@@ -154,19 +170,16 @@ export interface ICryptoCallbacks {
  * @see {@link module:client.MatrixClient} for the full list of options for
  * <code>opts</code>.
  */
-export function createClient(opts: ICreateClientOpts | string) {
-    if (typeof opts === "string") {
-        opts = {
-            "baseUrl": opts,
-        };
-    }
-    opts.request = opts.request || requestInstance;
-    opts.store = opts.store || new MemoryStore({
-        localStorage: global.localStorage,
-    });
-    opts.scheduler = opts.scheduler || new MatrixScheduler();
-    opts.cryptoStore = opts.cryptoStore || cryptoStoreFactory();
-    return new MatrixClient(opts);
+export function createClient(opts: ICreateClientOpts | string): MatrixClient {
+    return new MatrixClient(amendClientOpts(opts));
+}
+export function createRoomWidgetClient(
+    widgetApi: WidgetApi,
+    eventRequests: IEventRequests,
+    roomId: string,
+    opts: ICreateClientOpts | string,
+): MatrixClient {
+    return new RoomWidgetClient(widgetApi, eventRequests, roomId, amendClientOpts(opts));
 }
 
 /**

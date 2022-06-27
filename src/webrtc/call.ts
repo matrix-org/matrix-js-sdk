@@ -2070,36 +2070,33 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         if (this.opponentDeviceId) {
             const toDeviceSeq = this.toDeviceSeq++;
+            const payload = {
+                ...realContent,
+                device_id: this.client.deviceId,
+                sender_session_id: this.client.getSessionId(),
+                dest_session_id: this.opponentSessionId,
+                seq: toDeviceSeq,
+            };
 
             this.emit(CallEvent.SendVoipEvent, {
                 type: "toDevice",
                 eventType,
                 userId: this.invitee || this.getOpponentMember().userId,
                 opponentDeviceId: this.opponentDeviceId,
-                content: {
-                    ...realContent,
-                    device_id: this.client.deviceId,
-                    sender_session_id: this.client.getSessionId(),
-                    dest_session_id: this.opponentSessionId,
-                    seq: toDeviceSeq,
-                },
+                content: payload,
             });
 
-            const payload = {
-                type: eventType,
-                content: {
-                    ...realContent,
-                    device_id: this.client.deviceId,
-                    sender_session_id: this.client.getSessionId(),
-                    dest_session_id: this.opponentSessionId,
-                    seq: toDeviceSeq,
-                },
-            };
             const userId = this.invitee || this.getOpponentMember().userId;
-            return this.client.crypto.encryptAndSendToDevices([{
-                userId,
-                deviceInfo: this.opponentDeviceInfo,
-            }], payload);
+            if (this.client.isCryptoEnabled()) {
+                return this.client.crypto.encryptAndSendToDevices([{
+                    userId,
+                    deviceInfo: this.opponentDeviceInfo,
+                }], { type: eventType, content: payload });
+            } else {
+                return this.client.sendToDevice(eventType, {
+                    [userId]: { [this.opponentDeviceId]: payload },
+                });
+            }
         } else {
             this.emit(CallEvent.SendVoipEvent, {
                 type: "sendEvent",
