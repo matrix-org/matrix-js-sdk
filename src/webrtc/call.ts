@@ -708,9 +708,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         const statsReport = await this.peerConn.getStats();
         const stats = [];
-        for (const item of statsReport.values()) {
+        statsReport.forEach(item => {
             stats.push(item);
-        }
+        });
 
         return stats;
     }
