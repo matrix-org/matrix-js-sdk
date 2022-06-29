@@ -1701,12 +1701,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             feed.setAudioMuted(metadata?.audio_muted);
             feed.setVideoMuted(metadata?.video_muted);
             feed.purpose = this.remoteSDPStreamMetadata[streamId]?.purpose;
-
-            if (this.isPtt) {
-                // In PTT mode, it's more important that only one person is speaking at a time, so we
-                // actively disable the output of any streams where we believe the user is muted.
-                feed.stream.getAudioTracks().forEach(t => t.enabled = metadata ? !metadata.audio_muted : true);
-            }
         }
     }
 
