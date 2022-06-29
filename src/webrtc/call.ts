@@ -22,6 +22,8 @@ limitations under the License.
  * @module webrtc/call
  */
 
+import { parse as parseSdp, write as writeSdp } from "sdp-transform";
+
 import { logger } from '../logger';
 import * as utils from '../utils';
 import { MatrixEvent } from '../models/event';
@@ -170,6 +172,11 @@ export enum CallErrorCode {
      * An answer could not be created
      */
     CreateAnswer = 'create_answer',
+
+    /**
+     * An offer could not be created
+     */
+    CreateOffer = 'create_offer',
 
     /**
      * Error code used when we fail to send the answer
@@ -1438,6 +1445,31 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
     }
 
+    // Enables DTX (discontinuous transmission) on the given session to reduce
+    // bandwidth when transmitting silence
+    private enableDtx(description: RTCSessionDescriptionInit): void {
+        // The only way to enable DTX at this time is through SDP munging
+        const sdp = parseSdp(description.sdp);
+        sdp.media.forEach(media => {
+            if (media.type === "audio") {
+                media.fmtp.forEach(fmtp => fmtp.config += ";usedtx=1");
+            }
+        });
+        description.sdp = writeSdp(sdp);
+    }
+
+    private async createOffer(): Promise<RTCSessionDescriptionInit> {
+        const offer = await this.peerConn.createOffer();
+        this.enableDtx(offer);
+        return offer;
+    }
+
+    private async createAnswer(): Promise<RTCSessionDescriptionInit> {
+        const answer = await this.peerConn.createAnswer();
+        this.enableDtx(answer);
+        return answer;
+    }
+
     private async gotCallFeedsForAnswer(callFeeds: CallFeed[]): Promise<void> {
         if (this.callHasEnded()) return;
 
@@ -1449,10 +1481,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         this.setState(CallState.CreateAnswer);
 
-        let myAnswer;
+        let answer: RTCSessionDescriptionInit;
         try {
             this.getRidOfRTXCodecs();
-            myAnswer = await this.peerConn.createAnswer();
+            answer = await this.createAnswer();
         } catch (err) {
             logger.debug(`Call ${this.callId} Failed to create answer: `, err);
             this.terminate(CallParty.Local, CallErrorCode.CreateAnswer, true);
@@ -1460,7 +1492,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
 
         try {
-            await this.peerConn.setLocalDescription(myAnswer);
+            await this.peerConn.setLocalDescription(answer);
             this.setState(CallState.Connecting);
 
             // Allow a short time for initial candidates to be gathered
@@ -1672,8 +1704,17 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             await this.peerConn.setRemoteDescription(description);
 
             if (description.type === 'offer') {
-                this.getRidOfRTXCodecs();
-                await this.peerConn.setLocalDescription();
+                let answer: RTCSessionDescriptionInit;
+                try {
+                    this.getRidOfRTXCodecs();
+                    answer = await this.createAnswer();
+                } catch (err) {
+                    logger.debug(`Call ${this.callId} Failed to create answer: `, err);
+                    this.terminate(CallParty.Local, CallErrorCode.CreateAnswer, true);
+                    return;
+                }
+
+                await this.peerConn.setLocalDescription(answer);
 
                 this.sendVoipEvent(EventType.CallNegotiate, {
                     description: this.peerConn.localDescription,
@@ -1741,7 +1782,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private async wrappedGotLocalOffer(): Promise<void> {
         this.makingOffer = true;
         try {
-            this.getRidOfRTXCodecs();
             await this.gotLocalOffer();
         } catch (e) {
             this.getLocalOfferFailed(e);
@@ -1760,8 +1800,18 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return;
         }
 
+        let offer: RTCSessionDescriptionInit;
         try {
-            await this.peerConn.setLocalDescription();
+            this.getRidOfRTXCodecs();
+            offer = await this.createOffer();
+        } catch (err) {
+            logger.debug(`Call ${this.callId} Failed to create offer: `, err);
+            this.terminate(CallParty.Local, CallErrorCode.CreateOffer, true);
+            return;
+        }
+
+        try {
+            await this.peerConn.setLocalDescription(offer);
         } catch (err) {
             logger.debug(`Call ${this.callId} Error setting local description!`, err);
             this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);
