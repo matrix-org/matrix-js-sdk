@@ -327,6 +327,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private opponentCaps: CallCapabilities;
     private iceDisconnectedTimeout: ReturnType<typeof setTimeout>;
     private inviteTimeout: ReturnType<typeof setTimeout>;
+    private readonly removeTrackListeners = new Map<MediaStream, () => void>();
 
     // The logic of when & if a call is on hold is nontrivial and explained in is*OnHold
     // This flag represents whether we want the other party to be on hold
@@ -841,18 +842,25 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.setState(CallState.Ringing);
 
         if (event.getLocalAge()) {
-            setTimeout(() => {
-                if (this.state == CallState.Ringing) {
-                    logger.debug(`Call ${this.callId} invite has expired. Hanging up.`);
-                    this.hangupParty = CallParty.Remote; // effectively
-                    this.setState(CallState.Ended);
-                    this.stopAllMedia();
-                    if (this.peerConn.signalingState != 'closed') {
-                        this.peerConn.close();
-                    }
-                    this.emit(CallEvent.Hangup, this);
+            // Time out the call if it's ringing for too long
+            const ringingTimer = setTimeout(() => {
+                logger.debug(`Call ${this.callId} invite has expired. Hanging up.`);
+                this.hangupParty = CallParty.Remote; // effectively
+                this.setState(CallState.Ended);
+                this.stopAllMedia();
+                if (this.peerConn.signalingState != 'closed') {
+                    this.peerConn.close();
                 }
+                this.emit(CallEvent.Hangup, this);
             }, invite.lifetime - event.getLocalAge());
+
+            const onState = (state: CallState) => {
+                if (state !== CallState.Ringing) {
+                    clearTimeout(ringingTimer);
+                    this.off(CallEvent.State, onState);
+                }
+            };
+            this.on(CallEvent.State, onState);
         }
     }
 
@@ -1986,12 +1994,19 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         const stream = ev.streams[0];
         this.pushRemoteFeed(stream);
-        stream.addEventListener("removetrack", () => {
-            if (stream.getTracks().length === 0) {
-                logger.info(`Call ${this.callId} removing track streamId: ${stream.id}`);
-                this.deleteFeedByStream(stream);
-            }
-        });
+
+        if (!this.removeTrackListeners.has(stream)) {
+            const onRemoveTrack = () => {
+                if (stream.getTracks().length === 0) {
+                    logger.info(`Call ${this.callId} removing track streamId: ${stream.id}`);
+                    this.deleteFeedByStream(stream);
+                    stream.removeEventListener("removetrack", onRemoveTrack);
+                    this.removeTrackListeners.delete(stream);
+                }
+            };
+            stream.addEventListener("removetrack", onRemoveTrack);
+            this.removeTrackListeners.set(stream, onRemoveTrack);
+        }
     };
 
     private onDataChannel = (ev: RTCDataChannelEvent): void => {
@@ -2289,6 +2304,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             clearInterval(this.callLengthInterval);
             this.callLengthInterval = null;
         }
+
+        for (const [stream, listener] of this.removeTrackListeners) {
+            stream.removeEventListener("removetrack", listener);
+        }
+        this.removeTrackListeners.clear();
 
         this.callStatsAtEnd = await this.collectCallStats();
 

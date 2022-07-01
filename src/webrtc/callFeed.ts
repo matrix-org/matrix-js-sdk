@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { SDPStreamMetadataPurpose } from "./callEventTypes";
+import { acquireContext, releaseContext } from "./audioContext";
 import { MatrixClient } from "../client";
 import { RoomMember } from "../models/room-member";
 import { logger } from "../logger";
@@ -118,10 +119,8 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     }
 
     private initVolumeMeasuring(): void {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        if (!this.hasAudioTrack || !AudioContext) return;
-
-        this.audioContext = new AudioContext();
+        if (!this.hasAudioTrack) return;
+        if (!this.audioContext) this.audioContext = acquireContext();
 
         this.analyser = this.audioContext.createAnalyser();
         this.analyser.fftSize = 512;
@@ -211,7 +210,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
      */
     public measureVolumeActivity(enabled: boolean): void {
         if (enabled) {
-            if (!this.audioContext || !this.analyser || !this.frequencyBinCount || !this.hasAudioTrack) return;
+            if (!this.analyser || !this.frequencyBinCount || !this.hasAudioTrack) return;
 
             this.measuringVolumeActivity = true;
             this.volumeLooper();
@@ -288,5 +287,8 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
     public dispose(): void {
         clearTimeout(this.volumeLooperTimeout);
+        this.stream?.removeEventListener("addtrack", this.onAddTrack);
+        this.audioContext = null;
+        releaseContext();
     }
 }
