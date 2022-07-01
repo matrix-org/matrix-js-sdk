@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent, MatrixEventEvent } from '../models/event';
+import { MatrixEvent } from '../models/event';
 import { logger } from '../logger';
 import { CallDirection, CallErrorCode, CallState, createNewMatrixCall, MatrixCall } from './call';
 import { EventType } from '../@types/event';
@@ -140,13 +140,6 @@ export class CallEventHandler {
             this.nextSeqByCall.set(content.call_id, 0);
         }
 
-        if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
-            // add an event listener for once the event is decrypted.
-            event.once(MatrixEventEvent.Decrypted, async () => {
-                if (!this.eventIsACall(event)) return;
-            });
-        }
-
         if (content.seq === undefined) {
             this.callEventBuffer.push(event);
             return;
@@ -183,15 +176,6 @@ export class CallEventHandler {
             }
         }
     };
-
-    private eventIsACall(event: MatrixEvent): boolean {
-        const type = event.getType();
-        /**
-         * Unstable prefixes:
-         *   - org.matrix.call. : MSC3086 https://github.com/matrix-org/matrix-doc/pull/3086
-         */
-        return type.startsWith("m.call.") || type.startsWith("org.matrix.call.");
-    }
 
     private async handleCallEvent(event: MatrixEvent) {
         this.client.emit(ClientEvent.ReceivedVoipEvent, event);
