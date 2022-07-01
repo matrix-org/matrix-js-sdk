@@ -288,7 +288,10 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     public dispose(): void {
         clearTimeout(this.volumeLooperTimeout);
         this.stream?.removeEventListener("addtrack", this.onAddTrack);
-        this.audioContext = null;
-        releaseContext();
+        if (this.audioContext) {
+            this.audioContext = null;
+            this.analyser = null;
+            releaseContext();
+        }
     }
 }
