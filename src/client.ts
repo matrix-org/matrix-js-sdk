@@ -3435,7 +3435,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Update the list of ignored invites.
-     * @param invites 
+     * @param invites The new list of ignored invites.
      */
     public setIgnoredInvites(invites: IgnoredInvites): Promise<{}> {
         return this.setAccountData(IGNORED_INVITES_ACCOUNT_DATA_KEY, invites);
@@ -9354,7 +9354,7 @@ export type IgnoredRoomInvites = {
      * as a Matrix timestamp.
      */
     ts: number;
-}
+};
 
 /**
  * Invites to ignore across all devices/sessions, as per MSC 3840.
