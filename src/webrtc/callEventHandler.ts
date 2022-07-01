@@ -177,15 +177,6 @@ export class CallEventHandler {
         }
     };
 
-    private eventIsACall(event: MatrixEvent): boolean {
-        const type = event.getType();
-        /**
-         * Unstable prefixes:
-         *   - org.matrix.call. : MSC3086 https://github.com/matrix-org/matrix-doc/pull/3086
-         */
-        return type.startsWith("m.call.") || type.startsWith("org.matrix.call.");
-    }
-
     private async handleCallEvent(event: MatrixEvent) {
         this.client.emit(ClientEvent.ReceivedVoipEvent, event);
 
