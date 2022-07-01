@@ -59,6 +59,17 @@ const DUMMY_SDP = (
     "a=ssrc:3619738545 cname:2RWtmqhXLdoF4sOi\r\n"
 );
 
+class MockMediaStreamAudioSourceNode {
+    connect() {}
+}
+
+class MockAudioContext {
+    constructor() {}
+    createAnalyser() { return {}; }
+    createMediaStreamSource() { return new MockMediaStreamAudioSourceNode(); }
+    close() {}
+}
+
 class MockRTCPeerConnection {
     localDescription: RTCSessionDescription;
 
@@ -161,6 +172,9 @@ describe('Call', function() {
         };
         // @ts-ignore Mock
         global.document = {};
+
+        // @ts-ignore Mock
+        global.AudioContext = MockAudioContext;
 
         client = new TestClient("@alice:foo", "somedevice", "token", undefined, {});
         // We just stub out sendEvent: we're not interested in testing the client's
