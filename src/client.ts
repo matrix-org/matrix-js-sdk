@@ -3425,6 +3425,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Gets the list of currently ignored invites.
+     */
+    public getIgnoredInvites(): IgnoredInvites {
+        const event = this.getAccountData(IGNORED_INVITES_ACCOUNT_DATA_KEY);
+        if (!event || !event.getContent() || !event.getContent()["ignored_users"]) return {};
+        return event.getContent()["ignored_users"];
+    }
+
+    /**
+     * Update the list of ignored invites.
+     * @param invites 
+     */
+    public setIgnoredInvites(invites: IgnoredInvites): Promise<{}> {
+        return this.setAccountData(IGNORED_INVITES_ACCOUNT_DATA_KEY, invites);
+    }
+
+    /**
      * Join a room. If you have already joined the room, this will no-op.
      * @param {string} roomIdOrAlias The room ID or room alias to join.
      * @param {Object} opts Options when joining the room.
@@ -9320,3 +9337,34 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
  * @event module:client~MatrixClient#"WellKnown.client"
  * @param {object} data The JSON object returned by the server
  */
+
+const IGNORED_INVITES_ACCOUNT_DATA_KEY = "org.matrix.msc3840.ignored_invites";
+
+/**
+ * Ignore all invites to this room.
+ */
+export type IgnoredRoomInvites = {
+    /**
+     * The room ID for the room to ignore.
+     */
+    room_id: string;
+
+    /**
+     * When this instruction to ignore was decided by the user,
+     * as a Matrix timestamp.
+     */
+    ts: number;
+}
+
+/**
+ * Invites to ignore across all devices/sessions, as per MSC 3840.
+ *
+ * This data structure is expected to gain additional fields, all of
+ * them optional.
+ */
+export type IgnoredInvites = {
+    /**
+     * A list of rooms the user does not wish to be invited to.
+     */
+    ignored_rooms?: IgnoredRoomInvites[];
+};
