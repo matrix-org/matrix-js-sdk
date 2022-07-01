@@ -140,13 +140,6 @@ export class CallEventHandler {
             this.nextSeqByCall.set(content.call_id, 0);
         }
 
-        if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
-            // add an event listener for once the event is decrypted.
-            event.once(MatrixEventEvent.Decrypted, async () => {
-                if (!this.eventIsACall(event)) return;
-            });
-        }
-
         if (content.seq === undefined) {
             this.callEventBuffer.push(event);
             return;
