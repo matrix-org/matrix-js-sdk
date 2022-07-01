@@ -1971,7 +1971,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // the peer, since we don't want to block the line if they're not saying anything.
         // Experimenting in Chrome, this happens after 5 or 6 seconds, which is probably
         // fast enough.
-        if (this.isPtt && !["connected", "completed"].includes(this.peerConn.iceConnectionState)) {
+        if (this.isPtt && ["failed", "disconnected"].includes(this.peerConn.iceConnectionState)) {
             for (const feed of this.getRemoteFeeds()) {
                 feed.setAudioMuted(true);
                 feed.setVideoMuted(true);
