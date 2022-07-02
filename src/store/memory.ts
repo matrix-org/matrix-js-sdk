@@ -304,9 +304,9 @@ export class MemoryStore implements IStore {
     /**
      * Get account data event by event type
      * @param {string} eventType The event type being queried
-     * @return {?MatrixEvent} the user account_data event of given type, if any
+     * @return {MatrixEvent} the user account_data event of given type, if any
      */
-    public getAccountData(eventType: EventType | string): MatrixEvent | undefined {
+    public getAccountData(eventType: EventType | string): MatrixEvent {
         return this.accountData[eventType];
     }
 

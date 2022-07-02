@@ -482,7 +482,7 @@ export interface IUploadKeySignaturesResponse {
 }
 
 export interface IPreviewUrlResponse {
-    [key: string]: string | number;
+    [key: string]: string | number | undefined;
     "og:title": string;
     "og:type": string;
     "og:url": string;
