@@ -3429,8 +3429,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getIgnoredInvites(): IgnoredInvites {
         const event = this.getAccountData(IGNORED_INVITES_ACCOUNT_DATA_KEY);
-        if (!event || !event.getContent() || !event.getContent()["ignored_users"]) return {};
-        return event.getContent()["ignored_users"];
+        if (!event || !event.getContent()) return {};
+        return event.getContent();
     }
 
     /**
