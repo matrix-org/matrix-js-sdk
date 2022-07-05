@@ -1,5 +1,5 @@
-Changes in [19.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.0.0-rc.1) (2022-06-28)
-============================================================================================================
+Changes in [19.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.0.0) (2022-07-05)
+==================================================================================================
 
 ## 🚨 BREAKING CHANGES
  * Remove unused sessionStore ([\#2455](https://github.com/matrix-org/matrix-js-sdk/pull/2455)).
