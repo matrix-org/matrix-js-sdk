@@ -525,6 +525,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     private async initOpponentCrypto() {
         if (!this.opponentDeviceId) return;
+        if (!this.client.getUseE2eForGroupCall()) return;
 
         const userId = this.invitee || this.getOpponentMember().userId;
         const deviceInfoMap = await this.client.crypto.deviceList.downloadKeys([userId], false);
@@ -2144,21 +2145,30 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 },
             });
 
-            const payload = {
-                type: eventType,
-                content: {
-                    ...realContent,
-                    device_id: this.client.deviceId,
-                    sender_session_id: this.client.getSessionId(),
-                    dest_session_id: this.opponentSessionId,
-                    seq: toDeviceSeq,
-                },
+            const content = {
+                ...realContent,
+                device_id: this.client.deviceId,
+                sender_session_id: this.client.getSessionId(),
+                dest_session_id: this.opponentSessionId,
+                seq: toDeviceSeq,
             };
+
             const userId = this.invitee || this.getOpponentMember().userId;
-            return this.client.crypto.encryptAndSendToDevices([{
-                userId,
-                deviceInfo: this.opponentDeviceInfo,
-            }], payload);
+            if (this.client.getUseE2eForGroupCall()) {
+                return this.client.crypto.encryptAndSendToDevices([{
+                    userId,
+                    deviceInfo: this.opponentDeviceInfo,
+                }], {
+                    type: eventType,
+                    content,
+                });
+            } else {
+                return this.client.sendToDevice(eventType, {
+                    [userId]: {
+                        [this.opponentDeviceId]: content,
+                    },
+                });
+            }
         } else {
             this.emit(CallEvent.SendVoipEvent, {
                 type: "sendEvent",

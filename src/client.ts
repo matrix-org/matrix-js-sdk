@@ -346,6 +346,12 @@ export interface ICreateClientOpts {
      */
     fallbackICEServerAllowed?: boolean;
 
+    /**
+     * If true, to-device signalling for group calls will be encrypted
+     * with Olm. Default: true.
+     */
+    useE2eForGroupCall?: boolean;
+
     cryptoCallbacks?: ICryptoCallbacks;
 }
 
@@ -954,6 +960,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected sessionId: string;
     protected pendingEventEncryption = new Map<string, Promise<void>>();
 
+    private useE2eForGroupCall = true;
+
     constructor(opts: IMatrixClientCreateOpts) {
         super();
 
@@ -1043,6 +1051,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.iceCandidatePoolSize = opts.iceCandidatePoolSize === undefined ? 0 : opts.iceCandidatePoolSize;
         this.supportsCallTransfer = opts.supportsCallTransfer || false;
         this.fallbackICEServerAllowed = opts.fallbackICEServerAllowed || false;
+
+        if (opts.useE2eForGroupCall !== undefined) this.useE2eForGroupCall = opts.useE2eForGroupCall;
 
         // List of which rooms have encryption enabled: separate from crypto because
         // we still want to know which rooms are encrypted even if crypto is disabled:
@@ -1497,6 +1507,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public setSupportsCallTransfer(support: boolean) {
         this.supportsCallTransfer = support;
+    }
+
+    /**
+     * Returns true if to-device signalling for group calls will be encrypted with Olm.
+     * If false, it will be sent unencrypted.
+     * @returns boolean Whether group call signalling will be encrypted
+     */
+    public getUseE2eForGroupCall(): boolean {
+        return this.useE2eForGroupCall;
     }
 
     /**
