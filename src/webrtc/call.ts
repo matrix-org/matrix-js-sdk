@@ -704,7 +704,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     `enabled=${track.enabled}` +
                     `) to peer connection`,
                 );
-                senderArray.push(this.peerConn.addTrack(track, callFeed.stream));
+                const sender = this.peerConn.addTrack(track, callFeed.stream);
+                this.configureEncoding(sender);
+                senderArray.push(sender);
             }
         }
 
@@ -1221,6 +1223,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 newSender = this.peerConn.addTrack(track, this.localUsermediaStream);
             }
 
+            this.configureEncoding(newSender);
             newSenders.push(newSender);
         }
 
@@ -1468,12 +1471,14 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     private async createOffer(): Promise<RTCSessionDescriptionInit> {
+        this.configureTransceivers();
         const offer = await this.peerConn.createOffer();
         this.enableDtx(offer);
         return offer;
     }
 
     private async createAnswer(): Promise<RTCSessionDescriptionInit> {
+        this.configureTransceivers();
         const answer = await this.peerConn.createAnswer();
         this.enableDtx(answer);
         return answer;
@@ -1492,7 +1497,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         let answer: RTCSessionDescriptionInit;
         try {
-            this.getRidOfRTXCodecs();
             answer = await this.createAnswer();
         } catch (err) {
             logger.debug(`Call ${this.callId} Failed to create answer: `, err);
@@ -1715,7 +1719,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             if (description.type === 'offer') {
                 let answer: RTCSessionDescriptionInit;
                 try {
-                    this.getRidOfRTXCodecs();
                     answer = await this.createAnswer();
                 } catch (err) {
                     logger.debug(`Call ${this.callId} Failed to create answer: `, err);
@@ -1811,7 +1814,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         let offer: RTCSessionDescriptionInit;
         try {
-            this.getRidOfRTXCodecs();
             offer = await this.createOffer();
         } catch (err) {
             logger.debug(`Call ${this.callId} Failed to create offer: `, err);
@@ -2014,44 +2016,52 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.emit(CallEvent.DataChannel, ev.channel);
     };
 
-    /**
-     * This method removes all video/rtx codecs from screensharing video
-     * transceivers. This is necessary since they can cause problems. Without
-     * this the following steps should produce an error:
-     *   Chromium calls Firefox
-     *   Firefox answers
-     *   Firefox starts screen-sharing
-     *   Chromium starts screen-sharing
-     *   Call crashes for Chromium with:
-     *       [96685:23:0518/162603.933321:ERROR:webrtc_video_engine.cc(3296)] RTX codec (PT=97) mapped to PT=96 which is not in the codec list.
-     *       [96685:23:0518/162603.933377:ERROR:webrtc_video_engine.cc(1171)] GetChangedRecvParameters called without any video codecs.
-     *       [96685:23:0518/162603.933430:ERROR:sdp_offer_answer.cc(4302)] Failed to set local video description recv parameters for m-section with mid='2'. (INVALID_PARAMETER)
-     */
-    private getRidOfRTXCodecs(): void {
-        // RTCRtpReceiver.getCapabilities and RTCRtpSender.getCapabilities don't seem to be supported on FF
-        if (!RTCRtpReceiver.getCapabilities || !RTCRtpSender.getCapabilities) return;
+    private configureTransceivers(): void {
+        // These don't seem to be supported on Firefox
+        if (RTCRtpReceiver.getCapabilities && RTCRtpSender.getCapabilities) {
+            // Remove all video/rtx codecs from screensharing video transceivers.
+            // This is necessary since they can cause problems. Without this the
+            // following steps should produce an error:
+            //   Chromium calls Firefox
+            //   Firefox answers
+            //   Firefox starts screen-sharing
+            //   Chromium starts screen-sharing
+            //   Call crashes for Chromium with:
+            //       [96685:23:0518/162603.933321:ERROR:webrtc_video_engine.cc(3296)] RTX codec (PT=97) mapped to PT=96 which is not in the codec list.
+            //       [96685:23:0518/162603.933377:ERROR:webrtc_video_engine.cc(1171)] GetChangedRecvParameters called without any video codecs.
+            //       [96685:23:0518/162603.933430:ERROR:sdp_offer_answer.cc(4302)] Failed to set local video description recv parameters for m-section with mid='2'. (INVALID_PARAMETER)
+            const recvCodecs = RTCRtpReceiver.getCapabilities("video").codecs;
+            const sendCodecs = RTCRtpSender.getCapabilities("video").codecs;
+            const codecs = [...sendCodecs, ...recvCodecs];
 
-        const recvCodecs = RTCRtpReceiver.getCapabilities("video").codecs;
-        const sendCodecs = RTCRtpSender.getCapabilities("video").codecs;
-        const codecs = [...sendCodecs, ...recvCodecs];
+            for (const codec of codecs) {
+                if (codec.mimeType === "video/rtx") {
+                    const rtxCodecIndex = codecs.indexOf(codec);
+                    codecs.splice(rtxCodecIndex, 1);
+                }
+            }
 
-        for (const codec of codecs) {
-            if (codec.mimeType === "video/rtx") {
-                const rtxCodecIndex = codecs.indexOf(codec);
-                codecs.splice(rtxCodecIndex, 1);
+            for (const trans of this.peerConn.getTransceivers()) {
+                if (
+                    this.screensharingSenders.includes(trans.sender) &&
+                        (
+                            trans.sender.track?.kind === "video" ||
+                            trans.receiver.track?.kind === "video"
+                        )
+                ) {
+                    trans.setCodecPreferences(codecs);
+                }
             }
         }
+    }
 
-        for (const trans of this.peerConn.getTransceivers()) {
-            if (
-                this.screensharingSenders.includes(trans.sender) &&
-                    (
-                        trans.sender.track?.kind === "video" ||
-                        trans.receiver.track?.kind === "video"
-                    )
-            ) {
-                trans.setCodecPreferences(codecs);
-            }
+    private async configureEncoding(sender: RTCRtpSender): Promise<void> {
+        if (this.isPtt && sender.track?.kind === "audio") {
+            const params = sender.getParameters();
+            if (!params.encodings) params.encodings = [{}];
+
+            params.encodings.forEach(encoding => encoding.maxBitrate = 6000);
+            await sender.setParameters(params);
         }
     }
 
