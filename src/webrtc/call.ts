@@ -1494,7 +1494,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     continue;
                 }
 
-                const extraconfig = [] as string[];
+                const extraconfig: string[] = [];
                 if (params.enableDtx !== undefined) {
                     extraconfig.push(`usedtx=${params.enableDtx ? '1' : '0'}`);
                 }
