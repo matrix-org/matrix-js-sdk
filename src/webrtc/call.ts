@@ -93,6 +93,14 @@ interface AssertedIdentity {
     displayName: string;
 }
 
+// Used internally to specify modifications to codec parameters in SDP
+interface CodecParams {
+    enableDtx?: boolean; // true to enable discontinuous transmission, false to disable, undefined to leave as-is
+    maxAverageBitrate?: number; // sets the max average bitrate, or undefined to leave as-is
+}
+
+type CodecParamMods = Record<string, CodecParams>;
+
 export enum CallState {
     Fledgling = 'fledgling',
     InviteSent = 'invite_sent',
@@ -259,6 +267,18 @@ export class CallError extends Error {
 
 export function genCallID(): string {
     return Date.now().toString() + randomString(16);
+}
+
+function getCodecParamMods(isPtt: boolean): CodecParamMods {
+    const mods = {
+        'opus': {
+            enableDtx: true,
+        },
+    } as CodecParamMods;
+
+    if (isPtt) mods.opus.maxAverageBitrate = 12000;
+
+    return mods;
 }
 
 export type CallEventHandlerMap = {
@@ -1456,12 +1476,26 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     // Enables DTX (discontinuous transmission) on the given session to reduce
     // bandwidth when transmitting silence
-    private enableDtx(description: RTCSessionDescriptionInit): void {
+    private mungeSdp(description: RTCSessionDescriptionInit, mods: CodecParamMods): void {
         // The only way to enable DTX at this time is through SDP munging
         const sdp = parseSdp(description.sdp);
+
         sdp.media.forEach(media => {
-            if (media.type === "audio") {
-                media.fmtp.forEach(fmtp => fmtp.config += ";usedtx=1");
+            const payloadTypeMap = new Map<number, string>();
+            for (const rtp of media.rtp) {
+                payloadTypeMap.set(rtp.payload, rtp.codec);
+            }
+            for (const fmtp of media.fmtp) {
+                for (const [codec, params] of Object.entries(mods)) {
+                    if (payloadTypeMap.get(fmtp.payload) === codec) {
+                        if (params.enableDtx !== undefined) {
+                            fmtp.config += `;usedtx=${params.enableDtx ? '1' : '0'}`;
+                        }
+                        if (params.maxAverageBitrate !== undefined) {
+                            fmtp.config += `;maxaveragebitrate=${params.maxAverageBitrate}`;
+                        }
+                    }
+                }
             }
         });
         description.sdp = writeSdp(sdp);
@@ -1469,13 +1503,13 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     private async createOffer(): Promise<RTCSessionDescriptionInit> {
         const offer = await this.peerConn.createOffer();
-        this.enableDtx(offer);
+        this.mungeSdp(offer, getCodecParamMods(this.isPtt));
         return offer;
     }
 
     private async createAnswer(): Promise<RTCSessionDescriptionInit> {
         const answer = await this.peerConn.createAnswer();
-        this.enableDtx(answer);
+        this.mungeSdp(answer, getCodecParamMods(this.isPtt));
         return answer;
     }
 
