@@ -1518,7 +1518,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (selectedPartyId !== this.ourPartyId) {
             logger.info(`Got select_answer for party ID ${selectedPartyId}: we are party ID ${this.ourPartyId}.`);
             // The other party has picked somebody else's answer
-            this.terminate(CallParty.Remote, CallErrorCode.AnsweredElsewhere, true);
+            await this.terminate(CallParty.Remote, CallErrorCode.AnsweredElsewhere, true);
         }
     }
 
