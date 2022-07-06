@@ -39,7 +39,7 @@ describe('Store ignored invites', function() {
             ]
         };
         let promise = client.client.setIgnoredInvites(SAMPLE);
-        client.httpBackend.flush();
+        await client.httpBackend.flush();
         await promise;
 
         // Check that it was (mock)stored on the client.
