@@ -16,7 +16,7 @@ limitations under the License.
 
 import { SDPStreamMetadataPurpose } from "../../../src/webrtc/callEventTypes";
 import { CallFeed, CallFeedEvent } from "../../../src/webrtc/callFeed";
-import { MockMediaStream } from "../../test-utils/webrtc";
+import { MockMediaStream, MockMediaStreamTrack } from "../../test-utils/webrtc";
 import { TestClient } from "../../TestClient";
 
 describe("CallFeed", () => {
@@ -52,7 +52,10 @@ describe("CallFeed", () => {
         feed.setNewStream(replacementStream);
         expect(feedNewStreamCallback).toHaveBeenCalledWith(replacementStream);
         expect(feed.stream).toBe(replacementStream);
-        replacementStream.emit("addtrack");
+
+        feedNewStreamCallback.mockReset();
+
+        replacementStream.addTrack(new MockMediaStreamTrack("track_id", "audio"));
         expect(feedNewStreamCallback).toHaveBeenCalledWith(replacementStream);
     });
 });
