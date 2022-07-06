@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 // eslint-disable-next-line no-restricted-imports
-import EventEmitter from "events";
 
 export const DUMMY_SDP = (
     "v=0\r\n" +
@@ -96,7 +95,7 @@ export class MockMediaStreamTrack {
     stop() { }
 }
 
-export class MockMediaStream extends EventEmitter {
+export class MockMediaStream extends EventTarget {
     constructor(
         public id: string,
         private tracks: MockMediaStreamTrack[] = [],
@@ -107,9 +106,10 @@ export class MockMediaStream extends EventEmitter {
     getTracks() { return this.tracks; }
     getAudioTracks() { return this.tracks.filter((track) => track.kind === "audio"); }
     getVideoTracks() { return this.tracks.filter((track) => track.kind === "video"); }
-    addEventListener() { }
-    removeEventListener() { }
-    addTrack(track: MockMediaStreamTrack) { this.tracks.push(track); }
+    addTrack(track: MockMediaStreamTrack) {
+        this.tracks.push(track);
+        this.dispatchEvent(new Event("addtrack"));
+    }
     removeTrack(track: MockMediaStreamTrack) { this.tracks.splice(this.tracks.indexOf(track), 1); }
 }
 
