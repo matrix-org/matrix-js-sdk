@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// eslint-disable-next-line no-restricted-imports
-
 export const DUMMY_SDP = (
     "v=0\r\n" +
     "o=- 5022425983810148698 2 IN IP4 127.0.0.1\r\n" +
@@ -95,20 +93,36 @@ export class MockMediaStreamTrack {
     stop() { }
 }
 
-export class MockMediaStream extends EventTarget {
+// XXX: Using EventTarget in jest doesn't seem to work, so we write our own
+// implementation
+export class MockMediaStream {
     constructor(
         public id: string,
         private tracks: MockMediaStreamTrack[] = [],
-    ) {
-        super();
-    }
+    ) {}
 
+    listeners: [string, (...args: any[]) => any][] = [];
+
+    dispatchEvent(eventType: string) {
+        this.listeners.forEach(([t, c]) => {
+            if (t !== eventType) return;
+            c();
+        });
+    }
     getTracks() { return this.tracks; }
     getAudioTracks() { return this.tracks.filter((track) => track.kind === "audio"); }
     getVideoTracks() { return this.tracks.filter((track) => track.kind === "video"); }
+    addEventListener(eventType: string, callback: (...args: any[]) => any) {
+        this.listeners.push([eventType, callback]);
+    }
+    removeEventListener(eventType: string, callback: (...args: any[]) => any) {
+        this.listeners.filter(([t, c]) => {
+            return t !== eventType || c !== callback;
+        });
+    }
     addTrack(track: MockMediaStreamTrack) {
         this.tracks.push(track);
-        this.dispatchEvent(new Event("addtrack"));
+        this.dispatchEvent("addtrack");
     }
     removeTrack(track: MockMediaStreamTrack) { this.tracks.splice(this.tracks.indexOf(track), 1); }
 }
