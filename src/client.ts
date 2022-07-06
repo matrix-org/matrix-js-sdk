@@ -3428,8 +3428,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Gets the list of currently ignored invites.
      */
     public getIgnoredInvites(): IgnoredInvites {
-        const event = this.getAccountData(IGNORED_INVITES_ACCOUNT_DATA_KEY);
-        if (!event || !event.getContent()) return {};
+        const event = this.getAccountData(EventType.IgnoredInvites);
+        if (!event || !event.getContent()) {
+            return {}
+        }
         return event.getContent();
     }
 
@@ -3438,7 +3440,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param invites The new list of ignored invites.
      */
     public setIgnoredInvites(invites: IgnoredInvites): Promise<{}> {
-        return this.setAccountData(IGNORED_INVITES_ACCOUNT_DATA_KEY, invites);
+        return this.setAccountData(EventType.IgnoredInvites, invites);
     }
 
     /**
@@ -9337,8 +9339,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
  * @event module:client~MatrixClient#"WellKnown.client"
  * @param {object} data The JSON object returned by the server
  */
-
-const IGNORED_INVITES_ACCOUNT_DATA_KEY = "org.matrix.msc3840.ignored_invites";
 
 /**
  * Ignore all invites to this room.

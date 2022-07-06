@@ -81,6 +81,7 @@ export enum EventType {
     PushRules = "m.push_rules",
     Direct = "m.direct",
     IgnoredUserList = "m.ignored_user_list",
+    IgnoredInvites = "org.matrix.msc3840.ignored_invites",
 
     // to_device events
     RoomKey = "m.room_key",
