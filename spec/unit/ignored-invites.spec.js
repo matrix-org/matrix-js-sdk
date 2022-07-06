@@ -8,17 +8,17 @@ describe('Store ignored invites', function() {
         client = new TestClient("foobar", "device");
 
         // Mockup account data storage.
-        let dataStore = new Map();
-        client.client.setAccountData = function (eventType, content) {
+        const dataStore = new Map();
+        client.client.setAccountData = function(eventType, content) {
             dataStore.set(eventType, content);
             return Promise.resolve();
-        }
-        client.client.getAccountData = function (eventType) {
-            let data = dataStore.get(eventType);
+        };
+        client.client.getAccountData = function(eventType) {
+            const data = dataStore.get(eventType);
             return new MatrixEvent({
-                content: data
+                content: data,
             });
-        };   
+        };
     });
 
     afterEach(function() {
@@ -35,10 +35,10 @@ describe('Store ignored invites', function() {
                 {
                     room_id: "12345",
                     ts: Date.now(),
-                }
-            ]
+                },
+            ],
         };
-        let promise = client.client.setIgnoredInvites(SAMPLE);
+        const promise = client.client.setIgnoredInvites(SAMPLE);
         await client.httpBackend.flush();
         await promise;
 
