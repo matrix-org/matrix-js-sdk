@@ -17,7 +17,6 @@ limitations under the License.
 import { TestClient } from '../../TestClient';
 import { MatrixCall, CallErrorCode, CallEvent, supportsMatrixCall, CallType } from '../../../src/webrtc/call';
 import { SDPStreamMetadataKey, SDPStreamMetadataPurpose } from '../../../src/webrtc/callEventTypes';
-import { RoomMember } from "../../../src";
 import {
     DUMMY_SDP,
     MockMediaHandler,
@@ -27,6 +26,14 @@ import {
     MockRTCPeerConnection,
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
+
+const startVoiceCall = async (client: TestClient, call: MatrixCall): Promise<void> => {
+    const callPromise = call.placeVoiceCall();
+    await client.httpBackend.flush("");
+    await callPromise;
+
+    call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
+};
 
 describe('Call', function() {
     let client;
@@ -84,9 +91,8 @@ describe('Call', function() {
     });
 
     it('should ignore candidate events from non-matching party ID', async function() {
-        const callPromise = call.placeVoiceCall();
-        await client.httpBackend.flush();
-        await callPromise;
+        await startVoiceCall(client, call);
+
         await call.onAnswerReceived({
             getContent: () => {
                 return {
@@ -140,9 +146,7 @@ describe('Call', function() {
     });
 
     it('should add candidates received before answer if party ID is correct', async function() {
-        const callPromise = call.placeVoiceCall();
-        await client.httpBackend.flush();
-        await callPromise;
+        await startVoiceCall(client, call);
         call.peerConn.addIceCandidate = jest.fn();
 
         call.onRemoteIceCandidatesReceived({
@@ -200,9 +204,7 @@ describe('Call', function() {
     });
 
     it('should map asserted identity messages to remoteAssertedIdentity', async function() {
-        const callPromise = call.placeVoiceCall();
-        await client.httpBackend.flush();
-        await callPromise;
+        await startVoiceCall(client, call);
         await call.onAnswerReceived({
             getContent: () => {
                 return {
@@ -244,13 +246,7 @@ describe('Call', function() {
     });
 
     it("should map SDPStreamMetadata to feeds", async () => {
-        const callPromise = call.placeVoiceCall();
-        await client.httpBackend.flush();
-        await callPromise;
-
-        call.getOpponentMember = () => {
-            return { userId: "@bob:bar.uk" };
-        };
+        await startVoiceCall(client, call);
 
         await call.onAnswerReceived({
             getContent: () => {
@@ -288,13 +284,7 @@ describe('Call', function() {
     });
 
     it("should fallback to replaceTrack() if the other side doesn't support SPDStreamMetadata", async () => {
-        const callPromise = call.placeVoiceCall();
-        await client.httpBackend.flush();
-        await callPromise;
-
-        call.getOpponentMember = () => {
-            return { userId: "@bob:bar.uk" } as RoomMember;
-        };
+        await startVoiceCall(client, call);
 
         await call.onAnswerReceived({
             getContent: () => {
@@ -337,9 +327,7 @@ describe('Call', function() {
             ),
         );
 
-        const callPromise = call.placeVideoCall();
-        await client.httpBackend.flush();
-        await callPromise;
+        await startVoiceCall(client, call);
 
         await call.onAnswerReceived({
             getContent: () => {
@@ -375,9 +363,7 @@ describe('Call', function() {
     });
 
     it("should handle upgrade to video call", async () => {
-        const callPromise = call.placeVoiceCall();
-        await client.httpBackend.flush();
-        await callPromise;
+        await startVoiceCall(client, call);
 
         await call.onAnswerReceived({
             getContent: () => {
@@ -407,13 +393,7 @@ describe('Call', function() {
 
     describe("should handle stream replacement", () => {
         it("with both purpose and id", async () => {
-            const callPromise = call.placeVoiceCall();
-            await client.httpBackend.flush();
-            await callPromise;
-
-            call.getOpponentMember = () => {
-                return { userId: "@bob:bar.uk" };
-            };
+            await startVoiceCall(client, call);
 
             call.updateRemoteSDPStreamMetadata({
                 "remote_stream1": {
@@ -434,13 +414,7 @@ describe('Call', function() {
         });
 
         it("with just purpose", async () => {
-            const callPromise = call.placeVoiceCall();
-            await client.httpBackend.flush();
-            await callPromise;
-
-            call.getOpponentMember = () => {
-                return { userId: "@bob:bar.uk" };
-            };
+            await startVoiceCall(client, call);
 
             call.updateRemoteSDPStreamMetadata({
                 "remote_stream1": {
@@ -461,13 +435,7 @@ describe('Call', function() {
         });
 
         it("should not replace purpose is different", async () => {
-            const callPromise = call.placeVoiceCall();
-            await client.httpBackend.flush();
-            await callPromise;
-
-            call.getOpponentMember = () => {
-                return { userId: "@bob:bar.uk" };
-            };
+            await startVoiceCall(client, call);
 
             call.updateRemoteSDPStreamMetadata({
                 "remote_stream1": {
@@ -489,13 +457,7 @@ describe('Call', function() {
     });
 
     it("should handle SDPStreamMetadata changes", async () => {
-        const callPromise = call.placeVoiceCall();
-        await client.httpBackend.flush();
-        await callPromise;
-
-        call.getOpponentMember = () => {
-            return { userId: "@bob:bar.uk" };
-        };
+        await startVoiceCall(client, call);
 
         call.updateRemoteSDPStreamMetadata({
             "remote_stream": {
@@ -556,40 +518,27 @@ describe('Call', function() {
 
     describe("should deduce the call type correctly", () => {
         it("if no video", async () => {
-            const callPromise = call.placeVoiceCall();
-            await client.httpBackend.flush();
-            await callPromise;
+            call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 
-            call.getOpponentMember = () => {
-                return { userId: "@bob:bar.uk" };
-            };
             call.pushRemoteFeed(new MockMediaStream("remote_stream1", []));
-
             expect(call.type).toBe(CallType.Voice);
         });
 
         it("if remote video", async () => {
-            const callPromise = call.placeVoiceCall();
-            await client.httpBackend.flush();
-            await callPromise;
+            call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 
-            call.getOpponentMember = () => {
-                return { userId: "@bob:bar.uk" };
-            };
             call.pushRemoteFeed(new MockMediaStream("remote_stream1", [new MockMediaStreamTrack("track_id", "video")]));
-
             expect(call.type).toBe(CallType.Video);
         });
 
         it("if local video", async () => {
-            const callPromise = call.placeVideoCall();
-            await client.httpBackend.flush();
-            await callPromise;
+            call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 
-            call.getOpponentMember = () => {
-                return { userId: "@bob:bar.uk" };
-            };
-
+            call.pushNewLocalFeed(
+                new MockMediaStream("remote_stream1", [new MockMediaStreamTrack("track_id", "video")]),
+                SDPStreamMetadataPurpose.Usermedia,
+                false,
+            );
             expect(call.type).toBe(CallType.Video);
         });
     });
@@ -607,9 +556,8 @@ describe('Call', function() {
         })]);
         await client.httpBackend.flush();
         await callPromise;
-        call.getOpponentMember = () => {
-            return { userId: "@bob:bar.uk" };
-        };
+        call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
+
         call.pushNewLocalFeed(
             new MockMediaStream("local_stream2", [new MockMediaStreamTrack("track_id", "video")]),
             SDPStreamMetadataPurpose.Screenshare, "feed_id2",
@@ -660,9 +608,7 @@ describe('Call', function() {
         ]);
         await client.httpBackend.flush();
         await callPromise;
-        call.getOpponentMember = () => {
-            return { userId: "@bob:bar.uk" };
-        };
+        call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 
         call.updateRemoteSDPStreamMetadata({
             "remote_usermedia_stream_id": {
@@ -730,7 +676,7 @@ describe('Call', function() {
         expect(callHangupCallback).toHaveBeenCalled();
     });
 
-    describe("should handle turn servers", () => {
+    describe("turn servers", () => {
         it("should fallback if allowed", async () => {
             client.client.isFallbackICEServerAllowed = () => true;
             const localCall = new MatrixCall({
@@ -765,12 +711,7 @@ describe('Call', function() {
     });
 
     it("should handle creating a data channel", async () => {
-        const callPromise = call.placeVoiceCall();
-        await client.httpBackend.flush();
-        await callPromise;
-        call.getOpponentMember = () => {
-            return { userId: "@bob:bar.uk" };
-        };
+        await startVoiceCall(client, call);
 
         const dataChannelCallback = jest.fn();
         call.on(CallEvent.DataChannel, dataChannelCallback);
