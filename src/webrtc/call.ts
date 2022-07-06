@@ -1481,20 +1481,39 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const sdp = parseSdp(description.sdp);
 
         sdp.media.forEach(media => {
-            const payloadTypeMap = new Map<number, string>();
+            const payloadTypeToCodecMap = new Map<number, string>();
+            const codecToPayloadTypeMap = new Map<string, number>();
             for (const rtp of media.rtp) {
-                payloadTypeMap.set(rtp.payload, rtp.codec);
+                payloadTypeToCodecMap.set(rtp.payload, rtp.codec);
+                codecToPayloadTypeMap.set(rtp.codec, rtp.payload);
             }
-            for (const fmtp of media.fmtp) {
-                for (const [codec, params] of Object.entries(mods)) {
-                    if (payloadTypeMap.get(fmtp.payload) === codec) {
-                        if (params.enableDtx !== undefined) {
-                            fmtp.config += `;usedtx=${params.enableDtx ? '1' : '0'}`;
-                        }
-                        if (params.maxAverageBitrate !== undefined) {
-                            fmtp.config += `;maxaveragebitrate=${params.maxAverageBitrate}`;
-                        }
+
+            for (const [codec, params] of Object.entries(mods)) {
+                if (!codecToPayloadTypeMap.has(codec)) {
+                    logger.info(`Ignoring SDP modifications for ${codec} as it's not present.`);
+                    continue;
+                }
+
+                const extraconfig = [] as string[];
+                if (params.enableDtx !== undefined) {
+                    extraconfig.push(`usedtx=${params.enableDtx ? '1' : '0'}`);
+                }
+                if (params.maxAverageBitrate !== undefined) {
+                    extraconfig.push(`maxaveragebitrate=${params.maxAverageBitrate}`);
+                }
+
+                let found = false;
+                for (const fmtp of media.fmtp) {
+                    if (payloadTypeToCodecMap.get(fmtp.payload) === codec) {
+                        found = true;
+                        fmtp.config += ";" + extraconfig.join(";");
                     }
+                }
+                if (!found) {
+                    media.fmtp.push({
+                        payload: codecToPayloadTypeMap.get(codec),
+                        config: extraconfig.join(";"),
+                    });
                 }
             }
         });
