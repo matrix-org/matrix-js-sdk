@@ -9339,30 +9339,33 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
  */
 
 /**
- * Ignore all invites to this room.
+ * Metadata on ignored invites.
+ *
+ * This interface is expected to gain additional fields, all
+ * of them optional.
  */
-export type IgnoredRoomInvites = {
+export interface IgnoreInviteMetadata {
     /**
-     * The room ID for the room to ignore.
-     */
-    room_id: string;
-
-    /**
-     * When this instruction to ignore was decided by the user,
+     * The instant the user decided to ignore this invite,
      * as a Matrix timestamp.
      */
-    ts: number;
+    readonly ts: number;
+
+     /**
+      * A human-readable reason for ignoring this invite.
+      */
+    readonly reason?: string;
 };
 
 /**
  * Invites to ignore across all devices/sessions, as per MSC 3840.
  *
- * This data structure is expected to gain additional fields, all of
+ * This interface is expected to gain additional fields, all of
  * them optional.
  */
-export type IgnoredInvites = {
+export interface IgnoredInvites {
     /**
      * A list of rooms the user does not wish to be invited to.
      */
-    ignored_rooms?: IgnoredRoomInvites[];
+    readonly ignored_rooms?: Record</*room_id*/string, IgnoreInviteMetadata>;
 };
