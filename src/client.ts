@@ -9355,7 +9355,7 @@ export interface IgnoreInviteMetadata {
       * A human-readable reason for ignoring this invite.
       */
     readonly reason?: string;
-};
+}
 
 /**
  * Invites to ignore across all devices/sessions, as per MSC 3840.
@@ -9368,4 +9368,4 @@ export interface IgnoredInvites {
      * A list of rooms the user does not wish to be invited to.
      */
     readonly ignored_rooms?: Record</*room_id*/string, IgnoreInviteMetadata>;
-};
+}
