@@ -1318,12 +1318,11 @@ describe("MatrixClient", function() {
 
             // Insert something, we should be able to recover it.
             const SAMPLE = {
-                ignored_rooms: [
-                    {
-                        room_id: "12345",
+                ignored_rooms: {
+                    "12345": {
                         ts: Date.now(),
                     },
-                ],
+                },
             };
             await client.setIgnoredInvites(SAMPLE);
 
