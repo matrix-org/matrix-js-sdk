@@ -13,6 +13,7 @@ export enum SDPStreamMetadataPurpose {
 
 export interface SDPStreamMetadataObject {
     purpose: SDPStreamMetadataPurpose;
+    id: string;
     audio_muted: boolean;
     video_muted: boolean;
 }

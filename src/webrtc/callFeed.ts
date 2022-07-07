@@ -28,6 +28,7 @@ export interface ICallFeedOpts {
     roomId: string;
     userId: string;
     stream: MediaStream;
+    id: string;
     purpose: SDPStreamMetadataPurpose;
     /**
      * Whether or not the remote SDPStreamMetadata says audio is muted
@@ -57,6 +58,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     public stream: MediaStream;
     public userId: string;
     public purpose: SDPStreamMetadataPurpose;
+    public id: string;
     public speakingVolumeSamples: number[];
 
     private client: MatrixClient;
@@ -78,6 +80,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.roomId = opts.roomId;
         this.userId = opts.userId;
         this.purpose = opts.purpose;
+        this.id = opts.id;
         this.audioMuted = opts.audioMuted;
         this.videoMuted = opts.videoMuted;
         this.speakingVolumeSamples = new Array(SPEAKING_SAMPLE_COUNT).fill(-Infinity);

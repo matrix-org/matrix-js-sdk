@@ -491,6 +491,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 purpose: localFeed.purpose,
                 audio_muted: localFeed.isAudioMuted(),
                 video_muted: localFeed.isVideoMuted(),
+                id: localFeed.id,
             };
         }
         logger.debug("Got local SDPStreamMetadata", metadata);
@@ -515,6 +516,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         const userId = this.getOpponentMember().userId;
         const purpose = this.remoteSDPStreamMetadata[stream.id].purpose;
+        const id = this.remoteSDPStreamMetadata[stream.id].id;
         const audioMuted = this.remoteSDPStreamMetadata[stream.id].audio_muted;
         const videoMuted = this.remoteSDPStreamMetadata[stream.id].video_muted;
 
@@ -523,9 +525,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return;
         }
 
-        // Try to find a feed with the same purpose as the new stream,
-        // if we find it replace the old stream with the new one
-        const existingFeed = this.getRemoteFeeds().find((feed) => feed.purpose === purpose);
+        // Try to find a feed with the same purpose and id (if defined) as the
+        // new stream, if we find it replace the old stream with the new one
+        const existingFeed = this.getRemoteFeeds().find((feed) => {
+            return feed.purpose === purpose && (id ? (feed.id === id) : true);
+        });
         if (existingFeed) {
             existingFeed.setNewStream(stream);
         } else {
@@ -535,6 +539,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 userId,
                 stream,
                 purpose,
+                id,
                 audioMuted,
                 videoMuted,
             }));
@@ -551,6 +556,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const userId = this.getOpponentMember().userId;
         // We can guess the purpose here since the other client can only send one stream
         const purpose = SDPStreamMetadataPurpose.Usermedia;
+        // We se the id to undefined since the other client can only send one stream
+        const id = undefined;
         const oldRemoteStream = this.feeds.find((feed) => !feed.isLocal())?.stream;
 
         // Note that we check by ID and always set the remote stream: Chrome appears
@@ -576,6 +583,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 userId,
                 stream,
                 purpose,
+                id,
             }));
             this.emit(CallEvent.FeedsChanged, this.feeds);
         }
@@ -583,7 +591,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         logger.info(`Pushed remote stream (id="${stream.id}", active="${stream.active}")`);
     }
 
-    private pushNewLocalFeed(stream: MediaStream, purpose: SDPStreamMetadataPurpose, addToPeerConnection = true): void {
+    private pushNewLocalFeed(
+        stream: MediaStream,
+        purpose: SDPStreamMetadataPurpose,
+        id: string,
+        addToPeerConnection = true,
+    ): void {
         const userId = this.client.getUserId();
 
         // Tracks don't always start off enabled, eg. chrome will give a disabled
@@ -592,8 +605,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         setTracksEnabled(stream.getAudioTracks(), true);
         setTracksEnabled(stream.getVideoTracks(), true);
 
-        // We try to replace an existing feed if there already is one with the same purpose
-        const existingFeed = this.getLocalFeeds().find((feed) => feed.purpose === purpose);
+        // We try to replace an existing feed if there already is one with the
+        // same purpose and id (if defined)
+        const existingFeed = this.getLocalFeeds().find((feed) => {
+            return feed.purpose === purpose && (id ? feed.id === id : true);
+        });
         if (existingFeed) {
             existingFeed.setNewStream(stream);
         } else {
@@ -606,6 +622,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     userId,
                     stream,
                     purpose,
+                    id,
                 }),
                 addToPeerConnection,
             );
@@ -841,6 +858,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     userId: this.client.getUserId(),
                     stream,
                     purpose: SDPStreamMetadataPurpose.Usermedia,
+                    id: randomString(24),
                     audioMuted: false,
                     videoMuted: false,
                 });
@@ -1008,7 +1026,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             try {
                 const stream = await this.client.getMediaHandler().getScreensharingStream(desktopCapturerSourceId);
                 if (!stream) return false;
-                this.pushNewLocalFeed(stream, SDPStreamMetadataPurpose.Screenshare);
+                this.pushNewLocalFeed(stream, SDPStreamMetadataPurpose.Screenshare, randomString(24));
                 return true;
             } catch (err) {
                 logger.error("Failed to get screen-sharing stream:", err);
@@ -1048,7 +1066,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 });
                 sender.replaceTrack(track);
 
-                this.pushNewLocalFeed(stream, SDPStreamMetadataPurpose.Screenshare, false);
+                this.pushNewLocalFeed(stream, SDPStreamMetadataPurpose.Screenshare, this.localUsermediaFeed.id, false);
 
                 return true;
             } catch (err) {
@@ -1588,6 +1606,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             feed.setAudioMuted(this.remoteSDPStreamMetadata[streamId]?.audio_muted);
             feed.setVideoMuted(this.remoteSDPStreamMetadata[streamId]?.video_muted);
             feed.purpose = this.remoteSDPStreamMetadata[streamId]?.purpose;
+            feed.id = this.remoteSDPStreamMetadata[streamId]?.id;
         }
     }
 
@@ -2133,6 +2152,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 userId: this.client.getUserId(),
                 stream,
                 purpose: SDPStreamMetadataPurpose.Usermedia,
+                id: randomString(24),
                 audioMuted: false,
                 videoMuted: false,
             });
