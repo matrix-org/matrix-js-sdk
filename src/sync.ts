@@ -46,10 +46,10 @@ import {
     ISyncResponse,
     ITimeline,
 } from "./sync-accumulator";
-import { MatrixEvent } from "./models/event";
+import { IThreadBundledRelationship, MatrixEvent } from "./models/event";
 import { MatrixError, Method } from "./http-api";
 import { ISavedSync } from "./store";
-import { EventType } from "./@types/event";
+import { EventType, RelationType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
 import { RoomState, RoomStateEvent, IMarkerFoundOptions } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
@@ -1600,6 +1600,12 @@ export class SyncApi {
         return (obj.events as Array<IStrippedState | IRoomEvent | IStateEvent | IMinimalEvent>).map(function(e) {
             if (room) {
                 e["room_id"] = room.roomId;
+                if ("unsigned" in e) {
+                    const threadRel: IThreadBundledRelationship = e.unsigned?.["m.relations"]?.[RelationType.Thread];
+                    if (threadRel) {
+                        threadRel.latest_event.room_id = room.roomId;
+                    }
+                }
             }
             return mapper(e);
         });
