@@ -25,7 +25,7 @@ import {
     MockMediaDeviceInfo,
     MockRTCPeerConnection,
 } from "../../test-utils/webrtc";
-import { CallFeed } from "../../../src/webrtc/callFeed";
+import { CallFeed, CallFeedEvent } from "../../../src/webrtc/callFeed";
 
 const startVoiceCall = async (client: TestClient, call: MatrixCall): Promise<void> => {
     const callPromise = call.placeVoiceCall();
@@ -260,6 +260,7 @@ describe('Call', function() {
                     [SDPStreamMetadataKey]: {
                         "remote_stream": {
                             purpose: SDPStreamMetadataPurpose.Usermedia,
+                            id: "feed_id",
                             audio_muted: true,
                             video_muted: false,
                         },
@@ -279,6 +280,7 @@ describe('Call', function() {
         );
         const feed = call.getFeeds().find((feed) => feed.stream.id === "remote_stream");
         expect(feed?.purpose).toBe(SDPStreamMetadataPurpose.Usermedia);
+        expect(feed?.id).toBe("feed_id");
         expect(feed?.isAudioMuted()).toBeTruthy();
         expect(feed?.isVideoMuted()).not.toBeTruthy();
     });
@@ -398,19 +400,24 @@ describe('Call', function() {
             call.updateRemoteSDPStreamMetadata({
                 "remote_stream1": {
                     purpose: SDPStreamMetadataPurpose.Usermedia,
+                    id: "feed_id",
                 },
             });
             call.pushRemoteFeed(new MockMediaStream("remote_stream1", []));
             const feed = call.getFeeds().find((feed) => feed.stream.id === "remote_stream1");
+            const feedNewStreamCallback = jest.fn();
+            feed.on(CallFeedEvent.NewStream, feedNewStreamCallback);
 
             call.updateRemoteSDPStreamMetadata({
                 "remote_stream2": {
                     purpose: SDPStreamMetadataPurpose.Usermedia,
+                    id: "feed_id",
                 },
             });
             call.pushRemoteFeed(new MockMediaStream("remote_stream2", []));
 
             expect(feed?.stream?.id).toBe("remote_stream2");
+            expect(feedNewStreamCallback).toHaveBeenCalled();
         });
 
         it("with just purpose", async () => {
@@ -423,6 +430,8 @@ describe('Call', function() {
             });
             call.pushRemoteFeed(new MockMediaStream("remote_stream1", []));
             const feed = call.getFeeds().find((feed) => feed.stream.id === "remote_stream1");
+            const feedNewStreamCallback = jest.fn();
+            feed.on(CallFeedEvent.NewStream, feedNewStreamCallback);
 
             call.updateRemoteSDPStreamMetadata({
                 "remote_stream2": {
@@ -432,6 +441,7 @@ describe('Call', function() {
             call.pushRemoteFeed(new MockMediaStream("remote_stream2", []));
 
             expect(feed?.stream?.id).toBe("remote_stream2");
+            expect(feedNewStreamCallback).toHaveBeenCalled();
         });
 
         it("should not replace purpose is different", async () => {
@@ -444,6 +454,8 @@ describe('Call', function() {
             });
             call.pushRemoteFeed(new MockMediaStream("remote_stream1", []));
             const feed = call.getFeeds().find((feed) => feed.stream.id === "remote_stream1");
+            const feedNewStreamCallback = jest.fn();
+            feed.on(CallFeedEvent.NewStream, feedNewStreamCallback);
 
             call.updateRemoteSDPStreamMetadata({
                 "remote_stream2": {
@@ -453,6 +465,33 @@ describe('Call', function() {
             call.pushRemoteFeed(new MockMediaStream("remote_stream2", []));
 
             expect(feed?.stream?.id).toBe("remote_stream1");
+            expect(feedNewStreamCallback).not.toHaveBeenCalled();
+        });
+
+        it("should not replace if id is different", async () => {
+            await startVoiceCall(client, call);
+
+            call.updateRemoteSDPStreamMetadata({
+                "remote_stream1": {
+                    purpose: SDPStreamMetadataPurpose.Usermedia,
+                    id: "feed_id1",
+                },
+            });
+            call.pushRemoteFeed(new MockMediaStream("remote_stream1", []));
+            const feed = call.getFeeds().find((feed) => feed.stream.id === "remote_stream1");
+            const feedNewStreamCallback = jest.fn();
+            feed.on(CallFeedEvent.NewStream, feedNewStreamCallback);
+
+            call.updateRemoteSDPStreamMetadata({
+                "remote_stream2": {
+                    purpose: SDPStreamMetadataPurpose.Usermedia,
+                    id: "feed_id2",
+                },
+            });
+            call.pushRemoteFeed(new MockMediaStream("remote_stream2", []));
+
+            expect(feed?.stream?.id).toBe("remote_stream1");
+            expect(feedNewStreamCallback).not.toHaveBeenCalled();
         });
     });
 
@@ -462,6 +501,7 @@ describe('Call', function() {
         call.updateRemoteSDPStreamMetadata({
             "remote_stream": {
                 purpose: SDPStreamMetadataPurpose.Usermedia,
+                id: "feed_id1",
                 audio_muted: false,
                 video_muted: false,
             },
@@ -483,6 +523,7 @@ describe('Call', function() {
         });
 
         expect(feed?.purpose).toBe(SDPStreamMetadataPurpose.Screenshare);
+        expect(feed?.id).toBe("feed_id2");
         expect(feed?.audioMuted).toBe(true);
         expect(feed?.videoMuted).toBe(true);
     });
@@ -537,6 +578,7 @@ describe('Call', function() {
             call.pushNewLocalFeed(
                 new MockMediaStream("remote_stream1", [new MockMediaStreamTrack("track_id", "video")]),
                 SDPStreamMetadataPurpose.Usermedia,
+                "feed_id",
                 false,
             );
             expect(call.type).toBe(CallType.Video);
@@ -551,6 +593,7 @@ describe('Call', function() {
             roomId: call.roomId,
             userId: client.getUserId(),
             purpose: SDPStreamMetadataPurpose.Usermedia,
+            id: "feed_id1",
             audioMuted: false,
             videoMuted: false,
         })]);
@@ -567,11 +610,13 @@ describe('Call', function() {
         expect(call.getLocalSDPStreamMetadata()).toStrictEqual({
             "local_stream1": {
                 "purpose": SDPStreamMetadataPurpose.Usermedia,
+                "id": "feed_id1",
                 "audio_muted": true,
                 "video_muted": true,
             },
             "local_stream2": {
                 "purpose": SDPStreamMetadataPurpose.Screenshare,
+                "id": "feed_id2",
                 "audio_muted": true,
                 "video_muted": false,
             },
@@ -636,6 +681,7 @@ describe('Call', function() {
         expect(call.remoteScreensharingFeed.stream).toBe(remoteScreensharingStream);
         expect(call.remoteScreensharingStream).toBe(remoteScreensharingStream);
         expect(call.hasRemoteUserMediaAudioTrack).toBe(false);
+        expect(call.noIncomingFeeds()).toBe(false);
     });
 
     it("should end call after receiving a select event with a different party id", async () => {
