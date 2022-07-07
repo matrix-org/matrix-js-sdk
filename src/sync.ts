@@ -49,13 +49,14 @@ import {
 import { IThreadBundledRelationship, MatrixEvent } from "./models/event";
 import { MatrixError, Method } from "./http-api";
 import { ISavedSync } from "./store";
-import { EventType, RelationType } from "./@types/event";
+import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
 import { RoomState, RoomStateEvent, IMarkerFoundOptions } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
 import { BeaconEvent } from "./models/beacon";
 import { IEventsResponse } from "./@types/requests";
 import { IAbortablePromise } from "./@types/partials";
+import { THREAD_RELATION_TYPE } from "./models/thread";
 
 const DEBUG = true;
 
@@ -1601,7 +1602,8 @@ export class SyncApi {
             if (room) {
                 e["room_id"] = room.roomId;
                 if ("unsigned" in e) {
-                    const threadRel: IThreadBundledRelationship = e.unsigned?.["m.relations"]?.[RelationType.Thread];
+                    const threadRel: IThreadBundledRelationship =
+                        e.unsigned?.["m.relations"]?.[THREAD_RELATION_TYPE.name];
                     if (threadRel) {
                         threadRel.latest_event.room_id = room.roomId;
                     }
