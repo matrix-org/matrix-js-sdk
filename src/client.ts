@@ -9365,7 +9365,7 @@ export interface IgnoreInviteMetadata {
  */
 export interface IgnoredInvites {
     /**
-     * A list of rooms the user does not wish to be invited to.
+     * A map of room ids => metadata for rooms the user does not wish to be invited to.
      */
-    readonly ignored_rooms?: Record</*room_id*/string, IgnoreInviteMetadata>;
+    readonly ignored_rooms?: Record<string, IgnoreInviteMetadata>;
 }
