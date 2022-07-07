@@ -946,6 +946,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.baseUrl = opts.baseUrl;
         this.idBaseUrl = opts.idBaseUrl;
+        this.identityServer = opts.identityServer;
 
         this.usingExternalCrypto = opts.usingExternalCrypto;
         this.store = opts.store || new StubStore();
@@ -4814,8 +4815,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         };
 
         if (
-            this.identityServer &&
-            this.identityServer.getAccessToken &&
+            this.identityServer?.getAccessToken &&
             await this.doesServerAcceptIdentityAccessToken()
         ) {
             const identityAccessToken = await this.identityServer.getAccessToken();
@@ -7202,8 +7202,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             .filter(i => !i.id_access_token);
         if (
             invitesNeedingToken.length > 0 &&
-            this.identityServer &&
-            this.identityServer.getAccessToken &&
+            this.identityServer?.getAccessToken &&
             await this.doesServerAcceptIdentityAccessToken()
         ) {
             const identityAccessToken = await this.identityServer.getAccessToken();
