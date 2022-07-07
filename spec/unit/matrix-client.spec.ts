@@ -1297,4 +1297,39 @@ describe("MatrixClient", function() {
             expect(result!.aliases).toEqual(response.aliases);
         });
     });
+
+    describe("ignoring invites", () => {
+        it('stores ignored invites', async function() {
+            // Mockup account data storage.
+            const dataStore = new Map();
+            client.setAccountData = function(eventType, content) {
+                dataStore.set(eventType, content);
+                return Promise.resolve();
+            };
+            client.getAccountData = function(eventType) {
+                const data = dataStore.get(eventType);
+                return new MatrixEvent({
+                    content: data,
+                });
+            };
+
+            // Initially, the invite list should be empty but not `null`.
+            expect(await client.getIgnoredInvites()).toEqual({});
+    
+            // Insert something, we should be able to recover it.
+            const SAMPLE = {
+                ignored_rooms: [
+                    {
+                        room_id: "12345",
+                        ts: Date.now(),
+                    },
+                ],
+            };
+            await client.setIgnoredInvites(SAMPLE);
+    
+            // Check that it was (mock)stored on the client.
+            expect(await client.getIgnoredInvites()).toEqual(SAMPLE);
+        });
+    
+    });
 });
