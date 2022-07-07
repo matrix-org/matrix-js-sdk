@@ -700,7 +700,7 @@ describe("MatrixClient event timelines", function() {
                 };
             });
             req.check((request) => {
-                expect(request.opts.qs.filter).toEqual(JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER));
+                expect(request.queryParams.filter).toEqual(JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER));
             });
 
             await Promise.all([
