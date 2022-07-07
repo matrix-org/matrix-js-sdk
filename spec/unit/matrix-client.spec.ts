@@ -1315,7 +1315,7 @@ describe("MatrixClient", function() {
 
             // Initially, the invite list should be empty but not `null`.
             expect(await client.getIgnoredInvites()).toEqual({});
-    
+
             // Insert something, we should be able to recover it.
             const SAMPLE = {
                 ignored_rooms: [
@@ -1326,10 +1326,9 @@ describe("MatrixClient", function() {
                 ],
             };
             await client.setIgnoredInvites(SAMPLE);
-    
+
             // Check that it was (mock)stored on the client.
             expect(await client.getIgnoredInvites()).toEqual(SAMPLE);
         });
-    
     });
 });
