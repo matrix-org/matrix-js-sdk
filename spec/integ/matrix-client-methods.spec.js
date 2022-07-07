@@ -1001,7 +1001,7 @@ describe("MatrixClient", function() {
             };
 
             httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-                versions: ["r0.5.0"],
+                versions: ["r0.6.0"],
             });
 
             const prom = client.requestRegisterEmailToken("bob@email", "secret", 1);
