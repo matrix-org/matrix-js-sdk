@@ -842,6 +842,31 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         // the timelines are not contiguous.
         return null;
     }
+
+    /**
+     * Determine whether a given event can sanely be added to this event timeline set,
+     * for timeline sets relating to a thread, only return true for events in the same
+     * thread timeline, for timeline sets not relating to a thread only return true
+     * for events which should be shown in the main room timeline.
+     * Requires the `room` property to have been set at EventTimelineSet construction time.
+     *
+     * @param event {MatrixEvent} the event to check whether it belongs to this timeline set.
+     * @throws {Error} if `room` was not set when constructing this timeline set.
+     * @return {boolean} whether the event belongs to this timeline set.
+     */
+    public canContain(event: MatrixEvent): boolean {
+        if (!this.room) {
+            throw new Error("Cannot call `EventTimelineSet::canContain without a `room` set. " +
+                "Set the room when creating the EventTimelineSet to call this method.");
+        }
+
+        const { threadId, shouldLiveInRoom } = this.room.eventShouldLiveIn(event);
+
+        if (this.thread) {
+            return this.thread.id === threadId;
+        }
+        return shouldLiveInRoom;
+    }
 }
 
 /**
