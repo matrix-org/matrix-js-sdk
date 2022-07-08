@@ -533,7 +533,7 @@ export interface IClientWellKnown {
     [key: string]: any;
     "m.homeserver"?: IWellKnownConfig;
     "m.identity_server"?: IWellKnownConfig;
-    "m.authentication"?: IDelegatedAuthConfig;
+    "org.matrix.msc2965.authentication"?: IDelegatedAuthConfig; // MSC2965
 }
 
 export interface IWellKnownConfig {
@@ -545,7 +545,7 @@ export interface IWellKnownConfig {
     base_url?: string | null;
 }
 
-export interface IDelegatedAuthConfig {
+export interface IDelegatedAuthConfig { // MSC2965
     /** The OIDC Provider/issuer the client should use */
     issuer: string;
     /** The optional URL of the web UI where the user can manage their account */
