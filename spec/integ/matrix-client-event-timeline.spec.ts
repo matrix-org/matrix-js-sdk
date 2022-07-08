@@ -1055,10 +1055,7 @@ describe("MatrixClient event timelines", function() {
         client.clientOpts.experimentalThreadSupport = true;
         Thread.setServerSideSupport(true, false);
 
-        const room = client.getRoom(roomId);
-        const timelineSet = room.getTimelineSets()[0];
-
-        const syncData = {
+        httpBackend.when("GET", "/sync").respond(200, {
             next_batch: "s_5_4",
             rooms: {
                 join: {
@@ -1072,11 +1069,55 @@ describe("MatrixClient event timelines", function() {
                     },
                 },
             },
-        };
-        httpBackend.when("GET", "/sync").respond(200, syncData);
+        });
+        await Promise.all([httpBackend.flushAllExpected(), utils.syncPromise(client)]);
+
+        const room = client.getRoom(roomId);
+        const thread = room.getThread(THREAD_ROOT.event_id);
+        const timelineSet = thread.timelineSet;
+
+        httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_ROOT.event_id))
+            .respond(200, {
+                start: "start_token",
+                events_before: [],
+                event: THREAD_ROOT,
+                events_after: [],
+                state: [],
+                end: "end_token",
+            });
+        httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
+            encodeURIComponent(THREAD_ROOT.event_id) + "/" +
+            encodeURIComponent(THREAD_RELATION_TYPE.name) + "?limit=20")
+            .respond(200, function() {
+                return {
+                    original_event: THREAD_ROOT,
+                    chunk: [THREAD_REPLY],
+                    // no next batch as this is the oldest end of the timeline
+                };
+            });
+        await Promise.all([
+            client.getEventTimeline(timelineSet, THREAD_ROOT.event_id),
+            httpBackend.flushAllExpected(),
+        ]);
+
+        httpBackend.when("GET", "/sync").respond(200, {
+            next_batch: "s_5_5",
+            rooms: {
+                join: {
+                    [roomId]: {
+                        timeline: {
+                            events: [
+                                SYNC_THREAD_REPLY,
+                            ],
+                            prev_batch: "f_1_2",
+                        },
+                    },
+                },
+            },
+        });
 
         await Promise.all([httpBackend.flushAllExpected(), utils.syncPromise(client)]);
-        const tl = await client.getEventTimeline(timelineSet, THREAD_ROOT.event_id);
-        expect(tl.getEvents()[1].event).toEqual(THREAD_ROOT);
+
+        expect(thread.liveTimeline.getEvents()[1].event).toEqual(THREAD_REPLY);
     });
 });
