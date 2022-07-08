@@ -366,17 +366,26 @@ describe("Room", function() {
             const eventJson = utils.mkMessage({
                 room: roomId, user: userA, event: false,
             }) as object;
+            delete eventJson["txn_id"];
             const localEvent = new MatrixEvent(eventJson);
             localEvent.status = EventStatus.SENDING;
+            expect(localEvent.getTxnId()).toBeNull();
+            expect(room.timeline.length).toEqual(0);
 
             // first add the local echo
-            room.addPendingEvent(localEvent, "TXN_ID");
+            const txnId = "My_txn_id";
+            room.addPendingEvent(localEvent, txnId);
+            expect(room.getEventForTxnId(txnId)).toEqual(localEvent);
             expect(room.timeline.length).toEqual(1);
 
             // then the remoteEvent, it should de-dupe based on the event ID.
             const remoteEvent = new MatrixEvent(eventJson);
+            expect(remoteEvent.getTxnId()).toBeNull();
             room.addLiveEvents([remoteEvent]);
+            // the duplicate strategy code should ensure we don't add a 2nd event to the live timeline
             expect(room.timeline.length).toEqual(1);
+            // but without the event ID matching we will still have the local event in pending events
+            expect(room.getEventForTxnId(txnId)).toBeUndefined();
         });
     });
 
