@@ -423,15 +423,9 @@ export enum RoomVersionStability {
     Unstable = "unstable",
 }
 
-export interface IRoomCapability { // MSC3244
-    preferred: string | null;
-    support: string[];
-}
-
 export interface IRoomVersionsCapability {
     default: string;
     available: Record<string, RoomVersionStability>;
-    "org.matrix.msc3244.room_capabilities"?: Record<string, IRoomCapability>; // MSC3244
 }
 
 export interface ICapability {
