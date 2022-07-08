@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import { NotificationCountType, Room, RoomEvent } from "./models/room";
-import { ConnectionManagement } from "./conn-management";
 import { logger } from './logger';
 import * as utils from "./utils";
 import { EventTimeline } from "./models/event-timeline";
@@ -240,7 +239,6 @@ class ExtensionAccountData implements Extension {
 export class SlidingSyncSdk {
     private syncState: SyncState = null;
     private syncStateData: ISyncStateData;
-    private connManagement: ConnectionManagement;
     private lastPos: string = null;
     private failCount = 0;
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
@@ -268,7 +266,6 @@ export class SlidingSyncSdk {
                 RoomEvent.TimelineReset,
             ]);
         }
-        this.connManagement = new ConnectionManagement(client, this.updateSyncState.bind(this));
 
         this.slidingSync.on(SlidingSyncEvent.Lifecycle, this.onLifecycle.bind(this));
         this.slidingSync.on(SlidingSyncEvent.RoomData, this.onRoomData.bind(this));
@@ -377,10 +374,6 @@ export class SlidingSyncSdk {
      */
     public getSyncState(): SyncState {
         return this.syncState;
-    }
-
-    public retryImmediately() {
-        return this.connManagement.retryImmediately();
     }
 
     /**
@@ -663,7 +656,6 @@ export class SlidingSyncSdk {
      * Main entry point. Blocks until stop() is called.
      */
     public async sync() {
-        this.connManagement.start();
         logger.debug("Sliding sync init loop");
 
         //   1) We need to get push rules so we can check if events should bing as we get
@@ -693,7 +685,6 @@ export class SlidingSyncSdk {
     public stop(): void {
         logger.debug("SyncApi.stop");
         this.slidingSync.stop();
-        this.connManagement.stop();
     }
 
     /**
