@@ -1262,7 +1262,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             await this.upgradeCall(false, true);
             return this.isLocalVideoMuted();
         }
-        this.localUsermediaFeed?.setVideoMuted(muted);
+        this.localUsermediaFeed?.setAudioVideoMuted(null, muted);
         this.updateMuteStatus();
         await this.sendMetadataUpdate();
         return this.isLocalVideoMuted();
@@ -1296,7 +1296,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             await this.upgradeCall(true, false);
             return this.isMicrophoneMuted();
         }
-        this.localUsermediaFeed?.setAudioMuted(muted);
+        this.localUsermediaFeed?.setAudioVideoMuted(muted, null);
         this.updateMuteStatus();
         await this.sendMetadataUpdate();
         return this.isMicrophoneMuted();
@@ -1801,8 +1801,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             const streamId = feed.stream.id;
             const metadata = this.remoteSDPStreamMetadata[streamId];
 
-            feed.setAudioMuted(metadata?.audio_muted);
-            feed.setVideoMuted(metadata?.video_muted);
+            feed.setAudioVideoMuted(metadata?.audio_muted, metadata?.video_muted);
             feed.purpose = this.remoteSDPStreamMetadata[streamId]?.purpose;
         }
     }
@@ -2027,8 +2026,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // fast enough.
         if (this.isPtt && ["failed", "disconnected"].includes(this.peerConn.iceConnectionState)) {
             for (const feed of this.getRemoteFeeds()) {
-                feed.setAudioMuted(true);
-                feed.setVideoMuted(true);
+                feed.setAudioVideoMuted(true, true);
             }
         }
     };
