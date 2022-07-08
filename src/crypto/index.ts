@@ -2859,10 +2859,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
         if (event.isRedacted()) {
-            const redactionEvent = new MatrixEvent({
-                room_id: event.getRoomId(),
-                ...event.getUnsigned().redacted_because,
-            });
+            const redactionEvent = new MatrixEvent(event.getUnsigned().redacted_because);
             const decryptedEvent = await this.decryptEvent(redactionEvent);
 
             return {
