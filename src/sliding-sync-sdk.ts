@@ -652,6 +652,10 @@ export class SlidingSyncSdk {
         });
     }
 
+    public retryImmediately(): boolean {
+        return true;
+    }
+
     /**
      * Main entry point. Blocks until stop() is called.
      */

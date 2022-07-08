@@ -2194,7 +2194,22 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             const timeline = this.getTimelineForEvent(newEventId);
             if (timeline) {
                 // we've already received the event via the event stream.
-                // nothing more to do here.
+                // nothing more to do here, assuming the transaction ID was correctly matched.
+                // Let's check that.
+                const remoteEvent = this.findEventById(newEventId);
+                const remoteTxnId = remoteEvent.getUnsigned().transaction_id;
+                if (!remoteTxnId) {
+                    // This code path is mostly relevant for the Sliding Sync proxy.
+                    // The remote event did not contain a transaction ID, so we did not handle
+                    // the remote echo yet. Handle it now.
+                    const unsigned = remoteEvent.getUnsigned();
+                    unsigned.transaction_id = event.getTxnId();
+                    remoteEvent.setUnsigned(unsigned);
+                    // the remote event is _already_ in the timeline, so we need to remove it so
+                    // we can convert the local event into the final event.
+                    this.removeEvent(remoteEvent.getId());
+                    this.handleRemoteEcho(remoteEvent, event);
+                }
                 return;
             }
         }
