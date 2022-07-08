@@ -368,7 +368,7 @@ describe("Room", function() {
             }) as object;
             delete eventJson["txn_id"];
             delete eventJson["event_id"];
-            const localEvent = new MatrixEvent(Object.assign({event_id:"$temp"}, eventJson));
+            const localEvent = new MatrixEvent(Object.assign({ event_id: "$temp" }, eventJson));
             localEvent.status = EventStatus.SENDING;
             expect(localEvent.getTxnId()).toBeNull();
             expect(room.timeline.length).toEqual(0);
@@ -384,7 +384,7 @@ describe("Room", function() {
             room.updatePendingEvent(localEvent, EventStatus.SENT, realEventId);
 
             // then /sync returns the remoteEvent, it should de-dupe based on the event ID.
-            const remoteEvent = new MatrixEvent(Object.assign({event_id: realEventId}, eventJson));
+            const remoteEvent = new MatrixEvent(Object.assign({ event_id: realEventId }, eventJson));
             expect(remoteEvent.getTxnId()).toBeNull();
             room.addLiveEvents([remoteEvent]);
             // the duplicate strategy code should ensure we don't add a 2nd event to the live timeline
@@ -400,7 +400,7 @@ describe("Room", function() {
             delete eventJson["txn_id"];
             delete eventJson["event_id"];
             const txnId = "My_txn_id";
-            const localEvent = new MatrixEvent(Object.assign({event_id:"$temp", txn_id: txnId}, eventJson));
+            const localEvent = new MatrixEvent(Object.assign({ event_id: "$temp", txn_id: txnId }, eventJson));
             localEvent.status = EventStatus.SENDING;
             expect(localEvent.getTxnId()).toEqual(txnId);
             expect(room.timeline.length).toEqual(0);
@@ -412,7 +412,7 @@ describe("Room", function() {
 
             // now the /sync returns the remoteEvent, it is impossible for the JS SDK to de-dupe this.
             const realEventId = "$real-event-id";
-            const remoteEvent = new MatrixEvent(Object.assign({event_id: realEventId}, eventJson));
+            const remoteEvent = new MatrixEvent(Object.assign({ event_id: realEventId }, eventJson));
             expect(remoteEvent.getUnsigned().transaction_id).toBeUndefined();
             room.addLiveEvents([remoteEvent]);
             expect(room.timeline.length).toEqual(2); // impossible to de-dupe as no txn ID or matching event ID
