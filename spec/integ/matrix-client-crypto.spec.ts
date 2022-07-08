@@ -32,24 +32,25 @@ import { logger } from '../../src/logger';
 import * as testUtils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 import { CRYPTO_ENABLED } from "../../src/client";
+import { ClientEvent, IContent, MatrixClient, MatrixEvent } from "../../src/matrix";
 
-let aliTestClient;
+let aliTestClient: TestClient;
 const roomId = "!room:localhost";
 const aliUserId = "@ali:localhost";
 const aliDeviceId = "zxcvb";
 const aliAccessToken = "aseukfgwef";
-let bobTestClient;
+let bobTestClient: TestClient;
 const bobUserId = "@bob:localhost";
 const bobDeviceId = "bvcxz";
 const bobAccessToken = "fewgfkuesa";
-let aliMessages;
-let bobMessages;
+let aliMessages: IContent[];
+let bobMessages: IContent[];
 
 function bobUploadsDeviceKeys() {
     bobTestClient.expectDeviceKeyUpload();
     return Promise.all([
         bobTestClient.client.uploadKeys(),
-        bobTestClient.httpBackend.flush(),
+        bobTestClient.httpBackend.flushAllExpected(),
     ]).then(() => {
         expect(Object.keys(bobTestClient.deviceKeys).length).not.toEqual(0);
     });
@@ -67,16 +68,12 @@ function expectAliQueryKeys() {
     const bobKeys = {};
     bobKeys[bobDeviceId] = bobTestClient.deviceKeys;
     aliTestClient.httpBackend.when("POST", "/keys/query")
-            .respond(200, function(path, content) {
-        expect(content.device_keys[bobUserId]).toEqual(
-            [],
-            "Expected Alice to key query for " + bobUserId + ", got " +
-            Object.keys(content.device_keys),
-        );
-        const result = {};
-        result[bobUserId] = bobKeys;
-        return { device_keys: result };
-    });
+        .respond(200, function(_path, content) {
+            expect(content.device_keys[bobUserId]).toEqual([]);
+            const result = {};
+            result[bobUserId] = bobKeys;
+            return { device_keys: result };
+        });
     return aliTestClient.httpBackend.flush("/keys/query", 1);
 }
 
@@ -95,12 +92,8 @@ function expectBobQueryKeys() {
 
     bobTestClient.httpBackend.when(
         "POST", "/keys/query",
-    ).respond(200, function(path, content) {
-        expect(content.device_keys[aliUserId]).toEqual(
-            [],
-            "Expected Bob to key query for " + aliUserId + ", got " +
-            Object.keys(content.device_keys),
-        );
+    ).respond(200, function(_path, content) {
+        expect(content.device_keys[aliUserId]).toEqual([]);
         const result = {};
         result[aliUserId] = aliKeys;
         return { device_keys: result };
@@ -117,7 +110,7 @@ function expectAliClaimKeys() {
     return bobTestClient.awaitOneTimeKeyUpload().then((keys) => {
         aliTestClient.httpBackend.when(
             "POST", "/keys/claim",
-        ).respond(200, function(path, content) {
+        ).respond(200, function(_path, content) {
             const claimType = content.one_time_keys[bobUserId][bobDeviceId];
             expect(claimType).toEqual("signed_curve25519");
             let keyId = null;
@@ -139,7 +132,7 @@ function expectAliClaimKeys() {
         // time, and make sure the claim actually happens rather than ploughing on
         // confusingly.
         return aliTestClient.httpBackend.flush("/keys/claim", 1, 500).then((r) => {
-            expect(r).toEqual(1, "Ali did not claim Bob's keys");
+            expect(r).toEqual(1);
         });
     });
 }
@@ -161,6 +154,7 @@ function aliDownloadsKeys() {
     return Promise.all([p1, p2]).then(() => {
         return aliTestClient.client.crypto.deviceList.saveIfDirty();
     }).then(() => {
+        // @ts-ignore - protected
         aliTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
             const devices = data.devices[bobUserId];
             expect(devices[bobDeviceId].keys).toEqual(bobTestClient.deviceKeys.keys);
@@ -182,7 +176,7 @@ function bobEnablesEncryption() {
     return bobTestClient.client.setRoomEncryption(roomId, {
         algorithm: "m.olm.v1.curve25519-aes-sha2",
     }).then(function() {
-       expect(bobTestClient.client.isRoomEncrypted(roomId)).toBeTruthy();
+        expect(bobTestClient.client.isRoomEncrypted(roomId)).toBeTruthy();
     });
 }
 
@@ -240,7 +234,7 @@ function bobSendsReplyMessage() {
  * @return {promise} which resolves to the ciphertext for Bob's device.
  */
 function expectAliSendMessageRequest() {
-    return expectSendMessageRequest(aliTestClient.httpBackend).then(function(content) {
+    return expectSendMessageRequest(aliTestClient.httpBackend).then(function(content: IContent) {
         aliMessages.push(content);
         expect(Object.keys(content.ciphertext)).toEqual([bobTestClient.getDeviceKey()]);
         const ciphertext = content.ciphertext[bobTestClient.getDeviceKey()];
@@ -255,7 +249,7 @@ function expectAliSendMessageRequest() {
  * @return {promise} which resolves to the ciphertext for Bob's device.
  */
 function expectBobSendMessageRequest() {
-    return expectSendMessageRequest(bobTestClient.httpBackend).then(function(content) {
+    return expectSendMessageRequest(bobTestClient.httpBackend).then(function(content: IContent) {
         bobMessages.push(content);
         const aliKeyId = "curve25519:" + aliDeviceId;
         const aliDeviceCurve25519Key = aliTestClient.deviceKeys.keys[aliKeyId];
@@ -266,16 +260,16 @@ function expectBobSendMessageRequest() {
     });
 }
 
-function sendMessage(client) {
+function sendMessage(client: MatrixClient) {
     return client.sendMessage(
         roomId, { msgtype: "m.text", body: "Hello, World" },
     );
 }
 
-function expectSendMessageRequest(httpBackend) {
+function expectSendMessageRequest(httpBackend: TestClient["httpBackend"]): Promise<IContent> {
     const path = "/send/m.room.encrypted/";
     const prom = new Promise((resolve) => {
-        httpBackend.when("PUT", path).respond(200, function(path, content) {
+        httpBackend.when("PUT", path).respond(200, function(_path, content) {
             resolve(content);
             return {
                 event_id: "asdfgh",
@@ -301,7 +295,12 @@ function bobRecvMessage() {
     );
 }
 
-function recvMessage(httpBackend, client, sender, message) {
+function recvMessage(
+    httpBackend: TestClient["httpBackend"],
+    client: MatrixClient,
+    sender: string,
+    message: IContent,
+) {
     const syncData = {
         next_batch: "x",
         rooms: {
@@ -324,22 +323,22 @@ function recvMessage(httpBackend, client, sender, message) {
     };
     httpBackend.when("GET", "/sync").respond(200, syncData);
 
-    const eventPromise = new Promise((resolve, reject) => {
-        const onEvent = function(event) {
+    const eventPromise = new Promise<MatrixEvent>((resolve) => {
+        const onEvent = function(event: MatrixEvent) {
             // ignore the m.room.member events
             if (event.getType() == "m.room.member") {
                 return;
             }
             logger.log(client.credentials.userId + " received event",
-                        event);
+                event);
 
-            client.removeListener("event", onEvent);
+            client.removeListener(ClientEvent.Event, onEvent);
             resolve(event);
         };
-        client.on("event", onEvent);
+        client.on(ClientEvent.Event, onEvent);
     });
 
-    httpBackend.flush();
+    httpBackend.flushAllExpected();
 
     return eventPromise.then((event) => {
         expect(event.isEncrypted()).toBeTruthy();
@@ -363,7 +362,7 @@ function recvMessage(httpBackend, client, sender, message) {
  * @param {TestClient} testClient
  * @returns {Promise} which resolves when the sync has been flushed.
  */
-function firstSync(testClient) {
+function firstSync(testClient: TestClient) {
     // send a sync response including our test room.
     const syncData = {
         next_batch: "x",
@@ -471,11 +470,7 @@ describe("MatrixClient crypto", function() {
         bobKeys[bobDeviceId] = bobDeviceKeys;
         aliTestClient.httpBackend.when(
             "POST", "/keys/query",
-        ).respond(200, function(path, content) {
-            const result = {};
-            result[bobUserId] = bobKeys;
-            return { device_keys: result };
-        });
+        ).respond(200, { device_keys: { [bobUserId]: bobKeys } });
 
         return Promise.all([
             aliTestClient.client.downloadKeys([bobUserId, eveUserId]),
@@ -513,11 +508,7 @@ describe("MatrixClient crypto", function() {
         bobKeys[bobDeviceId] = bobDeviceKeys;
         aliTestClient.httpBackend.when(
             "POST", "/keys/query",
-        ).respond(200, function(path, content) {
-            const result = {};
-            result[bobUserId] = bobKeys;
-            return { device_keys: result };
-        });
+        ).respond(200, { device_keys: { [bobUserId]: bobKeys } });
 
         return Promise.all([
             aliTestClient.client.downloadKeys([bobUserId]),
@@ -541,7 +532,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Ali sends a message", function() {
-        aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} } });
+        aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} }, failures: {} });
         return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
@@ -551,7 +542,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Bob receives a message", function() {
-        aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} } });
+        aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} }, failures: {} });
         return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
@@ -562,7 +553,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Bob receives a message with a bogus sender", function() {
-        aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} } });
+        aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} }, failures: {} });
         return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
@@ -593,16 +584,16 @@ describe("MatrixClient crypto", function() {
                 };
                 bobTestClient.httpBackend.when("GET", "/sync").respond(200, syncData);
 
-                const eventPromise = new Promise((resolve, reject) => {
-                    const onEvent = function(event) {
+                const eventPromise = new Promise<MatrixEvent>((resolve) => {
+                    const onEvent = function(event: MatrixEvent) {
                         logger.log(bobUserId + " received event",
-                                    event);
+                            event);
                         resolve(event);
                     };
-                    bobTestClient.client.once("event", onEvent);
+                    bobTestClient.client.once(ClientEvent.Event, onEvent);
                 });
 
-                bobTestClient.httpBackend.flush();
+                bobTestClient.httpBackend.flushAllExpected();
                 return eventPromise;
             }).then((event) => {
                 expect(event.isEncrypted()).toBeTruthy();
@@ -616,7 +607,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Ali blocks Bob's device", function() {
-        aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} } });
+        aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} }, failures: {} });
         return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
@@ -627,16 +618,16 @@ describe("MatrixClient crypto", function() {
                 aliTestClient.client.setDeviceBlocked(bobUserId, bobDeviceId, true);
                 const p1 = sendMessage(aliTestClient.client);
                 const p2 = expectSendMessageRequest(aliTestClient.httpBackend)
-                      .then(function(sentContent) {
-                          // no unblocked devices, so the ciphertext should be empty
-                          expect(sentContent.ciphertext).toEqual({});
-                      });
+                    .then(function(sentContent) {
+                        // no unblocked devices, so the ciphertext should be empty
+                        expect(sentContent.ciphertext).toEqual({});
+                    });
                 return Promise.all([p1, p2]);
             });
     });
 
     it("Bob receives two pre-key messages", function() {
-        aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} } });
+        aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} }, failures: {} });
         return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
@@ -649,8 +640,8 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Bob replies to the message", function() {
-        aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} } });
-        bobTestClient.expectKeyQuery({ device_keys: { [bobUserId]: {} } });
+        aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} }, failures: {} });
+        bobTestClient.expectKeyQuery({ device_keys: { [bobUserId]: {} }, failures: {} });
         return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
@@ -661,14 +652,14 @@ describe("MatrixClient crypto", function() {
             .then(bobRecvMessage)
             .then(bobEnablesEncryption)
             .then(bobSendsReplyMessage).then(function(ciphertext) {
-                expect(ciphertext.type).toEqual(1, "Unexpected cipghertext type.");
+                expect(ciphertext.type).toEqual(1);
             }).then(aliRecvMessage);
     });
 
     it("Ali does a key query when encryption is enabled", function() {
         // enabling encryption in the room should make alice download devices
         // for both members.
-        aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} } });
+        aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} }, failures: {} });
         return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => firstSync(aliTestClient))
@@ -701,6 +692,7 @@ describe("MatrixClient crypto", function() {
                     device_keys: {
                         [bobUserId]: {},
                     },
+                    failures: {},
                 });
                 return aliTestClient.httpBackend.flushAllExpected();
             });
@@ -744,13 +736,13 @@ describe("MatrixClient crypto", function() {
                     expect(Object.keys(content.one_time_keys).length)
                         .toBeGreaterThanOrEqual(1);
                     logger.log('received %i one-time keys',
-                                Object.keys(content.one_time_keys).length);
+                        Object.keys(content.one_time_keys).length);
                     // cancel futher calls by telling the client
                     // we have more than we need
                     return {
-                       one_time_key_counts: {
-                           signed_curve25519: 70,
-                       },
+                        one_time_key_counts: {
+                            signed_curve25519: 70,
+                        },
                     };
                 }))
             .then(() => httpBackend.flushAllExpected());
