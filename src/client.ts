@@ -165,7 +165,7 @@ import {
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
 } from "./@types/event";
-import { IAbortablePromise, IdServerUnbindResult, IImageInfo, Preset, Visibility } from "./@types/partials";
+import { IAbortablePromise, IdServerUnbindResult, IImageInfo, JoinRule, Preset, Visibility } from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
 import { randomString } from "./randomstring";
 import { BackupManager, IKeyBackup, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup";
@@ -3298,9 +3298,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
         }
 
+        const ignoredInvites = this.getIgnoredInvites().ignored_rooms ?? {};
         return allRooms.filter((r) => {
             const tombstone = r.currentState.getStateEvents(EventType.RoomTombstone, '');
             if (tombstone && replacedRooms.has(r.roomId)) {
+                return false;
+            } else if (r.getMyMembership() === JoinRule.Invite && r.roomId in ignoredInvites) {
                 return false;
             }
             return true;
