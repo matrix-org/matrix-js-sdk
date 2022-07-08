@@ -96,19 +96,14 @@ describe("Relations", function() {
             },
         });
 
-        // Stub the room
-
-        const room = new Room("room123", null, null);
-
         // Add the target event first, then the relation event
         {
+            const room = new Room("room123", null, null);
             const relationsCreated = new Promise(resolve => {
                 targetEvent.once(MatrixEventEvent.RelationsCreated, resolve);
             });
 
-            const timelineSet = new EventTimelineSet(room, {
-                unstableClientRelationAggregation: true,
-            });
+            const timelineSet = new EventTimelineSet(room);
             timelineSet.addLiveEvent(targetEvent);
             timelineSet.addLiveEvent(relationEvent);
 
@@ -117,18 +112,25 @@ describe("Relations", function() {
 
         // Add the relation event first, then the target event
         {
+            const room = new Room("room123", null, null);
             const relationsCreated = new Promise(resolve => {
                 targetEvent.once(MatrixEventEvent.RelationsCreated, resolve);
             });
 
-            const timelineSet = new EventTimelineSet(room, {
-                unstableClientRelationAggregation: true,
-            });
+            const timelineSet = new EventTimelineSet(room);
             timelineSet.addLiveEvent(relationEvent);
             timelineSet.addLiveEvent(targetEvent);
 
             await relationsCreated;
         }
+    });
+
+    it("should re-use Relations between all timeline sets in a room", async () => {
+        const room = new Room("room123", null, null);
+        const timelineSet1 = new EventTimelineSet(room);
+        const timelineSet2 = new EventTimelineSet(room);
+        expect(room.relations).toBe(timelineSet1.relations);
+        expect(room.relations).toBe(timelineSet2.relations);
     });
 
     it("should ignore m.replace for state events", async () => {

@@ -18,11 +18,29 @@ limitations under the License.
  * @module models/event-timeline
  */
 
-import { RoomState } from "./room-state";
+import { logger } from '../logger';
+import { RoomState, IMarkerFoundOptions } from "./room-state";
 import { EventTimelineSet } from "./event-timeline-set";
 import { MatrixEvent } from "./event";
 import { Filter } from "../filter";
 import { EventType } from "../@types/event";
+
+export interface IInitialiseStateOptions extends Pick<IMarkerFoundOptions, 'timelineWasEmpty'> {
+    // This is a separate interface without any extra stuff currently added on
+    // top of `IMarkerFoundOptions` just because it feels like they have
+    // different concerns. One shouldn't necessarily look to add to
+    // `IMarkerFoundOptions` just because they want to add an extra option to
+    // `initialiseState`.
+}
+
+export interface IAddEventOptions extends Pick<IMarkerFoundOptions, 'timelineWasEmpty'> {
+    /** Whether to insert the new event at the start of the timeline where the
+     * oldest events are (timeline is in chronological order, oldest to most
+     * recent) */
+    toStartOfTimeline: boolean;
+    /** The state events to reconcile metadata from */
+    roomState?: RoomState;
+}
 
 export enum Direction {
     Backward = "b",
@@ -131,7 +149,7 @@ export class EventTimeline {
      * state with.
      * @throws {Error} if an attempt is made to call this after addEvent is called.
      */
-    public initialiseState(stateEvents: MatrixEvent[]): void {
+    public initialiseState(stateEvents: MatrixEvent[], { timelineWasEmpty }: IInitialiseStateOptions = {}): void {
         if (this.events.length > 0) {
             throw new Error("Cannot initialise state after events are added");
         }
@@ -152,8 +170,12 @@ export class EventTimeline {
             Object.freeze(e);
         }
 
-        this.startState.setStateEvents(stateEvents);
-        this.endState.setStateEvents(stateEvents);
+        this.startState.setStateEvents(stateEvents, {
+            timelineWasEmpty,
+        });
+        this.endState.setStateEvents(stateEvents, {
+            timelineWasEmpty,
+        });
     }
 
     /**
@@ -345,24 +367,60 @@ export class EventTimeline {
      * Add a new event to the timeline, and update the state
      *
      * @param {MatrixEvent} event   new event
-     * @param {boolean}  atStart     true to insert new event at the start
+     * @param {IAddEventOptions} options addEvent options
      */
-    public addEvent(event: MatrixEvent, atStart: boolean, stateContext?: RoomState): void {
-        if (!stateContext) {
-            stateContext = atStart ? this.startState : this.endState;
+    public addEvent(
+        event: MatrixEvent,
+        {
+            toStartOfTimeline,
+            roomState,
+            timelineWasEmpty,
+        }: IAddEventOptions,
+    ): void;
+    /**
+     * @deprecated In favor of the overload with `IAddEventOptions`
+     */
+    public addEvent(
+        event: MatrixEvent,
+        toStartOfTimeline: boolean,
+        roomState?: RoomState
+    ): void;
+    public addEvent(
+        event: MatrixEvent,
+        toStartOfTimelineOrOpts: boolean | IAddEventOptions,
+        roomState?: RoomState,
+    ): void {
+        let toStartOfTimeline = !!toStartOfTimelineOrOpts;
+        let timelineWasEmpty: boolean;
+        if (typeof (toStartOfTimelineOrOpts) === 'object') {
+            ({ toStartOfTimeline, roomState, timelineWasEmpty } = toStartOfTimelineOrOpts);
+        } else if (toStartOfTimelineOrOpts !== undefined) {
+            // Deprecation warning
+            // FIXME: Remove after 2023-06-01 (technical debt)
+            logger.warn(
+                'Overload deprecated: ' +
+                '`EventTimeline.addEvent(event, toStartOfTimeline, roomState?)` ' +
+                'is deprecated in favor of the overload with `EventTimeline.addEvent(event, IAddEventOptions)`',
+            );
+        }
+
+        if (!roomState) {
+            roomState = toStartOfTimeline ? this.startState : this.endState;
         }
 
         const timelineSet = this.getTimelineSet();
 
         if (timelineSet.room) {
-            EventTimeline.setEventMetadata(event, stateContext, atStart);
+            EventTimeline.setEventMetadata(event, roomState, toStartOfTimeline);
 
             // modify state but only on unfiltered timelineSets
             if (
                 event.isState() &&
                 timelineSet.room.getUnfilteredTimelineSet() === timelineSet
             ) {
-                stateContext.setStateEvents([event]);
+                roomState.setStateEvents([event], {
+                    timelineWasEmpty,
+                });
                 // it is possible that the act of setting the state event means we
                 // can set more metadata (specifically sender/target props), so try
                 // it again if the prop wasn't previously set. It may also mean that
@@ -373,22 +431,22 @@ export class EventTimeline {
                 // back in time, else we'll set the .sender value for BEFORE the given
                 // member event, whereas we want to set the .sender value for the ACTUAL
                 // member event itself.
-                if (!event.sender || (event.getType() === "m.room.member" && !atStart)) {
-                    EventTimeline.setEventMetadata(event, stateContext, atStart);
+                if (!event.sender || (event.getType() === "m.room.member" && !toStartOfTimeline)) {
+                    EventTimeline.setEventMetadata(event, roomState, toStartOfTimeline);
                 }
             }
         }
 
-        let insertIndex;
+        let insertIndex: number;
 
-        if (atStart) {
+        if (toStartOfTimeline) {
             insertIndex = 0;
         } else {
             insertIndex = this.events.length;
         }
 
         this.events.splice(insertIndex, 0, event); // insert element
-        if (atStart) {
+        if (toStartOfTimeline) {
             this.baseIndex++;
         }
     }

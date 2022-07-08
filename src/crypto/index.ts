@@ -75,7 +75,6 @@ import {
     ISignedKey,
     IUploadKeySignaturesResponse,
     MatrixClient,
-    SessionStore,
 } from "../client";
 import type { IRoomEncryption, RoomList } from "./RoomList";
 import { IKeyBackupInfo } from "./keybackup";
@@ -121,7 +120,7 @@ interface IInitOpts {
 
 export interface IBootstrapCrossSigningOpts {
     setupNewCrossSigning?: boolean;
-    authUploadDeviceSigningKeys?(makeRequest: (authData: any) => {}): Promise<void>;
+    authUploadDeviceSigningKeys?(makeRequest: (authData: any) => Promise<{}>): Promise<void>;
 }
 
 /* eslint-disable camelcase */
@@ -323,9 +322,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param {MatrixClient} baseApis base matrix api interface
      *
-     * @param {module:store/session/webstorage~WebStorageSessionStore} sessionStore
-     *    Store to be used for end-to-end crypto session data
-     *
      * @param {string} userId The user ID for the local user
      *
      * @param {string} deviceId The identifier for this device.
@@ -343,7 +339,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     constructor(
         public readonly baseApis: MatrixClient,
-        public readonly sessionStore: SessionStore,
         public readonly userId: string,
         private readonly deviceId: string,
         private readonly clientStore: IStore,
@@ -1725,13 +1720,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         logger.info(`Finished device verification upgrade for ${userId}`);
     }
 
-    public async setTrustedBackupPubKey(trustedPubKey: string): Promise<void> {
-        // This should be redundant post cross-signing is a thing, so just
-        // plonk it in localStorage for now.
-        this.sessionStore.setLocalTrustedBackupPubKey(trustedPubKey);
-        await this.backupManager.checkKeyBackup();
-    }
-
     /**
      */
     public enableLazyLoading(): void {
@@ -2590,7 +2578,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // because it first stores in memory. We should await the promise only
         // after all the in-memory state (roomEncryptors and _roomList) has been updated
         // to avoid races when calling this method multiple times. Hence keep a hold of the promise.
-        let storeConfigPromise = null;
+        let storeConfigPromise: Promise<void> = null;
         if (!existingConfig) {
             storeConfigPromise = this.roomList.setRoomEncryption(roomId, config);
         }
@@ -3296,7 +3284,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                     event.on(MatrixEventEvent.Status, statusListener);
                 });
             } catch (err) {
-                logger.error("error while waiting for the verification event to be sent: " + err.message);
+                logger.error("error while waiting for the verification event to be sent: ", err);
                 return;
             } finally {
                 event.removeListener(MatrixEventEvent.LocalEventIdReplaced, eventIdListener);
@@ -3320,7 +3308,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         try {
             await request.channel.handleEvent(event, request, isLiveEvent);
         } catch (err) {
-            logger.error("error while handling verification event: " + err.message);
+            logger.error("error while handling verification event", err);
         }
         const shouldEmit = isNewRequest &&
             !request.initiatedByMe &&

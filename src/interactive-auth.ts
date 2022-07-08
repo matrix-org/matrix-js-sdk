@@ -44,6 +44,7 @@ export interface IStageStatus {
 
 export interface IAuthData {
     session?: string;
+    type?: string;
     completed?: string[];
     flows?: IFlow[];
     available_flows?: IFlow[];

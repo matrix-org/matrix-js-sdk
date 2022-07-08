@@ -1,5 +1,5 @@
 import * as utils from "../test-utils/test-utils";
-import { EventTimeline } from "../../src/matrix";
+import { EventTimeline, Filter, MatrixEvent } from "../../src/matrix";
 import { logger } from "../../src/logger";
 import { TestClient } from "../TestClient";
 import { Thread, THREAD_RELATION_TYPE } from "../../src/models/thread";
@@ -70,10 +70,23 @@ const EVENTS = [
     }),
 ];
 
-const THREAD_ROOT = utils.mkMessage({
+const THREAD_ROOT = utils.mkEvent({
     room: roomId,
     user: userId,
-    msg: "thread root",
+    type: "m.room.message",
+    content: {
+        "body": "thread root",
+        "msgtype": "m.text",
+    },
+    unsigned: {
+        "m.relations": {
+            "io.element.thread": {
+                "latest_event": undefined,
+                "count": 1,
+                "current_user_participated": true,
+            },
+        },
+    },
 });
 
 const THREAD_REPLY = utils.mkEvent({
@@ -90,6 +103,8 @@ const THREAD_REPLY = utils.mkEvent({
         },
     },
 });
+
+THREAD_ROOT.unsigned["m.relations"]["io.element.thread"].latest_event = THREAD_REPLY;
 
 // start the client, and wait for it to initialise
 function startClient(httpBackend, client) {
@@ -500,7 +515,8 @@ describe("MatrixClient event timelines", function() {
             Thread.setServerSideSupport(true);
             client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId);
-            const timelineSet = room.getTimelineSets()[0];
+            const thread = room.createThread(THREAD_ROOT.event_id, undefined, [], false);
+            const timelineSet = thread.timelineSet;
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_REPLY.event_id))
                 .respond(200, function() {
@@ -537,6 +553,187 @@ describe("MatrixClient event timelines", function() {
 
             expect(timeline.getEvents().find(e => e.getId() === THREAD_ROOT.event_id)).toBeTruthy();
             expect(timeline.getEvents().find(e => e.getId() === THREAD_REPLY.event_id)).toBeTruthy();
+        });
+
+        it("should return relevant timeline from non-thread timelineSet when asking for the thread root", async () => {
+            client.clientOpts.experimentalThreadSupport = true;
+            Thread.setServerSideSupport(true);
+            client.stopClient(); // we don't need the client to be syncing at this time
+            const room = client.getRoom(roomId);
+            const threadRoot = new MatrixEvent(THREAD_ROOT);
+            const thread = room.createThread(THREAD_ROOT.event_id, threadRoot, [threadRoot], false);
+            const timelineSet = room.getTimelineSets()[0];
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_ROOT.event_id))
+                .respond(200, function() {
+                    return {
+                        start: "start_token0",
+                        events_before: [],
+                        event: THREAD_ROOT,
+                        events_after: [],
+                        end: "end_token0",
+                        state: [],
+                    };
+                });
+
+            const [timeline] = await Promise.all([
+                client.getEventTimeline(timelineSet, THREAD_ROOT.event_id),
+                httpBackend.flushAllExpected(),
+            ]);
+
+            expect(timeline).not.toBe(thread.liveTimeline);
+            expect(timelineSet.getTimelines()).toContain(timeline);
+            expect(timeline.getEvents().find(e => e.getId() === THREAD_ROOT.event_id)).toBeTruthy();
+        });
+
+        it("should return undefined when event is not in the thread that the given timelineSet is representing", () => {
+            client.clientOpts.experimentalThreadSupport = true;
+            Thread.setServerSideSupport(true);
+            client.stopClient(); // we don't need the client to be syncing at this time
+            const room = client.getRoom(roomId);
+            const threadRoot = new MatrixEvent(THREAD_ROOT);
+            const thread = room.createThread(THREAD_ROOT.event_id, threadRoot, [threadRoot], false);
+            const timelineSet = thread.timelineSet;
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(EVENTS[0].event_id))
+                .respond(200, function() {
+                    return {
+                        start: "start_token0",
+                        events_before: [],
+                        event: EVENTS[0],
+                        events_after: [],
+                        end: "end_token0",
+                        state: [],
+                    };
+                });
+
+            return Promise.all([
+                expect(client.getEventTimeline(timelineSet, EVENTS[0].event_id)).resolves.toBeUndefined(),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+
+        it("should return undefined when event is within a thread but timelineSet is not", () => {
+            client.clientOpts.experimentalThreadSupport = true;
+            Thread.setServerSideSupport(true);
+            client.stopClient(); // we don't need the client to be syncing at this time
+            const room = client.getRoom(roomId);
+            const timelineSet = room.getTimelineSets()[0];
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_REPLY.event_id))
+                .respond(200, function() {
+                    return {
+                        start: "start_token0",
+                        events_before: [],
+                        event: THREAD_REPLY,
+                        events_after: [],
+                        end: "end_token0",
+                        state: [],
+                    };
+                });
+
+            return Promise.all([
+                expect(client.getEventTimeline(timelineSet, THREAD_REPLY.event_id)).resolves.toBeUndefined(),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+
+        it("should should add lazy loading filter when requested", async () => {
+            client.clientOpts.lazyLoadMembers = true;
+            client.stopClient(); // we don't need the client to be syncing at this time
+            const room = client.getRoom(roomId);
+            const timelineSet = room.getTimelineSets()[0];
+
+            const req = httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(EVENTS[0].event_id));
+            req.respond(200, function() {
+                return {
+                    start: "start_token0",
+                    events_before: [],
+                    event: EVENTS[0],
+                    events_after: [],
+                    end: "end_token0",
+                    state: [],
+                };
+            });
+            req.check((request) => {
+                expect(request.opts.qs.filter).toEqual(JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER));
+            });
+
+            await Promise.all([
+                client.getEventTimeline(timelineSet, EVENTS[0].event_id),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+    });
+
+    describe("getLatestTimeline", function() {
+        it("should create a new timeline for new events", function() {
+            const room = client.getRoom(roomId);
+            const timelineSet = room.getTimelineSets()[0];
+
+            const latestMessageId = 'event1:bar';
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/messages")
+                .respond(200, function() {
+                    return {
+                        chunk: [{
+                            event_id: latestMessageId,
+                        }],
+                    };
+                });
+
+            httpBackend.when("GET", `/rooms/!foo%3Abar/context/${encodeURIComponent(latestMessageId)}`)
+                .respond(200, function() {
+                    return {
+                        start: "start_token",
+                        events_before: [EVENTS[1], EVENTS[0]],
+                        event: EVENTS[2],
+                        events_after: [EVENTS[3]],
+                        state: [
+                            ROOM_NAME_EVENT,
+                            USER_MEMBERSHIP_EVENT,
+                        ],
+                        end: "end_token",
+                    };
+                });
+
+            return Promise.all([
+                client.getLatestTimeline(timelineSet).then(function(tl) {
+                    // Instead of this assertion logic, we could just add a spy
+                    // for `getEventTimeline` and make sure it's called with the
+                    // correct parameters. This doesn't feel too bad to make sure
+                    // `getLatestTimeline` is doing the right thing though.
+                    expect(tl.getEvents().length).toEqual(4);
+                    for (let i = 0; i < 4; i++) {
+                        expect(tl.getEvents()[i].event).toEqual(EVENTS[i]);
+                        expect(tl.getEvents()[i].sender.name).toEqual(userName);
+                    }
+                    expect(tl.getPaginationToken(EventTimeline.BACKWARDS))
+                        .toEqual("start_token");
+                    expect(tl.getPaginationToken(EventTimeline.FORWARDS))
+                        .toEqual("end_token");
+                }),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+
+        it("should throw error when /messages does not return a message", () => {
+            const room = client.getRoom(roomId);
+            const timelineSet = room.getTimelineSets()[0];
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/messages")
+                .respond(200, () => {
+                    return {
+                        chunk: [
+                            // No messages to return
+                        ],
+                    };
+                });
+
+            return Promise.all([
+                expect(client.getLatestTimeline(timelineSet)).rejects.toThrow(),
+                httpBackend.flushAllExpected(),
+            ]);
         });
     });
 
