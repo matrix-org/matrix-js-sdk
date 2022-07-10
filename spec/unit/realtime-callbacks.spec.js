@@ -1,21 +1,13 @@
 import * as callbacks from "../../src/realtime-callbacks";
 
 let wallTime = 1234567890;
-jest.useFakeTimers();
+jest.useFakeTimers().setSystemTime(wallTime);
 
 describe("realtime-callbacks", function() {
     function tick(millis) {
         wallTime += millis;
         jest.advanceTimersByTime(millis);
     }
-
-    beforeEach(function() {
-        callbacks.setNow(() => wallTime);
-    });
-
-    afterEach(function() {
-        callbacks.setNow();
-    });
 
     describe("setTimeout", function() {
         it("should call the callback after the timeout", function() {
