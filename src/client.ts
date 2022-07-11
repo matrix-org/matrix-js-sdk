@@ -8944,7 +8944,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     public processBeaconEvents(
-        room: Room,
+        room?: Room,
         events?: MatrixEvent[],
     ): void {
         if (!events?.length) return;
