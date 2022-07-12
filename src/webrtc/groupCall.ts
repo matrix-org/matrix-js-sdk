@@ -1275,17 +1275,17 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
         if (state === CallState.Connected) {
             this.retryCallCounts.delete(getCallUserId(call));
 
-            // if we're calling an SFU, subscribe to its feeds
-            // XXX: check that datachannel is open first?
             if (this.client.localSfu) {
                 // now we know what our feed IDs are, we can publish them
                 // so others can subscribe to us...
                 this.sendMemberStateEvent();
 
+                // if we're calling an SFU, subscribe to its feeds
                 const memberStateEvents = this.room.currentState.getStateEvents(EventType.GroupCallMemberPrefix);
                 const localUserId = this.client.getUserId();
                 for (const stateEvent of memberStateEvents) {
                     const userId = stateEvent.getStateKey();
+                    // don't try to subscribe to our own feed(!)
                     if (userId === localUserId) continue;
                     const device = this.getDeviceForMember(userId);
                     this.subscribeStream(call, userId, device);
