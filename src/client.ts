@@ -190,6 +190,8 @@ import { MediaHandler } from "./webrtc/mediaHandler";
 import { IRefreshTokenResponse } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { ReceiptType } from "./@types/read_receipts";
+import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync";
+import { SlidingSyncSdk } from "./sliding-sync-sdk";
 import { Thread, THREAD_RELATION_TYPE } from "./models/thread";
 import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
 
@@ -411,6 +413,11 @@ export interface IStartClientOpts {
      * @experimental
      */
     experimentalThreadSupport?: boolean;
+
+    /**
+     * @experimental
+     */
+     slidingSync?: SlidingSync;
 }
 
 export interface IStoredClientOpts extends IStartClientOpts {
@@ -903,7 +910,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected verificationMethods: VerificationMethod[];
     protected fallbackICEServerAllowed = false;
     protected roomList: RoomList;
-    protected syncApi: SyncApi;
+    protected syncApi: SlidingSyncSdk | SyncApi;
     public pushRules: IPushRules;
     protected syncLeftRoomsPromise: Promise<Room[]>;
     protected syncedLeftRooms = false;
@@ -1176,7 +1183,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
             return this.canResetTimelineCallback(roomId);
         };
-        this.syncApi = new SyncApi(this, this.clientOpts);
+        if (this.clientOpts.slidingSync) {
+            this.syncApi = new SlidingSyncSdk(this.clientOpts.slidingSync, this, this.clientOpts);
+        } else {
+            this.syncApi = new SyncApi(this, this.clientOpts);
+        }
         this.syncApi.sync();
 
         if (this.clientOpts.clientWellKnownPollPeriod !== undefined) {
@@ -5874,6 +5885,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // There can be only room-kind push rule per room
         // and its id is the room id.
         if (this.pushRules) {
+            if (!this.pushRules[scope] || !this.pushRules[scope].room) {
+                return;
+            }
             for (let i = 0; i < this.pushRules[scope].room.length; i++) {
                 const rule = this.pushRules[scope].room[i];
                 if (rule.rule_id === roomId) {
@@ -8906,6 +8920,41 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (createEvent.getContent()?.[RoomCreateTypeField] !== RoomType.Space) return null;
 
         return new MSC3089TreeSpace(this, roomId);
+    }
+
+    /**
+     * Perform a single MSC3575 sliding sync request.
+     * @param {MSC3575SlidingSyncRequest} req The request to make.
+     * @param {string} proxyBaseUrl The base URL for the sliding sync proxy.
+     * @returns {MSC3575SlidingSyncResponse} The sliding sync response, or a standard error.
+     * @throws on non 2xx status codes with an object with a field "httpStatus":number.
+     */
+    public slidingSync(
+        req: MSC3575SlidingSyncRequest, proxyBaseUrl?: string,
+    ): IAbortablePromise<MSC3575SlidingSyncResponse> {
+        const qps: Record<string, any> = {};
+        if (req.pos) {
+            qps.pos = req.pos;
+            delete req.pos;
+        }
+        if (req.timeout) {
+            qps.timeout = req.timeout;
+            delete req.timeout;
+        }
+        const clientTimeout = req.clientTimeout;
+        delete req.clientTimeout;
+        return this.http.authedRequest<MSC3575SlidingSyncResponse>(
+            undefined,
+            Method.Post,
+            "/sync",
+            qps,
+            req,
+            {
+                prefix: "/_matrix/client/unstable/org.matrix.msc3575",
+                baseUrl: proxyBaseUrl,
+                localTimeoutMs: clientTimeout,
+            },
+        );
     }
 
     /**
