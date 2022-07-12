@@ -49,20 +49,6 @@ const callbackList: {
 const debuglog = function(...params: any[]) {};
 
 /**
- * Replace the function used by this module to get the current time.
- *
- * Intended for use by the unit tests.
- *
- * @param {function} [f] function which should return a millisecond counter
- *
- * @internal
- */
-export function setNow(f: () => number): void {
-    now = f || Date.now;
-}
-let now = Date.now;
-
-/**
  * reimplementation of window.setTimeout, which will call the callback if
  * the wallclock time goes past the deadline.
  *
@@ -78,7 +64,7 @@ export function setTimeout(func: (...params: any[]) => void, delayMs: number, ..
         delayMs = 0;
     }
 
-    const runAt = now() + delayMs;
+    const runAt = Date.now() + delayMs;
     const key = count++;
     debuglog("setTimeout: scheduling cb", key, "at", runAt,
         "(delay", delayMs, ")");
@@ -141,7 +127,7 @@ function scheduleRealCallback(): void {
         return;
     }
 
-    const timestamp = now();
+    const timestamp = Date.now();
     const delayMs = Math.min(first.runAt - timestamp, TIMER_CHECK_PERIOD_MS);
 
     debuglog("scheduleRealCallback: now:", timestamp, "delay:", delayMs);
@@ -150,7 +136,7 @@ function scheduleRealCallback(): void {
 
 function runCallbacks(): void {
     let cb;
-    const timestamp = now();
+    const timestamp = Date.now();
     debuglog("runCallbacks: now:", timestamp);
 
     // get the list of things to call
