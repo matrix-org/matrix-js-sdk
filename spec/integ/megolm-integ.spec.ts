@@ -784,48 +784,43 @@ describe("megolm", () => {
         expect(decrypted.content.body).toEqual('test');
     });
 
-    it('Alice should wait for device list to complete when sending a megolm message', function() {
-        let downloadPromise;
-        let sendPromise;
-
+    it('Alice should wait for device list to complete when sending a megolm message', async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { '@alice:localhost': {} }, failures: {} });
-        return aliceTestClient.start().then(() => {
-            // establish an olm session with alice
-            return createOlmSession(testOlmAccount, aliceTestClient);
-        }).then((p2pSession) => {
-            const syncResponse = getSyncResponse(['@bob:xyz']);
+        await aliceTestClient.start();
+        // establish an olm session with alice
+        const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
 
-            const olmEvent = encryptOlmEvent({
-                senderKey: testSenderKey,
-                recipient: aliceTestClient,
-                p2pSession: p2pSession,
+        const syncResponse = getSyncResponse(['@bob:xyz']);
+
+        const olmEvent = encryptOlmEvent({
+            senderKey: testSenderKey,
+            recipient: aliceTestClient,
+            p2pSession: p2pSession,
+        });
+
+        syncResponse.to_device = { events: [olmEvent] };
+
+        aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
+        await aliceTestClient.flushSync();
+
+        // this will block
+        logger.log('Forcing alice to download our device keys');
+        const downloadPromise = aliceTestClient.client.downloadKeys(['@bob:xyz']);
+
+        // so will this.
+        const sendPromise = aliceTestClient.client.sendTextMessage(ROOM_ID, 'test')
+            .then(() => {
+                throw new Error("sendTextMessage failed on an unknown device");
+            }, (e) => {
+                expect(e.name).toEqual("UnknownDeviceError");
             });
 
-            syncResponse.to_device = { events: [olmEvent] };
+        aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
+            200, getTestKeysQueryResponse('@bob:xyz'),
+        );
 
-            aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
-            return aliceTestClient.flushSync();
-        }).then(function() {
-            // this will block
-            logger.log('Forcing alice to download our device keys');
-            downloadPromise = aliceTestClient.client.downloadKeys(['@bob:xyz']);
-
-            // so will this.
-            sendPromise = aliceTestClient.client.sendTextMessage(ROOM_ID, 'test')
-                .then(() => {
-                    throw new Error("sendTextMessage failed on an unknown device");
-                }, (e) => {
-                    expect(e.name).toEqual("UnknownDeviceError");
-                });
-
-            aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
-                200, getTestKeysQueryResponse('@bob:xyz'),
-            );
-
-            return aliceTestClient.httpBackend.flushAllExpected();
-        }).then(function() {
-            return Promise.all([downloadPromise, sendPromise]);
-        });
+        await aliceTestClient.httpBackend.flushAllExpected();
+        await Promise.all([downloadPromise, sendPromise]);
     });
 
     it("Alice exports megolm keys and imports them to a new device", function() {
