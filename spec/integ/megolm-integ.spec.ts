@@ -823,89 +823,76 @@ describe("megolm", () => {
         await Promise.all([downloadPromise, sendPromise]);
     });
 
-    it("Alice exports megolm keys and imports them to a new device", function() {
-        let messageEncrypted;
-
+    it("Alice exports megolm keys and imports them to a new device", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { '@alice:localhost': {} }, failures: {} });
-        return aliceTestClient.start().then(() => {
-            // establish an olm session with alice
-            return createOlmSession(testOlmAccount, aliceTestClient);
-        }).then((p2pSession) => {
-            const groupSession = new Olm.OutboundGroupSession();
-            groupSession.create();
+        await aliceTestClient.start();
+        // establish an olm session with alice
+        const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
 
-            // make the room_key event
-            const roomKeyEncrypted = encryptGroupSessionKey({
-                senderKey: testSenderKey,
-                recipient: aliceTestClient,
-                p2pSession: p2pSession,
-                groupSession: groupSession,
-                room_id: ROOM_ID,
-            });
+        const groupSession = new Olm.OutboundGroupSession();
+        groupSession.create();
 
-            // encrypt a message with the group session
-            messageEncrypted = encryptMegolmEvent({
-                senderKey: testSenderKey,
-                groupSession: groupSession,
-                room_id: ROOM_ID,
-            });
-
-            // Alice gets both the events in a single sync
-            const syncResponse = {
-                next_batch: 1,
-                to_device: {
-                    events: [roomKeyEncrypted],
-                },
-                rooms: {
-                    join: {},
-                },
-            };
-            syncResponse.rooms.join[ROOM_ID] = {
-                timeline: {
-                    events: [messageEncrypted],
-                },
-            };
-
-            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
-            return aliceTestClient.flushSync();
-        }).then(async function() {
-            const room = aliceTestClient.client.getRoom(ROOM_ID);
-            await room.decryptCriticalEvents();
-            const event = room.getLiveTimeline().getEvents()[0];
-            expect(event.getContent().body).toEqual('42');
-
-            return aliceTestClient.client.exportRoomKeys();
-        }).then(function(exported) {
-            // start a new client
-            aliceTestClient.stop();
-
-            aliceTestClient = new TestClient(
-                "@alice:localhost", "device2", "access_token2",
-            );
-            return aliceTestClient.client.initCrypto().then(() => {
-                aliceTestClient.client.importRoomKeys(exported);
-                return aliceTestClient.start();
-            });
-        }).then(function() {
-            const syncResponse = {
-                next_batch: 1,
-                rooms: {
-                    join: {},
-                },
-            };
-            syncResponse.rooms.join[ROOM_ID] = {
-                timeline: {
-                    events: [messageEncrypted],
-                },
-            };
-
-            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
-            return aliceTestClient.flushSync();
-        }).then(function() {
-            const room = aliceTestClient.client.getRoom(ROOM_ID);
-            const event = room.getLiveTimeline().getEvents()[0];
-            expect(event.getContent().body).toEqual('42');
+        // make the room_key event
+        const roomKeyEncrypted = encryptGroupSessionKey({
+            senderKey: testSenderKey,
+            recipient: aliceTestClient,
+            p2pSession: p2pSession,
+            groupSession: groupSession,
+            room_id: ROOM_ID,
         });
+
+        // encrypt a message with the group session
+        const messageEncrypted = encryptMegolmEvent({
+            senderKey: testSenderKey,
+            groupSession: groupSession,
+            room_id: ROOM_ID,
+        });
+
+        // Alice gets both the events in a single sync
+        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+            next_batch: 1,
+            to_device: {
+                events: [roomKeyEncrypted],
+            },
+            rooms: {
+                join: { [ROOM_ID]: { timeline: { events: [messageEncrypted] } } },
+            },
+        });
+        await aliceTestClient.flushSync();
+
+        const room = aliceTestClient.client.getRoom(ROOM_ID);
+        await room.decryptCriticalEvents();
+        expect(room.getLiveTimeline().getEvents()[0].getContent().body).toEqual('42');
+
+        const exported = await aliceTestClient.client.exportRoomKeys();
+
+        // start a new client
+        aliceTestClient.stop();
+
+        aliceTestClient = new TestClient(
+            "@alice:localhost", "device2", "access_token2",
+        );
+        await aliceTestClient.client.initCrypto();
+        await aliceTestClient.client.importRoomKeys(exported);
+        await aliceTestClient.start();
+
+        const syncResponse = {
+            next_batch: 1,
+            rooms: {
+                join: {},
+            },
+        };
+        syncResponse.rooms.join[ROOM_ID] = {
+            timeline: {
+                events: [messageEncrypted],
+            },
+        };
+
+        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
+        await aliceTestClient.flushSync();
+
+        const event = room.getLiveTimeline().getEvents()[0];
+        expect(event.getContent().body).toEqual('42');
     });
 
     it("Alice receives an untrusted megolm key, only to receive the trusted one shortly after", function() {
