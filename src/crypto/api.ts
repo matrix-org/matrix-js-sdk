@@ -109,11 +109,6 @@ export interface ISecretStorageKeyInfo {
     passphrase: IPassphraseInfo;
 }
 
-export interface ISecretStorageKey {
-    keyId: string;
-    keyInfo: ISecretStorageKeyInfo;
-}
-
 export interface IPassphraseInfo {
     algorithm: "m.pbkdf2";
     iterations: number;

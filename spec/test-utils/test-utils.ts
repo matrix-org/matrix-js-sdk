@@ -70,7 +70,7 @@ export function mock<T>(constr: { new(...args: any[]): T }, name: string): T {
 
 interface IEventOpts {
     type: EventType | string;
-    room: string;
+    room?: string;
     sender?: string;
     skey?: string;
     content: IContent;
@@ -93,8 +93,8 @@ let testEventIndex = 1; // counter for events, easier for comparison of randomly
  * @return {Object} a JSON object representing this event.
  */
 export function mkEvent(opts: IEventOpts & { event: true }, client?: MatrixClient): MatrixEvent;
-export function mkEvent(opts: IEventOpts & { event?: false }, client?: MatrixClient): object;
-export function mkEvent(opts: IEventOpts & { event?: boolean }, client?: MatrixClient): object | MatrixEvent {
+export function mkEvent(opts: IEventOpts & { event?: false }, client?: MatrixClient): Partial<IEvent>;
+export function mkEvent(opts: IEventOpts & { event?: boolean }, client?: MatrixClient): Partial<IEvent> | MatrixEvent {
     if (!opts.type || !opts.content) {
         throw new Error("Missing .type or .content =>" + JSON.stringify(opts));
     }
@@ -145,8 +145,8 @@ interface IPresenceOpts {
  * @return {Object|MatrixEvent} The event
  */
 export function mkPresence(opts: IPresenceOpts & { event: true }): MatrixEvent;
-export function mkPresence(opts: IPresenceOpts & { event?: false }): object;
-export function mkPresence(opts: IPresenceOpts & { event?: boolean }): object | MatrixEvent {
+export function mkPresence(opts: IPresenceOpts & { event?: false }): Partial<IEvent>;
+export function mkPresence(opts: IPresenceOpts & { event?: boolean }): Partial<IEvent> | MatrixEvent {
     const event = {
         event_id: "$" + Math.random() + "-" + Math.random(),
         type: "m.presence",
@@ -162,7 +162,7 @@ export function mkPresence(opts: IPresenceOpts & { event?: boolean }): object | 
 }
 
 interface IMembershipOpts {
-    room: string;
+    room?: string;
     mship: string;
     sender?: string;
     user?: string;
@@ -186,8 +186,8 @@ interface IMembershipOpts {
  * @return {Object|MatrixEvent} The event
  */
 export function mkMembership(opts: IMembershipOpts & { event: true }): MatrixEvent;
-export function mkMembership(opts: IMembershipOpts & { event?: false }): object;
-export function mkMembership(opts: IMembershipOpts & { event?: boolean }): object | MatrixEvent {
+export function mkMembership(opts: IMembershipOpts & { event?: false }): Partial<IEvent>;
+export function mkMembership(opts: IMembershipOpts & { event?: boolean }): Partial<IEvent> | MatrixEvent {
     const eventOpts: IEventOpts = {
         ...opts,
         type: EventType.RoomMember,
@@ -209,7 +209,7 @@ export function mkMembership(opts: IMembershipOpts & { event?: boolean }): objec
 }
 
 interface IMessageOpts {
-    room: string;
+    room?: string;
     user: string;
     msg?: string;
     event?: boolean;
@@ -226,8 +226,11 @@ interface IMessageOpts {
  * @return {Object|MatrixEvent} The event
  */
 export function mkMessage(opts: IMessageOpts & { event: true }, client?: MatrixClient): MatrixEvent;
-export function mkMessage(opts: IMessageOpts & { event?: false }, client?: MatrixClient): object;
-export function mkMessage(opts: IMessageOpts & { event?: boolean }, client?: MatrixClient): object | MatrixEvent {
+export function mkMessage(opts: IMessageOpts & { event?: false }, client?: MatrixClient): Partial<IEvent>;
+export function mkMessage(
+    opts: IMessageOpts & { event?: boolean },
+    client?: MatrixClient,
+): Partial<IEvent> | MatrixEvent {
     const eventOpts: IEventOpts = {
         ...opts,
         type: EventType.RoomMessage,
@@ -260,11 +263,11 @@ interface IReplyMessageOpts extends IMessageOpts {
  * @return {Object|MatrixEvent} The event
  */
 export function mkReplyMessage(opts: IReplyMessageOpts & { event: true }, client?: MatrixClient): MatrixEvent;
-export function mkReplyMessage(opts: IReplyMessageOpts & { event?: false }, client?: MatrixClient): object;
+export function mkReplyMessage(opts: IReplyMessageOpts & { event?: false }, client?: MatrixClient): Partial<IEvent>;
 export function mkReplyMessage(
     opts: IReplyMessageOpts & { event?: boolean },
     client?: MatrixClient,
-): object | MatrixEvent {
+): Partial<IEvent> | MatrixEvent {
     const eventOpts: IEventOpts = {
         ...opts,
         type: EventType.RoomMessage,

@@ -236,4 +236,8 @@ export class TestClient {
     public isFallbackICEServerAllowed(): boolean {
         return true;
     }
+
+    public getUserId(): string {
+        return this.userId;
+    }
 }
