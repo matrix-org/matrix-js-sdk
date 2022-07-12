@@ -895,10 +895,8 @@ describe("megolm", () => {
         expect(event.getContent().body).toEqual('42');
     });
 
-    it("Alice receives an untrusted megolm key, only to receive the trusted one shortly after", function() {
-        const testClient = new TestClient(
-            "@alice:localhost", "device2", "access_token2",
-        );
+    it("Alice receives an untrusted megolm key, only to receive the trusted one shortly after", async () => {
+        const testClient = new TestClient("@alice:localhost", "device2", "access_token2");
         const groupSession = new Olm.OutboundGroupSession();
         groupSession.create();
         const inboundGroupSession = new Olm.InboundGroupSession();
@@ -908,52 +906,49 @@ describe("megolm", () => {
             groupSession: groupSession,
             room_id: ROOM_ID,
         });
-        return testClient.client.initCrypto().then(() => {
-            const keys = [{
+        await testClient.client.initCrypto();
+        const keys = [{
+            room_id: ROOM_ID,
+            algorithm: 'm.megolm.v1.aes-sha2',
+            session_id: groupSession.session_id(),
+            session_key: inboundGroupSession.export_session(0),
+            sender_key: testSenderKey,
+            forwarding_curve25519_key_chain: [],
+            sender_claimed_keys: {},
+        }];
+        await testClient.client.importRoomKeys(keys, { untrusted: true });
+
+        const event1 = testUtils.mkEvent({
+            event: true,
+            ...rawEvent,
+            room: ROOM_ID,
+        });
+        await event1.attemptDecryption(testClient.client.crypto, { isRetry: true });
+        expect(event1.isKeySourceUntrusted()).toBeTruthy();
+
+        const event2 = testUtils.mkEvent({
+            type: 'm.room_key',
+            content: {
                 room_id: ROOM_ID,
                 algorithm: 'm.megolm.v1.aes-sha2',
                 session_id: groupSession.session_id(),
-                session_key: inboundGroupSession.export_session(0),
-                sender_key: testSenderKey,
-                forwarding_curve25519_key_chain: [],
-                sender_claimed_keys: {},
-            }];
-            return testClient.client.importRoomKeys(keys, { untrusted: true });
-        }).then(() => {
-            const event = testUtils.mkEvent({
-                event: true,
-                ...rawEvent,
-                room: ROOM_ID,
-            });
-            return event.attemptDecryption(testClient.client.crypto, { isRetry: true }).then(() => {
-                expect(event.isKeySourceUntrusted()).toBeTruthy();
-            });
-        }).then(() => {
-            const event = testUtils.mkEvent({
-                type: 'm.room_key',
-                content: {
-                    room_id: ROOM_ID,
-                    algorithm: 'm.megolm.v1.aes-sha2',
-                    session_id: groupSession.session_id(),
-                    session_key: groupSession.session_key(),
-                },
-                event: true,
-            });
-            // @ts-ignore - private
-            event.senderCurve25519Key = testSenderKey;
-            // @ts-ignore - private
-            return testClient.client.crypto.onRoomKeyEvent(event);
-        }).then(() => {
-            const event = testUtils.mkEvent({
-                event: true,
-                ...rawEvent,
-                room: ROOM_ID,
-            });
-            return event.attemptDecryption(testClient.client.crypto, { isRetry: true }).then(() => {
-                expect(event.isKeySourceUntrusted()).toBeFalsy();
-                testClient.stop();
-            });
+                session_key: groupSession.session_key(),
+            },
+            event: true,
         });
+        // @ts-ignore - private
+        event2.senderCurve25519Key = testSenderKey;
+        // @ts-ignore - private
+        testClient.client.crypto.onRoomKeyEvent(event2);
+
+        const event3 = testUtils.mkEvent({
+            event: true,
+            ...rawEvent,
+            room: ROOM_ID,
+        });
+        await event3.attemptDecryption(testClient.client.crypto, { isRetry: true });
+        expect(event3.isKeySourceUntrusted()).toBeFalsy();
+        testClient.stop();
     });
 
     it("Alice can decrypt a message with falsey content", function() {
