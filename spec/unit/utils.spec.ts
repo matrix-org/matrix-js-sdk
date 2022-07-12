@@ -109,18 +109,6 @@ describe("utils", function() {
         });
     });
 
-    describe("checkObjectHasNoAdditionalKeys", function() {
-        it("should throw for extra keys", function() {
-            expect(function() {
-                utils.checkObjectHasNoAdditionalKeys({ foo: "bar", baz: 4 }, ["foo"]);
-            }).toThrow();
-
-            expect(function() {
-                utils.checkObjectHasNoAdditionalKeys({ foo: "bar" }, ["foo"]);
-            }).not.toThrow();
-        });
-    });
-
     describe("deepCompare", function() {
         const assert = {
             isTrue: function(x: any) {

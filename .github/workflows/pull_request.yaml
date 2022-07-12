@@ -16,7 +16,6 @@ concurrency: ${{ github.workflow }}-${{ github.event.pull_request.head.ref }}
 jobs:
   changelog:
     name: Preview Changelog
-    if: github.event.action != 'synchronize'
     runs-on: ubuntu-latest
     steps:
       - uses: matrix-org/allchange@main
