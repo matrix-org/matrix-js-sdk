@@ -520,6 +520,17 @@ describe('Call', function() {
             roomId: call.roomId,
             userId: "opponentUserId",
         };
+
+        client.client.getRoom = () => {
+            return {
+                getMember: (userId) => {
+                    if (userId === opponentMember.userId) {
+                        return opponentMember;
+                    }
+                },
+            };
+        };
+
         const opponentCaps = {
             "m.call.transferee": true,
             "m.call.dtmf": false,
@@ -530,7 +541,7 @@ describe('Call', function() {
                 party_id: "party_id",
                 capabilities: opponentCaps,
             }),
-            sender: opponentMember,
+            getSender: () => opponentMember.userId,
         });
 
         expect(call.getOpponentMember()).toBe(opponentMember);
@@ -672,6 +683,7 @@ describe('Call', function() {
                     sdp: DUMMY_SDP,
                 },
             }),
+            getSender: () => "@test:foo",
             getLocalAge: () => null,
         });
         call.feeds.push(new CallFeed({
