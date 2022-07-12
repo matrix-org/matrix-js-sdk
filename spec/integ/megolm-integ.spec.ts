@@ -672,118 +672,116 @@ describe("megolm", () => {
     });
 
     // https://github.com/vector-im/element-web/issues/2676
-    it("Alice should send to her other devices", function() {
+    it("Alice should send to her other devices", async () => {
         // for this test, we make the testOlmAccount be another of Alice's devices.
         // it ought to get included in messages Alice sends.
+        await aliceTestClient.start();
+        // an encrypted room with just alice
+        const syncResponse = {
+            next_batch: 1,
+            rooms: {
+                join: {},
+            },
+        };
+        syncResponse.rooms.join[ROOM_ID] = {
+            state: {
+                events: [
+                    testUtils.mkEvent({
+                        type: 'm.room.encryption',
+                        skey: '',
+                        content: {
+                            algorithm: 'm.megolm.v1.aes-sha2',
+                        },
+                    }),
+                    testUtils.mkMembership({
+                        mship: 'join',
+                        sender: aliceTestClient.userId,
+                    }),
+                ],
+            },
+        };
+        aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
 
-        let p2pSession;
-        let inboundGroupSession;
-        let decrypted;
+        // the completion of the first initialsync hould make Alice
+        // invalidate the device cache for all members in e2e rooms (ie,
+        // herself), and do a key query.
+        aliceTestClient.expectKeyQuery(
+            getTestKeysQueryResponse(aliceTestClient.userId),
+        );
 
-        return aliceTestClient.start().then(function() {
-            // an encrypted room with just alice
-            const syncResponse = {
-                next_batch: 1,
-                rooms: {
-                    join: {},
-                },
-            };
-            syncResponse.rooms.join[ROOM_ID] = {
-                state: {
-                    events: [
-                        testUtils.mkEvent({
-                            type: 'm.room.encryption',
-                            skey: '',
-                            content: {
-                                algorithm: 'm.megolm.v1.aes-sha2',
-                            },
-                        }),
-                        testUtils.mkMembership({
-                            mship: 'join',
-                            sender: aliceTestClient.userId,
-                        }),
-                    ],
-                },
-            };
-            aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
+        await aliceTestClient.httpBackend.flushAllExpected();
 
-            // the completion of the first initialsync hould make Alice
-            // invalidate the device cache for all members in e2e rooms (ie,
-            // herself), and do a key query.
-            aliceTestClient.expectKeyQuery(
-                getTestKeysQueryResponse(aliceTestClient.userId),
-            );
+        // start out with the device unknown - the send should be rejected.
+        try {
+            await aliceTestClient.client.sendTextMessage(ROOM_ID, 'test');
+            throw new Error("sendTextMessage succeeded on an unknown device");
+        } catch (e) {
+            expect(e.name).toEqual("UnknownDeviceError");
+            expect(Object.keys(e.devices)).toEqual([aliceTestClient.userId]);
+            expect(Object.keys(e.devices[aliceTestClient.userId])).
+                toEqual(['DEVICE_ID']);
+        }
 
-            return aliceTestClient.httpBackend.flushAllExpected();
-        }).then(function() {
-            // start out with the device unknown - the send should be rejected.
-            return aliceTestClient.client.sendTextMessage(ROOM_ID, 'test').then(() => {
-                throw new Error("sendTextMessage failed on an unknown device");
-            }, (e) => {
-                expect(e.name).toEqual("UnknownDeviceError");
-                expect(Object.keys(e.devices)).toEqual([aliceTestClient.userId]);
-                expect(Object.keys(e.devices[aliceTestClient.userId])).
-                    toEqual(['DEVICE_ID']);
-            });
-        }).then(function() {
-            // mark the device as known, and resend.
-            aliceTestClient.client.setDeviceKnown(aliceTestClient.userId, 'DEVICE_ID');
-            aliceTestClient.httpBackend.when('POST', '/keys/claim').respond(
-                200, function(path, content) {
-                    expect(content.one_time_keys[aliceTestClient.userId].DEVICE_ID)
-                        .toEqual("signed_curve25519");
-                    return getTestKeysClaimResponse(aliceTestClient.userId);
-                });
-
-            aliceTestClient.httpBackend.when(
-                'PUT', '/sendToDevice/m.room.encrypted/',
-            ).respond(200, function(path, content) {
-                logger.log("sendToDevice: ", content);
-                const m = content.messages[aliceTestClient.userId].DEVICE_ID;
-                const ct = m.ciphertext[testSenderKey];
-                expect(ct.type).toEqual(0); // pre-key message
-
-                p2pSession = new Olm.Session();
-                p2pSession.create_inbound(testOlmAccount, ct.body);
-                const decrypted = JSON.parse(p2pSession.decrypt(ct.type, ct.body));
-
-                expect(decrypted.type).toEqual('m.room_key');
-                inboundGroupSession = new Olm.InboundGroupSession();
-                inboundGroupSession.create(decrypted.content.session_key);
-                return {};
+        // mark the device as known, and resend.
+        aliceTestClient.client.setDeviceKnown(aliceTestClient.userId, 'DEVICE_ID');
+        aliceTestClient.httpBackend.when('POST', '/keys/claim').respond(
+            200, function(_path, content) {
+                expect(content.one_time_keys[aliceTestClient.userId].DEVICE_ID)
+                    .toEqual("signed_curve25519");
+                return getTestKeysClaimResponse(aliceTestClient.userId);
             });
 
-            aliceTestClient.httpBackend.when(
-                'PUT', '/send/',
-            ).respond(200, function(path, content) {
-                const ct = content.ciphertext;
-                const r = inboundGroupSession.decrypt(ct);
-                logger.log('Decrypted received megolm message', r);
-                decrypted = JSON.parse(r.plaintext);
+        let p2pSession: Olm.Session;
+        let inboundGroupSession: Olm.InboundGroupSession;
+        aliceTestClient.httpBackend.when(
+            'PUT', '/sendToDevice/m.room.encrypted/',
+        ).respond(200, function(_path, content) {
+            logger.log("sendToDevice: ", content);
+            const m = content.messages[aliceTestClient.userId].DEVICE_ID;
+            const ct = m.ciphertext[testSenderKey];
+            expect(ct.type).toEqual(0); // pre-key message
 
-                return {
-                    event_id: '$event_id',
-                };
-            });
+            p2pSession = new Olm.Session();
+            p2pSession.create_inbound(testOlmAccount, ct.body);
+            const decrypted = JSON.parse(p2pSession.decrypt(ct.type, ct.body));
 
-            // Grab the event that we'll need to resend
-            const room = aliceTestClient.client.getRoom(ROOM_ID);
-            const pendingEvents = room.getPendingEvents();
-            expect(pendingEvents.length).toEqual(1);
-            const unsentEvent = pendingEvents[0];
-
-            return Promise.all([
-                aliceTestClient.client.resendEvent(unsentEvent, room),
-
-                // the crypto stuff can take a while, so give the requests a whole second.
-                aliceTestClient.httpBackend.flushAllExpected({
-                    timeout: 1000,
-                }),
-            ]);
-        }).then(function() {
-            expect(decrypted.type).toEqual('m.room.message');
-            expect(decrypted.content.body).toEqual('test');
+            expect(decrypted.type).toEqual('m.room_key');
+            inboundGroupSession = new Olm.InboundGroupSession();
+            inboundGroupSession.create(decrypted.content.session_key);
+            return {};
         });
+
+        let decrypted: IEvent;
+        aliceTestClient.httpBackend.when(
+            'PUT', '/send/',
+        ).respond(200, function(_path, content: IContent) {
+            const ct = content.ciphertext;
+            const r: any = inboundGroupSession.decrypt(ct);
+            logger.log('Decrypted received megolm message', r);
+            decrypted = JSON.parse(r.plaintext);
+
+            return {
+                event_id: '$event_id',
+            };
+        });
+
+        // Grab the event that we'll need to resend
+        const room = aliceTestClient.client.getRoom(ROOM_ID);
+        const pendingEvents = room.getPendingEvents();
+        expect(pendingEvents.length).toEqual(1);
+        const unsentEvent = pendingEvents[0];
+
+        await Promise.all([
+            aliceTestClient.client.resendEvent(unsentEvent, room),
+
+            // the crypto stuff can take a while, so give the requests a whole second.
+            aliceTestClient.httpBackend.flushAllExpected({
+                timeout: 1000,
+            }),
+        ]);
+
+        expect(decrypted.type).toEqual('m.room.message');
+        expect(decrypted.content.body).toEqual('test');
     });
 
     it('Alice should wait for device list to complete when sending a megolm message', function() {
