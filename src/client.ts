@@ -5334,9 +5334,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // There is no guarantee that the event ended up in "timeline" (we might have switched to a neighbouring
         // timeline) - so check the room's index again. On the other hand, there's no guarantee the event ended up
         // anywhere, if it was later redacted, so we just return the timeline we first thought of.
-        return timelineSet.getTimelineForEvent(eventId)
-            ?? timelineSet.room.findThreadForEvent(event)?.liveTimeline // for Threads degraded support
-            ?? timeline;
+        return timelineSet.getTimelineForEvent(eventId) ?? timeline;
     }
 
     /**
