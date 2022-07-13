@@ -643,7 +643,7 @@ describe("MegolmDecryption", function() {
         const roomId = "!someroom";
 
         aliceClient.crypto.onToDeviceEvent(new MatrixEvent({
-            type: "org.matrix.room_key.withheld",
+            type: "m.room_key.withheld",
             sender: "@bob:example.com",
             content: {
                 algorithm: "m.megolm.v1.aes-sha2",
@@ -718,7 +718,7 @@ describe("MegolmDecryption", function() {
         const now = Date.now();
 
         aliceClient.crypto.onToDeviceEvent(new MatrixEvent({
-            type: "org.matrix.room_key.withheld",
+            type: "m.room_key.withheld",
             sender: "@bob:example.com",
             content: {
                 algorithm: "m.megolm.v1.aes-sha2",
