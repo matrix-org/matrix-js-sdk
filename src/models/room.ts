@@ -981,6 +981,10 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             newTimeline = await this.client.getEventTimeline(timelineSet, mostRecentEventInTimeline.getId());
         }
 
+        if (!newTimeline) {
+            throw new Error(`[refreshLiveTimeline for ${this.roomId}] No new timeline created`);
+        }
+
         // If a racing `/sync` beat us to creating a new timeline, use that
         // instead because it's the latest in the room and any new messages in
         // the scrollback will include the history.

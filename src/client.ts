@@ -5288,10 +5288,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         ];
 
         if (this.supportsExperimentalThreads()) {
-            if (!timelineSet.canContain(event)) {
-                return undefined;
-            }
-
             // Where the event is a thread reply (not a root) and running in MSC-enabled mode the Thread timeline only
             // functions contiguously, so we have to jump through some hoops to get our target event in it.
             // XXX: workaround for https://github.com/vector-im/element-meta/issues/150

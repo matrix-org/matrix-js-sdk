@@ -6,6 +6,7 @@ node_modules
 /*.log
 package-lock.json
 .lock-wscript
+.DS_Store
 build/Release
 coverage
 lib-cov

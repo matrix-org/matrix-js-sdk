@@ -691,6 +691,18 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             );
         }
 
+        if (timeline.getTimelineSet() !== this) {
+            throw new Error(`EventTimelineSet.addEventToTimeline: Timeline=${timeline.toString()} does not belong " + 
+                "in timelineSet(threadId=${this.thread?.id})`);
+        }
+
+        // Make sure events don't get mixed in timelines they shouldn't be in
+        // (e.g. a threaded message should not be in the main timeline).
+        if (!this.canContain(event)) {
+            logger.warn(`EventTimelineSet.addEventToTimeline: Ignoring event=${event.getId()} that does not belong in timeline=${timeline.toString()} timelineSet(threadId=${this.thread?.id})`);
+            return;
+        }
+
         const eventId = event.getId();
         timeline.addEvent(event, {
             toStartOfTimeline,

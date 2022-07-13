@@ -688,7 +688,7 @@ describe("MatrixClient room timelines", function() {
                 });
 
             // Wait for the timeline to reset(when it goes blank) which means
-            // it's in the middle of the refrsh logic right before the
+            // it's in the middle of the refresh logic right before the
             // `getEventTimeline()` -> `/context`. Then simulate a racey `/sync`
             // to happen in the middle of all of this refresh timeline logic. We
             // want to make sure the sync pagination still works as expected
