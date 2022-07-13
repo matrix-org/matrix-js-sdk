@@ -1552,7 +1552,10 @@ describe("Room", function() {
         });
 
         it("should remove cancelled events from the timeline", function() {
-            const room = new Room(roomId, null, userA);
+            const client = (new TestClient(
+                "@alice:example.com", "alicedevice",
+            )).client;
+            const room = new Room(roomId, client, userA);
             const eventA = utils.mkMessage({
                 room: roomId, user: userA, event: true,
             });
