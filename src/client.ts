@@ -5234,7 +5234,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * <p>If the EventTimelineSet object already has the given event in its store, the
      * corresponding timeline will be returned. Otherwise, a /context request is
      * made, and used to construct an EventTimeline.
-     * If the event does not belong to this EventTimelineSet then undefined will be returned.
+     * If the event does not belong to this EventTimelineSet then it will ignored.
      *
      * @param {EventTimelineSet} timelineSet  The timelineSet to look for the event in, must be bound to a room
      * @param {string} eventId  The ID of the event to look for
@@ -5242,7 +5242,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {Promise} Resolves:
      *    {@link module:models/event-timeline~EventTimeline} including the given event
      */
-    public async getEventTimeline(timelineSet: EventTimelineSet, eventId: string): Promise<EventTimeline | undefined> {
+    public async getEventTimeline(timelineSet: EventTimelineSet, eventId: string): Promise<EventTimeline> {
         // don't allow any timeline support unless it's been enabled.
         if (!this.timelineSupport) {
             throw new Error("timeline support is disabled. Set the 'timelineSupport'" +
