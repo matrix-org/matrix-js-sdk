@@ -27,7 +27,7 @@ describe("Relations", function() {
         client = (new TestClient(
             "@alice:example.com", "alicedevice",
         )).client;
-    })
+    });
 
     it("should deduplicate annotations", function() {
         const room = new Room("room123", client, null);
