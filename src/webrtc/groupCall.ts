@@ -146,33 +146,6 @@ function getCallUserId(call: MatrixCall): string | null {
     return call.getOpponentMember()?.userId || call.invitee || null;
 }
 
-/**
- * Returns a call feed for passing to a new call in the group call. The media
- * This could be either return the passed feed as-is or a clone, depending on the
- * platform.
- * @returns CallFeed
- */
-function feedForNewCallFromFeed(feed: CallFeed): CallFeed {
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-
-    // Safari can't send a MediaStream to multiple sources, so we clone it,
-    // however cloning mediastreams on Chrome appears to cause the audio renderer
-    // to become unstable and hang: https://github.com/vector-im/element-call/issues/267
-    // It's a bit arbitrary what we do for other browsers: I've made Safari the special
-    // case on a somewhat arbitrary basis.
-    // To retest later to see if this hack is still necessary:
-    //  * In Safari, you should be able to have a group call with 2 other people and both
-    //    of them see your video stream (either desktop or mobile Safari)
-    //  * In Chrome, you should be able to enter a call and then go to youtube and play
-    //    a video (both desktop & Android Chrome, although in Android you may have to
-    //    open YouTube in incognito mode to avoid being redirected to the app.)
-    if (isSafari) {
-        return feed.clone();
-    }
-
-    return feed;
-}
-
 export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventHandlerMap> {
     // Config
     public activeSpeakerInterval = 1000;
@@ -487,7 +460,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
         }
 
         for (const call of this.calls) {
-            call.localUsermediaFeed.setAudioMuted(muted);
+            call.localUsermediaFeed.setAudioVideoMuted(muted, null);
         }
 
         if (sendUpdatesBefore) {
@@ -501,7 +474,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
         if (this.localCallFeed) {
             logger.log(`groupCall ${this.groupCallId} setMicrophoneMuted stream ${
                 this.localCallFeed.stream.id} muted ${muted}`);
-            this.localCallFeed.setAudioMuted(muted);
+            this.localCallFeed.setAudioVideoMuted(muted, null);
             // I don't believe its actually necessary to enable these tracks: they
             // are the one on the groupcall's own CallFeed and are cloned before being
             // given to any of the actual calls, so these tracks don't actually go
@@ -541,7 +514,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
         if (this.localCallFeed) {
             logger.log(`groupCall ${this.groupCallId} setLocalVideoMuted stream ${
                 this.localCallFeed.stream.id} muted ${muted}`);
-            this.localCallFeed.setVideoMuted(muted);
+            this.localCallFeed.setAudioVideoMuted(null, muted);
             setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);
         }
 
@@ -598,7 +571,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
 
                 // TODO: handle errors
                 await Promise.all(this.calls.map(call => call.pushLocalFeed(
-                    feedForNewCallFromFeed(this.localScreenshareFeed),
+                    this.localScreenshareFeed.clone(),
                 )));
 
                 await this.sendMemberStateEvent();
@@ -673,7 +646,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
             this.addCall(newCall);
         }
 
-        newCall.answerWithCallFeeds(this.getLocalFeeds().map((feed) => feedForNewCallFromFeed(feed)));
+        newCall.answerWithCallFeeds(this.getLocalFeeds().map((feed) => feed.clone()));
     };
 
     /**
@@ -861,7 +834,7 @@ export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventH
 
         try {
             await newCall.placeCallWithCallFeeds(
-                this.getLocalFeeds().map(feed => feedForNewCallFromFeed(feed)),
+                this.getLocalFeeds().map(feed => feed.clone()),
                 requestScreenshareFeed,
             );
         } catch (e) {

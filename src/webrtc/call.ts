@@ -22,6 +22,8 @@ limitations under the License.
  * @module webrtc/call
  */
 
+import { parse as parseSdp, write as writeSdp } from "sdp-transform";
+
 import { logger } from '../logger';
 import * as utils from '../utils';
 import { MatrixEvent } from '../models/event';
@@ -90,6 +92,14 @@ interface AssertedIdentity {
     id: string;
     displayName: string;
 }
+
+// Used internally to specify modifications to codec parameters in SDP
+interface CodecParams {
+    enableDtx?: boolean; // true to enable discontinuous transmission, false to disable, undefined to leave as-is
+    maxAverageBitrate?: number; // sets the max average bitrate, or undefined to leave as-is
+}
+
+type CodecParamMods = Record<string, CodecParams>;
 
 export enum CallState {
     Fledgling = 'fledgling',
@@ -172,6 +182,11 @@ export enum CallErrorCode {
     CreateAnswer = 'create_answer',
 
     /**
+     * An offer could not be created
+     */
+    CreateOffer = 'create_offer',
+
+    /**
      * Error code used when we fail to send the answer
      * for some reason other than there being unknown devices
      */
@@ -231,7 +246,7 @@ export enum CallErrorCode {
 /**
  * The version field that we set in m.call.* events
  */
-const VOIP_PROTO_VERSION = 1;
+const VOIP_PROTO_VERSION = "1";
 
 /** The fallback ICE server to use for STUN or TURN protocols. */
 const FALLBACK_ICE_SERVER = 'stun:turn.matrix.org';
@@ -252,6 +267,18 @@ export class CallError extends Error {
 
 export function genCallID(): string {
     return Date.now().toString() + randomString(16);
+}
+
+function getCodecParamMods(isPtt: boolean): CodecParamMods {
+    const mods = {
+        'opus': {
+            enableDtx: true,
+        },
+    } as CodecParamMods;
+
+    if (isPtt) mods.opus.maxAverageBitrate = 12000;
+
+    return mods;
 }
 
 export type CallEventHandlerMap = {
@@ -320,6 +347,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private opponentCaps: CallCapabilities;
     private iceDisconnectedTimeout: ReturnType<typeof setTimeout>;
     private inviteTimeout: ReturnType<typeof setTimeout>;
+    private readonly removeTrackListeners = new Map<MediaStream, () => void>();
 
     // The logic of when & if a call is on hold is nontrivial and explained in is*OnHold
     // This flag represents whether we want the other party to be on hold
@@ -517,6 +545,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     private async initOpponentCrypto() {
         if (!this.opponentDeviceId) return;
+        if (!this.client.getUseE2eForGroupCall()) return;
 
         const userId = this.invitee || this.getOpponentMember().userId;
         const deviceInfoMap = await this.client.crypto.deviceList.downloadKeys([userId], false);
@@ -776,7 +805,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const statsReport = await this.peerConn.getStats();
         const stats = [];
         statsReport.forEach(item => {
-            stats.push(item[1]);
+            stats.push(item);
         });
 
         return stats;
@@ -834,18 +863,25 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.setState(CallState.Ringing);
 
         if (event.getLocalAge()) {
-            setTimeout(() => {
-                if (this.state == CallState.Ringing) {
-                    logger.debug(`Call ${this.callId} invite has expired. Hanging up.`);
-                    this.hangupParty = CallParty.Remote; // effectively
-                    this.setState(CallState.Ended);
-                    this.stopAllMedia();
-                    if (this.peerConn.signalingState != 'closed') {
-                        this.peerConn.close();
-                    }
-                    this.emit(CallEvent.Hangup, this);
+            // Time out the call if it's ringing for too long
+            const ringingTimer = setTimeout(() => {
+                logger.debug(`Call ${this.callId} invite has expired. Hanging up.`);
+                this.hangupParty = CallParty.Remote; // effectively
+                this.setState(CallState.Ended);
+                this.stopAllMedia();
+                if (this.peerConn.signalingState != 'closed') {
+                    this.peerConn.close();
                 }
+                this.emit(CallEvent.Hangup, this);
             }, invite.lifetime - event.getLocalAge());
+
+            const onState = (state: CallState) => {
+                if (state !== CallState.Ringing) {
+                    clearTimeout(ringingTimer);
+                    this.off(CallEvent.State, onState);
+                }
+            };
+            this.on(CallEvent.State, onState);
         }
     }
 
@@ -983,7 +1019,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (this.state === CallState.WaitLocalMedia) return;
         const content = {};
         // Don't send UserHangup reason to older clients
-        if ((this.opponentVersion && this.opponentVersion >= 1) || reason !== CallErrorCode.UserHangup) {
+        if ((this.opponentVersion && this.opponentVersion !== 0) || reason !== CallErrorCode.UserHangup) {
             content["reason"] = reason;
         }
         this.sendVoipEvent(EventType.CallHangup, content);
@@ -999,7 +1035,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             throw Error("Call must be in 'ringing' state to reject!");
         }
 
-        if (this.opponentVersion < 1) {
+        if (this.opponentVersion === 0) {
             logger.info(
                 `Call ${this.callId} Opponent version is less than 1 (${
                     this.opponentVersion}): sending hangup instead of reject`,
@@ -1226,7 +1262,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             await this.upgradeCall(false, true);
             return this.isLocalVideoMuted();
         }
-        this.localUsermediaFeed?.setVideoMuted(muted);
+        this.localUsermediaFeed?.setAudioVideoMuted(null, muted);
         this.updateMuteStatus();
         await this.sendMetadataUpdate();
         return this.isLocalVideoMuted();
@@ -1260,7 +1296,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             await this.upgradeCall(true, false);
             return this.isMicrophoneMuted();
         }
-        this.localUsermediaFeed?.setAudioMuted(muted);
+        this.localUsermediaFeed?.setAudioVideoMuted(muted, null);
         this.updateMuteStatus();
         await this.sendMetadataUpdate();
         return this.isMicrophoneMuted();
@@ -1438,6 +1474,64 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
     }
 
+    // Enables DTX (discontinuous transmission) on the given session to reduce
+    // bandwidth when transmitting silence
+    private mungeSdp(description: RTCSessionDescriptionInit, mods: CodecParamMods): void {
+        // The only way to enable DTX at this time is through SDP munging
+        const sdp = parseSdp(description.sdp);
+
+        sdp.media.forEach(media => {
+            const payloadTypeToCodecMap = new Map<number, string>();
+            const codecToPayloadTypeMap = new Map<string, number>();
+            for (const rtp of media.rtp) {
+                payloadTypeToCodecMap.set(rtp.payload, rtp.codec);
+                codecToPayloadTypeMap.set(rtp.codec, rtp.payload);
+            }
+
+            for (const [codec, params] of Object.entries(mods)) {
+                if (!codecToPayloadTypeMap.has(codec)) {
+                    logger.info(`Ignoring SDP modifications for ${codec} as it's not present.`);
+                    continue;
+                }
+
+                const extraconfig: string[] = [];
+                if (params.enableDtx !== undefined) {
+                    extraconfig.push(`usedtx=${params.enableDtx ? '1' : '0'}`);
+                }
+                if (params.maxAverageBitrate !== undefined) {
+                    extraconfig.push(`maxaveragebitrate=${params.maxAverageBitrate}`);
+                }
+
+                let found = false;
+                for (const fmtp of media.fmtp) {
+                    if (payloadTypeToCodecMap.get(fmtp.payload) === codec) {
+                        found = true;
+                        fmtp.config += ";" + extraconfig.join(";");
+                    }
+                }
+                if (!found) {
+                    media.fmtp.push({
+                        payload: codecToPayloadTypeMap.get(codec),
+                        config: extraconfig.join(";"),
+                    });
+                }
+            }
+        });
+        description.sdp = writeSdp(sdp);
+    }
+
+    private async createOffer(): Promise<RTCSessionDescriptionInit> {
+        const offer = await this.peerConn.createOffer();
+        this.mungeSdp(offer, getCodecParamMods(this.isPtt));
+        return offer;
+    }
+
+    private async createAnswer(): Promise<RTCSessionDescriptionInit> {
+        const answer = await this.peerConn.createAnswer();
+        this.mungeSdp(answer, getCodecParamMods(this.isPtt));
+        return answer;
+    }
+
     private async gotCallFeedsForAnswer(callFeeds: CallFeed[]): Promise<void> {
         if (this.callHasEnded()) return;
 
@@ -1449,10 +1543,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         this.setState(CallState.CreateAnswer);
 
-        let myAnswer;
+        let answer: RTCSessionDescriptionInit;
         try {
             this.getRidOfRTXCodecs();
-            myAnswer = await this.peerConn.createAnswer();
+            answer = await this.createAnswer();
         } catch (err) {
             logger.debug(`Call ${this.callId} Failed to create answer: `, err);
             this.terminate(CallParty.Local, CallErrorCode.CreateAnswer, true);
@@ -1460,7 +1554,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
 
         try {
-            await this.peerConn.setLocalDescription(myAnswer);
+            await this.peerConn.setLocalDescription(answer);
             this.setState(CallState.Connecting);
 
             // Allow a short time for initial candidates to be gathered
@@ -1630,7 +1724,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             logger.info(`Call ${this.callId} Got select_answer for party ID ${
                 selectedPartyId}: we are party ID ${this.ourPartyId}.`);
             // The other party has picked somebody else's answer
-            this.terminate(CallParty.Remote, CallErrorCode.AnsweredElsewhere, true);
+            await this.terminate(CallParty.Remote, CallErrorCode.AnsweredElsewhere, true);
         }
     }
 
@@ -1672,8 +1766,17 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             await this.peerConn.setRemoteDescription(description);
 
             if (description.type === 'offer') {
-                this.getRidOfRTXCodecs();
-                await this.peerConn.setLocalDescription();
+                let answer: RTCSessionDescriptionInit;
+                try {
+                    this.getRidOfRTXCodecs();
+                    answer = await this.createAnswer();
+                } catch (err) {
+                    logger.debug(`Call ${this.callId} Failed to create answer: `, err);
+                    this.terminate(CallParty.Local, CallErrorCode.CreateAnswer, true);
+                    return;
+                }
+
+                await this.peerConn.setLocalDescription(answer);
 
                 this.sendVoipEvent(EventType.CallNegotiate, {
                     description: this.peerConn.localDescription,
@@ -1698,15 +1801,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             const streamId = feed.stream.id;
             const metadata = this.remoteSDPStreamMetadata[streamId];
 
-            feed.setAudioMuted(metadata?.audio_muted);
-            feed.setVideoMuted(metadata?.video_muted);
+            feed.setAudioVideoMuted(metadata?.audio_muted, metadata?.video_muted);
             feed.purpose = this.remoteSDPStreamMetadata[streamId]?.purpose;
-
-            if (this.isPtt) {
-                // In PTT mode, it's more important that only one person is speaking at a time, so we
-                // actively disable the output of any streams where we believe the user is muted.
-                feed.stream.getAudioTracks().forEach(t => t.enabled = metadata ? !metadata.audio_muted : true);
-            }
         }
     }
 
@@ -1747,7 +1843,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private async wrappedGotLocalOffer(): Promise<void> {
         this.makingOffer = true;
         try {
-            this.getRidOfRTXCodecs();
             await this.gotLocalOffer();
         } catch (e) {
             this.getLocalOfferFailed(e);
@@ -1766,8 +1861,18 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return;
         }
 
+        let offer: RTCSessionDescriptionInit;
         try {
-            await this.peerConn.setLocalDescription();
+            this.getRidOfRTXCodecs();
+            offer = await this.createOffer();
+        } catch (err) {
+            logger.debug(`Call ${this.callId} Failed to create offer: `, err);
+            this.terminate(CallParty.Local, CallErrorCode.CreateOffer, true);
+            return;
+        }
+
+        try {
+            await this.peerConn.setLocalDescription(offer);
         } catch (err) {
             logger.debug(`Call ${this.callId} Error setting local description!`, err);
             this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);
@@ -1919,10 +2024,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // the peer, since we don't want to block the line if they're not saying anything.
         // Experimenting in Chrome, this happens after 5 or 6 seconds, which is probably
         // fast enough.
-        if (this.isPtt && !["connected", "completed"].includes(this.peerConn.iceConnectionState)) {
+        if (this.isPtt && ["failed", "disconnected"].includes(this.peerConn.iceConnectionState)) {
             for (const feed of this.getRemoteFeeds()) {
-                feed.setAudioMuted(true);
-                feed.setVideoMuted(true);
+                feed.setAudioVideoMuted(true, true);
             }
         }
     };
@@ -1942,12 +2046,19 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         const stream = ev.streams[0];
         this.pushRemoteFeed(stream);
-        stream.addEventListener("removetrack", () => {
-            if (stream.getTracks().length === 0) {
-                logger.info(`Call ${this.callId} removing track streamId: ${stream.id}`);
-                this.deleteFeedByStream(stream);
-            }
-        });
+
+        if (!this.removeTrackListeners.has(stream)) {
+            const onRemoveTrack = () => {
+                if (stream.getTracks().length === 0) {
+                    logger.info(`Call ${this.callId} removing track streamId: ${stream.id}`);
+                    this.deleteFeedByStream(stream);
+                    stream.removeEventListener("removetrack", onRemoveTrack);
+                    this.removeTrackListeners.delete(stream);
+                }
+            };
+            stream.addEventListener("removetrack", onRemoveTrack);
+            this.removeTrackListeners.set(stream, onRemoveTrack);
+        }
     };
 
     private onDataChannel = (ev: RTCDataChannelEvent): void => {
@@ -2086,15 +2197,28 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 content: payload,
             });
 
+            const content = {
+                ...realContent,
+                device_id: this.client.deviceId,
+                sender_session_id: this.client.getSessionId(),
+                dest_session_id: this.opponentSessionId,
+                seq: toDeviceSeq,
+            };
+
             const userId = this.invitee || this.getOpponentMember().userId;
-            if (this.client.isCryptoEnabled()) {
+            if (this.client.getUseE2eForGroupCall()) {
                 return this.client.crypto.encryptAndSendToDevices([{
                     userId,
                     deviceInfo: this.opponentDeviceInfo,
-                }], { type: eventType, content: payload });
+                }], {
+                    type: eventType,
+                    content,
+                });
             } else {
                 return this.client.sendToDevice(eventType, {
-                    [userId]: { [this.opponentDeviceId]: payload },
+                    [userId]: {
+                        [this.opponentDeviceId]: content,
+                    },
                 });
             }
         } else {
@@ -2242,6 +2366,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             clearInterval(this.callLengthInterval);
             this.callLengthInterval = null;
         }
+
+        for (const [stream, listener] of this.removeTrackListeners) {
+            stream.removeEventListener("removetrack", listener);
+        }
+        this.removeTrackListeners.clear();
 
         this.callStatsAtEnd = await this.collectCallStats();
 

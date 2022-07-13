@@ -346,6 +346,12 @@ export interface ICreateClientOpts {
      */
     fallbackICEServerAllowed?: boolean;
 
+    /**
+     * If true, to-device signalling for group calls will be encrypted
+     * with Olm. Default: true.
+     */
+    useE2eForGroupCall?: boolean;
+
     cryptoCallbacks?: ICryptoCallbacks;
 }
 
@@ -431,15 +437,9 @@ export enum RoomVersionStability {
     Unstable = "unstable",
 }
 
-export interface IRoomCapability { // MSC3244
-    preferred: string | null;
-    support: string[];
-}
-
 export interface IRoomVersionsCapability {
     default: string;
     available: Record<string, RoomVersionStability>;
-    "org.matrix.msc3244.room_capabilities"?: Record<string, IRoomCapability>; // MSC3244
 }
 
 export interface ICapability {
@@ -954,6 +954,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected sessionId: string;
     protected pendingEventEncryption = new Map<string, Promise<void>>();
 
+    private useE2eForGroupCall = true;
+
     constructor(opts: IMatrixClientCreateOpts) {
         super();
 
@@ -962,6 +964,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.baseUrl = opts.baseUrl;
         this.idBaseUrl = opts.idBaseUrl;
+        this.identityServer = opts.identityServer;
 
         this.usingExternalCrypto = opts.usingExternalCrypto;
         this.store = opts.store || new StubStore();
@@ -1043,6 +1046,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.iceCandidatePoolSize = opts.iceCandidatePoolSize === undefined ? 0 : opts.iceCandidatePoolSize;
         this.supportsCallTransfer = opts.supportsCallTransfer || false;
         this.fallbackICEServerAllowed = opts.fallbackICEServerAllowed || false;
+
+        if (opts.useE2eForGroupCall !== undefined) this.useE2eForGroupCall = opts.useE2eForGroupCall;
 
         // List of which rooms have encryption enabled: separate from crypto because
         // we still want to know which rooms are encrypted even if crypto is disabled:
@@ -1421,7 +1426,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @return {?string} MXID for the logged-in user, or null if not logged in
      */
-    public getUserId(): string {
+    public getUserId(): string | null {
         if (this.credentials && this.credentials.userId) {
             return this.credentials.userId;
         }
@@ -1443,7 +1448,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Get the local part of the current user ID e.g. "foo" in "@foo:bar".
      * @return {?string} The user ID localpart or null.
      */
-    public getUserIdLocalpart(): string {
+    public getUserIdLocalpart(): string | null {
         if (this.credentials && this.credentials.userId) {
             return this.credentials.userId.split(":")[0].substring(1);
         }
@@ -1500,13 +1505,22 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Returns true if to-device signalling for group calls will be encrypted with Olm.
+     * If false, it will be sent unencrypted.
+     * @returns boolean Whether group call signalling will be encrypted
+     */
+    public getUseE2eForGroupCall(): boolean {
+        return this.useE2eForGroupCall;
+    }
+
+    /**
      * Creates a new call.
      * The place*Call methods on the returned call can be used to actually place a call
      *
      * @param {string} roomId The room the call is to be placed in.
      * @return {MatrixCall} the call or null if the browser doesn't support calling.
      */
-    public createCall(roomId: string): MatrixCall {
+    public createCall(roomId: string): MatrixCall | null {
         return createNewMatrixCall(this, roomId);
     }
 
@@ -1860,7 +1874,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @return {module:crypto/deviceinfo} device or null
      */
-    public getStoredDevice(userId: string, deviceId: string): DeviceInfo {
+    public getStoredDevice(userId: string, deviceId: string): DeviceInfo | null {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -3385,7 +3399,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {?User} A user or null if there is no data store or the user does
      * not exist.
      */
-    public getUser(userId: string): User {
+    public getUser(userId: string): User | null {
         return this.store.getUser(userId);
     }
 
@@ -4886,8 +4900,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         };
 
         if (
-            this.identityServer &&
-            this.identityServer.getAccessToken &&
+            this.identityServer?.getAccessToken &&
             await this.doesServerAcceptIdentityAccessToken()
         ) {
             const identityAccessToken = await this.identityServer.getAccessToken();
@@ -6879,7 +6892,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Get the access token associated with this account.
      * @return {?String} The access_token or null
      */
-    public getAccessToken(): string {
+    public getAccessToken(): string | null {
         return this.http.opts.accessToken || null;
     }
 
@@ -7275,8 +7288,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             .filter(i => !i.id_access_token);
         if (
             invitesNeedingToken.length > 0 &&
-            this.identityServer &&
-            this.identityServer.getAccessToken &&
+            this.identityServer?.getAccessToken &&
             await this.doesServerAcceptIdentityAccessToken()
         ) {
             const identityAccessToken = await this.identityServer.getAccessToken();
@@ -8971,7 +8983,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} roomId The room ID to get a tree space reference for.
      * @returns {MSC3089TreeSpace} The tree space, or null if not a tree space.
      */
-    public unstableGetFileTreeSpace(roomId: string): MSC3089TreeSpace {
+    public unstableGetFileTreeSpace(roomId: string): MSC3089TreeSpace | null {
         const room = this.getRoom(roomId);
         if (room?.getMyMembership() !== 'join') return null;
 
@@ -9017,12 +9029,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     public processBeaconEvents(
-        room: Room,
+        room?: Room,
         events?: MatrixEvent[],
     ): void {
-        if (!events?.length) {
-            return;
-        }
+        if (!events?.length) return;
+        if (!room) return;
+
         room.currentState.processBeaconEvents(events, this);
     }
 
