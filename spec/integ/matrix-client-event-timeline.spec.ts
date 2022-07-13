@@ -627,7 +627,7 @@ describe("MatrixClient event timelines", function() {
             expect(timeline.getEvents().find(e => e.getId() === THREAD_ROOT.event_id)).toBeTruthy();
         });
 
-        it("should return undefined when event is not in the thread that the given timelineSet is representing", () => {
+        it("should not include main timeline event when timelineSet is representing a thread", async () => {
             // @ts-ignore
             client.clientOpts.experimentalThreadSupport = true;
             Thread.setServerSideSupport(true, false);
@@ -649,13 +649,40 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            return Promise.all([
-                expect(client.getEventTimeline(timelineSet, EVENTS[0].event_id)).resolves.toBeUndefined(),
-                httpBackend.flushAllExpected(),
-            ]);
+            // getEventTimeline -> thread.fetchInitialEvents
+            httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
+                encodeURIComponent(THREAD_ROOT.event_id) + "/" +
+                encodeURIComponent(THREAD_RELATION_TYPE.name) + "?limit=20&direction=b")
+                .respond(200, function() {
+                    return {
+                        original_event: THREAD_ROOT,
+                        chunk: [THREAD_REPLY],
+                        // no next batch as this is the oldest end of the timeline
+                    };
+                });
+
+            // getEventTimeline -> thread.fetchEvents
+            httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
+                encodeURIComponent(THREAD_ROOT.event_id) + "/" +
+                encodeURIComponent(THREAD_RELATION_TYPE.name) + "?direction=b&limit=50")
+                .respond(200, function() {
+                    return {
+                        original_event: THREAD_ROOT,
+                        chunk: [THREAD_REPLY],
+                        // no next batch as this is the oldest end of the timeline
+                    };
+                });
+
+            const timelinePromise = client.getEventTimeline(timelineSet, EVENTS[0].event_id);
+            await httpBackend.flushAllExpected();
+
+            const timeline = await timelinePromise;
+
+            // The main timeline event should not be in the timelineSet representing a thread
+            expect(timeline.getEvents().find(e => e.getId() === EVENTS[0].event_id)).toBeFalsy();
         });
 
-        it("should return undefined when event is within a thread but timelineSet is not", () => {
+        it("should not include threaded reply when timelineSet is representing the main room", async () => {
             // @ts-ignore
             client.clientOpts.experimentalThreadSupport = true;
             Thread.setServerSideSupport(true, false);
@@ -675,10 +702,13 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            return Promise.all([
-                expect(client.getEventTimeline(timelineSet, THREAD_REPLY.event_id)).resolves.toBeUndefined(),
-                httpBackend.flushAllExpected(),
-            ]);
+            const timelinePromise = client.getEventTimeline(timelineSet, THREAD_REPLY.event_id);
+            await httpBackend.flushAllExpected();
+
+            const timeline = await timelinePromise;
+
+            // The threaded reply should not be in a main room timeline
+            expect(timeline.getEvents().find(e => e.getId() === THREAD_REPLY.event_id)).toBeFalsy();
         });
 
         it("should should add lazy loading filter when requested", async () => {
