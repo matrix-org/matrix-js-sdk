@@ -607,9 +607,6 @@ describe("megolm", function() {
                 event_id: '$event_id',
             });
             aliceTestClient.httpBackend.when(
-                'PUT', '/sendToDevice/org.matrix.room_key.withheld/',
-            ).respond(200, {});
-            aliceTestClient.httpBackend.when(
                 'PUT', '/sendToDevice/m.room_key.withheld/',
             ).respond(200, {});
 
@@ -709,9 +706,6 @@ describe("megolm", function() {
                     event_id: '$event_id',
                 };
             });
-            aliceTestClient.httpBackend.when(
-                'PUT', '/sendToDevice/org.matrix.room_key.withheld/',
-            ).respond(200, {});
             aliceTestClient.httpBackend.when(
                 'PUT', '/sendToDevice/m.room_key.withheld/',
             ).respond(200, {});
