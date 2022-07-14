@@ -44,6 +44,7 @@ export interface ICallFeedOpts {
 export enum CallFeedEvent {
     NewStream = "new_stream",
     MuteStateChanged = "mute_state_changed",
+    LocalVolumeChanged = "local_volume_changed",
     VolumeChanged = "volume_changed",
     Speaking = "speaking",
 }
@@ -51,6 +52,7 @@ export enum CallFeedEvent {
 type EventHandlerMap = {
     [CallFeedEvent.NewStream]: (stream: MediaStream) => void;
     [CallFeedEvent.MuteStateChanged]: (audioMuted: boolean, videoMuted: boolean) => void;
+    [CallFeedEvent.LocalVolumeChanged]: (localVolume: number) => void;
     [CallFeedEvent.VolumeChanged]: (volume: number) => void;
     [CallFeedEvent.Speaking]: (speaking: boolean) => void;
 };
@@ -66,6 +68,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     private roomId: string;
     private audioMuted: boolean;
     private videoMuted: boolean;
+    private localVolume = 1;
     private measuringVolumeActivity = false;
     private audioContext: AudioContext;
     private analyser: AnalyserNode;
@@ -290,5 +293,14 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
             this.analyser = null;
             releaseContext();
         }
+    }
+
+    public getLocalVolume(): number {
+        return this.localVolume;
+    }
+
+    public setLocalVolume(localVolume: number): void {
+        this.localVolume = localVolume;
+        this.emit(CallFeedEvent.LocalVolumeChanged, localVolume);
     }
 }
