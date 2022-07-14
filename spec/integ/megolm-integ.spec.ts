@@ -34,13 +34,7 @@ import { ISignatures } from "../../src/@types/signed";
 
 const ROOM_ID = "!room:id";
 
-/**
- * start an Olm session with a given recipient
- *
- * @param {Olm.Account} olmAccount
- * @param {TestClient} recipientTestClient
- * @return {Promise} promise for Olm.Session
- */
+// start an Olm session with a given recipient
 async function createOlmSession(olmAccount: Olm.Account, recipientTestClient: TestClient): Promise<Olm.Session> {
     const keys = await recipientTestClient.awaitOneTimeKeyUpload();
     const otkId = Object.keys(keys)[0];
@@ -58,19 +52,7 @@ interface ToDeviceEvent {
     type: string;
 }
 
-/**
- * encrypt an event with olm
- *
- * @param {object} opts
- * @param {string=} opts.sender
- * @param {string} opts.senderKey
- * @param {Olm.Session} opts.p2pSession
- * @param {TestClient} opts.recipient
- * @param {object=} opts.plaincontent
- * @param {string=} opts.plaintype
- *
- * @return {object} event
- */
+// encrypt an event with olm
 function encryptOlmEvent(opts: {
     sender?: string;
     senderKey: string;
@@ -107,17 +89,7 @@ function encryptOlmEvent(opts: {
     return event;
 }
 
-/**
- * encrypt an event with megolm
- *
- * @param {object} opts
- * @param {string} opts.senderKey
- * @param {Olm.OutboundGroupSession} opts.groupSession
- * @param {object=} opts.plaintext
- * @param {string=} opts.room_id
- *
- * @return {object} event
- */
+// encrypt an event with megolm
 function encryptMegolmEvent(opts: {
     senderKey: string;
     groupSession: Olm.OutboundGroupSession;
@@ -155,18 +127,7 @@ function encryptMegolmEvent(opts: {
     };
 }
 
-/**
- * build an encrypted room_key event to share a group session
- *
- * @param {object} opts
- * @param {string} opts.senderKey
- * @param {TestClient} opts.recipient
- * @param {Olm.Session} opts.p2pSession
- * @param {Olm.OutboundGroupSession} opts.groupSession
- * @param {string=} opts.room_id
- *
- * @return {object} event
- */
+// build an encrypted room_key event to share a group session
 function encryptGroupSessionKey(opts: {
     senderKey: string;
     recipient: TestClient;
@@ -188,14 +149,7 @@ function encryptGroupSessionKey(opts: {
     });
 }
 
-/**
- * get a /sync response which contains a single room (ROOM_ID),
- * with the members given
- *
- * @param {string[]} roomMembers
- *
- * @return {object} event
- */
+// get a /sync response which contains a single room (ROOM_ID), with the members given
 function getSyncResponse(roomMembers: string[]): ISyncResponse {
     const roomResponse = {
         state: {
@@ -249,7 +203,7 @@ describe("megolm", function() {
      * response to /keys/query
      *
      * @param {string} userId The user ID to query for
-     * @returns {Object} The fake query response
+     * @returns {IDownloadKeyResult} The fake query response
      */
     function getTestKeysQueryResponse(userId: string): IDownloadKeyResult {
         const testE2eKeys = JSON.parse(testOlmAccount.identity_keys());
@@ -286,7 +240,7 @@ describe("megolm", function() {
      * response to /keys/claim
 
      * @param {string} userId The user ID to query for
-     * @returns {Object} The fake key claim response
+     * @returns {IClaimOTKsResult} The fake key claim response
      */
     function getTestKeysClaimResponse(userId: string): IClaimOTKsResult {
         testOlmAccount.generate_one_time_keys(1);
