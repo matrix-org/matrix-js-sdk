@@ -1,5 +1,5 @@
 /*
-Copyright 2015-2021 The Matrix.org Foundation C.I.C.
+Copyright 2015-2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -502,7 +502,7 @@ interface ITurnServerResponse {
     ttl: number;
 }
 
-interface ITurnServer {
+export interface ITurnServer {
     urls: string[];
     username: string;
     credential: string;
@@ -787,6 +787,8 @@ export enum ClientEvent {
     DeleteRoom = "deleteRoom",
     SyncUnexpectedError = "sync.unexpectedError",
     ClientWellKnown = "WellKnown.client",
+    TurnServers = "turnServers",
+    TurnServersError = "turnServers.error",
 }
 
 type RoomEvents = RoomEvent.Name
@@ -857,6 +859,8 @@ export type ClientEventHandlerMap = {
     [ClientEvent.DeleteRoom]: (roomId: string) => void;
     [ClientEvent.SyncUnexpectedError]: (error: Error) => void;
     [ClientEvent.ClientWellKnown]: (data: IClientWellKnown) => void;
+    [ClientEvent.TurnServers]: (servers: ITurnServer[]) => void;
+    [ClientEvent.TurnServersError]: (error: Error, fatal: boolean) => void;
 } & RoomEventHandlerMap
     & RoomStateEventHandlerMap
     & CryptoEventHandlerMap
@@ -933,7 +937,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected clientWellKnownPromise: Promise<IClientWellKnown>;
     protected turnServers: ITurnServer[] = [];
     protected turnServersExpiry = 0;
-    protected checkTurnServersIntervalID: ReturnType<typeof setInterval>;
+    protected checkTurnServersIntervalID: ReturnType<typeof setInterval> | null = null;
     protected exportedOlmDeviceToImport: IOlmDevice;
     protected txnCtr = 0;
     protected mediaHandler = new MediaHandler(this);
@@ -1220,6 +1224,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.callEventHandler = null;
 
         global.clearInterval(this.checkTurnServersIntervalID);
+        this.checkTurnServersIntervalID = null;
+
         if (this.clientWellKnownIntervalID !== undefined) {
             global.clearInterval(this.clientWellKnownIntervalID);
         }
@@ -6300,6 +6306,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.turnServersExpiry;
     }
 
+    public get pollingTurnServers(): boolean {
+        return this.checkTurnServersIntervalID !== null;
+    }
+
     // XXX: Intended private, used in code.
     public async checkTurnServers(): Promise<boolean> {
         if (!this.canSupportVoip) {
@@ -6327,17 +6337,21 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     // The TTL is in seconds but we work in ms
                     this.turnServersExpiry = Date.now() + (res.ttl * 1000);
                     credentialsGood = true;
+                    this.emit(ClientEvent.TurnServers, this.turnServers);
                 }
             } catch (err) {
                 logger.error("Failed to get TURN URIs", err);
-                // If we get a 403, there's no point in looping forever.
                 if (err.httpStatus === 403) {
+                    // We got a 403, so there's no point in looping forever.
                     logger.info("TURN access unavailable for this account: stopping credentials checks");
                     if (this.checkTurnServersIntervalID !== null) global.clearInterval(this.checkTurnServersIntervalID);
                     this.checkTurnServersIntervalID = null;
+                    this.emit(ClientEvent.TurnServersError, err, true); // fatal
+                } else {
+                    // otherwise, if we failed for whatever reason, try again the next time we're called.
+                    this.emit(ClientEvent.TurnServersError, err, false); // non-fatal
                 }
             }
-            // otherwise, if we failed for whatever reason, try again the next time we're called.
         }
 
         return credentialsGood;
