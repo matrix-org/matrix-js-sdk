@@ -22,6 +22,7 @@ import {
 } from "matrix-widget-api";
 
 import { ISendEventResponse } from "./@types/requests";
+import { logger } from "./logger";
 import { MatrixClient, ClientEvent, IMatrixClientCreateOpts, IStartClientOpts } from "./client";
 import { MatrixEvent } from "./models/event";
 import { Room } from "./models/room";
@@ -43,6 +44,7 @@ export interface IEventRequests {
 
 export class RoomWidgetClient extends MatrixClient {
     private room: Room;
+    private widgetApiReady = new Promise<void>(resolve => this.widgetApi.once("ready", resolve));
 
     constructor(
         private readonly widgetApi: WidgetApi,
@@ -78,19 +80,25 @@ export class RoomWidgetClient extends MatrixClient {
 
         this.room = this.syncApi.createRoom(this.roomId);
         this.store.storeRoom(this.room);
-        window.mxRoom = this.room;
+
+        await this.widgetApiReady;
 
         // Backfill the requested events
+        // We only get the most recent event for every type + state key combo,
+        // so it doesn't really matter what order we inject them in
         await Promise.all(
             this.eventRequests.receiveState?.map(async ({ eventType, stateKey }) => {
                 const rawEvents = await this.widgetApi.readStateEvents(eventType, undefined, stateKey);
                 const events = rawEvents.map(rawEvent => new MatrixEvent(rawEvent));
 
                 await this.syncApi.injectRoomEvents(this.room, [], events);
-                events.forEach(event => this.emit(ClientEvent.Event, event));
-                console.log("injected", events);
+                events.forEach(event => {
+                    this.emit(ClientEvent.Event, event);
+                    logger.info(`Backfilled event ${event.getId()} ${event.getType()} ${event.getStateKey()}`);
+                });
             }) ?? [],
         );
+        logger.info("Finished backfilling events");
     }
 
     public stopClient() {
@@ -121,6 +129,7 @@ export class RoomWidgetClient extends MatrixClient {
         const event = new MatrixEvent(ev.detail.data);
         await this.syncApi.injectRoomEvents(this.room, [], [event]);
         this.emit(ClientEvent.Event, event);
+        logger.info(`Received event ${event.getId()} ${event.getType()} ${event.getStateKey()}`);
     };
 
     private onToDevice = (ev: CustomEvent<ISendToDeviceToWidgetActionRequest>) =>

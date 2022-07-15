@@ -2181,7 +2181,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         if (this.opponentDeviceId) {
             const toDeviceSeq = this.toDeviceSeq++;
-            const payload = {
+            const content = {
                 ...realContent,
                 device_id: this.client.deviceId,
                 sender_session_id: this.client.getSessionId(),
@@ -2194,16 +2194,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 eventType,
                 userId: this.invitee || this.getOpponentMember().userId,
                 opponentDeviceId: this.opponentDeviceId,
-                content: payload,
+                content,
             });
-
-            const content = {
-                ...realContent,
-                device_id: this.client.deviceId,
-                sender_session_id: this.client.getSessionId(),
-                dest_session_id: this.opponentSessionId,
-                seq: toDeviceSeq,
-            };
 
             const userId = this.invitee || this.getOpponentMember().userId;
             if (this.client.getUseE2eForGroupCall()) {
