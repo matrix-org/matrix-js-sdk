@@ -24,13 +24,13 @@ import {
     IContent,
     IEvent,
     IClaimOTKsResult,
+    IJoinedRoom,
     ISyncResponse,
     IDownloadKeyResult,
     MatrixEvent,
     MatrixEventEvent,
 } from "../../src/matrix";
 import { IDeviceKeys } from "../../src/crypto/dehydration";
-import { ISignatures } from "../../src/@types/signed";
 
 const ROOM_ID = "!room:id";
 
@@ -75,18 +75,17 @@ function encryptOlmEvent(opts: {
         type: opts.plaintype || 'm.test',
     };
 
-    const event = {
+    return {
         content: {
             algorithm: 'm.olm.v1.curve25519-aes-sha2',
-            ciphertext: {},
+            ciphertext: {
+                [opts.recipient.getDeviceKey()]: opts.p2pSession.encrypt(JSON.stringify(plaintext)),
+            },
             sender_key: opts.senderKey,
         },
         sender: opts.sender || '@bob:xyz',
         type: 'm.room.encrypted',
     };
-    event.content.ciphertext[opts.recipient.getDeviceKey()] =
-        opts.p2pSession.encrypt(JSON.stringify(plaintext));
-    return event;
 }
 
 // encrypt an event with megolm
@@ -151,40 +150,51 @@ function encryptGroupSessionKey(opts: {
 
 // get a /sync response which contains a single room (ROOM_ID), with the members given
 function getSyncResponse(roomMembers: string[]): ISyncResponse {
-    const roomResponse = {
+    const roomResponse: IJoinedRoom = {
+        summary: {
+            "m.heroes": [],
+            "m.joined_member_count": roomMembers.length,
+            "m.invited_member_count": roomMembers.length,
+        },
         state: {
             events: [
-                testUtils.mkEvent({
+                testUtils.mkEventCustom({
+                    sender: roomMembers[0],
                     type: 'm.room.encryption',
-                    skey: '',
+                    state_key: '',
                     content: {
                         algorithm: 'm.megolm.v1.aes-sha2',
                     },
                 }),
             ],
         },
+        timeline: {
+            events: [],
+            prev_batch: '',
+        },
+        ephemeral: { events: [] },
+        account_data: { events: [] },
+        unread_notifications: {},
     };
 
     for (let i = 0; i < roomMembers.length; i++) {
         roomResponse.state.events.push(
-            testUtils.mkMembership({
-                mship: 'join',
+            testUtils.mkMembershipCustom({
+                membership: 'join',
                 sender: roomMembers[i],
             }),
         );
     }
 
-    const syncResponse = {
+    return {
         next_batch: "1",
         rooms: {
-            join: {},
+            join: { [ROOM_ID]: roomResponse },
             invite: {},
             leave: {},
         },
         account_data: { events: [] },
     };
-    syncResponse.rooms.join[ROOM_ID] = roomResponse;
-    return syncResponse;
 }
 
 describe("megolm", () => {
@@ -218,21 +228,12 @@ describe("megolm", () => {
         };
         const j = anotherjson.stringify(testDeviceKeys);
         const sig = testOlmAccount.sign(j);
-        testDeviceKeys.signatures = {};
-        testDeviceKeys.signatures[userId] = {
-            'ed25519:DEVICE_ID': sig,
-        };
+        testDeviceKeys.signatures = { [userId]: { 'ed25519:DEVICE_ID': sig } };
 
-        const queryResponse = {
-            device_keys: {},
+        return {
+            device_keys: { [userId]: { 'DEVICE_ID': testDeviceKeys } },
             failures: {},
         };
-
-        queryResponse.device_keys[userId] = {
-            'DEVICE_ID': testDeviceKeys,
-        };
-
-        return queryResponse;
     }
 
     /**
@@ -249,23 +250,18 @@ describe("megolm", () => {
 
         const keyId = Object.keys(testOneTimeKeys.curve25519)[0];
         const oneTimeKey: string = testOneTimeKeys.curve25519[keyId];
-        const keyResult: { key: string, signatures: ISignatures } = {
-            key: oneTimeKey,
-            signatures: {},
-        };
-        const j = anotherjson.stringify({ key: oneTimeKey });
+        const unsignedKeyResult = { key: oneTimeKey };
+        const j = anotherjson.stringify(unsignedKeyResult);
         const sig = testOlmAccount.sign(j);
-        keyResult.signatures[userId] = {
-            'ed25519:DEVICE_ID': sig,
+        const keyResult = {
+            ...unsignedKeyResult,
+            signatures: { [userId]: { 'ed25519:DEVICE_ID': sig } },
         };
 
-        const claimResponse = { one_time_keys: {}, failures: {} };
-        claimResponse.one_time_keys[userId] = {
-            'DEVICE_ID': {},
+        return {
+            one_time_keys: { [userId]: { 'DEVICE_ID': { ['signed_curve25519:' + keyId]: keyResult } } },
+            failures: {},
         };
-        claimResponse.one_time_keys[userId].DEVICE_ID['signed_curve25519:' + keyId] =
-            keyResult;
-        return claimResponse;
     }
 
     beforeEach(async () => {
@@ -311,12 +307,9 @@ describe("megolm", () => {
                 events: [roomKeyEncrypted],
             },
             rooms: {
-                join: {},
-            },
-        };
-        syncResponse.rooms.join[ROOM_ID] = {
-            timeline: {
-                events: [messageEncrypted],
+                join: {
+                    [ROOM_ID]: { timeline: { events: [messageEncrypted] } },
+                },
             },
         };
 
@@ -437,12 +430,7 @@ describe("megolm", () => {
                 events: [roomKeyEncrypted2],
             },
             rooms: {
-                join: {},
-            },
-        };
-        syncResponse2.rooms.join[ROOM_ID] = {
-            timeline: {
-                events: [messageEncrypted],
+                join: { [ROOM_ID]: { timeline: { events: [messageEncrypted] } } },
             },
         };
         aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse2);
@@ -679,30 +667,21 @@ describe("megolm", () => {
         // an encrypted room with just alice
         const syncResponse = {
             next_batch: 1,
-            rooms: {
-                join: {},
-            },
-        };
-        syncResponse.rooms.join[ROOM_ID] = {
-            state: {
-                events: [
-                    testUtils.mkEvent({
-                        type: 'm.room.encryption',
-                        skey: '',
-                        content: {
-                            algorithm: 'm.megolm.v1.aes-sha2',
-                        },
-                    }),
-                    testUtils.mkMembership({
-                        mship: 'join',
-                        sender: aliceTestClient.userId,
-                    }),
-                ],
-            },
+            rooms: { join: { [ROOM_ID]: { state: { events: [
+                testUtils.mkEvent({
+                    type: 'm.room.encryption',
+                    skey: '',
+                    content: { algorithm: 'm.megolm.v1.aes-sha2' },
+                }),
+                testUtils.mkMembership({
+                    mship: 'join',
+                    sender: aliceTestClient.userId,
+                }),
+            ] } } } },
         };
         aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
 
-        // the completion of the first initialsync hould make Alice
+        // the completion of the first initialsync should make Alice
         // invalidate the device cache for all members in e2e rooms (ie,
         // herself), and do a key query.
         aliceTestClient.expectKeyQuery(
@@ -879,12 +858,7 @@ describe("megolm", () => {
         const syncResponse = {
             next_batch: 1,
             rooms: {
-                join: {},
-            },
-        };
-        syncResponse.rooms.join[ROOM_ID] = {
-            timeline: {
-                events: [messageEncrypted],
+                join: { [ROOM_ID]: { timeline: { events: [messageEncrypted] } } },
             },
         };
 
@@ -991,12 +965,7 @@ describe("megolm", () => {
                 events: [roomKeyEncrypted],
             },
             rooms: {
-                join: {},
-            },
-        };
-        syncResponse.rooms.join[ROOM_ID] = {
-            timeline: {
-                events: [messageEncrypted],
+                join: { [ROOM_ID]: { timeline: { events: [messageEncrypted] } } },
             },
         };
 
