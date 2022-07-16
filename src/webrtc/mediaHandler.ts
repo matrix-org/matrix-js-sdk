@@ -359,7 +359,7 @@ export class MediaHandler extends TypedEventEmitter<
 
     private getScreenshareContraints(opts: IScreensharingOpts): DesktopCapturerConstraints {
         const { desktopCapturerSourceId, audio } = opts;
-        if (opts.desktopCapturerSourceId) {
+        if (desktopCapturerSourceId) {
             logger.debug("Using desktop capturer source", desktopCapturerSourceId);
             return {
                 audio,
