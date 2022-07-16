@@ -51,6 +51,7 @@ import { ISendEventResponse } from "../@types/requests";
 import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter";
 import { DeviceInfo } from '../crypto/deviceinfo';
 import { GroupCallUnknownDeviceError } from './groupCall';
+import { IScreensharingOpts } from "./mediaHandler";
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
@@ -1100,7 +1101,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * @param {string} desktopCapturerSourceId optional id of the desktop capturer source to use
      * @returns {boolean} new screensharing state
      */
-    public async setScreensharingEnabled(enabled: boolean, desktopCapturerSourceId?: string): Promise<boolean> {
+    public async setScreensharingEnabled(enabled: boolean, opts?: IScreensharingOpts): Promise<boolean> {
         // Skip if there is nothing to do
         if (enabled && this.isScreensharing()) {
             logger.warn(`Call ${this.callId} There is already a screensharing stream - there is nothing to do!`);
@@ -1112,13 +1113,13 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         // Fallback to replaceTrack()
         if (!this.opponentSupportsSDPStreamMetadata()) {
-            return this.setScreensharingEnabledWithoutMetadataSupport(enabled, desktopCapturerSourceId);
+            return this.setScreensharingEnabledWithoutMetadataSupport(enabled, opts);
         }
 
         logger.debug(`Call ${this.callId} set screensharing enabled? ${enabled}`);
         if (enabled) {
             try {
-                const stream = await this.client.getMediaHandler().getScreensharingStream(desktopCapturerSourceId);
+                const stream = await this.client.getMediaHandler().getScreensharingStream(opts);
                 if (!stream) return false;
                 this.pushNewLocalFeed(stream, SDPStreamMetadataPurpose.Screenshare);
                 return true;
@@ -1144,12 +1145,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * @returns {boolean} new screensharing state
      */
     private async setScreensharingEnabledWithoutMetadataSupport(
-        enabled: boolean, desktopCapturerSourceId?: string,
+        enabled: boolean, opts?: IScreensharingOpts,
     ): Promise<boolean> {
         logger.debug(`Call ${this.callId} Set screensharing enabled? ${enabled} using replaceTrack()`);
         if (enabled) {
             try {
-                const stream = await this.client.getMediaHandler().getScreensharingStream(desktopCapturerSourceId);
+                const stream = await this.client.getMediaHandler().getScreensharingStream(opts);
                 if (!stream) return false;
 
                 const track = stream.getTracks().find((track) => {
