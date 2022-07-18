@@ -426,13 +426,18 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             return matrixEvent.event.event_id === readReceiptEventId;
         });
 
+        utils.span("attemptDecryption", false, {room_id: this.roomId});
         const decryptionPromises = events
             .slice(readReceiptTimelineIndex)
             .filter(event => event.shouldAttemptDecryption())
             .reverse()
             .map(event => event.attemptDecryption(this.client.crypto, { isRetry: true }));
 
-        return Promise.allSettled(decryptionPromises) as unknown as Promise<void>;
+        const p = Promise.allSettled(decryptionPromises) as unknown as Promise<void>;
+        p.finally(() => {
+            utils.span("attemptDecryption", true, {room_id: this.roomId});
+        });
+        return p;
     }
 
     /**

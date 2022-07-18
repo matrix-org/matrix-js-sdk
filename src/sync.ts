@@ -1438,12 +1438,12 @@ export class SyncApi {
             });
             utils.span("do_sync|sync_rooms|sync_process_room_account", true, {room_id: room.roomId});
 
-            utils.span("do_sync|sync_rooms|decrypt_critical_events", true, {room_id: room.roomId});
+            utils.span("do_sync|sync_rooms|decrypt_critical_events", false, {room_id: room.roomId});
             // Decrypt only the last message in all rooms to make sure we can generate a preview
             // And decrypt all events after the recorded read receipt to ensure an accurate
             // notification count
             room.decryptCriticalEvents();
-            utils.span("do_sync|sync_rooms|decrypt_critical_events", false, {room_id: room.roomId});
+            utils.span("do_sync|sync_rooms|decrypt_critical_events", true, {room_id: room.roomId});
         });
 
         if (leaveRooms.length > 0) {
