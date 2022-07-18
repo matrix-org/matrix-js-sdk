@@ -353,6 +353,13 @@ export function ensureNoTrailingSlash(url: string): string {
     }
 }
 
+export function span(section: string, end?: boolean, extraKeys?: object) {
+    const err = new Error();
+    extraKeys = extraKeys || {};
+    extraKeys["line"] = err.stack.split("\n")[2].trim();
+    console.log("SPAN", end ? "END" : "START", new Date().getTime(), section, JSON.stringify(extraKeys));
+}
+
 // Returns a promise which resolves with a given value after the given number of ms
 export function sleep<T>(ms: number, value?: T): Promise<T> {
     return new Promise((resolve => {

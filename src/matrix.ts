@@ -55,6 +55,10 @@ export {
     createNewMatrixCall,
 } from "./webrtc/call";
 
+export {
+    span
+} from "./utils";
+
 // expose the underlying request object so different environments can use
 // different request libs (e.g. request or browser-request)
 let requestInstance;

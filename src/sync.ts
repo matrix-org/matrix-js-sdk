@@ -618,6 +618,7 @@ export class SyncApi {
      * Main entry point
      */
     public sync(): void {
+        utils.span("pre_sync_loop");
         const client = this.client;
 
         this.running = true;
@@ -640,8 +641,10 @@ export class SyncApi {
         const getPushRules = async () => {
             try {
                 debuglog("Getting push rules...");
+                utils.span("pre_sync_loop|push_rules");
                 const result = await client.getPushRules();
                 debuglog("Got push rules");
+                utils.span("pre_sync_loop|push_rules", true);
 
                 client.pushRules = result;
             } catch (err) {
@@ -664,6 +667,7 @@ export class SyncApi {
         };
 
         const checkLazyLoadStatus = async () => {
+            utils.span("pre_sync_loop|check_lazy_load");
             debuglog("Checking lazy load status...");
             if (this.opts.lazyLoadMembers && client.isGuest()) {
                 this.opts.lazyLoadMembers = false;
@@ -709,12 +713,14 @@ export class SyncApi {
                 logger.error("Storing client options failed", err);
                 throw err;
             }
+            utils.span("pre_sync_loop|check_lazy_load", true);
 
             getFilter(); // Now get the filter and start syncing
         };
 
         const getFilter = async () => {
             debuglog("Getting filter...");
+            utils.span("pre_sync_loop|check_sync_filter");
             let filter;
             if (this.opts.filter) {
                 filter = this.opts.filter;
@@ -740,6 +746,7 @@ export class SyncApi {
             // The right solution would be to tie /sync pagination tokens into
             // /notifications API somehow.
             client.resetNotifTimelineSet();
+            utils.span("pre_sync_loop|check_sync_filter", true);
 
             if (this.currentSyncRequest === null) {
                 // Send this first sync request here so we can then wait for the saved
@@ -751,6 +758,7 @@ export class SyncApi {
             // Now wait for the saved sync to finish...
             debuglog("Waiting for saved sync before starting sync processing...");
             await savedSyncPromise;
+            utils.span("pre_sync_loop", true);
             this.doSync({ filterId });
         };
 
@@ -821,6 +829,7 @@ export class SyncApi {
      */
     private async syncFromCache(savedSync: ISavedSync): Promise<void> {
         debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
+        utils.span("saved_sync");
 
         const nextSyncToken = savedSync.nextBatch;
 
@@ -855,6 +864,7 @@ export class SyncApi {
         if (!this.storeIsInvalid) {
             this.updateSyncState(SyncState.Prepared, syncEventData);
         }
+        utils.span("saved_sync", true);
     }
 
     /**
@@ -875,6 +885,7 @@ export class SyncApi {
             this.updateSyncState(SyncState.Stopped);
             return;
         }
+        utils.span("do_sync");
 
         const syncToken = client.store.getSyncToken();
 
@@ -884,11 +895,14 @@ export class SyncApi {
             if (this.currentSyncRequest === null) {
                 this.currentSyncRequest = this.doSyncRequest(syncOptions, syncToken);
             }
+            utils.span("do_sync|do_request");
             data = await this.currentSyncRequest;
         } catch (e) {
             this.onSyncError(e, syncOptions);
+            utils.span("do_sync", true);
             return;
         } finally {
+            utils.span("do_sync|do_request", true);
             this.currentSyncRequest = null;
         }
 
@@ -901,8 +915,9 @@ export class SyncApi {
 
         // Reset after a successful sync
         this.failedSyncCount = 0;
-
+        utils.span("do_sync|store.setSyncData");
         await client.store.setSyncData(data);
+        utils.span("do_sync|store.setSyncData", true);
 
         const syncEventData = {
             oldSyncToken: syncToken,
@@ -913,7 +928,9 @@ export class SyncApi {
         if (this.opts.crypto) {
             // tell the crypto module we're about to process a sync
             // response
+            utils.span("do_sync|crypto_preprocess");
             await this.opts.crypto.onSyncWillProcess(syncEventData);
+            utils.span("do_sync|crypto_preprocess", true);
         }
 
         try {
@@ -934,12 +951,15 @@ export class SyncApi {
         if (!syncOptions.hasSyncedBefore) {
             this.updateSyncState(SyncState.Prepared, syncEventData);
             syncOptions.hasSyncedBefore = true;
+            // don't close the span, rely on the listener for SyncState to do this.
         }
 
         // tell the crypto module to do its processing. It may block (to do a
         // /keys/changes request).
         if (this.opts.crypto) {
+            utils.span("do_sync|crypto_postprocess");
             await this.opts.crypto.onSyncCompleted(syncEventData);
+            utils.span("do_sync|crypto_postprocess", true);
         }
 
         // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
@@ -952,13 +972,15 @@ export class SyncApi {
             // device changes. We can also skip the delay since we're not calling this very
             // frequently (and we don't really want to delay the sync for it).
             if (this.opts.crypto) {
+                utils.span("do_sync|crypto_save_dlist");
                 await this.opts.crypto.saveDeviceList(0);
+                utils.span("do_sync|crypto_save_dlist", true);
             }
 
             // tell databases that everything is now in a consistent state and can be saved.
             client.store.save();
         }
-
+        utils.span("do_sync", true);
         // Begin next sync
         this.doSync(syncOptions);
     }
@@ -1134,6 +1156,7 @@ export class SyncApi {
 
         // handle presence events (User objects)
         if (data.presence && Array.isArray(data.presence.events)) {
+            utils.span("do_sync|sync_presence", false, {num_events: data.presence.events.length});
             data.presence.events.map(client.getEventMapper()).forEach(
                 function(presenceEvent) {
                     let user = client.store.getUser(presenceEvent.getSender());
@@ -1146,10 +1169,12 @@ export class SyncApi {
                     }
                     client.emit(ClientEvent.Event, presenceEvent);
                 });
+                utils.span("do_sync|sync_presence", true);
         }
 
         // handle non-room account_data
         if (data.account_data && Array.isArray(data.account_data.events)) {
+            utils.span("do_sync|sync_global_account_data", false, {num_events: data.account_data.events.length});
             const events = data.account_data.events.map(client.getEventMapper());
             const prevEventsMap = events.reduce((m, c) => {
                 m[c.getId()] = client.store.getAccountData(c.getType());
@@ -1171,10 +1196,12 @@ export class SyncApi {
                     return accountDataEvent;
                 },
             );
+            utils.span("do_sync|sync_global_account_data", true);
         }
 
         // handle to-device events
         if (Array.isArray(data.to_device?.events) && data.to_device.events.length > 0) {
+            utils.span("do_sync|sync_to_device_events", false, {num_events: data.to_device.events.length});
             const cancelledKeyVerificationTxns = [];
             data.to_device.events
                 .map(client.getEventMapper())
@@ -1221,11 +1248,13 @@ export class SyncApi {
                         client.emit(ClientEvent.ToDeviceEvent, toDeviceEvent);
                     },
                 );
+                utils.span("do_sync|sync_to_device_events", true);
         } else {
             // no more to-device events: we can stop polling with a short timeout.
             this.catchingUp = false;
         }
 
+        utils.span("do_sync|sync_rooms");
         // the returned json structure is a bit crap, so make it into a
         // nicer form (array) after applying sanity to make sure we don't fail
         // on missing keys (on the off chance)
@@ -1247,24 +1276,28 @@ export class SyncApi {
 
         this.notifEvents = [];
 
-        // Handle invites
-        await utils.promiseMapSeries(inviteRooms, async (inviteObj) => {
-            const room = inviteObj.room;
-            const stateEvents = this.mapSyncEventsFormat(inviteObj.invite_state, room);
+        if (inviteRooms.length > 0 ) {
+            // Handle invites
+            utils.span("do_sync|sync_rooms|invites", false, {num_invites: inviteRooms.length});
+            await utils.promiseMapSeries(inviteRooms, async (inviteObj) => {
+                const room = inviteObj.room;
+                const stateEvents = this.mapSyncEventsFormat(inviteObj.invite_state, room);
 
-            await this.processRoomEvents(room, stateEvents);
-            if (inviteObj.isBrandNewRoom) {
-                room.recalculate();
-                client.store.storeRoom(room);
-                client.emit(ClientEvent.Room, room);
-            } else {
-                // Update room state for invite->reject->invite cycles
-                room.recalculate();
-            }
-            stateEvents.forEach(function(e) {
-                client.emit(ClientEvent.Event, e);
+                await this.processRoomEvents(room, stateEvents);
+                if (inviteObj.isBrandNewRoom) {
+                    room.recalculate();
+                    client.store.storeRoom(room);
+                    client.emit(ClientEvent.Room, room);
+                } else {
+                    // Update room state for invite->reject->invite cycles
+                    room.recalculate();
+                }
+                stateEvents.forEach(function(e) {
+                    client.emit(ClientEvent.Event, e);
+                });
             });
-        });
+            utils.span("do_sync|sync_rooms|invites", true);
+        }
 
         // Handle joins
         await utils.promiseMapSeries(joinRooms, async (joinObj) => {
@@ -1388,49 +1421,65 @@ export class SyncApi {
                 }
             };
 
+            utils.span("do_sync|sync_rooms|sync_process_room_state", false, {num_events: stateEvents.length, room_id: room.roomId});
             await utils.promiseMapSeries(stateEvents, processRoomEvent);
+            utils.span("do_sync|sync_rooms|sync_process_room_state", true, {room_id: room.roomId});
+            utils.span("do_sync|sync_rooms|sync_process_room_timeline", false, {num_events: events.length, room_id: room.roomId});
             await utils.promiseMapSeries(events, processRoomEvent);
+            utils.span("do_sync|sync_rooms|sync_process_room_timeline", true, {room_id: room.roomId});
+            utils.span("do_sync|sync_rooms|sync_process_room_ephemeral", false, {num_events: ephemeralEvents.length, room_id: room.roomId});
             ephemeralEvents.forEach(function(e) {
                 client.emit(ClientEvent.Event, e);
             });
+            utils.span("do_sync|sync_rooms|sync_process_room_ephemeral", true, {room_id: room.roomId});
+            utils.span("do_sync|sync_rooms|sync_process_room_account", false, {num_events: accountDataEvents.length, room_id: room.roomId});
             accountDataEvents.forEach(function(e) {
                 client.emit(ClientEvent.Event, e);
             });
+            utils.span("do_sync|sync_rooms|sync_process_room_account", true, {room_id: room.roomId});
 
+            utils.span("do_sync|sync_rooms|decrypt_critical_events", true, {room_id: room.roomId});
             // Decrypt only the last message in all rooms to make sure we can generate a preview
             // And decrypt all events after the recorded read receipt to ensure an accurate
             // notification count
             room.decryptCriticalEvents();
+            utils.span("do_sync|sync_rooms|decrypt_critical_events", false, {room_id: room.roomId});
         });
 
-        // Handle leaves (e.g. kicked rooms)
-        await utils.promiseMapSeries(leaveRooms, async (leaveObj) => {
-            const room = leaveObj.room;
-            const stateEvents = this.mapSyncEventsFormat(leaveObj.state, room);
-            const events = this.mapSyncEventsFormat(leaveObj.timeline, room);
-            const accountDataEvents = this.mapSyncEventsFormat(leaveObj.account_data);
+        if (leaveRooms.length > 0) {
+            utils.span("do_sync|sync_leave_rooms", false, {num_rooms: leaveRooms.length});
+            // Handle leaves (e.g. kicked rooms)
+            await utils.promiseMapSeries(leaveRooms, async (leaveObj) => {
+                const room = leaveObj.room;
+                const stateEvents = this.mapSyncEventsFormat(leaveObj.state, room);
+                const events = this.mapSyncEventsFormat(leaveObj.timeline, room);
+                const accountDataEvents = this.mapSyncEventsFormat(leaveObj.account_data);
 
-            await this.processRoomEvents(room, stateEvents, events);
-            room.addAccountData(accountDataEvents);
+                await this.processRoomEvents(room, stateEvents, events);
+                room.addAccountData(accountDataEvents);
 
-            room.recalculate();
-            if (leaveObj.isBrandNewRoom) {
-                client.store.storeRoom(room);
-                client.emit(ClientEvent.Room, room);
-            }
+                room.recalculate();
+                if (leaveObj.isBrandNewRoom) {
+                    client.store.storeRoom(room);
+                    client.emit(ClientEvent.Room, room);
+                }
 
-            this.processEventsForNotifs(room, events);
+                this.processEventsForNotifs(room, events);
 
-            stateEvents.forEach(function(e) {
-                client.emit(ClientEvent.Event, e);
+                stateEvents.forEach(function(e) {
+                    client.emit(ClientEvent.Event, e);
+                });
+                events.forEach(function(e) {
+                    client.emit(ClientEvent.Event, e);
+                });
+                accountDataEvents.forEach(function(e) {
+                    client.emit(ClientEvent.Event, e);
+                });
             });
-            events.forEach(function(e) {
-                client.emit(ClientEvent.Event, e);
-            });
-            accountDataEvents.forEach(function(e) {
-                client.emit(ClientEvent.Event, e);
-            });
-        });
+            utils.span("do_sync|sync_leave_rooms", true);
+        }
+
+        utils.span("do_sync|sync_rooms", true);
 
         // update the notification timeline, if appropriate.
         // we only do this for live events, as otherwise we can't order them sanely
@@ -1438,18 +1487,22 @@ export class SyncApi {
         // XXX: we could fix this by making EventTimeline support chronological
         // ordering... but it doesn't, right now.
         if (syncEventData.oldSyncToken && this.notifEvents.length) {
+            utils.span("do_sync|sync_notif_timeline", false, {num_events: this.notifEvents.length});
             this.notifEvents.sort(function(a, b) {
                 return a.getTs() - b.getTs();
             });
             this.notifEvents.forEach(function(event) {
                 client.getNotifTimelineSet().addLiveEvent(event);
             });
+            utils.span("do_sync|sync_notif_timeline", true);
         }
 
         // Handle device list updates
         if (data.device_lists) {
             if (this.opts.crypto) {
+                utils.span("do_sync|sync_device_lists", false, {changed: data.device_lists.changed.length, left: data.device_lists.left.length});
                 await this.opts.crypto.handleDeviceListChanges(syncEventData, data.device_lists);
+                utils.span("do_sync|sync_device_lists", true);
             } else {
                 // FIXME if we *don't* have a crypto module, we still need to
                 // invalidate the device lists. But that would require a
@@ -1458,6 +1511,7 @@ export class SyncApi {
         }
 
         // Handle one_time_keys_count
+        utils.span("do_sync|sync_crypto_otk_keys");
         if (this.opts.crypto && data.device_one_time_keys_count) {
             const currentCount = data.device_one_time_keys_count.signed_curve25519 || 0;
             this.opts.crypto.updateOneTimeKeyCount(currentCount);
@@ -1475,6 +1529,7 @@ export class SyncApi {
                 !unusedFallbackKeys.includes("signed_curve25519"),
             );
         }
+        utils.span("do_sync|sync_crypto_otk_keys", true);
     }
 
     /**
@@ -1666,6 +1721,7 @@ export class SyncApi {
         // the given state events
         const liveTimeline = room.getLiveTimeline();
         const timelineWasEmpty = liveTimeline.getEvents().length == 0;
+        utils.span("do_sync|sync_rooms|sync_process_room_events", false, {empty_timeline: timelineWasEmpty, room_id: room.roomId});
         if (timelineWasEmpty) {
             // Passing these events into initialiseState will freeze them, so we need
             // to compute and cache the push actions for them now, otherwise sync dies
@@ -1723,6 +1779,7 @@ export class SyncApi {
             timelineWasEmpty,
         });
         this.client.processBeaconEvents(room, timelineEventList);
+        utils.span("do_sync|sync_rooms|sync_process_room_events", true, {room_id: room.roomId});
     }
 
     /**
