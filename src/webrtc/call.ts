@@ -93,10 +93,20 @@ interface AssertedIdentity {
     displayName: string;
 }
 
+enum MediaType {
+    AUDIO = "audio",
+    VIDEO = "video",
+}
+
+enum CodecName {
+    OPUS = "opus",
+    // add more as needed
+}
+
 // Used internally to specify modifications to codec parameters in SDP
 interface CodecParamsMod {
-    mediaType: string;
-    codec: string;
+    mediaType: MediaType;
+    codec: CodecName;
     enableDtx?: boolean; // true to enable discontinuous transmission, false to disable, undefined to leave as-is
     maxAverageBitrate?: number; // sets the max average bitrate, or undefined to leave as-is
 }
