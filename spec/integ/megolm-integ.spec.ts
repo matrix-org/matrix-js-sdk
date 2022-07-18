@@ -981,65 +981,68 @@ describe("megolm", () => {
         expect(decryptedEvent.getClearContent()).toBeUndefined();
     });
 
-    it("should re-insert room IDs when decrypting bundled redaction events", async () => {
-        await aliceTestClient.start();
-        const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
-        const groupSession = new Olm.OutboundGroupSession();
-        groupSession.create();
+    it(
+        "should successfully decrypt bundled redaction events that don't include a room_id in their /sync data",
+        async () => {
+            await aliceTestClient.start();
+            const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
+            const groupSession = new Olm.OutboundGroupSession();
+            groupSession.create();
 
-        // make the room_key event
-        const roomKeyEncrypted = encryptGroupSessionKey({
-            senderKey: testSenderKey,
-            recipient: aliceTestClient,
-            p2pSession: p2pSession,
-            groupSession: groupSession,
-            room_id: ROOM_ID,
-        });
-
-        // encrypt a message with the group session
-        const messageEncrypted = encryptMegolmEvent({
-            senderKey: testSenderKey,
-            groupSession: groupSession,
-            room_id: ROOM_ID,
-        });
-
-        const redactionEncrypted = encryptMegolmEvent({
-            senderKey: testSenderKey,
-            groupSession: groupSession,
-            plaintext: {
+            // make the room_key event
+            const roomKeyEncrypted = encryptGroupSessionKey({
+                senderKey: testSenderKey,
+                recipient: aliceTestClient,
+                p2pSession: p2pSession,
+                groupSession: groupSession,
                 room_id: ROOM_ID,
-                type: "m.room.redaction",
-                redacts: messageEncrypted.event_id,
-                content: { reason: "redaction test" },
-            },
-        });
+            });
 
-        const messageEncryptedWithRedaction = {
-            ...messageEncrypted,
-            unsigned: { redacted_because: redactionEncrypted },
-        };
+            // encrypt a message with the group session
+            const messageEncrypted = encryptMegolmEvent({
+                senderKey: testSenderKey,
+                groupSession: groupSession,
+                room_id: ROOM_ID,
+            });
 
-        const syncResponse = {
-            next_batch: 1,
-            to_device: {
-                events: [roomKeyEncrypted],
-            },
-            rooms: {
-                join: {
-                    [ROOM_ID]: { timeline: { events: [messageEncryptedWithRedaction] } },
+            const redactionEncrypted = encryptMegolmEvent({
+                senderKey: testSenderKey,
+                groupSession: groupSession,
+                plaintext: {
+                    room_id: ROOM_ID,
+                    type: "m.room.redaction",
+                    redacts: messageEncrypted.event_id,
+                    content: { reason: "redaction test" },
                 },
-            },
-        };
+            });
 
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
-        await aliceTestClient.flushSync();
+            const messageEncryptedWithRedaction = {
+                ...messageEncrypted,
+                unsigned: { redacted_because: redactionEncrypted },
+            };
 
-        const room = aliceTestClient.client.getRoom(ROOM_ID);
-        const event = room.getLiveTimeline().getEvents()[0];
-        expect(event.isEncrypted()).toBe(true);
-        await event.attemptDecryption(aliceTestClient.client.crypto);
-        expect(event.getContent()).toEqual({});
-        const redactionEvent: any = event.getRedactionEvent();
-        expect(redactionEvent.content.reason).toEqual("redaction test");
-    });
+            const syncResponse = {
+                next_batch: 1,
+                to_device: {
+                    events: [roomKeyEncrypted],
+                },
+                rooms: {
+                    join: {
+                        [ROOM_ID]: { timeline: { events: [messageEncryptedWithRedaction] } },
+                    },
+                },
+            };
+
+            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
+            await aliceTestClient.flushSync();
+
+            const room = aliceTestClient.client.getRoom(ROOM_ID);
+            const event = room.getLiveTimeline().getEvents()[0];
+            expect(event.isEncrypted()).toBe(true);
+            await event.attemptDecryption(aliceTestClient.client.crypto);
+            expect(event.getContent()).toEqual({});
+            const redactionEvent: any = event.getRedactionEvent();
+            expect(redactionEvent.content.reason).toEqual("redaction test");
+        },
+    );
 });
