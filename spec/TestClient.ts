@@ -23,7 +23,6 @@ import MockHttpBackend from 'matrix-mock-request';
 
 import { LocalStorageCryptoStore } from '../src/crypto/store/localStorage-crypto-store';
 import { logger } from '../src/logger';
-import { WebStorageSessionStore } from "../src/store/session/webstorage";
 import { syncPromise } from "./test-utils/test-utils";
 import { createClient } from "../src/matrix";
 import { ICreateClientOpts, IDownloadKeyResult, MatrixClient, PendingEventOrdering } from "../src/client";
@@ -40,8 +39,8 @@ import { IKeysUploadResponse, IUploadKeysRequest } from '../src/client';
 export class TestClient {
     public readonly httpBackend: MockHttpBackend;
     public readonly client: MatrixClient;
-    private deviceKeys: IDeviceKeys;
-    private oneTimeKeys: Record<string, IOneTimeKey>;
+    public deviceKeys: IDeviceKeys;
+    public oneTimeKeys: Record<string, IOneTimeKey>;
 
     constructor(
         public readonly userId?: string,
@@ -53,7 +52,6 @@ export class TestClient {
         if (sessionStoreBackend === undefined) {
             sessionStoreBackend = new MockStorageApi();
         }
-        const sessionStore = new WebStorageSessionStore(sessionStoreBackend);
 
         this.httpBackend = new MockHttpBackend();
 
@@ -62,7 +60,6 @@ export class TestClient {
             userId: userId,
             accessToken: accessToken,
             deviceId: deviceId,
-            sessionStore: sessionStore,
             request: this.httpBackend.requestFn as IHttpOpts["request"],
             ...options,
         };
@@ -238,5 +235,9 @@ export class TestClient {
 
     public isFallbackICEServerAllowed(): boolean {
         return true;
+    }
+
+    public getUserId(): string {
+        return this.userId;
     }
 }

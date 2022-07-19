@@ -16,7 +16,6 @@ concurrency: ${{ github.workflow }}-${{ github.event.pull_request.head.ref }}
 jobs:
   changelog:
     name: Preview Changelog
-    if: github.event.action != 'synchronize'
     runs-on: ubuntu-latest
     steps:
       - uses: matrix-org/allchange@main
@@ -31,7 +30,7 @@ jobs:
       pull-requests: read
     steps:
       - name: Add notice
-        uses: actions/github-script@v5
+        uses: actions/github-script@v6
         if: contains(github.event.pull_request.labels.*.name, 'X-Blocked')
         with:
           script: |
@@ -53,7 +52,7 @@ jobs:
 
       - name: Add label
         if: ${{ steps.teams.outputs.isTeamMember == 'false' }}
-        uses: actions/github-script@v5
+        uses: actions/github-script@v6
         with:
           script: |
             github.rest.issues.addLabels({
@@ -72,7 +71,7 @@ jobs:
       github.event.pull_request.head.repo.full_name != github.repository
     steps:
       - name: Close pull request
-        uses: actions/github-script@v5
+        uses: actions/github-script@v6
         with:
           script: |
             github.rest.issues.createComment({

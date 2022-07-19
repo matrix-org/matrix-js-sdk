@@ -27,11 +27,19 @@ describe("MatrixClient", function() {
     let store = null;
     const userId = "@alice:localhost";
     const accessToken = "aseukfgwef";
+    const idServerDomain = "identity.localhost"; // not a real server
+    const identityAccessToken = "woop-i-am-a-secret";
 
     beforeEach(function() {
         store = new MemoryStore();
 
-        const testClient = new TestClient(userId, "aliceDevice", accessToken, undefined, { store });
+        const testClient = new TestClient(userId, "aliceDevice", accessToken, undefined, {
+            store,
+            identityServer: {
+                getAccessToken: () => Promise.resolve(identityAccessToken),
+            },
+            idBaseUrl: `https://${idServerDomain}`,
+        });
         httpBackend = testClient.httpBackend;
         client = testClient.client;
     });
@@ -993,7 +1001,7 @@ describe("MatrixClient", function() {
             };
 
             httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-                versions: ["r0.5.0"],
+                versions: ["r0.6.0"],
             });
 
             const prom = client.requestRegisterEmailToken("bob@email", "secret", 1);
@@ -1004,6 +1012,64 @@ describe("MatrixClient", function() {
                     send_attempt: 1,
                 });
             }).respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("inviteByThreePid", () => {
+        it("should supply an id_access_token", async () => {
+            const targetEmail = "gerald@example.org";
+
+            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
+                versions: ["r0.6.0"],
+            });
+
+            httpBackend.when("POST", "/invite").check(req => {
+                expect(req.data).toStrictEqual({
+                    id_server: idServerDomain,
+                    id_access_token: identityAccessToken,
+                    medium: "email",
+                    address: targetEmail,
+                });
+            }).respond(200, {});
+
+            const prom = client.inviteByThreePid("!room:example.org", "email", targetEmail);
+            await httpBackend.flush();
+            await prom; // returns empty object, so no validation needed
+        });
+    });
+
+    describe("createRoom", () => {
+        it("should populate id_access_token on 3pid invites", async () => {
+            const targetEmail = "gerald@example.org";
+            const response = {
+                room_id: "!room:localhost",
+            };
+            const input = {
+                invite_3pid: [{
+                    // we intentionally exclude the access token here, so it can be populated for us
+                    id_server: idServerDomain,
+                    medium: "email",
+                    address: targetEmail,
+                }],
+            };
+
+            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
+                versions: ["r0.6.0"],
+            });
+
+            httpBackend.when("POST", "/createRoom").check(req => {
+                expect(req.data).toMatchObject({
+                    invite_3pid: expect.arrayContaining([{
+                        ...input.invite_3pid[0],
+                        id_access_token: identityAccessToken,
+                    }]),
+                });
+                expect(req.data.invite_3pid.length).toBe(1);
+            }).respond(200, response);
+
+            const prom = client.createRoom(input);
             await httpBackend.flush();
             expect(await prom).toStrictEqual(response);
         });

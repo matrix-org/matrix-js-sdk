@@ -5,6 +5,8 @@ on:
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 jobs:
   notify-downstream:
+    # Only respect triggers from our develop branch, ignore that of forks
+    if: github.repository == 'matrix-org/matrix-js-sdk'
     continue-on-error: true
     strategy:
       fail-fast: false
@@ -18,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Notify matrix-react-sdk repo that a new SDK build is on develop so it can CI against it
-        uses: peter-evans/repository-dispatch@v1
+        uses: peter-evans/repository-dispatch@v2
         with:
           token: ${{ secrets.ELEMENT_BOT_TOKEN }}
           repository: ${{ matrix.repo }}

@@ -168,7 +168,6 @@ import {
 import { IAbortablePromise, IdServerUnbindResult, IImageInfo, Preset, Visibility } from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
 import { randomString } from "./randomstring";
-import { WebStorageSessionStore } from "./store/session/webstorage";
 import { BackupManager, IKeyBackup, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE, MSC3089TreeSpace } from "./models/MSC3089TreeSpace";
 import { ISignatures } from "./@types/signed";
@@ -191,11 +190,12 @@ import { MediaHandler } from "./webrtc/mediaHandler";
 import { IRefreshTokenResponse } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { ReceiptType } from "./@types/read_receipts";
+import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync";
+import { SlidingSyncSdk } from "./sliding-sync-sdk";
 import { Thread, THREAD_RELATION_TYPE } from "./models/thread";
 import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
 
 export type Store = IStore;
-export type SessionStore = WebStorageSessionStore;
 
 export type Callback<T = any> = (err: Error | any | null, data?: T) => void;
 export type ResetTimelineCallback = (roomId: string) => boolean;
@@ -315,14 +315,6 @@ export interface ICreateClientOpts {
      */
     pickleKey?: string;
 
-    /**
-     * A store to be used for end-to-end crypto session data. Most data has been
-     * migrated out of here to `cryptoStore` instead. If not specified,
-     * end-to-end crypto will be disabled. The `createClient` helper
-     * _will not_ create this store at the moment.
-     */
-    sessionStore?: SessionStore;
-
     verificationMethods?: Array<VerificationMethod>;
 
     /**
@@ -421,6 +413,11 @@ export interface IStartClientOpts {
      * @experimental
      */
     experimentalThreadSupport?: boolean;
+
+    /**
+     * @experimental
+     */
+     slidingSync?: SlidingSync;
 }
 
 export interface IStoredClientOpts extends IStartClientOpts {
@@ -433,15 +430,9 @@ export enum RoomVersionStability {
     Unstable = "unstable",
 }
 
-export interface IRoomCapability { // MSC3244
-    preferred: string | null;
-    support: string[];
-}
-
 export interface IRoomVersionsCapability {
     default: string;
     available: Record<string, RoomVersionStability>;
-    "org.matrix.msc3244.room_capabilities"?: Record<string, IRoomCapability>; // MSC3244
 }
 
 export interface ICapability {
@@ -897,7 +888,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public timelineSupport = false;
     public urlPreviewCache: { [key: string]: Promise<IPreviewUrlResponse> } = {};
     public identityServer: IIdentityServerProvider;
-    public sessionStore: SessionStore; // XXX: Intended private, used in code.
     public http: MatrixHttpApi; // XXX: Intended private, used in code.
     public crypto: Crypto; // XXX: Intended private, used in code.
     public cryptoCallbacks: ICryptoCallbacks; // XXX: Intended private, used in code.
@@ -920,7 +910,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected verificationMethods: VerificationMethod[];
     protected fallbackICEServerAllowed = false;
     protected roomList: RoomList;
-    protected syncApi: SyncApi;
+    protected syncApi: SlidingSyncSdk | SyncApi;
     public pushRules: IPushRules;
     protected syncLeftRoomsPromise: Promise<Room[]>;
     protected syncedLeftRooms = false;
@@ -957,6 +947,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.baseUrl = opts.baseUrl;
         this.idBaseUrl = opts.idBaseUrl;
+        this.identityServer = opts.identityServer;
 
         this.usingExternalCrypto = opts.usingExternalCrypto;
         this.store = opts.store || new StubStore();
@@ -1029,7 +1020,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.timelineSupport = Boolean(opts.timelineSupport);
 
         this.cryptoStore = opts.cryptoStore;
-        this.sessionStore = opts.sessionStore;
         this.verificationMethods = opts.verificationMethods;
         this.cryptoCallbacks = opts.cryptoCallbacks || {};
 
@@ -1193,7 +1183,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
             return this.canResetTimelineCallback(roomId);
         };
-        this.syncApi = new SyncApi(this, this.clientOpts);
+        if (this.clientOpts.slidingSync) {
+            this.syncApi = new SlidingSyncSdk(this.clientOpts.slidingSync, this, this.clientOpts);
+        } else {
+            this.syncApi = new SyncApi(this, this.clientOpts);
+        }
         this.syncApi.sync();
 
         if (this.clientOpts.clientWellKnownPollPeriod !== undefined) {
@@ -1415,7 +1409,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @return {?string} MXID for the logged-in user, or null if not logged in
      */
-    public getUserId(): string {
+    public getUserId(): string | null {
         if (this.credentials && this.credentials.userId) {
             return this.credentials.userId;
         }
@@ -1437,7 +1431,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Get the local part of the current user ID e.g. "foo" in "@foo:bar".
      * @return {?string} The user ID localpart or null.
      */
-    public getUserIdLocalpart(): string {
+    public getUserIdLocalpart(): string | null {
         if (this.credentials && this.credentials.userId) {
             return this.credentials.userId.split(":")[0].substring(1);
         }
@@ -1492,7 +1486,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} roomId The room the call is to be placed in.
      * @return {MatrixCall} the call or null if the browser doesn't support calling.
      */
-    public createCall(roomId: string): MatrixCall {
+    public createCall(roomId: string): MatrixCall | null {
         return createNewMatrixCall(this, roomId);
     }
 
@@ -1654,10 +1648,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return;
         }
 
-        if (!this.sessionStore) {
-            // this is temporary, the sessionstore is supposed to be going away
-            throw new Error(`Cannot enable encryption: no sessionStore provided`);
-        }
         if (!this.cryptoStore) {
             // the cryptostore is provided by sdk.createClient, so this shouldn't happen
             throw new Error(`Cannot enable encryption: no cryptoStore provided`);
@@ -1686,8 +1676,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const crypto = new Crypto(
             this,
-            this.sessionStore,
-            userId, this.deviceId,
+            userId,
+            this.deviceId,
             this.store,
             this.cryptoStore,
             this.roomList,
@@ -1804,7 +1794,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @return {module:crypto/deviceinfo} device or null
      */
-    public getStoredDevice(userId: string, deviceId: string): DeviceInfo {
+    public getStoredDevice(userId: string, deviceId: string): DeviceInfo | null {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -3329,7 +3319,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {?User} A user or null if there is no data store or the user does
      * not exist.
      */
-    public getUser(userId: string): User {
+    public getUser(userId: string): User | null {
         return this.store.getUser(userId);
     }
 
@@ -4830,8 +4820,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         };
 
         if (
-            this.identityServer &&
-            this.identityServer.getAccessToken &&
+            this.identityServer?.getAccessToken &&
             await this.doesServerAcceptIdentityAccessToken()
         ) {
             const identityAccessToken = await this.identityServer.getAccessToken();
@@ -5299,15 +5288,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         ];
 
         if (this.supportsExperimentalThreads()) {
-            const { threadId, shouldLiveInRoom } = timelineSet.room.eventShouldLiveIn(event);
-
-            if (!timelineSet.thread && !shouldLiveInRoom) {
-                // Thread response does not belong in this timelineSet
-                return undefined;
-            }
-
-            if (timelineSet.thread?.id !== threadId) {
-                // Event does not belong in this timelineSet
+            if (!timelineSet.canContain(event)) {
                 return undefined;
             }
 
@@ -5904,6 +5885,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // There can be only room-kind push rule per room
         // and its id is the room id.
         if (this.pushRules) {
+            if (!this.pushRules[scope] || !this.pushRules[scope].room) {
+                return;
+            }
             for (let i = 0; i < this.pushRules[scope].room.length; i++) {
                 const rule = this.pushRules[scope].room[i];
                 if (rule.rule_id === roomId) {
@@ -6308,9 +6292,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Get the unix timestamp (in seconds) at which the current
+     * Get the unix timestamp (in milliseconds) at which the current
      * TURN credentials (from getTurnServers) expire
-     * @return {number} The expiry timestamp, in seconds, or null if no credentials
+     * @return {number} The expiry timestamp, in milliseconds, or null if no credentials
      */
     public getTurnServersExpiry(): number | null {
         return this.turnServersExpiry;
@@ -6830,7 +6814,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Get the access token associated with this account.
      * @return {?String} The access_token or null
      */
-    public getAccessToken(): string {
+    public getAccessToken(): string | null {
         return this.http.opts.accessToken || null;
     }
 
@@ -7226,8 +7210,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             .filter(i => !i.id_access_token);
         if (
             invitesNeedingToken.length > 0 &&
-            this.identityServer &&
-            this.identityServer.getAccessToken &&
+            this.identityServer?.getAccessToken &&
             await this.doesServerAcceptIdentityAccessToken()
         ) {
             const identityAccessToken = await this.identityServer.getAccessToken();
@@ -8922,7 +8905,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} roomId The room ID to get a tree space reference for.
      * @returns {MSC3089TreeSpace} The tree space, or null if not a tree space.
      */
-    public unstableGetFileTreeSpace(roomId: string): MSC3089TreeSpace {
+    public unstableGetFileTreeSpace(roomId: string): MSC3089TreeSpace | null {
         const room = this.getRoom(roomId);
         if (room?.getMyMembership() !== 'join') return null;
 
@@ -8937,6 +8920,41 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (createEvent.getContent()?.[RoomCreateTypeField] !== RoomType.Space) return null;
 
         return new MSC3089TreeSpace(this, roomId);
+    }
+
+    /**
+     * Perform a single MSC3575 sliding sync request.
+     * @param {MSC3575SlidingSyncRequest} req The request to make.
+     * @param {string} proxyBaseUrl The base URL for the sliding sync proxy.
+     * @returns {MSC3575SlidingSyncResponse} The sliding sync response, or a standard error.
+     * @throws on non 2xx status codes with an object with a field "httpStatus":number.
+     */
+    public slidingSync(
+        req: MSC3575SlidingSyncRequest, proxyBaseUrl?: string,
+    ): IAbortablePromise<MSC3575SlidingSyncResponse> {
+        const qps: Record<string, any> = {};
+        if (req.pos) {
+            qps.pos = req.pos;
+            delete req.pos;
+        }
+        if (req.timeout) {
+            qps.timeout = req.timeout;
+            delete req.timeout;
+        }
+        const clientTimeout = req.clientTimeout;
+        delete req.clientTimeout;
+        return this.http.authedRequest<MSC3575SlidingSyncResponse>(
+            undefined,
+            Method.Post,
+            "/sync",
+            qps,
+            req,
+            {
+                prefix: "/_matrix/client/unstable/org.matrix.msc3575",
+                baseUrl: proxyBaseUrl,
+                localTimeoutMs: clientTimeout,
+            },
+        );
     }
 
     /**
@@ -8968,12 +8986,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     public processBeaconEvents(
-        room: Room,
+        room?: Room,
         events?: MatrixEvent[],
     ): void {
-        if (!events?.length) {
-            return;
-        }
+        if (!events?.length) return;
+        if (!room) return;
+
         room.currentState.processBeaconEvents(events, this);
     }
 

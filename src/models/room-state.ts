@@ -370,7 +370,6 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         });
 
         this.onBeaconLivenessChange();
-
         // update higher level data structures. This needs to be done AFTER the
         // core event dict as these structures may depend on other state events in
         // the given array (e.g. disambiguating display names in one go to do both
@@ -401,7 +400,6 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
                 const member = this.getOrCreateMember(userId, event);
                 member.setMembershipEvent(event, this);
-
                 this.updateMember(member);
                 this.emit(RoomStateEvent.Members, event, this, member);
             } else if (event.getType() === EventType.RoomPowerLevels) {

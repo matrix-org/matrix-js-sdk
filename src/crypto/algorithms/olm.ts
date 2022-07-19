@@ -52,7 +52,7 @@ interface IMessage {
  */
 class OlmEncryption extends EncryptionAlgorithm {
     private sessionPrepared = false;
-    private prepPromise: Promise<void> = null;
+    private prepPromise: Promise<void> | null = null;
 
     /**
      * @private
@@ -117,11 +117,11 @@ class OlmEncryption extends EncryptionAlgorithm {
             ciphertext: {},
         };
 
-        const promises = [];
+        const promises: Promise<void>[] = [];
 
         for (let i = 0; i < users.length; ++i) {
             const userId = users[i];
-            const devices = this.crypto.getStoredDevicesForUser(userId);
+            const devices = this.crypto.getStoredDevicesForUser(userId) || [];
 
             for (let j = 0; j < devices.length; ++j) {
                 const deviceInfo = devices[j];
@@ -240,7 +240,7 @@ class OlmDecryption extends DecryptionAlgorithm {
             throw new DecryptionError(
                 "OLM_BAD_ROOM",
                 "Message intended for room " + payload.room_id, {
-                    reported_room: event.getRoomId(),
+                    reported_room: event.getRoomId() || "ROOM_ID_UNDEFINED",
                 },
             );
         }

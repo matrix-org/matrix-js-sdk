@@ -57,7 +57,7 @@ import { RelationsContainer } from "./relations-container";
 // room versions which are considered okay for people to run without being asked
 // to upgrade (ie: "stable"). Eventually, we should remove these when all homeservers
 // return an m.room_versions capability.
-const KNOWN_SAFE_ROOM_VERSION = '9';
+export const KNOWN_SAFE_ROOM_VERSION = '9';
 const SAFE_ROOM_VERSIONS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: ReceiptType): MatrixEvent {
@@ -368,18 +368,16 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
 
         if (this.opts.pendingEventOrdering === PendingEventOrdering.Detached) {
             this.pendingEventList = [];
-            const serializedPendingEventList = client.sessionStore.store.getItem(pendingEventsKey(this.roomId));
-            if (serializedPendingEventList) {
-                JSON.parse(serializedPendingEventList)
-                    .forEach(async (serializedEvent: Partial<IEvent>) => {
-                        const event = new MatrixEvent(serializedEvent);
-                        if (event.getType() === EventType.RoomMessageEncrypted) {
-                            await event.attemptDecryption(this.client.crypto);
-                        }
-                        event.setStatus(EventStatus.NOT_SENT);
-                        this.addPendingEvent(event, event.getTxnId());
-                    });
-            }
+            this.client.store.getPendingEvents(this.roomId).then(events => {
+                events.forEach(async (serializedEvent: Partial<IEvent>) => {
+                    const event = new MatrixEvent(serializedEvent);
+                    if (event.getType() === EventType.RoomMessageEncrypted) {
+                        await event.attemptDecryption(this.client.crypto);
+                    }
+                    event.setStatus(EventStatus.NOT_SENT);
+                    this.addPendingEvent(event, event.getTxnId());
+                });
+            });
         }
 
         // awaited by getEncryptionTargetMembers while room members are loading
@@ -1919,6 +1917,27 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         // If any pending visibility change is waiting for this (older) event,
         this.applyPendingVisibilityEvents(event);
 
+        // Sliding Sync modifications:
+        // The proxy cannot guarantee every sent event will have a transaction_id field, so we need
+        // to check the event ID against the list of pending events if there is no transaction ID
+        // field. Only do this for events sent by us though as it's potentially expensive to loop
+        // the pending events map.
+        const txnId = event.getUnsigned().transaction_id;
+        if (!txnId && event.getSender() === this.myUserId) {
+            // check the txn map for a matching event ID
+            for (const tid in this.txnToEvent) {
+                const localEvent = this.txnToEvent[tid];
+                if (localEvent.getId() === event.getId()) {
+                    logger.debug("processLiveEvent: found sent event without txn ID: ", tid, event.getId());
+                    // update the unsigned field so we can re-use the same codepaths
+                    const unsigned = event.getUnsigned();
+                    unsigned.transaction_id = tid;
+                    event.setUnsigned(unsigned);
+                    break;
+                }
+            }
+        }
+
         if (event.getUnsigned().transaction_id) {
             const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id];
             if (existingEvent) {
@@ -2075,15 +2094,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 return isEventEncrypted || !isRoomEncrypted;
             });
 
-            const { store } = this.client.sessionStore;
-            if (this.pendingEventList.length > 0) {
-                store.setItem(
-                    pendingEventsKey(this.roomId),
-                    JSON.stringify(pendingEvents),
-                );
-            } else {
-                store.removeItem(pendingEventsKey(this.roomId));
-            }
+            this.client.store.setPendingEvents(this.roomId, pendingEvents);
         }
     }
 
@@ -2183,7 +2194,22 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             const timeline = this.getTimelineForEvent(newEventId);
             if (timeline) {
                 // we've already received the event via the event stream.
-                // nothing more to do here.
+                // nothing more to do here, assuming the transaction ID was correctly matched.
+                // Let's check that.
+                const remoteEvent = this.findEventById(newEventId);
+                const remoteTxnId = remoteEvent.getUnsigned().transaction_id;
+                if (!remoteTxnId) {
+                    // This code path is mostly relevant for the Sliding Sync proxy.
+                    // The remote event did not contain a transaction ID, so we did not handle
+                    // the remote echo yet. Handle it now.
+                    const unsigned = remoteEvent.getUnsigned();
+                    unsigned.transaction_id = event.getTxnId();
+                    remoteEvent.setUnsigned(unsigned);
+                    // the remote event is _already_ in the timeline, so we need to remove it so
+                    // we can convert the local event into the final event.
+                    this.removeEvent(remoteEvent.getId());
+                    this.handleRemoteEcho(remoteEvent, event);
+                }
                 return;
             }
         }
@@ -3110,14 +3136,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
         event.applyVisibilityEvent(visibilityChange);
     }
-}
-
-/**
- * @param {string} roomId ID of the current room
- * @returns {string} Storage key to retrieve pending events
- */
-function pendingEventsKey(roomId: string): string {
-    return `mx_pending_events_${roomId}`;
 }
 
 // a map from current event status to a list of allowed next statuses

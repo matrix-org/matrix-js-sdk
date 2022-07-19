@@ -1,5 +1,21 @@
+/*
+Copyright 2022 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 import * as utils from "../test-utils/test-utils";
-import { EventTimeline, Filter, MatrixEvent } from "../../src/matrix";
+import { ClientEvent, EventTimeline, Filter, IEvent, MatrixClient, MatrixEvent, Room } from "../../src/matrix";
 import { logger } from "../../src/logger";
 import { TestClient } from "../TestClient";
 import { Thread, THREAD_RELATION_TYPE } from "../../src/models/thread";
@@ -10,8 +26,14 @@ const accessToken = "aseukfgwef";
 const roomId = "!foo:bar";
 const otherUserId = "@bob:localhost";
 
+const withoutRoomId = (e: Partial<IEvent>): Partial<IEvent> => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { room_id: _, ...copy } = e;
+    return copy;
+};
+
 const USER_MEMBERSHIP_EVENT = utils.mkMembership({
-    room: roomId, mship: "join", user: userId, name: userName,
+    room: roomId, mship: "join", user: userId, name: userName, event: false,
 });
 
 const ROOM_NAME_EVENT = utils.mkEvent({
@@ -19,34 +41,37 @@ const ROOM_NAME_EVENT = utils.mkEvent({
     content: {
         name: "Old room name",
     },
+    event: false,
 });
 
 const INITIAL_SYNC_DATA = {
     next_batch: "s_5_3",
     rooms: {
         join: {
-            "!foo:bar": {  // roomId
+            [roomId]: {
                 timeline: {
                     events: [
                         utils.mkMessage({
-                            room: roomId, user: otherUserId, msg: "hello",
+                            user: otherUserId, msg: "hello", event: false,
                         }),
                     ],
                     prev_batch: "f_1_1",
                 },
                 state: {
                     events: [
-                        ROOM_NAME_EVENT,
+                        withoutRoomId(ROOM_NAME_EVENT),
                         utils.mkMembership({
-                            room: roomId, mship: "join",
+                            mship: "join",
                             user: otherUserId, name: "Bob",
+                            event: false,
                         }),
-                        USER_MEMBERSHIP_EVENT,
+                        withoutRoomId(USER_MEMBERSHIP_EVENT),
                         utils.mkEvent({
-                            type: "m.room.create", room: roomId, user: userId,
+                            type: "m.room.create", user: userId,
                             content: {
                                 creator: userId,
                             },
+                            event: false,
                         }),
                     ],
                 },
@@ -57,23 +82,37 @@ const INITIAL_SYNC_DATA = {
 
 const EVENTS = [
     utils.mkMessage({
-        room: roomId, user: userId, msg: "we",
+        room: roomId, user: userId, msg: "we", event: false,
     }),
     utils.mkMessage({
-        room: roomId, user: userId, msg: "could",
+        room: roomId, user: userId, msg: "could", event: false,
     }),
     utils.mkMessage({
-        room: roomId, user: userId, msg: "be",
+        room: roomId, user: userId, msg: "be", event: false,
     }),
     utils.mkMessage({
-        room: roomId, user: userId, msg: "heroes",
+        room: roomId, user: userId, msg: "heroes", event: false,
     }),
 ];
 
-const THREAD_ROOT = utils.mkMessage({
+const THREAD_ROOT = utils.mkEvent({
     room: roomId,
     user: userId,
-    msg: "thread root",
+    type: "m.room.message",
+    content: {
+        "body": "thread root",
+        "msgtype": "m.text",
+    },
+    unsigned: {
+        "m.relations": {
+            "io.element.thread": {
+                //"latest_event": undefined,
+                "count": 1,
+                "current_user_participated": true,
+            },
+        },
+    },
+    event: false,
 });
 
 const THREAD_REPLY = utils.mkEvent({
@@ -89,10 +128,25 @@ const THREAD_REPLY = utils.mkEvent({
             event_id: THREAD_ROOT.event_id,
         },
     },
+    event: false,
 });
 
+THREAD_ROOT.unsigned["m.relations"]["io.element.thread"].latest_event = THREAD_REPLY;
+
+const SYNC_THREAD_ROOT = withoutRoomId(THREAD_ROOT);
+const SYNC_THREAD_REPLY = withoutRoomId(THREAD_REPLY);
+SYNC_THREAD_ROOT.unsigned = {
+    "m.relations": {
+        "io.element.thread": {
+            "latest_event": SYNC_THREAD_REPLY,
+            "count": 1,
+            "current_user_participated": true,
+        },
+    },
+};
+
 // start the client, and wait for it to initialise
-function startClient(httpBackend, client) {
+function startClient(httpBackend: TestClient["httpBackend"], client: MatrixClient) {
     httpBackend.when("GET", "/versions").respond(200, {});
     httpBackend.when("GET", "/pushrules").respond(200, {});
     httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
@@ -101,8 +155,8 @@ function startClient(httpBackend, client) {
     client.startClient();
 
     // set up a promise which will resolve once the client is initialised
-    const prom = new Promise((resolve) => {
-        client.on("sync", function(state) {
+    const prom = new Promise<void>((resolve) => {
+        client.on(ClientEvent.Sync, function(state) {
             logger.log("sync", state);
             if (state != "SYNCING") {
                 return;
@@ -118,8 +172,8 @@ function startClient(httpBackend, client) {
 }
 
 describe("getEventTimeline support", function() {
-    let httpBackend;
-    let client;
+    let httpBackend: TestClient["httpBackend"];
+    let client: MatrixClient;
 
     beforeEach(function() {
         const testClient = new TestClient(userId, "DEVICE", accessToken);
@@ -162,7 +216,7 @@ describe("getEventTimeline support", function() {
 
     it("scrollback should be able to scroll back to before a gappy /sync", function() {
         // need a client with timelineSupport disabled to make this work
-        let room;
+        let room: Room;
 
         return startClient(httpBackend, client).then(function() {
             room = client.getRoom(roomId);
@@ -174,7 +228,7 @@ describe("getEventTimeline support", function() {
                         "!foo:bar": {
                             timeline: {
                                 events: [
-                                    EVENTS[0],
+                                    withoutRoomId(EVENTS[0]),
                                 ],
                                 prev_batch: "f_1_1",
                             },
@@ -190,7 +244,7 @@ describe("getEventTimeline support", function() {
                         "!foo:bar": {
                             timeline: {
                                 events: [
-                                    EVENTS[1],
+                                    withoutRoomId(EVENTS[1]),
                                 ],
                                 limited: true,
                                 prev_batch: "f_1_2",
@@ -225,8 +279,8 @@ describe("getEventTimeline support", function() {
 });
 
 describe("MatrixClient event timelines", function() {
-    let client = null;
-    let httpBackend = null;
+    let client: MatrixClient;
+    let httpBackend: TestClient["httpBackend"];
 
     beforeEach(function() {
         const testClient = new TestClient(
@@ -245,7 +299,7 @@ describe("MatrixClient event timelines", function() {
     afterEach(function() {
         httpBackend.verifyNoOutstandingExpectation();
         client.stopClient();
-        Thread.setServerSideSupport(false);
+        Thread.setServerSideSupport(false, false);
     });
 
     describe("getEventTimeline", function() {
@@ -293,7 +347,7 @@ describe("MatrixClient event timelines", function() {
                         "!foo:bar": {
                             timeline: {
                                 events: [
-                                    EVENTS[0],
+                                    withoutRoomId(EVENTS[0]),
                                 ],
                                 prev_batch: "f_1_2",
                             },
@@ -328,7 +382,7 @@ describe("MatrixClient event timelines", function() {
                         "!foo:bar": {
                             timeline: {
                                 events: [
-                                    EVENTS[3],
+                                    withoutRoomId(EVENTS[3]),
                                 ],
                                 prev_batch: "f_1_2",
                             },
@@ -351,7 +405,7 @@ describe("MatrixClient event timelines", function() {
                 });
 
             const prom = new Promise((resolve, reject) => {
-                client.on("sync", function() {
+                client.on(ClientEvent.Sync, function() {
                     client.getEventTimeline(timelineSet, EVENTS[2].event_id,
                     ).then(function(tl) {
                         expect(tl.getEvents().length).toEqual(4);
@@ -496,8 +550,9 @@ describe("MatrixClient event timelines", function() {
         });
 
         it("should handle thread replies with server support by fetching a contiguous thread timeline", async () => {
+            // @ts-ignore
             client.clientOpts.experimentalThreadSupport = true;
-            Thread.setServerSideSupport(true);
+            Thread.setServerSideSupport(true, false);
             client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId);
             const thread = room.createThread(THREAD_ROOT.event_id, undefined, [], false);
@@ -540,19 +595,47 @@ describe("MatrixClient event timelines", function() {
             expect(timeline.getEvents().find(e => e.getId() === THREAD_REPLY.event_id)).toBeTruthy();
         });
 
-        it("should return undefined when event is not within a thread but timelineSet is", async () => {
+        it("should return relevant timeline from non-thread timelineSet when asking for the thread root", async () => {
+            // @ts-ignore
             client.clientOpts.experimentalThreadSupport = true;
-            Thread.setServerSideSupport(true);
+            Thread.setServerSideSupport(true, false);
+            client.stopClient(); // we don't need the client to be syncing at this time
+            const room = client.getRoom(roomId);
+            const threadRoot = new MatrixEvent(THREAD_ROOT);
+            const thread = room.createThread(THREAD_ROOT.event_id, threadRoot, [threadRoot], false);
+            const timelineSet = room.getTimelineSets()[0];
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_ROOT.event_id))
+                .respond(200, function() {
+                    return {
+                        start: "start_token0",
+                        events_before: [],
+                        event: THREAD_ROOT,
+                        events_after: [],
+                        end: "end_token0",
+                        state: [],
+                    };
+                });
+
+            const [timeline] = await Promise.all([
+                client.getEventTimeline(timelineSet, THREAD_ROOT.event_id),
+                httpBackend.flushAllExpected(),
+            ]);
+
+            expect(timeline).not.toBe(thread.liveTimeline);
+            expect(timelineSet.getTimelines()).toContain(timeline);
+            expect(timeline.getEvents().find(e => e.getId() === THREAD_ROOT.event_id)).toBeTruthy();
+        });
+
+        it("should return undefined when event is not in the thread that the given timelineSet is representing", () => {
+            // @ts-ignore
+            client.clientOpts.experimentalThreadSupport = true;
+            Thread.setServerSideSupport(true, false);
             client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId);
             const threadRoot = new MatrixEvent(THREAD_ROOT);
             const thread = room.createThread(THREAD_ROOT.event_id, threadRoot, [threadRoot], false);
             const timelineSet = thread.timelineSet;
-
-            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id))
-                .respond(200, function() {
-                    return THREAD_ROOT;
-                });
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(EVENTS[0].event_id))
                 .respond(200, function() {
@@ -566,16 +649,16 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            const timelinePromise = client.getEventTimeline(timelineSet, EVENTS[0].event_id);
-            await httpBackend.flushAllExpected();
-
-            const timeline = await timelinePromise;
-            expect(timeline).toBeUndefined();
+            return Promise.all([
+                expect(client.getEventTimeline(timelineSet, EVENTS[0].event_id)).resolves.toBeUndefined(),
+                httpBackend.flushAllExpected(),
+            ]);
         });
 
-        it("should return undefined when event is within a thread but timelineSet is not", async () => {
+        it("should return undefined when event is within a thread but timelineSet is not", () => {
+            // @ts-ignore
             client.clientOpts.experimentalThreadSupport = true;
-            Thread.setServerSideSupport(true);
+            Thread.setServerSideSupport(true, false);
             client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];
@@ -592,14 +675,14 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            const timelinePromise = client.getEventTimeline(timelineSet, THREAD_REPLY.event_id);
-            await httpBackend.flushAllExpected();
-
-            const timeline = await timelinePromise;
-            expect(timeline).toBeUndefined();
+            return Promise.all([
+                expect(client.getEventTimeline(timelineSet, THREAD_REPLY.event_id)).resolves.toBeUndefined(),
+                httpBackend.flushAllExpected(),
+            ]);
         });
 
         it("should should add lazy loading filter when requested", async () => {
+            // @ts-ignore
             client.clientOpts.lazyLoadMembers = true;
             client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId);
@@ -617,7 +700,7 @@ describe("MatrixClient event timelines", function() {
                 };
             });
             req.check((request) => {
-                expect(request.opts.qs.filter).toEqual(JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER));
+                expect(request.queryParams.filter).toEqual(JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER));
             });
 
             await Promise.all([
@@ -824,7 +907,7 @@ describe("MatrixClient event timelines", function() {
                         "!foo:bar": {
                             timeline: {
                                 events: [
-                                    event,
+                                    withoutRoomId(event),
                                 ],
                                 prev_batch: "f_1_1",
                             },
@@ -902,11 +985,10 @@ describe("MatrixClient event timelines", function() {
 
         // a state event, followed by a redaction thereof
         const event = utils.mkMembership({
-            room: roomId, mship: "join", user: otherUserId,
+            mship: "join", user: otherUserId,
         });
         const redaction = utils.mkEvent({
             type: "m.room.redaction",
-            room_id: roomId,
             sender: otherUserId,
             content: {},
         });
@@ -948,7 +1030,7 @@ describe("MatrixClient event timelines", function() {
                 timeline: {
                     events: [
                         utils.mkMessage({
-                            room: roomId, user: otherUserId, msg: "world",
+                            user: otherUserId, msg: "world",
                         }),
                     ],
                     limited: true,
@@ -966,5 +1048,76 @@ describe("MatrixClient event timelines", function() {
             const tl = room.getLiveTimeline();
             expect(tl.getEvents().length).toEqual(1);
         });
+    });
+
+    it("should re-insert room IDs for bundled thread relation events", async () => {
+        // @ts-ignore
+        client.clientOpts.experimentalThreadSupport = true;
+        Thread.setServerSideSupport(true, false);
+
+        httpBackend.when("GET", "/sync").respond(200, {
+            next_batch: "s_5_4",
+            rooms: {
+                join: {
+                    [roomId]: {
+                        timeline: {
+                            events: [
+                                SYNC_THREAD_ROOT,
+                            ],
+                            prev_batch: "f_1_1",
+                        },
+                    },
+                },
+            },
+        });
+        await Promise.all([httpBackend.flushAllExpected(), utils.syncPromise(client)]);
+
+        const room = client.getRoom(roomId);
+        const thread = room.getThread(THREAD_ROOT.event_id);
+        const timelineSet = thread.timelineSet;
+
+        httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_ROOT.event_id))
+            .respond(200, {
+                start: "start_token",
+                events_before: [],
+                event: THREAD_ROOT,
+                events_after: [],
+                state: [],
+                end: "end_token",
+            });
+        httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
+            encodeURIComponent(THREAD_ROOT.event_id) + "/" +
+            encodeURIComponent(THREAD_RELATION_TYPE.name) + "?limit=20")
+            .respond(200, function() {
+                return {
+                    original_event: THREAD_ROOT,
+                    chunk: [THREAD_REPLY],
+                    // no next batch as this is the oldest end of the timeline
+                };
+            });
+        await Promise.all([
+            client.getEventTimeline(timelineSet, THREAD_ROOT.event_id),
+            httpBackend.flushAllExpected(),
+        ]);
+
+        httpBackend.when("GET", "/sync").respond(200, {
+            next_batch: "s_5_5",
+            rooms: {
+                join: {
+                    [roomId]: {
+                        timeline: {
+                            events: [
+                                SYNC_THREAD_REPLY,
+                            ],
+                            prev_batch: "f_1_2",
+                        },
+                    },
+                },
+            },
+        });
+
+        await Promise.all([httpBackend.flushAllExpected(), utils.syncPromise(client)]);
+
+        expect(thread.liveTimeline.getEvents()[1].event).toEqual(THREAD_REPLY);
     });
 });

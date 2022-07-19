@@ -55,7 +55,7 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
     private _beaconInfo: BeaconInfoState;
     private _isLive: boolean;
     private livenessWatchTimeout: ReturnType<typeof setTimeout>;
-    private _latestLocationState: BeaconLocationState | undefined;
+    private _latestLocationEvent: MatrixEvent | undefined;
 
     constructor(
         private rootEvent: MatrixEvent,
@@ -90,7 +90,11 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
     }
 
     public get latestLocationState(): BeaconLocationState | undefined {
-        return this._latestLocationState;
+        return this._latestLocationEvent && parseBeaconContent(this._latestLocationEvent.getContent());
+    }
+
+    public get latestLocationEvent(): MatrixEvent | undefined {
+        return this._latestLocationEvent;
     }
 
     public update(beaconInfoEvent: MatrixEvent): void {
@@ -168,13 +172,13 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
         const latestLocationEvent = validLocationEvents.sort(sortEventsByLatestContentTimestamp)?.[0];
 
         if (latestLocationEvent) {
-            this._latestLocationState = parseBeaconContent(latestLocationEvent.getContent());
+            this._latestLocationEvent = latestLocationEvent;
             this.emit(BeaconEvent.LocationUpdate, this.latestLocationState);
         }
     }
 
     private clearLatestLocation = () => {
-        this._latestLocationState = undefined;
+        this._latestLocationEvent = undefined;
         this.emit(BeaconEvent.LocationUpdate, this.latestLocationState);
     };
 
@@ -185,8 +189,16 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
 
     private checkLiveness(): void {
         const prevLiveness = this.isLive;
+
+        // element web sets a beacon's start timestamp to the senders local current time
+        // when Alice's system clock deviates slightly from Bob's a beacon Alice intended to be live
+        // may have a start timestamp in the future from Bob's POV
+        // handle this by adding 6min of leniency to the start timestamp when it is in the future
+        const startTimestamp = this._beaconInfo?.timestamp > Date.now() ?
+            this._beaconInfo?.timestamp - 360000 /* 6min */ :
+            this._beaconInfo?.timestamp;
         this._isLive = this._beaconInfo?.live &&
-            isTimestampInDuration(this._beaconInfo?.timestamp, this._beaconInfo?.timeout, Date.now());
+            isTimestampInDuration(startTimestamp, this._beaconInfo?.timeout, Date.now());
 
         if (prevLiveness !== this.isLive) {
             this.emit(BeaconEvent.LivenessChange, this.isLive, this);

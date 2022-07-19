@@ -111,6 +111,7 @@ interface IRequest extends _Request {
 
 interface IRequestOpts<T> {
     prefix?: string;
+    baseUrl?: string;
     localTimeoutMs?: number;
     headers?: Record<string, string>;
     json?: boolean; // defaults to true
@@ -576,6 +577,9 @@ export class MatrixHttpApi {
      * @param {string=} opts.prefix The full prefix to use e.g.
      * "/_matrix/client/v2_alpha". If not specified, uses this.opts.prefix.
      *
+     * @param {string=} opts.baseUrl The alternative base url to use.
+     * If not specified, uses this.opts.baseUrl
+     *
      * @param {Object=} opts.headers map of additional request headers
      *
      * @return {Promise} Resolves to <code>{data: {Object},
@@ -671,7 +675,8 @@ export class MatrixHttpApi {
         opts?: O,
     ): IAbortablePromise<ResponseType<T, O>> {
         const prefix = opts?.prefix ?? this.opts.prefix;
-        const fullUri = this.opts.baseUrl + prefix + path;
+        const baseUrl = opts?.baseUrl ?? this.opts.baseUrl;
+        const fullUri = baseUrl + prefix + path;
 
         return this.requestOtherUrl<T, O>(callback, method, fullUri, queryParams, data, opts);
     }

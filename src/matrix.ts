@@ -41,7 +41,6 @@ export * from "./interactive-auth";
 export * from "./service-types";
 export * from "./store/memory";
 export * from "./store/indexeddb";
-export * from "./store/session/webstorage";
 export * from "./crypto/store/memory-crypto-store";
 export * from "./crypto/store/indexeddb-crypto-store";
 export * from "./content-repo";
