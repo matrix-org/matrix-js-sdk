@@ -99,7 +99,7 @@ export class TimelineWindow {
      *
      * @return {Promise}
      */
-    public load(initialEventId?: string, initialWindowSize = 20): Promise<void> {
+    public async load(initialEventId?: string, initialWindowSize = 20): Promise<void> {
         // given an EventTimeline, find the event we were looking for, and initialise our
         // fields so that the event in question is in the middle of the window.
         const initFields = (timeline: EventTimeline) => {
@@ -135,11 +135,12 @@ export class TimelineWindow {
                 return Promise.resolve();
             }
 
-            return this.client.getEventTimeline(this.timelineSet, initialEventId).then(initFields);
+            await this.client.getEventTimeline(this.timelineSet, initialEventId).then(initFields);
+            return;
         } else {
             const tl = this.timelineSet.getLiveTimeline();
             initFields(tl);
-            return Promise.resolve();
+            return;
         }
     }
 
