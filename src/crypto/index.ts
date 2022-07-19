@@ -2953,6 +2953,30 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         await this.outgoingRoomKeyRequestManager.cancelAndResendAllOutgoingRequests();
     }
 
+    public async onCryptoRoomEncryptionEvents(roomIdToRoomEncryptionEvent: Record<string,MatrixEvent>): Promise<void> {
+        const roomsWhichNeedEncryptionStored: Record<string,IRoomEncryption> = {};
+        for (const roomId in roomIdToRoomEncryptionEvent) {
+            const content = roomIdToRoomEncryptionEvent[roomId].getContent<IRoomEncryption>();
+            if (!content.algorithm) {
+                logger.log("Ignoring setRoomEncryption with no algorithm");
+                continue;
+            }
+            const existingAlg = this.roomEncryptors[roomId];
+            if (existingAlg) {
+                continue;
+            }
+            const existingConfig = this.roomList.getRoomEncryption(roomId);
+            if (!existingConfig) {
+                roomsWhichNeedEncryptionStored[roomId] = content;
+            }
+        }
+        await this.roomList.bulkSetRoomEncryption(roomsWhichNeedEncryptionStored);
+
+        for (const roomId in roomIdToRoomEncryptionEvent) {
+            await this.onCryptoEvent(roomIdToRoomEncryptionEvent[roomId]);
+        }
+    }
+
     /**
      * handle an m.room.encryption event
      *

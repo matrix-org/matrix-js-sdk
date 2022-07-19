@@ -58,6 +58,19 @@ export class RoomList {
         return Boolean(this.getRoomEncryption(roomId));
     }
 
+    public async bulkSetRoomEncryption(idToInfo: Record<string, IRoomEncryption>): Promise<void> {
+        for (const roomId in idToInfo) {
+            this.roomEncryption[roomId] = idToInfo[roomId];
+        }
+        await this.cryptoStore.doTxn(
+            'readwrite', [IndexedDBCryptoStore.STORE_ROOMS], (txn) => {
+                for (const roomId in idToInfo) {
+                    this.cryptoStore.storeEndToEndRoom(roomId, idToInfo[roomId], txn);
+                }
+            },
+        );
+    }
+
     public async setRoomEncryption(roomId: string, roomInfo: IRoomEncryption): Promise<void> {
         // important that this happens before calling into the store
         // as it prevents the Crypto::setRoomEncryption from calling

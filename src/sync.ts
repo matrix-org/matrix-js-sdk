@@ -1300,6 +1300,9 @@ export class SyncApi {
             utils.span("do_sync|sync_rooms|invites", true);
         }
 
+        let roomEncryptionEvents: Record<string, MatrixEvent> = {};
+
+
         // Handle joins
         await utils.promiseMapSeries(joinRooms, async (joinObj) => {
             const room = joinObj.room;
@@ -1418,7 +1421,7 @@ export class SyncApi {
             const processRoomEvent = async (e) => {
                 client.emit(ClientEvent.Event, e);
                 if (e.isState() && e.getType() == "m.room.encryption" && this.opts.crypto) {
-                    await this.opts.crypto.onCryptoEvent(e);
+                    roomEncryptionEvents[e.getRoomId()] = e;
                 }
             };
 
@@ -1438,14 +1441,24 @@ export class SyncApi {
                 client.emit(ClientEvent.Event, e);
             });
             utils.span("do_sync|sync_rooms|sync_process_room_account", true, {room_id: room.roomId});
-
-            utils.span("do_sync|sync_rooms|decrypt_critical_events", false, {room_id: room.roomId});
-            // Decrypt only the last message in all rooms to make sure we can generate a preview
-            // And decrypt all events after the recorded read receipt to ensure an accurate
-            // notification count
-            room.decryptCriticalEvents();
-            utils.span("do_sync|sync_rooms|decrypt_critical_events", true, {room_id: room.roomId});
         });
+
+        // bulk set encrypted rooms then decrypt their critical events
+        await this.opts.crypto.onCryptoRoomEncryptionEvents(roomEncryptionEvents);
+
+
+        // Decrypt only the last message in all rooms to make sure we can generate a preview
+        // And decrypt all events after the recorded read receipt to ensure an accurate
+        // notification count
+        for (const encryptedRoomId in roomEncryptionEvents) {
+            const r = client.store.getRoom(encryptedRoomId);
+            if (!r) {
+                console.error("no room found for " + encryptedRoomId);
+                continue;
+            }
+            r.decryptCriticalEvents();
+        }
+
 
         if (leaveRooms.length > 0) {
             utils.span("do_sync|sync_leave_rooms", false, {num_rooms: leaveRooms.length});
@@ -1501,9 +1514,7 @@ export class SyncApi {
         // Handle device list updates
         if (data.device_lists) {
             if (this.opts.crypto) {
-                utils.span("do_sync|sync_device_lists", false, {changed: data.device_lists.changed.length, left: data.device_lists.left.length});
                 await this.opts.crypto.handleDeviceListChanges(syncEventData, data.device_lists);
-                utils.span("do_sync|sync_device_lists", true);
             } else {
                 // FIXME if we *don't* have a crypto module, we still need to
                 // invalidate the device lists. But that would require a
