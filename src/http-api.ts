@@ -1064,7 +1064,7 @@ interface IErrorJson extends Partial<IUsageLimit> {
  * @constructor
  * @param {Object} errorJson The Matrix error JSON returned from the homeserver.
  * @prop {string} errcode The Matrix 'errcode' value, e.g. "M_FORBIDDEN".
- * @prop {string} unstableErrorCode A possible unstable 'errcode' when a new error code is being introduced to the spec.
+ * @prop {string} unstableErrorCode A possible unstable 'errcode' when a new error code is being introduced to the spec. e.g. "ORG.MATRIX.MSC3848.ALREADY_JOINED"
  * @prop {string} name Same as MatrixError.errcode but with a default unknown string.
  * @prop {string} message The Matrix 'error' value, e.g. "Missing token."
  * @prop {Object} data The raw Matrix error JSON used to construct this object.
