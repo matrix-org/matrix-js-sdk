@@ -1053,6 +1053,8 @@ function getResponseContentType(response: XMLHttpRequest | IncomingMessage): Par
 interface IErrorJson extends Partial<IUsageLimit> {
     [key: string]: any; // extensible
     errcode?: string;
+    // https://github.com/matrix-org/matrix-spec-proposals/pull/3848
+    "org.matrix.unstable.errcode"?: string;
     error?: string;
 }
 
@@ -1062,6 +1064,7 @@ interface IErrorJson extends Partial<IUsageLimit> {
  * @constructor
  * @param {Object} errorJson The Matrix error JSON returned from the homeserver.
  * @prop {string} errcode The Matrix 'errcode' value, e.g. "M_FORBIDDEN".
+ * @prop {string} unstableErrorCode A possible unstable 'errcode' when a new error code is being introduced to the spec.
  * @prop {string} name Same as MatrixError.errcode but with a default unknown string.
  * @prop {string} message The Matrix 'error' value, e.g. "Missing token."
  * @prop {Object} data The raw Matrix error JSON used to construct this object.
@@ -1069,12 +1072,14 @@ interface IErrorJson extends Partial<IUsageLimit> {
  */
 export class MatrixError extends Error {
     public readonly errcode: string;
+    public readonly unstableErrorCode: string;
     public readonly data: IErrorJson;
     public httpStatus?: number; // set by http-api
 
     constructor(errorJson: IErrorJson = {}) {
-        super(`MatrixError: ${errorJson.errcode}`);
+        super(`MatrixError: ${errorJson["org.matrix.unstable.errcode"] ?? errorJson.errcode}`);
         this.errcode = errorJson.errcode;
+        this.unstableErrorCode = errorJson["org.matrix.unstable.errcode"];
         this.name = errorJson.errcode || "Unknown error code";
         this.message = errorJson.error || "Unknown message";
         this.data = errorJson;
