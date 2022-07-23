@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { Stream } from "stream";
+import { setMaxListeners } from "process";
+
 import { SDPStreamMetadataPurpose } from "./callEventTypes";
 import { acquireContext, releaseContext } from "./audioContext";
 import { MatrixClient } from "../client";
@@ -21,7 +24,7 @@ import { RoomMember } from "../models/room-member";
 import { logger } from "../logger";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 
-const POLLING_INTERVAL = 200; // ms
+const POLLING_INTERVAL = 10; // ms
 export const SPEAKING_THRESHOLD = -60; // dB
 const SPEAKING_SAMPLE_COUNT = 8; // samples
 
@@ -51,18 +54,26 @@ export enum CallFeedEvent {
 
 type EventHandlerMap = {
     [CallFeedEvent.NewStream]: (stream: MediaStream) => void;
-    [CallFeedEvent.MuteStateChanged]: (audioMuted: boolean, videoMuted: boolean) => void;
     [CallFeedEvent.LocalVolumeChanged]: (localVolume: number) => void;
+    [CallFeedEvent.MuteStateChanged]: (
+        audioMuted: boolean,
+        videoMuted: boolean
+    ) => void;
     [CallFeedEvent.VolumeChanged]: (volume: number) => void;
     [CallFeedEvent.Speaking]: (speaking: boolean) => void;
 };
 
-export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> {
+export class CallFeed extends TypedEventEmitter<
+    CallFeedEvent,
+    EventHandlerMap
+> {
     public stream: MediaStream;
+    public secondStream: MediaStream;
     public sdpMetadataStreamId: string;
     public userId: string;
     public purpose: SDPStreamMetadataPurpose;
     public speakingVolumeSamples: number[];
+    public voiceActivityTreshold: number;
 
     private client: MatrixClient;
     private roomId: string;
@@ -86,8 +97,11 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.purpose = opts.purpose;
         this.audioMuted = opts.audioMuted;
         this.videoMuted = opts.videoMuted;
-        this.speakingVolumeSamples = new Array(SPEAKING_SAMPLE_COUNT).fill(-Infinity);
+        this.speakingVolumeSamples = new Array(SPEAKING_SAMPLE_COUNT).fill(
+            -Infinity
+        );
         this.sdpMetadataStreamId = opts.stream.id;
+        this.voiceActivityTreshold = -55;
 
         this.updateStream(null, opts.stream);
 
@@ -121,6 +135,26 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.emit(CallFeedEvent.NewStream, this.stream);
     }
 
+    public swapStream(): void {
+        if (this.stream) {
+            this.stream.removeEventListener("addtrack", this.onAddTrack);
+            this.measureVolumeActivity(false);
+        }
+        const bufferStream = this.stream;
+        this.stream = this.secondStream;
+        this.secondStream = bufferStream;
+        if (this.stream) {
+            this.stream.addEventListener("addtrack", this.onAddTrack);
+
+            if (this.hasAudioTrack) {
+                this.initVolumeMeasuring();
+            } else {
+                this.measureVolumeActivity(false);
+            }
+        }
+        this.emit(CallFeedEvent.NewStream, this.stream);
+    }
+
     private initVolumeMeasuring(): void {
         if (!this.hasAudioTrack) return;
         if (!this.audioContext) this.audioContext = acquireContext();
@@ -129,10 +163,14 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.analyser.fftSize = 512;
         this.analyser.smoothingTimeConstant = 0.1;
 
-        const mediaStreamAudioSourceNode = this.audioContext.createMediaStreamSource(this.stream);
+        this.secondStream = this.stream.clone();
+        const mediaStreamAudioSourceNode =
+            this.audioContext.createMediaStreamSource(this.secondStream);
         mediaStreamAudioSourceNode.connect(this.analyser);
 
-        this.frequencyBinCount = new Float32Array(this.analyser.frequencyBinCount);
+        this.frequencyBinCount = new Float32Array(
+            this.analyser.frequencyBinCount
+        );
     }
 
     private onAddTrack = (): void => {
@@ -188,6 +226,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
      */
     public setNewStream(newStream: MediaStream): void {
         this.updateStream(this.stream, newStream);
+        //this.updateStream(this.secondStream, newStream);
     }
 
     /**
@@ -198,12 +237,37 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     public setAudioVideoMuted(audioMuted: boolean, videoMuted: boolean): void {
         if (audioMuted !== null) {
             if (this.audioMuted !== audioMuted) {
-                this.speakingVolumeSamples.fill(-Infinity);
+                //this.speakingVolumeSamples.fill(-Infinity);
             }
             this.audioMuted = audioMuted;
         }
         if (videoMuted !== null) this.videoMuted = videoMuted;
-        this.emit(CallFeedEvent.MuteStateChanged, this.audioMuted, this.videoMuted);
+        this.emit(
+            CallFeedEvent.MuteStateChanged,
+            this.audioMuted,
+            this.videoMuted
+        );
+    }
+
+    /**
+     * Set one or both of feed's internal audio and video video mute state
+     * Either value may be null to leave it as-is
+     * @param muted is the feed's video muted?
+     */
+    public setAudioVideoBelowTreshold(
+        audioMuted: boolean,
+        videoMuted: boolean
+    ): void {
+        if (audioMuted !== null) {
+            if (this.audioMuted !== audioMuted) {
+            }
+            this.audioMuted = audioMuted;
+        }
+        this.emit(
+            CallFeedEvent.MuteStateChanged,
+            this.audioMuted,
+            this.videoMuted
+        );
     }
 
     /**
@@ -212,7 +276,13 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
      */
     public measureVolumeActivity(enabled: boolean): void {
         if (enabled) {
-            if (!this.analyser || !this.frequencyBinCount || !this.hasAudioTrack) return;
+            if (
+                !this.analyser ||
+                !this.frequencyBinCount ||
+                !this.hasAudioTrack
+            ) {
+                return;
+            }
 
             this.measuringVolumeActivity = true;
             this.volumeLooper();
@@ -248,6 +318,10 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
         let newSpeaking = false;
 
+        const gainNode = this.audioContext.createGain();
+        gainNode.gain.value = 0.1;
+        gainNode.connect(this.audioContext.destination);
+
         for (let i = 0; i < this.speakingVolumeSamples.length; i++) {
             const volume = this.speakingVolumeSamples[i];
 
@@ -262,13 +336,28 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
             this.emit(CallFeedEvent.Speaking, this.speaking);
         }
 
-        this.volumeLooperTimeout = setTimeout(this.volumeLooper, POLLING_INTERVAL);
+        // const total = this.speakingVolumeSamples.reduce((a, b) => a + b, 0);
+        // const avg = total / this.speakingVolumeSamples.length;
+        console.log({ maxVolume });
+
+        if (maxVolume > this.voiceActivityTreshold) {
+            this.setAudioVideoMuted(false, false);
+        } else {
+            this.setAudioVideoMuted(true, true);
+        }
+
+        this.volumeLooperTimeout = setTimeout(
+            this.volumeLooper,
+            POLLING_INTERVAL
+        );
     };
 
     public clone(): CallFeed {
         const mediaHandler = this.client.getMediaHandler();
         const stream = this.stream.clone();
-        logger.log(`callFeed cloning stream ${this.stream.id} newStream ${stream.id}`);
+        logger.log(
+            `callFeed cloning stream ${this.stream.id} newStream ${stream.id}`
+        );
 
         if (this.purpose === SDPStreamMetadataPurpose.Usermedia) {
             mediaHandler.userMediaStreams.push(stream);
