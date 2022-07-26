@@ -829,7 +829,6 @@ describe("MegolmDecryption", function() {
         const now = Date.now();
 
         // pretend we got an event that we can't decrypt
-        // @ts-ignore accessing private fn
         aliceEventEmitter.emit(ClientEvent.ToDeviceEvent, new MatrixEvent({
             type: "m.room.encrypted",
             sender: "@bob:example.com",
