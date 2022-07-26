@@ -210,7 +210,7 @@ export interface IEncryptedContent {
 }
 /* eslint-enable camelcase */
 
-interface IEncryptAndSendToDevicesResult {
+export interface IEncryptAndSendToDevicesResult {
     contentMap: Record<string, Record<string, IEncryptedContent>>;
     deviceInfoByUserIdAndDeviceId: Map<string, Map<string, DeviceInfo>>;
 }
