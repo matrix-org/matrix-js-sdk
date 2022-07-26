@@ -1917,6 +1917,27 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         // If any pending visibility change is waiting for this (older) event,
         this.applyPendingVisibilityEvents(event);
 
+        // Sliding Sync modifications:
+        // The proxy cannot guarantee every sent event will have a transaction_id field, so we need
+        // to check the event ID against the list of pending events if there is no transaction ID
+        // field. Only do this for events sent by us though as it's potentially expensive to loop
+        // the pending events map.
+        const txnId = event.getUnsigned().transaction_id;
+        if (!txnId && event.getSender() === this.myUserId) {
+            // check the txn map for a matching event ID
+            for (const tid in this.txnToEvent) {
+                const localEvent = this.txnToEvent[tid];
+                if (localEvent.getId() === event.getId()) {
+                    logger.debug("processLiveEvent: found sent event without txn ID: ", tid, event.getId());
+                    // update the unsigned field so we can re-use the same codepaths
+                    const unsigned = event.getUnsigned();
+                    unsigned.transaction_id = tid;
+                    event.setUnsigned(unsigned);
+                    break;
+                }
+            }
+        }
+
         if (event.getUnsigned().transaction_id) {
             const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id];
             if (existingEvent) {
@@ -2173,7 +2194,22 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             const timeline = this.getTimelineForEvent(newEventId);
             if (timeline) {
                 // we've already received the event via the event stream.
-                // nothing more to do here.
+                // nothing more to do here, assuming the transaction ID was correctly matched.
+                // Let's check that.
+                const remoteEvent = this.findEventById(newEventId);
+                const remoteTxnId = remoteEvent.getUnsigned().transaction_id;
+                if (!remoteTxnId) {
+                    // This code path is mostly relevant for the Sliding Sync proxy.
+                    // The remote event did not contain a transaction ID, so we did not handle
+                    // the remote echo yet. Handle it now.
+                    const unsigned = remoteEvent.getUnsigned();
+                    unsigned.transaction_id = event.getTxnId();
+                    remoteEvent.setUnsigned(unsigned);
+                    // the remote event is _already_ in the timeline, so we need to remove it so
+                    // we can convert the local event into the final event.
+                    this.removeEvent(remoteEvent.getId());
+                    this.handleRemoteEcho(remoteEvent, event);
+                }
                 return;
             }
         }

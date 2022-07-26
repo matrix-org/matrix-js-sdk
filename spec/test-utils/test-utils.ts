@@ -129,6 +129,21 @@ export function mkEvent(opts: IEventOpts & { event?: boolean }, client?: MatrixC
     return opts.event ? new MatrixEvent(event) : event;
 }
 
+type GeneratedMetadata = {
+    event_id: string;
+    txn_id: string;
+    origin_server_ts: number;
+};
+
+export function mkEventCustom<T>(base: T): T & GeneratedMetadata {
+    return {
+        event_id: "$" + testEventIndex++ + "-" + Math.random() + "-" + Math.random(),
+        txn_id: "~" + Math.random(),
+        origin_server_ts: Date.now(),
+        ...base,
+    };
+}
+
 interface IPresenceOpts {
     user?: string;
     sender?: string;
@@ -206,6 +221,18 @@ export function mkMembership(opts: IMembershipOpts & { event?: boolean }): Parti
         eventOpts.content.avatar_url = opts.url;
     }
     return mkEvent(eventOpts);
+}
+
+export function mkMembershipCustom<T>(
+    base: T & { membership: string, sender: string, content?: IContent },
+): T & { type: EventType, sender: string, state_key: string, content: IContent } & GeneratedMetadata {
+    const content = base.content || {};
+    return mkEventCustom({
+        ...base,
+        content: { ...content, membership: base.membership },
+        type: EventType.RoomMember,
+        state_key: base.sender,
+    });
 }
 
 interface IMessageOpts {
