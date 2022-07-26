@@ -1,6 +1,6 @@
 /*
 Copyright 2018,2019 New Vector Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2019, 2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,17 +15,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { MockedObject } from 'jest-mock';
+
 import '../../../olm-loader';
 import { MemoryCryptoStore } from "../../../../src/crypto/store/memory-crypto-store";
-import { MockStorageApi } from "../../../MockStorageApi";
 import { logger } from "../../../../src/logger";
 import { OlmDevice } from "../../../../src/crypto/OlmDevice";
 import * as olmlib from "../../../../src/crypto/olmlib";
 import { DeviceInfo } from "../../../../src/crypto/deviceinfo";
+import { MatrixClient } from '../../../../src';
 
 function makeOlmDevice() {
-    const mockStorage = new MockStorageApi();
-    const cryptoStore = new MemoryCryptoStore(mockStorage);
+    const cryptoStore = new MemoryCryptoStore();
     const olmDevice = new OlmDevice(cryptoStore);
     return olmDevice;
 }
@@ -148,7 +149,7 @@ describe("OlmDevice", function() {
                         setTimeout(reject, 500);
                     });
                 },
-            };
+            } as unknown as MockedObject<MatrixClient>;
             const devicesByUser = {
                 "@bob:example.com": [
                     DeviceInfo.fromStorage({
@@ -205,7 +206,7 @@ describe("OlmDevice", function() {
                         setTimeout(reject, 500);
                     });
                 },
-            };
+            } as unknown as MockedObject<MatrixClient>;
 
             const deviceBobA = DeviceInfo.fromStorage({
                 keys: {
