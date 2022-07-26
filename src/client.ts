@@ -40,9 +40,11 @@ import { sleep } from './utils';
 import { Direction, EventTimeline } from "./models/event-timeline";
 import { IActionsObject, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery";
+import { IEncryptAndSendToDevicesResult } from "./crypto";
 import * as olmlib from "./crypto/olmlib";
 import { decodeBase64, encodeBase64 } from "./crypto/olmlib";
-import { IExportedDevice as IOlmDevice } from "./crypto/OlmDevice";
+import { IExportedDevice as IExportedOlmDevice } from "./crypto/OlmDevice";
+import { IOlmDevice } from "./crypto/algorithms/megolm";
 import { TypedReEmitter } from './ReEmitter';
 import { IRoomEncryption, RoomList } from './crypto/RoomList';
 import { logger } from './logger';
@@ -206,7 +208,7 @@ const CAPABILITIES_CACHE_MS = 21600000; // 6 hours - an arbitrary value
 const TURN_CHECK_INTERVAL = 10 * 60 * 1000; // poll for turn credentials every 10 minutes
 
 interface IExportedDevice {
-    olmDevice: IOlmDevice;
+    olmDevice: IExportedOlmDevice;
     userId: string;
     deviceId: string;
 }
@@ -934,7 +936,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected turnServers: ITurnServer[] = [];
     protected turnServersExpiry = 0;
     protected checkTurnServersIntervalID: ReturnType<typeof setInterval>;
-    protected exportedOlmDeviceToImport: IOlmDevice;
+    protected exportedOlmDeviceToImport: IExportedOlmDevice;
     protected txnCtr = 0;
     protected mediaHandler = new MediaHandler(this);
     protected pendingEventEncryption = new Map<string, Promise<void>>();
@@ -2542,6 +2544,30 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // the server is hiding it from us. Check the store to see if it was
         // previously encrypted.
         return this.roomList.isRoomEncrypted(roomId);
+    }
+
+    /**
+     * Encrypts and sends a given object via Olm to-device messages to a given
+     * set of devices.
+     *
+     * @param {object[]} userDeviceInfoArr
+     *   mapping from userId to deviceInfo
+     *
+     * @param {object} payload fields to include in the encrypted payload
+     *      *
+     * @return {Promise<{contentMap, deviceInfoByDeviceId}>} Promise which
+     *     resolves once the message has been encrypted and sent to the given
+     *     userDeviceMap, and returns the { contentMap, deviceInfoByDeviceId }
+     *     of the successfully sent messages.
+     */
+    public encryptAndSendToDevices(
+        userDeviceInfoArr: IOlmDevice<DeviceInfo>[],
+        payload: object,
+    ): Promise<IEncryptAndSendToDevicesResult> {
+        if (!this.crypto) {
+            throw new Error("End-to-End encryption disabled");
+        }
+        return this.crypto.encryptAndSendToDevices(userDeviceInfoArr, payload);
     }
 
     /**
