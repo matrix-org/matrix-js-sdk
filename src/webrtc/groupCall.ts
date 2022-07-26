@@ -1,7 +1,14 @@
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { CallFeed, SPEAKING_THRESHOLD } from "./callFeed";
 import { MatrixClient } from "../client";
-import { CallErrorCode, CallEvent, CallState, genCallID, MatrixCall, setTracksEnabled } from "./call";
+import { CallErrorCode,
+    CallEvent,
+    CallEventHandlerMap,
+    CallState,
+    genCallID,
+    MatrixCall,
+    setTracksEnabled,
+} from "./call";
 import { RoomMember } from "../models/room-member";
 import { Room } from "../models/room";
 import { logger } from "../logger";
@@ -146,7 +153,10 @@ function getCallUserId(call: MatrixCall): string | null {
     return call.getOpponentMember()?.userId || call.invitee || null;
 }
 
-export class GroupCall extends TypedEventEmitter<GroupCallEvent, GroupCallEventHandlerMap> {
+export class GroupCall extends TypedEventEmitter<
+    GroupCallEvent | CallEvent,
+    GroupCallEventHandlerMap & CallEventHandlerMap
+> {
     // Config
     public activeSpeakerInterval = 1000;
     public retryCallInterval = 5000;
