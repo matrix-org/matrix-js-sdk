@@ -26,6 +26,9 @@ import { logger } from "./logger";
 import { MatrixClient, ClientEvent, IMatrixClientCreateOpts, IStartClientOpts } from "./client";
 import { MatrixEvent } from "./models/event";
 import { Room } from "./models/room";
+import { IEncryptAndSendToDevicesResult } from "./crypto";
+import { DeviceInfo } from "./crypto/deviceinfo";
+import { IOlmDevice } from "./crypto/algorithms/megolm";
 
 interface IStateEventRequest {
     eventType: string;
@@ -121,17 +124,36 @@ export class RoomWidgetClient extends MatrixClient {
         eventType: string,
         contentMap: { [userId: string]: { [deviceId: string]: Record<string, any> } },
     ): Promise<{}> {
-        await this.widgetApi.sendToDevice(eventType, contentMap);
+        await this.widgetApi.sendToDevice(eventType, false, contentMap);
         return {};
     }
 
+    public async encryptAndSendToDevices(
+        userDeviceInfoArr: IOlmDevice<DeviceInfo>[],
+        payload: object,
+    ): Promise<IEncryptAndSendToDevicesResult> {
+        const contentMap: { [userId: string]: { [deviceId: string]: unknown } } = {};
+        for (const { userId, deviceInfo: { deviceId } } of userDeviceInfoArr) {
+            if (!contentMap[userId]) contentMap[userId] = {};
+            contentMap[userId][deviceId] = payload;
+        }
+
+        // Since encryption is handled entirely on the other side of the widget
+        // API, we can't actually return anything useful
+        await this.widgetApi.sendToDevice((payload as { type: string }).type, true, contentMap);
+        return { contentMap: {}, deviceInfoByUserIdAndDeviceId: new Map() };
+    }
+
     private onEvent = async (ev: CustomEvent<ISendEventToWidgetActionRequest>) => {
+        ev.preventDefault();
         const event = new MatrixEvent(ev.detail.data);
         await this.syncApi.injectRoomEvents(this.room, [], [event]);
         this.emit(ClientEvent.Event, event);
         logger.info(`Received event ${event.getId()} ${event.getType()} ${event.getStateKey()}`);
     };
 
-    private onToDevice = (ev: CustomEvent<ISendToDeviceToWidgetActionRequest>) =>
+    private onToDevice = (ev: CustomEvent<ISendToDeviceToWidgetActionRequest>) => {
+        ev.preventDefault();
         this.emit(ClientEvent.ToDeviceEvent, new MatrixEvent(ev.detail.data));
+    };
 }
