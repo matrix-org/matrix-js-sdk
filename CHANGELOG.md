@@ -1,5 +1,5 @@
-Changes in [19.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.1.0-rc.1) (2022-07-12)
-============================================================================================================
+Changes in [19.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.1.0) (2022-07-26)
+==================================================================================================
 
 ## 🦖 Deprecations
  * Remove MSC3244 support ([\#2504](https://github.com/matrix-org/matrix-js-sdk/pull/2504)).
