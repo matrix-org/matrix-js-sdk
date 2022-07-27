@@ -24,12 +24,12 @@ describe("MatrixEvent", () => {
 
         beforeEach(() => {
             encryptedEvent = new MatrixEvent({
+                event_id: eventId,
                 type: 'm.room.encrypted',
                 content: {
                     ciphertext: 'secrets',
                 },
             });
-            encryptedEvent.event.id = eventId;
         });
 
         it('should retry decryption if a retry is queued', async () => {

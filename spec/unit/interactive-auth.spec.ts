@@ -30,7 +30,7 @@ class FakeClient {
     }
 }
 
-const getFakeClient = (): MatrixClient => new FakeClient as unknown as MatrixClient;
+const getFakeClient = (): MatrixClient => new FakeClient() as unknown as MatrixClient;
 
 describe("InteractiveAuth", function() {
     it("should start an auth stage and complete it", function() {
