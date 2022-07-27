@@ -34,7 +34,7 @@ const mockClient = {
  * create a timeline with a bunch (default 3) events.
  * baseIndex is 1 by default.
  */
-function createTimeline(numEvents = 3, baseIndex = 1) {
+function createTimeline(numEvents = 3, baseIndex = 1): EventTimeline {
     const room = new Room(ROOM_ID, mockClient, USER_ID);
     const timelineSet = new EventTimelineSet(room);
     jest.spyOn(timelineSet.room, 'getUnfilteredTimelineSet').mockReturnValue(timelineSet);
@@ -51,7 +51,7 @@ function createTimeline(numEvents = 3, baseIndex = 1) {
     return timeline;
 }
 
-function addEventsToTimeline(timeline, numEvents, toStartOfTimeline) {
+function addEventsToTimeline(timeline: EventTimeline, numEvents: number, toStartOfTimeline: boolean) {
     for (let i = 0; i < numEvents; i++) {
         timeline.addEvent(
             mkMessage({
@@ -66,7 +66,7 @@ function addEventsToTimeline(timeline, numEvents, toStartOfTimeline) {
 /*
  * create a pair of linked timelines
  */
-function createLinkedTimelines() {
+function createLinkedTimelines(): [EventTimeline, EventTimeline] {
     const tl1 = createTimeline();
     const tl2 = createTimeline();
     tl1.setNeighbouringTimeline(tl2, EventTimeline.FORWARDS);
@@ -162,12 +162,6 @@ describe("TimelineWindow", function() {
         windowLimit?: number;
     }): [TimelineWindow, EventTimelineSet] {
         const timelineSet = { getTimelineForEvent: () => null } as unknown as EventTimelineSet;
-        // client = {};
-        // client.getEventTimeline = function(timelineSet0, eventId0) {
-        //     expect(timelineSet0).toBe(timelineSet);
-        //     return Promise.resolve(timeline);
-        // };
-
         mockClient.getEventTimeline.mockResolvedValue(timeline);
 
         return [new TimelineWindow(mockClient, timelineSet, opts), timelineSet];
