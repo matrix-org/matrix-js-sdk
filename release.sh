@@ -121,6 +121,8 @@ echo $release | grep -q '-' && prerelease=1
 
 if [ $prerelease -eq 1 ]; then
     echo Making a PRE-RELEASE
+else
+    read -p "Making a FINAL RELEASE, press enter to continue " REPLY
 fi
 
 # We might already be on the release branch, in which case, yay
