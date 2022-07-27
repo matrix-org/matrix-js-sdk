@@ -21,14 +21,14 @@ import * as algorithms from "../../../../src/crypto/algorithms";
 import { MemoryCryptoStore } from "../../../../src/crypto/store/memory-crypto-store";
 import * as testUtils from "../../../test-utils/test-utils";
 import { OlmDevice } from "../../../../src/crypto/OlmDevice";
-import { Crypto } from "../../../../src/crypto";
+import { Crypto, IncomingRoomKeyRequest } from "../../../../src/crypto";
 import { logger } from "../../../../src/logger";
 import { MatrixEvent } from "../../../../src/models/event";
 import { TestClient } from "../../../TestClient";
 import { Room } from "../../../../src/models/room";
 import * as olmlib from "../../../../src/crypto/olmlib";
 import { TypedEventEmitter } from '../../../../src/models/typed-event-emitter';
-import { ClientEvent, RoomMember } from '../../../../src';
+import { ClientEvent, MatrixClient, RoomMember } from '../../../../src';
 import { DeviceInfo, IDevice } from '../../../../src/crypto/deviceinfo';
 import { DeviceTrustLevel } from '../../../../src/crypto/CrossSigning';
 
@@ -49,14 +49,17 @@ describe("MegolmDecryption", function() {
         return Olm.init();
     });
 
-    let megolmDecryption;
-    let mockOlmLib;
+    let megolmDecryption: algorithms.DecryptionAlgorithm;
+    let mockOlmLib: MockedObject<typeof olmlib>;
     let mockCrypto: MockedObject<Crypto>;
-    let mockBaseApis;
+    let mockBaseApis: MockedObject<MatrixClient>;
 
     beforeEach(async function() {
         mockCrypto = testUtils.mock(Crypto, 'Crypto') as MockedObject<Crypto>;
-        mockBaseApis = {};
+        mockBaseApis = {
+            claimOneTimeKeys: jest.fn(),
+            sendToDevice: jest.fn(),
+        } as unknown as MockedObject<MatrixClient>;
 
         const cryptoStore = new MemoryCryptoStore();
 
@@ -71,11 +74,15 @@ describe("MegolmDecryption", function() {
         });
 
         // we stub out the olm encryption bits
-        mockOlmLib = {};
-        mockOlmLib.ensureOlmSessionsForDevices = jest.fn();
-        mockOlmLib.encryptMessageForDevice =
-            jest.fn().mockResolvedValue(undefined);
+        mockOlmLib = {
+            encryptMessageForDevice: jest.fn().mockResolvedValue(undefined),
+            ensureOlmSessionsForDevices: jest.fn(),
+        } as unknown as MockedObject<typeof olmlib>;
+
+        // @ts-ignore illegal assignment that makes these tests work :/
         megolmDecryption.olmlib = mockOlmLib;
+
+        jest.clearAllMocks();
     });
 
     describe('receives some keys:', function() {
@@ -135,10 +142,13 @@ describe("MegolmDecryption", function() {
         });
 
         it('can respond to a key request event', function() {
-            const keyRequest = {
+            const keyRequest: IncomingRoomKeyRequest = {
+                requestId: '123',
+                share: jest.fn(),
                 userId: '@alice:foo',
                 deviceId: 'alidevice',
                 requestBody: {
+                    algorithm: '',
                     room_id: ROOM_ID,
                     sender_key: "SENDER_CURVE25519",
                     session_id: groupSession.session_id(),
@@ -157,6 +167,7 @@ describe("MegolmDecryption", function() {
                 mockOlmLib.ensureOlmSessionsForDevices.mockResolvedValue({
                     '@alice:foo': { 'alidevice': {
                         sessionId: 'alisession',
+                        device: new DeviceInfo('alidevice'),
                     } },
                 });
 
@@ -167,7 +178,7 @@ describe("MegolmDecryption", function() {
                     });
                 });
 
-                mockBaseApis.sendToDevice = jest.fn();
+                mockBaseApis.sendToDevice.mockReset();
 
                 // do the share
                 megolmDecryption.shareKeysWithDevice(keyRequest);
@@ -295,7 +306,8 @@ describe("MegolmDecryption", function() {
                 olmDevice.verifySignature = jest.fn();
                 await olmDevice.init();
 
-                mockBaseApis.claimOneTimeKeys = jest.fn().mockReturnValue(Promise.resolve({
+                mockBaseApis.claimOneTimeKeys.mockResolvedValue({
+                    failures: {},
                     one_time_keys: {
                         '@alice:home.server': {
                             aliceDevice: {
@@ -310,8 +322,8 @@ describe("MegolmDecryption", function() {
                             },
                         },
                     },
-                }));
-                mockBaseApis.sendToDevice = jest.fn().mockResolvedValue(undefined);
+                });
+                mockBaseApis.sendToDevice.mockResolvedValue(undefined);
 
                 aliceDeviceInfo = {
                     deviceId: 'aliceDevice',

@@ -52,8 +52,8 @@ describe("OlmDevice", function() {
         return global.Olm.init();
     });
 
-    let aliceOlmDevice;
-    let bobOlmDevice;
+    let aliceOlmDevice: OlmDevice;
+    let bobOlmDevice: OlmDevice;
 
     beforeEach(async function() {
         aliceOlmDevice = makeOlmDevice();
@@ -70,7 +70,7 @@ describe("OlmDevice", function() {
                 bobOlmDevice.deviceCurve25519Key,
                 sid,
                 "The olm or proteus is an aquatic salamander in the family Proteidae",
-            );
+            ) as any; // OlmDevice.encryptMessage has incorrect return type
 
             const result = await bobOlmDevice.createInboundSession(
                 aliceOlmDevice.deviceCurve25519Key,
@@ -97,7 +97,7 @@ describe("OlmDevice", function() {
                 bobOlmDevice.deviceCurve25519Key,
                 sessionId,
                 MESSAGE,
-            );
+            ) as any; // OlmDevice.encryptMessage has incorrect return type
 
             const bobRecreatedOlmDevice = makeOlmDevice();
             bobRecreatedOlmDevice.init({ fromExportedDevice: exported });
@@ -121,7 +121,7 @@ describe("OlmDevice", function() {
                 bobOlmDevice.deviceCurve25519Key,
                 sessionId,
                 MESSAGE_2,
-            );
+            ) as any; // OlmDevice.encryptMessage has incorrect return type
 
             const bobRecreatedAgainOlmDevice = makeOlmDevice();
             bobRecreatedAgainOlmDevice.init({ fromExportedDevice: exportedAgain });
