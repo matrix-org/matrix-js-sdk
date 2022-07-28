@@ -93,13 +93,23 @@ interface AssertedIdentity {
     displayName: string;
 }
 
+enum MediaType {
+    AUDIO = "audio",
+    VIDEO = "video",
+}
+
+enum CodecName {
+    OPUS = "opus",
+    // add more as needed
+}
+
 // Used internally to specify modifications to codec parameters in SDP
-interface CodecParams {
+interface CodecParamsMod {
+    mediaType: MediaType;
+    codec: CodecName;
     enableDtx?: boolean; // true to enable discontinuous transmission, false to disable, undefined to leave as-is
     maxAverageBitrate?: number; // sets the max average bitrate, or undefined to leave as-is
 }
-
-type CodecParamMods = Record<string, CodecParams>;
 
 export enum CallState {
     Fledgling = 'fledgling',
@@ -269,14 +279,15 @@ export function genCallID(): string {
     return Date.now().toString() + randomString(16);
 }
 
-function getCodecParamMods(isPtt: boolean): CodecParamMods {
-    const mods = {
-        'opus': {
+function getCodecParamMods(isPtt: boolean): CodecParamsMod[] {
+    const mods = [
+        {
+            mediaType: "audio",
+            codec: "opus",
             enableDtx: true,
+            maxAverageBitrate: isPtt ? 12000 : undefined,
         },
-    } as CodecParamMods;
-
-    if (isPtt) mods.opus.maxAverageBitrate = 12000;
+    ] as CodecParamsMod[];
 
     return mods;
 }
@@ -1476,7 +1487,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     // Enables DTX (discontinuous transmission) on the given session to reduce
     // bandwidth when transmitting silence
-    private mungeSdp(description: RTCSessionDescriptionInit, mods: CodecParamMods): void {
+    private mungeSdp(description: RTCSessionDescriptionInit, mods: CodecParamsMod[]): void {
         // The only way to enable DTX at this time is through SDP munging
         const sdp = parseSdp(description.sdp);
 
@@ -1488,30 +1499,32 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 codecToPayloadTypeMap.set(rtp.codec, rtp.payload);
             }
 
-            for (const [codec, params] of Object.entries(mods)) {
-                if (!codecToPayloadTypeMap.has(codec)) {
-                    logger.info(`Ignoring SDP modifications for ${codec} as it's not present.`);
+            for (const mod of mods) {
+                if (mod.mediaType !== media.type) continue;
+
+                if (!codecToPayloadTypeMap.has(mod.codec)) {
+                    logger.info(`Ignoring SDP modifications for ${mod.codec} as it's not present.`);
                     continue;
                 }
 
                 const extraconfig: string[] = [];
-                if (params.enableDtx !== undefined) {
-                    extraconfig.push(`usedtx=${params.enableDtx ? '1' : '0'}`);
+                if (mod.enableDtx !== undefined) {
+                    extraconfig.push(`usedtx=${mod.enableDtx ? '1' : '0'}`);
                 }
-                if (params.maxAverageBitrate !== undefined) {
-                    extraconfig.push(`maxaveragebitrate=${params.maxAverageBitrate}`);
+                if (mod.maxAverageBitrate !== undefined) {
+                    extraconfig.push(`maxaveragebitrate=${mod.maxAverageBitrate}`);
                 }
 
                 let found = false;
                 for (const fmtp of media.fmtp) {
-                    if (payloadTypeToCodecMap.get(fmtp.payload) === codec) {
+                    if (payloadTypeToCodecMap.get(fmtp.payload) === mod.codec) {
                         found = true;
                         fmtp.config += ";" + extraconfig.join(";");
                     }
                 }
                 if (!found) {
                     media.fmtp.push({
-                        payload: codecToPayloadTypeMap.get(codec),
+                        payload: codecToPayloadTypeMap.get(mod.codec),
                         config: extraconfig.join(";"),
                     });
                 }
