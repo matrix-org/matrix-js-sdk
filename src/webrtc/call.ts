@@ -546,6 +546,13 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private async initOpponentCrypto() {
         if (!this.opponentDeviceId) return;
         if (!this.client.getUseE2eForGroupCall()) return;
+        // It's possible to want E2EE and yet not have the means to manage E2EE
+        // ourselves (for example if the client is a RoomWidgetClient)
+        if (!this.client.isCryptoEnabled()) {
+            // All we know is the device ID
+            this.opponentDeviceInfo = { deviceId: this.opponentDeviceId };
+            return;
+        }
 
         const userId = this.invitee || this.getOpponentMember().userId;
         const deviceInfoMap = await this.client.crypto.deviceList.downloadKeys([userId], false);
@@ -2199,7 +2206,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
             const userId = this.invitee || this.getOpponentMember().userId;
             if (this.client.getUseE2eForGroupCall()) {
-                return this.client.crypto.encryptAndSendToDevices([{
+                return this.client.encryptAndSendToDevices([{
                     userId,
                     deviceInfo: this.opponentDeviceInfo,
                 }], {

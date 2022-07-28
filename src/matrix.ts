@@ -20,7 +20,7 @@ import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store";
 import { MemoryStore } from "./store/memory";
 import { MatrixScheduler } from "./scheduler";
 import { MatrixClient, ICreateClientOpts } from "./client";
-import { RoomWidgetClient, IEventRequests } from "./embedded";
+import { RoomWidgetClient, ICapabilities } from "./embedded";
 import { DeviceTrustLevel } from "./crypto/CrossSigning";
 import { ISecretStorageKeyInfo } from "./crypto/api";
 
@@ -175,11 +175,11 @@ export function createClient(opts: ICreateClientOpts | string): MatrixClient {
 }
 export function createRoomWidgetClient(
     widgetApi: WidgetApi,
-    eventRequests: IEventRequests,
+    capabilities: ICapabilities,
     roomId: string,
     opts: ICreateClientOpts | string,
 ): MatrixClient {
-    return new RoomWidgetClient(widgetApi, eventRequests, roomId, amendClientOpts(opts));
+    return new RoomWidgetClient(widgetApi, capabilities, roomId, amendClientOpts(opts));
 }
 
 /**
