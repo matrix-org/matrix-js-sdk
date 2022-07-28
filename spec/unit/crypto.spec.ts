@@ -25,7 +25,7 @@ function awaitEvent(emitter, event) {
     });
 }
 
-async function keyshareEventForEvent(client, event, index) {
+async function keyshareEventForEvent(client, event, index): Promise<MatrixEvent> {
     const roomId = event.getRoomId();
     const eventContent = event.getWireContent();
     const key = await client.crypto.olmDevice.getInboundGroupSessionKey(
@@ -50,6 +50,7 @@ async function keyshareEventForEvent(client, event, index) {
         },
     });
     // make onRoomKeyEvent think this was an encrypted event
+    // @ts-ignore private property
     ksEvent.senderCurve25519Key = "akey";
     return ksEvent;
 }
@@ -79,7 +80,7 @@ describe("Crypto", function() {
                 getId: () => "$event_id",
                 getSenderKey: () => null,
                 getWireContent: () => {return {};},
-            };
+            } as unknown as MatrixEvent;
 
             let encryptionInfo = client.getEventEncryptionInfo(event);
             expect(encryptionInfo.encrypted).toBeFalsy();
@@ -154,12 +155,15 @@ describe("Crypto", function() {
         beforeEach(async function() {
             const mockStorage = new MockStorageApi();
             const clientStore = new MemoryStore({ localStorage: mockStorage });
-            const cryptoStore = new MemoryCryptoStore(mockStorage);
+            const cryptoStore = new MemoryCryptoStore();
 
             cryptoStore.storeEndToEndDeviceData({
                 devices: {
                     '@bob:home.server': {
                         'BOBDEVICE': {
+                            algorithms: [],
+                            verified: 1,
+                            known: false,
                             keys: {
                                 'curve25519:BOBDEVICE': 'this is a key',
                             },
@@ -167,7 +171,7 @@ describe("Crypto", function() {
                     },
                 },
                 trackingStatus: {},
-            });
+            }, {});
 
             mockBaseApis = {
                 sendToDevice: jest.fn(),
@@ -185,6 +189,7 @@ describe("Crypto", function() {
                 clientStore,
                 cryptoStore,
                 mockRoomList,
+                [],
             );
             crypto.registerEventHandlers(fakeEmitter);
             await crypto.init();
@@ -195,7 +200,7 @@ describe("Crypto", function() {
         });
 
         it("restarts wedged Olm sessions", async function() {
-            const prom = new Promise((resolve) => {
+            const prom = new Promise<void>((resolve) => {
                 mockBaseApis.claimOneTimeKeys = function() {
                     resolve();
                     return otkResponse;
@@ -276,8 +281,12 @@ describe("Crypto", function() {
                 // alice encrypts each event, and then bob tries to decrypt
                 // them without any keys, so that they'll be in pending
                 await aliceClient.crypto.encryptEvent(event, aliceRoom);
+                // remove keys from the event
+                // @ts-ignore private properties
                 event.clearEvent = undefined;
+                // @ts-ignore private properties
                 event.senderCurve25519Key = null;
+                // @ts-ignore private properties
                 event.claimedEd25519Key = null;
                 try {
                     await bobClient.crypto.decryptEvent(event);
@@ -291,7 +300,7 @@ describe("Crypto", function() {
                 roomId, olmlib.MEGOLM_ALGORITHM,
             );
 
-            let eventPromise = Promise.all(events.map((ev) => {
+            const decryptEventsPromise = Promise.all(events.map((ev) => {
                 return awaitEvent(ev, "Event.decrypted");
             }));
 
@@ -300,7 +309,7 @@ describe("Crypto", function() {
             // can
             let ksEvent = await keyshareEventForEvent(aliceClient, events[1], 1);
             await bobDecryptor.onRoomKeyEvent(ksEvent);
-            await eventPromise;
+            await decryptEventsPromise;
             expect(events[0].getContent().msgtype).toBe("m.bad.encrypted");
             expect(events[1].getContent().msgtype).not.toBe("m.bad.encrypted");
 
@@ -320,10 +329,10 @@ describe("Crypto", function() {
 
             // keyshare the session key starting at the first message, so
             // that it can now be decrypted
-            eventPromise = awaitEvent(events[0], "Event.decrypted");
+            const decryptEventPromise = awaitEvent(events[0], "Event.decrypted");
             ksEvent = await keyshareEventForEvent(aliceClient, events[0], 0);
             await bobDecryptor.onRoomKeyEvent(ksEvent);
-            await eventPromise;
+            await decryptEventPromise;
             expect(events[0].getContent().msgtype).not.toBe("m.bad.encrypted");
             await sleep(1);
             // the room key request should be gone since we've now decrypted everything
@@ -354,8 +363,12 @@ describe("Crypto", function() {
             // alice encrypts each event, and then bob tries to decrypt
             // them without any keys, so that they'll be in pending
             await aliceClient.crypto.encryptEvent(event, aliceRoom);
+            // remove keys from the event
+            // @ts-ignore private property
             event.clearEvent = undefined;
+            // @ts-ignore private property
             event.senderCurve25519Key = null;
+            // @ts-ignore private property
             event.claimedEd25519Key = null;
             try {
                 await bobClient.crypto.decryptEvent(event);
