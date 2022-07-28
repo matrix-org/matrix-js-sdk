@@ -51,6 +51,7 @@ import { ISendEventResponse } from "../@types/requests";
 import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter";
 import { DeviceInfo } from '../crypto/deviceinfo';
 import { GroupCallUnknownDeviceError } from './groupCall';
+import { IScreensharingOpts } from "./mediaHandler";
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
@@ -93,13 +94,23 @@ interface AssertedIdentity {
     displayName: string;
 }
 
+enum MediaType {
+    AUDIO = "audio",
+    VIDEO = "video",
+}
+
+enum CodecName {
+    OPUS = "opus",
+    // add more as needed
+}
+
 // Used internally to specify modifications to codec parameters in SDP
-interface CodecParams {
+interface CodecParamsMod {
+    mediaType: MediaType;
+    codec: CodecName;
     enableDtx?: boolean; // true to enable discontinuous transmission, false to disable, undefined to leave as-is
     maxAverageBitrate?: number; // sets the max average bitrate, or undefined to leave as-is
 }
-
-type CodecParamMods = Record<string, CodecParams>;
 
 export enum CallState {
     Fledgling = 'fledgling',
@@ -269,14 +280,15 @@ export function genCallID(): string {
     return Date.now().toString() + randomString(16);
 }
 
-function getCodecParamMods(isPtt: boolean): CodecParamMods {
-    const mods = {
-        'opus': {
+function getCodecParamMods(isPtt: boolean): CodecParamsMod[] {
+    const mods = [
+        {
+            mediaType: "audio",
+            codec: "opus",
             enableDtx: true,
+            maxAverageBitrate: isPtt ? 12000 : undefined,
         },
-    } as CodecParamMods;
-
-    if (isPtt) mods.opus.maxAverageBitrate = 12000;
+    ] as CodecParamsMod[];
 
     return mods;
 }
@@ -1107,7 +1119,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * @param {string} desktopCapturerSourceId optional id of the desktop capturer source to use
      * @returns {boolean} new screensharing state
      */
-    public async setScreensharingEnabled(enabled: boolean, desktopCapturerSourceId?: string): Promise<boolean> {
+    public async setScreensharingEnabled(enabled: boolean, opts?: IScreensharingOpts): Promise<boolean> {
         // Skip if there is nothing to do
         if (enabled && this.isScreensharing()) {
             logger.warn(`Call ${this.callId} There is already a screensharing stream - there is nothing to do!`);
@@ -1119,13 +1131,13 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         // Fallback to replaceTrack()
         if (!this.opponentSupportsSDPStreamMetadata()) {
-            return this.setScreensharingEnabledWithoutMetadataSupport(enabled, desktopCapturerSourceId);
+            return this.setScreensharingEnabledWithoutMetadataSupport(enabled, opts);
         }
 
         logger.debug(`Call ${this.callId} set screensharing enabled? ${enabled}`);
         if (enabled) {
             try {
-                const stream = await this.client.getMediaHandler().getScreensharingStream(desktopCapturerSourceId);
+                const stream = await this.client.getMediaHandler().getScreensharingStream(opts);
                 if (!stream) return false;
                 this.pushNewLocalFeed(stream, SDPStreamMetadataPurpose.Screenshare);
                 return true;
@@ -1151,12 +1163,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * @returns {boolean} new screensharing state
      */
     private async setScreensharingEnabledWithoutMetadataSupport(
-        enabled: boolean, desktopCapturerSourceId?: string,
+        enabled: boolean, opts?: IScreensharingOpts,
     ): Promise<boolean> {
         logger.debug(`Call ${this.callId} Set screensharing enabled? ${enabled} using replaceTrack()`);
         if (enabled) {
             try {
-                const stream = await this.client.getMediaHandler().getScreensharingStream(desktopCapturerSourceId);
+                const stream = await this.client.getMediaHandler().getScreensharingStream(opts);
                 if (!stream) return false;
 
                 const track = stream.getTracks().find((track) => {
@@ -1483,7 +1495,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     // Enables DTX (discontinuous transmission) on the given session to reduce
     // bandwidth when transmitting silence
-    private mungeSdp(description: RTCSessionDescriptionInit, mods: CodecParamMods): void {
+    private mungeSdp(description: RTCSessionDescriptionInit, mods: CodecParamsMod[]): void {
         // The only way to enable DTX at this time is through SDP munging
         const sdp = parseSdp(description.sdp);
 
@@ -1495,30 +1507,32 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 codecToPayloadTypeMap.set(rtp.codec, rtp.payload);
             }
 
-            for (const [codec, params] of Object.entries(mods)) {
-                if (!codecToPayloadTypeMap.has(codec)) {
-                    logger.info(`Ignoring SDP modifications for ${codec} as it's not present.`);
+            for (const mod of mods) {
+                if (mod.mediaType !== media.type) continue;
+
+                if (!codecToPayloadTypeMap.has(mod.codec)) {
+                    logger.info(`Ignoring SDP modifications for ${mod.codec} as it's not present.`);
                     continue;
                 }
 
                 const extraconfig: string[] = [];
-                if (params.enableDtx !== undefined) {
-                    extraconfig.push(`usedtx=${params.enableDtx ? '1' : '0'}`);
+                if (mod.enableDtx !== undefined) {
+                    extraconfig.push(`usedtx=${mod.enableDtx ? '1' : '0'}`);
                 }
-                if (params.maxAverageBitrate !== undefined) {
-                    extraconfig.push(`maxaveragebitrate=${params.maxAverageBitrate}`);
+                if (mod.maxAverageBitrate !== undefined) {
+                    extraconfig.push(`maxaveragebitrate=${mod.maxAverageBitrate}`);
                 }
 
                 let found = false;
                 for (const fmtp of media.fmtp) {
-                    if (payloadTypeToCodecMap.get(fmtp.payload) === codec) {
+                    if (payloadTypeToCodecMap.get(fmtp.payload) === mod.codec) {
                         found = true;
                         fmtp.config += ";" + extraconfig.join(";");
                     }
                 }
                 if (!found) {
                     media.fmtp.push({
-                        payload: codecToPayloadTypeMap.get(codec),
+                        payload: codecToPayloadTypeMap.get(mod.codec),
                         config: extraconfig.join(";"),
                     });
                 }

@@ -30,6 +30,11 @@ export type MediaHandlerEventHandlerMap = {
     [MediaHandlerEvent.LocalStreamsChanged]: () => void;
 };
 
+export interface IScreensharingOpts {
+    desktopCapturerSourceId?: string;
+    audio?: boolean;
+}
+
 export class MediaHandler extends TypedEventEmitter<
     MediaHandlerEvent.LocalStreamsChanged, MediaHandlerEventHandlerMap
 > {
@@ -254,20 +259,20 @@ export class MediaHandler extends TypedEventEmitter<
      * @param reusable is allowed to be reused by the MediaHandler
      * @returns {MediaStream} based on passed parameters
      */
-    public async getScreensharingStream(desktopCapturerSourceId: string, reusable = true): Promise<MediaStream | null> {
+    public async getScreensharingStream(opts: IScreensharingOpts = {}, reusable = true): Promise<MediaStream | null> {
         let stream: MediaStream;
 
         if (this.screensharingStreams.length === 0) {
-            const screenshareConstraints = this.getScreenshareContraints(desktopCapturerSourceId);
+            const screenshareConstraints = this.getScreenshareContraints(opts);
             if (!screenshareConstraints) return null;
 
-            if (desktopCapturerSourceId) {
+            if (opts.desktopCapturerSourceId) {
                 // We are using Electron
-                logger.debug("Getting screensharing stream using getUserMedia()", desktopCapturerSourceId);
+                logger.debug("Getting screensharing stream using getUserMedia()", opts);
                 stream = await navigator.mediaDevices.getUserMedia(screenshareConstraints);
             } else {
                 // We are not using Electron
-                logger.debug("Getting screensharing stream using getDisplayMedia()");
+                logger.debug("Getting screensharing stream using getDisplayMedia()", opts);
                 stream = await navigator.mediaDevices.getDisplayMedia(screenshareConstraints);
             }
         } else {
@@ -352,11 +357,12 @@ export class MediaHandler extends TypedEventEmitter<
         };
     }
 
-    private getScreenshareContraints(desktopCapturerSourceId?: string): DesktopCapturerConstraints {
+    private getScreenshareContraints(opts: IScreensharingOpts): DesktopCapturerConstraints {
+        const { desktopCapturerSourceId, audio } = opts;
         if (desktopCapturerSourceId) {
             logger.debug("Using desktop capturer source", desktopCapturerSourceId);
             return {
-                audio: false,
+                audio,
                 video: {
                     mandatory: {
                         chromeMediaSource: "desktop",
@@ -367,7 +373,7 @@ export class MediaHandler extends TypedEventEmitter<
         } else {
             logger.debug("Not using desktop capturer source");
             return {
-                audio: false,
+                audio,
                 video: true,
             };
         }
