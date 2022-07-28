@@ -20,6 +20,7 @@ import { MatrixEvent } from "../models/event";
 import { EventType } from "../@types/event";
 import { CallEventHandlerEvent } from "./callEventHandler";
 import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
+import { IScreensharingOpts } from "./mediaHandler";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -537,7 +538,7 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     public async setScreensharingEnabled(
-        enabled: boolean, desktopCapturerSourceId?: string,
+        enabled: boolean, opts: IScreensharingOpts = {},
     ): Promise<boolean> {
         if (enabled === this.isScreensharing()) {
             return enabled;
@@ -546,8 +547,7 @@ export class GroupCall extends TypedEventEmitter<
         if (enabled) {
             try {
                 logger.log("Asking for screensharing permissions...");
-
-                const stream = await this.client.getMediaHandler().getScreensharingStream(desktopCapturerSourceId);
+                const stream = await this.client.getMediaHandler().getScreensharingStream(opts);
 
                 for (const track of stream.getTracks()) {
                     const onTrackEnded = () => {
@@ -560,7 +560,7 @@ export class GroupCall extends TypedEventEmitter<
 
                 logger.log("Screensharing permissions granted. Setting screensharing enabled on all calls");
 
-                this.localDesktopCapturerSourceId = desktopCapturerSourceId;
+                this.localDesktopCapturerSourceId = opts.desktopCapturerSourceId;
                 this.localScreenshareFeed = new CallFeed({
                     client: this.client,
                     roomId: this.room.roomId,
