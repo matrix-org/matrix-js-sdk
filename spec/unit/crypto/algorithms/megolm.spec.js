@@ -148,6 +148,7 @@ describe("MegolmDecryption", function() {
                 });
 
                 mockBaseApis.sendToDevice = jest.fn();
+                mockBaseApis.queueToDevice = jest.fn();
 
                 // do the share
                 megolmDecryption.shareKeysWithDevice(keyRequest);
@@ -292,6 +293,7 @@ describe("MegolmDecryption", function() {
                     },
                 }));
                 mockBaseApis.sendToDevice = jest.fn().mockResolvedValue(undefined);
+                mockBaseApis.queueToDevice = jest.fn().mockResolvedValue(undefined);
 
                 aliceDeviceInfo = {
                     deviceId: 'aliceDevice',
@@ -369,7 +371,7 @@ describe("MegolmDecryption", function() {
                 expect(mockCrypto.downloadKeys).toHaveBeenCalledWith(
                     ['@alice:home.server'], false,
                 );
-                expect(mockBaseApis.sendToDevice).toHaveBeenCalled();
+                expect(mockBaseApis.queueToDevice).toHaveBeenCalled();
                 expect(mockBaseApis.claimOneTimeKeys).toHaveBeenCalledWith(
                     [['@alice:home.server', 'aliceDevice']], 'signed_curve25519', 2000,
                 );
@@ -412,7 +414,7 @@ describe("MegolmDecryption", function() {
                     'YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWI',
                 );
 
-                mockBaseApis.sendToDevice.mockClear();
+                mockBaseApis.queueToDevice.mockClear();
                 await megolmEncryption.reshareKeyWithDevice(
                     olmDevice.deviceCurve25519Key,
                     ct1.session_id,
@@ -420,7 +422,7 @@ describe("MegolmDecryption", function() {
                     aliceDeviceInfo,
                 );
 
-                expect(mockBaseApis.sendToDevice).not.toHaveBeenCalled();
+                expect(mockBaseApis.queueToDevice).not.toHaveBeenCalled();
             });
         });
     });
