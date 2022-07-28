@@ -1,15 +1,36 @@
+/*
+Copyright 2022 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+import { mocked, MockedObject } from 'jest-mock';
+
 import '../../../olm-loader';
 import * as algorithms from "../../../../src/crypto/algorithms";
 import { MemoryCryptoStore } from "../../../../src/crypto/store/memory-crypto-store";
-import { MockStorageApi } from "../../../MockStorageApi";
 import * as testUtils from "../../../test-utils/test-utils";
 import { OlmDevice } from "../../../../src/crypto/OlmDevice";
-import { Crypto } from "../../../../src/crypto";
+import { Crypto, IncomingRoomKeyRequest } from "../../../../src/crypto";
 import { logger } from "../../../../src/logger";
 import { MatrixEvent } from "../../../../src/models/event";
 import { TestClient } from "../../../TestClient";
 import { Room } from "../../../../src/models/room";
 import * as olmlib from "../../../../src/crypto/olmlib";
+import { TypedEventEmitter } from '../../../../src/models/typed-event-emitter';
+import { ClientEvent, MatrixClient, RoomMember } from '../../../../src';
+import { DeviceInfo, IDevice } from '../../../../src/crypto/deviceinfo';
+import { DeviceTrustLevel } from '../../../../src/crypto/CrossSigning';
 
 const MegolmDecryption = algorithms.DECRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
 const MegolmEncryption = algorithms.ENCRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
@@ -28,17 +49,20 @@ describe("MegolmDecryption", function() {
         return Olm.init();
     });
 
-    let megolmDecryption;
-    let mockOlmLib;
-    let mockCrypto;
-    let mockBaseApis;
+    let megolmDecryption: algorithms.DecryptionAlgorithm;
+    let mockOlmLib: MockedObject<typeof olmlib>;
+    let mockCrypto: MockedObject<Crypto>;
+    let mockBaseApis: MockedObject<MatrixClient>;
 
     beforeEach(async function() {
-        mockCrypto = testUtils.mock(Crypto, 'Crypto');
-        mockBaseApis = {};
+        mockCrypto = testUtils.mock(Crypto, 'Crypto') as MockedObject<Crypto>;
+        mockBaseApis = {
+            claimOneTimeKeys: jest.fn(),
+            sendToDevice: jest.fn(),
+            queueToDevice: jest.fn(),
+        } as unknown as MockedObject<MatrixClient>;
 
-        const mockStorage = new MockStorageApi();
-        const cryptoStore = new MemoryCryptoStore(mockStorage);
+        const cryptoStore = new MemoryCryptoStore();
 
         const olmDevice = new OlmDevice(cryptoStore);
 
@@ -51,11 +75,15 @@ describe("MegolmDecryption", function() {
         });
 
         // we stub out the olm encryption bits
-        mockOlmLib = {};
-        mockOlmLib.ensureOlmSessionsForDevices = jest.fn();
-        mockOlmLib.encryptMessageForDevice =
-            jest.fn().mockResolvedValue(undefined);
+        mockOlmLib = {
+            encryptMessageForDevice: jest.fn().mockResolvedValue(undefined),
+            ensureOlmSessionsForDevices: jest.fn(),
+        } as unknown as MockedObject<typeof olmlib>;
+
+        // @ts-ignore illegal assignment that makes these tests work :/
         megolmDecryption.olmlib = mockOlmLib;
+
+        jest.clearAllMocks();
     });
 
     describe('receives some keys:', function() {
@@ -87,7 +115,7 @@ describe("MegolmDecryption", function() {
                 decryptEvent: function() {
                     return Promise.resolve(decryptedData);
                 },
-            };
+            } as unknown as Crypto;
 
             await event.attemptDecryption(mockCrypto).then(() => {
                 megolmDecryption.onRoomKeyEvent(event);
@@ -115,10 +143,13 @@ describe("MegolmDecryption", function() {
         });
 
         it('can respond to a key request event', function() {
-            const keyRequest = {
+            const keyRequest: IncomingRoomKeyRequest = {
+                requestId: '123',
+                share: jest.fn(),
                 userId: '@alice:foo',
                 deviceId: 'alidevice',
                 requestBody: {
+                    algorithm: '',
                     room_id: ROOM_ID,
                     sender_key: "SENDER_CURVE25519",
                     session_id: groupSession.session_id(),
@@ -131,24 +162,25 @@ describe("MegolmDecryption", function() {
                 expect(hasKeys).toBe(true);
 
                 // set up some pre-conditions for the share call
-                const deviceInfo = {};
+                const deviceInfo = {} as DeviceInfo;
                 mockCrypto.getStoredDevice.mockReturnValue(deviceInfo);
 
                 mockOlmLib.ensureOlmSessionsForDevices.mockResolvedValue({
                     '@alice:foo': { 'alidevice': {
                         sessionId: 'alisession',
+                        device: new DeviceInfo('alidevice'),
                     } },
                 });
 
-                const awaitEncryptForDevice = new Promise((res, rej) => {
+                const awaitEncryptForDevice = new Promise<void>((res, rej) => {
                     mockOlmLib.encryptMessageForDevice.mockImplementation(() => {
                         res();
                         return Promise.resolve();
                     });
                 });
 
-                mockBaseApis.sendToDevice = jest.fn();
-                mockBaseApis.queueToDevice = jest.fn();
+                mockBaseApis.sendToDevice.mockReset();
+                mockBaseApis.queueToDevice.mockReset();
 
                 // do the share
                 megolmDecryption.shareKeysWithDevice(keyRequest);
@@ -266,17 +298,18 @@ describe("MegolmDecryption", function() {
             let olmDevice;
 
             beforeEach(async () => {
+                // @ts-ignore assigning to readonly prop
                 mockCrypto.backupManager = {
                     backupGroupSession: () => {},
                 };
-                const mockStorage = new MockStorageApi();
-                const cryptoStore = new MemoryCryptoStore(mockStorage);
+                const cryptoStore = new MemoryCryptoStore();
 
                 olmDevice = new OlmDevice(cryptoStore);
                 olmDevice.verifySignature = jest.fn();
                 await olmDevice.init();
 
-                mockBaseApis.claimOneTimeKeys = jest.fn().mockReturnValue(Promise.resolve({
+                mockBaseApis.claimOneTimeKeys.mockResolvedValue({
+                    failures: {},
                     one_time_keys: {
                         '@alice:home.server': {
                             aliceDevice: {
@@ -291,9 +324,9 @@ describe("MegolmDecryption", function() {
                             },
                         },
                     },
-                }));
-                mockBaseApis.sendToDevice = jest.fn().mockResolvedValue(undefined);
-                mockBaseApis.queueToDevice = jest.fn().mockResolvedValue(undefined);
+                });
+                mockBaseApis.sendToDevice.mockResolvedValue(undefined);
+                mockBaseApis.queueToDevice.mockResolvedValue(undefined);
 
                 aliceDeviceInfo = {
                     deviceId: 'aliceDevice',
@@ -313,15 +346,17 @@ describe("MegolmDecryption", function() {
 
                 mockCrypto.checkDeviceTrust.mockReturnValue({
                     isVerified: () => false,
-                });
+                } as DeviceTrustLevel);
 
                 megolmEncryption = new MegolmEncryption({
                     userId: '@user:id',
+                    deviceId: '12345',
                     crypto: mockCrypto,
                     olmDevice: olmDevice,
                     baseApis: mockBaseApis,
                     roomId: ROOM_ID,
                     config: {
+                        algorithm: 'm.megolm.v1.aes-sha2',
                         rotation_period_ms: rotationPeriodMs,
                     },
                 });
@@ -451,33 +486,33 @@ describe("MegolmDecryption", function() {
         };
         const roomId = "!someroom";
         const room = new Room(roomId, aliceClient, "@alice:example.com", {});
+
+        const bobMember = new RoomMember(roomId, "@bob:example.com");
         room.getEncryptionTargetMembers = async function() {
-            return [{ userId: "@bob:example.com" }];
+            return [bobMember];
         };
         room.setBlacklistUnverifiedDevices(true);
         aliceClient.store.storeRoom(room);
         await aliceClient.setRoomEncryption(roomId, encryptionCfg);
 
-        const BOB_DEVICES = {
+        const BOB_DEVICES: Record<string, IDevice> = {
             bobdevice1: {
-                user_id: "@bob:example.com",
-                device_id: "bobdevice1",
                 algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
                 keys: {
                     "ed25519:Dynabook": bobDevice1.deviceEd25519Key,
                     "curve25519:Dynabook": bobDevice1.deviceCurve25519Key,
                 },
                 verified: 0,
+                known: false,
             },
             bobdevice2: {
-                user_id: "@bob:example.com",
-                device_id: "bobdevice2",
                 algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
                 keys: {
                     "ed25519:Dynabook": bobDevice2.deviceEd25519Key,
                     "curve25519:Dynabook": bobDevice2.deviceCurve25519Key,
                 },
                 verified: -1,
+                known: false,
             },
         };
 
@@ -488,32 +523,7 @@ describe("MegolmDecryption", function() {
             return this.getDevicesFromStore(userIds);
         };
 
-        let run = false;
-        aliceClient.sendToDevice = async (msgtype, contentMap) => {
-            run = true;
-            expect(msgtype).toMatch(/^(org.matrix|m).room_key.withheld$/);
-            delete contentMap["@bob:example.com"].bobdevice1.session_id;
-            delete contentMap["@bob:example.com"].bobdevice2.session_id;
-            expect(contentMap).toStrictEqual({
-                '@bob:example.com': {
-                    bobdevice1: {
-                        algorithm: "m.megolm.v1.aes-sha2",
-                        room_id: roomId,
-                        code: 'm.unverified',
-                        reason:
-                        'The sender has disabled encrypting to unverified devices.',
-                        sender_key: aliceDevice.deviceCurve25519Key,
-                    },
-                    bobdevice2: {
-                        algorithm: "m.megolm.v1.aes-sha2",
-                        room_id: roomId,
-                        code: 'm.blacklisted',
-                        reason: 'The sender has blocked you.',
-                        sender_key: aliceDevice.deviceCurve25519Key,
-                    },
-                },
-            });
-        };
+        aliceClient.sendToDevice = jest.fn().mockResolvedValue({});
 
         const event = new MatrixEvent({
             type: "m.room.message",
@@ -527,7 +537,30 @@ describe("MegolmDecryption", function() {
         });
         await aliceClient.crypto.encryptEvent(event, room);
 
-        expect(run).toBe(true);
+        expect(aliceClient.sendToDevice).toHaveBeenCalled();
+        const [msgtype, contentMap] = mocked(aliceClient.sendToDevice).mock.calls[0];
+        expect(msgtype).toMatch(/^(org.matrix|m).room_key.withheld$/);
+        delete contentMap["@bob:example.com"].bobdevice1.session_id;
+        delete contentMap["@bob:example.com"].bobdevice2.session_id;
+        expect(contentMap).toStrictEqual({
+            '@bob:example.com': {
+                bobdevice1: {
+                    algorithm: "m.megolm.v1.aes-sha2",
+                    room_id: roomId,
+                    code: 'm.unverified',
+                    reason:
+                    'The sender has disabled encrypting to unverified devices.',
+                    sender_key: aliceDevice.deviceCurve25519Key,
+                },
+                bobdevice2: {
+                    algorithm: "m.megolm.v1.aes-sha2",
+                    room_id: roomId,
+                    code: 'm.blacklisted',
+                    reason: 'The sender has blocked you.',
+                    sender_key: aliceDevice.deviceCurve25519Key,
+                },
+            },
+        });
 
         aliceClient.stopClient();
         bobClient1.stopClient();
@@ -559,18 +592,16 @@ describe("MegolmDecryption", function() {
         await aliceClient.setRoomEncryption(roomId, encryptionCfg);
         await bobClient.setRoomEncryption(roomId, encryptionCfg);
 
-        aliceRoom.getEncryptionTargetMembers = async () => {
-            return [
-                {
-                    userId: "@alice:example.com",
-                    membership: "join",
-                },
-                {
-                    userId: "@bob:example.com",
-                    membership: "join",
-                },
-            ];
-        };
+        aliceRoom.getEncryptionTargetMembers = jest.fn().mockResolvedValue([
+            {
+                userId: "@alice:example.com",
+                membership: "join",
+            },
+            {
+                userId: "@bob:example.com",
+                membership: "join",
+            },
+        ]);
         const BOB_DEVICES = {
             bobdevice: {
                 user_id: "@bob:example.com",
@@ -592,29 +623,13 @@ describe("MegolmDecryption", function() {
             return this.getDevicesFromStore(userIds);
         };
 
-        aliceClient.claimOneTimeKeys = async () => {
+        aliceClient.claimOneTimeKeys = jest.fn().mockResolvedValue({
             // Bob has no one-time keys
-            return {
-                one_time_keys: {},
-            };
-        };
-
-        const sendPromise = new Promise((resolve, reject) => {
-            aliceClient.sendToDevice = async (msgtype, contentMap) => {
-                expect(msgtype).toMatch(/^(org.matrix|m).room_key.withheld$/);
-                expect(contentMap).toStrictEqual({
-                    '@bob:example.com': {
-                        bobdevice: {
-                            algorithm: "m.megolm.v1.aes-sha2",
-                            code: 'm.no_olm',
-                            reason: 'Unable to establish a secure channel.',
-                            sender_key: aliceDevice.deviceCurve25519Key,
-                        },
-                    },
-                });
-                resolve();
-            };
+            one_time_keys: {},
+            failures: {},
         });
+
+        aliceClient.sendToDevice = jest.fn().mockResolvedValue({});
 
         const event = new MatrixEvent({
             type: "m.room.message",
@@ -624,7 +639,21 @@ describe("MegolmDecryption", function() {
             content: {},
         });
         await aliceClient.crypto.encryptEvent(event, aliceRoom);
-        await sendPromise;
+
+        expect(aliceClient.sendToDevice).toHaveBeenCalled();
+        const [msgtype, contentMap] = mocked(aliceClient.sendToDevice).mock.calls[0];
+        expect(msgtype).toMatch(/^(org.matrix|m).room_key.withheld$/);
+        expect(contentMap).toStrictEqual({
+            '@bob:example.com': {
+                bobdevice: {
+                    algorithm: "m.megolm.v1.aes-sha2",
+                    code: 'm.no_olm',
+                    reason: 'Unable to establish a secure channel.',
+                    sender_key: aliceDevice.deviceCurve25519Key,
+                },
+            },
+        });
+
         aliceClient.stopClient();
         bobClient.stopClient();
     });
@@ -642,9 +671,12 @@ describe("MegolmDecryption", function() {
         ]);
         const bobDevice = bobClient.crypto.olmDevice;
 
+        const aliceEventEmitter = new TypedEventEmitter<ClientEvent.ToDeviceEvent, any>();
+        aliceClient.crypto.registerEventHandlers(aliceEventEmitter);
+
         const roomId = "!someroom";
 
-        aliceClient.crypto.onToDeviceEvent(new MatrixEvent({
+        aliceEventEmitter.emit(ClientEvent.ToDeviceEvent, new MatrixEvent({
             type: "m.room_key.withheld",
             sender: "@bob:example.com",
             content: {
@@ -671,7 +703,7 @@ describe("MegolmDecryption", function() {
             },
         }))).rejects.toThrow("The sender has blocked you.");
 
-        aliceClient.crypto.onToDeviceEvent(new MatrixEvent({
+        aliceEventEmitter.emit(ClientEvent.ToDeviceEvent, new MatrixEvent({
             type: "m.room_key.withheld",
             sender: "@bob:example.com",
             content: {
@@ -712,14 +744,18 @@ describe("MegolmDecryption", function() {
             aliceClient.initCrypto(),
             bobClient.initCrypto(),
         ]);
-        aliceClient.crypto.downloadKeys = async () => {};
+
+        const aliceEventEmitter = new TypedEventEmitter<ClientEvent.ToDeviceEvent, any>();
+        aliceClient.crypto.registerEventHandlers(aliceEventEmitter);
+
+        aliceClient.crypto.downloadKeys = jest.fn();
         const bobDevice = bobClient.crypto.olmDevice;
 
         const roomId = "!someroom";
 
         const now = Date.now();
 
-        aliceClient.crypto.onToDeviceEvent(new MatrixEvent({
+        aliceEventEmitter.emit(ClientEvent.ToDeviceEvent, new MatrixEvent({
             type: "m.room_key.withheld",
             sender: "@bob:example.com",
             content: {
@@ -751,7 +787,7 @@ describe("MegolmDecryption", function() {
             origin_server_ts: now,
         }))).rejects.toThrow("The sender was unable to establish a secure channel.");
 
-        aliceClient.crypto.onToDeviceEvent(new MatrixEvent({
+        aliceEventEmitter.emit(ClientEvent.ToDeviceEvent, new MatrixEvent({
             type: "m.room_key.withheld",
             sender: "@bob:example.com",
             content: {
@@ -797,15 +833,18 @@ describe("MegolmDecryption", function() {
             aliceClient.initCrypto(),
             bobClient.initCrypto(),
         ]);
+        const aliceEventEmitter = new TypedEventEmitter<ClientEvent.ToDeviceEvent, any>();
+        aliceClient.crypto.registerEventHandlers(aliceEventEmitter);
+
         const bobDevice = bobClient.crypto.olmDevice;
-        aliceClient.crypto.downloadKeys = async () => {};
+        aliceClient.crypto.downloadKeys = jest.fn();
 
         const roomId = "!someroom";
 
         const now = Date.now();
 
         // pretend we got an event that we can't decrypt
-        aliceClient.crypto.onToDeviceEvent(new MatrixEvent({
+        aliceEventEmitter.emit(ClientEvent.ToDeviceEvent, new MatrixEvent({
             type: "m.room.encrypted",
             sender: "@bob:example.com",
             content: {
