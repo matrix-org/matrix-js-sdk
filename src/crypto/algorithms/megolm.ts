@@ -22,6 +22,7 @@ limitations under the License.
 
 import { logger } from '../../logger';
 import * as olmlib from "../olmlib";
+import { EventType } from '../../@types/event';
 import {
     DecryptionAlgorithm,
     DecryptionError,
@@ -37,6 +38,7 @@ import { IOlmSessionResult } from "../olmlib";
 import { DeviceInfoMap } from "../DeviceList";
 import { MatrixEvent } from "../..";
 import { IEventDecryptionResult, IMegolmSessionData, IncomingRoomKeyRequest } from "../index";
+import { ToDeviceBatch, ToDeviceMessage } from '../../models/ToDeviceMessage';
 
 // determine whether the key can be shared with invitees
 export function isRoomSharedHistory(room: Room): boolean {
@@ -609,7 +611,11 @@ class MegolmEncryption extends EncryptionAlgorithm {
         userDeviceMap: IOlmDevice[],
         payload: IPayload,
     ): Promise<void> {
-        const contentMap: Record<string, Record<string, IEncryptedContent>> = {};
+        const toDeviceBatch: ToDeviceBatch = {
+            eventType: EventType.RoomMessageEncrypted,
+            batch: [],
+        };
+
         // Map from userId to a map of deviceId to deviceInfo
         const deviceInfoByUserIdAndDeviceId = new Map<string, Map<string, DeviceInfo>>();
 
@@ -637,10 +643,11 @@ class MegolmEncryption extends EncryptionAlgorithm {
             // We hold by reference, this updates deviceInfoByUserIdAndDeviceId[userId]
             userIdDeviceInfo.set(deviceId, deviceInfo);
 
-            if (!contentMap[userId]) {
-                contentMap[userId] = {};
-            }
-            contentMap[userId][deviceId] = encryptedContent;
+            toDeviceBatch.batch.push({
+                userId,
+                deviceId,
+                payload: encryptedContent,
+            });
 
             promises.push(
                 olmlib.encryptMessageForDevice(
@@ -660,40 +667,29 @@ class MegolmEncryption extends EncryptionAlgorithm {
             // in which case it will have just not added anything to the ciphertext object.
             // There's no point sending messages to devices if we couldn't encrypt to them,
             // since that's effectively a blank message.
-            for (const userId of Object.keys(contentMap)) {
-                for (const deviceId of Object.keys(contentMap[userId])) {
-                    if (Object.keys(contentMap[userId][deviceId].ciphertext).length === 0) {
-                        logger.log(
-                            "No ciphertext for device " +
-                            userId + ":" + deviceId + ": pruning",
-                        );
-                        delete contentMap[userId][deviceId];
-                    }
-                }
-                // No devices left for that user? Strip that too.
-                if (Object.keys(contentMap[userId]).length === 0) {
-                    logger.log("Pruned all devices for user " + userId);
-                    delete contentMap[userId];
+            const prunedBatch: ToDeviceMessage[] = [];
+            for (const msg of toDeviceBatch.batch) {
+                if (Object.keys(msg.payload.ciphertext).length > 0) {
+                    prunedBatch.push(msg);
+                } else {
+                    logger.log(
+                        "No ciphertext for device " +
+                        msg.userId + ":" + msg.deviceId + ": pruning",
+                    );
                 }
             }
 
-            // Is there anything left?
-            if (Object.keys(contentMap).length === 0) {
-                logger.log("No users left to send to: aborting");
-                return;
-            }
+            toDeviceBatch.batch = prunedBatch;
 
-            return this.baseApis.sendToDevice("m.room.encrypted", contentMap).then(() => {
+            return this.baseApis.queueToDevice(toDeviceBatch).then(() => {
                 // store that we successfully uploaded the keys of the current slice
-                for (const userId of Object.keys(contentMap)) {
-                    for (const deviceId of Object.keys(contentMap[userId])) {
-                        session.markSharedWithDevice(
-                            userId,
-                            deviceId,
-                            deviceInfoByUserIdAndDeviceId.get(userId).get(deviceId).getIdentityKey(),
-                            chainIndex,
-                        );
-                    }
+                for (const msg of toDeviceBatch.batch) {
+                    session.markSharedWithDevice(
+                        msg.userId,
+                        msg.deviceId,
+                        deviceInfoByUserIdAndDeviceId.get(msg.userId).get(msg.deviceId).getIdentityKey(),
+                        chainIndex,
+                    );
                 }
             });
         });
