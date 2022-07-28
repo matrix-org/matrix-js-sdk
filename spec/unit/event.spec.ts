@@ -1,6 +1,6 @@
 /*
 Copyright 2017 New Vector Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2019, 2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,16 +15,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "../../src/logger";
 import { MatrixEvent } from "../../src/models/event";
 
 describe("MatrixEvent", () => {
     describe(".attemptDecryption", () => {
         let encryptedEvent;
+        const eventId = 'test_encrypted_event';
 
         beforeEach(() => {
             encryptedEvent = new MatrixEvent({
-                id: 'test_encrypted_event',
+                event_id: eventId,
                 type: 'm.room.encrypted',
                 content: {
                     ciphertext: 'secrets',
@@ -32,45 +32,34 @@ describe("MatrixEvent", () => {
             });
         });
 
-        it('should retry decryption if a retry is queued', () => {
-            let callCount = 0;
-
-            let prom2;
-            let prom2Fulfilled = false;
+        it('should retry decryption if a retry is queued', async () => {
+            const eventAttemptDecryptionSpy = jest.spyOn(encryptedEvent, 'attemptDecryption');
 
             const crypto = {
-                decryptEvent: function() {
-                    ++callCount;
-                    logger.log(`decrypt: ${callCount}`);
-                    if (callCount == 1) {
+                decryptEvent: jest.fn()
+                    .mockImplementationOnce(() => {
                         // schedule a second decryption attempt while
                         // the first one is still running.
-                        prom2 = encryptedEvent.attemptDecryption(crypto);
-                        prom2.then(() => prom2Fulfilled = true);
+                        encryptedEvent.attemptDecryption(crypto);
 
                         const error = new Error("nope");
                         error.name = 'DecryptionError';
                         return Promise.reject(error);
-                    } else {
-                        expect(prom2Fulfilled).toBe(
-                            false, 'second attemptDecryption resolved too soon');
-
+                    })
+                    .mockImplementationOnce(() => {
                         return Promise.resolve({
                             clearEvent: {
                                 type: 'm.room.message',
                             },
                         });
-                    }
-                },
+                    }),
             };
 
-            return encryptedEvent.attemptDecryption(crypto).then(() => {
-                expect(callCount).toEqual(2);
-                expect(encryptedEvent.getType()).toEqual('m.room.message');
+            await encryptedEvent.attemptDecryption(crypto);
 
-                // make sure the second attemptDecryption resolves
-                return prom2;
-            });
+            expect(eventAttemptDecryptionSpy).toHaveBeenCalledTimes(2);
+            expect(crypto.decryptEvent).toHaveBeenCalledTimes(2);
+            expect(encryptedEvent.getType()).toEqual('m.room.message');
         });
     });
 });
