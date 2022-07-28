@@ -21,6 +21,7 @@ import { IHttpOpts, IndexedDBStore, MatrixEvent, MemoryStore, Room } from "../..
 import { MatrixClient } from "../../src/client";
 import { ToDeviceBatch } from '../../src/models/ToDeviceMessage';
 import { logger } from '../../src/logger';
+import { IStore } from '../../src/store';
 
 const FAKE_USER = "@alice:example.org";
 const FAKE_DEVICE_ID = "AAAAAAAA";
@@ -73,11 +74,17 @@ describe.each([
     let httpBackend: MockHttpBackend;
     let client: MatrixClient;
 
-    beforeEach(function() {
+    beforeEach(async function() {
         httpBackend = new MockHttpBackend();
 
-        const store = storeType === StoreType.IndexedDB ?
-            new IndexedDBStore({ indexedDB: fakeIndexedDB }) : new MemoryStore();
+        let store: IStore;
+        if (storeType === StoreType.IndexedDB) {
+            const idbStore = new IndexedDBStore({ indexedDB: fakeIndexedDB });
+            await idbStore.startup();
+            store = idbStore;
+        } else {
+            store = new MemoryStore();
+        }
 
         client = new MatrixClient({
             baseUrl: "https://my.home.server",
@@ -127,6 +134,7 @@ describe.each([
                 FAKE_MSG,
             ],
         });
+        await flushAndRunTimersUntil(() => httpBackend.requests.length > 0);
         expect(httpBackend.flushSync(null, 1)).toEqual(1);
 
         await flushAndRunTimersUntil(() => httpBackend.requests.length > 0);
@@ -147,6 +155,7 @@ describe.each([
                 FAKE_MSG,
             ],
         });
+        await flushAndRunTimersUntil(() => httpBackend.requests.length > 0);
         expect(httpBackend.flushSync(null, 1)).toEqual(1);
 
         // Asserting that another request is never made is obviously
@@ -182,6 +191,7 @@ describe.each([
                 FAKE_MSG,
             ],
         });
+        await flushAndRunTimersUntil(() => httpBackend.requests.length > 0);
         expect(httpBackend.flushSync(null, 1)).toEqual(1);
         await flushPromises();
 
