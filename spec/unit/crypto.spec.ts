@@ -464,7 +464,7 @@ describe("Crypto", function() {
             await client.initCrypto();
             client.crypto.getSecretStorageKey = async () => null;
             client.crypto.isCrossSigningReady = async () => false;
-            client.crypto.baseApis.uploadDeviceSigningKeys = () => null;
+            client.crypto.baseApis.uploadDeviceSigningKeys = jest.fn().mockResolvedValue(null);
             client.crypto.baseApis.setAccountData = () => null;
             client.crypto.baseApis.uploadKeySignatures = () => null;
             client.crypto.baseApis.http.authedRequest = () => null;

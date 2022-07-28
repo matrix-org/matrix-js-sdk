@@ -21,14 +21,14 @@ import { request } from "../../src/matrix";
 import { AutoDiscovery } from "../../src/autodiscovery";
 
 describe("AutoDiscovery", function() {
-    let httpBackend: MockHttpBackend | null = null;
-
-    beforeEach(function() {
-        httpBackend = new MockHttpBackend();
+    const getHttpBackend = (): MockHttpBackend => {
+        const httpBackend = new MockHttpBackend();
         request(httpBackend.requestFn);
-    });
+        return httpBackend;
+    };
 
     it("should throw an error when no domain is specified", function() {
+        getHttpBackend();
         return Promise.all([
             // @ts-ignore testing no args
             AutoDiscovery.findClientConfig(/* no args */).then(() => {
@@ -43,7 +43,7 @@ describe("AutoDiscovery", function() {
                 return true;
             }),
 
-            AutoDiscovery.findClientConfig(null).then(() => {
+            AutoDiscovery.findClientConfig(null as any).then(() => {
                 throw new Error("Expected a failure, not success with null");
             }, () => {
                 return true;
@@ -58,6 +58,7 @@ describe("AutoDiscovery", function() {
     });
 
     it("should return PROMPT when .well-known 404s", function() {
+        const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/.well-known/matrix/client").respond(404, {});
         return Promise.all([
             httpBackend.flushAllExpected(),
@@ -81,6 +82,7 @@ describe("AutoDiscovery", function() {
     });
 
     it("should return FAIL_PROMPT when .well-known returns a 500 error", function() {
+        const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/.well-known/matrix/client").respond(500, {});
         return Promise.all([
             httpBackend.flushAllExpected(),
@@ -104,6 +106,7 @@ describe("AutoDiscovery", function() {
     });
 
     it("should return FAIL_PROMPT when .well-known returns a 400 error", function() {
+        const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/.well-known/matrix/client").respond(400, {});
         return Promise.all([
             httpBackend.flushAllExpected(),
@@ -127,6 +130,7 @@ describe("AutoDiscovery", function() {
     });
 
     it("should return FAIL_PROMPT when .well-known returns an empty body", function() {
+        const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/.well-known/matrix/client").respond(200, "");
         return Promise.all([
             httpBackend.flushAllExpected(),
@@ -150,6 +154,7 @@ describe("AutoDiscovery", function() {
     });
 
     it("should return FAIL_PROMPT when .well-known returns not-JSON", function() {
+        const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/.well-known/matrix/client").respond(200, "abc");
         return Promise.all([
             httpBackend.flushAllExpected(),
@@ -174,6 +179,7 @@ describe("AutoDiscovery", function() {
 
     it("should return FAIL_PROMPT when .well-known does not have a base_url for " +
         "m.homeserver (empty string)", function() {
+        const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
                 base_url: "",
@@ -202,6 +208,7 @@ describe("AutoDiscovery", function() {
 
     it("should return FAIL_PROMPT when .well-known does not have a base_url for " +
         "m.homeserver (no property)", function() {
+        const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {},
         });
@@ -228,6 +235,7 @@ describe("AutoDiscovery", function() {
 
     it("should return FAIL_ERROR when .well-known has an invalid base_url for " +
         "m.homeserver (disallowed scheme)", function() {
+        const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
                 base_url: "mxc://example.org",
@@ -256,6 +264,7 @@ describe("AutoDiscovery", function() {
 
     it("should return FAIL_ERROR when .well-known has an invalid base_url for " +
         "m.homeserver (verification failure: 404)", function() {
+        const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/_matrix/client/versions").respond(404, {});
         httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
@@ -285,6 +294,7 @@ describe("AutoDiscovery", function() {
 
     it("should return FAIL_ERROR when .well-known has an invalid base_url for " +
         "m.homeserver (verification failure: 500)", function() {
+        const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/_matrix/client/versions").respond(500, {});
         httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
@@ -314,6 +324,7 @@ describe("AutoDiscovery", function() {
 
     it("should return FAIL_ERROR when .well-known has an invalid base_url for " +
         "m.homeserver (verification failure: 200 but wrong content)", function() {
+        const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
             not_matrix_versions: ["r0.0.1"],
         });
@@ -345,6 +356,7 @@ describe("AutoDiscovery", function() {
 
     it("should return SUCCESS when .well-known has a verifiably accurate base_url for " +
         "m.homeserver", function() {
+        const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/_matrix/client/versions").check((req) => {
             expect(req.path).toEqual("https://example.org/_matrix/client/versions");
         }).respond(200, {
@@ -377,6 +389,7 @@ describe("AutoDiscovery", function() {
     });
 
     it("should return SUCCESS with the right homeserver URL", function() {
+        const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/_matrix/client/versions").check((req) => {
             expect(req.path)
                 .toEqual("https://chat.example.org/_matrix/client/versions");
@@ -412,6 +425,7 @@ describe("AutoDiscovery", function() {
 
     it("should return SUCCESS / FAIL_PROMPT when the identity server configuration " +
         "is wrong (missing base_url)", function() {
+        const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/_matrix/client/versions").check((req) => {
             expect(req.path)
                 .toEqual("https://chat.example.org/_matrix/client/versions");
@@ -452,6 +466,7 @@ describe("AutoDiscovery", function() {
 
     it("should return SUCCESS / FAIL_PROMPT when the identity server configuration " +
         "is wrong (empty base_url)", function() {
+        const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/_matrix/client/versions").check((req) => {
             expect(req.path)
                 .toEqual("https://chat.example.org/_matrix/client/versions");
@@ -492,6 +507,7 @@ describe("AutoDiscovery", function() {
 
     it("should return SUCCESS / FAIL_PROMPT when the identity server configuration " +
         "is wrong (validation error: 404)", function() {
+        const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/_matrix/client/versions").check((req) => {
             expect(req.path)
                 .toEqual("https://chat.example.org/_matrix/client/versions");
@@ -533,6 +549,7 @@ describe("AutoDiscovery", function() {
 
     it("should return SUCCESS / FAIL_PROMPT when the identity server configuration " +
         "is wrong (validation error: 500)", function() {
+        const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/_matrix/client/versions").check((req) => {
             expect(req.path)
                 .toEqual("https://chat.example.org/_matrix/client/versions");
@@ -574,6 +591,7 @@ describe("AutoDiscovery", function() {
 
     it("should return SUCCESS when the identity server configuration is " +
         "verifiably accurate", function() {
+        const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/_matrix/client/versions").check((req) => {
             expect(req.path)
                 .toEqual("https://chat.example.org/_matrix/client/versions");
@@ -616,6 +634,7 @@ describe("AutoDiscovery", function() {
 
     it("should return SUCCESS and preserve non-standard keys from the " +
         ".well-known response", function() {
+        const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/_matrix/client/versions").check((req) => {
             expect(req.path)
                 .toEqual("https://chat.example.org/_matrix/client/versions");
