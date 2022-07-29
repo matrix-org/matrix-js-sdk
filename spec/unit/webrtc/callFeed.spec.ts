@@ -14,14 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { SDPStreamMetadataPurpose } from "../../../src/webrtc/callEventTypes";
-import { CallFeed, CallFeedEvent } from "../../../src/webrtc/callFeed";
-import { MockMediaStream, MockMediaStreamTrack } from "../../test-utils/webrtc";
 import { TestClient } from "../../TestClient";
 
 describe("CallFeed", () => {
-    const roomId = "room_id";
-
     let client;
 
     beforeEach(() => {
@@ -30,32 +25,5 @@ describe("CallFeed", () => {
 
     afterEach(() => {
         client.stop();
-    });
-
-    it("should handle stream replacement", () => {
-        const feedNewStreamCallback = jest.fn();
-        const feed = new CallFeed({
-            client,
-            roomId,
-            userId: "user1",
-            // @ts-ignore Mock
-            stream: new MockMediaStream("stream1"),
-            id: "id",
-            purpose: SDPStreamMetadataPurpose.Usermedia,
-            audioMuted: false,
-            videoMuted: false,
-        });
-        feed.on(CallFeedEvent.NewStream, feedNewStreamCallback);
-
-        const replacementStream = new MockMediaStream("stream2");
-        // @ts-ignore Mock
-        feed.setNewStream(replacementStream);
-        expect(feedNewStreamCallback).toHaveBeenCalledWith(replacementStream);
-        expect(feed.stream).toBe(replacementStream);
-
-        feedNewStreamCallback.mockReset();
-
-        replacementStream.addTrack(new MockMediaStreamTrack("track_id", "audio"));
-        expect(feedNewStreamCallback).toHaveBeenCalledWith(replacementStream);
     });
 });
