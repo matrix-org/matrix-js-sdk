@@ -562,7 +562,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // ourselves (for example if the client is a RoomWidgetClient)
         if (!this.client.isCryptoEnabled()) {
             // All we know is the device ID
-            this.opponentDeviceInfo = { deviceId: this.opponentDeviceId };
+            this.opponentDeviceInfo = new DeviceInfo(this.opponentDeviceId);
             return;
         }
 
@@ -2442,10 +2442,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return;
         }
 
-        const candidates = this.candidateSendQueue.map(candidate => candidate.toJSON());
+        const candidates = this.candidateSendQueue;
         this.candidateSendQueue = [];
         ++this.candidateSendTries;
-        const content = { candidates };
+        const content = { candidates: candidates.map(candidate => candidate.toJSON()) };
         logger.debug(`Call ${this.callId} attempting to send ${candidates.length} candidates`);
         try {
             await this.sendVoipEvent(EventType.CallCandidates, content);
