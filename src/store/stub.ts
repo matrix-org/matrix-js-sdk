@@ -276,7 +276,7 @@ export class StubStore implements IStore {
         return Promise.resolve();
     }
 
-    public getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch> {
+    public getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null> {
         return Promise.resolve(null);
     }
 
