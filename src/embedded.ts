@@ -237,5 +237,5 @@ export class RoomWidgetClient extends MatrixClient {
         } finally {
             this.lifecycle.signal.removeEventListener("abort", onClientStopped);
         }
-    };
+    }
 }
