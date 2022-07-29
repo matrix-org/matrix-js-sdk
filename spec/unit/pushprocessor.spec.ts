@@ -1,15 +1,15 @@
 import * as utils from "../test-utils/test-utils";
 import { PushProcessor } from "../../src/pushprocessor";
-import { EventType } from "../../src";
+import { EventType, MatrixClient, MatrixEvent } from "../../src";
 
 describe('NotificationService', function() {
     const testUserId = "@ali:matrix.org";
     const testDisplayName = "Alice M";
     const testRoomId = "!fl1bb13:localhost";
 
-    let testEvent;
+    let testEvent: MatrixEvent;
 
-    let pushProcessor;
+    let pushProcessor: PushProcessor;
 
     // These would be better if individual rules were configured in the tests themselves.
     const matrixClient = {
@@ -196,7 +196,7 @@ describe('NotificationService', function() {
                 ],
             },
         },
-    };
+    } as unknown as MatrixClient;
 
     beforeEach(function() {
         testEvent = utils.mkEvent({
