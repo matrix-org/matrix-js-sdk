@@ -34,23 +34,23 @@ export class ToDeviceMessageQueue {
     constructor(private client: MatrixClient) {
     }
 
-    public start() {
+    public start(): void {
         this.running = true;
         this.sendQueue();
     }
 
-    public stop() {
+    public stop(): void {
         this.running = false;
         if (this.retryTimeout !== null) clearTimeout(this.retryTimeout);
         this.retryTimeout = null;
     }
 
-    public async queueBatch(batch: ToDeviceBatch) {
+    public async queueBatch(batch: ToDeviceBatch): Promise<void> {
         const batches: ToDeviceBatchWithTxnId[] = [];
         for (let i = 0; i < batch.batch.length; i += MAX_BATCH_SIZE) {
             batches.push({
                 eventType: batch.eventType,
-                batch: batch.batch.slice(i, i + 20),
+                batch: batch.batch.slice(i, i + MAX_BATCH_SIZE),
                 txnId: this.client.makeTxnId(),
             });
         }
@@ -59,7 +59,7 @@ export class ToDeviceMessageQueue {
         this.sendQueue();
     }
 
-    public sendQueue = async () => {
+    public sendQueue = async (): Promise<void> => {
         if (this.retryTimeout !== null) clearTimeout(this.retryTimeout);
         this.retryTimeout = null;
 
