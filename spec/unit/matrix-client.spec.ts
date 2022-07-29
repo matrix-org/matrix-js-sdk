@@ -1353,10 +1353,10 @@ describe("MatrixClient", function() {
                 uris: [
                     "turn:turn.example.com:3478?transport=udp",
                     "turn:10.20.30.40:3478?transport=tcp",
-                    "turns:10.20.30.40:443?transport=tcp"
+                    "turns:10.20.30.40:443?transport=tcp",
                 ],
                 username: "1443779631:@user:example.com",
-                password: "JlKfBy1QwLrO20385QyAtEyIv0="
+                password: "JlKfBy1QwLrO20385QyAtEyIv0=",
             };
             jest.spyOn(client, "turnServer").mockResolvedValue(turnServer);
 
