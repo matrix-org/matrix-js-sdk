@@ -83,6 +83,8 @@ import { ISyncStateData } from "../sync";
 import { CryptoStore } from "./store/base";
 import { IVerificationChannel } from "./verification/request/Channel";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { ToDeviceBatch, ToDeviceMessage } from "../models/ToDeviceMessage";
+import { EventType } from "../matrix";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -209,11 +211,6 @@ export interface IEncryptedContent {
     ciphertext: Record<string, string>;
 }
 /* eslint-enable camelcase */
-
-interface IEncryptAndSendToDevicesResult {
-    contentMap: Record<string, Record<string, IEncryptedContent>>;
-    deviceInfoByUserIdAndDeviceId: Map<string, Map<string, DeviceInfo>>;
-}
 
 export enum CryptoEvent {
     DeviceVerificationChanged = "deviceVerificationChanged",
@@ -3124,16 +3121,18 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param {object} payload fields to include in the encrypted payload
      *      *
-     * @return {Promise<{contentMap, deviceInfoByDeviceId}>} Promise which
-     *     resolves once the message has been encrypted and sent to the given
-     *     userDeviceMap, and returns the { contentMap, deviceInfoByDeviceId }
-     *     of the successfully sent messages.
+     * @return {Promise<void>} Promise which resolves once the message
+     *   has been encrypted and queued for sending
      */
     public encryptAndSendToDevices(
         userDeviceInfoArr: IOlmDevice<DeviceInfo>[],
         payload: object,
-    ): Promise<IEncryptAndSendToDevicesResult> {
-        const contentMap: Record<string, Record<string, IEncryptedContent>> = {};
+    ): Promise<void> {
+        const toDeviceBatch: ToDeviceBatch = {
+            eventType: EventType.RoomMessageEncrypted,
+            batch: [],
+        };
+
         const deviceInfoByUserIdAndDeviceId = new Map<string, Map<string, DeviceInfo>>();
 
         const promises: Promise<unknown>[] = [];
@@ -3156,10 +3155,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             // We hold by reference, this updates deviceInfoByUserIdAndDeviceId[userId]
             userIdDeviceInfo.set(deviceId, deviceInfo);
 
-            if (!contentMap[userId]) {
-                contentMap[userId] = {};
-            }
-            contentMap[userId][deviceId] = encryptedContent;
+            toDeviceBatch.batch.push({
+                userId,
+                deviceId,
+                payload: encryptedContent,
+            });
 
             promises.push(
                 olmlib.ensureOlmSessionsForDevices(
@@ -3185,32 +3185,21 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             // in which case it will have just not added anything to the ciphertext object.
             // There's no point sending messages to devices if we couldn't encrypt to them,
             // since that's effectively a blank message.
-            for (const userId of Object.keys(contentMap)) {
-                for (const deviceId of Object.keys(contentMap[userId])) {
-                    if (Object.keys(contentMap[userId][deviceId].ciphertext).length === 0) {
-                        logger.log(`No ciphertext for device ${userId}:${deviceId}: pruning`);
-                        delete contentMap[userId][deviceId];
-                    }
-                }
-                // No devices left for that user? Strip that too.
-                if (Object.keys(contentMap[userId]).length === 0) {
-                    logger.log(`Pruned all devices for user ${userId}`);
-                    delete contentMap[userId];
+            const prunedBatch: ToDeviceMessage[] = [];
+            for (const msg of toDeviceBatch.batch) {
+                if (Object.keys(msg.payload.ciphertext).length > 0) {
+                    prunedBatch.push(msg);
+                } else {
+                    logger.log(
+                        "No ciphertext for device " +
+                        msg.userId + ":" + msg.deviceId + ": pruning",
+                    );
                 }
             }
 
-            // Is there anything left?
-            if (Object.keys(contentMap).length === 0) {
-                logger.log("No users left to send to: aborting");
-                return;
-            }
+            toDeviceBatch.batch = prunedBatch;
 
-            return this.baseApis.sendToDevice("m.room.encrypted", contentMap).then(
-                (response) => ({ contentMap, deviceInfoByUserIdAndDeviceId }),
-            ).catch(error => {
-                logger.error("sendToDevice failed", error);
-                throw error;
-            });
+            return this.baseApis.queueToDevice(toDeviceBatch);
         }).catch(error => {
             logger.error("encryptAndSendToDevices promises failed", error);
             throw error;
