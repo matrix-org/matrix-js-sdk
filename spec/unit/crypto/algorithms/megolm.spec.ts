@@ -360,8 +360,11 @@ describe("MegolmDecryption", function() {
 
                 // Splice the real method onto the mock object as megolm uses this method
                 // on the crypto class in order to encrypt / start sessions
+                // @ts-ignore Mock
                 mockCrypto.encryptAndSendToDevices = Crypto.prototype.encryptAndSendToDevices;
+                // @ts-ignore Mock
                 mockCrypto.olmDevice = olmDevice;
+                // @ts-ignore Mock
                 mockCrypto.baseApis = mockBaseApis;
 
                 mockRoom = {
