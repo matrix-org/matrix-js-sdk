@@ -1800,7 +1800,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 await this.peerConn.setLocalDescription(answer);
 
                 this.sendVoipEvent(EventType.CallNegotiate, {
-                    description: this.peerConn.localDescription,
+                    description: this.peerConn.localDescription?.toJSON(),
                     [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(true),
                 });
             }
@@ -1921,9 +1921,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         // clunky because TypeScript can't follow the types through if we use an expression as the key
         if (this.state === CallState.CreateOffer) {
-            content.offer = this.peerConn.localDescription;
+            content.offer = this.peerConn.localDescription?.toJSON();
         } else {
-            content.description = this.peerConn.localDescription;
+            content.description = this.peerConn.localDescription?.toJSON();
         }
 
         content.capabilities = {
@@ -2442,12 +2442,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return;
         }
 
-        const candidates = this.candidateSendQueue;
+        const candidates = this.candidateSendQueue.map(candidate => candidate.toJSON());
         this.candidateSendQueue = [];
         ++this.candidateSendTries;
-        const content = {
-            candidates: candidates,
-        };
+        const content = { candidates };
         logger.debug(`Call ${this.callId} attempting to send ${candidates.length} candidates`);
         try {
             await this.sendVoipEvent(EventType.CallCandidates, content);
