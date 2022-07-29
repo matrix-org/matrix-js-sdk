@@ -27,7 +27,7 @@ describe("ContentRepo", function() {
             });
 
         it("should return the empty string for null input", function() {
-            expect(getHttpUriForMxc(null, null)).toEqual("");
+            expect(getHttpUriForMxc(null as any, '')).toEqual("");
         });
 
         it("should return a thumbnail URL if a width/height/resize is specified",
