@@ -2873,7 +2873,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
         if (event.isRedacted()) {
-            const redactionEvent = new MatrixEvent(event.getUnsigned().redacted_because);
+            const redactionEvent = new MatrixEvent({
+                room_id: event.getRoomId(),
+                ...event.getUnsigned().redacted_because,
+            });
             const decryptedEvent = await this.decryptEvent(redactionEvent);
 
             return {
@@ -3236,8 +3239,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 this.secretStorage.onRequestReceived(event);
             } else if (event.getType() === "m.secret.send") {
                 this.secretStorage.onSecretReceived(event);
-            } else if (event.getType() === "m.room_key.withheld"
-                || event.getType() === "org.matrix.room_key.withheld") {
+            } else if (event.getType() === "m.room_key.withheld") {
                 this.onRoomKeyWithheldEvent(event);
             } else if (event.getContent().transaction_id) {
                 this.onKeyVerificationMessage(event);
