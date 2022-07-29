@@ -78,6 +78,9 @@ export class ToDeviceMessageQueue {
                 this.retryAttempts = 0;
             }
 
+            // Make sure we're still running after the async tasks: if not, stop.
+            if (!this.running) return;
+
             logger.debug("All queued to-device messages sent");
         } catch (e) {
             ++this.retryAttempts;
