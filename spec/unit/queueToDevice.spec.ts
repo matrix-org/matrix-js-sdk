@@ -96,6 +96,7 @@ describe.each([
 
     afterEach(function() {
         jest.useRealTimers();
+        client.stopClient();
     });
 
     it("sends a to-device message", async function() {
@@ -217,30 +218,26 @@ describe.each([
 
         await Promise.all([client.startClient(), httpBackend.flush(null, 1, 20)]);
 
-        try {
-            httpBackend.when(
-                "PUT", "/sendToDevice/org.example.foo/",
-            ).respond(500);
+        httpBackend.when(
+            "PUT", "/sendToDevice/org.example.foo/",
+        ).respond(500);
 
-            httpBackend.when(
-                "PUT", "/sendToDevice/org.example.foo/",
-            ).respond(200, {});
+        httpBackend.when(
+            "PUT", "/sendToDevice/org.example.foo/",
+        ).respond(200, {});
 
-            await client.queueToDevice({
-                eventType: "org.example.foo",
-                batch: [
-                    FAKE_MSG,
-                ],
-            });
-            expect(await httpBackend.flush(null, 1, 1)).toEqual(1);
-            await flushPromises();
+        await client.queueToDevice({
+            eventType: "org.example.foo",
+            batch: [
+                FAKE_MSG,
+            ],
+        });
+        expect(await httpBackend.flush(null, 1, 1)).toEqual(1);
+        await flushPromises();
 
-            client.retryImmediately();
+        client.retryImmediately();
 
-            expect(await httpBackend.flush(null, 1, 20)).toEqual(1);
-        } finally {
-            client.stopClient();
-        }
+        expect(await httpBackend.flush(null, 1, 20)).toEqual(1);
     });
 
     it("retries on when client is started", async function() {
@@ -250,31 +247,27 @@ describe.each([
 
         await Promise.all([client.startClient(), httpBackend.flush("/_matrix/client/versions", 1, 20)]);
 
-        try {
-            httpBackend.when(
-                "PUT", "/sendToDevice/org.example.foo/",
-            ).respond(500);
+        httpBackend.when(
+            "PUT", "/sendToDevice/org.example.foo/",
+        ).respond(500);
 
-            httpBackend.when(
-                "PUT", "/sendToDevice/org.example.foo/",
-            ).respond(200, {});
+        httpBackend.when(
+            "PUT", "/sendToDevice/org.example.foo/",
+        ).respond(200, {});
 
-            await client.queueToDevice({
-                eventType: "org.example.foo",
-                batch: [
-                    FAKE_MSG,
-                ],
-            });
-            expect(await httpBackend.flush(null, 1, 1)).toEqual(1);
-            await flushPromises();
+        await client.queueToDevice({
+            eventType: "org.example.foo",
+            batch: [
+                FAKE_MSG,
+            ],
+        });
+        expect(await httpBackend.flush(null, 1, 1)).toEqual(1);
+        await flushPromises();
 
-            client.stopClient();
-            await Promise.all([client.startClient(), httpBackend.flush("/_matrix/client/versions", 1, 20)]);
+        client.stopClient();
+        await Promise.all([client.startClient(), httpBackend.flush("/_matrix/client/versions", 1, 20)]);
 
-            expect(await httpBackend.flush(null, 1, 20)).toEqual(1);
-        } finally {
-            client.stopClient();
-        }
+        expect(await httpBackend.flush(null, 1, 20)).toEqual(1);
     });
 
     it("retries when a message is retried", async function() {
@@ -284,37 +277,33 @@ describe.each([
 
         await Promise.all([client.startClient(), httpBackend.flush(null, 1, 20)]);
 
-        try {
-            httpBackend.when(
-                "PUT", "/sendToDevice/org.example.foo/",
-            ).respond(500);
+        httpBackend.when(
+            "PUT", "/sendToDevice/org.example.foo/",
+        ).respond(500);
 
-            httpBackend.when(
-                "PUT", "/sendToDevice/org.example.foo/",
-            ).respond(200, {});
+        httpBackend.when(
+            "PUT", "/sendToDevice/org.example.foo/",
+        ).respond(200, {});
 
-            await client.queueToDevice({
-                eventType: "org.example.foo",
-                batch: [
-                    FAKE_MSG,
-                ],
-            });
+        await client.queueToDevice({
+            eventType: "org.example.foo",
+            batch: [
+                FAKE_MSG,
+            ],
+        });
 
-            expect(await httpBackend.flush(null, 1, 1)).toEqual(1);
-            await flushPromises();
+        expect(await httpBackend.flush(null, 1, 1)).toEqual(1);
+        await flushPromises();
 
-            const dummyEvent = new MatrixEvent({
-                event_id: "!fake:example.org",
-            });
-            const mockRoom = {
-                updatePendingEvent: jest.fn(),
-            } as unknown as Room;
-            client.resendEvent(dummyEvent, mockRoom);
+        const dummyEvent = new MatrixEvent({
+            event_id: "!fake:example.org",
+        });
+        const mockRoom = {
+            updatePendingEvent: jest.fn(),
+        } as unknown as Room;
+        client.resendEvent(dummyEvent, mockRoom);
 
-            expect(await httpBackend.flush(null, 1, 20)).toEqual(1);
-        } finally {
-            client.stopClient();
-        }
+        expect(await httpBackend.flush(null, 1, 20)).toEqual(1);
     });
 
     it("splits many messages into multiple HTTP requests", async function() {
