@@ -693,4 +693,63 @@ describe('Call', function() {
             expect(supportsMatrixCall()).toBe(false);
         });
     });
+
+    describe("should ignore streams with ids for which we already have a feed", () => {
+        const STREAM_ID = "stream_id";
+        const FEEDS_CHANGED_CALLBACK = jest.fn();
+
+        beforeEach(async () => {
+            await startVoiceCall(client, call);
+            call.on(CallEvent.FeedsChanged, FEEDS_CHANGED_CALLBACK);
+            jest.spyOn(call, "pushLocalFeed");
+        });
+
+        afterEach(() => {
+            FEEDS_CHANGED_CALLBACK.mockReset();
+        });
+
+        it("pushRemoteFeed()", async () => {
+            await call.onAnswerReceived({
+                getContent: () => {
+                    return {
+                        version: 1,
+                        call_id: call.callId,
+                        party_id: 'party_id',
+                        answer: {
+                            sdp: DUMMY_SDP,
+                        },
+                        [SDPStreamMetadataKey]: {
+                            [STREAM_ID]: {
+                                purpose: SDPStreamMetadataPurpose.Usermedia,
+                            },
+                        },
+                    };
+                },
+            });
+
+            call.pushRemoteFeed(new MockMediaStream(STREAM_ID));
+            call.pushRemoteFeed(new MockMediaStream(STREAM_ID));
+
+            expect(call.getRemoteFeeds().length).toBe(1);
+            expect(FEEDS_CHANGED_CALLBACK).toHaveBeenCalledTimes(1);
+        });
+
+        it("pushRemoteFeedWithoutMetadata()", async () => {
+            call.pushRemoteFeedWithoutMetadata(new MockMediaStream(STREAM_ID));
+            call.pushRemoteFeedWithoutMetadata(new MockMediaStream(STREAM_ID));
+
+            expect(call.getRemoteFeeds().length).toBe(1);
+            expect(FEEDS_CHANGED_CALLBACK).toHaveBeenCalledTimes(1);
+        });
+
+        it("pushNewLocalFeed()", async () => {
+            call.pushNewLocalFeed(new MockMediaStream(STREAM_ID), SDPStreamMetadataPurpose.Screenshare);
+            call.pushNewLocalFeed(new MockMediaStream(STREAM_ID), SDPStreamMetadataPurpose.Screenshare);
+
+            // We already have one local feed from placeVoiceCall()
+            expect(call.getLocalFeeds().length).toBe(2);
+            expect(FEEDS_CHANGED_CALLBACK).toHaveBeenCalledTimes(1);
+            expect(call.pushLocalFeed).toHaveBeenCalled();
+        });
+    });
 });
