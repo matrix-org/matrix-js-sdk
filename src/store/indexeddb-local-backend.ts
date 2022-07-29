@@ -579,7 +579,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         await txnAsPromise(txn);
     }
 
-    public async getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch> {
+    public async getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null> {
         const txn = this.db.transaction(["to_device_queue"], "readonly");
         const store = txn.objectStore("to_device_queue");
         const cursor = await reqAsCursorPromise(store.openCursor());
