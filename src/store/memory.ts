@@ -445,7 +445,7 @@ export class MemoryStore implements IStore {
         return Promise.resolve();
     }
 
-    public async getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch> {
+    public async getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null> {
         if (this.pendingToDeviceBatches.length === 0) return null;
         return this.pendingToDeviceBatches[0];
     }
