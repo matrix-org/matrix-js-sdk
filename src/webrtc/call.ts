@@ -2591,6 +2591,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private chooseOpponent(ev: MatrixEvent): void {
         // I choo-choo-choose you
         const msg = ev.getContent<MCallInviteNegotiate | MCallAnswer>();
+        const sender = ev.getSender();
 
         logger.debug(`Call ${this.callId} choosing opponent party ID ${msg.party_id}`);
 
@@ -2606,13 +2607,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.opponentPartyId = msg.party_id || null;
         }
         this.opponentCaps = msg.capabilities || {} as CallCapabilities;
-        this.opponentMember = this.client.getRoom(this.roomId).getMember(ev.getSender());
-        if (!this.opponentMember && this.client.localSfu) {
-            // XXX: call.ts is obsessed about there only being one person it's talking to
-            // but in an SFU world, there can be many.
-            logger.warn("choosing ourselves as an opponent for the SFU call for now");
-            this.opponentMember = this.client.getRoom(this.roomId).getMember(this.client.getUserId());
-        }
+        this.opponentMember = sender === this.client.localSfu
+            ? { userId: sender } as RoomMember // FIXME: While we never try to get anything other than the userId, this is WRONG
+            : this.client.getRoom(this.roomId).getMember(sender);
     }
 
     private async addBufferedIceCandidates(): Promise<void> {
