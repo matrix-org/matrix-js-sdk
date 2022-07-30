@@ -1543,6 +1543,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns boolean Whether group call signalling will be encrypted
      */
     public getUseE2eForGroupCall(): boolean {
+        // FIXME: SFUs don't support E2E atm
+        if (this.localSfu) return false;
         return this.useE2eForGroupCall;
     }
 
