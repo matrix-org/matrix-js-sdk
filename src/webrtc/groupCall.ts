@@ -1054,6 +1054,14 @@ export class GroupCall extends TypedEventEmitter<
             logger.info("Subscribing to ", streams, userId);
         }
 
+        call.dataChannel.onclose = () => {
+            logger.error("DC was closed");
+        };
+
+        call.dataChannel.onerror = (error) => {
+            logger.error("DC has errored", error);
+        };
+
         if (call.dataChannel.readyState === 'connecting') {
             const p: Promise<void> = new Promise(resolve => {});
             call.dataChannel.onopen = () => {
@@ -1084,6 +1092,7 @@ export class GroupCall extends TypedEventEmitter<
         };
 
         call.dataChannel.send(JSON.stringify(msg));
+        logger.warn("Sent select message over DC", msg);
     }
 
     private async onDataChannelMessage(call: MatrixCall, event: MessageEvent) {
@@ -1333,7 +1342,7 @@ export class GroupCall extends TypedEventEmitter<
             this.retryCallCounts.delete(getCallUserId(call));
 
             if (this.client.localSfu) {
-                // now we know what our feed IDs are, we can publish them
+                // now we know what our stream IDs are, we can publish them
                 // so others can subscribe to us...
                 this.sendMemberStateEvent();
 
@@ -1343,6 +1352,7 @@ export class GroupCall extends TypedEventEmitter<
                 for (const stateEvent of memberStateEvents) {
                     const userId = stateEvent.getStateKey();
                     // don't try to subscribe to our own feed(!)
+                    // TODO: What happens if we do?
                     if (userId === localUserId) continue;
                     const device = this.getDeviceForMember(userId);
                     this.subscribeStream(call, userId, device);
