@@ -29,7 +29,7 @@ fi
 npm --version > /dev/null || (echo "npm is required: please install it"; kill $$)
 yarn --version > /dev/null || (echo "yarn is required: please install it"; kill $$)
 
-USAGE="$0 [-xz] [-c changelog_file] vX.Y.Z"
+USAGE="$0 [-x] [-c changelog_file] vX.Y.Z"
 
 help() {
     cat <<EOF
@@ -37,7 +37,6 @@ $USAGE
 
     -c changelog_file:  specify name of file containing changelog
     -x:                 skip updating the changelog
-    -z:                 skip generating the jsdoc
     -n:                 skip publish to NPM
 EOF
 }
@@ -60,7 +59,6 @@ if ! git diff-files --quiet; then
 fi
 
 skip_changelog=
-skip_jsdoc=
 skip_npm=
 changelog_file="CHANGELOG.md"
 expected_npm_user="matrixdotorg"
@@ -75,9 +73,6 @@ while getopts hc:u:xzn f; do
             ;;
         x)
             skip_changelog=1
-            ;;
-        z)
-            skip_jsdoc=1
             ;;
         n)
             skip_npm=1
@@ -126,14 +121,16 @@ echo $release | grep -q '-' && prerelease=1
 
 if [ $prerelease -eq 1 ]; then
     echo Making a PRE-RELEASE
+else
+    read -p "Making a FINAL RELEASE, press enter to continue " REPLY
 fi
 
-# we might already be on the release branch, in which case, yay
-# If we're on any branch starting with 'release', we don't create
-# a separate release branch (this allows us to use the same
+# We might already be on the release branch, in which case, yay
+# If we're on any branch starting with 'release', or the staging branch
+# we don't create a separate release branch (this allows us to use the same
 # release branch for releases and release candidates).
 curbranch=$(git symbolic-ref --short HEAD)
-if [[ "$curbranch" != release* ]]; then
+if [[ "$curbranch" != release* && "$curbranch" != "staging" ]]; then
     echo "Creating release branch"
     git checkout -b "$rel_branch"
 else
@@ -324,22 +321,6 @@ if [ -z "$skip_npm" ]; then
         package=$(cat package.json | jq -er .name)
         npm dist-tag add "$package@$release" latest
     fi
-fi
-
-if [ -z "$skip_jsdoc" ]; then
-    echo "generating jsdocs"
-    yarn gendoc
-
-    echo "copying jsdocs to gh-pages branch"
-    git checkout gh-pages
-    git pull
-    cp -a ".jsdoc/matrix-js-sdk/$release" .
-    perl -i -pe 'BEGIN {$rel=shift} $_ =~ /^<\/ul>/ && print
-        "<li><a href=\"${rel}/index.html\">Version ${rel}</a></li>\n"' \
-        $release index.html
-    git add "$release"
-    git commit --no-verify -m "Add jsdoc for $release" index.html "$release"
-    git push origin gh-pages
 fi
 
 # if it is a pre-release, leave it on the release branch for now.

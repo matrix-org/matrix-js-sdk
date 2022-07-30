@@ -243,7 +243,7 @@ export class IndexedDBStore extends MemoryStore {
      * @returns {event[]} the events, potentially an empty array if OOB loading didn't yield any new members
      * @returns {null} in case the members for this room haven't been stored yet
      */
-    public getOutOfBandMembers = this.degradable((roomId: string): Promise<IStateEventWithRoomId[]> => {
+    public getOutOfBandMembers = this.degradable((roomId: string): Promise<IStateEventWithRoomId[] | null> => {
         return this.backend.getOutOfBandMembers(roomId);
     }, "getOutOfBandMembers");
 
@@ -297,7 +297,7 @@ export class IndexedDBStore extends MemoryStore {
 
         return async (...args) => {
             try {
-                return func.call(this, ...args);
+                return await func.call(this, ...args);
             } catch (e) {
                 logger.error("IndexedDBStore failure, degrading to MemoryStore", e);
                 this.emitter.emit("degraded", e);
@@ -320,11 +320,45 @@ export class IndexedDBStore extends MemoryStore {
                 // `IndexedDBStore` also maintain the state that `MemoryStore` uses (many are
                 // not overridden at all).
                 if (fallbackFn) {
-                    return fallbackFn(...args);
+                    return fallbackFn.call(this, ...args);
                 }
             }
         };
     }
+
+    // XXX: ideally these would be stored in indexeddb as part of the room but,
+    // we don't store rooms as such and instead accumulate entire sync responses atm.
+    public async getPendingEvents(roomId: string): Promise<Partial<IEvent>[]> {
+        if (!this.localStorage) return super.getPendingEvents(roomId);
+
+        const serialized = this.localStorage.getItem(pendingEventsKey(roomId));
+        if (serialized) {
+            try {
+                return JSON.parse(serialized);
+            } catch (e) {
+                logger.error("Could not parse persisted pending events", e);
+            }
+        }
+        return [];
+    }
+
+    public async setPendingEvents(roomId: string, events: Partial<IEvent>[]): Promise<void> {
+        if (!this.localStorage) return super.setPendingEvents(roomId, events);
+
+        if (events.length > 0) {
+            this.localStorage.setItem(pendingEventsKey(roomId), JSON.stringify(events));
+        } else {
+            this.localStorage.removeItem(pendingEventsKey(roomId));
+        }
+    }
+}
+
+/**
+ * @param {string} roomId ID of the current room
+ * @returns {string} Storage key to retrieve pending events
+ */
+function pendingEventsKey(roomId: string): string {
+    return `mx_pending_events_${roomId}`;
 }
 
 type DegradableFn<A extends Array<any>, T> = (...args: A) => Promise<T>;

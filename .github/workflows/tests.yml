@@ -2,14 +2,17 @@ name: Tests
 on:
   pull_request: { }
   push:
-    branches: [ develop, main, master ]
+    branches: [ develop, master ]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   jest:
     name: Jest
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Yarn cache
         uses: actions/setup-node@v3
@@ -23,10 +26,10 @@ jobs:
         run: "yarn build"
 
       - name: Run tests with coverage
-        run: "yarn coverage --ci"
+        run: "yarn coverage --ci --reporters github-actions"
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: coverage
           path: |

@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { SDPStreamMetadataPurpose } from "./callEventTypes";
+import { acquireContext, releaseContext } from "./audioContext";
 import { MatrixClient } from "../client";
 import { RoomMember } from "../models/room-member";
 import { logger } from "../logger";
@@ -43,6 +44,7 @@ export interface ICallFeedOpts {
 export enum CallFeedEvent {
     NewStream = "new_stream",
     MuteStateChanged = "mute_state_changed",
+    LocalVolumeChanged = "local_volume_changed",
     VolumeChanged = "volume_changed",
     Speaking = "speaking",
 }
@@ -50,6 +52,7 @@ export enum CallFeedEvent {
 type EventHandlerMap = {
     [CallFeedEvent.NewStream]: (stream: MediaStream) => void;
     [CallFeedEvent.MuteStateChanged]: (audioMuted: boolean, videoMuted: boolean) => void;
+    [CallFeedEvent.LocalVolumeChanged]: (localVolume: number) => void;
     [CallFeedEvent.VolumeChanged]: (volume: number) => void;
     [CallFeedEvent.Speaking]: (speaking: boolean) => void;
 };
@@ -65,6 +68,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     private roomId: string;
     private audioMuted: boolean;
     private videoMuted: boolean;
+    private localVolume = 1;
     private measuringVolumeActivity = false;
     private audioContext: AudioContext;
     private analyser: AnalyserNode;
@@ -118,10 +122,8 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     }
 
     private initVolumeMeasuring(): void {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        if (!this.hasAudioTrack || !AudioContext) return;
-
-        this.audioContext = new AudioContext();
+        if (!this.hasAudioTrack) return;
+        if (!this.audioContext) this.audioContext = acquireContext();
 
         this.analyser = this.audioContext.createAnalyser();
         this.analyser.fftSize = 512;
@@ -187,21 +189,18 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     }
 
     /**
-     * Set feed's internal audio mute state
-     * @param muted is the feed's audio muted?
-     */
-    public setAudioMuted(muted: boolean): void {
-        this.audioMuted = muted;
-        this.speakingVolumeSamples.fill(-Infinity);
-        this.emit(CallFeedEvent.MuteStateChanged, this.audioMuted, this.videoMuted);
-    }
-
-    /**
-     * Set feed's internal video mute state
+     * Set one or both of feed's internal audio and video video mute state
+     * Either value may be null to leave it as-is
      * @param muted is the feed's video muted?
      */
-    public setVideoMuted(muted: boolean): void {
-        this.videoMuted = muted;
+    public setAudioVideoMuted(audioMuted: boolean, videoMuted: boolean): void {
+        if (audioMuted !== null) {
+            if (this.audioMuted !== audioMuted) {
+                this.speakingVolumeSamples.fill(-Infinity);
+            }
+            this.audioMuted = audioMuted;
+        }
+        if (videoMuted !== null) this.videoMuted = videoMuted;
         this.emit(CallFeedEvent.MuteStateChanged, this.audioMuted, this.videoMuted);
     }
 
@@ -211,7 +210,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
      */
     public measureVolumeActivity(enabled: boolean): void {
         if (enabled) {
-            if (!this.audioContext || !this.analyser || !this.frequencyBinCount || !this.hasAudioTrack) return;
+            if (!this.analyser || !this.frequencyBinCount || !this.hasAudioTrack) return;
 
             this.measuringVolumeActivity = true;
             this.volumeLooper();
@@ -288,5 +287,20 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
     public dispose(): void {
         clearTimeout(this.volumeLooperTimeout);
+        this.stream?.removeEventListener("addtrack", this.onAddTrack);
+        if (this.audioContext) {
+            this.audioContext = null;
+            this.analyser = null;
+            releaseContext();
+        }
+    }
+
+    public getLocalVolume(): number {
+        return this.localVolume;
+    }
+
+    public setLocalVolume(localVolume: number): void {
+        this.localVolume = localVolume;
+        this.emit(CallFeedEvent.LocalVolumeChanged, localVolume);
     }
 }

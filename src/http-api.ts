@@ -48,9 +48,14 @@ TODO:
 export const PREFIX_R0 = "/_matrix/client/r0";
 
 /**
- * A constant representing the URI path for release v1 of the Client-Server HTTP API.
+ * A constant representing the URI path for the legacy release v1 of the Client-Server HTTP API.
  */
 export const PREFIX_V1 = "/_matrix/client/v1";
+
+/**
+ * A constant representing the URI path for Client-Server API endpoints versioned at v3.
+ */
+export const PREFIX_V3 = "/_matrix/client/v3";
 
 /**
  * A constant representing the URI path for as-yet unspecified Client-Server HTTP APIs.
@@ -106,6 +111,7 @@ interface IRequest extends _Request {
 
 interface IRequestOpts<T> {
     prefix?: string;
+    baseUrl?: string;
     localTimeoutMs?: number;
     headers?: Record<string, string>;
     json?: boolean; // defaults to true
@@ -403,7 +409,7 @@ export class MatrixHttpApi {
                                 resp = bodyParser(resp);
                             }
                         } catch (err) {
-                            err.http_status = xhr.status;
+                            err.httpStatus = xhr.status;
                             cb(err);
                             return;
                         }
@@ -571,6 +577,9 @@ export class MatrixHttpApi {
      * @param {string=} opts.prefix The full prefix to use e.g.
      * "/_matrix/client/v2_alpha". If not specified, uses this.opts.prefix.
      *
+     * @param {string=} opts.baseUrl The alternative base url to use.
+     * If not specified, uses this.opts.baseUrl
+     *
      * @param {Object=} opts.headers map of additional request headers
      *
      * @return {Promise} Resolves to <code>{data: {Object},
@@ -666,7 +675,8 @@ export class MatrixHttpApi {
         opts?: O,
     ): IAbortablePromise<ResponseType<T, O>> {
         const prefix = opts?.prefix ?? this.opts.prefix;
-        const fullUri = this.opts.baseUrl + prefix + path;
+        const baseUrl = opts?.baseUrl ?? this.opts.baseUrl;
+        const fullUri = baseUrl + prefix + path;
 
         return this.requestOtherUrl<T, O>(callback, method, fullUri, queryParams, data, opts);
     }
@@ -1055,7 +1065,7 @@ interface IErrorJson extends Partial<IUsageLimit> {
  * @prop {string} name Same as MatrixError.errcode but with a default unknown string.
  * @prop {string} message The Matrix 'error' value, e.g. "Missing token."
  * @prop {Object} data The raw Matrix error JSON used to construct this object.
- * @prop {integer} httpStatus The numeric HTTP status code given
+ * @prop {number} httpStatus The numeric HTTP status code given
  */
 export class MatrixError extends Error {
     public readonly errcode: string;

@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent, MatrixEventEvent } from '../models/event';
+import { MatrixEvent } from '../models/event';
 import { logger } from '../logger';
 import { CallDirection, CallErrorCode, CallState, createNewMatrixCall, MatrixCall } from './call';
 import { EventType } from '../@types/event';
 import { ClientEvent, MatrixClient } from '../client';
 import { MCallAnswer, MCallHangupReject } from "./callEventTypes";
-import { GroupCallError, GroupCallErrorCode, GroupCallEvent } from './groupCall';
+import { GroupCall, GroupCallErrorCode, GroupCallEvent, GroupCallUnknownDeviceError } from './groupCall';
 import { RoomEvent } from "../models/room";
 
 // Don't ring unless we'd be ringing for at least 3 seconds: the user needs some
@@ -94,7 +94,7 @@ export class CallEventHandler {
             return eventType.startsWith("m.call.") || eventType.startsWith("org.matrix.call.");
         });
 
-        const ignoreCallIds = new Set<String>();
+        const ignoreCallIds = new Set<string>();
 
         // inspect the buffer and mark all calls which have been answered
         // or hung up before passing them to the call event handler.
@@ -140,13 +140,6 @@ export class CallEventHandler {
             this.nextSeqByCall.set(content.call_id, 0);
         }
 
-        if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
-            // add an event listener for once the event is decrypted.
-            event.once(MatrixEventEvent.Decrypted, async () => {
-                if (!this.eventIsACall(event)) return;
-            });
-        }
-
         if (content.seq === undefined) {
             this.callEventBuffer.push(event);
             return;
@@ -184,15 +177,6 @@ export class CallEventHandler {
         }
     };
 
-    private eventIsACall(event: MatrixEvent): boolean {
-        const type = event.getType();
-        /**
-         * Unstable prefixes:
-         *   - org.matrix.call. : MSC3086 https://github.com/matrix-org/matrix-doc/pull/3086
-         */
-        return type.startsWith("m.call.") || type.startsWith("org.matrix.call.");
-    }
-
     private async handleCallEvent(event: MatrixEvent) {
         this.client.emit(ClientEvent.ReceivedVoipEvent, event);
 
@@ -210,8 +194,9 @@ export class CallEventHandler {
 
         let opponentDeviceId: string | undefined;
 
+        let groupCall: GroupCall;
         if (groupCallId) {
-            const groupCall = this.client.groupCallEventHandler.getGroupCallById(groupCallId);
+            groupCall = this.client.groupCallEventHandler.getGroupCallById(groupCallId);
 
             if (!groupCall) {
                 logger.warn(`Cannot find a group call ${groupCallId} for event ${type}. Ignoring event.`);
@@ -224,10 +209,7 @@ export class CallEventHandler {
                 logger.warn(`Cannot find a device id for ${senderId}. Ignoring event.`);
                 groupCall.emit(
                     GroupCallEvent.Error,
-                    new GroupCallError(
-                        GroupCallErrorCode.UnknownDevice,
-                        `Incoming Call: No opponent device found for ${senderId}, ignoring.`,
-                    ),
+                    new GroupCallUnknownDeviceError(senderId),
                 );
                 return;
             }
@@ -282,7 +264,13 @@ export class CallEventHandler {
             }
 
             call.callId = content.call_id;
-            await call.initWithInvite(event);
+            try {
+                await call.initWithInvite(event);
+            } catch (e) {
+                if (e.code === GroupCallErrorCode.UnknownDevice) {
+                    groupCall?.emit(GroupCallEvent.Error, e);
+                }
+            }
             this.calls.set(call.callId, call);
 
             // if we stashed candidate events for that call ID, play them back now
@@ -293,7 +281,7 @@ export class CallEventHandler {
             }
 
             // Were we trying to call that user (room)?
-            let existingCall;
+            let existingCall: MatrixCall;
             for (const thisCall of this.calls.values()) {
                 const isCalling = [CallState.WaitLocalMedia, CallState.CreateOffer, CallState.InviteSent].includes(
                     thisCall.state,
@@ -380,7 +368,7 @@ export class CallEventHandler {
 
         // The following events need a call and a peer connection
         if (!call || !call.hasPeerConnection) {
-            logger.warn("Discarding an event, we don't have a call/peerConn", type);
+            logger.info(`Discarding possible call event ${event.getId()} as we don't have a call/peerConn`, type);
             return;
         }
         // Ignore remote echo

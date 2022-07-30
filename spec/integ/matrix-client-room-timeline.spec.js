@@ -1,5 +1,6 @@
 import * as utils from "../test-utils/test-utils";
 import { EventStatus } from "../../src/models/event";
+import { RoomEvent } from "../../src";
 import { TestClient } from "../TestClient";
 
 describe("MatrixClient room timelines", function() {
@@ -579,7 +580,7 @@ describe("MatrixClient room timelines", function() {
             });
         });
 
-        it("should emit a 'Room.timelineReset' event", function() {
+        it("should emit a `RoomEvent.TimelineReset` event when the sync response is `limited`", function() {
             const eventData = [
                 utils.mkMessage({ user: userId, room: roomId }),
             ];
@@ -606,6 +607,273 @@ describe("MatrixClient room timelines", function() {
                     expect(emitCount).toEqual(1);
                 });
             });
+        });
+    });
+
+    describe('Refresh live timeline', () => {
+        const initialSyncEventData = [
+            utils.mkMessage({ user: userId, room: roomId }),
+            utils.mkMessage({ user: userId, room: roomId }),
+            utils.mkMessage({ user: userId, room: roomId }),
+        ];
+
+        const contextUrl = `/rooms/${encodeURIComponent(roomId)}/context/` +
+        `${encodeURIComponent(initialSyncEventData[2].event_id)}`;
+        const contextResponse = {
+            start: "start_token",
+            events_before: [initialSyncEventData[1], initialSyncEventData[0]],
+            event: initialSyncEventData[2],
+            events_after: [],
+            state: [
+                USER_MEMBERSHIP_EVENT,
+            ],
+            end: "end_token",
+        };
+
+        let room;
+        beforeEach(async () => {
+            setNextSyncData(initialSyncEventData);
+
+            // Create a room from the sync
+            await Promise.all([
+                httpBackend.flushAllExpected(),
+                utils.syncPromise(client, 1),
+            ]);
+
+            // Get the room after the first sync so the room is created
+            room = client.getRoom(roomId);
+            expect(room).toBeTruthy();
+        });
+
+        it('should clear and refresh messages in timeline', async () => {
+            // `/context` request for `refreshLiveTimeline()` -> `getEventTimeline()`
+            // to construct a new timeline from.
+            httpBackend.when("GET", contextUrl)
+                .respond(200, function() {
+                    // The timeline should be cleared at this point in the refresh
+                    expect(room.timeline.length).toEqual(0);
+
+                    return contextResponse;
+                });
+
+            // Refresh the timeline.
+            await Promise.all([
+                room.refreshLiveTimeline(),
+                httpBackend.flushAllExpected(),
+            ]);
+
+            // Make sure the message are visible
+            const resultantEventsInTimeline = room.getUnfilteredTimelineSet().getLiveTimeline().getEvents();
+            const resultantEventIdsInTimeline = resultantEventsInTimeline.map((event) => event.getId());
+            expect(resultantEventIdsInTimeline).toEqual([
+                initialSyncEventData[0].event_id,
+                initialSyncEventData[1].event_id,
+                initialSyncEventData[2].event_id,
+            ]);
+        });
+
+        it('Perfectly merges timelines if a sync finishes while refreshing the timeline', async () => {
+            // `/context` request for `refreshLiveTimeline()` ->
+            // `getEventTimeline()` to construct a new timeline from.
+            //
+            // We only resolve this request after we detect that the timeline
+            // was reset(when it goes blank) and force a sync to happen in the
+            // middle of all of this refresh timeline logic. We want to make
+            // sure the sync pagination still works as expected after messing
+            // the refresh timline logic messes with the pagination tokens.
+            httpBackend.when("GET", contextUrl)
+                .respond(200, () => {
+                    // Now finally return and make the `/context` request respond
+                    return contextResponse;
+                });
+
+            // Wait for the timeline to reset(when it goes blank) which means
+            // it's in the middle of the refrsh logic right before the
+            // `getEventTimeline()` -> `/context`. Then simulate a racey `/sync`
+            // to happen in the middle of all of this refresh timeline logic. We
+            // want to make sure the sync pagination still works as expected
+            // after messing the refresh timline logic messes with the
+            // pagination tokens.
+            //
+            // We define this here so the event listener is in place before we
+            // call `room.refreshLiveTimeline()`.
+            const racingSyncEventData = [
+                utils.mkMessage({ user: userId, room: roomId }),
+            ];
+            const waitForRaceySyncAfterResetPromise = new Promise((resolve, reject) => {
+                let eventFired = false;
+                // Throw a more descriptive error if this part of the test times out.
+                const failTimeout = setTimeout(() => {
+                    if (eventFired) {
+                        reject(new Error(
+                            'TestError: `RoomEvent.TimelineReset` fired but we timed out trying to make' +
+                            'a `/sync` happen in time.',
+                        ));
+                    } else {
+                        reject(new Error(
+                            'TestError: Timed out while waiting for `RoomEvent.TimelineReset` to fire.',
+                        ));
+                    }
+                }, 4000 /* FIXME: Is there a way to reference the current timeout of this test in Jest? */);
+
+                room.on(RoomEvent.TimelineReset, async () => {
+                    try {
+                        eventFired = true;
+
+                        // The timeline should be cleared at this point in the refresh
+                        expect(room.getUnfilteredTimelineSet().getLiveTimeline().getEvents().length).toEqual(0);
+
+                        // Then make a `/sync` happen by sending a message and seeing that it
+                        // shows up (simulate a /sync naturally racing with us).
+                        setNextSyncData(racingSyncEventData);
+                        httpBackend.when("GET", "/sync").respond(200, function() {
+                            return NEXT_SYNC_DATA;
+                        });
+                        await Promise.all([
+                            httpBackend.flush("/sync", 1),
+                            utils.syncPromise(client, 1),
+                        ]);
+                        // Make sure the timeline has the racey sync data
+                        const afterRaceySyncTimelineEvents = room
+                            .getUnfilteredTimelineSet()
+                            .getLiveTimeline()
+                            .getEvents();
+                        const afterRaceySyncTimelineEventIds = afterRaceySyncTimelineEvents
+                            .map((event) => event.getId());
+                        expect(afterRaceySyncTimelineEventIds).toEqual([
+                            racingSyncEventData[0].event_id,
+                        ]);
+
+                        clearTimeout(failTimeout);
+                        resolve();
+                    } catch (err) {
+                        reject(err);
+                    }
+                });
+            });
+
+            // Refresh the timeline. Just start the function, we will wait for
+            // it to finish after the racey sync.
+            const refreshLiveTimelinePromise = room.refreshLiveTimeline();
+
+            await waitForRaceySyncAfterResetPromise;
+
+            await Promise.all([
+                refreshLiveTimelinePromise,
+                // Then flush the remaining `/context` to left the refresh logic complete
+                httpBackend.flushAllExpected(),
+            ]);
+
+            // Make sure sync pagination still works by seeing a new message show up
+            // after refreshing the timeline.
+            const afterRefreshEventData = [
+                utils.mkMessage({ user: userId, room: roomId }),
+            ];
+            setNextSyncData(afterRefreshEventData);
+            httpBackend.when("GET", "/sync").respond(200, function() {
+                return NEXT_SYNC_DATA;
+            });
+            await Promise.all([
+                httpBackend.flushAllExpected(),
+                utils.syncPromise(client, 1),
+            ]);
+
+            // Make sure the timeline includes the the events from the `/sync`
+            // that raced and beat us in the middle of everything and the
+            // `/sync` after the refresh. Since the `/sync` beat us to create
+            // the timeline, `initialSyncEventData` won't be visible unless we
+            // paginate backwards with `/messages`.
+            const resultantEventsInTimeline = room.getUnfilteredTimelineSet().getLiveTimeline().getEvents();
+            const resultantEventIdsInTimeline = resultantEventsInTimeline.map((event) => event.getId());
+            expect(resultantEventIdsInTimeline).toEqual([
+                racingSyncEventData[0].event_id,
+                afterRefreshEventData[0].event_id,
+            ]);
+        });
+
+        it('Timeline recovers after `/context` request to generate new timeline fails', async () => {
+            // `/context` request for `refreshLiveTimeline()` -> `getEventTimeline()`
+            // to construct a new timeline from.
+            httpBackend.when("GET", contextUrl)
+                .respond(500, function() {
+                    // The timeline should be cleared at this point in the refresh
+                    expect(room.timeline.length).toEqual(0);
+
+                    return {
+                        errcode: 'TEST_FAKE_ERROR',
+                        error: 'We purposely intercepted this /context request to make it fail ' +
+                                 'in order to test whether the refresh timeline code is resilient',
+                    };
+                });
+
+            // Refresh the timeline and expect it to fail
+            const settledFailedRefreshPromises = await Promise.allSettled([
+                room.refreshLiveTimeline(),
+                httpBackend.flushAllExpected(),
+            ]);
+            // We only expect `TEST_FAKE_ERROR` here. Anything else is
+            // unexpected and should fail the test.
+            if (settledFailedRefreshPromises[0].status === 'fulfilled') {
+                throw new Error('Expected the /context request to fail with a 500');
+            } else if (settledFailedRefreshPromises[0].reason.errcode !== 'TEST_FAKE_ERROR') {
+                throw settledFailedRefreshPromises[0].reason;
+            }
+
+            // The timeline will be empty after we refresh the timeline and fail
+            // to construct a new timeline.
+            expect(room.timeline.length).toEqual(0);
+
+            // `/messages` request for `refreshLiveTimeline()` ->
+            // `getLatestTimeline()` to construct a new timeline from.
+            httpBackend.when("GET", `/rooms/${encodeURIComponent(roomId)}/messages`)
+                .respond(200, function() {
+                    return {
+                        chunk: [{
+                            // The latest message in the room
+                            event_id: initialSyncEventData[2].event_id,
+                        }],
+                    };
+                });
+            // `/context` request for `refreshLiveTimeline()` ->
+            // `getLatestTimeline()` -> `getEventTimeline()` to construct a new
+            // timeline from.
+            httpBackend.when("GET", contextUrl)
+                .respond(200, function() {
+                    // The timeline should be cleared at this point in the refresh
+                    expect(room.timeline.length).toEqual(0);
+
+                    return contextResponse;
+                });
+
+            // Refresh the timeline again but this time it should pass
+            await Promise.all([
+                room.refreshLiveTimeline(),
+                httpBackend.flushAllExpected(),
+            ]);
+
+            // Make sure sync pagination still works by seeing a new message show up
+            // after refreshing the timeline.
+            const afterRefreshEventData = [
+                utils.mkMessage({ user: userId, room: roomId }),
+            ];
+            setNextSyncData(afterRefreshEventData);
+            httpBackend.when("GET", "/sync").respond(200, function() {
+                return NEXT_SYNC_DATA;
+            });
+            await Promise.all([
+                httpBackend.flushAllExpected(),
+                utils.syncPromise(client, 1),
+            ]);
+
+            // Make sure the message are visible
+            const resultantEventsInTimeline = room.getUnfilteredTimelineSet().getLiveTimeline().getEvents();
+            const resultantEventIdsInTimeline = resultantEventsInTimeline.map((event) => event.getId());
+            expect(resultantEventIdsInTimeline).toEqual([
+                initialSyncEventData[0].event_id,
+                initialSyncEventData[1].event_id,
+                initialSyncEventData[2].event_id,
+                afterRefreshEventData[0].event_id,
+            ]);
         });
     });
 });
