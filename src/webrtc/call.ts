@@ -1142,7 +1142,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             await this.upgradeCall(false, true);
             return this.isLocalVideoMuted();
         }
-        this.localUsermediaFeed?.setVideoMuted(muted);
+        this.localUsermediaFeed?.setAudioVideoMuted(null, muted);
         this.updateMuteStatus();
         return this.isLocalVideoMuted();
     }
@@ -1174,7 +1174,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             await this.upgradeCall(true, false);
             return this.isMicrophoneMuted();
         }
-        this.localUsermediaFeed?.setAudioMuted(muted);
+        this.localUsermediaFeed?.setAudioVideoMuted(muted, null);
         this.updateMuteStatus();
         return this.isMicrophoneMuted();
     }
@@ -1585,8 +1585,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.remoteSDPStreamMetadata = utils.recursivelyAssign(this.remoteSDPStreamMetadata || {}, metadata, true);
         for (const feed of this.getRemoteFeeds()) {
             const streamId = feed.stream.id;
-            feed.setAudioMuted(this.remoteSDPStreamMetadata[streamId]?.audio_muted);
-            feed.setVideoMuted(this.remoteSDPStreamMetadata[streamId]?.video_muted);
+            const metadata = this.remoteSDPStreamMetadata[streamId];
+
+            feed.setAudioVideoMuted(metadata?.audio_muted, metadata?.video_muted);
             feed.purpose = this.remoteSDPStreamMetadata[streamId]?.purpose;
         }
     }
