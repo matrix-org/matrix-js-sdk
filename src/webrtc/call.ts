@@ -843,7 +843,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const sdpStreamMetadata = invite[SDPStreamMetadataKey];
         if (sdpStreamMetadata) {
             this.updateRemoteSDPStreamMetadata(sdpStreamMetadata);
-        } else {
+        } else if (!this.client.localSfu) {
             logger.debug(`Call ${
                 this.callId} did not get any SDPStreamMetadata! Can not send/receive multiple streams`);
         }
@@ -1694,7 +1694,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const sdpStreamMetadata = content[SDPStreamMetadataKey];
         if (sdpStreamMetadata) {
             this.updateRemoteSDPStreamMetadata(sdpStreamMetadata);
-        } else {
+        } else if (!this.client.localSfu) {
             logger.warn(`Call ${this.callId} Did not get any SDPStreamMetadata! Can not send/receive multiple streams`);
         }
 
