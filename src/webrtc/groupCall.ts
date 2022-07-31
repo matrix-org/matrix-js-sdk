@@ -13,7 +13,7 @@ import { RoomMember } from "../models/room-member";
 import { Room } from "../models/room";
 import { logger } from "../logger";
 import { ReEmitter } from "../ReEmitter";
-import { SDPStreamMetadataPurpose } from "./callEventTypes";
+import { SDPStreamMetadata, SDPStreamMetadataPurpose } from "./callEventTypes";
 import { createNewMatrixCall } from "./call";
 import { ISendEventResponse } from "../@types/requests";
 import { MatrixEvent } from "../models/event";
@@ -22,6 +22,7 @@ import { CallEventHandlerEvent } from "./callEventHandler";
 import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
 import { randomString } from "../randomstring";
 import { IScreensharingOpts } from "./mediaHandler";
+import { recursivelyAssign } from "../utils";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -112,7 +113,7 @@ export interface IGroupCallMemberTrack {
 }
 
 export interface IGroupCallMemberFeed {
-    // id: string; // pc.getLocalStreams() is deprecated so we can't get a stream ID any more...
+    id: string;
     purpose: SDPStreamMetadataPurpose;
     tracks: IGroupCallMemberTrack[];
 }
@@ -131,7 +132,7 @@ export interface IGroupCallMemberCallState {
 
 export interface ISfuTrackDesc {
     "stream_id": string;
-    "track_id": string;
+    "track_id"?: string;
 }
 
 export interface ISfuDataChannelMessage {
@@ -266,6 +267,7 @@ export class GroupCall extends TypedEventEmitter<
     private transmitTimer: ReturnType<typeof setTimeout> | null = null;
     private memberStateExpirationTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
     private resendMemberStateTimer: ReturnType<typeof setTimeout> | null = null;
+    private subscribedStreams: ISfuTrackDesc[] = [];
 
     constructor(
         private client: MatrixClient,
@@ -764,40 +766,24 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     private async sendMemberStateEvent(): Promise<ISendEventResponse> {
-        let feeds;
-        if (this.client.localSfu) {
-            if (this.calls.length == 0) {
-                logger.warn("Can't publish accurate m.call.member event as SFU call not set up yet");
-                // placeholder feed content
-                feeds = this.getLocalFeeds().map((feed) => ({
-                    "purpose": feed.purpose,
-                }));
-            } else {
-                feeds = this.getLocalFeeds().map((feed) => ({
-                    "purpose": SDPStreamMetadataPurpose.Usermedia, // FIXME - track
+        const feeds = this.getLocalFeeds().map((feed) => ({
+            purpose: feed.purpose,
+            id: feed.stream.id,
 
-                    // we have to advertise the actual tracks we're sending to the SFU from the PC
-                    // we can't use the feeds' mediaStream IDs, as they are local rather than the copy
-                    // sent over WebRTC
-                    //
-                    // TODO: correctly track which rtpSenders are associated with which feed
-                    // rather than assuming that all our senders are from this feed.
-                    "tracks": this.calls[0].peerConn.getTransceivers().map(transceiver => ({
-                        "id": getTrackDesc(this.calls[0].peerConn.localDescription?.sdp, transceiver.mid)?.track_id,
-                        "kind": transceiver.sender.track.kind,
-                        "settings": defloat(transceiver.sender.track.getSettings()),
-                    })),
-                }));
-                logger.warn("calculated SFU feeds as", feeds);
-            }
-        } else {
-            feeds = this.getLocalFeeds().map((feed) => ({
-                "purpose": feed.purpose,
-                // don't bother publishing feed details
-                // if we're not using an SFU, given each
-                // call will have a different ID.
-            }));
-        }
+            // we have to advertise the actual tracks we're sending to the SFU from the PC
+            // we can't use the feeds' mediaStream IDs, as they are local rather than the copy
+            // sent over WebRTC
+            //
+            // TODO: correctly track which rtpSenders are associated with which feed
+            // rather than assuming that all our senders are from this feed.
+            tracks: this.calls[0]
+                ? this.calls[0].peerConn.getTransceivers().map(transceiver => ({
+                    "id": getTrackDesc(this.calls[0].peerConn.localDescription?.sdp, transceiver.mid)?.track_id,
+                    "kind": transceiver.sender.track.kind,
+                    "settings": defloat(transceiver.sender.track.getSettings()),
+                }))
+                : undefined,
+        }));
 
         const send = () => this.updateMemberCallState({
             "m.call_id": this.groupCallId,
@@ -861,6 +847,33 @@ export class GroupCall extends TypedEventEmitter<
         return this.client.sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, content, localUserId);
     }
 
+    private getRemoteFeedsFromState(): IGroupCallMemberFeed[] {
+        return this.getMemberStateEvents()?.reduce((feeds, event) => {
+            if (event.getSender() === this.client.getUserId()) return feeds; // Ignore local
+            const newFeeds = event.getContent<IGroupCallRoomMemberState>()?.["m.calls"]?.[0]?.["m.devices"]?.[0]?.feeds;
+            if (!newFeeds) return feeds;
+            return [...feeds, ...newFeeds];
+        }, []) ?? [];
+    }
+
+    private getRemoteSDPStreamMetadataForCall(): SDPStreamMetadata {
+        return this.getMemberStateEvents().reduce((metaAcc: SDPStreamMetadata, event: MatrixEvent) => {
+            if (event.getSender() === this.client.getUserId()) return metaAcc; // Ignore local
+            const feeds = event.getContent<IGroupCallRoomMemberState>()?.["m.calls"]?.[0]?.["m.devices"]?.[0]?.feeds;
+            if (!feeds) return metaAcc;
+            const metadata = feeds.reduce((feedAcc: SDPStreamMetadata, feed: IGroupCallMemberFeed) => {
+                if (!feed?.id) return feedAcc;
+                return recursivelyAssign(feedAcc, {
+                    [feed.id]: {
+                        purpose: feed.purpose,
+                        userId: event.getSender(),
+                    },
+                }, true);
+            }, {});
+            return recursivelyAssign(metaAcc, metadata, true);
+        }, {});
+    }
+
     public onMemberStateChanged = async (event: MatrixEvent) => {
         // The member events may be received for another room, which we will ignore.
         if (event.getRoomId() !== this.room.roomId) return;
@@ -920,11 +933,24 @@ export class GroupCall extends TypedEventEmitter<
             return;
         }
 
-        let opponentDevice;
+        let opponentDevice: IGroupCallMemberDevice;
         let peerUserId: string;
         let existingCall: MatrixCall;
 
-        if (!this.client.localSfu) {
+        if (this.client.localSfu) {
+            peerUserId = this.client.localSfu;
+            opponentDevice = {
+                "device_id": this.client.localSfuDeviceId,
+                // XXX: the SFU might need to specify a session_id so that if it
+                // restarts and starts sending invites to us, we know that it's
+                // forgotten who we were?  But then we need a way to communicate
+                // the session_id to the clients, which is tough if the SFU is
+                // not in the right room.
+                "session_id": "sfu",
+                "feeds": [],
+            };
+            existingCall = this.getCallByUserId(peerUserId);
+        } else {
             // Only initiate a call with a user who has a userId that is
             // lexicographically less than your own. Otherwise, that user will
             // call you.
@@ -954,23 +980,12 @@ export class GroupCall extends TypedEventEmitter<
             ) {
                 return;
             }
-        } else {
-            peerUserId = this.client.localSfu;
-            opponentDevice = {
-                "device_id": this.client.localSfuDeviceId,
-                // XXX: the SFU might need to specify a session_id so that if it
-                // restarts and starts sending invites to us, we know that it's
-                // forgotten who we were?  But then we need a way to communicate
-                // the session_id to the clients, which is tough if the SFU is
-                // not in the right room.
-                "session_id": "sfu",
-                "feeds": [],
-            };
-            existingCall = this.getCallByUserId(peerUserId);
         }
 
-        if (!this.client.localSfu ||
-            (this.client.localSfu && !existingCall)) {
+        if (
+            !this.client.localSfu ||
+            (this.client.localSfu && !existingCall)
+        ) {
             const newCall = createNewMatrixCall(
                 this.client,
                 this.room.roomId,
@@ -979,6 +994,9 @@ export class GroupCall extends TypedEventEmitter<
                     opponentDeviceId: opponentDevice.device_id,
                     opponentSessionId: opponentDevice.session_id,
                     groupCallId: this.groupCallId,
+                    initialRemoteSDPStreamMetadata: this.client.localSfu
+                        ? this.getRemoteSDPStreamMetadataForCall()
+                        : undefined,
                 },
             );
 
@@ -988,9 +1006,10 @@ export class GroupCall extends TypedEventEmitter<
                 (feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
 
             try {
-                // Safari can't send a MediaStream to multiple sources, so clone it
                 await newCall.placeCallWithCallFeeds(
-                    this.getLocalFeeds().map(feed => feed.clone()),
+                    this.client.localSfu === peerUserId
+                        ? this.getLocalFeeds() // TODO: We should just setup the datachannel
+                        : this.getLocalFeeds().map(feed => feed.clone()), // Safari can't send a MediaStream to multiple sources, so clone it
                     requestScreenshareFeed,
                 );
             } catch (e) {
@@ -1014,71 +1033,46 @@ export class GroupCall extends TypedEventEmitter<
             } else {
                 this.addCall(newCall);
             }
-
-            if (this.client.localSfu) {
-                // TODO: play nice with application layer DC listeners
-                newCall.dataChannel.onmessage = this.onDataChannelMessage.bind(this, newCall);
-            }
-        }
-
-        if (this.client.localSfu && existingCall) {
+        } else if (this.client.localSfu && existingCall) {
             // subscribe if we already had an existing call (otherwise
             // we'll subscribe on the new call being set up)
-            const remoteDevice = this.getDeviceForMember(member.userId);
-            // TODO: only subscribe to the streams you care about
-            this.subscribeStream(existingCall, member.userId, remoteDevice);
+            existingCall.updateRemoteSDPStreamMetadata(this.getRemoteSDPStreamMetadataForCall());
+            this.subscribeToSFU(existingCall, this.getRemoteFeedsFromState());
         }
     };
 
-    private async subscribeStream(call: MatrixCall, userId: string, device: IGroupCallMemberDevice) {
-        // Asks the SFU to subscribe to the tracks originating from a given device.
-
-        const streams: ISfuTrackDesc[] = [];
-        for (const feed of device.feeds) {
-            if (!feed.tracks) {
-                logger.warn(`missing feeds for ${userId}`);
-            } else {
-                for (const track of feed.tracks) {
-                    streams.push({
-                        "stream_id": "unknown",
-                        "track_id": track.id,
-                    });
-                }
-            }
-        }
-
-        if (streams.length == 0) {
-            logger.warn("Failed to find any streams to subscribe to");
-            return;
-        } else {
-            logger.info("Subscribing to ", streams, userId);
-        }
-
-        call.dataChannel.onclose = () => {
-            logger.error("DC was closed");
-        };
-
-        call.dataChannel.onerror = (error) => {
-            logger.error("DC has errored", error);
-        };
-
+    private async waitForDatachannelToBeOpen(call: MatrixCall): Promise<void> {
         if (call.dataChannel.readyState === 'connecting') {
-            const p: Promise<void> = new Promise(resolve => {});
-            call.dataChannel.onopen = () => {
-                Promise.resolve(p);
-            };
+            const p = new Promise<void>(resolve => {
+                call.dataChannel.onopen = () => resolve();
+                call.dataChannel.onclose = () => resolve();
+            });
             await p;
         }
-        if (call.dataChannel.readyState !== 'open') {
-            logger.warn("Can't sent to DC in state", call.dataChannel.readyState);
+        return;
+    }
+
+    private async subscribeToSFU(call: MatrixCall, feeds: IGroupCallMemberFeed[]) {
+        await this.waitForDatachannelToBeOpen(call);
+        if (call.dataChannel.readyState !== "open") {
+            logger.warn("Can't sent to DC in state:", call.dataChannel.readyState);
+            return;
         }
 
-        // we have to create a new offer first so we can answer it
-        const offer = await call.peerConn.createOffer();
-        call.peerConn.setLocalDescription(offer);
+        // Only subscribe to streams we aren't already subscribed to
+        const streams: ISfuTrackDesc[] = feeds.filter((feed) => {
+            if (!feed.tracks) return false; // If we don't have info about tracks, the SFU won't have them either
+            return !this.subscribedStreams.find((stream) => stream.stream_id === feed.id);
+        }).map((feed) => ({ stream_id: feed.id }));
 
-        // FIXME: play nice with application-layer use of the DC
-        //
+        if (streams.length === 0) {
+            logger.warn("Failed to find any new streams to subscribe to");
+            return;
+        } else {
+            this.subscribedStreams.push(...streams);
+            logger.warn("Subscribing to:", streams);
+        }
+
         // TODO: rather than gutwrenching into our MatrixCall's peerConnection,
         // should this be handled inside MatrixCall instead?
         //
@@ -1088,44 +1082,10 @@ export class GroupCall extends TypedEventEmitter<
             "conf_id": this.groupCallId,
             "id": Date.now() + randomString(5),
             "start": streams,
-            "sdp": call.peerConn.localDescription.sdp,
         };
 
         call.dataChannel.send(JSON.stringify(msg));
         logger.warn("Sent select message over DC", msg);
-    }
-
-    private async onDataChannelMessage(call: MatrixCall, event: MessageEvent) {
-        // FIXME: this feels like it should be on MatrixCall rather than gutwrenching
-        let json: ISfuDataChannelMessage;
-        try {
-            json = JSON.parse(event.data);
-        } catch (e) {
-            logger.warn("Ignoring non-JSON DC event");
-            return;
-        }
-
-        if (!json.op) {
-            logger.warn("Ignoring unrecognised DC event");
-            return;
-        }
-
-        if (json.op !== "answer") {
-            logger.warn("Ignoring unrecognised DC event op ", json.op);
-            return;
-        }
-
-        try {
-            await call.peerConn.setRemoteDescription({
-                "type": "answer",
-                "sdp": json.sdp,
-            });
-        } catch (e) {
-            logger.debug(`Call ${call.callId} Failed to set remote description`, e);
-            // fixme: terminate is private
-            //call.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
-            return;
-        }
     }
 
     public getDeviceForMember(userId: string): IGroupCallMemberDevice {
@@ -1284,39 +1244,12 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     private onCallFeedsChanged = (call: MatrixCall) => {
-        const opponentMemberId = getCallUserId(call);
-
-        if (!opponentMemberId) {
-            throw new Error("Cannot change call feeds without user id");
-        }
-
-        const currentUserMediaFeed = this.getUserMediaFeedByUserId(opponentMemberId);
-        const remoteUsermediaFeed = call.remoteUsermediaFeed;
-        const remoteFeedChanged = remoteUsermediaFeed !== currentUserMediaFeed;
-
-        if (remoteFeedChanged) {
-            if (!currentUserMediaFeed && remoteUsermediaFeed) {
-                this.addUserMediaFeed(remoteUsermediaFeed);
-            } else if (currentUserMediaFeed && remoteUsermediaFeed) {
-                this.replaceUserMediaFeed(currentUserMediaFeed, remoteUsermediaFeed);
-            } else if (currentUserMediaFeed && !remoteUsermediaFeed) {
-                this.removeUserMediaFeed(currentUserMediaFeed);
-            }
-        }
-
-        const currentScreenshareFeed = this.getScreenshareFeedByUserId(opponentMemberId);
-        const remoteScreensharingFeed = call.remoteScreensharingFeed;
-        const remoteScreenshareFeedChanged = remoteScreensharingFeed !== currentScreenshareFeed;
-
-        if (remoteScreenshareFeedChanged) {
-            if (!currentScreenshareFeed && remoteScreensharingFeed) {
-                this.addScreenshareFeed(remoteScreensharingFeed);
-            } else if (currentScreenshareFeed && remoteScreensharingFeed) {
-                this.replaceScreenshareFeed(currentScreenshareFeed, remoteScreensharingFeed);
-            } else if (currentScreenshareFeed && !remoteScreensharingFeed) {
-                this.removeScreenshareFeed(currentScreenshareFeed);
-            }
-        }
+        call.getRemoteFeeds().filter((cf) => {
+            return !this.userMediaFeeds.find((gf) => gf.stream.id === cf.stream.id);
+        }).forEach((feed) => {
+            if (feed.purpose === SDPStreamMetadataPurpose.Usermedia) this.addUserMediaFeed(feed);
+            else if (feed.purpose === SDPStreamMetadataPurpose.Screenshare) this.addScreenshareFeed(feed);
+        });
     };
 
     private onCallStateChanged = (call: MatrixCall, state: CallState, _oldState: CallState) => {
@@ -1341,22 +1274,13 @@ export class GroupCall extends TypedEventEmitter<
         if (state === CallState.Connected) {
             this.retryCallCounts.delete(getCallUserId(call));
 
-            if (this.client.localSfu) {
-                // now we know what our stream IDs are, we can publish them
-                // so others can subscribe to us...
-                this.sendMemberStateEvent();
+            // Now we know what our track IDs are, we can publish them so others
+            // can subscribe to us...
+            this.sendMemberStateEvent();
 
-                // if we're calling an SFU, subscribe to its feeds
-                const memberStateEvents = this.room.currentState.getStateEvents(EventType.GroupCallMemberPrefix);
-                const localUserId = this.client.getUserId();
-                for (const stateEvent of memberStateEvents) {
-                    const userId = stateEvent.getStateKey();
-                    // don't try to subscribe to our own feed(!)
-                    // TODO: What happens if we do?
-                    if (userId === localUserId) continue;
-                    const device = this.getDeviceForMember(userId);
-                    this.subscribeStream(call, userId, device);
-                }
+            // if we're calling an SFU, subscribe to its feeds
+            if (call.getOpponentMember().userId === this.client.localSfu) {
+                this.subscribeToSFU(call, this.getRemoteFeedsFromState());
             }
         }
     };
@@ -1380,20 +1304,6 @@ export class GroupCall extends TypedEventEmitter<
     private addUserMediaFeed(callFeed: CallFeed) {
         this.userMediaFeeds.push(callFeed);
         callFeed.measureVolumeActivity(true);
-        this.emit(GroupCallEvent.UserMediaFeedsChanged, this.userMediaFeeds);
-    }
-
-    private replaceUserMediaFeed(existingFeed: CallFeed, replacementFeed: CallFeed) {
-        const feedIndex = this.userMediaFeeds.findIndex((feed) => feed.userId === existingFeed.userId);
-
-        if (feedIndex === -1) {
-            throw new Error("Couldn't find user media feed to replace");
-        }
-
-        this.userMediaFeeds.splice(feedIndex, 1, replacementFeed);
-
-        existingFeed.dispose();
-        replacementFeed.measureVolumeActivity(true);
         this.emit(GroupCallEvent.UserMediaFeedsChanged, this.userMediaFeeds);
     }
 
@@ -1463,19 +1373,6 @@ export class GroupCall extends TypedEventEmitter<
 
     private addScreenshareFeed(callFeed: CallFeed) {
         this.screenshareFeeds.push(callFeed);
-        this.emit(GroupCallEvent.ScreenshareFeedsChanged, this.screenshareFeeds);
-    }
-
-    private replaceScreenshareFeed(existingFeed: CallFeed, replacementFeed: CallFeed) {
-        const feedIndex = this.screenshareFeeds.findIndex((feed) => feed.userId === existingFeed.userId);
-
-        if (feedIndex === -1) {
-            throw new Error("Couldn't find screenshare feed to replace");
-        }
-
-        this.screenshareFeeds.splice(feedIndex, 1, replacementFeed);
-
-        existingFeed.dispose();
         this.emit(GroupCallEvent.ScreenshareFeedsChanged, this.screenshareFeeds);
     }
 

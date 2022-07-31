@@ -50,7 +50,7 @@ import { MatrixClient } from "../client";
 import { ISendEventResponse } from "../@types/requests";
 import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter";
 import { DeviceInfo } from '../crypto/deviceinfo';
-import { GroupCallUnknownDeviceError } from './groupCall';
+import { GroupCallUnknownDeviceError, ISfuDataChannelMessage } from './groupCall';
 import { IScreensharingOpts } from "./mediaHandler";
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
@@ -80,6 +80,7 @@ interface CallOpts {
     opponentDeviceId?: string;
     opponentSessionId?: string;
     groupCallId?: string;
+    initialRemoteSDPStreamMetadata?: SDPStreamMetadata;
 }
 
 interface TurnServer {
@@ -404,6 +405,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.opponentDeviceId = opts.opponentDeviceId;
         this.opponentSessionId = opts.opponentSessionId;
         this.groupCallId = opts.groupCallId;
+        this.remoteSDPStreamMetadata = opts.initialRemoteSDPStreamMetadata;
         // Array of Objects with urls, username, credential keys
         this.turnServers = opts.turnServers || [];
         if (this.turnServers.length === 0 && this.client.isFallbackICEServerAllowed()) {
@@ -440,8 +442,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      */
     public createDataChannel(label: string, options: RTCDataChannelInit) {
         const dataChannel = this.peerConn.createDataChannel(label, options);
-        this.emit(CallEvent.DataChannel, dataChannel);
-        this.dataChannel = dataChannel;
+        this.setupDataChannel(dataChannel);
         return dataChannel;
     }
 
@@ -582,6 +583,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
             metadata[localFeed.sdpMetadataStreamId] = {
                 purpose: localFeed.purpose,
+                userId: this.client.getUserId(),
                 audio_muted: localFeed.isAudioMuted(),
                 video_muted: localFeed.isVideoMuted(),
             };
@@ -600,15 +602,16 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     private pushRemoteFeed(stream: MediaStream): void {
         // Fallback to old behavior if the other side doesn't support SDPStreamMetadata
-        if (!this.opponentSupportsSDPStreamMetadata()) {
+        const metadata = this.remoteSDPStreamMetadata?.[stream.id];
+        if (!this.opponentSupportsSDPStreamMetadata() || !metadata) {
             this.pushRemoteFeedWithoutMetadata(stream);
             return;
         }
 
-        const userId = this.getOpponentMember().userId;
-        const purpose = this.remoteSDPStreamMetadata[stream.id].purpose;
-        const audioMuted = this.remoteSDPStreamMetadata[stream.id].audio_muted;
-        const videoMuted = this.remoteSDPStreamMetadata[stream.id].video_muted;
+        const userId = metadata.userId;
+        const purpose = metadata.purpose;
+        const audioMuted = metadata.audio_muted;
+        const videoMuted = metadata.video_muted;
 
         if (!purpose) {
             logger.warn(`Call ${this.callId} Ignoring stream with id ${
@@ -616,26 +619,30 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return;
         }
 
-        // Try to find a feed with the same purpose as the new stream,
-        // if we find it replace the old stream with the new one
-        const existingFeed = this.getRemoteFeeds().find((feed) => feed.purpose === purpose);
-        if (existingFeed) {
-            existingFeed.setNewStream(stream);
-        } else {
-            this.feeds.push(new CallFeed({
-                client: this.client,
-                roomId: this.roomId,
-                userId,
-                stream,
-                purpose,
-                audioMuted,
-                videoMuted,
-            }));
-            this.emit(CallEvent.FeedsChanged, this.feeds);
+        if (this.getFeedByStreamId(stream.id)) {
+            logger.warn(`Ignoring stream with id ${stream.id} because we already have a feed for it`);
+            return;
         }
 
-        logger.info(`Call ${this.callId} Pushed remote stream (id="${
-            stream.id}", active="${stream.active}", purpose=${purpose})`);
+        this.feeds.push(new CallFeed({
+            client: this.client,
+            roomId: this.roomId,
+            userId,
+            stream,
+            purpose,
+            audioMuted,
+            videoMuted,
+        }));
+        this.emit(CallEvent.FeedsChanged, this.feeds);
+
+        logger.info(
+            `Call ${this.callId} Pushed remote stream (` +
+            `id="${stream.id}" ` +
+            `active="${stream.active}" ` +
+            `purpose=${purpose} ` +
+            `userId=${userId}` +
+            `)`,
+        );
     }
 
     /**
@@ -1811,7 +1818,62 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
     }
 
-    private updateRemoteSDPStreamMetadata(metadata: SDPStreamMetadata): void {
+    private onDataChannelMessage = async (event: MessageEvent): Promise<void> => {
+        // TODO: play nice with application layer DC listeners
+
+        let json: ISfuDataChannelMessage;
+        try {
+            json = JSON.parse(event.data);
+        } catch (e) {
+            logger.warn("Ignoring non-JSON DC event:", event.data);
+            return;
+        }
+
+        if (!json.op) {
+            logger.warn("Ignoring unrecognized DC event:", json.op);
+            return;
+        }
+
+        logger.warn(`Received DC ${json.op} event`, json);
+
+        switch (json.op) {
+            case "offer":
+                try {
+                    await this.peerConn.setRemoteDescription({
+                        "type": "offer",
+                        "sdp": json.sdp,
+                    });
+
+                    const answer = await this.peerConn.createAnswer();
+                    await this.peerConn.setLocalDescription(answer);
+
+                    const msg: ISfuDataChannelMessage = {
+                        "op": "answer",
+                        "conf_id": this.groupCallId,
+                        "id": Date.now() + randomString(5),
+                        "sdp": answer.sdp,
+                    };
+
+                    this.dataChannel.send(JSON.stringify(msg));
+                    logger.warn("Sent answer message over DC", msg);
+                } catch (e) {
+                    logger.debug(`Call ${this.callId} Failed to set remote description`, e);
+                    this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
+                    return;
+                }
+                break;
+            case "error":
+                logger.error("Received DC error event", json.message);
+
+                break;
+            default:
+                logger.warn("Ignoring unrecognized DC event op ", json.op);
+
+                break;
+        }
+    };
+
+    public updateRemoteSDPStreamMetadata(metadata: SDPStreamMetadata): void {
         this.remoteSDPStreamMetadata = utils.recursivelyAssign(this.remoteSDPStreamMetadata || {}, metadata, true);
         for (const feed of this.getRemoteFeeds()) {
             const streamId = feed.stream.id;
@@ -2078,8 +2140,14 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     };
 
     private onDataChannel = (ev: RTCDataChannelEvent): void => {
-        this.emit(CallEvent.DataChannel, ev.channel);
+        this.setupDataChannel(ev.channel);
     };
+
+    private setupDataChannel(dataChannel: RTCDataChannel): void {
+        this.dataChannel = dataChannel;
+        this.emit(CallEvent.DataChannel, dataChannel);
+        this.dataChannel.addEventListener("message", this.onDataChannelMessage);
+    }
 
     /**
      * This method removes all video/rtx codecs from screensharing video
@@ -2714,6 +2782,7 @@ export function createNewMatrixCall(client: any, roomId: string, options?: CallO
         opponentDeviceId: options?.opponentDeviceId,
         opponentSessionId: options?.opponentSessionId,
         groupCallId: options?.groupCallId,
+        initialRemoteSDPStreamMetadata: options?.initialRemoteSDPStreamMetadata,
     };
     const call = new MatrixCall(opts);
 
