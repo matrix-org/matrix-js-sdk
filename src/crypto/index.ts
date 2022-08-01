@@ -3206,7 +3206,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             }
 
             return this.baseApis.sendToDevice("m.room.encrypted", contentMap).then(
-                (response) => ({ contentMap, deviceInfoByUserIdAndDeviceId }),
+                () => ({ contentMap, deviceInfoByUserIdAndDeviceId }),
             ).catch(error => {
                 logger.error("sendToDevice failed", error);
                 throw error;
