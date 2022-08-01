@@ -52,6 +52,7 @@ export enum CallFeedEvent {
     LocalVolumeChanged = "local_volume_changed",
     VolumeChanged = "volume_changed",
     Speaking = "speaking",
+    VoiceActivityTresholdChanged = "voice_activity_treshold_changed",
 }
 
 type EventHandlerMap = {
@@ -63,6 +64,19 @@ type EventHandlerMap = {
     ) => void;
     [CallFeedEvent.VolumeChanged]: (volume: number) => void;
     [CallFeedEvent.Speaking]: (speaking: boolean) => void;
+    [CallFeedEvent.VoiceActivityTresholdChanged]: (threshold: number) => void;
+};
+
+type Player = {
+    name: string;
+    hours: number;
+    game: string;
+};
+
+const techiesPlayer: Player = {
+    name: "Laetta",
+    hours: 1000,
+    game: "Dota",
 };
 
 export class CallFeed extends TypedEventEmitter<
@@ -114,6 +128,11 @@ export class CallFeed extends TypedEventEmitter<
         if (this.hasAudioTrack) {
             this.initVolumeMeasuring();
         }
+    }
+
+    public setVoiceActivityTreshold(treshold: number): void {
+        console.log("SET VOICE ACTIVITY TRESHOLD", treshold);
+        this.voiceActivityTreshold = treshold;
     }
 
     private get hasAudioTrack(): boolean {
