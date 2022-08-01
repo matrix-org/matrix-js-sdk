@@ -42,6 +42,8 @@ export interface ICallFeedOpts {
      * Whether or not the remote SDPStreamMetadata says video is muted
      */
     videoMuted: boolean;
+
+    setVADMute?: (muted: boolean) => void;
 }
 
 export enum CallFeedEvent {
@@ -74,10 +76,13 @@ export class CallFeed extends TypedEventEmitter<
     public purpose: SDPStreamMetadataPurpose;
     public speakingVolumeSamples: number[];
     public voiceActivityTreshold: number;
+    public setVADMute: (muted: boolean) => void;
+    public VADEnabled = true;
 
     private client: MatrixClient;
     private roomId: string;
     private audioMuted: boolean;
+    private vadAudioMuted: boolean;
     private videoMuted: boolean;
     private localVolume = 1;
     private measuringVolumeActivity = false;
@@ -102,6 +107,7 @@ export class CallFeed extends TypedEventEmitter<
         );
         this.sdpMetadataStreamId = opts.stream.id;
         this.voiceActivityTreshold = -55;
+        this.setVADMute = opts.setVADMute;
 
         this.updateStream(null, opts.stream);
 
@@ -234,7 +240,10 @@ export class CallFeed extends TypedEventEmitter<
      * Either value may be null to leave it as-is
      * @param muted is the feed's video muted?
      */
-    public setAudioVideoMuted(audioMuted: boolean, videoMuted: boolean): void {
+    public setAudioVideoMuted(
+        audioMuted: boolean | null,
+        videoMuted: boolean | null
+    ): void {
         if (audioMuted !== null) {
             if (this.audioMuted !== audioMuted) {
                 //this.speakingVolumeSamples.fill(-Infinity);
@@ -247,6 +256,25 @@ export class CallFeed extends TypedEventEmitter<
             this.audioMuted,
             this.videoMuted
         );
+    }
+
+    public setVadMuted(
+        audioMuted: boolean | null,
+        videoMuted: boolean | null
+    ): void {
+        if (audioMuted !== null) {
+            if (this.vadAudioMuted !== audioMuted) {
+                //this.speakingVolumeSamples.fill(-Infinity);
+            }
+            this.vadAudioMuted = audioMuted;
+        }
+        // console.log("setVadMuted", this.audioMuted, this.videoMuted);
+        // if (videoMuted !== null) this.videoMuted = videoMuted;
+        // this.emit(
+        //     CallFeedEvent.MuteStateChanged,
+        //     this.vadAudioMuted,
+        //     this.videoMuted,
+        // );
     }
 
     /**
@@ -297,9 +325,8 @@ export class CallFeed extends TypedEventEmitter<
         this.speakingThreshold = threshold;
     }
 
-    private volumeLooper = () => {
+    private volumeLooper = async () => {
         if (!this.analyser) return;
-
         if (!this.measuringVolumeActivity) return;
 
         this.analyser.getFloatFrequencyData(this.frequencyBinCount);
@@ -338,12 +365,16 @@ export class CallFeed extends TypedEventEmitter<
 
         // const total = this.speakingVolumeSamples.reduce((a, b) => a + b, 0);
         // const avg = total / this.speakingVolumeSamples.length;
-        console.log({ maxVolume });
+        // console.log({ maxVolume });
 
-        if (maxVolume > this.voiceActivityTreshold) {
-            this.setAudioVideoMuted(false, false);
-        } else {
-            this.setAudioVideoMuted(true, true);
+        if (this.VADEnabled && !this.audioMuted) {
+            if (maxVolume > this.voiceActivityTreshold && this.vadAudioMuted) {
+                console.log("MUTE FALSE");
+                this.setVADMute(false);
+            } else if (!this.vadAudioMuted) {
+                console.log("MUTE TRUE");
+                this.setVADMute(true);
+            }
         }
 
         this.volumeLooperTimeout = setTimeout(
