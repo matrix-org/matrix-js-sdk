@@ -605,7 +605,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                         listIndex,
                         op.range[0],
                         op.range[1],
-                        op.room_ids.join(" "),
+                        (op.room_ids || []).join(" "),
                         ";",
                     );
                     break;
