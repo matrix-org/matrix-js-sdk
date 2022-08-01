@@ -80,7 +80,10 @@ export class CallFeed extends TypedEventEmitter<
     public voiceActivityTreshold: number;
     public setVADMute: (muted: boolean) => void;
     public VADEnabled = true;
+<<<<<<< HEAD
     public maxCurrentVolume = -Infinity;
+=======
+>>>>>>> feat: voice activity detection
 
     private client: MatrixClient;
     private roomId: string;
@@ -377,6 +380,7 @@ export class CallFeed extends TypedEventEmitter<
             this.emit(CallFeedEvent.Speaking, this.speaking);
         }
 
+<<<<<<< HEAD
         // Handle voice activity detection only if it is enabled and user has not manually muted themselves
         if (this.VADEnabled && !this.audioMuted) {
             // If the user is speaking
@@ -393,6 +397,19 @@ export class CallFeed extends TypedEventEmitter<
                     // user has been silent for X milliseconds
                     this.setVADMute(true);
                 }
+=======
+        // const total = this.speakingVolumeSamples.reduce((a, b) => a + b, 0);
+        // const avg = total / this.speakingVolumeSamples.length;
+        // console.log({ maxVolume });
+
+        if (this.VADEnabled && !this.audioMuted) {
+            if (maxVolume > this.voiceActivityTreshold && this.vadAudioMuted) {
+                console.log("MUTE FALSE");
+                this.setVADMute(false);
+            } else if (!this.vadAudioMuted) {
+                console.log("MUTE TRUE");
+                this.setVADMute(true);
+>>>>>>> feat: voice activity detection
             }
         }
 
