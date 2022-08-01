@@ -65,6 +65,21 @@ type EventHandlerMap = {
     [CallFeedEvent.VolumeChanged]: (volume: number) => void;
     [CallFeedEvent.Speaking]: (speaking: boolean) => void;
     [CallFeedEvent.VoiceActivityTresholdChanged]: (threshold: number) => void;
+<<<<<<< HEAD
+=======
+};
+
+type Player = {
+    name: string;
+    hours: number;
+    game: string;
+};
+
+const techiesPlayer: Player = {
+    name: "Laetta",
+    hours: 1000,
+    game: "Dota",
+>>>>>>> feat: voice activity slider
 };
 
 export class CallFeed extends TypedEventEmitter<
