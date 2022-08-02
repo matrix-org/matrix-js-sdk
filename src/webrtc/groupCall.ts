@@ -727,11 +727,7 @@ export class GroupCall extends TypedEventEmitter<
 
     public async setScreensharingEnabled(
         enabled: boolean,
-<<<<<<< HEAD
         opts: IScreensharingOpts = {}
-=======
-        desktopCapturerSourceId?: string
->>>>>>> feat: voice activity detection
     ): Promise<boolean> {
         if (enabled === this.isScreensharing()) {
             return enabled;
