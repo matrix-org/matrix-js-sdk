@@ -67,18 +67,6 @@ type EventHandlerMap = {
     [CallFeedEvent.VoiceActivityTresholdChanged]: (threshold: number) => void;
 };
 
-type Player = {
-    name: string;
-    hours: number;
-    game: string;
-};
-
-const techiesPlayer: Player = {
-    name: "Laetta",
-    hours: 1000,
-    game: "Dota",
-};
-
 export class CallFeed extends TypedEventEmitter<
     CallFeedEvent,
     EventHandlerMap
