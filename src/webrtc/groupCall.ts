@@ -445,6 +445,7 @@ export class GroupCall extends TypedEventEmitter<
         }
 
         this.client.getMediaHandler().stopAllStreams();
+        this.subscribedStreams = [];
 
         if (this.state !== GroupCallState.Entered) {
             return;
